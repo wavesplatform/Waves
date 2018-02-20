@@ -7,6 +7,7 @@ import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Address, Alias}
 import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.smart.Script
 import scorex.transaction.{Transaction, TransactionParser}
 
 class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWriteLock) extends SnapshotStateReader {
@@ -83,6 +84,9 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
     sp().getWavesBalance(a).map { case (v1, v2, v3) => (v1, LeaseInfo(v2, v3)) }.getOrElse((0L, LeaseInfo(0L, 0L)))
   }
 
+  override def accountScript(address: Address): Option[Script] = read { implicit l =>
+    sp().getScript(address)
+  }
   override def assetBalance(a: Address, asset: ByteStr): Long = read { implicit l =>
     sp().getAssetBalance(a, asset).getOrElse(0L)
   }

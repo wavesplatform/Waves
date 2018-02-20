@@ -7,7 +7,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account._
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.serialization.{BytesSerializable, Deser}
+import scorex.serialization.Deser
 import scorex.transaction.TransactionParser._
 
 import scala.util.{Failure, Success, Try}
@@ -24,10 +24,10 @@ case class CreateAliasTransaction private(sender: PublicKeyAccount,
 
   override val id: Coeval[AssetId] = Coeval.evalOnce(ByteStr(FastCryptographicHash(transactionType.id.toByte +: alias.bytes.arr)))
 
-  override val toSign: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(
     Array(transactionType.id.toByte),
     sender.publicKey,
-    BytesSerializable.arrayWithSize(alias.bytes.arr),
+    Deser.serializeArray(alias.bytes.arr),
     Longs.toByteArray(fee),
     Longs.toByteArray(timestamp)))
 
@@ -38,7 +38,7 @@ case class CreateAliasTransaction private(sender: PublicKeyAccount,
   ))
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(toSign(), signature.arr))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), signature.arr))
 
 }
 
@@ -73,7 +73,7 @@ object CreateAliasTransaction {
              fee: Long,
              timestamp: Long): Either[ValidationError, CreateAliasTransaction] = {
     create(sender, alias, fee, timestamp, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.toSign())))
+      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes())))
     }
   }
 }

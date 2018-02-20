@@ -7,12 +7,13 @@ import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.SnapshotStateReader
+import org.scalatest.Matchers
 import org.iq80.leveldb.DB
 import scorex.block.Block
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.{History, ValidationError}
 
-package object diffs {
+package object diffs extends Matchers {
 
   private val lock = new ReentrantReadWriteLock()
 
@@ -44,6 +45,9 @@ package object diffs {
     val totalDiff2 = differ(compositeState, block)
     assertion(totalDiff2)
   }
+
+  def assertLeft(db: DB, preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(errorMessage: String): Unit
+  = assertDiffEi(db, preconditions, block, fs)(_ should produce(errorMessage))
 
   def assertDiffAndState(db: DB, preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: (BlockDiff, SnapshotStateReader) => Unit): Unit = {
     val fp = newHistory(db, fs)

@@ -8,7 +8,7 @@ import scorex.transaction.TransactionParser.TransactionType
 
 class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
-  property("Transfer serialization roundtrip") {
+  property("CreateAliasTransaction serialization roundtrip") {
     forAll(createAliasGen) { tx: CreateAliasTransaction =>
       require(tx.bytes().head == TransactionType.CreateAliasTransaction.id)
       val recovered = CreateAliasTransaction.parseTail(tx.bytes().tail).get
@@ -16,7 +16,7 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
     }
   }
 
-  property("Transfer serialization from TypedTransaction") {
+  property("CreateAliasTransaction serialization from TypedTransaction") {
     forAll(createAliasGen) { tx: CreateAliasTransaction =>
       val recovered = TransactionParser.parseBytes(tx.bytes()).get
       assertTxs(recovered.asInstanceOf[CreateAliasTransaction], tx)

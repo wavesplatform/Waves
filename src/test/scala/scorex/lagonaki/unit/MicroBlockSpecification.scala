@@ -37,7 +37,7 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
     assert(parsedBlock.signaturesValid().isRight)
 
     assert(microBlock.signature == parsedBlock.signature)
-    assert(microBlock.generator == parsedBlock.generator)
+    assert(microBlock.sender == parsedBlock.sender)
     assert(microBlock.totalResBlockSig == parsedBlock.totalResBlockSig)
     assert(microBlock.prevResBlockSig == parsedBlock.prevResBlockSig)
     assert(microBlock.transactionData == parsedBlock.transactionData)

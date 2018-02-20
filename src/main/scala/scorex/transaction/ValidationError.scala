@@ -29,6 +29,12 @@ object ValidationError {
   case class InvalidSignature(s: Signed, details: Option[InvalidSignature] = None) extends ValidationError {
     override def toString: String = s"InvalidSignature(${s.toString + " reason: " + details})"
   }
+
+  case class TransactionNotAllowedByScript(t: Transaction) extends ValidationError {
+    override def toString: String = s"TransactionNotAllowedByScript($t)"
+  }
+
+  case class ScriptParseError(m: String) extends ValidationError
   case class GenericError(err: String) extends ValidationError
   object GenericError {
     def apply(ex: Throwable): GenericError = new GenericError(Throwables.getStackTraceAsString(ex))

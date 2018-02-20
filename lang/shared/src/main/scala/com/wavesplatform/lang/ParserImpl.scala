@@ -1,0 +1,95 @@
+package com.wavesplatform.lang
+
+import com.wavesplatform.lang.Terms._
+import com.wavesplatform.lang.Terms.Untyped._
+import com.wavesplatform.lang.traits.Base58
+import fastparse.{WhitespaceApi, core}
+import scodec.bits.ByteVector
+
+abstract class ParserImpl { this: Base58 =>
+
+  private val White = WhitespaceApi.Wrapper {
+    import fastparse.all._
+    NoTrace(CharIn(" ", "\t", "\r", "\n").rep)
+  }
+
+  import White._
+  import fastparse.noApi._
+
+  val varName = CharIn('A' to 'Z').rep(1).!
+
+  private def numberP: P[CONST_INT]    = P(CharIn('0' to '9').rep(min = 1).!.map(t => CONST_INT(t.toInt)))
+  private def trueP: P[TRUE.type]      = P("true").map(_ => TRUE)
+  private def falseP: P[FALSE.type]    = P("false").map(_ => FALSE)
+  private def bracesP: P[EXPR]         = P("(" ~ block ~ ")")
+  private def curlyBracesP: P[EXPR]    = P("{" ~ block ~ "}")
+  private def letP: P[LET]             = P("let " ~ varName ~ "=" ~ block).map { case ((x, y)) => LET(x, y) }
+  private def refP: P[REF]             = P(varName).map(x => REF(x))
+  private def ifP: P[IF]               = P("if" ~ "(" ~ block ~ ")" ~ "then" ~ block ~ "else" ~ block).map { case (x, y, z) => IF(x, y, z) }
+  private def isDefined: P[IS_DEFINED] = P("isDefined" ~ "(" ~ block ~ ")").map(b => IS_DEFINED(b))
+  private def getP: P[GET]             = P("get" ~ "(" ~ block ~ ")").map(b => GET(b))
+  private def someP: P[SOME]           = P("Some" ~ "(" ~ block ~ ")").map(x => SOME(x))
+  private def noneP: P[NONE.type]      = P("None").map(_ => NONE)
+
+  private def getterP: P[GETTER] = P(refP ~ "." ~ varName).map { case ((b, f)) => GETTER(b, f) }
+
+  private def patmat1P: P[BLOCK] =
+    P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "None" ~ "=>" ~ block ~ "case" ~ "Some" ~ "(" ~ varName ~ ")" ~ "=>" ~ block ~ "}")
+      .map { case ((exp, ifNone, ref, ifSome)) => patmat(exp, ref, ifSome, ifNone) }
+
+  private def patmat2P: P[BLOCK] =
+    P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "Some" ~ "(" ~ varName ~ ")" ~ "=>" ~ block ~ "case" ~ "None" ~ "=>" ~ block ~ "}")
+      .map { case ((exp, ref, ifSome, ifNone)) => patmat(exp, ref, ifSome, ifNone) }
+
+  def patmat(exp: EXPR, ref: String, ifSome: EXPR, ifNone: EXPR): BLOCK =
+    BLOCK(
+      Some(LET(s"$exp", exp)),
+      IF(IS_DEFINED(REF(s"$exp")),
+        BLOCK(
+          Some(LET(ref, GET(REF(s"$exp")))),
+          ifSome
+        ),
+        ifNone)
+    )
+
+  private def sigVerifyP: P[SIG_VERIFY] = P("checkSig" ~ "(" ~ block ~ "," ~ block ~ "," ~ block ~ ")").map {
+    case ((x, y, z)) => SIG_VERIFY(x, y, z)
+  }
+  private def byteVectorP: P[CONST_BYTEVECTOR] =
+    P("base58'" ~ CharsWhileIn(Base58Chars).! ~ "'").map(x => CONST_BYTEVECTOR(ByteVector(base58Decode(x).get)))
+
+  private def block: P[EXPR] = P("\n".rep ~ letP.rep ~ expr ~ ";".rep).map {
+    case ((Nil, y)) => y
+    case ((all, y)) => all.foldRight(y) { case (r, curr) => BLOCK(Some(r), curr) }
+
+  }
+
+  private val opsByPriority = List[(String, BINARY_OP_KIND)](
+    "||" -> OR_OP,
+    "&&" -> AND_OP,
+    "==" -> EQ_OP,
+    ">=" -> GE_OP,
+    ">" -> GT_OP,
+    "+" -> SUM_OP
+  )
+
+  private def binaryOp(rest: List[(String, BINARY_OP_KIND)]): P[EXPR] = rest match {
+    case Nil => atom
+    case (lessPriorityOp, kind) :: restOps =>
+      val operand = binaryOp(restOps)
+      P(operand ~ (lessPriorityOp.!.map(_ => kind) ~ operand).rep()).map {
+        case ((left: EXPR, r: Seq[(BINARY_OP_KIND, EXPR)])) =>
+          r.foldLeft(left) { case (acc, (currKind, currOperand)) => BINARY_OP(acc, currKind, currOperand) }
+      }
+  }
+
+  private def expr = P(binaryOp(opsByPriority) | atom)
+
+  private def atom =
+    P(ifP | patmat1P | patmat2P | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | sigVerifyP | getterP | refP | isDefined | getP )
+
+  def apply(str: String): core.Parsed[EXPR, Char, String] = block.parse(str)
+}
+
+
+

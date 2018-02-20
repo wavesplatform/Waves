@@ -127,7 +127,7 @@ class MassTransferTransactionDiffTest extends PropSpec
 
     forAll(setup) { case (genesis, transfer) =>
       assertDiffEi(db, Seq(block(Seq(genesis))), block(Seq(transfer)), settings) { blockDiffEi =>
-        blockDiffEi should produce("MassTransfer transaction has not been activated yet")
+        blockDiffEi should produce("MassTransferTransaction transaction has not been activated")
       }
     }
   }

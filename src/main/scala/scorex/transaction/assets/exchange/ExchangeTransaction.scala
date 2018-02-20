@@ -15,7 +15,7 @@ import scala.util.{Failure, Success, Try}
 
 case class ExchangeTransaction private(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, buyMatcherFee: Long,
                                        sellMatcherFee: Long, fee: Long, timestamp: Long, signature: ByteStr)
-  extends SignedTransaction {
+  extends SignedTransaction with FastHashId {
 
   override val transactionType: TransactionType.Value = TransactionType.ExchangeTransaction
 
@@ -24,13 +24,13 @@ case class ExchangeTransaction private(buyOrder: Order, sellOrder: Order, price:
   @ApiModelProperty(hidden = true)
   override val sender: PublicKeyAccount = buyOrder.matcherPublicKey
 
-  override val toSign: Coeval[Array[Byte]] = Coeval.evalOnce(Array(transactionType.id.toByte) ++
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Array(transactionType.id.toByte) ++
     Ints.toByteArray(buyOrder.bytes().length) ++ Ints.toByteArray(sellOrder.bytes().length) ++
     buyOrder.bytes() ++ sellOrder.bytes() ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
     Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
     Longs.toByteArray(timestamp))
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign() ++ signature.arr)
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature.arr)
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
     "order1" -> buyOrder.json(),
@@ -48,7 +48,7 @@ object ExchangeTransaction {
   def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
              buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long): Either[ValidationError, ExchangeTransaction] = {
     create(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).right.map { unverified =>
-      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(matcher.privateKey, unverified.toSign())))
+      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(matcher.privateKey, unverified.bodyBytes())))
     }
   }
 

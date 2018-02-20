@@ -38,8 +38,6 @@ case class GenesisTransaction private(recipient: Address, amount: Long, timestam
     require(res.length == TypeLength + BASE_LENGTH)
     res
   }
-
-  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(true)
 }
 
 

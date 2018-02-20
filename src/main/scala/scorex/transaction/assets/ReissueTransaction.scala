@@ -17,11 +17,11 @@ case class ReissueTransaction private(sender: PublicKeyAccount,
                                       reissuable: Boolean,
                                       fee: Long,
                                       timestamp: Long,
-                                      signature: ByteStr) extends SignedTransaction {
+                                      signature: ByteStr) extends SignedTransaction with FastHashId {
 
   override val transactionType: TransactionType.Value = TransactionType.ReissueTransaction
 
-  val toSign: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte),
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte),
     sender.publicKey,
     assetId.arr,
     Longs.toByteArray(quantity),
@@ -37,7 +37,7 @@ case class ReissueTransaction private(sender: PublicKeyAccount,
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), signature.arr, toSign()))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), signature.arr, bodyBytes()))
 }
 
 object ReissueTransaction {
@@ -80,6 +80,6 @@ object ReissueTransaction {
              fee: Long,
              timestamp: Long): Either[ValidationError, ReissueTransaction] =
     create(sender, assetId, quantity, reissuable, fee, timestamp, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.toSign())))
+      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes())))
     }
 }
