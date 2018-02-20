@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import com.wavesplatform.crypto
 import com.wavesplatform.it.matcher.OrderExclusionTestSuite.MatcherFee
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
@@ -12,7 +13,7 @@ package object matcher {
     val timeToLiveTimestamp = creationTime + timeToLive.toMillis
     val matcherPublicKey = matcherNode.publicKey
     val unsigned = Order(node.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, MatcherFee, Array())
-    val signature = EllipticCurveImpl.sign(node.privateKey, unsigned.toSign)
+    val signature = crypto.sign(node.privateKey, unsigned.toSign)
     unsigned.copy(signature = signature)
   }
 }

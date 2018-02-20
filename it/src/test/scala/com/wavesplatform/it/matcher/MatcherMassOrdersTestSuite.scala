@@ -2,6 +2,7 @@ package com.wavesplatform.it.matcher
 
 import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.crypto
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
@@ -14,8 +15,8 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class MatcherMassOrdersTestSuite extends FreeSpec  with NodesFromDocker with MatcherUtils
-  with ReportingTestName  with Matchers with BeforeAndAfterAll with CancelAfterFailure{
+class MatcherMassOrdersTestSuite extends FreeSpec with NodesFromDocker with MatcherUtils
+  with ReportingTestName with Matchers with BeforeAndAfterAll with CancelAfterFailure {
 
   import MatcherMassOrdersTestSuite._
 
@@ -79,7 +80,7 @@ class MatcherMassOrdersTestSuite extends FreeSpec  with NodesFromDocker with Mat
 
     val ts = System.currentTimeMillis()
     val privateKey = aliceNode.privateKey
-    val signature = ByteStr(EllipticCurveImpl.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts)))
+    val signature = ByteStr(crypto.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts)))
     val orderIds = Await.result(matcherNode.getOrderbookByPublicKey(aliceNode.publicKeyStr, ts, signature), 1.minute)
       .map(_.id)
 
@@ -90,7 +91,7 @@ class MatcherMassOrdersTestSuite extends FreeSpec  with NodesFromDocker with Mat
 
     // Alice check that order Active order is still in list
     val ts1 = System.currentTimeMillis()
-    val signature1 = ByteStr(EllipticCurveImpl.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts1)))
+    val signature1 = ByteStr(crypto.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts1)))
     val orderIdsAfterMatching = Await.result(matcherNode.getOrderbookByPublicKey(aliceNode.publicKeyStr, ts1, signature1), 1.minute)
       .map(_.id)
 
@@ -104,6 +105,7 @@ class MatcherMassOrdersTestSuite extends FreeSpec  with NodesFromDocker with Mat
 object MatcherMassOrdersTestSuite {
   val ForbiddenAssetId = "FdbnAsset"
   val orderLimit = 20
+
   import NodeConfigs.Default
 
   private val matcherConfig = ConfigFactory.parseString(

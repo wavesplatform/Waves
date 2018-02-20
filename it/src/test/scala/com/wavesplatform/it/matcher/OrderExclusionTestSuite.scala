@@ -2,21 +2,20 @@ package com.wavesplatform.it.matcher
 
 import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.crypto
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.Random
 
 class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
-  with ReportingTestName with NodesFromDocker with MatcherUtils{
+  with ReportingTestName with NodesFromDocker with MatcherUtils {
 
   import OrderExclusionTestSuite._
 
@@ -60,7 +59,7 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     matcherCheckOrderStatus(matcherNode, aliceAsset, id) shouldBe "Accepted"
 
     // Alice check that order is correct
-    val orders = matcherGetOrderBook(matcherNode, aliceAsset )
+    val orders = matcherGetOrderBook(matcherNode, aliceAsset)
     orders.asks.head.amount shouldBe 500
     orders.asks.head.price shouldBe 2 * Waves * Order.PriceConstant
   }
@@ -79,7 +78,7 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     val privateKey = aliceNode.privateKey
 
     val pk = node.publicKey.publicKey
-    val signature = ByteStr(EllipticCurveImpl.sign(privateKey, pk ++ Longs.toByteArray(ts)))
+    val signature = ByteStr(crypto.sign(privateKey, pk ++ Longs.toByteArray(ts)))
 
     val orderhistory = Await.result(matcherNode.getOrderbookByPublicKey(node.publicKeyStr, ts, signature), 1.minute)
     orderhistory.seq(0).status

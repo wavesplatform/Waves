@@ -3,6 +3,7 @@ package matcher
 
 import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.crypto
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.NodesFromDocker
@@ -85,7 +86,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   "frozen amount should be listed via matcherBalance REST endpoint" in {
     val ts = System.currentTimeMillis()
     val privateKey = aliceNode.privateKey
-    val signature = Base58.encode(EllipticCurveImpl.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts)))
+    val signature = Base58.encode(crypto.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts)))
 
     val json = parse(Await.result(matcherNode.matcherGet(s"/matcher/matcherBalance/${aliceNode.publicKeyStr}", _
       .addHeader("Timestamp", ts)
@@ -97,7 +98,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   "and should be listed by trader's publiс key via REST" in {
     val ts = System.currentTimeMillis()
     val privateKey = aliceNode.privateKey
-    val signature = ByteStr(EllipticCurveImpl.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts)))
+    val signature = ByteStr(crypto.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts)))
     val orderIds = Await.result(matcherNode.getOrderbookByPublicKey(aliceNode.publicKeyStr, ts, signature), 1.minute)
       .map(_.id)
 
@@ -287,7 +288,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     val privateKey = node.privateKey
     val publicKey = node.publicKey
     val request = CancelOrderRequest(publicKey, Base58.decode(orderId).get, Array.emptyByteArray)
-    val sig = EllipticCurveImpl.sign(privateKey, request.toSign)
+    val sig = crypto.sign(privateKey, request.toSign)
     val signedRequest = request.copy(signature = sig)
     val futureResult = matcherNode.cancelOrder(pair.amountAssetStr, pair.priceAssetStr, signedRequest)
 
