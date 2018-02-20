@@ -1,9 +1,9 @@
 package scorex.account
 
+import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.utils.base58Length
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.SecureCryptographicHash._
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.InvalidAddress
 import scorex.utils.ScorexLogging
@@ -31,7 +31,7 @@ object Address extends ScorexLogging {
   private class AddressImpl(val bytes: ByteStr) extends Address
 
   def fromPublicKey(publicKey: Array[Byte]): Address = {
-    val publicKeyHash = hash(publicKey).take(HashLength)
+    val publicKeyHash = crypto.secureHash(publicKey).take(HashLength)
     val withoutChecksum = AddressVersion +: scheme.chainId +: publicKeyHash
     val bytes = withoutChecksum ++ calcCheckSum(withoutChecksum)
     new AddressImpl(ByteStr(bytes))
@@ -59,6 +59,6 @@ object Address extends ScorexLogging {
     } yield address
   }
 
-  private def calcCheckSum(withoutChecksum: Array[Byte]): Array[Byte] = hash(withoutChecksum).take(ChecksumLength)
+  private def calcCheckSum(withoutChecksum: Array[Byte]): Array[Byte] = crypto.secureHash(withoutChecksum).take(ChecksumLength)
 
 }

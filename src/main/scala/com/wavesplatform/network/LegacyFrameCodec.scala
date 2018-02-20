@@ -2,11 +2,11 @@ package com.wavesplatform.network
 
 import java.util
 
+import com.wavesplatform.crypto
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled._
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.ByteToMessageCodec
-import scorex.crypto.hash.FastCryptographicHash
 import scorex.network.message.Message._
 import scorex.utils.ScorexLogging
 
@@ -31,7 +31,7 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase) extends ByteToMessageCodec[Ra
     if (length > 0) {
       val declaredChecksum = in.readSlice(ChecksumLength)
       in.readBytes(dataBytes)
-      val actualChecksum = wrappedBuffer(FastCryptographicHash.hash(dataBytes), 0, ChecksumLength)
+      val actualChecksum = wrappedBuffer(crypto.fastHash(dataBytes), 0, ChecksumLength)
 
       require(declaredChecksum.equals(actualChecksum), "invalid checksum")
       actualChecksum.release()
@@ -50,7 +50,7 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase) extends ByteToMessageCodec[Ra
     out.writeByte(msg.code)
     if (msg.data.length > 0) {
       out.writeInt(msg.data.length)
-      out.writeBytes(FastCryptographicHash.hash(msg.data), 0, ChecksumLength)
+      out.writeBytes(crypto.fastHash(msg.data), 0, ChecksumLength)
       out.writeBytes(msg.data)
     } else {
       out.writeInt(0)

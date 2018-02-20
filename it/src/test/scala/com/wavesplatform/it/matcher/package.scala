@@ -1,7 +1,6 @@
 package com.wavesplatform.it
 
 import com.wavesplatform.it.matcher.OrderExclusionTestSuite.MatcherFee
-import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.duration._

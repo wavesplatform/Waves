@@ -4,17 +4,16 @@ import java.security.SecureRandom
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.crypto
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
-import scorex.crypto.signatures.PrivateKey
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
 case class UtilsApiRoute(settings: RestAPISettings) extends ApiRoute {
+
   import UtilsApiRoute._
 
   private def seed(length: Int) = {
@@ -43,8 +42,8 @@ case class UtilsApiRoute(settings: RestAPISettings) extends ApiRoute {
   ))
   @ApiResponse(code = 200, message = "Json with error message")
   def length: Route = (path("seed" / IntNumber) & get) { length =>
-      if (length <= MaxSeedSize) complete(seed(length))
-      else complete(TooBigArrayAllocation)
+    if (length <= MaxSeedSize) complete(seed(length))
+    else complete(TooBigArrayAllocation)
   }
 
   @Path("/hash/secure")
@@ -57,7 +56,7 @@ case class UtilsApiRoute(settings: RestAPISettings) extends ApiRoute {
   ))
   def hashSecure: Route = (path("hash" / "secure") & post) {
     entity(as[String]) { message =>
-      complete(Json.obj("message" -> message, "hash" -> Base58.encode(SecureCryptographicHash(message))))
+      complete(Json.obj("message" -> message, "hash" -> Base58.encode(crypto.secureHash(message))))
     }
   }
 
@@ -71,7 +70,7 @@ case class UtilsApiRoute(settings: RestAPISettings) extends ApiRoute {
   ))
   def hashFast: Route = (path("hash" / "fast") & post) {
     entity(as[String]) { message =>
-      complete(Json.obj("message" -> message, "hash" -> Base58.encode(FastCryptographicHash(message))))
+      complete(Json.obj("message" -> message, "hash" -> Base58.encode(crypto.fastHash(message))))
     }
   }
 
@@ -85,10 +84,10 @@ case class UtilsApiRoute(settings: RestAPISettings) extends ApiRoute {
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
   ))
-  def sign: Route = (path("sign" / Segment) & post) {pk =>
+  def sign: Route = (path("sign" / Segment) & post) { pk =>
     entity(as[String]) { message =>
       complete(Json.obj("message" -> message, "signature" ->
-        Base58.encode(EllipticCurveImpl.sign(PrivateKey(Base58.decode(pk).get), Base58.decode(message).get))))
+        Base58.encode(crypto.sign(Base58.decode(pk).get, Base58.decode(message).get))))
     }
   }
 }

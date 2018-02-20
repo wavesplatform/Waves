@@ -2,17 +2,17 @@ package scorex.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
+import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{Format, JsObject, JsValue, Json}
 import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.TransactionParser._
 import scorex.transaction.ValidationError.Validation
 import scorex.transaction._
-import scorex.transaction.assets.MassTransferTransaction.{toJson, ParsedTransfer}
+import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, toJson}
 
 import scala.util.{Either, Failure, Success, Try}
 
@@ -22,8 +22,7 @@ case class MassTransferTransaction private(assetId: Option[AssetId],
                                            timestamp: Long,
                                            fee: Long,
                                            attachment: Array[Byte],
-                                           signature: ByteStr) extends SignedTransaction
-{
+                                           signature: ByteStr) extends SignedTransaction {
   override val transactionType: TransactionType.Value = TransactionType.MassTransferTransaction
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
@@ -57,7 +56,7 @@ case class MassTransferTransaction private(assetId: Option[AssetId],
   }
 
   def compactJson(recipient: AddressOrAlias): JsObject = jsonBase() ++ Json.obj(
-      "transfers" -> toJson(transfers.filter(_.address == recipient)))
+    "transfers" -> toJson(transfers.filter(_.address == recipient)))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(toSign(), signature.arr))
 }
@@ -66,7 +65,9 @@ object MassTransferTransaction {
   val MaxTransferCount = 100
 
   case class Transfer(recipient: String, amount: Long)
+
   case class ParsedTransfer(address: AddressOrAlias, amount: Long)
+
   implicit val transferFormat: Format[Transfer] = Json.format
 
   def parseTail(bytes: Array[Byte]): Try[MassTransferTransaction] = Try {
@@ -82,6 +83,7 @@ object MassTransferTransaction {
         case Left(e) => (Left(e), offset)
       }
     }
+
     val transfersList: List[(Validation[ParsedTransfer], Int)] =
       List.iterate(readTransfer(s0 + 2), transferCount) { case (_, offset) => readTransfer(offset) }
 
@@ -104,7 +106,9 @@ object MassTransferTransaction {
              feeAmount: Long,
              attachment: Array[Byte],
              signature: ByteStr): Either[ValidationError, MassTransferTransaction] = {
-    Try { transfers.map(_.amount).fold(feeAmount)(Math.addExact) }.fold(
+    Try {
+      transfers.map(_.amount).fold(feeAmount)(Math.addExact)
+    }.fold(
       ex => Left(ValidationError.OverflowError),
       totalAmount =>
         if (transfers.lengthCompare(MaxTransferCount) > 0) {
@@ -128,7 +132,7 @@ object MassTransferTransaction {
              feeAmount: Long,
              attachment: Array[Byte]): Either[ValidationError, MassTransferTransaction] = {
     create(assetId, sender, transfers, timestamp, feeAmount, attachment, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.toSign())))
+      unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.toSign())))
     }
   }
 
