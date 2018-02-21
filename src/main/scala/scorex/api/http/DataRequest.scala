@@ -1,9 +1,10 @@
 package scorex.api.http
 
 import play.api.libs.json.{Format, Json}
+import scorex.transaction.DataTransaction.Data
 
 case class DataRequest(sender: String,
-                       data: Map[String, String],
+                       data: Data,
                        fee: Long,
                        timestamp: Option[Long] = None)
 

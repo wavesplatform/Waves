@@ -8,6 +8,7 @@ import com.wavesplatform.utils._
 import org.iq80.leveldb.{DB, WriteBatch}
 import scorex.account.{Address, Alias}
 import scorex.serialization.Deser
+import scorex.transaction.DataTransaction
 import scorex.transaction.smart.Script
 import scorex.utils.{NTP, Time}
 
@@ -162,8 +163,8 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
     } else None
   }
 
-  def getAccountData(acc: Address): Map[String, String] = {
-    Map("SS stub" -> "ok", "CSR stub" -> "BROKEN", "parsed" -> "BROKEN")///
+  def getAccountData(acc: Address): DataTransaction.Data = {
+    Map("SS stub" -> DataTransaction.BooleanValue(true), "parsed" -> DataTransaction.BooleanValue(false))///
   }
 
   override def removeEverything(b: Option[WriteBatch]): Unit = {

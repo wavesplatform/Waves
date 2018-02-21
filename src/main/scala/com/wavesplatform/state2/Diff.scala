@@ -3,6 +3,7 @@ package com.wavesplatform.state2
 import cats.Monoid
 import cats.implicits._
 import scorex.account.{Address, Alias}
+import scorex.transaction.DataTransaction.Data
 import scorex.transaction.Transaction
 import scorex.transaction.smart.Script
 
@@ -48,7 +49,7 @@ case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 orderFills: Map[ByteStr, OrderFillInfo],
                 leaseState: Map[ByteStr, Boolean],
                 scripts: Map[Address, Option[Script]],
-                accountData: Map[Address, Map[String, String]]) {
+                accountData: Map[Address, Data]) {
 
   lazy val accountTransactionIds: Map[Address, List[ByteStr]] = {
     val map: List[(Address, Set[(Int, Long, ByteStr)])] = transactions.toList
@@ -71,7 +72,7 @@ object Diff {
             paymentTransactionIdsByHashes: Map[ByteStr, ByteStr] = Map.empty,
             leaseState: Map[ByteStr, Boolean] = Map.empty,
             scripts: Map[Address, Option[Script]] = Map.empty,
-            accountData: Map[Address, Map[String, String]] = Map.empty): Diff = Diff(
+            accountData: Map[Address, Data] = Map.empty): Diff = Diff(
     transactions = Map((tx.id(), (height, tx, portfolios.keys.toSet))),
     portfolios = portfolios,
     issuedAssets = assetInfos,

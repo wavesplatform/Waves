@@ -52,7 +52,7 @@ trait SnapshotStateReader extends Synchronized {
 
   def accountScript(address: Address): Option[Script]
 
-  def accountData(acc: Address): Map[String, String]
+  def accountData(acc: Address): DataTransaction.Data
 }
 
 object SnapshotStateReader {
