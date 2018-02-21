@@ -20,7 +20,7 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
 
   private val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
 
-  private val context = TypeChecker.Context(
+  private val context = TypeChecker.TypeCheckerContext(
     predefTypes = Map("Transaction" -> Verifier.transactionType),
     varDefs = Map(
       "TX" -> TYPEREF("Transaction")

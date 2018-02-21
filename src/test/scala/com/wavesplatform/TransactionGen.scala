@@ -82,7 +82,7 @@ trait TransactionGen extends ScriptGen {
   } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
 
   val scriptGen = BOOLgen(1000).map { expr =>
-    val typed = TypeChecker(TypeChecker.Context.empty, expr).right.get
+    val typed = TypeChecker(TypeChecker.TypeCheckerContext.empty, expr).right.get
     Script(typed)
   }
 

@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.lang.Context.Obj
 import com.wavesplatform.lang.Terms._
 import scodec.bits.ByteVector
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
@@ -9,13 +10,6 @@ import scala.util.{Failure, Success, Try}
 object Evaluator {
 
   import scala.util.control.TailCalls.{TailRec, done, tailcall}
-
-  type Defs = Map[String, (TYPE, Any)]
-
-  case class Context(typeDefs: Map[String, CUSTOMTYPE], defs: Defs)
-  object Context {
-    val empty = Context(Map.empty, Map.empty)
-  }
 
   type TypeResolutionError = String
   type ExcecutionError = String
@@ -145,7 +139,7 @@ object Evaluator {
       }
 
       case Typed.GETTER(expr, field, _) => tailcall {
-        r[OBJECT](ctx, expr).map {
+        r[Obj](ctx, expr).map {
           case Right(obj) => obj.fields.find(_._1 == field) match {
             case Some((_, lzy)) => Right(lzy.value())
             case None => Left("field not found")

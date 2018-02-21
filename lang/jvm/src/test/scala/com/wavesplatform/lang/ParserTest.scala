@@ -1,6 +1,5 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.Evaluator.Context
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.Terms.Untyped._
 import org.scalatest.prop.PropertyChecks
@@ -190,7 +189,7 @@ X > Y
 
   private def eval(code: String) = {
     val untyped = parse(code)
-    val typed   = TypeChecker(TypeChecker.Context.empty, untyped)
+    val typed   = TypeChecker(TypeChecker.TypeCheckerContext.empty, untyped)
     typed.flatMap(Evaluator(Context.empty, _))
   }
 }

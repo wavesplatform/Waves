@@ -1,6 +1,6 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.Evaluator.{Context, Defs}
+import com.wavesplatform.lang.Context._
 import com.wavesplatform.lang.Terms.Typed._
 import com.wavesplatform.lang.Terms._
 import monix.eval.Coeval
@@ -9,8 +9,8 @@ import org.scalatest.{Matchers, PropSpec}
 
 class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def ev(predefTypes: Map[String, CUSTOMTYPE] = Map.empty, defs: Defs = Map.empty, expr: EXPR): Either[_, _] = {
-    Evaluator(Context(predefTypes, defs), expr)
+  private def ev(predefTypes: Map[String, CustomType] = Map.empty, defs: Defs = Map.empty, expr: EXPR): Either[_, _] = {
+    Evaluator(Context(predefTypes, defs, Map.empty), expr)
   }
 
   private def simpleDeclarationAndUsage(i: Int) = BLOCK(Some(LET("x", CONST_INT(i))), REF("x", INT), INT)
@@ -99,8 +99,8 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   }
 
   property("custom type field access") {
-    val pointType = CUSTOMTYPE("Point", List("X" -> INT, "Y" -> INT))
-    val pointInstance = OBJECT(Map("X" -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
+    val pointType = CustomType("Point", List("X" -> INT, "Y" -> INT))
+    val pointInstance = Obj(Map("X" -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
     ev(
       predefTypes = Map(pointType.name -> pointType),
       defs = Map(("p", (TYPEREF(pointType.name), pointInstance))),

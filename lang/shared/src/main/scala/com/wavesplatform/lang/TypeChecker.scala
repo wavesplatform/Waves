@@ -2,6 +2,7 @@ package com.wavesplatform.lang
 
 import cats.data.EitherT
 import cats.syntax.all._
+import com.wavesplatform.lang.Context.CustomType
 import com.wavesplatform.lang.Terms._
 import monix.eval.Coeval
 
@@ -9,18 +10,18 @@ import scala.util.{Failure, Success, Try}
 
 object TypeChecker {
 
-  type Defs = Map[String, TYPE]
+  type TypeDefs = Map[String, TYPE]
+  case class TypeCheckerContext(predefTypes: Map[String, CustomType], varDefs: TypeDefs)
 
-  case class Context(predefTypes: Map[String, CUSTOMTYPE], varDefs: Defs)
-  object Context {
-    val empty = Context(Map.empty, Map.empty)
+  object TypeCheckerContext {
+    val empty = TypeCheckerContext(Map.empty, Map.empty)
   }
 
   type TypeResolutionError      = String
   type TypeCheckResult[T]       = Either[TypeResolutionError, T]
   private type SetTypeResult[T] = EitherT[Coeval, String, T]
 
-  private def setType(ctx: Context, t: SetTypeResult[Untyped.EXPR]): SetTypeResult[Typed.EXPR] = t.flatMap {
+  private def setType(ctx: TypeCheckerContext, t: SetTypeResult[Untyped.EXPR]): SetTypeResult[Typed.EXPR] = t.flatMap {
     case x: Untyped.CONST_INT        => EitherT.pure(Typed.CONST_INT(x.t))
     case x: Untyped.CONST_BYTEVECTOR => EitherT.pure(Typed.CONST_BYTEVECTOR(x.bs))
     case Untyped.TRUE                => EitherT.pure(Typed.TRUE)
@@ -152,7 +153,7 @@ object TypeChecker {
     case some: Untyped.SOME => setType(ctx, EitherT.pure(some.t)).map(t => Typed.SOME(t = t, tpe = OPTION(t.tpe)))
   }
 
-  def apply(c: Context, expr: Untyped.EXPR): TypeCheckResult[Typed.EXPR] = {
+  def apply(c: TypeCheckerContext, expr: Untyped.EXPR): TypeCheckResult[Typed.EXPR] = {
     def result = setType(c, EitherT.pure(expr)).value().left.map { e =>
       s"Typecheck failed: $e"
     }
