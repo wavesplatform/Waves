@@ -28,7 +28,7 @@ trait OrderHistory {
 
   def openVolumes(address: String): Option[Map[String, Long]]
 
-  def ordersByAddress(address: String): Set[String]
+  def orderIdsByAddress(address: String): Set[String]
 
   def fetchOrderHistoryByPair(assetPair: AssetPair, address: String): Seq[(String, OrderInfo, Option[Order])]
 
@@ -152,7 +152,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     get(makeKey(AddressPortfolioPrefix, address)).map(PortfolioCodec.decode).map(_.explicitGet().value)
   }
 
-  override def ordersByAddress(address: String): Set[String] = {
+  override def orderIdsByAddress(address: String): Set[String] = {
     get(makeKey(AddressToOrdersPrefix, address)).map(OrderIdsCodec.decode).map(_.explicitGet().value)
       .map(_.toSet).getOrElse(Set())
   }
@@ -170,7 +170,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
   }
 
   override def fetchOrderHistoryByPair(assetPair: AssetPair, address: String): Seq[(String, OrderInfo, Option[Order])] = {
-    ordersByAddress(address)
+    orderIdsByAddress(address)
       .toSeq
       .map(id => (id, orderInfo(id), order(id)))
       .filter(_._3.exists(_.assetPair == assetPair))
@@ -180,7 +180,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
 
   override def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])] = {
     import OrderInfo.orderStatusOrdering
-    ordersByAddress(address)
+    orderIdsByAddress(address)
       .toSeq
       .map(id => (id, orderInfo(id)))
       .sortBy(_._2.status)

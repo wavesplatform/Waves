@@ -323,6 +323,8 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     Await.result(waitOrderCancelled, 1.minute)
   }
 
+  // "should cancel oldest sell orders if the owner moved some of its assets to another account"
+
   private def matcherExpectOrderPlacementRejected(order: Order, expectedStatusCode: Int, expectedStatus: String): Boolean = {
     val futureResult = matcherNode.expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus)
 

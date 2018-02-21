@@ -3,6 +3,7 @@ package com.wavesplatform.matcher.model
 import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.matcher.model.MatcherModel.Price
+import com.wavesplatform.state2.Portfolio
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.transaction.AssetAcc
 import scorex.transaction.assets.exchange._
@@ -119,6 +120,13 @@ object Events {
   case class OrderCanceled(limitOrder: LimitOrder) extends Event
 
   case class ExchangeTransactionCreated(tx: ExchangeTransaction)
+
+  case class BalanceChanged(changesByAddress: Map[String, Portfolio]) {
+    def isEmpty: Boolean = changesByAddress.isEmpty
+  }
+  object BalanceChanged {
+    val empty: BalanceChanged = BalanceChanged(Map.empty)
+  }
 
   def createOrderInfo(event: Event): Map[String, OrderInfo] = {
     event match {

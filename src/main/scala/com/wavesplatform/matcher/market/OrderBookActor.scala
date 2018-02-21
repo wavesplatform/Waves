@@ -66,7 +66,8 @@ class OrderBookActor(assetPair: AssetPair,
       onAddOrder(order)
     case cancel: CancelOrder =>
       onCancelOrder(cancel)
-    case ForceCancelOrder(_, orderId) =>
+    case msg@ForceCancelOrder(_, orderId) =>
+      log.debug(s"Got $msg")
       onForceCancelOrder(orderId)
     case OrderCleanup =>
       onOrderCleanup(orderBook, NTP.correctedTime())
@@ -141,13 +142,17 @@ class OrderBookActor(assetPair: AssetPair,
   }
 
   private def onForceCancelOrder(orderIdToCancel: String): Unit = {
+    log.debug(s"onForceCancelOrder, orderIdToCancel: $orderIdToCancel")
     OrderBook.cancelOrder(orderBook, orderIdToCancel) match {
       case Some(oc) =>
+        log.debug(s"onForceCancelOrder, oc: $oc")
         persist(oc) { _ =>
           applyEvent(oc)
           sender() ! OrderCanceled(orderIdToCancel)
         }
-      case _ => sender() ! OrderCancelRejected("Order not found")
+      case _ =>
+        log.debug(s"onForceCancelOrder, oc not found, asks=${orderBook.asks.mapValues(_.map(_.order.idStr()))}, bids=${orderBook.bids.mapValues(_.map(_.order.idStr()))}")
+        sender() ! OrderCancelRejected("Order not found")
     }
   }
 

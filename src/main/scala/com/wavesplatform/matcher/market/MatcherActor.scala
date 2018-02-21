@@ -141,6 +141,7 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
         removeOrderBook(ob.assetPair)
       }
     case ob: OrderBookRequest =>
+      log.debug(s"Forwarding $ob to child actor: ${context.child(OrderBookActor.name(ob.assetPair))}")
       checkAssetPair(ob) {
         context.child(OrderBookActor.name(ob.assetPair))
           .fold(returnEmptyOrderBook(ob.assetPair))(forwardReq(ob))
@@ -168,6 +169,7 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
     case RecoveryCompleted =>
       log.info("MatcherActor - Recovery completed!")
       initPredefinedPairs()
+      context.actorOf(BalanceWatcherActor.props(self, orderHistory))
   }
 
   override def receiveCommand: Receive = forwardToOrderBook

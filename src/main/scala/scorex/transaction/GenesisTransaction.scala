@@ -16,7 +16,6 @@ case class GenesisTransaction private(recipient: Address, amount: Long, timestam
 
   override val assetFee: (Option[AssetId], Long) = (None, 0)
   override val id: Coeval[AssetId] = Coeval.evalOnce(signature)
-  override def sender: PublicKeyAccount = PublicKeyAccount.empty
 
   val transactionType: TransactionParser.TransactionType.Value = TransactionType.GenesisTransaction
 

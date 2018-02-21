@@ -4,12 +4,28 @@ import cats._
 import cats.kernel.instances.map._
 import cats.Monoid
 import scorex.block.Block.Fraction
+import scorex.transaction.AssetId
 
 case class Portfolio(balance: Long, leaseInfo: LeaseInfo, assets: Map[ByteStr, Long]) {
   lazy val effectiveBalance: Long = safeSum(balance, leaseInfo.leaseIn) - leaseInfo.leaseOut
   lazy val spendableBalance: Long = balance - leaseInfo.leaseOut
 
   lazy val isEmpty: Boolean = this == Portfolio.portfolioMonoid.empty
+
+  def balanceOf(assetId: Option[AssetId]): Long = assetId.flatMap(assets.get).getOrElse(0)
+  def remove(assetId: Option[AssetId], amount: Long): Option[Portfolio] = {
+    val origAmount = assetId match {
+      case None => balance
+      case Some(x) => assets.getOrElse(x, 0L)
+    }
+
+    val updatedAmount = origAmount - amount
+    if (updatedAmount < 0) None
+    else Some(assetId match {
+      case None => copy(balance = updatedAmount)
+      case Some(x) => copy(assets = this.assets.updated(x, updatedAmount))
+    })
+  }
 }
 
 object Portfolio {

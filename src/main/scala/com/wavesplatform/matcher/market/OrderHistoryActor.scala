@@ -16,14 +16,14 @@ import scorex.account.Address
 import scorex.transaction.AssetAcc
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.utils.NTP
+import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxPool, val wallet: Wallet)
-  extends Actor with OrderValidator {
+  extends Actor with OrderValidator with ScorexLogging {
 
   val orderHistory = OrderHistoryImpl(db, settings)
 
@@ -45,6 +45,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
     case req: DeleteOrderFromHistory =>
       deleteFromOrderHistory(req)
     case GetOrderStatus(_, id, _) =>
+      log.debug(s"Order status for $id: ${orderHistory.orderStatus(id)}, ${orderHistory.orderInfo(id)}")
       sender() ! GetOrderStatusResponse(orderHistory.orderStatus(id))
     case GetTradableBalance(assetPair, addr, _) =>
       sender() ! getPairTradableBalance(assetPair, addr)
@@ -67,6 +68,24 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       recoverFromOrderBook(ob)
     case ForceCancelOrderFromHistory(id) =>
       forceCancelOrder(id)
+    case msg@GetActiveOrdersByAddress(addr) =>
+      log.debug(s"Received $msg")
+      val active: Seq[LimitOrder] = orderHistory.orderIdsByAddress(addr)
+        .view
+        .map { id =>
+          id -> orderHistory.orderInfo(id)
+        }
+        .filter {
+          case (_, info) => info.remaining > 0
+        }
+        .flatMap { case (id, info) =>
+          orderHistory.order(id).map { order => LimitOrder(order).partial(info.remaining) }
+        }
+        .force[LimitOrder, Seq[LimitOrder]](collection.breakOut)
+
+      val sendMsg = GetActiveOrdersByAddressResponse(addr, active)
+      log.debug(s"Sending $sendMsg")
+      sender.forward(sendMsg)
   }
 
   def fetchOrderHistory(req: GetOrderHistory): Unit = {
@@ -148,6 +167,10 @@ object OrderHistoryActor {
   case class GetAllOrderHistory(address: String, ts: Long) extends ExpirableOrderHistoryRequest
 
   case class GetOrderStatus(assetPair: AssetPair, id: String, ts: Long) extends ExpirableOrderHistoryRequest
+
+  case class GetActiveOrdersByAddress(address: String)
+
+  case class GetActiveOrdersByAddressResponse(address: String, orders: Seq[LimitOrder])
 
   case class DeleteOrderFromHistory(assetPair: AssetPair, address: String, id: String, ts: Long) extends ExpirableOrderHistoryRequest
 

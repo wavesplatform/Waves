@@ -182,7 +182,9 @@ object UtxPoolImpl {
 
     def add(txId: ByteStr, txDiff: Diff): Unit = {
       val nonEmptyPessimisticPortfolios = txDiff.portfolios
-        .mapValues(_.pessimistic)
+        .map {
+          case (addr, portfolio) => addr -> portfolio.pessimistic
+        }
         .filterNot {
           case (_, portfolio) => portfolio.isEmpty
         }
