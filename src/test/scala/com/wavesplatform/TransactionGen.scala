@@ -37,9 +37,11 @@ trait TransactionGen extends ScriptGen {
 
   val aliasSymbolChar: Gen[Char] = Gen.oneOf('.', '@', '_', '-')
 
+  val invalidAliasSymbolChar: Gen[Char] = Gen.oneOf('~', '`', '!', '#', '$', '%', '^', '&', '*', '=', '+')
+
   val aliasAlphabetGen: Gen[Char] = frequency((1, numChar), (1, aliasSymbolChar), (9, alphaLowerChar))
 
-  val invalidAliasAlphabetGen: Gen[Char] = frequency((1, numChar), (1, aliasSymbolChar), (9, alphaUpperChar))
+  val invalidAliasAlphabetGen: Gen[Char] = frequency((1, numChar), (3, invalidAliasSymbolChar), (9, alphaUpperChar))
 
   val validAliasStringGen: Gen[String] = for {
     length <- Gen.chooseNum(Alias.MinLength, Alias.MaxLength)
