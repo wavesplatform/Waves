@@ -2,14 +2,13 @@ package com.wavesplatform.history
 
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.ENOUGH_AMT
-import com.wavesplatform.{TransactionGen, WithDB}
+import com.wavesplatform.{TransactionGen, WithDB, crypto}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock, SignerData}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.crypto.EllipticCurveImpl
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.ValidationError.MicroBlockAppendError
 import scorex.transaction.assets.TransferTransaction
@@ -94,7 +93,7 @@ class BlockchainUpdaterLiquidBlockTest extends PropSpec
                           version: Byte, ts: Long): (Block, MicroBlock) = {
     val newTotalBlock = unsafeBlock(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
     val unsigned = new MicroBlock(version, signer, txs, prevTotal.uniqueId, newTotalBlock.uniqueId, ByteStr.empty)
-    val signature = EllipticCurveImpl.sign(signer, unsigned.bytes())
+    val signature = crypto.sign(signer, unsigned.bytes())
     val signed = unsigned.copy(signature = ByteStr(signature))
     (newTotalBlock, signed)
   }
@@ -117,7 +116,7 @@ class BlockchainUpdaterLiquidBlockTest extends PropSpec
       featureVotes = Set.empty
     )
 
-    unsigned.copy(signerData = SignerData(signer, ByteStr(EllipticCurveImpl.sign(signer, unsigned.bytes()))))
+    unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes()))))
   }
 
 }

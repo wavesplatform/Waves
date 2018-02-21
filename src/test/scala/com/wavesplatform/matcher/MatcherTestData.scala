@@ -2,12 +2,12 @@ package com.wavesplatform.matcher
 
 import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.crypto
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state2.ByteStr
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PrivateKeyAccount
-import scorex.crypto.hash.SecureCryptographicHash
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.utils.NTP
 
@@ -16,7 +16,7 @@ trait MatcherTestData {
 
   val bytes32gen: Gen[Array[Byte]] = Gen.listOfN(signatureSize, Arbitrary.arbitrary[Byte]).map(_.toArray)
   val WalletSeed = ByteStr("Matcher".getBytes())
-  val MatcherSeed = SecureCryptographicHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
+  val MatcherSeed = crypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
   val MatcherAccount = PrivateKeyAccount(MatcherSeed)
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue)
@@ -85,7 +85,7 @@ trait MatcherTestData {
           matcherFee: Option[Long] = None, ts: Option[Long] = None): Order =
     valueFromGen(buyGenerator(pair, (price * Order.PriceConstant).toLong, amount, sender, matcherFee, ts))._1
 
-  def sell(pair: AssetPair, price: BigDecimal, amount: Long,sender: Option[PrivateKeyAccount] = None,
+  def sell(pair: AssetPair, price: BigDecimal, amount: Long, sender: Option[PrivateKeyAccount] = None,
            matcherFee: Option[Long] = None, ts: Option[Long] = None): Order =
     valueFromGen(sellGenerator(pair, (price * Order.PriceConstant).toLong, amount, sender, matcherFee, ts))._1
 

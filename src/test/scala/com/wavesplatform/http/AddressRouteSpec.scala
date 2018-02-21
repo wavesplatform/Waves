@@ -2,15 +2,13 @@ package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{LeaseInfo, Portfolio}
-import com.wavesplatform.{NoShrink, TestWallet}
+import com.wavesplatform.{NoShrink, TestWallet, crypto}
 import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
 import scorex.api.http.{AddressApiRoute, ApiKeyNotValid, InvalidMessage}
-import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.settings.TestFunctionalitySettings
 
@@ -76,17 +74,6 @@ class AddressRouteSpec
     }
   }
 
-  routePath("/balance/{address}") ignore {
-    val state = stub[SnapshotStateReader]
-    (state.accountPortfolio _).when(*).returns(Portfolio(0, mock[LeaseInfo], Map.empty))
-    val route = AddressApiRoute(restAPISettings, testWallet, Coeval.now(state), TestFunctionalitySettings.Stub).route
-    Get(routePath(s"/balance/${allAddresses.head}")) ~> route ~> check {
-      val r = responseAs[AddressApiRoute.Balance]
-      r.balance shouldEqual 0
-      r.confirmations shouldEqual 0
-    }
-  }
-
   private def testSign(path: String, encode: Boolean): Unit =
     forAll(generatedMessages) { case (account, message) =>
       val uri = routePath(s"/$path/${account.address}")
@@ -98,7 +85,7 @@ class AddressRouteSpec
         (resp \ "message").as[String] shouldEqual (if (encode) Base58.encode(message.getBytes) else message)
         (resp \ "publicKey").as[String] shouldEqual Base58.encode(account.publicKey)
 
-        EllipticCurveImpl.verify(signature, message.getBytes, account.publicKey) shouldBe true
+        crypto.verify(signature, message.getBytes, account.publicKey) shouldBe true
       }
     }
 
@@ -110,7 +97,7 @@ class AddressRouteSpec
     forAll(generatedMessages) { case (account, message) =>
       val uri = routePath(s"/$path/${account.address}")
       val messageBytes = message.getBytes()
-      val signature = EllipticCurveImpl.sign(account, messageBytes)
+      val signature = crypto.sign(account, messageBytes)
       val validBody = Json.obj("message" -> JsString(if (encode) Base58.encode(messageBytes) else message),
         "publickey" -> JsString(Base58.encode(account.publicKey)),
         "signature" -> JsString(Base58.encode(signature)))
@@ -142,6 +129,4 @@ class AddressRouteSpec
       (responseAs[JsObject] \ "deleted").as[Boolean] shouldBe true
     }
   }
-
-  routePath("/publicKey/{publicKey}") in pending
 }

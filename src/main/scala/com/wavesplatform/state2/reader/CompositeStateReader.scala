@@ -10,6 +10,7 @@ import monix.eval.Coeval
 import scorex.account.{Address, Alias}
 import scorex.transaction.Transaction
 import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.smart.Script
 
 class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockDiff) extends SnapshotStateReader {
 
@@ -34,7 +35,7 @@ class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockD
 
   override def accountTransactionIds(a: Address, limit: Int): Seq[ByteStr] = {
     val fromDiff = txDiff.accountTransactionIds.get(a).orEmpty
-    if (fromDiff.length >= limit) {
+    if (fromDiff.lengthCompare(limit) >= 0) {
       fromDiff.take(limit)
     } else {
       fromDiff ++ inner.accountTransactionIds(a, limit - fromDiff.size) // fresh head ++ stale tail
@@ -84,8 +85,19 @@ class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockD
     in + diffed
   }
 
-  override def accountData(acc: Address): Map[String, String] =
-    inner.accountData(acc) ++ blockDiff.txsDiff.accountData.get(acc).orEmpty
+  override def accountScript(address: Address): Option[Script] = {
+    blockDiff.txsDiff.scripts.get(address) match {
+      case None => inner.accountScript(address)
+      case Some(None) => None
+      case Some(Some(scr)) => Some(scr)
+    }
+  }
+
+  override def accountData(acc: Address): Map[String, String] = {
+    val fromInner = inner.accountData(acc)
+    val fromDiff = blockDiff.txsDiff.accountData.get(acc).orEmpty
+    fromInner ++ fromDiff
+  }
 }
 
 object CompositeStateReader {

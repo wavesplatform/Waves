@@ -1,14 +1,13 @@
 package scorex.transaction.assets.exchange
 
 import com.google.common.primitives.Longs
+import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
 import scorex.transaction.TransactionParser._
 import scorex.transaction.ValidationError.GenericError
@@ -72,7 +71,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
 
   import Order._
 
-  val signatureValid = Coeval.evalOnce(EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey))
+  val sender = senderPublicKey
+  val signatureValid = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(price, amount) &&
@@ -101,7 +101,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     Longs.toByteArray(matcherFee)
 
   @ApiModelProperty(hidden = true)
-  val id: Coeval[Array[Byte]] = Coeval.evalOnce(FastCryptographicHash(toSign))
+  val id: Coeval[Array[Byte]] = Coeval.evalOnce(crypto.fastHash(toSign))
 
   @ApiModelProperty(hidden = true)
   val idStr: Coeval[String] = Coeval.evalOnce(Base58.encode(id()))
@@ -187,34 +187,33 @@ object Order {
   def buy(sender: PrivateKeyAccount, matcher: PublicKeyAccount, pair: AssetPair,
           price: Long, amount: Long, timestamp: Long, expiration: Long, matcherFee: Long): Order = {
     val unsigned = Order(sender, matcher, pair, OrderType.BUY, price, amount, timestamp, expiration, matcherFee, Array())
-    val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
+    val sig = crypto.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }
 
   def sell(sender: PrivateKeyAccount, matcher: PublicKeyAccount, pair: AssetPair,
            price: Long, amount: Long, timestamp: Long, expiration: Long, matcherFee: Long): Order = {
     val unsigned = Order(sender, matcher, pair, OrderType.SELL, price, amount, timestamp, expiration, matcherFee, Array())
-    val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
+    val sig = crypto.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }
 
   def apply(sender: PrivateKeyAccount, matcher: PublicKeyAccount, pair: AssetPair, orderType: OrderType,
             price: Long, amount: Long, timestamp: Long, expiration: Long, matcherFee: Long): Order = {
     val unsigned = Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, Array())
-    val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
+    val sig = crypto.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }
 
   def parseBytes(bytes: Array[Byte]): Try[Order] = Try {
-    import EllipticCurveImpl._
     var from = 0
     val sender = PublicKeyAccount(bytes.slice(from, from + KeyLength))
     from += KeyLength
     val matcher = PublicKeyAccount(bytes.slice(from, from + KeyLength))
     from += KeyLength
-    val (amountAssetId, s0) = Deser.parseOption(bytes, from, AssetIdLength)
+    val (amountAssetId, s0) = Deser.parseByteArrayOption(bytes, from, AssetIdLength)
     from = s0
-    val (priceAssetId, s1) = Deser.parseOption(bytes, from, AssetIdLength)
+    val (priceAssetId, s1) = Deser.parseByteArrayOption(bytes, from, AssetIdLength)
     from = s1
     val orderType = bytes(from)
     from += 1
@@ -235,7 +234,7 @@ object Order {
 
   def sign(unsigned: Order, sender: PrivateKeyAccount): Order = {
     require(unsigned.senderPublicKey == sender)
-    val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
+    val sig = crypto.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }
 

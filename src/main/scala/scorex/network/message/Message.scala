@@ -1,8 +1,8 @@
 package scorex.network.message
 
 import com.google.common.primitives.{Bytes, Ints}
+import com.wavesplatform.crypto
 import monix.eval.Coeval
-import scorex.crypto.hash.FastCryptographicHash._
 import scorex.serialization.BytesSerializable
 
 import scala.util.{Success, Try}
@@ -26,7 +26,7 @@ case class Message[Content <: AnyRef](spec: MessageSpec[Content],
 
   val bytes = Coeval.evalOnce {
     val dataWithChecksum = if (dataLength > 0) {
-      val checksum = hash(dataBytes).take(ChecksumLength)
+      val checksum = crypto.fastHash(dataBytes).take(ChecksumLength)
       Bytes.concat(checksum, dataBytes)
     } else dataBytes //empty array
 

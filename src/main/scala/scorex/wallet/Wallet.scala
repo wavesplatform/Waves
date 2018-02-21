@@ -3,12 +3,12 @@ package scorex.wallet
 import java.io.File
 
 import com.google.common.primitives.{Bytes, Ints}
+import com.wavesplatform.crypto
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.utils.JsonFileStorage
 import play.api.libs.json._
 import scorex.account.{Address, PrivateKeyAccount}
-import scorex.crypto.hash.SecureCryptographicHash
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.MissingSenderPrivateKey
 import scorex.utils.{ScorexLogging, randomBytes}
@@ -56,7 +56,7 @@ object Wallet extends ScorexLogging {
   }
 
   def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] =
-    SecureCryptographicHash(Bytes.concat(Ints.toByteArray(nonce), seed))
+    crypto.secureHash(Bytes.concat(Ints.toByteArray(nonce), seed))
 
   def apply(settings: WalletSettings): Wallet = new WalletImpl(settings.file, settings.password, settings.seed)
 

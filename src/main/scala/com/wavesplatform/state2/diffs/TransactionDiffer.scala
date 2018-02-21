@@ -3,22 +3,23 @@ package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.Diff
+import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.transaction.ValidationError.UnsupportedTransactionType
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.smart.{SetScriptTransaction, Verifier}
 
 object TransactionDiffer {
 
-  case class TransactionValidationError(cause: ValidationError,tx: Transaction) extends ValidationError
+  case class TransactionValidationError(cause: ValidationError, tx: Transaction) extends ValidationError
 
   def apply(settings: FunctionalitySettings, prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int)
            (s: SnapshotStateReader, fp: FeatureProvider, tx: Transaction): Either[ValidationError, Diff] = {
     for {
-      t0 <- tx.signaturesValid()
+      t0 <- Verifier(s, currentBlockHeight)(tx)
       t1 <- CommonValidation.disallowTxFromFuture(settings, currentBlockTimestamp, t0)
       t2 <- CommonValidation.disallowTxFromPast(prevBlockTimestamp, t1)
       t3 <- CommonValidation.disallowBeforeActivationTime(fp, currentBlockHeight, t2)
@@ -36,6 +37,8 @@ object TransactionDiffer {
         case ltx: LeaseCancelTransaction => LeaseTransactionsDiff.leaseCancel(s, settings, currentBlockTimestamp, currentBlockHeight)(ltx)
         case etx: ExchangeTransaction => ExchangeTransactionDiff(s, currentBlockHeight)(etx)
         case atx: CreateAliasTransaction => CreateAliasTransactionDiff(currentBlockHeight)(atx)
+        case sstx: SetScriptTransaction => SetScriptTransactionDiff(currentBlockHeight)(sstx)
+        case sttx: ScriptTransferTransaction => ScriptTransferTransactionDiff(s, currentBlockHeight)(sttx)
         case dtx: DataTransaction => DataTransactionDiff(s, currentBlockHeight)(dtx)
         case _ => Left(UnsupportedTransactionType)
       }

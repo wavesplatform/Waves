@@ -1,6 +1,6 @@
 package scorex.account
 
-import scorex.crypto.EllipticCurveImpl
+import com.wavesplatform.crypto
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.GenericError
 
@@ -17,7 +17,7 @@ object PrivateKeyAccount {
   private case class PrivateKeyAccountImpl(seed: Array[Byte], privateKey: Array[Byte], publicKey: Array[Byte]) extends PrivateKeyAccount
 
   def apply(seed: Array[Byte]): PrivateKeyAccount = {
-    val pair = EllipticCurveImpl.createKeyPair(seed)
+    val pair = crypto.createKeyPair(seed)
     PrivateKeyAccountImpl(seed, pair._1, pair._2)
   }
 

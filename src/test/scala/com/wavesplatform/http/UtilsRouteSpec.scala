@@ -1,12 +1,12 @@
 package com.wavesplatform.http
 
+import com.wavesplatform.crypto
 import com.wavesplatform.http.ApiMarshallers._
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue}
 import scorex.api.http.{TooBigArrayAllocation, UtilsApiRoute}
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
 
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks {
   private val route = UtilsApiRoute(restAPISettings).route
@@ -32,8 +32,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   for ((hash, f) <- Seq[(String, String => Array[Byte])](
-    "secure" -> SecureCryptographicHash.apply,
-    "fast" -> FastCryptographicHash.apply
+    "secure" -> crypto.secureHash,
+    "fast" -> crypto.fastHash
   )) {
     val uri = routePath(s"/hash/$hash")
     uri in {

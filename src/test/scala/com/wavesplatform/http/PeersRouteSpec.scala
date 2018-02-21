@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
 import java.net.{InetAddress, InetSocketAddress}
-import java.util.concurrent.{ConcurrentHashMap}
+import java.util.concurrent.ConcurrentHashMap
 
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}
@@ -97,19 +97,6 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     }(result)
   }
 
-  routePath("/blacklisted") ignore {
-    forAll(genListOf(TestsCount, inetSocketAddressGen)) { addresses =>
-      val addressSet = addresses.map(_.getAddress).toSet
-
-      (peerDatabase.blacklistedHosts _).expects().returning(addressSet)
-      val route = PeersApiRoute(restAPISettings, connectToPeer, peerDatabase, new ConcurrentHashMap[Channel, PeerInfo]()).route
-      val result = Get(routePath("/blacklisted")) ~> route ~> runRoute
-
-      check {
-        responseAs[Seq[BlacklistedPeer]].map(_.hostname) should contain theSameElementsAs addressSet.map(_.toString)
-      }(result)
-    }
-  }
 }
 
 object PeersRouteSpec {

@@ -5,6 +5,7 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.crypto
 import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state2.StateReader
@@ -13,7 +14,6 @@ import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.BroadcastRoute
 import scorex.account.{Address, PublicKeyAccount}
-import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.{PoSCalc, TransactionFactory}
 import scorex.utils.Time
@@ -297,7 +297,7 @@ case class AddressApiRoute(settings: RestAPISettings, functionalitySettings: Fun
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
     val s = state()
-    s.read  { _ =>
+    s.read { _ =>
       Address.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
         acc.address,
         confirmations,
@@ -317,7 +317,7 @@ case class AddressApiRoute(settings: RestAPISettings, functionalitySettings: Fun
     withAuth {
       val res = wallet.findWallet(address).map(pk => {
         val messageBytes = message.getBytes(StandardCharsets.UTF_8)
-        val signature = EllipticCurveImpl.sign(pk, messageBytes)
+        val signature = crypto.sign(pk, messageBytes)
         val msg = if (encode) Base58.encode(messageBytes) else message
         Signed(msg, Base58.encode(pk.publicKey), Base58.encode(signature))
       })
@@ -341,7 +341,7 @@ case class AddressApiRoute(settings: RestAPISettings, functionalitySettings: Fun
     (msg, Base58.decode(signature), Base58.decode(publicKey)) match {
       case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
         val account = PublicKeyAccount(pubKeyBytes)
-        val isValid = account.address == address && EllipticCurveImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
+        val isValid = account.address == address && crypto.verify(signatureBytes, msgBytes, pubKeyBytes)
         Right(Json.obj("valid" -> isValid))
       case _ => Left(InvalidMessage)
     }
@@ -355,10 +355,9 @@ case class AddressApiRoute(settings: RestAPISettings, functionalitySettings: Fun
   @ApiOperation(value = "Address from Public Key", notes = "Generate a address from public key", httpMethod = "GET")
   def publicKey: Route = (path("publicKey" / Segment) & get) { publicKey =>
     Base58.decode(publicKey) match {
-      case Success(pubKeyBytes) => {
+      case Success(pubKeyBytes) =>
         val account = Address.fromPublicKey(pubKeyBytes)
         complete(Json.obj("address" -> account.address))
-      }
       case Failure(_) => complete(InvalidPublicKey)
     }
   }

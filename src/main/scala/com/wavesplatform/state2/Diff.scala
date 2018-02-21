@@ -4,6 +4,7 @@ import cats.Monoid
 import cats.implicits._
 import scorex.account.{Address, Alias}
 import scorex.transaction.Transaction
+import scorex.transaction.smart.Script
 
 case class Snapshot(prevHeight: Int, balance: Long, effectiveBalance: Long)
 
@@ -46,6 +47,7 @@ case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 paymentTransactionIdsByHashes: Map[ByteStr, ByteStr],
                 orderFills: Map[ByteStr, OrderFillInfo],
                 leaseState: Map[ByteStr, Boolean],
+                scripts: Map[Address, Option[Script]],
                 accountData: Map[Address, Map[String, String]]) {
 
   lazy val accountTransactionIds: Map[Address, List[ByteStr]] = {
@@ -68,6 +70,7 @@ object Diff {
             orderFills: Map[ByteStr, OrderFillInfo] = Map.empty,
             paymentTransactionIdsByHashes: Map[ByteStr, ByteStr] = Map.empty,
             leaseState: Map[ByteStr, Boolean] = Map.empty,
+            scripts: Map[Address, Option[Script]] = Map.empty,
             accountData: Map[Address, Map[String, String]] = Map.empty): Diff = Diff(
     transactions = Map((tx.id(), (height, tx, portfolios.keys.toSet))),
     portfolios = portfolios,
@@ -76,9 +79,10 @@ object Diff {
     paymentTransactionIdsByHashes = paymentTransactionIdsByHashes,
     orderFills = orderFills,
     leaseState = leaseState,
+    scripts = scripts,
     accountData = accountData)
 
-  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
+  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
 
   implicit class DiffExt(d: Diff) {
     def asBlockDiff: BlockDiff = BlockDiff(d, 0, Map.empty)
@@ -95,6 +99,7 @@ object Diff {
       paymentTransactionIdsByHashes = older.paymentTransactionIdsByHashes ++ newer.paymentTransactionIdsByHashes,
       orderFills = older.orderFills.combine(newer.orderFills),
       leaseState = older.leaseState ++ newer.leaseState,
+      scripts = older.scripts ++ newer.scripts,
       accountData = older.accountData ++ newer.accountData)
   }
 }

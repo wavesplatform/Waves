@@ -8,6 +8,7 @@ import akka.http.scaladsl.server.{Directive1, Route}
 import akka.pattern.ask
 import akka.util.Timeout
 import com.google.common.primitives.Longs
+import com.wavesplatform.crypto
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse}
 import com.wavesplatform.matcher.market.MatcherTransactionWriter.GetTransactionsByOrder
@@ -18,7 +19,6 @@ import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.PublicKeyAccount
 import scorex.api.http._
-import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
@@ -155,7 +155,7 @@ case class MatcherApiRoute(wallet: Wallet,
       json[CancelOrderRequest] { req =>
         if (req.isSignatureValid) {
           (orderHistory ? DeleteOrderFromHistory(pair, req.senderPublicKey.address,
-              Base58.encode(req.orderId), NTP.correctedTime()))
+            Base58.encode(req.orderId), NTP.correctedTime()))
             .mapTo[MatcherResponse]
             .map(r => r.code -> r.json)
         } else {
@@ -171,7 +171,7 @@ case class MatcherApiRoute(wallet: Wallet,
       val sig = Base58.decode(signature).get
       val ts = timestamp.toLong
       require(math.abs(ts - NTP.correctedTime()).millis < matcherSettings.maxTimestampDiff, "Incorrect timestamp")
-      require(EllipticCurveImpl.verify(sig, pk ++ Longs.toByteArray(ts), pk), "Incorrect signature")
+      require(crypto.verify(sig, pk ++ Longs.toByteArray(ts), pk), "Incorrect signature")
       PublicKeyAccount(pk).address
     }
   }
@@ -235,7 +235,9 @@ case class MatcherApiRoute(wallet: Wallet,
     implicit val timeout = Timeout(10.seconds)
     val resp: Future[MatcherResponse] = (orderHistory ? ForceCancelOrderFromHistory(orderId)).flatMap {
       case Some(order: Order) => (matcher ? ForceCancelOrder(order.assetPair, orderId)).mapTo[MatcherResponse]
-      case None => Future { OrderCancelRejected("Order not found") }
+      case None => Future {
+        OrderCancelRejected("Order not found")
+      }
     }
 
     complete(resp.map(r => r.code -> r.json))
@@ -247,7 +249,7 @@ case class MatcherApiRoute(wallet: Wallet,
     httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "Address", dataType = "string", paramType = "path")
-   ))
+  ))
   def getAllOrderHistory: Route = (path("orders" / Segment) & get & withAuth) { addr =>
     implicit val timeout = Timeout(10.seconds)
     complete((orderHistory ? GetAllOrderHistory(addr, NTP.correctedTime()))

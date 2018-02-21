@@ -1,14 +1,14 @@
 package scorex.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.serialization.{BytesSerializable, Deser}
+import scorex.serialization.Deser
 import scorex.transaction.TransactionParser._
 import scorex.transaction.{ValidationError, _}
 
@@ -23,12 +23,12 @@ case class TransferTransaction private(assetId: Option[AssetId],
                                        fee: Long,
                                        attachment: Array[Byte],
                                        signature: ByteStr)
-  extends SignedTransaction {
+  extends SignedTransaction with FastHashId {
   override val transactionType: TransactionType.Value = TransactionType.TransferTransaction
 
   override val assetFee: (Option[AssetId], Long) = (feeAssetId, fee)
 
-  val toSign: Coeval[Array[Byte]] = Coeval.evalOnce {
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val timestampBytes = Longs.toByteArray(timestamp)
     val assetIdBytes = assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
     val amountBytes = Longs.toByteArray(amount)
@@ -43,7 +43,7 @@ case class TransferTransaction private(assetId: Option[AssetId],
       amountBytes,
       feeBytes,
       recipient.bytes.arr,
-      BytesSerializable.arrayWithSize(attachment))
+      Deser.serializeArray(attachment))
   }
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
@@ -54,7 +54,7 @@ case class TransferTransaction private(assetId: Option[AssetId],
     "attachment" -> Base58.encode(attachment)
   ))
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), signature.arr, toSign()))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), signature.arr, bodyBytes()))
 
 }
 
@@ -65,14 +65,13 @@ object TransferTransaction {
 
 
   def parseTail(bytes: Array[Byte]): Try[TransferTransaction] = Try {
-    import EllipticCurveImpl._
 
     val signature = ByteStr(bytes.slice(0, SignatureLength))
     val txId = bytes(SignatureLength)
     require(txId == TransactionType.TransferTransaction.id.toByte, s"Signed tx id is not match")
     val sender = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
-    val (assetIdOpt, s0) = Deser.parseOption(bytes, SignatureLength + KeyLength + 1, AssetIdLength)
-    val (feeAssetIdOpt, s1) = Deser.parseOption(bytes, s0, AssetIdLength)
+    val (assetIdOpt, s0) = Deser.parseByteArrayOption(bytes, SignatureLength + KeyLength + 1, AssetIdLength)
+    val (feeAssetIdOpt, s1) = Deser.parseByteArrayOption(bytes, s0, AssetIdLength)
     val timestamp = Longs.fromByteArray(bytes.slice(s1, s1 + 8))
     val amount = Longs.fromByteArray(bytes.slice(s1 + 8, s1 + 16))
     val feeAmount = Longs.fromByteArray(bytes.slice(s1 + 16, s1 + 24))
@@ -116,7 +115,7 @@ object TransferTransaction {
              feeAmount: Long,
              attachment: Array[Byte]): Either[ValidationError, TransferTransaction] = {
     create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.toSign())))
+      unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
     }
   }
 }

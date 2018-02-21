@@ -1,3 +1,4 @@
+import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.toPlatformDepsGroupID
 import sbt._
 
 object Dependencies {
@@ -18,11 +19,6 @@ object Dependencies {
     "org.bitlet" % "weupnp" % "0.1.4",
     // Solves an issue with kamon-influxdb
     asyncHttpClient
-  )
-
-  lazy val scalatest = Seq(
-    "org.scalatest" %% "scalatest" % "3.0.3",
-    "org.scalactic" %% "scalactic" % "3.0.3"
   )
 
   lazy val testKit = scalatest ++ Seq(
@@ -76,7 +72,20 @@ object Dependencies {
   )
 
   lazy val fp = Seq(
-    "org.typelevel" %% "cats-core" % "1.0.0-RC1",
-    "io.monix" %% "monix" % "3.0.0-M2"
+    "org.typelevel" %% "cats-core" % "1.0.1",
+    "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
+  )
+  lazy val monix = Def.setting(Seq("io.monix" %%% "monix" % "3.0.0-M3"))
+  lazy val scodec = Def.setting(Seq("org.scodec" %%% "scodec-core" % "1.10.3"))
+  lazy val fastparse = Def.setting(Seq("com.lihaoyi" %%% "fastparse" % "1.0.0"))
+  lazy val ficus = Seq("com.iheart" %% "ficus" % "1.4.2")
+  lazy val scorex = Seq(("org.scorexfoundation" %% "scrypto" % "2.0.4").exclude("org.slf4j", "slf4j-api"))
+  lazy val commons_net = Seq("commons-net" % "commons-net" % "3.+")
+  lazy val scalatest = Seq("org.scalatest" %% "scalatest" % "3.0.3")
+  lazy val scalactic = Seq("org.scalactic" %% "scalactic" % "3.0.3")
+  lazy val cats = Seq("org.typelevel" %% "cats-core" % "1.0.1")
+  lazy val scalacheck = Seq(
+    "org.scalacheck" %% "scalacheck" % "1.13.5",
+    "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
   )
 }

@@ -4,6 +4,7 @@ import com.wavesplatform.utils.base58Length
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.smart.SetScriptTransaction
 
 import scala.util.{Failure, Try}
 
@@ -21,7 +22,9 @@ object TransactionParser {
     val LeaseCancelTransaction = Value(9)
     val CreateAliasTransaction = Value(10)
     val MassTransferTransaction = Value(11)
-    val DataTransaction = Value(12)
+    val SetScriptTransaction = Value(12)
+    val ScriptTransferTransaction = Value(13)
+    val DataTransaction = Value(14)
   }
 
   val TimestampLength = 8
@@ -66,6 +69,12 @@ object TransactionParser {
 
       case txType: Byte if txType == TransactionType.MassTransferTransaction.id =>
         MassTransferTransaction.parseTail(data.tail)
+
+      case txType: Byte if txType == TransactionType.SetScriptTransaction.id =>
+        SetScriptTransaction.parseTail(data.tail)
+
+      case txType: Byte if txType == TransactionType.ScriptTransferTransaction.id =>
+        ScriptTransferTransaction.parseTail(data.tail)
 
       case txType: Byte if txType == TransactionType.DataTransaction.id =>
         DataTransaction.parseTail(data.tail)

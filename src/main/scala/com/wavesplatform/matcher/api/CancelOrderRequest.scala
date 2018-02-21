@@ -1,11 +1,11 @@
 package com.wavesplatform.matcher.api
 
+import com.wavesplatform.crypto
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json.{JsObject, JsPath, Json, Reads}
 import scorex.account.PublicKeyAccount
-import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.OrderJson._
 
@@ -16,7 +16,7 @@ case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") s
   lazy val toSign: Array[Byte] = senderPublicKey.publicKey ++ orderId
 
   @ApiModelProperty(hidden = true)
-  def isSignatureValid = EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey)
+  def isSignatureValid: Boolean = crypto.verify(signature, toSign, senderPublicKey.publicKey)
 
   def json: JsObject = Json.obj(
     "sender" -> Base58.encode(senderPublicKey.publicKey),

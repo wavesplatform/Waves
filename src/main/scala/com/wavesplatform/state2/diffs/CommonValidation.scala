@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{Portfolio, _}
@@ -11,6 +11,7 @@ import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.smart.SetScriptTransaction
 
 import scala.concurrent.duration._
 import scala.util.{Left, Right}
@@ -66,7 +67,12 @@ object CommonValidation {
       }
   }
 
-  def disallowBeforeActivationTime[T <: Transaction](featureProvider: FeatureProvider, height: Int, tx: T): Either[ValidationError, T] =
+  def disallowBeforeActivationTime[T <: Transaction](featureProvider: FeatureProvider, height: Int, tx: T): Either[ValidationError, T] = {
+
+    def activationBarrier(b: BlockchainFeature) =
+      Either.cond(featureProvider.isFeatureActivated(b, height),
+        tx, ValidationError.ActivationError(s"${tx.getClass.getSimpleName} transaction has not been activated yet"))
+
     tx match {
       case _: BurnTransaction => Right(tx)
       case _: PaymentTransaction => Right(tx)
@@ -78,14 +84,13 @@ object CommonValidation {
       case _: LeaseTransaction => Right(tx)
       case _: LeaseCancelTransaction => Right(tx)
       case _: CreateAliasTransaction => Right(tx)
-      case _: MassTransferTransaction =>
-        Either.cond(featureProvider.isFeatureActivated(BlockchainFeatures.MassTransfer, height),
-          tx, ValidationError.ActivationError("MassTransfer transaction has not been activated yet"))
-      case _: DataTransaction => Right(tx) ///check activation
-//        Either.cond(featureProvider.isFeatureActivated(BlockchainFeatures.MassTransfer, height),
-//          tx, ValidationError.ActivationError("MassTransfer transaction has not been activated yet"))
+      case _: MassTransferTransaction => activationBarrier(BlockchainFeatures.MassTransfer)
+      case _: SetScriptTransaction => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: ScriptTransferTransaction => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: DataTransaction => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
+  }
 
   def disallowTxFromFuture[T <: Transaction](settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {
     val allowTransactionsFromFutureByTimestamp = tx.timestamp < settings.allowTransactionsFromFutureUntil
