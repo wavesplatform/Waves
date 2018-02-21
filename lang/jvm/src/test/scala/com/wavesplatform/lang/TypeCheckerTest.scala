@@ -106,7 +106,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
                                                  expectedResult: TypeCheckResult[TYPE],
                                                  varDefs: TypeDefs= Map.empty,
                                                  predefTypes: Map[String, CustomType] = Map.empty): Unit = property(propertyName) {
-    TypeChecker(TypeCheckerContext(predefTypes, varDefs), expr).map(_.tpe) match {
+    TypeChecker(TypeCheckerContext(predefTypes, varDefs, Map.empty), expr).map(_.tpe) match {
       case Right(x)    => Right(x) shouldBe expectedResult
       case e @ Left(_) => e shouldBe expectedResult
     }
@@ -123,7 +123,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
                                                  expectedResult: TypeCheckResult[Typed.EXPR],
                                                  predefTypes: Map[String, CustomType],
                                                  varDefs: TypeDefs): Unit = property(propertyName) {
-    TypeChecker(TypeCheckerContext(predefTypes, varDefs), expr) shouldBe expectedResult
+    TypeChecker(TypeCheckerContext(predefTypes, varDefs, Map.empty), expr) shouldBe expectedResult
   }
 
   private def treeTypeErasureTests(exprs: (String, Typed.EXPR)*): Unit = exprs.foreach {

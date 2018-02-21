@@ -54,10 +54,22 @@ object TypeChecker {
           if(args.lengthCompare(argTypes.size) != 0)
             EitherT.fromEither[Coeval](Left(s"Function '$name' requires ${argTypes.size} arguments, but ${args.size} are provided"))
           else {
-            val actualArgTypes: Seq[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg)))
-            ???
-            EitherT.fromEither[Coeval](Right(Typed.TRUE))
+            import cats.instances.vector._
+            val actualArgTypes: Vector[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg))).toVector
+            val sequencedActualArgTypes = actualArgTypes.sequence[SetTypeResult, Typed.EXPR].map(_.zip(argTypes))
+            sequencedActualArgTypes.subflatMap { v =>
+              val matches = v.map { case ((e, tpe)) => findCommonType(e.tpe, tpe) match {
+                case Some(_) => Right(())
+                case None => Left("Eh")
+              }
+              }
+              matches.find(_.isLeft) match {
+                case Some(left) => left
+                case None => Right(resultType)
+              }
+            }
           }
+          EitherT.fromEither[Coeval](Right(Typed.TRUE))
         case None => EitherT.fromEither[Coeval](Left(s"Function '$name' not found"))
       }
       value
