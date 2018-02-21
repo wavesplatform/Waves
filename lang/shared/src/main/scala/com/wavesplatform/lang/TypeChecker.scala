@@ -1,6 +1,6 @@
 package com.wavesplatform.lang
 
-import cats.data.EitherT
+import cats.data._
 import cats.syntax.all._
 import com.wavesplatform.lang.Context.CustomType
 import com.wavesplatform.lang.Terms._
@@ -11,10 +11,11 @@ import scala.util.{Failure, Success, Try}
 object TypeChecker {
 
   type TypeDefs = Map[String, TYPE]
-  case class TypeCheckerContext(predefTypes: Map[String, CustomType], varDefs: TypeDefs)
+  type FunctionSigs = Map[String, (List[TYPE],TYPE)]
+  case class TypeCheckerContext(predefTypes: Map[String, CustomType], varDefs: TypeDefs, functionDefs: FunctionSigs)
 
   object TypeCheckerContext {
-    val empty = TypeCheckerContext(Map.empty, Map.empty)
+    val empty = TypeCheckerContext(Map.empty, Map.empty, Map.empty)
   }
 
   type TypeResolutionError      = String
@@ -46,6 +47,20 @@ object TypeChecker {
             case x => Left(s"Can't access to '${getter.field}' of a primitive type $x")
           }
         }
+
+    case expr@Untyped.FUNCTION_CALL(name, args) =>
+      val value: EitherT[Coeval, String, Typed.EXPR] = ctx.functionDefs.get(name) match {
+        case Some((argTypes, resultType)) =>
+          if(args.lengthCompare(argTypes.size) != 0)
+            EitherT.fromEither[Coeval](Left(s"Function '$name' requires ${argTypes.size} arguments, but ${args.size} are provided"))
+          else {
+            val actualArgTypes: Seq[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg)))
+            ???
+            EitherT.fromEither[Coeval](Right(Typed.TRUE))
+          }
+        case None => EitherT.fromEither[Coeval](Left(s"Function '$name' not found"))
+      }
+      value
 
     case expr@Untyped.BINARY_OP(a, op, b) =>
       (setType(ctx, EitherT.pure(a)), setType(ctx, EitherT.pure(b))).tupled

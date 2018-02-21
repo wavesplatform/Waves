@@ -39,7 +39,7 @@ object Terms {
     case object FALSE                                                      extends EXPR
     case object NONE                                                       extends EXPR
     case class SOME(t: EXPR)                                               extends EXPR
-    case class FUNCTION_CALL(functionName: String, args: List[EXPR])
+    case class FUNCTION_CALL(functionName: String, args: List[EXPR])       extends EXPR
   }
 
   object Typed {
