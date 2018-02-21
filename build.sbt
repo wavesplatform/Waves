@@ -1,7 +1,7 @@
-import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys.{sourceGenerators, _}
 import sbt._
+import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
 
@@ -158,7 +158,8 @@ lazy val lang =
         Dependencies.scalactic ++
         Dependencies.monix.value ++
         Dependencies.scodec.value ++
-        Dependencies.fastparse.value
+        Dependencies.fastparse.value,
+      resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins")
     )
     .jsSettings(
       scalaJSLinkerConfig ~= {
