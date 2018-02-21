@@ -18,22 +18,22 @@ class BurnTransactionSuite2 extends BaseTransactionSuite {
     notMiner.assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
 
     // burn half of the coins and check balance
-    var burnId = sender.burn(firstAddress, issuedAssetId, defaultQuantity / 2, fee = defaultFee).id
+    val burnId = sender.burn(firstAddress, issuedAssetId, defaultQuantity / 2, fee = defaultFee).id
 
     nodes.waitForHeightAraiseAndTxPresent(burnId)
     notMiner.assertBalances(firstAddress, balance - 2 * defaultFee, effectiveBalance - 2 * defaultFee)
     notMiner.assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity / 2)
 
-    var assetOpt = notMiner.assetsBalance(firstAddress).balances.find(_.assetId == issuedAssetId)
+    val assetOpt = notMiner.assetsBalance(firstAddress).balances.find(_.assetId == issuedAssetId)
     assert(assetOpt.exists(_.balance == defaultQuantity / 2))
 
     // burn the rest and check again
-    burnId = sender.burn(firstAddress, issuedAssetId, defaultQuantity / 2, fee = defaultFee).id
+    val burnIdRest = sender.burn(firstAddress, issuedAssetId, defaultQuantity / 2, fee = defaultFee).id
 
-    nodes.waitForHeightAraiseAndTxPresent(burnId)
+    nodes.waitForHeightAraiseAndTxPresent(burnIdRest)
     notMiner.assertAssetBalance(firstAddress, issuedAssetId, 0)
 
-    assetOpt = notMiner.assetsBalance(firstAddress).balances.find(_.assetId == issuedAssetId)
-    assert(assetOpt.isEmpty)
+    val assetOptRest = notMiner.assetsBalance(firstAddress).balances.find(_.assetId == issuedAssetId)
+    assert(assetOptRest.isEmpty)
   }
 }
