@@ -1,8 +1,8 @@
 package scorex.transaction
 
-import com.wavesplatform.state2._
+import com.wavesplatform.crypto
+import com.wavesplatform.state2.{ByteStr, _}
 import monix.eval.Coeval
-import scorex.crypto.EllipticCurveImpl
 
 trait SignedTransaction extends ProvenTransaction with Signed {
 
@@ -12,5 +12,5 @@ trait SignedTransaction extends ProvenTransaction with Signed {
 
   def proofs: Proofs = Proofs.create(Seq(signature)).explicitGet()
 
-  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr, bodyBytes(), sender.publicKey))
+  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature.arr, bodyBytes(), sender.publicKey))
 }

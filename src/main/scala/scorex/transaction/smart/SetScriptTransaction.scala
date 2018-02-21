@@ -1,11 +1,11 @@
 package scorex.transaction.smart
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.crypto
 import com.wavesplatform.state2._
 import monix.eval.Coeval
 import play.api.libs.json.Json
 import scorex.account._
-import scorex.crypto.EllipticCurveImpl
 import scorex.serialization.Deser
 import scorex.transaction.TransactionParser.{KeyLength, TransactionType}
 import scorex.transaction.ValidationError.GenericError
@@ -42,7 +42,7 @@ object SetScriptTransaction {
   def parseTail(bytes: Array[Byte]): Try[SetScriptTransaction] = Try {
     val version = bytes(0)
     val sender = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
-    val (scriptOptEi: Option[Either[ValidationError.ScriptParseError, Script]], scriptEnd) = Deser.parseOption(bytes, KeyLength + 1)(str => Script.fromBytes(Deser.parseArraySize(str,0)._1))
+    val (scriptOptEi: Option[Either[ValidationError.ScriptParseError, Script]], scriptEnd) = Deser.parseOption(bytes, KeyLength + 1)(str => Script.fromBytes(Deser.parseArraySize(str, 0)._1))
     val scriptEiOpt = scriptOptEi match {
       case None => Right(None)
       case Some(Right(sc)) => Right(Some(sc))
@@ -55,7 +55,7 @@ object SetScriptTransaction {
       scriptOpt <- scriptEiOpt
       _ <- Either.cond(version == 1, (), GenericError(s"Unsupported SetScriptTransaction version ${version.toInt}"))
       proofs <- Proofs.fromBytes(bytes.drop(scriptEnd + 16))
-                                                    tx <- create(sender, scriptOpt, fee, timestamp, proofs)
+      tx <- create(sender, scriptOpt, fee, timestamp, proofs)
     } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
@@ -76,6 +76,6 @@ object SetScriptTransaction {
                  script: Script,
                  fee: Long,
                  timestamp: Long): Either[ValidationError, SetScriptTransaction] = create(sender, Some(script), fee, timestamp, Proofs.empty).right.map { unsigned =>
-    unsigned.copy(proofs = Proofs.create(Seq(ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes())))).explicitGet())
+    unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes())))).explicitGet())
   }
 }

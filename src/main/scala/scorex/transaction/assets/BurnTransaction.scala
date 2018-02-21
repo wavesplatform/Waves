@@ -1,11 +1,11 @@
 package scorex.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.TransactionParser._
 import scorex.transaction.{ValidationError, _}
 
@@ -51,7 +51,6 @@ object BurnTransaction {
   }
 
   def parseTail(bytes: Array[Byte]): Try[BurnTransaction] = Try {
-    import EllipticCurveImpl._
     val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
     val assetId = ByteStr(bytes.slice(KeyLength, KeyLength + AssetIdLength))
     val quantityStart = KeyLength + AssetIdLength
@@ -85,6 +84,6 @@ object BurnTransaction {
              fee: Long,
              timestamp: Long): Either[ValidationError, BurnTransaction] =
     create(sender, assetId, quantity, fee, timestamp, ByteStr.empty).right.map { unverified =>
-      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unverified.bodyBytes())))
+      unverified.copy(signature = ByteStr(crypto.sign(sender, unverified.bodyBytes())))
     }
 }

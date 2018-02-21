@@ -3,15 +3,13 @@ package scorex.lagonaki.unit
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.produce
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction._
 import scorex.transaction.assets.TransferTransaction
 
@@ -89,7 +87,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
   property(" block with txs bytes/parse roundtrip version 3") {
     val version = 3.toByte
 
-    val faetureSetGen : Gen[Set[Short]] = Gen.choose(0, Block.MaxFeaturesInBlock).flatMap(fc => Gen.listOfN(fc, arbitrary[Short])).map(_.toSet)
+    val faetureSetGen: Gen[Set[Short]] = Gen.choose(0, Block.MaxFeaturesInBlock).flatMap(fc => Gen.listOfN(fc, arbitrary[Short])).map(_.toSet)
 
     forAll(blockGen, faetureSetGen) {
       case ((baseTarget, reference, generationSignature, recipient, transactionData), featureVotes) =>
@@ -108,8 +106,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     forAll(randomTransactionsGen(60000), accountGen, byteArrayGen(Block.BlockIdLength), byteArrayGen(Block.GeneratorSignatureLength)) { case ((txs, acc, ref, gs)) =>
       val (block, t0) = Instrumented.withTime(Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, acc, Set.empty).explicitGet())
       val (bytes, t1) = Instrumented.withTime(block.bytesWithoutSignature())
-      val (hash, t2) = Instrumented.withTime(FastCryptographicHash.hash(bytes))
-      val (sig, t3) = Instrumented.withTime(EllipticCurveImpl.sign(acc, hash))
+      val (hash, t2) = Instrumented.withTime(crypto.fastHash(bytes))
+      val (sig, t3) = Instrumented.withTime(crypto.sign(acc, hash))
       println((t0, t1, t2, t3))
     }
   }

@@ -13,7 +13,7 @@ import scorex.transaction.assets.TransferTransaction
 
 import scala.util.Random
 
-class MicroBlockSpecification extends FunSuite with Matchers with MockFactory with ShouldVerb{
+class MicroBlockSpecification extends FunSuite with Matchers with MockFactory with ShouldVerb {
 
   val prevResBlockSig = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))
   val totalResBlockSig = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))

@@ -3,15 +3,14 @@ package tools
 import java.io.{File, FileNotFoundException}
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.state2._
+import com.wavesplatform.{TransactionGen, crypto}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import scorex.account.{Address, AddressScheme, PrivateKeyAccount}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.TransactionParser.SignatureLength
 import scorex.wallet.Wallet
@@ -93,7 +92,7 @@ object GenesisBlockGenerator extends App with TransactionGen {
       version = 1,
       timestamp = settings.timestamp,
       reference = reference,
-      consensusData = NxtLikeConsensusBlockData(settings.baseTarget, ByteStr(Array.fill(DigestSize)(0: Byte))),
+      consensusData = NxtLikeConsensusBlockData(settings.baseTarget, ByteStr(Array.fill(crypto.DigestSize)(0: Byte))),
       transactionData = genesisTxs,
       signer = genesisSigner,
       featureVotes = Set.empty

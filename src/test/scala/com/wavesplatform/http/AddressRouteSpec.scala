@@ -2,14 +2,13 @@ package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.{NoShrink, TestWallet}
+import com.wavesplatform.{NoShrink, TestWallet, crypto}
 import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
 import scorex.api.http.{AddressApiRoute, ApiKeyNotValid, InvalidMessage}
-import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.settings.TestFunctionalitySettings
 
@@ -86,7 +85,7 @@ class AddressRouteSpec
         (resp \ "message").as[String] shouldEqual (if (encode) Base58.encode(message.getBytes) else message)
         (resp \ "publicKey").as[String] shouldEqual Base58.encode(account.publicKey)
 
-        EllipticCurveImpl.verify(signature, message.getBytes, account.publicKey) shouldBe true
+        crypto.verify(signature, message.getBytes, account.publicKey) shouldBe true
       }
     }
 
@@ -98,7 +97,7 @@ class AddressRouteSpec
     forAll(generatedMessages) { case (account, message) =>
       val uri = routePath(s"/$path/${account.address}")
       val messageBytes = message.getBytes()
-      val signature = EllipticCurveImpl.sign(account, messageBytes)
+      val signature = crypto.sign(account, messageBytes)
       val validBody = Json.obj("message" -> JsString(if (encode) Base58.encode(messageBytes) else message),
         "publickey" -> JsString(Base58.encode(account.publicKey)),
         "signature" -> JsString(Base58.encode(signature)))

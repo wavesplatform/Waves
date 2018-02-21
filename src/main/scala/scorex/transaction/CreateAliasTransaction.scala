@@ -1,12 +1,11 @@
 package scorex.transaction
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account._
-import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.Deser
 import scorex.transaction.TransactionParser._
 
@@ -22,7 +21,7 @@ case class CreateAliasTransaction private(sender: PublicKeyAccount,
 
   override val transactionType: TransactionType.Value = TransactionType.CreateAliasTransaction
 
-  override val id: Coeval[AssetId] = Coeval.evalOnce(ByteStr(FastCryptographicHash(transactionType.id.toByte +: alias.bytes.arr)))
+  override val id: Coeval[AssetId] = Coeval.evalOnce(ByteStr(crypto.fastHash(transactionType.id.toByte +: alias.bytes.arr)))
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(
     Array(transactionType.id.toByte),
@@ -45,7 +44,6 @@ case class CreateAliasTransaction private(sender: PublicKeyAccount,
 object CreateAliasTransaction {
 
   def parseTail(bytes: Array[Byte]): Try[CreateAliasTransaction] = Try {
-    import EllipticCurveImpl._
     val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
     val (aliasBytes, aliasEnd) = Deser.parseArraySize(bytes, KeyLength)
     (for {
@@ -73,7 +71,7 @@ object CreateAliasTransaction {
              fee: Long,
              timestamp: Long): Either[ValidationError, CreateAliasTransaction] = {
     create(sender, alias, fee, timestamp, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes())))
+      unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
     }
   }
 }

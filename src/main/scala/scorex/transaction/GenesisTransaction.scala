@@ -1,11 +1,11 @@
 package scorex.transaction
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.Address
-import scorex.crypto.hash.FastCryptographicHash._
 import scorex.transaction.TransactionParser._
 
 import scala.util.{Failure, Success, Try}
@@ -17,7 +17,7 @@ case class GenesisTransaction private(recipient: Address, amount: Long, timestam
   override val assetFee: (Option[AssetId], Long) = (None, 0)
   override val id: Coeval[AssetId] = Coeval.evalOnce(signature)
 
-  val transactionType = TransactionType.GenesisTransaction
+  val transactionType: TransactionParser.TransactionType.Value = TransactionType.GenesisTransaction
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     Json.obj("type" -> transactionType.id,
@@ -54,7 +54,7 @@ object GenesisTransaction extends {
 
     val data = Bytes.concat(typeBytes, timestampBytes, recipient.bytes.arr, Bytes.concat(amountFill, amountBytes))
 
-    val h = hash(data)
+    val h = crypto.fastHash(data)
     Bytes.concat(h, h)
   }
 

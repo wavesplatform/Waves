@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.{TransactionGen, crypto}
 import io.netty.buffer.Unpooled.wrappedBuffer
 import io.netty.buffer.{ByteBuf, Unpooled}
 import io.netty.channel.embedded.EmbeddedChannel
@@ -8,7 +8,6 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.crypto.hash.FastCryptographicHash
 import scorex.network.message.{Message => ScorexMessage}
 import scorex.transaction.Transaction
 
@@ -55,7 +54,7 @@ class LegacyFrameCodecSpec extends FreeSpec
 
   private def write(buff: ByteBuf, tx: Transaction): Unit = {
     val txBytes = tx.bytes()
-    val checkSum = wrappedBuffer(FastCryptographicHash.hash(txBytes), 0, ScorexMessage.ChecksumLength)
+    val checkSum = wrappedBuffer(crypto.fastHash(txBytes), 0, ScorexMessage.ChecksumLength)
 
     buff.writeInt(LegacyFrameCodec.Magic)
     buff.writeByte(TransactionSpec.messageCode)

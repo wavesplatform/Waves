@@ -1,5 +1,5 @@
-import sbt._
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.toPlatformDepsGroupID
+import sbt._
 
 object Dependencies {
 
@@ -79,7 +79,7 @@ object Dependencies {
   lazy val scodec = Def.setting(Seq("org.scodec" %%% "scodec-core" % "1.10.3"))
   lazy val fastparse = Def.setting(Seq("com.lihaoyi" %%% "fastparse" % "1.0.0"))
   lazy val ficus = Seq("com.iheart" %% "ficus" % "1.4.2")
-  lazy val scorex = Seq(("org.scorexfoundation" %% "scrypto" % "1.2.2").exclude("org.slf4j", "slf4j-api"))
+  lazy val scorex = Seq(("org.scorexfoundation" %% "scrypto" % "2.0.4").exclude("org.slf4j", "slf4j-api"))
   lazy val commons_net = Seq("commons-net" % "commons-net" % "3.+")
   lazy val scalatest = Seq("org.scalatest" %% "scalatest" % "3.0.3")
   lazy val scalactic = Seq("org.scalactic" %% "scalactic" % "3.0.3")

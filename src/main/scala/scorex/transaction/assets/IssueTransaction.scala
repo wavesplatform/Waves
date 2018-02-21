@@ -2,11 +2,11 @@ package scorex.transaction.assets
 
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.EllipticCurveImpl
 import scorex.serialization.Deser
 import scorex.transaction.TransactionParser._
 import scorex.transaction.{ValidationError, _}
@@ -109,6 +109,6 @@ object IssueTransaction {
              fee: Long,
              timestamp: Long): Either[ValidationError, IssueTransaction] =
     create(sender, name, description, quantity, decimals, reissuable, fee, timestamp, ByteStr.empty).right.map { unverified =>
-      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unverified.bodyBytes())))
+      unverified.copy(signature = ByteStr(crypto.sign(sender, unverified.bodyBytes())))
     }
 }

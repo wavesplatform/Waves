@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.google.common.base.Throwables
+import com.wavesplatform.crypto
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.StateReader
@@ -8,8 +9,6 @@ import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.account.{Address, PublicKeyAccount}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.crypto.hash.FastCryptographicHash
-import scorex.crypto.hash.FastCryptographicHash.hash
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
@@ -29,8 +28,8 @@ object PoSCalc extends ScorexLogging {
   def calcHit(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount): BigInt =
     BigInt(1, calcGeneratorSignature(lastBlockData, generator).take(8).reverse)
 
-  def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount): FastCryptographicHash.Digest =
-    hash(lastBlockData.generationSignature.arr ++ generator.publicKey)
+  def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount): Array[Byte] =
+    crypto.fastHash(lastBlockData.generationSignature.arr ++ generator.publicKey)
 
   def calcBaseTarget(avgBlockDelay: FiniteDuration, parentHeight: Int, parentBaseTarget: Long,
                      parentTimestamp: Long, maybeGreatGrandParentTimestamp: Option[Long], timestamp: Long): Long = {
@@ -76,7 +75,7 @@ object PoSCalc extends ScorexLogging {
         t = cData.baseTarget
         calculatedTs = (hit * 1000) / (BigInt(t) * balance) + block.timestamp
         _ <- Either.cond(0 < calculatedTs && calculatedTs < Long.MaxValue, (), s"Invalid next block generation time: $calculatedTs")
-      } yield (balance,calculatedTs.toLong)
+      } yield (balance, calculatedTs.toLong)
       case Failure(exc) =>
         log.error("Critical error calculating nextBlockGenerationTime", exc)
         Left(Throwables.getStackTraceAsString(exc))

@@ -7,8 +7,8 @@ import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import org.scalatest.Matchers
 import org.iq80.leveldb.DB
+import org.scalatest.Matchers
 import scorex.block.Block
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.{History, ValidationError}

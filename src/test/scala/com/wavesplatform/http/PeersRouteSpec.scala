@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
 import java.net.{InetAddress, InetSocketAddress}
-import java.util.concurrent.{ConcurrentHashMap}
+import java.util.concurrent.ConcurrentHashMap
 
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}

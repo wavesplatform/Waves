@@ -15,7 +15,6 @@ import scorex.transaction.assets.TransferTransaction.MaxAttachmentSize
 
 class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private val Timeout = 2.minutes
   private val assetQuantity = 100.waves
   private val transferAmount = 5.waves
   private val leasingAmount = 5.waves

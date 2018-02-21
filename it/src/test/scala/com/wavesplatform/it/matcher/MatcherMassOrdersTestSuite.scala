@@ -2,14 +2,15 @@ package com.wavesplatform.it.matcher
 
 import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.crypto
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.OrderbookHistory
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
-import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -42,7 +43,7 @@ class MatcherMassOrdersTestSuite extends FreeSpec with NodesFromDocker with Matc
       case head +: tail =>
         val r = result.flatMap { _ =>
           matcherNode.placeOrder(prepareOrder(node, matcherNode, assetPair, orderType,
-            Order.PriceConstant, amount, (70 + Random.nextInt(70)).seconds)).map(_ => ())
+            Order.PriceConstant, amount, (120 + Random.nextInt(70)).seconds)).map(_ => ())
         }
         execute(tail, r)
     }
@@ -54,7 +55,7 @@ class MatcherMassOrdersTestSuite extends FreeSpec with NodesFromDocker with Matc
   private def aliceOrderHistory(): Seq[OrderbookHistory] = {
     val ts = System.currentTimeMillis()
     val privateKey = aliceNode.privateKey
-    val signature = ByteStr(EllipticCurveImpl.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts)))
+    val signature = ByteStr(crypto.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts)))
     Await.result(matcherNode.getOrderbookByPublicKey(aliceNode.publicKeyStr, ts, signature), 1.minute)
   }
 
@@ -76,8 +77,8 @@ class MatcherMassOrdersTestSuite extends FreeSpec with NodesFromDocker with Matc
     waitForAssetBalance(aliceNode, aliceAsset, AssetQuantity)
     waitForAssetBalance(aliceNode, aliceSecondAsset, AssetQuantity)
     waitForAssetBalance(matcherNode, aliceAsset, 0)
-    Await.result(aliceNode.transfer(aliceNode.address, bobNode.address, AssetQuantity / 2, 100000, Some(aliceAsset)), 1.minute);
-    Await.result(aliceNode.transfer(aliceNode.address, bobNode.address, AssetQuantity / 2, 100000, Some(aliceSecondAsset)), 1.minute);
+    Await.result(aliceNode.transfer(aliceNode.address, bobNode.address, AssetQuantity / 2, 100000, Some(aliceAsset)), 1.minute)
+    Await.result(aliceNode.transfer(aliceNode.address, bobNode.address, AssetQuantity / 2, 100000, Some(aliceSecondAsset)), 1.minute)
     waitForAssetBalance(bobNode, aliceAsset, AssetQuantity / 2)
 
     // Alice places sell order
@@ -88,7 +89,7 @@ class MatcherMassOrdersTestSuite extends FreeSpec with NodesFromDocker with Matc
       prepareOrder(aliceNode, matcherNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, 10.minutes))
 
     val (aliceOrderToCancelId, _) = matcherPlaceOrder(matcherNode,
-      prepareOrder(aliceNode, matcherNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, 70.seconds))
+      prepareOrder(aliceNode, matcherNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, 2.minutes))
 
     val (aliceActiveOrderId, _) = matcherPlaceOrder(matcherNode,
       prepareOrder(aliceNode, matcherNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant + 1, 3, 10.minutes))

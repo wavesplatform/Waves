@@ -3,12 +3,11 @@ package scorex.transaction
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.TransactionParser._
 
 import scala.util.{Failure, Success, Try}
@@ -21,7 +20,7 @@ case class PaymentTransaction private(sender: PublicKeyAccount,
                                       signature: ByteStr) extends SignedTransaction {
   override val transactionType = TransactionType.PaymentTransaction
   override val assetFee: (Option[AssetId], Long) = (None, fee)
-  override val id = Coeval.evalOnce(signature)
+  override val id: Coeval[AssetId] = Coeval.evalOnce(signature)
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
     "recipient" -> recipient.address,
@@ -33,7 +32,7 @@ case class PaymentTransaction private(sender: PublicKeyAccount,
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Ints.toByteArray(transactionType.id),
     Longs.toByteArray(timestamp), sender.publicKey, recipient.bytes.arr, Longs.toByteArray(amount), Longs.toByteArray(fee)))
 
-  val hash: Coeval[FastCryptographicHash.Digest] = Coeval.evalOnce(FastCryptographicHash(hashBytes()))
+  val hash: Coeval[Array[Byte]] = Coeval.evalOnce(crypto.fastHash(hashBytes()))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(hashBytes(), signature.arr))
 
@@ -41,7 +40,7 @@ case class PaymentTransaction private(sender: PublicKeyAccount,
 
 object PaymentTransaction {
 
-  val RecipientLength = Address.AddressLength
+  val RecipientLength: Int = Address.AddressLength
 
   private val SenderLength = 32
   private val FeeLength = 8
@@ -49,7 +48,7 @@ object PaymentTransaction {
 
   def create(sender: PrivateKeyAccount, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
     create(sender, recipient, amount, fee, timestamp, ByteStr.empty).right.map(unsigned => {
-      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes())))
+      unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
     })
   }
 

@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 
 import cats._
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.wavesplatform.crypto
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state2._
 import monix.eval.Coeval
@@ -11,8 +12,6 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.fields.FeaturesBlockField
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
-import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.transaction.TransactionParser._
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
@@ -170,7 +169,7 @@ case class Block private(override val timestamp: Long,
 
   val prevBlockFeePart: Coeval[Portfolio] = Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
 
-  protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signerData.signature.arr, bytesWithoutSignature(), signerData.generator.publicKey))
+  protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signerData.signature.arr, bytesWithoutSignature(), signerData.generator.publicKey))
   protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
   override def toString: String =
@@ -263,7 +262,7 @@ object Block extends ScorexLogging {
                    signer: PrivateKeyAccount,
                    featureVotes: Set[Short]): Either[GenericError, Block] =
     build(version, timestamp, reference, consensusData, transactionData, SignerData(signer, ByteStr.empty), featureVotes).right.map(unsigned =>
-      unsigned.copy(signerData = SignerData(signer, ByteStr(EllipticCurveImpl.sign(signer, unsigned.bytes())))))
+      unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))))
 
   def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
     gs.transactions.map { ts =>
@@ -278,7 +277,7 @@ object Block extends ScorexLogging {
 
     val transactionGenesisData = genesisTransactions(genesisSettings)
     val transactionGenesisDataField = TransactionsBlockFieldVersion1or2(transactionGenesisData)
-    val consensusGenesisData = NxtLikeConsensusBlockData(genesisSettings.initialBaseTarget, ByteStr(Array.fill(DigestSize)(0: Byte)))
+    val consensusGenesisData = NxtLikeConsensusBlockData(genesisSettings.initialBaseTarget, ByteStr(Array.fill(crypto.DigestSize)(0: Byte)))
     val consensusGenesisDataField = NxtConsensusBlockField(consensusGenesisData)
     val txBytesSize = transactionGenesisDataField.bytes().length
     val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionGenesisDataField.bytes()
@@ -295,9 +294,9 @@ object Block extends ScorexLogging {
       txBytes ++
       genesisSigner.publicKey
 
-    val signature = genesisSettings.signature.fold(EllipticCurveImpl.sign(genesisSigner, toSign))(_.arr)
+    val signature = genesisSettings.signature.fold(crypto.sign(genesisSigner, toSign))(_.arr)
 
-    if (EllipticCurveImpl.verify(signature, toSign, genesisSigner.publicKey))
+    if (crypto.verify(signature, toSign, genesisSigner.publicKey))
       Right(Block(timestamp = timestamp,
         version = GenesisBlockVersion,
         reference = ByteStr(reference),
