@@ -150,7 +150,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
       fee,
       timestamp,
       attachment.headOption.map(_ => Base58.encode(attachment)),
-      proofs.base58()
+      proofs.base58().toList
     )
   }
 }
