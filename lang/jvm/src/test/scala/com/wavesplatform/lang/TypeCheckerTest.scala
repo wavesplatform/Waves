@@ -1,7 +1,8 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.lang.Context.CustomType
 import com.wavesplatform.lang.Terms._
-import com.wavesplatform.lang.TypeChecker.{Context, Defs, TypeCheckResult}
+import com.wavesplatform.lang.TypeChecker.{TypeCheckResult, TypeCheckerContext, TypeDefs}
 import monix.eval.Coeval
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -10,7 +11,7 @@ import scorex.crypto.encode.Base58
 
 class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private val pointType = CUSTOMTYPE("Point", List("x" -> INT, "y" -> INT))
+  private val pointType = CustomType("Point", List("x" -> INT, "y" -> INT))
 
   rootTypeTest("successful on very deep expressions (stack overflow check)")(
     expr = (1 to 100000).foldLeft[Untyped.EXPR](Untyped.CONST_INT(0))((acc, _) => Untyped.BINARY_OP(acc, SUM_OP, Untyped.CONST_INT(1))),
@@ -103,9 +104,9 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
 
   private def rootTypeTest(propertyName: String)(expr: Untyped.EXPR,
                                                  expectedResult: TypeCheckResult[TYPE],
-                                                 varDefs: Defs = Map.empty,
-                                                 predefTypes: Map[String, CUSTOMTYPE] = Map.empty): Unit = property(propertyName) {
-    TypeChecker(Context(predefTypes, varDefs), expr).map(_.tpe) match {
+                                                 varDefs: TypeDefs= Map.empty,
+                                                 predefTypes: Map[String, CustomType] = Map.empty): Unit = property(propertyName) {
+    TypeChecker(TypeCheckerContext(predefTypes, varDefs, Map.empty), expr).map(_.tpe) match {
       case Right(x)    => Right(x) shouldBe expectedResult
       case e @ Left(_) => e shouldBe expectedResult
     }
@@ -114,22 +115,22 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   private def errorTests(exprs: ((String, String), Untyped.EXPR)*): Unit = exprs.foreach {
     case ((label, error), input) =>
       property(s"Error: $label") {
-        TypeChecker(Context.empty, input) should produce(error)
+        TypeChecker(TypeCheckerContext.empty, input) should produce(error)
       }
   }
 
   private def treeTypeTest(propertyName: String)(expr: Untyped.EXPR,
                                                  expectedResult: TypeCheckResult[Typed.EXPR],
-                                                 predefTypes: Map[String, CUSTOMTYPE],
-                                                 varDefs: Defs): Unit = property(propertyName) {
-    TypeChecker(Context(predefTypes, varDefs), expr) shouldBe expectedResult
+                                                 predefTypes: Map[String, CustomType],
+                                                 varDefs: TypeDefs): Unit = property(propertyName) {
+    TypeChecker(TypeCheckerContext(predefTypes, varDefs, Map.empty), expr) shouldBe expectedResult
   }
 
   private def treeTypeErasureTests(exprs: (String, Typed.EXPR)*): Unit = exprs.foreach {
     case (exprName, expected) =>
       property(exprName) {
         val erased = erase(expected)
-        TypeChecker(Context.empty, erased) shouldBe Right(expected)
+        TypeChecker(TypeCheckerContext.empty, erased) shouldBe Right(expected)
       }
   }
 

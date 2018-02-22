@@ -43,10 +43,10 @@ abstract class ParserImpl { this: Base58 =>
 
   def patmat(exp: EXPR, ref: String, ifSome: EXPR, ifNone: EXPR): BLOCK =
     BLOCK(
-      Some(LET(s"$exp", exp)),
-      IF(IS_DEFINED(REF(s"$exp")),
+      Some(LET("@exp", exp)),
+      IF(IS_DEFINED(REF("@exp")),
         BLOCK(
-          Some(LET(ref, GET(REF(s"$exp")))),
+          Some(LET(ref, GET(REF("@exp")))),
           ifSome
         ),
         ifNone)

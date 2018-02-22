@@ -1,7 +1,8 @@
 package com.wavesplatform.lang
 
-import cats.data.EitherT
+import cats.data._
 import cats.syntax.all._
+import com.wavesplatform.lang.Context.CustomType
 import com.wavesplatform.lang.Terms._
 import monix.eval.Coeval
 
@@ -9,18 +10,19 @@ import scala.util.{Failure, Success, Try}
 
 object TypeChecker {
 
-  type Defs = Map[String, TYPE]
+  type TypeDefs = Map[String, TYPE]
+  type FunctionSigs = Map[String, (List[TYPE],TYPE)]
+  case class TypeCheckerContext(predefTypes: Map[String, CustomType], varDefs: TypeDefs, functionDefs: FunctionSigs)
 
-  case class Context(predefTypes: Map[String, CUSTOMTYPE], varDefs: Defs)
-  object Context {
-    val empty = Context(Map.empty, Map.empty)
+  object TypeCheckerContext {
+    val empty = TypeCheckerContext(Map.empty, Map.empty, Map.empty)
   }
 
   type TypeResolutionError      = String
   type TypeCheckResult[T]       = Either[TypeResolutionError, T]
   private type SetTypeResult[T] = EitherT[Coeval, String, T]
 
-  private def setType(ctx: Context, t: SetTypeResult[Untyped.EXPR]): SetTypeResult[Typed.EXPR] = t.flatMap {
+  private def setType(ctx: TypeCheckerContext, t: SetTypeResult[Untyped.EXPR]): SetTypeResult[Typed.EXPR] = t.flatMap {
     case x: Untyped.CONST_INT        => EitherT.pure(Typed.CONST_INT(x.t))
     case x: Untyped.CONST_BYTEVECTOR => EitherT.pure(Typed.CONST_BYTEVECTOR(x.bs))
     case Untyped.TRUE                => EitherT.pure(Typed.TRUE)
@@ -45,6 +47,32 @@ object TypeChecker {
             case x => Left(s"Can't access to '${getter.field}' of a primitive type $x")
           }
         }
+
+    case expr@Untyped.FUNCTION_CALL(name, args) =>
+      val value: EitherT[Coeval, String, Typed.EXPR] = ctx.functionDefs.get(name) match {
+        case Some((argTypes, resultType)) =>
+          if(args.lengthCompare(argTypes.size) != 0)
+            EitherT.fromEither[Coeval](Left(s"Function '$name' requires ${argTypes.size} arguments, but ${args.size} are provided"))
+          else {
+            import cats.instances.vector._
+            val actualArgTypes: Vector[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg))).toVector
+            val sequencedActualArgTypes = actualArgTypes.sequence[SetTypeResult, Typed.EXPR].map(_.zip(argTypes))
+            sequencedActualArgTypes.subflatMap { v =>
+              val matches = v.map { case ((e, tpe)) => findCommonType(e.tpe, tpe) match {
+                case Some(_) => Right(())
+                case None => Left("Eh")
+              }
+              }
+              matches.find(_.isLeft) match {
+                case Some(left) => left
+                case None => Right(resultType)
+              }
+            }
+          }
+          EitherT.fromEither[Coeval](Right(Typed.TRUE))
+        case None => EitherT.fromEither[Coeval](Left(s"Function '$name' not found"))
+      }
+      value
 
     case expr@Untyped.BINARY_OP(a, op, b) =>
       (setType(ctx, EitherT.pure(a)), setType(ctx, EitherT.pure(b))).tupled
@@ -152,7 +180,7 @@ object TypeChecker {
     case some: Untyped.SOME => setType(ctx, EitherT.pure(some.t)).map(t => Typed.SOME(t = t, tpe = OPTION(t.tpe)))
   }
 
-  def apply(c: Context, expr: Untyped.EXPR): TypeCheckResult[Typed.EXPR] = {
+  def apply(c: TypeCheckerContext, expr: Untyped.EXPR): TypeCheckResult[Typed.EXPR] = {
     def result = setType(c, EitherT.pure(expr)).value().left.map { e =>
       s"Typecheck failed: $e"
     }
