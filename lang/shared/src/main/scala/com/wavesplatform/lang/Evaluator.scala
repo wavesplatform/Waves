@@ -23,31 +23,29 @@ object Evaluator {
           case None => r[blockTpe.Underlying](ctx, inner)
           case Some(Typed.LET(newVarName, newVarBlock)) =>
             ctx.defs.get(newVarName) match {
-              case Some(_) => EitherT.leftT[Coeval,T](s"Value '$newVarName' already defined in the scope")
+              case Some(_) => EitherT.leftT[Coeval, T](s"Value '$newVarName' already defined in the scope")
               case None =>
                 val varBlockTpe = newVarBlock.tpe
-                r[varBlockTpe.Underlying](ctx, newVarBlock).flatMap {
-                  newVarValue =>
-                    val updatedCtx = ctx.copy(defs = ctx.defs.updated(newVarName, (varBlockTpe, newVarValue)))
-                    r[blockTpe.Underlying](updatedCtx, inner)
-                }
+                for {
+                  newVarValue <- r[varBlockTpe.Underlying](ctx, newVarBlock)
+                  updatedCtx = ctx.copy(defs = ctx.defs.updated(newVarName, (varBlockTpe, newVarValue)))
+                  res <- r[blockTpe.Underlying](updatedCtx, inner)
+                } yield res
             }
         }
 
       case let: Typed.LET => r[let.tpe.Underlying](ctx, let.value)
 
       case Typed.REF(str, _) =>
-        EitherT.fromEither[Coeval] {
-          ctx.defs.get(str) match {
-            case Some((x, y)) => Right(y.asInstanceOf[x.Underlying])
-            case None         => Left(s"A definition of '$str' is not found")
-          }
+        ctx.defs.get(str) match {
+          case Some((x, y)) => EitherT.rightT[Coeval, String](y.asInstanceOf[x.Underlying])
+          case None         => EitherT.leftT[Coeval, Any](s"A definition of '$str' is not found")
         }
 
-      case Typed.CONST_INT(v)        => EitherT.rightT[Coeval, String](Right(v))
-      case Typed.CONST_BYTEVECTOR(v) => EitherT.rightT[Coeval, String](Right(v))
-      case Typed.TRUE                => EitherT.rightT[Coeval, String](Right(true))
-      case Typed.FALSE               => EitherT.rightT[Coeval, String](Right(false))
+      case Typed.CONST_INT(v)        => EitherT.rightT[Coeval, String](v)
+      case Typed.CONST_BYTEVECTOR(v) => EitherT.rightT[Coeval, String](v)
+      case Typed.TRUE                => EitherT.rightT[Coeval, String](true)
+      case Typed.FALSE               => EitherT.rightT[Coeval, String](false)
 
       case Typed.BINARY_OP(a, SUM_OP, b, INT) =>
         for {
@@ -71,16 +69,7 @@ object Evaluator {
           case true  => r[tpe.Underlying](ctx, t1)
           case false => r[tpe.Underlying](ctx, t2)
         }
-      /*
-                                    case Typed.FUNCTION_CALL(fname, args, resType) => tailcall {
-                                      ctx.functions.get(fname) match {
-                                        case Some(function) =>
-                                          val argValues = ??? // args
-                                          done(function.eval(argValues))
-                                        case None => done(Left(s"Function '$fname' not found"))
-                                      }
-                                    }
-       */
+
       case Typed.BINARY_OP(t1, AND_OP, t2, BOOLEAN) =>
         r[Boolean](ctx, t1) flatMap {
           case false => EitherT.rightT[Coeval, String](false)
@@ -99,24 +88,17 @@ object Evaluator {
         } yield i1 == i2
 
       case isDefined @ Typed.IS_DEFINED(opt) =>
-        EitherT {
-          r[isDefined.tpe.Underlying](ctx, opt).value.map {
-            case Right(x: Option[_]) => Right(x.isDefined)
-            case Right(_)            => Left("IS_DEFINED invoked on non-option type")
-            case _                   => Left("IS_DEFINED expression error")
-          }
+        r[isDefined.tpe.Underlying](ctx, opt).flatMap {
+          case x: Option[_] => EitherT.rightT[Coeval, String](x.isDefined)
+          case _            => EitherT.leftT[Coeval, Boolean]("IS_DEFINED invoked on non-option type")
         }
       case Typed.GET(opt, tpe) =>
-        EitherT {
-          r[tpe.Underlying](ctx, opt).value.map {
-            case Right(Some(x)) => Right(x)
-            case Right(_)       => Left("GET(NONE)")
-            case _              => Left("GET expression error")
-          }
+        r[tpe.Underlying](ctx, opt) flatMap {
+          case Some(x) => EitherT.rightT[Coeval, String](x)
+          case _       => EitherT.leftT[Coeval, Any]("GET(NONE)")
         }
       case Typed.NONE         => EitherT.rightT[Coeval, String](None)
       case Typed.SOME(b, tpe) => r[tpe.Underlying](ctx, b).map(Some(_))
-
       case Typed.SIG_VERIFY(msg, sig, pk) =>
         for {
           s <- r[ByteVector](ctx, sig)
@@ -140,9 +122,11 @@ object Evaluator {
   def apply[A](c: Context, expr: Typed.EXPR): ExecResult[A] = {
     def result = r[A](c, expr).value.apply()
 
-    Try(result) match {
-      case Failure(ex)  => Left(ex.toString)
-      case Success(res) => res
-    }
+//    Try(result) match {
+//      case Failure(ex)  => Left(ex.toString)
+//      case Success(res) => res
+//    }
+    result
+
   }
 }

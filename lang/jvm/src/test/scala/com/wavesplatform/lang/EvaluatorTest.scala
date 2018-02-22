@@ -20,6 +20,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(expr = term) shouldBe Right(100000)
   }
 
+
   property("successful on unused let") {
     ev(
       expr = BLOCK(
@@ -28,6 +29,21 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
         INT
       )) shouldBe Right(3)
   }
+
+
+  property("successful on some expr") {
+    ev(expr = SOME(CONST_INT(4), OPTION(INT))) shouldBe Right(Some(4))
+  }
+
+  property("successful on some block") {
+    ev(
+      expr = BLOCK(
+        None,
+        SOME(CONST_INT(3), OPTION(INT)),
+        OPTION(INT)
+      )) shouldBe Right(Some(3))
+  }
+
 
   property("successful on x = y") {
     ev(

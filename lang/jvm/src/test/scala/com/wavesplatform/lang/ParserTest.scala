@@ -168,7 +168,6 @@ X > Y
 
     eval("""
           |
-          |let X = Some(10)
           |
           |match(X) {
           |  case None => 0
