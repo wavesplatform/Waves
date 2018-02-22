@@ -1,8 +1,8 @@
 package scorex.transaction.smart
 
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.Evaluator
-import com.wavesplatform.lang.Evaluator.Context
+import com.wavesplatform.lang.Context.{CustomType, LazyVal, Obj}
+import com.wavesplatform.lang.{Context, Evaluator}
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Coeval
@@ -29,7 +29,8 @@ object Verifier {
       Map(
         ("H", (INT, height)),
         ("TX", (TYPEREF("Transaction"), transactionObject(transaction)))
-      ))
+      ),
+      Map.empty)
     Evaluator[Boolean](context, script.script) match {
       case Left(execError) => Left(GenericError(s"Script execution error: $execError"))
       case Right(false) => Left(TransactionNotAllowedByScript(transaction))
@@ -46,7 +47,7 @@ object Verifier {
 
   val optionByteVector = OPTION(BYTEVECTOR)
 
-  val transactionType = CUSTOMTYPE(
+  val transactionType = CustomType(
     "Transaction",
     List(
       "TYPE" -> INT,
@@ -74,7 +75,7 @@ object Verifier {
     })
 
   private def transactionObject(tx: Transaction) =
-    OBJECT(
+    Obj(
       Map(
         "TYPE" -> LazyVal(INT)(Coeval.evalOnce(tx.transactionType.id)),
         "ID" -> LazyVal(BYTEVECTOR)(tx.id.map(_.arr).map(ByteVector(_))),

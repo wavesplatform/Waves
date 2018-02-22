@@ -24,7 +24,8 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
     predefTypes = Map("Transaction" -> Verifier.transactionType),
     varDefs = Map(
       "TX" -> TYPEREF("Transaction")
-    )
+    ),
+    Map.empty
   )
 
   def preconditionsTransferAndLease(code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = {
