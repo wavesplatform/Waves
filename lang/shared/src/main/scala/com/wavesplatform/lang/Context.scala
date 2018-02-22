@@ -16,17 +16,17 @@ object Context {
 
   sealed trait CustomFunction {
     val resultType: TYPE
-    def eval(args: List[Any]) : resultType.Underlying
+    def eval(args: List[Any]) : Either[String,resultType.Underlying]
   }
   object CustomFunction {
 
-    case class CustomFunctionImpl(name: String, resultType: TYPE, args: List[(String, TYPE)], ev: List[Any] => Any) extends CustomFunction {
-      override def eval(args: List[Any]): resultType.Underlying = {
-        ev(args).asInstanceOf[resultType.Underlying]
+    case class CustomFunctionImpl(name: String, resultType: TYPE, args: List[(String, TYPE)], ev: List[Any] => Either[String,Any]) extends CustomFunction {
+      override def eval(args: List[Any]): Either[String,resultType.Underlying] = {
+        ev(args).map(_.asInstanceOf[resultType.Underlying])
       }
     }
 
-    def apply(name: String, resultType: TYPE, args: List[(String, TYPE)])(ev: List[Any] => resultType.Underlying): CustomFunction
+    def apply(name: String, resultType: TYPE, args: List[(String, TYPE)])(ev: List[Any] => Either[String,resultType.Underlying]): CustomFunction
         = CustomFunctionImpl(name, resultType, args, ev)
 
   }
