@@ -284,43 +284,118 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     )
   }
 
-  "should cancel a sell order if the owner moved its assets to another account" in {
-    // Bob issues new asset
-    val bobAssetQuantity = 10000
+  "owner moves assets/waves to another account and order become an invalid" - {
     val bobAssetName = "NewBobCoin"
-    val bobAsset = issueAsset(bobNode, bobAssetName, bobAssetQuantity)
-    val bobAssetId = ByteStr.decodeBase58(bobAsset).get
-    waitForAssetBalance(bobNode, bobAsset, bobAssetQuantity)
+    var bobAssetIdRaw: String = ""
+    var bobAssetId: ByteStr = ByteStr.empty
+    var bobWavesPair: AssetPair = AssetPair(None, None)
 
-    // Bob wants to sell all own assets for 1 Wave
-    val bobWavesPair = AssetPair(
-      amountAsset = Some(bobAssetId),
-      priceAsset = None
-    )
 
-    Await.result(matcherNode.waitForHeightArise, 1.minute)
+    def bobOrder(amount: Int) = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.SELL, 1 * Waves * Order.PriceConstant, amount)
+    def bobPlacesAssetOrder(amount: Int): String = {
+      val (id, _) = matcherPlaceOrder(matcherNode, bobOrder(amount))
+      waitForOrderStatus(matcherNode, bobAssetIdRaw, id, "Accepted")
+      id
+    }
 
-    def bobOrder = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.SELL, 1 * Waves * Order.PriceConstant, bobAssetQuantity)
+    def transfer(from: Node, to: Node, assetId: Option[ByteStr], amount: Long): Unit = {
+      val transferTx = TransferTransaction.create(
+        assetId = assetId,
+        sender = from.privateKey,
+        recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).right.get,
+        amount = amount,
+        timestamp = System.currentTimeMillis(),
+        feeAssetId = None,
+        feeAmount = TransactionFee,
+        attachment = Array.emptyByteArray
+      ).right.get
+      Await.result(matcherNode.signedTransfer(createSignedTransferRequest(transferTx)), 1.minute)
+    }
 
-    val (sellId, _) = matcherPlaceOrder(matcherNode, bobOrder)
-    waitForOrderStatus(matcherNode, bobAsset, sellId, "Accepted")
+    def waitOrderCancelled(orderId: String): Unit = {
+      val task = matcherNode.waitFor[MatcherStatusResponse](s"Order '$orderId' is cancelled")(
+        _.getOrderStatus(bobAssetName, orderId), _.status == "Cancelled", 1.second)
+      Await.result(task, 1.minute)
+    }
 
-    // Bob moves all his tokens to Alice
-    val transferTx = TransferTransaction.create(
-      assetId = Some(bobAssetId),
-      sender = bobNode.privateKey,
-      recipient = scorex.account.Address.fromBytes(Base58.decode(aliceNode.address).get).right.get,
-      amount = bobAssetQuantity,
-      timestamp = System.currentTimeMillis(),
-      feeAssetId = None,
-      feeAmount = 100000,
-      attachment = Array.emptyByteArray
-    ).right.get
+    def checkBobOrderActive(orderId: String): Unit = {
+      val newestOrderStatus = matcherNode.getOrderStatus(bobAssetName, orderId)
+      Await.result(newestOrderStatus, 10.seconds).status shouldBe "Accepted"
+    }
 
-    Await.result(matcherNode.signedTransfer(createSignedTransferRequest(transferTx)), 1.minute)
+    "prepare" in {
+      // Bob issues new asset
+      val bobAssetQuantity = 10000
+      bobAssetIdRaw = issueAsset(bobNode, bobAssetName, bobAssetQuantity)
+      bobAssetId = ByteStr.decodeBase58(bobAssetIdRaw).get
+      bobWavesPair = AssetPair(
+        amountAsset = Some(bobAssetId),
+        priceAsset = None
+      )
 
-    val waitOrderCancelled = matcherNode.waitFor[MatcherStatusResponse]("Order is cancelled")(_.getOrderStatus(bobAssetName, sellId), _.status == "Cancelled", 1.second)
-    Await.result(waitOrderCancelled, 1.minute)
+      waitForAssetBalance(bobNode, bobAssetIdRaw, bobAssetQuantity)
+      Await.result(matcherNode.waitForHeightArise, 1.minute)
+    }
+
+    "order with assets" - {
+      "moved assets, insufficient assets" in {
+        val oldestOrderId = bobPlacesAssetOrder(8000)
+        val newestOrderId = bobPlacesAssetOrder(1000)
+
+        transfer(bobNode, aliceNode, Some(bobAssetId), 3000)
+
+        waitOrderCancelled(oldestOrderId)
+        withClue("The newest order is still active") {
+          checkBobOrderActive(newestOrderId)
+        }
+
+        // Cleanup
+        matcherCancelOrder(bobNode, bobWavesPair, newestOrderId) should be("OrderCanceled")
+        Await.result(matcherNode.waitForHeightArise, 1.minute)
+        println(s"Alice: ${Await.result(matcherNode.assetsBalance(aliceNode.address), 5.seconds)}")
+        println(s"Bob: ${Await.result(matcherNode.assetsBalance(bobNode.address), 5.seconds)}")
+
+        transfer(aliceNode, bobNode, Some(bobAssetId), 3000)
+        Await.result(matcherNode.waitForHeightArise, 1.minute)
+        println(s"Alice: ${Await.result(matcherNode.assetsBalance(aliceNode.address), 5.seconds)}")
+        println(s"Bob: ${Await.result(matcherNode.assetsBalance(bobNode.address), 5.seconds)}")
+      }
+
+      "leased waves, insufficient fee" in {
+        val bobBalance = Await.result(bobNode.balance(bobNode.address), 1.minute).balance
+        println(s"bobBalance: $bobBalance")
+        val oldestOrderId = bobPlacesAssetOrder(1000)
+        val newestOrderId = bobPlacesAssetOrder(1000)
+
+        val transferAmount = bobBalance - MatcherFee - TransactionFee
+        transfer(bobNode, aliceNode, None, transferAmount)
+
+        waitOrderCancelled(oldestOrderId)
+        withClue("The newest order is still active") {
+          checkBobOrderActive(newestOrderId)
+        }
+
+        // Cleanup
+        matcherCancelOrder(bobNode, bobWavesPair, newestOrderId) should be("OrderCanceled")
+        transfer(aliceNode, bobNode, None, transferAmount)
+      }
+
+      "moved waves, insufficient fee" in {}
+    }
+
+    "order with waves" - {
+      "leased waves, insufficient fee" in {
+        // Amount of waves in order is smaller than fee
+      }
+
+      "leased waves, insufficient waves" in {
+
+      }
+
+      "moved waves, insufficient fee" in {
+        // Amount of waves in order is smaller than fee
+      }
+    }
   }
 
   // "should cancel oldest sell orders if the owner moved some of its assets to another account"
