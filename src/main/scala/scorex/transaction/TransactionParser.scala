@@ -34,6 +34,8 @@ object TransactionParser {
   val SignatureStringLength: Int = base58Length(SignatureLength)
   val KeyLength = 32
   val KeyStringLength: Int = base58Length(KeyLength)
+  val MaxProofsLength = 8 * 512
+  val MaxProofsStringLength: Int = base58Length(MaxProofsLength)
 
   def parseBytes(data: Array[Byte]): Try[Transaction] =
     data.head match {

@@ -6,10 +6,12 @@ import org.scalatest.CancelAfterFailure
 import scorex.account.AddressOrAlias
 import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.crypto.encode.Base58
+import scorex.transaction.Proofs
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.MassTransferTransaction
 import scorex.transaction.assets.MassTransferTransaction.MaxTransferCount
 import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, Transfer}
+
 import scala.concurrent.duration._
 import scorex.transaction.assets.TransferTransaction.MaxAttachmentSize
 
@@ -102,8 +104,8 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   test("invalid transfer should not be in UTX or blockchain") {
     import scorex.transaction.assets.MassTransferTransaction.MaxTransferCount
     val address2 = AddressOrAlias.fromString(secondAddress).right.get
-    val valid = MassTransferTransaction.create(
-      None, sender.privateKey,
+    val valid = MassTransferTransaction.selfSigned(
+      Proofs.Version, None, sender.privateKey,
       List(ParsedTransfer(address2, transferAmount)),
       System.currentTimeMillis,
       calcFee(1), Array.emptyByteArray).right.get
@@ -128,7 +130,6 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
 
 
   test("huuuge transactions are allowed") {
-
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val fee = calcFee(MaxTransferCount)
     val amount = (balance1 - fee) / MaxTransferCount
@@ -138,8 +139,6 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     nodes.waitForHeightAraiseAndTxPresent(transferId)
     notMiner.assertBalances(firstAddress, balance1 - fee, eff1 - fee)
-
-
   }
 
   private def createSignedMassTransferRequest(tx: MassTransferTransaction): SignedMassTransferRequest = {
@@ -151,7 +150,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
       fee,
       timestamp,
       attachment.headOption.map(_ => Base58.encode(attachment)),
-      signature.base58
+      proofs.base58()
     )
   }
 }

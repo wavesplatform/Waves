@@ -2,6 +2,7 @@ package scorex.transaction
 
 import com.wavesplatform.state2._
 import monix.eval.Coeval
+import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
 import scorex.transaction.ValidationError.GenericError
 
@@ -9,6 +10,7 @@ import scala.util.Try
 
 case class Proofs private(proofs: Seq[ByteStr]) {
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Proofs.Version +: Deser.serializeArrays(proofs.map(_.arr)))
+  val base58: Coeval[String] = Coeval.evalOnce(Base58.encode(bytes()))
 }
 
 object Proofs {
