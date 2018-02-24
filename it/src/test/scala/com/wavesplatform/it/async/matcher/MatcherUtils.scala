@@ -39,7 +39,6 @@ trait MatcherUtils {
     } yield a
 
     val issueTransaction = Await.result(futureIssueTransaction, 1.minute)
-
     issueTransaction.id
   }
 
