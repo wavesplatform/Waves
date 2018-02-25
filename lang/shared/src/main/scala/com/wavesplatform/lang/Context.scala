@@ -15,6 +15,7 @@ object Context {
   case class CustomType(name: String, fields: List[(String, TYPE)])
 
   sealed trait CustomFunction {
+    val name: String
     val resultType: TYPE
     def eval(args: List[Any]) : Either[String,resultType.Underlying]
   }

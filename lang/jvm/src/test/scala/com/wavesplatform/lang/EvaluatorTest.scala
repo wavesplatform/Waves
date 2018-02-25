@@ -7,10 +7,12 @@ import monix.eval.Coeval
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
+import scala.util.Try
+
 class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def ev(predefTypes: Map[String, CustomType] = Map.empty, defs: Defs = Map.empty, expr: EXPR): Either[_, _] = {
-    Evaluator(Context(predefTypes, defs, Map.empty), expr)
+  private def ev(context: Context = Context.empty, expr: EXPR): Either[_, _] = {
+    Evaluator(context, expr)
   }
 
   private def simpleDeclarationAndUsage(i: Int) = BLOCK(Some(LET("x", CONST_INT(i))), REF("x", INT), INT)
@@ -20,7 +22,6 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(expr = term) shouldBe Right(100000)
   }
 
-
   property("successful on unused let") {
     ev(
       expr = BLOCK(
@@ -29,7 +30,6 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
         INT
       )) shouldBe Right(3)
   }
-
 
   property("successful on some expr") {
     ev(expr = SOME(CONST_INT(4), OPTION(INT))) shouldBe Right(Some(4))
@@ -44,16 +44,15 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
       )) shouldBe Right(Some(3))
   }
 
-
   property("successful on x = y") {
     ev(
       expr = BLOCK(Some(LET("x", CONST_INT(3))),
-        BLOCK(
-          Some(LET("y", REF("x", INT))),
-          BINARY_OP(REF("x", INT), SUM_OP, REF("y", INT), INT),
-          INT
-        ),
-        INT)) shouldBe Right(6)
+                   BLOCK(
+                     Some(LET("y", REF("x", INT))),
+                     BINARY_OP(REF("x", INT), SUM_OP, REF("y", INT), INT),
+                     INT
+                   ),
+                   INT)) shouldBe Right(6)
   }
 
   property("successful on simple get") {
@@ -92,7 +91,8 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   }
 
   property("successful on same value names in different branches") {
-    ev(expr = IF(BINARY_OP(CONST_INT(1), EQ_OP, CONST_INT(2), INT), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4), INT)) shouldBe Right(4)
+    ev(expr = IF(BINARY_OP(CONST_INT(1), EQ_OP, CONST_INT(2), INT), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4), INT)) shouldBe Right(
+      4)
   }
 
   property("fails if override") {
@@ -115,13 +115,30 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   }
 
   property("custom type field access") {
-    val pointType = CustomType("Point", List("X" -> INT, "Y" -> INT))
-    val pointInstance = Obj(Map("X" -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
+    val pointType     = CustomType("Point", List("X" -> INT, "Y"                     -> INT))
+    val pointInstance = Obj(Map("X"                  -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
     ev(
-      predefTypes = Map(pointType.name -> pointType),
-      defs = Map(("p", (TYPEREF(pointType.name), pointInstance))),
+      context = Context(
+        typeDefs = Map(pointType.name -> pointType),
+        defs = Map(("p", (TYPEREF(pointType.name), pointInstance))),
+        functions = Map.empty
+      ),
       expr = BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", INT), SUM_OP, CONST_INT(2), INT)
     ) shouldBe Right(5)
+  }
 
+  property("successful on simple function evaluation") {
+
+    val multiplierFunction = CustomFunction("MULTIPLY", Terms.INT, List(("x1", Terms.INT), ("x2", Terms.INT))) {
+      case x1 :: x2 :: Nil => Try { x1.asInstanceOf[Int] * x2.asInstanceOf[Int] }.toEither.left.map(_.toString)
+    }
+    ev(
+      context = Context(
+        typeDefs = Map.empty,
+        defs = Map.empty,
+        functions = Map(multiplierFunction.name -> multiplierFunction)
+      ),
+      expr = FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_INT(3), Typed.CONST_INT(4)), INT)
+    ) shouldBe Right(12)
   }
 }

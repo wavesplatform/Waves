@@ -153,43 +153,4 @@ X > Y
     parse("if(isDefined(X)) then get(X) else Y") shouldBe IF(IS_DEFINED(REF("X")), GET(REF("X")), REF("Y"))
   }
 
-  property("EVALUATE patmat") {
-    eval("""
-          |let MULTICHARVARNAME = Some(500)
-          |
-          |let Z = match(MULTICHARVARNAME) {
-          | case None => 8
-          | case Some(B) => B + B
-          | }
-          |
-          | get(Some(Z)) + 1
-          |
-      """.stripMargin) shouldBe Right(1001)
-
-    eval("""
-          |
-          | let X = Some(10)
-          |
-          |match(X) {
-          |  case None => 0
-          |  case Some(V) => V + V + V + V
-          |}
-        """.stripMargin) shouldBe Right(40)
-
-    eval("""
-          |
-          |let X = Some(10)
-          |
-          |match(X) {
-          |  case Some(V) => V + V + V + V
-          |  case None => 0
-          |}
-        """.stripMargin) shouldBe Right(40)
-  }
-
-  private def eval(code: String) = {
-    val untyped = parse(code)
-    val typed   = TypeChecker(TypeChecker.TypeCheckerContext.empty, untyped)
-    typed.flatMap(Evaluator(Context.empty, _))
-  }
 }

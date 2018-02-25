@@ -111,8 +111,27 @@ object Evaluator {
           r[Obj](ctx, EitherT.pure(expr)).flatMap { (obj: Obj) =>
             obj.fields.find(_._1 == field) match {
               case Some((_, lzy)) => EitherT.rightT[Coeval, String](lzy.value().asInstanceOf[Any])
-              case None           => EitherT.leftT[Coeval, Any]("field not found")
+              case None           => EitherT.leftT[Coeval, Any](s"field '$field' not found")
             }
+          }
+        case Typed.FUNCTION_CALL(name, args, tpe) =>
+          import cats.data._
+          import cats.syntax.all._
+          import cats.instances.vector._
+          ctx.functions.get(name) match {
+            case Some(func) =>
+              val argsVector = args
+                .map(a =>
+                  r[a.tpe.Underlying](ctx, EitherT.pure(a))
+                    .map(_.asInstanceOf[Any]))
+                .toVector
+              val argsSequenced = argsVector.sequence[TrampolinedExecResult, Any]
+              for {
+                actualArgs <- argsSequenced
+                value: Either[String, func.resultType.Underlying] = func.eval(actualArgs.toList)
+                r <- EitherT.fromEither[Coeval](value)
+              } yield r
+            case None => EitherT.leftT[Coeval, Any](s"function '$name' not found")
           }
         case Typed.BINARY_OP(_, SUM_OP, _, tpe) if tpe != INT             => EitherT.leftT[Coeval, Any](s"Expected INT, but got $tpe: $t")
         case Typed.BINARY_OP(_, GE_OP | GT_OP, _, tpe) if tpe != BOOLEAN  => EitherT.leftT[Coeval, Any](s"Expected INT, but got $tpe: $t")
