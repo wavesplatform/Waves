@@ -20,7 +20,7 @@ object TypeChecker {
     def fromContext(ctx: Context): TypeCheckerContext =
       TypeCheckerContext(predefTypes = ctx.typeDefs,
                          varDefs = ctx.varDefs.mapValues(_._1),
-                         functionDefs = ctx.functions.mapValues(cf => (cf.args.map(_._2), cf.resultType)))
+                         functionDefs = ctx.functions.mapValues(_.types))
   }
 
   type TypeResolutionError      = String

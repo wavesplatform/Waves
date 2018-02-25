@@ -41,7 +41,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       ),
       "IS_DEFINED(NONE)" -> IS_DEFINED(NONE),
       "IS_DEFINED(SOME)" -> IS_DEFINED(SOME(TRUE, OPTION(BOOLEAN))),
-      "LET"        -> LET("x", CONST_INT(0)),
+      "LET"              -> LET("x", CONST_INT(0)),
       "BLOCK" -> BLOCK(
         let = None,
         body = CONST_INT(0),
@@ -55,7 +55,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       ),
       "GET(SOME)" -> GET(SOME(TRUE, OPTION(BOOLEAN)), BOOLEAN),
       "GET(NONE)" -> GET(NONE, NOTHING),
-      "SOME" -> SOME(TRUE, OPTION(BOOLEAN)),
+      "SOME"      -> SOME(TRUE, OPTION(BOOLEAN)),
       "BLOCK(LET(X), REF(y) = x)" -> BLOCK(
         let = Some(LET("x", CONST_INT(0))),
         body = LET("y", REF("x", INT)),
@@ -65,8 +65,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   treeTypeTest("GETTER")(
-    predefTypes = Map(pointType.name -> pointType),
-    varDefs = Map("p"                -> TYPEREF("Point")),
+    ctx = TypeCheckerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> TYPEREF("Point")), functionDefs = Map.empty),
     expr = Untyped.GETTER(
       ref = Untyped.REF("p"),
       field = "x"
@@ -80,31 +79,38 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   )
 
   treeTypeTest("REF(OBJECT)")(
-    predefTypes = Map(pointType.name -> pointType),
-    varDefs = Map("p"                -> TYPEREF("Point")),
+    ctx = TypeCheckerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> TYPEREF("Point")), functionDefs = Map.empty),
     expr = Untyped.REF("p"),
     expectedResult = Right(Typed.REF("p", TYPEREF("Point")))
   )
 
   treeTypeTest("REF x = y")(
-    predefTypes = Map(pointType.name -> pointType),
-    varDefs = Map("p"                -> TYPEREF("Point")),
+    ctx = TypeCheckerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> TYPEREF("Point")), functionDefs = Map.empty),
     expr = Untyped.REF("p"),
     expectedResult = Right(Typed.REF("p", TYPEREF("Point")))
+  )
+
+  treeTypeTest("MULTIPLY(1,2)")(
+    ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(multiplierFunction.name -> multiplierFunction.types)),
+    expr = Untyped.FUNCTION_CALL(multiplierFunction.name, List(Untyped.CONST_INT(1), Untyped.CONST_INT(2))),
+    expectedResult = Right(Typed.FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_INT(1), Typed.CONST_INT(2)), INT))
   )
 
   {
     import Untyped._
 
     errorTests(
-      "BINARY_OP wrong types" -> "The first operand is expected to be INT" -> BINARY_OP(TRUE, SUM_OP, CONST_INT(1)),
-      "IF con't find common" -> "Can't find common type" -> IF(TRUE, TRUE, CONST_INT(0))
+      "BINARY_OP with wrong types"                   -> "The first operand is expected to be INT" -> BINARY_OP(TRUE, SUM_OP, CONST_INT(1)),
+      "IF can't find common"                         -> "Can't find common type" -> IF(TRUE, TRUE, CONST_INT(0)),
+      "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(multiplierFunction.name, List(CONST_INT(0))),
+      "FUNCTION_CALL with wrong type of argument"    -> "Types of arguments of function call" -> FUNCTION_CALL(multiplierFunction.name,
+                                                                                                            List(CONST_INT(0), FALSE))
     )
   }
 
   private def rootTypeTest(propertyName: String)(expr: Untyped.EXPR,
                                                  expectedResult: TypeCheckResult[TYPE],
-                                                 varDefs: TypeDefs= Map.empty,
+                                                 varDefs: TypeDefs = Map.empty,
                                                  predefTypes: Map[String, CustomType] = Map.empty): Unit = property(propertyName) {
     TypeChecker(TypeCheckerContext(predefTypes, varDefs, Map.empty), expr).map(_.tpe) match {
       case Right(x)    => Right(x) shouldBe expectedResult
@@ -115,16 +121,14 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   private def errorTests(exprs: ((String, String), Untyped.EXPR)*): Unit = exprs.foreach {
     case ((label, error), input) =>
       property(s"Error: $label") {
-        TypeChecker(TypeCheckerContext.empty, input) should produce(error)
+        TypeChecker(TypeCheckerContext(Map.empty, Map.empty, Map(multiplierFunction.name -> multiplierFunction.types)), input) should produce(error)
       }
   }
 
-  private def treeTypeTest(propertyName: String)(expr: Untyped.EXPR,
-                                                 expectedResult: TypeCheckResult[Typed.EXPR],
-                                                 predefTypes: Map[String, CustomType],
-                                                 varDefs: TypeDefs): Unit = property(propertyName) {
-    TypeChecker(TypeCheckerContext(predefTypes, varDefs, Map.empty), expr) shouldBe expectedResult
-  }
+  private def treeTypeTest(propertyName: String)(expr: Untyped.EXPR, expectedResult: TypeCheckResult[Typed.EXPR], ctx: TypeCheckerContext): Unit =
+    property(propertyName) {
+      TypeChecker(ctx, expr) shouldBe expectedResult
+    }
 
   private def treeTypeErasureTests(exprs: (String, Typed.EXPR)*): Unit = exprs.foreach {
     case (exprName, expected) =>

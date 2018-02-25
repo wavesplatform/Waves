@@ -7,8 +7,6 @@ import monix.eval.Coeval
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
-import scala.util.Try
-
 class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   private def ev(context: Context = Context.empty, expr: EXPR): Either[_, _] = {
@@ -128,11 +126,6 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   }
 
   property("successful on simple function evaluation") {
-
-    val multiplierFunction = CustomFunction("MULTIPLY", Terms.INT, List(("x1", Terms.INT), ("x2", Terms.INT))) {
-      case x1 :: x2 :: Nil => Try { x1.asInstanceOf[Int] * x2.asInstanceOf[Int] }.toEither.left.map(_.toString)
-    }
-
     ev(
       context = Context(
         typeDefs = Map.empty,

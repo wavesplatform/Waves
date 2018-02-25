@@ -1,16 +1,9 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.Context.CustomFunction
-import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
-
-import scala.util.Try
+import org.scalatest.{Matchers, PropSpec}
 
 class IntegrationTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
-
-  val multiplierFunction = CustomFunction("MULTIPLY", Terms.INT, List(("x1", Terms.INT), ("x2", Terms.INT))) {
-    case x1 :: x2 :: Nil => Try { x1.asInstanceOf[Int] * x2.asInstanceOf[Int] }.toEither.left.map(_.toString)
-  }
 
   private def eval(code: String) = {
     val untyped = Parser(code).get.value
@@ -54,12 +47,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with Matchers with No
   }
 
   property("function call") {
-    eval(
-      """
-        |
-        | MULTIPLY(3,4)
-        |
-      """.stripMargin) shouldBe Right(12)
+    eval("MULTIPLY(3,4)".stripMargin) shouldBe Right(12)
 
   }
 }

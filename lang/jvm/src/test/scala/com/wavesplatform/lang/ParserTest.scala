@@ -149,13 +149,8 @@ X > Y
   }
 
   property("function call") {
-    val script =
-      """
-        |
-        | FOO(1,2)
-        |
-      """.stripMargin
-    parse(script) shouldBe FUNCTION_CALL("FOO", List(CONST_INT(1),CONST_INT(2)))
+    parse("FOO(1,2)".stripMargin) shouldBe FUNCTION_CALL("FOO", List(CONST_INT(1),CONST_INT(2)))
+    parse("FOO(X)".stripMargin) shouldBe FUNCTION_CALL("FOO", List(REF("X")))
   }
 
 

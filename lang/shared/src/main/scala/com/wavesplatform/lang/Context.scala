@@ -19,6 +19,7 @@ object Context {
     val args: List[(String, TYPE)]
     val resultType: TYPE
     def eval(args: List[Any]) : Either[String,resultType.Underlying]
+    val types : (List[TYPE], TYPE)
   }
   object CustomFunction {
 
@@ -26,6 +27,7 @@ object Context {
       override def eval(args: List[Any]): Either[String,resultType.Underlying] = {
         ev(args).map(_.asInstanceOf[resultType.Underlying])
       }
+      override lazy val types = (args.map(_._2), resultType)
     }
 
     def apply(name: String, resultType: TYPE, args: List[(String, TYPE)])(ev: List[Any] => Either[String,resultType.Underlying]): CustomFunction
