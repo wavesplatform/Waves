@@ -1,7 +1,7 @@
 package scorex.transaction.smart
 
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.Context.{CustomType, LazyVal, Obj}
+import com.wavesplatform.lang.Context.{CustomFunction, CustomType, LazyVal, Obj}
 import com.wavesplatform.lang.{Context, Evaluator}
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.state2.reader.SnapshotStateReader
@@ -17,25 +17,33 @@ object Verifier {
     case _: GenesisTransaction => Right(tx)
     case pt: ProvenTransaction =>
       (pt, s.accountScript(pt.sender)) match {
-        case (_, Some(script)) => verify(script, currentBlockHeight, pt)
+        case (_, Some(script))              => verify(script, currentBlockHeight, pt)
         case (stx: SignedTransaction, None) => stx.signaturesValid()
-        case _ => verifyAsEllipticCurveSignature(pt)
+        case _                              => verifyAsEllipticCurveSignature(pt)
       }
   }
 
   def verify[T <: ProvenTransaction](script: Script, height: Int, transaction: T): Either[ValidationError, T] = {
 
-    val context = Context(Map("Transaction" -> transactionType),
+    val context = Context(
+      Map("Transaction" -> transactionType),
       Map(
         ("H", (INT, height)),
         ("TX", (TYPEREF("Transaction"), transactionObject(transaction)))
       ),
-      Map.empty)
+      Map(sigVerify.name -> sigVerify)
+    )
     Evaluator[Boolean](context, script.script) match {
       case Left(execError) => Left(GenericError(s"Script execution error: $execError"))
-      case Right(false) => Left(TransactionNotAllowedByScript(transaction))
-      case Right(true) => Right(transaction)
+      case Right(false)    => Left(TransactionNotAllowedByScript(transaction))
+      case Right(true)     => Right(transaction)
     }
+  }
+
+  val sigVerify = CustomFunction("SIGVERIFY", BOOLEAN, List(("sig", BYTEVECTOR), ("message", BYTEVECTOR), ("pub", BYTEVECTOR))) {
+    case m :: p :: s :: Nil =>
+      Right(crypto.verify(s.asInstanceOf[ByteVector].toArray, m.asInstanceOf[ByteVector].toArray, p.asInstanceOf[ByteVector].toArray))
+    case _ => ???
   }
 
   def verifyAsEllipticCurveSignature[T <: ProvenTransaction](pt: T): Either[ValidationError, T] =
@@ -50,14 +58,14 @@ object Verifier {
   val transactionType = CustomType(
     "Transaction",
     List(
-      "TYPE" -> INT,
-      "ID" -> BYTEVECTOR,
+      "TYPE"      -> INT,
+      "ID"        -> BYTEVECTOR,
       "BODYBYTES" -> BYTEVECTOR,
-      "SENDERPK" -> BYTEVECTOR,
-      "PROOFA" -> BYTEVECTOR,
-      "PROOFB" -> BYTEVECTOR,
-      "PROOFC" -> BYTEVECTOR,
-      "ASSETID" -> optionByteVector
+      "SENDERPK"  -> BYTEVECTOR,
+      "PROOFA"    -> BYTEVECTOR,
+      "PROOFB"    -> BYTEVECTOR,
+      "PROOFC"    -> BYTEVECTOR,
+      "ASSETID"   -> optionByteVector
     )
   )
 
@@ -78,18 +86,18 @@ object Verifier {
     Obj(
       Map(
         "TYPE" -> LazyVal(INT)(Coeval.evalOnce(tx.transactionType.id)),
-        "ID" -> LazyVal(BYTEVECTOR)(tx.id.map(_.arr).map(ByteVector(_))),
+        "ID"   -> LazyVal(BYTEVECTOR)(tx.id.map(_.arr).map(ByteVector(_))),
         "BODYBYTES" -> LazyVal(BYTEVECTOR)(tx match {
           case pt: ProvenTransaction => pt.bodyBytes.map(ByteVector(_))
-          case _ => thro
+          case _                     => thro
         }),
         "SENDERPK" -> LazyVal(BYTEVECTOR)(tx match {
           case pt: Authorized => Coeval.evalOnce(ByteVector(pt.sender.publicKey))
-          case _ => thro
+          case _              => thro
         }),
         "ASSETID" -> LazyVal(optionByteVector)(tx match {
           case tt: TransferTransaction => Coeval.evalOnce(tt.assetId.map(x => ByteVector(x.arr)).asInstanceOf[optionByteVector.Underlying])
-          case _ => thro
+          case _                       => thro
         }),
         "PROOFA" -> proofBinding(tx, 0),
         "PROOFB" -> proofBinding(tx, 1),

@@ -56,11 +56,11 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
         BOOLEAN
       ),
       AND_OP,
-      SIG_VERIFY(
+      FUNCTION_CALL("SIGVERIFY", List(
         GETTER(REF("TX", TYPEREF("Transaction")), "BODYBYTES", BYTEVECTOR),
         GETTER(REF("TX", TYPEREF("Transaction")), "PROOFA", BYTEVECTOR),
         GETTER(REF("TX", TYPEREF("Transaction")), "SENDERPK", BYTEVECTOR)
-      ),
+      ), BOOLEAN),
       BOOLEAN
     )
     forAll(preconditionsTransferAndLease(onlySend)) {
@@ -80,16 +80,16 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
            |let B = base58'${ByteStr(pk1.publicKey)}'
            |let C = base58'${ByteStr(pk2.publicKey)}'
            |
-          |let AC = if(checkSig(TX.BODYBYTES,TX.PROOFA,A)) then 1 else 0
-           |let BC = if(checkSig(TX.BODYBYTES,TX.PROOFB,B)) then 1 else 0
-           |let CC = if(checkSig(TX.BODYBYTES,TX.PROOFC,C)) then 1 else 0
+          |let AC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOFA,A)) then 1 else 0
+           |let BC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOFB,B)) then 1 else 0
+           |let CC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOFC,C)) then 1 else 0
            |
           | AC + BC+ CC >= 2
            |
       """.stripMargin
       val untyped = Parser(script).get.value
       val typed = TypeChecker(context, untyped)
-      typed.right.get
+      typed.explicitGet()
     }
 
     val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, ScriptTransferTransaction, Seq[ByteStr])] = for {

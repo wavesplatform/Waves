@@ -7,7 +7,6 @@ import monix.eval.Coeval
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
-import scorex.crypto.encode.Base58
 
 class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
@@ -34,11 +33,6 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       "EQ(BOOL)"         -> BINARY_OP(TRUE, EQ_OP, FALSE, BOOLEAN),
       "GT"               -> BINARY_OP(CONST_INT(0), GT_OP, CONST_INT(1), BOOLEAN),
       "GE"               -> BINARY_OP(CONST_INT(0), GE_OP, CONST_INT(1), BOOLEAN),
-      "SIG_VERIFY" -> SIG_VERIFY(
-        message = CONST_BYTEVECTOR(ByteVector(Base58.decode("333").get)),
-        signature = CONST_BYTEVECTOR(ByteVector(Base58.decode("222").get)),
-        publicKey = CONST_BYTEVECTOR(ByteVector(Base58.decode("111").get))
-      ),
       "IS_DEFINED(NONE)" -> IS_DEFINED(NONE),
       "IS_DEFINED(SOME)" -> IS_DEFINED(SOME(TRUE, OPTION(BOOLEAN))),
       "LET"              -> LET("x", CONST_INT(0)),
@@ -151,7 +145,6 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
 
         case getter: Typed.GETTER        => aux(getter.ref).map(Untyped.GETTER(_, getter.field))
         case binaryOp: Typed.BINARY_OP   => (aux(binaryOp.a), aux(binaryOp.b)).mapN(Untyped.BINARY_OP(_, binaryOp.kind, _))
-        case sigVerify: Typed.SIG_VERIFY => (aux(sigVerify.message), aux(sigVerify.signature), aux(sigVerify.publicKey)).mapN(Untyped.SIG_VERIFY)
         case isDefined: Typed.IS_DEFINED => aux(isDefined.opt).map(Untyped.IS_DEFINED)
         case let: Typed.LET              => aux(let.value).map(Untyped.LET(let.name, _))
         case block: Typed.BLOCK =>

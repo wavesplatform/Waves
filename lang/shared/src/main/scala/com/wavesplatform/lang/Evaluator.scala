@@ -4,8 +4,6 @@ import cats.data.EitherT
 import com.wavesplatform.lang.Context.Obj
 import com.wavesplatform.lang.Terms._
 import monix.eval.Coeval
-import scodec.bits.ByteVector
-import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 import scala.util.{Failure, Success, Try}
 
@@ -100,13 +98,6 @@ object Evaluator {
           }
         case Typed.NONE         => EitherT.rightT[Coeval, String](None)
         case Typed.SOME(b, tpe) => r[tpe.Underlying](ctx, EitherT.pure(b)).map(Some(_))
-        case Typed.SIG_VERIFY(msg, sig, pk) =>
-          for {
-            s <- r[ByteVector](ctx, EitherT.pure(sig))
-            m <- r[ByteVector](ctx, EitherT.pure(msg))
-            p <- r[ByteVector](ctx, EitherT.pure(pk))
-          } yield Curve25519.verify(Signature(s.toArray), m.toArray, PublicKey(p.toArray))
-
         case Typed.GETTER(expr, field, _) =>
           r[Obj](ctx, EitherT.pure(expr)).flatMap { (obj: Obj) =>
             obj.fields.find(_._1 == field) match {
@@ -116,8 +107,8 @@ object Evaluator {
           }
         case Typed.FUNCTION_CALL(name, args, tpe) =>
           import cats.data._
-          import cats.syntax.all._
           import cats.instances.vector._
+          import cats.syntax.all._
           ctx.functions.get(name) match {
             case Some(func) =>
               val argsVector = args

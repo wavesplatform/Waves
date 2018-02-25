@@ -28,7 +28,6 @@ object Terms {
     case class GETTER(ref: EXPR, field: String)                            extends EXPR
     case class CONST_BYTEVECTOR(bs: ByteVector)                            extends EXPR
     case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR)           extends EXPR
-    case class SIG_VERIFY(message: EXPR, signature: EXPR, publicKey: EXPR) extends EXPR
     case class IS_DEFINED(opt: EXPR)                                       extends EXPR
     case class LET(name: String, value: EXPR)                              extends EXPR
     case class BLOCK(let: Option[LET], body: EXPR)                         extends EXPR
@@ -48,7 +47,6 @@ object Terms {
     case class GETTER(ref: EXPR, field: String, override val tpe: TYPE)                      extends EXPR(tpe)
     case class CONST_BYTEVECTOR(bs: ByteVector)                                              extends EXPR(BYTEVECTOR)
     case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR, override val tpe: TYPE)     extends EXPR(tpe)
-    case class SIG_VERIFY(message: EXPR, signature: EXPR, publicKey: EXPR)                   extends EXPR(BOOLEAN)
     case class IS_DEFINED(opt: EXPR)                                                         extends EXPR(BOOLEAN)
     case class LET(name: String, value: EXPR)                                                extends EXPR(UNIT)
     case class BLOCK(let: Option[LET], body: EXPR, override val tpe: TYPE)                   extends EXPR(tpe)

@@ -16,7 +16,7 @@ abstract class ParserImpl { this: Base58 =>
   import White._
   import fastparse.noApi._
 
-  val varName = CharIn('A' to 'Z').rep(1).!
+  private val varName = CharIn('A' to 'Z').rep(1).!
 
   private def numberP: P[CONST_INT]    = P(CharIn('0' to '9').rep(min = 1).!.map(t => CONST_INT(t.toInt)))
   private def trueP: P[TRUE.type]      = P("true").map(_ => TRUE)
@@ -59,9 +59,6 @@ abstract class ParserImpl { this: Base58 =>
         ifNone)
     )
 
-  private def sigVerifyP: P[SIG_VERIFY] = P("checkSig" ~ "(" ~ block ~ "," ~ block ~ "," ~ block ~ ")").map {
-    case ((x, y, z)) => SIG_VERIFY(x, y, z)
-  }
   private def byteVectorP: P[CONST_BYTEVECTOR] =
     P("base58'" ~ CharsWhileIn(Base58Chars).! ~ "'").map(x => CONST_BYTEVECTOR(ByteVector(base58Decode(x).get)))
 
@@ -93,10 +90,7 @@ abstract class ParserImpl { this: Base58 =>
   private def expr = P(binaryOp(opsByPriority) | atom)
 
   private def atom =
-    P(ifP | patmat1P | patmat2P | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | sigVerifyP | getterP | functionCallP | refP | isDefined | getP )
+    P(functionCallP | ifP | patmat1P | patmat2P | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | getterP | refP | isDefined | getP )
 
-  def apply(str: String): core.Parsed[EXPR, Char, String] = block.parse(str)
+  def apply(str: String): core.Parsed[EXPR, Char, String] = P(block ~ End).parse(str)
 }
-
-
-

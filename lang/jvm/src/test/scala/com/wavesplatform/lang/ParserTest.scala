@@ -33,19 +33,13 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("bytestr expressions") {
-    parse("checkSig(base58'333', base58'222', base58'111')") shouldBe SIG_VERIFY(
-      CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("333").get)),
-      CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("222").get)),
-      CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("111").get))
-    )
-
-    parse("false || checkSig(base58'333', base58'222', base58'111')") shouldBe BINARY_OP(
+    parse("false || SIGVERIFY(base58'333', base58'222', base58'111')") shouldBe BINARY_OP(
       FALSE,
       OR_OP,
-      SIG_VERIFY(
+      FUNCTION_CALL( "SIGVERIFY", List(
         CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("333").get)),
         CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("222").get)),
-        CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("111").get))
+        CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("111").get)))
       )
     )
   }
@@ -136,16 +130,16 @@ X > Y
         |
         |let W = TX.BODYBYTES
         |let P = TX.PROOF
-        |let V = checkSig(W,P,A)
+        |let V = SIGVERIFY(W,P,A)
         |
         |let AC = if(V) then 1 else 0
-        |let BC = if(checkSig(TX.BODYBYTES,TX.PROOF,B)) then 1 else 0
-        |let CC = if(checkSig(TX.BODYBYTES,TX.PROOF,C)) then 1 else 0
+        |let BC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOF,B)) then 1 else 0
+        |let CC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOF,C)) then 1 else 0
         |
         | AC + BC+ CC >= 2
         |
       """.stripMargin
-    parse(script)
+    parse(script) // gets parsed, but later will fail on type check!
   }
 
   property("function call") {

@@ -111,12 +111,6 @@ object TypeChecker {
         }
         .map { case (operands, tpe) => Typed.BINARY_OP(operands._1, op, operands._2, tpe) }
 
-    case sigVerify: Untyped.SIG_VERIFY =>
-      (setType(ctx, EitherT.pure(sigVerify.message)),
-       setType(ctx, EitherT.pure(sigVerify.signature)),
-       setType(ctx, EitherT.pure(sigVerify.publicKey)))
-        .mapN(Typed.SIG_VERIFY)
-
     case isDefined: Untyped.IS_DEFINED =>
       setType(ctx, EitherT.pure(isDefined.opt)).map(of => Typed.IS_DEFINED(of))
 
