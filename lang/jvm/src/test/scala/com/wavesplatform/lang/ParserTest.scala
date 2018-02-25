@@ -148,6 +148,17 @@ X > Y
     parse(script)
   }
 
+  property("function call") {
+    val script =
+      """
+        |
+        | FOO(1,2)
+        |
+      """.stripMargin
+    parse(script) shouldBe FUNCTION_CALL("FOO", List(CONST_INT(1),CONST_INT(2)))
+  }
+
+
   property("isDefined/get") {
     parse("isDefined(X)") shouldBe IS_DEFINED(REF("X"))
     parse("if(isDefined(X)) then get(X) else Y") shouldBe IF(IS_DEFINED(REF("X")), GET(REF("X")), REF("Y"))

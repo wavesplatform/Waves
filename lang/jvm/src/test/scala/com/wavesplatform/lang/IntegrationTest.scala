@@ -6,7 +6,7 @@ import org.scalatest.prop.PropertyChecks
 
 import scala.util.Try
 
-class CompleteTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
+class IntegrationTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
 
   val multiplierFunction = CustomFunction("MULTIPLY", Terms.INT, List(("x1", Terms.INT), ("x2", Terms.INT))) {
     case x1 :: x2 :: Nil => Try { x1.asInstanceOf[Int] * x2.asInstanceOf[Int] }.toEither.left.map(_.toString)
@@ -14,8 +14,9 @@ class CompleteTest extends PropSpec with PropertyChecks with Matchers with NoShr
 
   private def eval(code: String) = {
     val untyped = Parser(code).get.value
-    val typed   = TypeChecker(TypeChecker.TypeCheckerContext.empty, untyped)
-    typed.flatMap(Evaluator(Context(Map.empty, Map.empty, Map(multiplierFunction.name -> multiplierFunction)), _))
+    val ctx = Context(Map.empty, Map.empty, Map(multiplierFunction.name -> multiplierFunction))
+    val typed   = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(ctx), untyped)
+    typed.flatMap(Evaluator(ctx, _))
   }
 
   property("pattern matching") {

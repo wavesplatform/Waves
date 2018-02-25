@@ -120,7 +120,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(
       context = Context(
         typeDefs = Map(pointType.name -> pointType),
-        defs = Map(("p", (TYPEREF(pointType.name), pointInstance))),
+        varDefs = Map(("p", (TYPEREF(pointType.name), pointInstance))),
         functions = Map.empty
       ),
       expr = BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", INT), SUM_OP, CONST_INT(2), INT)
@@ -132,10 +132,11 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     val multiplierFunction = CustomFunction("MULTIPLY", Terms.INT, List(("x1", Terms.INT), ("x2", Terms.INT))) {
       case x1 :: x2 :: Nil => Try { x1.asInstanceOf[Int] * x2.asInstanceOf[Int] }.toEither.left.map(_.toString)
     }
+
     ev(
       context = Context(
         typeDefs = Map.empty,
-        defs = Map.empty,
+        varDefs = Map.empty,
         functions = Map(multiplierFunction.name -> multiplierFunction)
       ),
       expr = FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_INT(3), Typed.CONST_INT(4)), INT)

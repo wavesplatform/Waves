@@ -4,7 +4,7 @@ import Context._
 import com.wavesplatform.lang.Terms.TYPE
 import monix.eval.Coeval
 
-case class Context(typeDefs: Map[String, CustomType], defs: Defs, functions: Map[String, CustomFunction])
+case class Context(typeDefs: Map[String, CustomType], varDefs: Defs, functions: Map[String, CustomFunction])
 
 object Context {
 
@@ -16,6 +16,7 @@ object Context {
 
   sealed trait CustomFunction {
     val name: String
+    val args: List[(String, TYPE)]
     val resultType: TYPE
     def eval(args: List[Any]) : Either[String,resultType.Underlying]
   }

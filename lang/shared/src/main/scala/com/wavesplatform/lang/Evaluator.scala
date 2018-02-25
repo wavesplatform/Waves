@@ -23,13 +23,13 @@ object Evaluator {
           mayBeLet match {
             case None => r[blockTpe.Underlying](ctx, EitherT.pure(inner))
             case Some(Typed.LET(newVarName, newVarBlock)) =>
-              ctx.defs.get(newVarName) match {
+              ctx.varDefs.get(newVarName) match {
                 case Some(_) => EitherT.leftT[Coeval, T](s"Value '$newVarName' already defined in the scope")
                 case None =>
                   val varBlockTpe = newVarBlock.tpe
                   for {
                     newVarValue <- r[varBlockTpe.Underlying](ctx, EitherT.pure(newVarBlock))
-                    updatedCtx = ctx.copy(defs = ctx.defs.updated(newVarName, (varBlockTpe, newVarValue)))
+                    updatedCtx = ctx.copy(varDefs = ctx.varDefs.updated(newVarName, (varBlockTpe, newVarValue)))
                     res <- r[blockTpe.Underlying](updatedCtx, EitherT.pure(inner))
                   } yield res
               }
@@ -38,7 +38,7 @@ object Evaluator {
         case let: Typed.LET => r[let.tpe.Underlying](ctx, EitherT.pure(let.value))
 
         case Typed.REF(str, _) =>
-          ctx.defs.get(str) match {
+          ctx.varDefs.get(str) match {
             case Some((x, y)) => EitherT.rightT[Coeval, String](y.asInstanceOf[x.Underlying])
             case None         => EitherT.leftT[Coeval, T](s"A definition of '$str' is not found")
           }

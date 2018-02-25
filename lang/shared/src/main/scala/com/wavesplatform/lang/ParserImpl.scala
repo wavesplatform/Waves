@@ -34,7 +34,7 @@ abstract class ParserImpl { this: Base58 =>
   private def functionCallArgs : P[Seq[EXPR]] = (expr.rep(exactly=1) ~ P("," ~ expr).rep()).map {
     case (arg0, argsOther) => arg0 ++ argsOther
   }
-  private def functionCall : P[FUNCTION_CALL] = P(varName ~ "(" ~ functionCallArgs ~ ")").map {
+  private def functionCallP : P[FUNCTION_CALL] = P(varName ~ "(" ~ functionCallArgs ~ ")").map {
     case (functionName, args) => FUNCTION_CALL(functionName,args.toList)
   }
 
@@ -93,7 +93,7 @@ abstract class ParserImpl { this: Base58 =>
   private def expr = P(binaryOp(opsByPriority) | atom)
 
   private def atom =
-    P(ifP | patmat1P | patmat2P | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | sigVerifyP | getterP | refP | isDefined | getP )
+    P(ifP | patmat1P | patmat2P | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | sigVerifyP | getterP | functionCallP | refP | isDefined | getP )
 
   def apply(str: String): core.Parsed[EXPR, Char, String] = block.parse(str)
 }

@@ -10,12 +10,17 @@ import scala.util.{Failure, Success, Try}
 
 object TypeChecker {
 
-  type TypeDefs = Map[String, TYPE]
-  type FunctionSigs = Map[String, (List[TYPE],TYPE)]
+  type TypeDefs     = Map[String, TYPE]
+  type FunctionSigs = Map[String, (List[TYPE], TYPE)]
   case class TypeCheckerContext(predefTypes: Map[String, CustomType], varDefs: TypeDefs, functionDefs: FunctionSigs)
 
   object TypeCheckerContext {
     val empty = TypeCheckerContext(Map.empty, Map.empty, Map.empty)
+
+    def fromContext(ctx: Context): TypeCheckerContext =
+      TypeCheckerContext(predefTypes = ctx.typeDefs,
+                         varDefs = ctx.varDefs.mapValues(_._1),
+                         functionDefs = ctx.functions.mapValues(cf => (cf.args.map(_._2), cf.resultType)))
   }
 
   type TypeResolutionError      = String
@@ -48,59 +53,61 @@ object TypeChecker {
           }
         }
 
-    case expr@Untyped.FUNCTION_CALL(name, args) =>
+    case expr @ Untyped.FUNCTION_CALL(name, args) =>
       val value: EitherT[Coeval, String, Typed.EXPR] = ctx.functionDefs.get(name) match {
         case Some((argTypes, resultType)) =>
-          if(args.lengthCompare(argTypes.size) != 0)
+          if (args.lengthCompare(argTypes.size) != 0)
             EitherT.fromEither[Coeval](Left(s"Function '$name' requires ${argTypes.size} arguments, but ${args.size} are provided"))
           else {
             import cats.instances.vector._
             val actualArgTypes: Vector[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg))).toVector
-            val sequencedActualArgTypes = actualArgTypes.sequence[SetTypeResult, Typed.EXPR].map(_.zip(argTypes))
-            sequencedActualArgTypes.subflatMap { v =>
-              val matches = v.map { case ((e, tpe)) => findCommonType(e.tpe, tpe) match {
-                case Some(_) => Right(())
-                case None => Left("Eh")
-              }
+            val sequencedActualArgTypes                           = actualArgTypes.sequence[SetTypeResult, Typed.EXPR].map(_.zip(argTypes))
+            sequencedActualArgTypes.subflatMap { v: Seq[(Typed.EXPR, TYPE)] =>
+              val matches = v.map {
+                case ((e, tpe)) =>
+                  findCommonType(e.tpe, tpe) match {
+                    case Some(_) => Right(e)
+                    case None    => Left(s"Types of arguments of function call '$name' don't match")
+                  }
               }
               matches.find(_.isLeft) match {
                 case Some(left) => left
-                case None => Right(resultType)
+                case None       => Right(Typed.FUNCTION_CALL(name, v.map(_._1).toList, resultType))
               }
             }
           }
-          EitherT.fromEither[Coeval](Right(Typed.TRUE))
         case None => EitherT.fromEither[Coeval](Left(s"Function '$name' not found"))
       }
       value
 
-    case expr@Untyped.BINARY_OP(a, op, b) =>
+    case expr @ Untyped.BINARY_OP(a, op, b) =>
       (setType(ctx, EitherT.pure(a)), setType(ctx, EitherT.pure(b))).tupled
-        .subflatMap { case operands@(a, b) =>
-          val aTpe = a.tpe
-          val bTpe = b.tpe
+        .subflatMap {
+          case operands @ (a, b) =>
+            val aTpe = a.tpe
+            val bTpe = b.tpe
 
-          op match {
-            case SUM_OP =>
-              if (aTpe != INT) Left(s"The first operand is expected to be INT, but got $aTpe: $a in $expr")
-              else if (bTpe != INT) Left(s"The second operand is expected to be INT, but got $bTpe: $b in $expr")
-              else Right(operands -> INT)
+            op match {
+              case SUM_OP =>
+                if (aTpe != INT) Left(s"The first operand is expected to be INT, but got $aTpe: $a in $expr")
+                else if (bTpe != INT) Left(s"The second operand is expected to be INT, but got $bTpe: $b in $expr")
+                else Right(operands -> INT)
 
-            case GT_OP | GE_OP =>
-              if (aTpe != INT) Left(s"The first operand is expected to be INT, but got $aTpe: $a in $expr")
-              else if (bTpe != INT) Left(s"The second operand is expected to be INT, but got $bTpe: $b in $expr")
-              else Right(operands -> BOOLEAN)
+              case GT_OP | GE_OP =>
+                if (aTpe != INT) Left(s"The first operand is expected to be INT, but got $aTpe: $a in $expr")
+                else if (bTpe != INT) Left(s"The second operand is expected to be INT, but got $bTpe: $b in $expr")
+                else Right(operands -> BOOLEAN)
 
-            case AND_OP | OR_OP =>
-              if (aTpe != BOOLEAN) Left(s"The first operand is expected to be BOOLEAN, but got $aTpe: $a in $expr")
-              else if (bTpe != BOOLEAN) Left(s"The second operand is expected to be BOOLEAN, but got $bTpe: $b in $expr")
-              else Right(operands -> BOOLEAN)
+              case AND_OP | OR_OP =>
+                if (aTpe != BOOLEAN) Left(s"The first operand is expected to be BOOLEAN, but got $aTpe: $a in $expr")
+                else if (bTpe != BOOLEAN) Left(s"The second operand is expected to be BOOLEAN, but got $bTpe: $b in $expr")
+                else Right(operands -> BOOLEAN)
 
-            case EQ_OP =>
-              findCommonType(aTpe, bTpe)
-                .map(_ => Right(operands -> BOOLEAN))
-                .getOrElse(Left(s"Can't find common type for $aTpe and $bTpe: $a and $b in $expr"))
-          }
+              case EQ_OP =>
+                findCommonType(aTpe, bTpe)
+                  .map(_ => Right(operands -> BOOLEAN))
+                  .getOrElse(Left(s"Can't find common type for $aTpe and $bTpe: $a and $b in $expr"))
+            }
         }
         .map { case (operands, tpe) => Typed.BINARY_OP(operands._1, op, operands._2, tpe) }
 
