@@ -21,7 +21,7 @@ trait UtxPool extends AutoCloseable {
 
   def packUnconfirmed(rest: TwoDimensionalMiningConstraint, sortInBlock: Boolean): (Seq[Transaction], TwoDimensionalMiningConstraint)
 
-  def batched(f: UtxBatchOps => Unit): Unit = f(createBatchOps)
+  def batched[Result](f: UtxBatchOps => Result): Result = f(createBatchOps)
 
   def createBatchOps: UtxBatchOps
 

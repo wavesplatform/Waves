@@ -40,12 +40,16 @@ class MatcherUtxPool(underlying: UtxPool, events: EventStream) extends UtxPool w
                                sortInBlock: Boolean)
     : (Seq[Transaction], TwoDimensionalMiningConstraint) = underlying.packUnconfirmed(rest, sortInBlock)
 
-  override def batched(f: UtxBatchOps => Unit): Unit = {
+  override def batched[Result](f: UtxBatchOps => Result): Result = {
     val ops = new BatchOpsImpl(underlying.createBatchOps)
-    f(ops)
+    val r = f(ops)
     val msg = ops.message
-    log.debug(s"Sending $msg")
-    events.publish(msg)
+    if (msg.isEmpty) log.debug("No changes")
+    else {
+      log.debug(s"Sending $msg")
+      events.publish(msg)
+    }
+    r
   }
 
   override def createBatchOps: UtxBatchOps = new BatchOpsImpl(underlying.createBatchOps)

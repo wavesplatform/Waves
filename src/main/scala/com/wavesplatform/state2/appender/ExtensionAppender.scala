@@ -88,7 +88,9 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
                           .addField("txs", droppedBlocks.size)
                       )
                     }
-                    droppedBlocks.flatMap(_.transactionData).foreach(utxStorage.putIfNew)
+                    utxStorage.batched { ops =>
+                      droppedBlocks.flatMap(_.transactionData).foreach(ops.putIfNew)
+                    }
                     Right(Some(history.score()))
                 }
             }

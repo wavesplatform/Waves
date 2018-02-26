@@ -113,12 +113,13 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings,
   def batchTransfer: Route = (path("batch-transfer") & post) {
     json[List[SignedTransferRequest]] { reqs =>
       val r = Future
-        .traverse(reqs) { x =>
-          Future {
-            for {
-              tx <- x.toTx
-              added <- utx.putIfNew(tx)
-            } yield (tx, added)
+        .traverse(reqs) { x => Future(x.toTx) }
+        .map { xs =>
+          utx.batched { ops =>
+            xs.map {
+              case Left(e) => Left(e)
+              case Right(tx) => ops.putIfNew(tx).map((tx, _))
+            }
           }
         }
         .map { xs =>
