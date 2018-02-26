@@ -5,6 +5,7 @@ import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang._
 import com.wavesplatform.state2._
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB, crypto}
+import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -20,29 +21,23 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
 
   private val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
 
-  private val context = TypeChecker.TypeCheckerContext(
-    predefTypes = Map("Transaction" -> Verifier.transactionType),
-    varDefs = Map(
-      "TX" -> TYPEREF("Transaction")
-    ),
-    Map.empty
-  )
+  private val context = TypeChecker.TypeCheckerContext.fromContext(Verifier.buildContext(Coeval(???), Coeval(???)))
 
   def preconditionsTransferAndLease(code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = {
     val untyped = Parser(code).get.value
-    val typed = TypeChecker(context, untyped).right.get
+    val typed   = TypeChecker(context, untyped).explicitGet()
     preconditionsTransferAndLease(typed)
   }
 
   def preconditionsTransferAndLease(typed: Typed.EXPR): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] =
     for {
-      master <- accountGen
+      master    <- accountGen
       recepient <- accountGen
-      ts <- positiveIntGen
+      ts        <- positiveIntGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
       setScript <- selfSignedSetScriptTransactionGenP(master, Script(typed))
-      transfer <- transferGeneratorP(master, recepient.toAddress, None, None)
-      lease <- leaseAndCancelGeneratorP(master, recepient.toAddress, master)
+      transfer  <- transferGeneratorP(master, recepient.toAddress, None, None)
+      lease     <- leaseAndCancelGeneratorP(master, recepient.toAddress, master)
     } yield (genesis, setScript, lease._1, transfer)
 
   property("transfer is allowed but lease is not due to predicate") {
@@ -56,11 +51,15 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
         BOOLEAN
       ),
       AND_OP,
-      FUNCTION_CALL("SIGVERIFY", List(
-        GETTER(REF("TX", TYPEREF("Transaction")), "BODYBYTES", BYTEVECTOR),
-        GETTER(REF("TX", TYPEREF("Transaction")), "PROOFA", BYTEVECTOR),
-        GETTER(REF("TX", TYPEREF("Transaction")), "SENDERPK", BYTEVECTOR)
-      ), BOOLEAN),
+      FUNCTION_CALL(
+        "SIGVERIFY",
+        List(
+          GETTER(REF("TX", TYPEREF("Transaction")), "BODYBYTES", BYTEVECTOR),
+          GETTER(REF("TX", TYPEREF("Transaction")), "PROOFA", BYTEVECTOR),
+          GETTER(REF("TX", TYPEREF("Transaction")), "SENDERPK", BYTEVECTOR)
+        ),
+        BOOLEAN
+      ),
       BOOLEAN
     )
     forAll(preconditionsTransferAndLease(onlySend)) {
@@ -88,21 +87,20 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
            |
       """.stripMargin
       val untyped = Parser(script).get.value
-      val typed = TypeChecker(context, untyped)
-      typed.explicitGet()
+      TypeChecker(context, untyped).explicitGet()
     }
 
     val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, ScriptTransferTransaction, Seq[ByteStr])] = for {
-      master <- accountGen
-      s0 <- accountGen
-      s1 <- accountGen
-      s2 <- accountGen
+      master    <- accountGen
+      s0        <- accountGen
+      s1        <- accountGen
+      s2        <- accountGen
       recepient <- accountGen
-      ts <- positiveIntGen
+      ts        <- positiveIntGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
       setSctipt <- selfSignedSetScriptTransactionGenP(master, Script(multisig2Of3Lang(s0, s1, s2)))
-      amount <- positiveLongGen
-      fee <- smallFeeGen
+      amount    <- positiveLongGen
+      fee       <- smallFeeGen
       timestamp <- timestampGen
     } yield {
       val unsigned =
@@ -160,9 +158,8 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
     forAll(preconditionsTransferAndLease(badScript)) {
       case ((genesis, script, lease, transfer)) =>
         assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), fs) { case _ => () }
-        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), fs) { totalDiffEi =>
-          totalDiffEi should produce("transactions is of another type")
-        }
+        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), fs)(totalDiffEi =>
+          totalDiffEi should produce("transactions is of another type"))
     }
   }
 

@@ -21,23 +21,20 @@ object Evaluator {
           mayBeLet match {
             case None => r[blockTpe.Underlying](ctx, EitherT.pure(inner))
             case Some(Typed.LET(newVarName, newVarBlock)) =>
-              ctx.varDefs.get(newVarName) match {
+              ctx.letDefs.get(newVarName) match {
                 case Some(_) => EitherT.leftT[Coeval, T](s"Value '$newVarName' already defined in the scope")
                 case None =>
                   val varBlockTpe = newVarBlock.tpe
                   for {
                     newVarValue <- r[varBlockTpe.Underlying](ctx, EitherT.pure(newVarBlock))
-                    updatedCtx = ctx.copy(varDefs = ctx.varDefs.updated(newVarName, (varBlockTpe, newVarValue)))
+                    updatedCtx = ctx.copy(letDefs = ctx.letDefs.updated(newVarName, (varBlockTpe, Coeval.evalOnce(newVarValue))))
                     res <- r[blockTpe.Underlying](updatedCtx, EitherT.pure(inner))
                   } yield res
               }
           }
-
-        case let: Typed.LET => r[let.tpe.Underlying](ctx, EitherT.pure(let.value))
-
         case Typed.REF(str, _) =>
-          ctx.varDefs.get(str) match {
-            case Some((x, y)) => EitherT.rightT[Coeval, String](y.asInstanceOf[x.Underlying])
+          ctx.letDefs.get(str) match {
+            case Some((tpe, lzy)) => EitherT.rightT[Coeval, String](lzy().asInstanceOf[tpe.Underlying])
             case None         => EitherT.leftT[Coeval, T](s"A definition of '$str' is not found")
           }
 
@@ -100,10 +97,11 @@ object Evaluator {
         case Typed.SOME(b, tpe) => r[tpe.Underlying](ctx, EitherT.pure(b)).map(Some(_))
         case Typed.GETTER(expr, field, _) =>
           r[Obj](ctx, EitherT.pure(expr)).flatMap { (obj: Obj) =>
-            obj.fields.find(_._1 == field) match {
-              case Some((_, lzy)) => EitherT.rightT[Coeval, String](lzy.value().asInstanceOf[Any])
-              case None           => EitherT.leftT[Coeval, Any](s"field '$field' not found")
+            val value: EitherT[Coeval, ExcecutionError, Any] = obj.fields.find(_._1 == field) match {
+              case Some((_, lzy)) => EitherT(lzy.value.map(Right(_).asInstanceOf[Either[ExcecutionError,Any]]))
+              case None => EitherT.leftT[Coeval, Any](s"field '$field' not found")
             }
+            value
           }
         case Typed.FUNCTION_CALL(name, args, tpe) =>
           import cats.data._

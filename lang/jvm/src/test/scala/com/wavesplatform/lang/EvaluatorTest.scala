@@ -118,10 +118,23 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(
       context = Context(
         typeDefs = Map(pointType.name -> pointType),
-        varDefs = Map(("p", (TYPEREF(pointType.name), pointInstance))),
+        letDefs = Map(("p", (TYPEREF(pointType.name), Coeval.evalOnce(pointInstance)))),
         functions = Map.empty
       ),
       expr = BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", INT), SUM_OP, CONST_INT(2), INT)
+    ) shouldBe Right(5)
+  }
+
+  property("lazy let evaluation doesn't throw if not used") {
+    val pointType     = CustomType("Point", List("X" -> INT, "Y"                     -> INT))
+    val pointInstance = Obj(Map("X"                  -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
+    ev(
+      context = Context(
+        typeDefs = Map(pointType.name -> pointType),
+        letDefs = Map("p"             -> (TYPEREF(pointType.name), Coeval.evalOnce(pointInstance)), "badVal" -> (INT, Coeval(???))),
+        functions = Map.empty
+      ),
+      expr = BLOCK(Some(LET("Z", REF("badVal", INT))), BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", INT), SUM_OP, CONST_INT(2), INT), INT)
     ) shouldBe Right(5)
   }
 
@@ -129,7 +142,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(
       context = Context(
         typeDefs = Map.empty,
-        varDefs = Map.empty,
+        letDefs = Map.empty,
         functions = Map(multiplierFunction.name -> multiplierFunction)
       ),
       expr = FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_INT(3), Typed.CONST_INT(4)), INT)

@@ -4,11 +4,11 @@ import Context._
 import com.wavesplatform.lang.Terms.TYPE
 import monix.eval.Coeval
 
-case class Context(typeDefs: Map[String, CustomType], varDefs: Defs, functions: Map[String, CustomFunction])
+case class Context(typeDefs: Map[String, CustomType], letDefs: Defs, functions: Map[String, CustomFunction])
 
 object Context {
 
-  type Defs = Map[String, (TYPE, Any)]
+  type Defs = Map[String, (TYPE, Coeval[Any])]
 
   val empty = Context(Map.empty, Map.empty, Map.empty)
 

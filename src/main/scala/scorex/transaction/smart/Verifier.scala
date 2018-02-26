@@ -23,26 +23,26 @@ object Verifier {
       }
   }
 
-  def verify[T <: ProvenTransaction](script: Script, height: Int, transaction: T): Either[ValidationError, T] = {
-
-    val context = Context(
-      Map("Transaction" -> transactionType),
-      Map(
-        ("H", (INT, height)),
-        ("TX", (TYPEREF("Transaction"), transactionObject(transaction)))
-      ),
-      Map(sigVerify.name -> sigVerify)
-    )
-    Evaluator[Boolean](context, script.script) match {
+  def verify[T <: ProvenTransaction](script: Script, height: Int, transaction: T): Either[ValidationError, T] =
+    Evaluator[Boolean](buildContext(Coeval.evalOnce(transaction), Coeval.evalOnce(height)), script.script) match {
       case Left(execError) => Left(GenericError(s"Script execution error: $execError"))
       case Right(false)    => Left(TransactionNotAllowedByScript(transaction))
       case Right(true)     => Right(transaction)
     }
-  }
 
-  val sigVerify = CustomFunction("SIGVERIFY", BOOLEAN, List(("sig", BYTEVECTOR), ("message", BYTEVECTOR), ("pub", BYTEVECTOR))) {
-    case m :: p :: s :: Nil =>
-      Right(crypto.verify(s.asInstanceOf[ByteVector].toArray, m.asInstanceOf[ByteVector].toArray, p.asInstanceOf[ByteVector].toArray))
+  def buildContext(tx: Coeval[Transaction], height: Coeval[Int]): Context = Context(
+    Map("Transaction" -> transactionType),
+    Map(
+      ("H", (INT, height)),
+      ("TX", (TYPEREF("Transaction"), transactionObject(tx)))
+    ),
+    Map(sigVerify.name -> sigVerify)
+  )
+
+  val sigVerify = CustomFunction("SIGVERIFY", BOOLEAN, List(("message", BYTEVECTOR), ("sig", BYTEVECTOR), ("pub", BYTEVECTOR))) {
+    case m :: s :: p :: Nil =>
+      val bool = crypto.verify(s.asInstanceOf[ByteVector].toArray, m.asInstanceOf[ByteVector].toArray, p.asInstanceOf[ByteVector].toArray)
+      Right(bool)
     case _ => ???
   }
 
@@ -69,7 +69,9 @@ object Verifier {
     )
   )
 
-  val thro = Coeval(throw new IllegalArgumentException("transactions is of another type"))
+  val thro = Coeval{
+    throw new IllegalArgumentException("transactions is of another type")
+  }
 
   private def proofBinding(tx: Transaction, x: Int) =
     LazyVal(BYTEVECTOR)(tx match {
@@ -82,7 +84,7 @@ object Verifier {
       case _ => thro
     })
 
-  private def transactionObject(tx: Transaction) =
+  private def transactionObject(transaction: Coeval[Transaction]): Coeval[Obj] = transaction map { tx =>
     Obj(
       Map(
         "TYPE" -> LazyVal(INT)(Coeval.evalOnce(tx.transactionType.id)),
@@ -103,5 +105,5 @@ object Verifier {
         "PROOFB" -> proofBinding(tx, 1),
         "PROOFC" -> proofBinding(tx, 2)
       ))
-
+  }
 }

@@ -45,8 +45,6 @@ trait ScriptGen {
 
   def BOOLgen(gas: Int): Gen[EXPR] = if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1)) else Gen.const(TRUE)
 
-  private def CONST_BYTEVECTORgen: Gen[CONST_BYTEVECTOR] = Gen.choose(0, 100).flatMap(l => Gen.containerOfN[Array, Byte](l, Arbitrary.arbitrary[Byte])).map(bs => CONST_BYTEVECTOR(ByteVector(bs)))
-
   private def IF_BOOLgen(gas: Int): Gen[EXPR] = for {
     cnd <- BOOLgen((gas - 3) / 3)
     t <- BOOLgen((gas - 3) / 3)
