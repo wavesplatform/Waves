@@ -150,6 +150,7 @@ lazy val lang =
     .withoutSuffixFor(JVMPlatform)
     .settings(
       version := "0.0.1",
+      test in assembly := {},
       libraryDependencies ++=
         Dependencies.cats ++
         Dependencies.scalacheck ++
