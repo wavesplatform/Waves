@@ -1,9 +1,8 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.Terms.Untyped._
+import com.wavesplatform.lang.Terms._
 import org.scalacheck._
-import scodec.bits.ByteVector
 
 trait ScriptGen {
 
