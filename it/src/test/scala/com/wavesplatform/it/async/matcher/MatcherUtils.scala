@@ -36,6 +36,7 @@ trait MatcherUtils {
     val fee = 100000000L
     val futureIssueTransaction: Future[Transaction] = for {
       a <- node.issueAsset(node.address, name, description, amount, 0, fee, reissuable = false)
+      _ <- node.waitForTransaction(a.id)
     } yield a
 
     val issueTransaction = Await.result(futureIssueTransaction, 1.minute)

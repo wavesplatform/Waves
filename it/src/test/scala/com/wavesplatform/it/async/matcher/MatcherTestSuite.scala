@@ -13,9 +13,11 @@ import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import play.api.libs.json.JsNumber
 import play.api.libs.json.Json.parse
 import scorex.api.http.assets.SignedTransferRequest
+import scorex.api.http.leasing.{SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -290,15 +292,21 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     var bobAssetId: ByteStr = ByteStr.empty
     var bobWavesPair: AssetPair = AssetPair(None, None)
 
-
-    def bobOrder(amount: Int) = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.SELL, 1 * Waves * Order.PriceConstant, amount)
-    def bobPlacesAssetOrder(amount: Int): String = {
-      val (id, _) = matcherPlaceOrder(matcherNode, bobOrder(amount))
+    def bobPlacesWavesOrder(price: Long, amount: Int): String = {
+      val bobOrder = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.BUY, price, amount)
+      val (id, _) = matcherPlaceOrder(matcherNode, bobOrder)
       waitForOrderStatus(matcherNode, bobAssetIdRaw, id, "Accepted")
       id
     }
 
-    def transfer(from: Node, to: Node, assetId: Option[ByteStr], amount: Long): Unit = {
+    def bobPlacesAssetOrder(amount: Int): String = {
+      val bobOrder = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.SELL, 1 * Waves * Order.PriceConstant, amount)
+      val (id, _) = matcherPlaceOrder(matcherNode, bobOrder)
+      waitForOrderStatus(matcherNode, bobAssetIdRaw, id, "Accepted")
+      id
+    }
+
+    def transfer(from: Node, to: Node, assetId: Option[ByteStr], amount: Long, wait: Boolean = false): Unit = {
       val transferTx = TransferTransaction.create(
         assetId = assetId,
         sender = from.privateKey,
@@ -309,7 +317,33 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         feeAmount = TransactionFee,
         attachment = Array.emptyByteArray
       ).right.get
-      Await.result(matcherNode.signedTransfer(createSignedTransferRequest(transferTx)), 1.minute)
+      val tx = Await.result(matcherNode.signedTransfer(createSignedTransferRequest(transferTx)), 1.minute)
+      if (wait) Await.result(matcherNode.waitForTransaction(tx.id), 1.minute)
+    }
+
+    def lease(from: Node, to: Node, amount: Long): ByteStr = {
+      val leaseTx = LeaseTransaction.create(
+        sender = from.privateKey,
+        recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).right.get,
+        amount = amount,
+        timestamp = System.currentTimeMillis(),
+        fee = TransactionFee
+      ).right.get
+      val tx = Await.result(matcherNode.signedLease(createSignedLeaseRequest(leaseTx)), 1.minute)
+      Await.result(matcherNode.waitForTransaction(tx.id), 1.minute)
+      ByteStr(Base58.decode(tx.id).get)
+    }
+
+    def cancelLease(sender: Node, leaseId: ByteStr, amount: Long): Unit = {
+      val cancelLeaseTx = LeaseCancelTransaction.create(
+        sender = sender.privateKey,
+        leaseId = leaseId,
+        fee = TransactionFee,
+        timestamp = System.currentTimeMillis()
+      ).right.get
+
+      val tx = Await.result(matcherNode.signedLeaseCancel(createSignedLeaseCancelRequest(cancelLeaseTx)), 1.minute)
+      Await.result(matcherNode.waitForTransaction(tx.id), 1.minute)
     }
 
     def waitOrderCancelled(orderId: String): Unit = {
@@ -334,7 +368,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       )
 
       waitForAssetBalance(bobNode, bobAssetIdRaw, bobAssetQuantity)
-      Await.result(matcherNode.waitForHeightArise, 1.minute)
     }
 
     "order with assets" - {
@@ -342,27 +375,47 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         val oldestOrderId = bobPlacesAssetOrder(8000)
         val newestOrderId = bobPlacesAssetOrder(1000)
 
-        transfer(bobNode, aliceNode, Some(bobAssetId), 3000)
+        transfer(bobNode, aliceNode, Some(bobAssetId), 3050)
 
-        waitOrderCancelled(oldestOrderId)
-        withClue("The newest order is still active") {
+        withClue(s"The oldest order '$oldestOrderId' was cancelled") {
+          waitOrderCancelled(oldestOrderId)
+        }
+        withClue(s"The newest order '$newestOrderId' is still active") {
           checkBobOrderActive(newestOrderId)
         }
 
         // Cleanup
+        Await.ready(matcherNode.waitForHeightArise, 1.minute)
         matcherCancelOrder(bobNode, bobWavesPair, newestOrderId) should be("OrderCanceled")
-        Await.result(matcherNode.waitForHeightArise, 1.minute)
-        println(s"Alice: ${Await.result(matcherNode.assetsBalance(aliceNode.address), 5.seconds)}")
-        println(s"Bob: ${Await.result(matcherNode.assetsBalance(bobNode.address), 5.seconds)}")
-
-        transfer(aliceNode, bobNode, Some(bobAssetId), 3000)
-        Await.result(matcherNode.waitForHeightArise, 1.minute)
-        println(s"Alice: ${Await.result(matcherNode.assetsBalance(aliceNode.address), 5.seconds)}")
-        println(s"Bob: ${Await.result(matcherNode.assetsBalance(bobNode.address), 5.seconds)}")
+        transfer(aliceNode, bobNode, Some(bobAssetId), 3050, wait = true)
+        Await.ready(matcherNode.waitForHeightArise, 1.minute)
       }
 
       "leased waves, insufficient fee" in {
-        val bobBalance = Await.result(bobNode.balance(bobNode.address), 1.minute).balance
+        val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
+        println(s"bobBalance: $bobBalance")
+        val oldestOrderId = bobPlacesAssetOrder(1000)
+        val newestOrderId = bobPlacesAssetOrder(1000)
+
+        val leaseAmount = bobBalance - MatcherFee - TransactionFee
+        val leaseId = lease(bobNode, aliceNode, leaseAmount)
+
+        withClue(s"The oldest order '$oldestOrderId' was cancelled") {
+          waitOrderCancelled(oldestOrderId)
+        }
+        withClue(s"The newest order '$newestOrderId' is still active") {
+          checkBobOrderActive(newestOrderId)
+        }
+
+        // Cleanup
+        Await.ready(matcherNode.waitForHeightArise, 1.minute)
+        matcherCancelOrder(bobNode, bobWavesPair, newestOrderId) should be("OrderCanceled")
+        cancelLease(bobNode, leaseId, leaseAmount)
+        Await.ready(matcherNode.waitForHeightArise, 1.minute)
+      }
+
+      "moved waves, insufficient fee" in {
+        val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
         println(s"bobBalance: $bobBalance")
         val oldestOrderId = bobPlacesAssetOrder(1000)
         val newestOrderId = bobPlacesAssetOrder(1000)
@@ -370,26 +423,61 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         val transferAmount = bobBalance - MatcherFee - TransactionFee
         transfer(bobNode, aliceNode, None, transferAmount)
 
-        waitOrderCancelled(oldestOrderId)
-        withClue("The newest order is still active") {
+        withClue(s"The oldest order '$oldestOrderId' was cancelled") {
+          waitOrderCancelled(oldestOrderId)
+        }
+        withClue(s"The newest order '$newestOrderId' is still active") {
           checkBobOrderActive(newestOrderId)
         }
 
         // Cleanup
+        Await.ready(matcherNode.waitForHeightArise, 1.minute)
         matcherCancelOrder(bobNode, bobWavesPair, newestOrderId) should be("OrderCanceled")
-        transfer(aliceNode, bobNode, None, transferAmount)
+        transfer(aliceNode, bobNode, None, transferAmount, wait = true)
+        Await.ready(matcherNode.waitForHeightArise, 1.minute)
       }
-
-      "moved waves, insufficient fee" in {}
     }
 
     "order with waves" - {
       "leased waves, insufficient fee" in {
         // Amount of waves in order is smaller than fee
+        val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
+        println(s"bobBalance: $bobBalance")
+
+        val price = TransactionFee / 2
+        val orderId = bobPlacesWavesOrder(price * Order.PriceConstant, 1)
+
+        val leaseAmount = bobBalance - TransactionFee - price
+        val leaseId = lease(bobNode, aliceNode, leaseAmount)
+
+        withClue(s"The order '$orderId' was cancelled") {
+          waitOrderCancelled(orderId)
+        }
+
+        // Cleanup
+        Await.ready(matcherNode.waitForHeightArise, 1.minute)
+        cancelLease(bobNode, leaseId, leaseAmount)
+        Await.ready(matcherNode.waitForHeightArise, 1.minute)
       }
 
       "leased waves, insufficient waves" in {
+        val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
+        println(s"bobBalance: $bobBalance")
 
+        val price = 1 * Waves
+        val orderId = bobPlacesWavesOrder(price * Order.PriceConstant, 1)
+
+        val leaseAmount = bobBalance - TransactionFee - price / 2
+        val leaseId = lease(bobNode, aliceNode, leaseAmount)
+
+        withClue(s"The order '$orderId' was cancelled") {
+          waitOrderCancelled(orderId)
+        }
+
+        // Cleanup
+        Await.ready(matcherNode.waitForHeightArise, 1.minute)
+        cancelLease(bobNode, leaseId, leaseAmount)
+        Await.ready(matcherNode.waitForHeightArise, 1.minute)
       }
 
       "moved waves, insufficient fee" in {
@@ -397,8 +485,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       }
     }
   }
-
-  // "should cancel oldest sell orders if the owner moved some of its assets to another account"
 
   private def matcherExpectOrderPlacementRejected(order: Order, expectedStatusCode: Int, expectedStatus: String): Boolean = {
     val futureResult = matcherNode.expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus)
@@ -419,7 +505,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     result.status
   }
 
-  protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {
+  private def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {
     import tx._
     SignedTransferRequest(
       Base58.encode(tx.sender.publicKey),
@@ -431,6 +517,29 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       timestamp,
       attachment.headOption.map(_ => Base58.encode(attachment)),
       signature.base58
+    )
+  }
+
+  private def createSignedLeaseRequest(tx: LeaseTransaction): SignedLeaseRequest = {
+    import tx._
+    SignedLeaseRequest(
+      Base58.encode(tx.sender.publicKey),
+      amount,
+      fee,
+      recipient.stringRepr,
+      timestamp,
+      signature.base58
+    )
+  }
+
+  private def createSignedLeaseCancelRequest(tx: LeaseCancelTransaction): SignedLeaseCancelRequest = {
+    import tx._
+    SignedLeaseCancelRequest(
+      Base58.encode(tx.sender.publicKey),
+      leaseId.base58,
+      timestamp,
+      signature.base58,
+      fee
     )
   }
 
