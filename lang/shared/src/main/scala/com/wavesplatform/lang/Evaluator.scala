@@ -24,18 +24,20 @@ object Evaluator {
               ctx.letDefs.get(newVarName) match {
                 case Some(_) => EitherT.leftT[Coeval, T](s"Value '$newVarName' already defined in the scope")
                 case None =>
-                  val varBlockTpe = newVarBlock.tpe
-                  for {
-                    newVarValue <- r[varBlockTpe.Underlying](ctx, EitherT.pure(newVarBlock))
-                    updatedCtx = ctx.copy(letDefs = ctx.letDefs.updated(newVarName, (varBlockTpe, Coeval.evalOnce(newVarValue))))
-                    res <- r[blockTpe.Underlying](updatedCtx, EitherT.pure(inner))
-                  } yield res
+                  val varBlockTpe                                                  = newVarBlock.tpe
+                  val eitherTCoeval: TrampolinedExecResult[varBlockTpe.Underlying] = r[varBlockTpe.Underlying](ctx, EitherT.pure(newVarBlock))
+                  val calculatedValue: Coeval[varBlockTpe.Underlying] = eitherTCoeval.value.flatMap {
+                    case Left(err) => Coeval(???)
+                    case Right(v)  => Coeval(v)
+                  }
+                  val updatedCtx: Context = ctx.copy(letDefs = ctx.letDefs.updated(newVarName, (varBlockTpe, calculatedValue)))
+                  r[blockTpe.Underlying](updatedCtx, EitherT.pure(inner))
               }
           }
         case Typed.REF(str, _) =>
           ctx.letDefs.get(str) match {
             case Some((tpe, lzy)) => EitherT.rightT[Coeval, String](lzy().asInstanceOf[tpe.Underlying])
-            case None         => EitherT.leftT[Coeval, T](s"A definition of '$str' is not found")
+            case None             => EitherT.leftT[Coeval, T](s"A definition of '$str' is not found")
           }
 
         case Typed.CONST_INT(v)        => EitherT.rightT[Coeval, String](v)
@@ -98,8 +100,8 @@ object Evaluator {
         case Typed.GETTER(expr, field, _) =>
           r[Obj](ctx, EitherT.pure(expr)).flatMap { (obj: Obj) =>
             val value: EitherT[Coeval, ExcecutionError, Any] = obj.fields.find(_._1 == field) match {
-              case Some((_, lzy)) => EitherT(lzy.value.map(Right(_).asInstanceOf[Either[ExcecutionError,Any]]))
-              case None => EitherT.leftT[Coeval, Any](s"field '$field' not found")
+              case Some((_, lzy)) => EitherT(lzy.value.map(Right(_).asInstanceOf[Either[ExcecutionError, Any]]))
+              case None           => EitherT.leftT[Coeval, Any](s"field '$field' not found")
             }
             value
           }
