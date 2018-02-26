@@ -11,7 +11,7 @@ import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.{CreateAliasTransaction, Transaction, ValidationError}
+import scorex.transaction.{CreateAliasTransaction, Proofs, Transaction, ValidationError}
 import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration._
@@ -140,7 +140,7 @@ class NarrowTransactionGenerator(settings: Settings,
               })
             } else Some(randomFrom(accounts).get, None)
             senderAndAssetOpt.flatMap { case (sender, asset) =>
-              logOption(MassTransferTransaction.create(asset, sender, transfers.toList, ts, moreThatStandartFee,
+              logOption(MassTransferTransaction.selfSigned(Proofs.Version, asset, sender, transfers.toList, ts, moreThatStandartFee,
                 Array.fill(r.nextInt(100))(r.nextInt().toByte)))
             }
         }

@@ -188,7 +188,7 @@ trait TransactionGen extends ScriptGen {
 
   def massTransferGeneratorP(sender: PrivateKeyAccount, transfers: List[ParsedTransfer], assetId: Option[AssetId]): Gen[MassTransferTransaction] = for {
     (_, _, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
-  } yield MassTransferTransaction.create(assetId, sender, transfers, timestamp, feeAmount, attachment).right.get
+  } yield MassTransferTransaction.selfSigned(Proofs.Version, assetId, sender, transfers, timestamp, feeAmount, attachment).right.get
 
   def createWavesTransfer(sender: PrivateKeyAccount, recipient: Address,
                           amount: Long, fee: Long, timestamp: Long): Either[ValidationError, TransferTransaction] =
@@ -227,7 +227,7 @@ trait TransactionGen extends ScriptGen {
         amount <- Gen.choose(1L, Long.MaxValue / MaxTransferCount)
       } yield ParsedTransfer(recipient, amount)
       recipients <- Gen.listOfN(transferCount, transferGen)
-    } yield MassTransferTransaction.create(assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
+    } yield MassTransferTransaction.selfSigned(Proofs.Version, assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
   }.label("massTransferTransaction")
 
   val MinIssueFee = 100000000
