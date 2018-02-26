@@ -31,6 +31,12 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
     context.system.eventStream.subscribe(self, classOf[OrderAdded])
     context.system.eventStream.subscribe(self, classOf[OrderExecuted])
     context.system.eventStream.subscribe(self, classOf[OrderCanceled])
+    log.debug("preStart")
+  }
+
+  override def postStop(): Unit = {
+    super.postStop()
+    log.debug("postStop")
   }
 
   def processExpirableRequest(r: Any): Unit = r match {
@@ -66,9 +72,10 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       orderHistory.orderCanceled(ev)
     case RecoverFromOrderBook(ob) =>
       recoverFromOrderBook(ob)
-    case ForceCancelOrderFromHistory(id) =>
+    case msg@ForceCancelOrderFromHistory(id) =>
+      log.debug(s"Received cancel request: $msg")
       forceCancelOrder(id)
-    case msg@GetActiveOrdersByAddress(addr) =>
+    case msg@GetActiveOrdersByAddress(requestId, addr) =>
       log.debug(s"Received $msg")
       val active: Seq[LimitOrder] = orderHistory.orderIdsByAddress(addr)
         .view
@@ -76,14 +83,14 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
           id -> orderHistory.orderInfo(id)
         }
         .filter {
-          case (_, info) => info.remaining > 0
+          case (_, info) => !info.status.isFinal && info.remaining > 0
         }
         .flatMap { case (id, info) =>
           orderHistory.order(id).map { order => LimitOrder(order).partial(info.remaining) }
         }
         .force[LimitOrder, Seq[LimitOrder]](collection.breakOut)
 
-      val sendMsg = GetActiveOrdersByAddressResponse(addr, active)
+      val sendMsg = GetActiveOrdersByAddressResponse(requestId, addr, active)
       log.debug(s"Sending $sendMsg")
       sender.forward(sendMsg)
   }
@@ -99,6 +106,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   def forceCancelOrder(id: String): Unit = {
     orderHistory.order(id).map((_, orderHistory.orderInfo(id))) match {
       case Some((o, oi)) =>
+        log.info(s"Cancelled $id: ${OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, o))}")
         orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, o)))
         sender() ! o
       case None =>
@@ -168,9 +176,9 @@ object OrderHistoryActor {
 
   case class GetOrderStatus(assetPair: AssetPair, id: String, ts: Long) extends ExpirableOrderHistoryRequest
 
-  case class GetActiveOrdersByAddress(address: String)
+  case class GetActiveOrdersByAddress(requestId: Long, address: String)
 
-  case class GetActiveOrdersByAddressResponse(address: String, orders: Seq[LimitOrder])
+  case class GetActiveOrdersByAddressResponse(requestId: Long, address: String, orders: Seq[LimitOrder])
 
   case class DeleteOrderFromHistory(assetPair: AssetPair, address: String, id: String, ts: Long) extends ExpirableOrderHistoryRequest
 

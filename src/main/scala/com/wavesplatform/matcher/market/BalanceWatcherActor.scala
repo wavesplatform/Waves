@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{Actor, ActorRef, Cancellable, Props, ReceiveTimeout}
+import com.wavesplatform.matcher.market.BalanceWatcherActor._
 import com.wavesplatform.matcher.market.OrderBookActor.ForceCancelOrder
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ForceCancelOrderFromHistory, GetActiveOrdersByAddress, GetActiveOrdersByAddressResponse}
 import com.wavesplatform.matcher.model.Events.BalanceChanged
@@ -8,7 +9,6 @@ import com.wavesplatform.matcher.model.LimitOrder
 import com.wavesplatform.state2.Portfolio
 import scorex.transaction.assets.exchange.AssetPair
 import scorex.utils.ScorexLogging
-import BalanceWatcherActor._
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
@@ -17,7 +17,10 @@ class BalanceWatcherActor(matcher: ActorRef, orderHistory: ActorRef) extends Act
   private type OrdersToDelete   = List[(AssetPair, String)]
   private type ChangesByAddress = Map[String, Portfolio]
 
+  private var requestIdCounter = 0L
+
   override def preStart(): Unit = {
+    super.preStart()
     context.system.eventStream.subscribe(self, classOf[BalanceChanged])
   }
 
@@ -27,8 +30,8 @@ class BalanceWatcherActor(matcher: ActorRef, orderHistory: ActorRef) extends Act
       becomeWorking(changes)
   }
 
-  private def waitOrders(stashedChanges: ChangesByAddress, changesByAddress: ChangesByAddress, waitOrdersTimeout: Cancellable): Receive = {
-    case x @ GetActiveOrdersByAddressResponse(address, orders) =>
+  private def waitOrders(taskId: Long, stashedChanges: ChangesByAddress, changesByAddress: ChangesByAddress, waitOrdersTimeout: Cancellable): Receive = {
+    case x @ GetActiveOrdersByAddressResponse(`taskId`, address, orders) =>
       log.debug(s"Received in waitOrders: $x")
       // just check portfolio without any arithmetic operations
       ordersToDelete(changesByAddress, address, orders) // ERROR
@@ -51,12 +54,13 @@ class BalanceWatcherActor(matcher: ActorRef, orderHistory: ActorRef) extends Act
       if (updated.isEmpty) {
         if (stashedChanges.isEmpty) context.become(receive)
         else becomeWorking(stashedChanges)
-      } else context.become(waitOrders(stashedChanges, updated, reschedule(waitOrdersTimeout)))
+      } else context.become(waitOrders(taskId, stashedChanges, updated, reschedule(waitOrdersTimeout)))
 
     case x: BalanceChanged =>
       log.debug(s"Received in waitOrders: $x")
       context.become(
         waitOrders(
+          taskId = taskId,
           stashedChanges = replaceChanges(stashedChanges, x.changesByAddress),
           changesByAddress = changesByAddress,
           waitOrdersTimeout = reschedule(waitOrdersTimeout)
@@ -70,12 +74,14 @@ class BalanceWatcherActor(matcher: ActorRef, orderHistory: ActorRef) extends Act
 
   private def becomeWorking(changes: ChangesByAddress): Unit = {
     changes.keys
-      .map(GetActiveOrdersByAddress)
+      .map(GetActiveOrdersByAddress(requestIdCounter, _))
       .map { x =>
         log.debug(s"Sending to orderHistory: $x"); x
       }
       .foreach(orderHistory ! _)
-    context.become(waitOrders(Map.empty, changes, reschedule(EmptyCancellable)))
+
+    context.become(waitOrders(requestIdCounter, Map.empty, changes, reschedule(EmptyCancellable)))
+    requestIdCounter += 1
   }
 
   private def reschedule(old: Cancellable): Cancellable = {
