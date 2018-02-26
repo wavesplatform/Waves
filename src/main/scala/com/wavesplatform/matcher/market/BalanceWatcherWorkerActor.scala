@@ -1,7 +1,7 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{Actor, ActorRef, Cancellable, Props, ReceiveTimeout}
-import com.wavesplatform.matcher.market.BalanceWatcherActor._
+import com.wavesplatform.matcher.market.BalanceWatcherWorkerActor._
 import com.wavesplatform.matcher.market.OrderBookActor.ForceCancelOrder
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ForceCancelOrderFromHistory, GetActiveOrdersByAddress, GetActiveOrdersByAddressResponse}
 import com.wavesplatform.matcher.model.Events.BalanceChanged
@@ -12,17 +12,12 @@ import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
-class BalanceWatcherActor(matcher: ActorRef, orderHistory: ActorRef) extends Actor with ScorexLogging {
+class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) extends Actor with ScorexLogging {
 
   private type OrdersToDelete   = List[(AssetPair, String)]
   private type ChangesByAddress = Map[String, Portfolio]
 
   private var requestIdCounter = 0L
-
-  override def preStart(): Unit = {
-    super.preStart()
-    context.system.eventStream.subscribe(self, classOf[BalanceChanged])
-  }
 
   override def receive: Receive = {
     case x @ BalanceChanged(changes) =>
@@ -30,7 +25,10 @@ class BalanceWatcherActor(matcher: ActorRef, orderHistory: ActorRef) extends Act
       becomeWorking(changes)
   }
 
-  private def waitOrders(taskId: Long, stashedChanges: ChangesByAddress, changesByAddress: ChangesByAddress, waitOrdersTimeout: Cancellable): Receive = {
+  private def waitOrders(taskId: Long,
+                         stashedChanges: ChangesByAddress,
+                         changesByAddress: ChangesByAddress,
+                         waitOrdersTimeout: Cancellable): Receive = {
     case x @ GetActiveOrdersByAddressResponse(`taskId`, address, orders) =>
       log.debug(s"Received in waitOrders: $x")
       // just check portfolio without any arithmetic operations
@@ -119,7 +117,7 @@ class BalanceWatcherActor(matcher: ActorRef, orderHistory: ActorRef) extends Act
 
 }
 
-object BalanceWatcherActor {
+object BalanceWatcherWorkerActor {
   val TimeoutToProcessChanges: FiniteDuration = 1.minute
 
   val EmptyCancellable: Cancellable = new Cancellable {
@@ -127,5 +125,5 @@ object BalanceWatcherActor {
     override def isCancelled: Boolean = true
   }
 
-  def props(matcher: ActorRef, orderHistory: ActorRef): Props = Props(new BalanceWatcherActor(matcher, orderHistory))
+  def props(matcher: ActorRef, orderHistory: ActorRef): Props = Props(new BalanceWatcherWorkerActor(matcher, orderHistory))
 }

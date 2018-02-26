@@ -3,9 +3,11 @@ package com.wavesplatform.matcher.market
 import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence.{PersistentActor, RecoveryCompleted}
+import akka.routing.RoundRobinPool
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{DeleteOrderBookRequest, GetOrderBookResponse, OrderBookRequest}
+import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.StateReader
 import com.wavesplatform.utx.UtxPool
@@ -169,12 +171,17 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
     case RecoveryCompleted =>
       log.info("MatcherActor - Recovery completed!")
       initPredefinedPairs()
-      context.actorOf(BalanceWatcherActor.props(self, orderHistory))
+      createBalanceWatcher()
   }
 
   override def receiveCommand: Receive = forwardToOrderBook
 
   override def persistenceId: String = "matcher"
+
+  private def createBalanceWatcher(): Unit = {
+    val balanceWatcherMaster = context.actorOf(RoundRobinPool(3).props(BalanceWatcherWorkerActor.props(self, orderHistory)), "order-watcher-router")
+    context.system.eventStream.subscribe(balanceWatcherMaster, classOf[BalanceChanged])
+  }
 }
 
 object MatcherActor {

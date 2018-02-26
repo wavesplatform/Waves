@@ -4,6 +4,7 @@ import java.util.NoSuchElementException
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.{ByteStr, StateReader}
@@ -85,19 +86,25 @@ case class TransactionsApiRoute(
     new ApiImplicitParam(name = "id", value = "transaction id ", required = true, dataType = "string", paramType = "path")
   ))
   def info: Route = (pathPrefix("info") & get) {
-    pathEndOrSingleSlash {
-      complete(InvalidSignature)
-    } ~
-    path(Segment) { encoded =>
-      ByteStr.decodeBase58(encoded) match {
-        case Success(id) =>
-          state().transactionInfo(id) match {
-            case Some((h, Some(tx))) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
-            case Some((h, None)) => complete(Json.obj("height" -> JsNumber(h)))
-            case None => complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
+    respondWithHeaders(
+      RawHeader("Cache-Control", "no-cache, no-store, must-revalidate"), // HTTP 1.1.
+      RawHeader("Pragma", "no-cache"), // HTTP 1.0.
+      RawHeader("Expires", "0") // Proxies.
+    ) {
+      pathEndOrSingleSlash {
+        complete(InvalidSignature)
+      } ~
+        path(Segment) { encoded =>
+          ByteStr.decodeBase58(encoded) match {
+            case Success(id) =>
+              state().transactionInfo(id) match {
+                case Some((h, Some(tx))) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
+                case Some((h, None)) => complete(Json.obj("height" -> JsNumber(h)))
+                case None => complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
+              }
+            case _ => complete(InvalidSignature)
           }
-        case _ => complete(InvalidSignature)
-      }
+        }
     }
   }
 
