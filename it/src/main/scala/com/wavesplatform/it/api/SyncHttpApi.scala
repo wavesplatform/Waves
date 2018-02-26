@@ -69,7 +69,7 @@ object SyncHttpApi extends Assertions{
     import com.wavesplatform.it.api.AsyncHttpApi.{NodesAsyncHttpApi => async}
 
 
-    private val TxInBlockchainAwaitTime = 2 * nodes.head.blockDelay
+    private val TxInBlockchainAwaitTime = 3 * nodes.head.blockDelay
     private val ConditionAwaitTime = 5.minutes
 
 
