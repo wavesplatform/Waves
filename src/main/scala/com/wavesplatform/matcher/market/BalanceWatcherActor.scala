@@ -35,12 +35,13 @@ class BalanceWatcherActor(matcher: ActorRef, orderHistory: ActorRef) extends Act
 //            x
 //          }
         // .foreach(matcher ! _)
-          .map { case (_, id) => ForceCancelOrderFromHistory(id) }
-          .map { x =>
-            log.debug(s"Sending to history: $x")
-            x
-          }
-        .foreach(orderHistory ! _)
+        .foreach { case (pair, id) =>
+          log.debug(s"Sending to history: $id")
+          orderHistory ! ForceCancelOrderFromHistory(id)
+
+          log.debug(s"Sending to matcher: $id")
+          matcher ! ForceCancelOrder(pair, id)
+        }
 
       val updated = changesByAddress - address
       if (updated.isEmpty) {
@@ -67,13 +68,13 @@ class BalanceWatcherActor(matcher: ActorRef, orderHistory: ActorRef) extends Act
         val ordersByPriority = orders.sortBy(_.order.timestamp)(Ordering[Long].reverse)
         val (_, r) = ordersByPriority.foldLeft((portfolio, List.empty: OrdersToDelete)) {
           case ((restPortfolio, toDelete), limitOrder) =>
-            val updatedPortfolio = restPortfolio.copy(balance = restPortfolio.balance - restPortfolio.leaseInfo.leaseOut)
-              .remove(limitOrder.spentAcc.assetId, limitOrder.getSpendAmount)
-              .flatMap(_.remove(None, limitOrder.remainingFee))
+            val updatedPortfolio1 = restPortfolio.copy(balance = restPortfolio.balance - restPortfolio.leaseInfo.leaseOut)
+            val updatedPortfolio2 = updatedPortfolio1.remove(limitOrder.spentAcc.assetId, limitOrder.getSpendAmount)
+            val updatedPortfolio3 = updatedPortfolio2.flatMap(_.remove(None, limitOrder.remainingFee))
 
-            log.debug(s"$restPortfolio -> $updatedPortfolio: asset = ${limitOrder.spentAcc.assetId} -> ${limitOrder.remainingAmount}, ${limitOrder.getSpendAmount}")
+            log.debug(s"$restPortfolio -> $updatedPortfolio1 -> $updatedPortfolio2 -> $updatedPortfolio3")
 
-            updatedPortfolio match {
+            updatedPortfolio3 match {
               case Some(x) => (x, toDelete)
               case None =>
                 (restPortfolio, (limitOrder.order.assetPair -> limitOrder.order.idStr()) :: toDelete)
