@@ -20,6 +20,9 @@ object PoSCalc extends ScorexLogging {
   val MinimalEffectiveBalanceForGenerator2: Long = 100000000000L
 
   private val AvgBlockTimeDepth: Int = 3
+
+  // Min BaseTarget value is 9 because only in this case it is possible to get to next integer value (10)
+  // then increasing base target by 11% and casting it to Long afterward (see lines 55 and 59)
   private val MinBaseTarget: Long = 9
 
   private val MinBlockDelaySeconds = 53
