@@ -19,8 +19,6 @@ trait PublicKeyAccount {
 
 object PublicKeyAccount {
 
-  val empty = PublicKeyAccount.apply(Array.fill(TransactionParser.KeyStringLength)(0))
-
   private case class PublicKeyAccountImpl(publicKey: Array[Byte]) extends PublicKeyAccount
 
   def apply(publicKey: Array[Byte]): PublicKeyAccount = PublicKeyAccountImpl(publicKey)

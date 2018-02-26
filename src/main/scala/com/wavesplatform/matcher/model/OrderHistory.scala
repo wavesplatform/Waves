@@ -126,6 +126,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
   }
 
   override def orderCanceled(event: OrderCanceled): Unit = {
+    log.info(s"Canceled")
     saveOrderInfo(event)
     saveOpenPortfolio(event)
   }
