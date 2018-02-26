@@ -2,7 +2,8 @@ package scorex.api.http.assets
 
 import cats.implicits._
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
-import play.api.libs.json.{Format, Json}
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
 import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.assets.MassTransferTransaction.Transfer
@@ -10,7 +11,17 @@ import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 import scorex.transaction.{AssetIdStringLength, Proofs, ValidationError}
 
 object SignedMassTransferRequest {
-  implicit val jsonFormat: Format[SignedMassTransferRequest] = Json.format
+  implicit val reads: Reads[SignedMassTransferRequest] = (
+      (JsPath \ "senderPublicKey").read[String] and
+      (JsPath \ "assetId").readNullable[String] and
+      (JsPath \ "transfers").read[List[Transfer]] and
+      (JsPath \ "fee").read[Long] and
+      (JsPath \ "timestamp").read[Long] and
+      (JsPath \ "attachment").readNullable[String] and
+      (JsPath \ "proofs").read[List[String]].orElse((JsPath \ "signature").read[String].map(List(_)))
+    )(SignedMassTransferRequest.apply _)
+
+  implicit val writes: Writes[SignedMassTransferRequest] = Json.writes[SignedMassTransferRequest]
 }
 
 @ApiModel(value = "Signed Asset transfer transaction")
