@@ -292,73 +292,8 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     var bobAssetId: ByteStr = ByteStr.empty
     var bobWavesPair: AssetPair = AssetPair(None, None)
 
-    def bobPlacesWavesOrder(price: Long, amount: Int): String = {
-      val bobOrder = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.BUY, price, amount)
-      val (id, _) = matcherPlaceOrder(matcherNode, bobOrder)
-      waitForOrderStatus(matcherNode, bobAssetIdRaw, id, "Accepted")
-      id
-    }
-
-    def bobPlacesAssetOrder(amount: Int): String = {
-      val bobOrder = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.SELL, 1 * Waves * Order.PriceConstant, amount)
-      val (id, _) = matcherPlaceOrder(matcherNode, bobOrder)
-      waitForOrderStatus(matcherNode, bobAssetIdRaw, id, "Accepted")
-      id
-    }
-
-    def transfer(from: Node, to: Node, assetId: Option[ByteStr], amount: Long, wait: Boolean = false): Unit = {
-      val transferTx = TransferTransaction.create(
-        assetId = assetId,
-        sender = from.privateKey,
-        recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).right.get,
-        amount = amount,
-        timestamp = System.currentTimeMillis(),
-        feeAssetId = None,
-        feeAmount = TransactionFee,
-        attachment = Array.emptyByteArray
-      ).right.get
-      val tx = Await.result(matcherNode.signedTransfer(createSignedTransferRequest(transferTx)), 1.minute)
-      if (wait) Await.result(matcherNode.waitForTransaction(tx.id), 1.minute)
-    }
-
-    def lease(from: Node, to: Node, amount: Long): ByteStr = {
-      val leaseTx = LeaseTransaction.create(
-        sender = from.privateKey,
-        recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).right.get,
-        amount = amount,
-        timestamp = System.currentTimeMillis(),
-        fee = TransactionFee
-      ).right.get
-      val tx = Await.result(matcherNode.signedLease(createSignedLeaseRequest(leaseTx)), 1.minute)
-      Await.result(matcherNode.waitForTransaction(tx.id), 1.minute)
-      ByteStr(Base58.decode(tx.id).get)
-    }
-
-    def cancelLease(sender: Node, leaseId: ByteStr, amount: Long): Unit = {
-      val cancelLeaseTx = LeaseCancelTransaction.create(
-        sender = sender.privateKey,
-        leaseId = leaseId,
-        fee = TransactionFee,
-        timestamp = System.currentTimeMillis()
-      ).right.get
-
-      val tx = Await.result(matcherNode.signedLeaseCancel(createSignedLeaseCancelRequest(cancelLeaseTx)), 1.minute)
-      Await.result(matcherNode.waitForTransaction(tx.id), 1.minute)
-    }
-
-    def waitOrderCancelled(orderId: String): Unit = {
-      val task = matcherNode.waitFor[MatcherStatusResponse](s"Order '$orderId' is cancelled")(
-        _.getOrderStatus(bobAssetName, orderId), _.status == "Cancelled", 1.second)
-      Await.result(task, 1.minute)
-    }
-
-    def checkBobOrderActive(orderId: String): Unit = {
-      val newestOrderStatus = matcherNode.getOrderStatus(bobAssetName, orderId)
-      Await.result(newestOrderStatus, 10.seconds).status shouldBe "Accepted"
-    }
-
     "prepare" in {
-      // Bob issues new asset
+      // Bob issues a new asset
       val bobAssetQuantity = 10000
       bobAssetIdRaw = issueAsset(bobNode, bobAssetName, bobAssetQuantity)
       bobAssetId = ByteStr.decodeBase58(bobAssetIdRaw).get
@@ -501,6 +436,71 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         transfer(aliceNode, bobNode, None, transferAmount)
         Await.ready(matcherNode.waitForHeightArise, 1.minute)
       }
+    }
+
+    def bobPlacesWavesOrder(price: Long, amount: Int): String = {
+      val bobOrder = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.BUY, price, amount)
+      val (id, _) = matcherPlaceOrder(matcherNode, bobOrder)
+      waitForOrderStatus(matcherNode, bobAssetIdRaw, id, "Accepted")
+      id
+    }
+
+    def bobPlacesAssetOrder(amount: Int): String = {
+      val bobOrder = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.SELL, 1 * Waves * Order.PriceConstant, amount)
+      val (id, _) = matcherPlaceOrder(matcherNode, bobOrder)
+      waitForOrderStatus(matcherNode, bobAssetIdRaw, id, "Accepted")
+      id
+    }
+
+    def transfer(from: Node, to: Node, assetId: Option[ByteStr], amount: Long, wait: Boolean = false): Unit = {
+      val transferTx = TransferTransaction.create(
+        assetId = assetId,
+        sender = from.privateKey,
+        recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).right.get,
+        amount = amount,
+        timestamp = System.currentTimeMillis(),
+        feeAssetId = None,
+        feeAmount = TransactionFee,
+        attachment = Array.emptyByteArray
+      ).right.get
+      val tx = Await.result(matcherNode.signedTransfer(createSignedTransferRequest(transferTx)), 1.minute)
+      if (wait) Await.result(matcherNode.waitForTransaction(tx.id), 1.minute)
+    }
+
+    def lease(from: Node, to: Node, amount: Long): ByteStr = {
+      val leaseTx = LeaseTransaction.create(
+        sender = from.privateKey,
+        recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).right.get,
+        amount = amount,
+        timestamp = System.currentTimeMillis(),
+        fee = TransactionFee
+      ).right.get
+      val tx = Await.result(matcherNode.signedLease(createSignedLeaseRequest(leaseTx)), 1.minute)
+      Await.result(matcherNode.waitForTransaction(tx.id), 1.minute)
+      ByteStr(Base58.decode(tx.id).get)
+    }
+
+    def cancelLease(sender: Node, leaseId: ByteStr, amount: Long): Unit = {
+      val cancelLeaseTx = LeaseCancelTransaction.create(
+        sender = sender.privateKey,
+        leaseId = leaseId,
+        fee = TransactionFee,
+        timestamp = System.currentTimeMillis()
+      ).right.get
+
+      val tx = Await.result(matcherNode.signedLeaseCancel(createSignedLeaseCancelRequest(cancelLeaseTx)), 1.minute)
+      Await.result(matcherNode.waitForTransaction(tx.id), 1.minute)
+    }
+
+    def waitOrderCancelled(orderId: String): Unit = {
+      val task = matcherNode.waitFor[MatcherStatusResponse](s"Order '$orderId' is cancelled")(
+        _.getOrderStatus(bobAssetName, orderId), _.status == "Cancelled", 1.second)
+      Await.result(task, 1.minute)
+    }
+
+    def checkBobOrderActive(orderId: String): Unit = {
+      val newestOrderStatus = matcherNode.getOrderStatus(bobAssetName, orderId)
+      Await.result(newestOrderStatus, 10.seconds).status shouldBe "Accepted"
     }
   }
 
