@@ -62,7 +62,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
   private val OrdersPrefix = "orders".getBytes(Charset)
   private val OrdersInfoPrefix = "infos".getBytes(Charset)
   private val AddressToOrdersPrefix = "addr-orders".getBytes(Charset)
-  private val AddressToActiveOrdersPrefix = "active-addr-orders".getBytes(Charset)
+  private val AddressToActiveOrdersPrefix = "a-addr-orders".getBytes(Charset)
   private val AddressPortfolioPrefix = "portfolios".getBytes(Charset)
 
   def savePairAddress(address: String, orderId: String): Unit = {
@@ -78,15 +78,19 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     }
   }
 
-  def saveOrderInfo(event: Event): Unit = {
-    Events.createOrderInfo(event).foreach { case (orderId, (o, oi)) =>
+  private def saveOrderInfo(event: Event): Map[String, (Order, OrderInfo)] = {
+    val updatedInfo = Events.createOrderInfo(event).map {
+      case (orderId, (o, oi)) => (orderId, (o, orderInfo(orderId).combine(oi)))
+    }
+
+    updatedInfo.foreach { case (orderId, (o, oi)) =>
       val combinedOi = orderInfo(orderId).combine(oi)
 
       put(makeKey(OrdersInfoPrefix, orderId), combinedOi.jsonStr.getBytes(Charset), None)
       log.debug(s"Changed OrderInfo for: $orderId -> " + orderInfo(orderId))
-
-      if (combinedOi.remaining <= 0) deleteFromActiveOnly(o.senderPublicKey.address, orderId)
     }
+
+    updatedInfo
   }
 
   def openPortfolio(address: String): OpenPortfolio = {
@@ -116,23 +120,34 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
   override def orderAccepted(event: OrderAdded): Unit = {
     val lo = event.order
     saveOrder(lo.order)
-    saveOrderInfo(event)
+    val updatedInfo = saveOrderInfo(event)
     saveOpenPortfolio(event)
     savePairAddress(lo.order.senderPublicKey.address, lo.order.idStr())
+
+    updatedInfo.foreach { case (orderId, (o, oi)) =>
+      if (!oi.status.isFinal) addToActive(o.senderPublicKey.address, orderId)
+    }
   }
 
   override def orderExecuted(event: OrderExecuted): Unit = {
     saveOrder(event.submitted.order)
     savePairAddress(event.submitted.order.senderPublicKey.address, event.submitted.order.idStr())
-    saveOrderInfo(event)
+    val updatedInfo = saveOrderInfo(event)
     saveOpenPortfolio(OrderAdded(event.submittedExecuted))
     saveOpenPortfolio(event)
+
+    updatedInfo.foreach { case (orderId, (o, oi)) =>
+      if (oi.status.isFinal) deleteFromActiveOnly(o.senderPublicKey.address, orderId)
+    }
   }
 
   override def orderCanceled(event: OrderCanceled): Unit = {
-    log.info(s"Canceled")
-    saveOrderInfo(event)
+    val updatedInfo = saveOrderInfo(event)
     saveOpenPortfolio(event)
+
+    updatedInfo.foreach { case (orderId, (o, oi)) =>
+      if (oi.status.isFinal) deleteFromActiveOnly(o.senderPublicKey.address, orderId)
+    }
   }
 
   override def orderInfo(id: String): OrderInfo =
@@ -204,7 +219,15 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     deleteOrderFromAddress(AddressToActiveOrdersPrefix, address, orderId)
   }
 
+  private def addToActive(address: String, orderId: String): Unit =  {
+    log.debug(s"addToActive($address, $orderId)")
+    val key = makeKey(AddressToActiveOrdersPrefix, address)
+    val orig = get(OrderIdsCodec)(key).getOrElse(Array.empty)
+    put(key, OrderIdsCodec.encode(orig :+ orderId), None)
+  }
+
   private def deleteFromActiveOnly(address: String, orderId: String): Unit = {
+    log.debug(s"deleteFromActiveOnly($address, $orderId)")
     deleteOrderFromAddress(AddressToActiveOrdersPrefix, address, orderId)
   }
 

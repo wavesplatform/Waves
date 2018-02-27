@@ -77,14 +77,9 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       forceCancelOrder(id)
     case msg@GetActiveOrdersByAddress(requestId, addr) =>
       log.debug(s"Received $msg")
-      val active: Seq[LimitOrder] = orderHistory.orderIdsByAddress(addr)
+      val active: Seq[LimitOrder] = orderHistory.activeOrderIdsByAddress(addr)
         .view
-        .map { id =>
-          id -> orderHistory.orderInfo(id)
-        }
-        .filter {
-          case (_, info) => !info.status.isFinal && info.remaining > 0
-        }
+        .map { id => id -> orderHistory.orderInfo(id) }
         .flatMap { case (id, info) =>
           orderHistory.order(id).map { order => LimitOrder(order).partial(info.remaining) }
         }
