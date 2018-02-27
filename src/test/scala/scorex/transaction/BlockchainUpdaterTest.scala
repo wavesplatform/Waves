@@ -195,7 +195,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
     fp.featureStatus(1, h.height()) shouldBe BlockchainFeatureStatus.Approved
   }
 
-  test("block processing should fail if unimplemented feature was activated on blockchaing when autoShutdownOnUnsupportedFeature = yes and exit with code 38") {
+  test("block processing should fail if unimplemented feature was activated on blockchain when autoShutdownOnUnsupportedFeature = yes and exit with code 38") {
     val signal = new Semaphore(1)
     signal.acquire()
 
