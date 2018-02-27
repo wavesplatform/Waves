@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.lang.Context.Obj
 import scodec.bits.ByteVector
 
 object Terms {
@@ -11,8 +12,7 @@ object Terms {
   case object BYTEVECTOR           extends TYPE { type Underlying = ByteVector           }
   case object BOOLEAN              extends TYPE { type Underlying = Boolean              }
   case class OPTION(t: TYPE)       extends TYPE { type Underlying = Option[t.Underlying] }
-  case class TYPEREF(name: String) extends TYPE { type Underlying = AnyRef               }
-
+  case class TYPEREF(name: String) extends TYPE { type Underlying = Obj                  }
 
   sealed trait BINARY_OP_KIND
   case object SUM_OP extends BINARY_OP_KIND
@@ -24,21 +24,21 @@ object Terms {
 
   object Untyped {
     sealed trait EXPR
-    case class CONST_INT(t: Int)                                           extends EXPR
-    case class GETTER(ref: EXPR, field: String)                            extends EXPR
-    case class CONST_BYTEVECTOR(bs: ByteVector)                            extends EXPR
-    case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR)           extends EXPR
-    case class IS_DEFINED(opt: EXPR)                                       extends EXPR
-    case class LET(name: String, value: EXPR)                              extends EXPR
-    case class BLOCK(let: Option[LET], body: EXPR)                         extends EXPR
-    case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)                 extends EXPR
-    case class REF(key: String)                                            extends EXPR
-    case class GET(opt: EXPR)                                              extends EXPR
-    case object TRUE                                                       extends EXPR
-    case object FALSE                                                      extends EXPR
-    case object NONE                                                       extends EXPR
-    case class SOME(t: EXPR)                                               extends EXPR
-    case class FUNCTION_CALL(functionName: String, args: List[EXPR])       extends EXPR
+    case class CONST_INT(t: Int)                                     extends EXPR
+    case class GETTER(ref: EXPR, field: String)                      extends EXPR
+    case class CONST_BYTEVECTOR(bs: ByteVector)                      extends EXPR
+    case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR)     extends EXPR
+    case class IS_DEFINED(opt: EXPR)                                 extends EXPR
+    case class LET(name: String, value: EXPR)                        extends EXPR
+    case class BLOCK(let: Option[LET], body: EXPR)                   extends EXPR
+    case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)           extends EXPR
+    case class REF(key: String)                                      extends EXPR
+    case class GET(opt: EXPR)                                        extends EXPR
+    case object TRUE                                                 extends EXPR
+    case object FALSE                                                extends EXPR
+    case object NONE                                                 extends EXPR
+    case class SOME(t: EXPR)                                         extends EXPR
+    case class FUNCTION_CALL(functionName: String, args: List[EXPR]) extends EXPR
   }
 
   object Typed {

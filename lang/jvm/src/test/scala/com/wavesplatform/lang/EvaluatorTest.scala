@@ -114,7 +114,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   }
 
   property("custom type field access") {
-    val pointType     = CustomType("Point", List("X" -> INT, "Y"                     -> INT))
+    val pointType     = PredefType("Point", List("X" -> INT, "Y"                     -> INT))
     val pointInstance = Obj(Map("X"                  -> LazyVal(INT)(EitherT.pure(3)), "Y" -> LazyVal(INT)(EitherT.pure(4))))
     ev(
       context = Context(
@@ -127,7 +127,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   }
 
   property("lazy let evaluation doesn't throw if not used") {
-    val pointType     = CustomType("Point", List(("X", INT), ("Y", INT)))
+    val pointType     = PredefType("Point", List(("X", INT), ("Y", INT)))
     val pointInstance = Obj(Map(("X", LazyVal(INT)(EitherT.pure(3))), ("Y", LazyVal(INT)(EitherT.pure(4)))))
     ev(
       context = Context(

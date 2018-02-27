@@ -2,7 +2,7 @@ package com.wavesplatform.lang
 
 import cats.data._
 import cats.syntax.all._
-import com.wavesplatform.lang.Context.CustomType
+import com.wavesplatform.lang.Context.PredefType
 import com.wavesplatform.lang.Terms._
 import monix.eval.Coeval
 
@@ -12,7 +12,7 @@ object TypeChecker {
 
   type TypeDefs     = Map[String, TYPE]
   type FunctionSigs = Map[String, (List[TYPE], TYPE)]
-  case class TypeCheckerContext(predefTypes: Map[String, CustomType], varDefs: TypeDefs, functionDefs: FunctionSigs)
+  case class TypeCheckerContext(predefTypes: Map[String, PredefType], varDefs: TypeDefs, functionDefs: FunctionSigs)
 
   object TypeCheckerContext {
     val empty = TypeCheckerContext(Map.empty, Map.empty, Map.empty)

@@ -6,7 +6,7 @@ import com.wavesplatform.lang.Evaluator.TrampolinedExecResult
 import com.wavesplatform.lang.Terms.TYPE
 import monix.eval.Coeval
 
-case class Context(typeDefs: Map[String, CustomType], letDefs: Defs, functions: Map[String, CustomFunction])
+case class Context(typeDefs: Map[String, PredefType], letDefs: Defs, functions: Map[String, PredefFunction])
 
 object Context {
 
@@ -14,27 +14,27 @@ object Context {
 
   val empty = Context(Map.empty, Map.empty, Map.empty)
 
-  case class CustomType(name: String, fields: List[(String, TYPE)])
+  case class PredefType(name: String, fields: List[(String, TYPE)])
 
-  sealed trait CustomFunction {
+  sealed trait PredefFunction {
     val name: String
     val args: List[(String, TYPE)]
     val resultType: TYPE
     def eval(args: List[Any]): TrampolinedExecResult[resultType.Underlying]
     val types: (List[TYPE], TYPE)
   }
-  object CustomFunction {
+  object PredefFunction {
 
-    case class CustomFunctionImpl(name: String, resultType: TYPE, args: List[(String, TYPE)], ev: List[Any] => Either[String, Any])
-        extends CustomFunction {
+    case class PredefFunctionImpl(name: String, resultType: TYPE, args: List[(String, TYPE)], ev: List[Any] => Either[String, Any])
+        extends PredefFunction {
       override def eval(args: List[Any]): TrampolinedExecResult[resultType.Underlying] = {
         EitherT.fromEither[Coeval](ev(args).map(_.asInstanceOf[resultType.Underlying]))
       }
       override lazy val types: (List[TYPE], TYPE) = (args.map(_._2), resultType)
     }
 
-    def apply(name: String, resultType: TYPE, args: List[(String, TYPE)])(ev: List[Any] => Either[String, resultType.Underlying]): CustomFunction =
-      CustomFunctionImpl(name, resultType, args, ev)
+    def apply(name: String, resultType: TYPE, args: List[(String, TYPE)])(ev: List[Any] => Either[String, resultType.Underlying]): PredefFunction =
+      PredefFunctionImpl(name, resultType, args, ev)
 
   }
 

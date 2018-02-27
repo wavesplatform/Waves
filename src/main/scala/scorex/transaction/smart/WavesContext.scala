@@ -6,6 +6,8 @@ import com.wavesplatform.lang.Context._
 import com.wavesplatform.lang.Evaluator.TrampolinedExecResult
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang._
+import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 import scorex.transaction.assets.TransferTransaction
@@ -13,26 +15,9 @@ import scorex.transaction.{Authorized, ProvenTransaction, Transaction}
 
 object WavesContext {
 
-  def build(tx: Coeval[Transaction], height: Coeval[Int]): Context = Context(
-    Map("Transaction" -> transactionType),
-    Map(
-      ("H", (INT, height)),
-      ("TX", (TYPEREF("Transaction"), transactionObject(tx)))
-    ),
-    Map(sigVerify.name -> sigVerify)
-  )
-
-  val sigVerify = CustomFunction("SIGVERIFY", BOOLEAN, List(("message", BYTEVECTOR), ("sig", BYTEVECTOR), ("pub", BYTEVECTOR))) {
-    case m :: s :: p :: Nil =>
-      val bool = crypto.verify(s.asInstanceOf[ByteVector].toArray, m.asInstanceOf[ByteVector].toArray, p.asInstanceOf[ByteVector].toArray)
-      Right(bool)
-    case _ => ???
-  }
-
-
   val optionByteVector = OPTION(BYTEVECTOR)
 
-  val transactionType = CustomType(
+  val transactionType = PredefType(
     "Transaction",
     List(
       "TYPE"      -> INT,
@@ -46,7 +31,13 @@ object WavesContext {
     )
   )
 
-  private def err[R](msg: String) : TrampolinedExecResult[R] = EitherT.leftT[Coeval,R](msg)
+  val sigVerify: PredefFunction = PredefFunction("SIGVERIFY", BOOLEAN, List(("message", BYTEVECTOR), ("sig", BYTEVECTOR), ("pub", BYTEVECTOR))) {
+    case (m: ByteVector) :: (s: ByteVector) :: (p: ByteVector) :: Nil =>
+      Right(crypto.verify(s.toArray, m.toArray, p.toArray))
+    case _ => ???
+  }
+
+  private def err[R](msg: String): TrampolinedExecResult[R] = EitherT.leftT[Coeval, R](msg)
 
   private def proofBinding(tx: Transaction, x: Int): LazyVal =
     LazyVal(BYTEVECTOR)(tx match {
@@ -59,7 +50,7 @@ object WavesContext {
       case _ => err("Transaction doesn't contain proofs")
     })
 
-  private def transactionObject(transaction: Coeval[Transaction]): Coeval[Obj] = transaction map { tx =>
+  private def transactionObject(tx: Transaction): Obj =
     Obj(
       Map(
         "TYPE" -> LazyVal(INT)(EitherT.pure(tx.transactionType.id)),
@@ -73,12 +64,36 @@ object WavesContext {
           case _              => err("Transaction doesn't contain sender public key")
         }),
         "ASSETID" -> LazyVal(optionByteVector)(tx match {
-          case tt: TransferTransaction => EitherT.pure(tt.assetId.map(x => ByteVector(x.arr)).asInstanceOf[optionByteVector.Underlying]
+          case tt: TransferTransaction => EitherT.pure(tt.assetId.map(x => ByteVector(x.arr)).asInstanceOf[optionByteVector.Underlying])
           case _                       => err("Transaction doesn't contain asset id")
         }),
         "PROOFA" -> proofBinding(tx, 0),
         "PROOFB" -> proofBinding(tx, 1),
         "PROOFC" -> proofBinding(tx, 2)
       ))
+
+  private def getTxById(state: SnapshotStateReader) = {
+    val returnType = OPTION(TYPEREF(transactionType.name))
+    PredefFunction("GETTRANSACTIONBYID", returnType, List(("id", BYTEVECTOR))) {
+      case (id: ByteVector) :: Nil =>
+        val maybeTx: Option[Transaction]           = state.transactionInfo(ByteStr(id.toArray)).map(_._2.get)
+        val maybeDomainTx                          = maybeTx.map(transactionObject)
+        Right(maybeDomainTx).map(_.asInstanceOf[returnType.Underlying])
+      case _ => ???
+    }
   }
+
+  def build(tx: Coeval[Transaction], height: Coeval[Int], state: SnapshotStateReader): Context = {
+    val txById = getTxById(state)
+
+    Context(
+      Map(transactionType.name -> transactionType),
+      Map(
+        ("H", (INT, height)),
+        ("TX", (TYPEREF(transactionType.name), tx.map(transactionObject)))
+      ),
+      Map(sigVerify.name -> sigVerify, txById.name -> txById)
+    )
+  }
+
 }
