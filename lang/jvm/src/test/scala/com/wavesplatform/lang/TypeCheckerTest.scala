@@ -163,6 +163,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
         case ref: Typed.REF   => Coeval(Untyped.REF(ref.key))
         case get: Typed.GET   => aux(get.opt).map(Untyped.GET)
         case some: Typed.SOME => aux(some.t).map(Untyped.SOME)
+        case f: Typed.FUNCTION_CALL => ???
       })
 
     aux(expr)()

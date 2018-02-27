@@ -56,7 +56,7 @@ object WavesContext {
         "TYPE" -> LazyVal(INT)(EitherT.pure(tx.transactionType.id)),
         "ID"   -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(tx.id().arr))),
         "BODYBYTES" -> LazyVal(BYTEVECTOR)(tx match {
-          case pt: ProvenTransaction => EitherT.pure(ByteVector(pt.bodyBytes))
+          case pt: ProvenTransaction => EitherT.pure(ByteVector(pt.bodyBytes()))
           case _                     => err("Transaction doesn't contain body bytes")
         }),
         "SENDERPK" -> LazyVal(BYTEVECTOR)(tx match {

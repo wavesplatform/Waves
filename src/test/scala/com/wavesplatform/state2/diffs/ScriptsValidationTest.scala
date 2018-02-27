@@ -21,7 +21,7 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
 
   private val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
 
-  private val context = TypeChecker.TypeCheckerContext.fromContext(WavesContext.build(Coeval(???), Coeval(???)))
+  private val context = TypeChecker.TypeCheckerContext.fromContext(WavesContext.build(Coeval(???), Coeval(???), null))
 
   def preconditionsTransferAndLease(code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = {
     val untyped = Parser(code).get.value
@@ -159,7 +159,7 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
       case ((genesis, script, lease, transfer)) =>
         assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), fs) { case _ => () }
         assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), fs)(totalDiffEi =>
-          totalDiffEi should produce("transactions is of another type"))
+          totalDiffEi should produce("doesn't contain asset id"))
     }
   }
 

@@ -13,14 +13,14 @@ object Verifier {
     case _: GenesisTransaction => Right(tx)
     case pt: ProvenTransaction =>
       (pt, s.accountScript(pt.sender)) match {
-        case (_, Some(script))              => verify(script, currentBlockHeight, pt)
+        case (_, Some(script))              => verify(s, script, currentBlockHeight, pt)
         case (stx: SignedTransaction, None) => stx.signaturesValid()
         case _                              => verifyAsEllipticCurveSignature(pt)
       }
   }
 
-  def verify[T <: ProvenTransaction](script: Script, height: Int, transaction: T): Either[ValidationError, T] =
-    Evaluator[Boolean](WavesContext.build(Coeval.evalOnce(transaction), Coeval.evalOnce(height)), script.script) match {
+  def verify[T <: ProvenTransaction](s: SnapshotStateReader, script: Script, height: Int, transaction: T): Either[ValidationError, T] =
+    Evaluator[Boolean](WavesContext.build(Coeval.evalOnce(transaction), Coeval.evalOnce(height), s), script.script) match {
       case Left(execError) => Left(GenericError(s"Script execution error: $execError"))
       case Right(false)    => Left(TransactionNotAllowedByScript(transaction))
       case Right(true)     => Right(transaction)
