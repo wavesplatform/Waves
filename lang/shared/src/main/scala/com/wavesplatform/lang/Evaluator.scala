@@ -9,9 +9,7 @@ import scala.util.{Failure, Success, Try}
 
 object Evaluator {
 
-  type TypeResolutionError      = String
   type ExcecutionError          = String
-  type ExecResult[T]            = Either[ExcecutionError, T]
   type TrampolinedExecResult[T] = EitherT[Coeval, ExcecutionError, T]
 
   private def r[T](ctx: Context, t: TrampolinedExecResult[Typed.EXPR]): TrampolinedExecResult[T] =
@@ -119,8 +117,7 @@ object Evaluator {
               val argsSequenced = argsVector.sequence[TrampolinedExecResult, Any]
               for {
                 actualArgs <- argsSequenced
-                value: Either[String, func.resultType.Underlying] = func.eval(actualArgs.toList)
-                r <- EitherT.fromEither[Coeval](value)
+                r <- func.eval(actualArgs.toList)
               } yield r
             case None => EitherT.leftT[Coeval, Any](s"function '$name' not found")
           }
@@ -131,7 +128,7 @@ object Evaluator {
       }).map(_.asInstanceOf[T])
     }
 
-  def apply[A](c: Context, expr: Typed.EXPR): ExecResult[A] = {
+  def apply[A](c: Context, expr: Typed.EXPR): Either[ExcecutionError, A] = {
     def result = r[A](c, EitherT.pure(expr)).value.apply()
     Try(result) match {
       case Failure(ex)  => Left(ex.toString)

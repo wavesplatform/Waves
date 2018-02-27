@@ -1,6 +1,8 @@
 package com.wavesplatform.lang
 
 import Context._
+import cats.data.EitherT
+import com.wavesplatform.lang.Evaluator.TrampolinedExecResult
 import com.wavesplatform.lang.Terms.TYPE
 import monix.eval.Coeval
 
@@ -18,20 +20,21 @@ object Context {
     val name: String
     val args: List[(String, TYPE)]
     val resultType: TYPE
-    def eval(args: List[Any]) : Either[String,resultType.Underlying]
-    val types : (List[TYPE], TYPE)
+    def eval(args: List[Any]): TrampolinedExecResult[resultType.Underlying]
+    val types: (List[TYPE], TYPE)
   }
   object CustomFunction {
 
-    case class CustomFunctionImpl(name: String, resultType: TYPE, args: List[(String, TYPE)], ev: List[Any] => Either[String,Any]) extends CustomFunction {
-      override def eval(args: List[Any]): Either[String,resultType.Underlying] = {
-        ev(args).map(_.asInstanceOf[resultType.Underlying])
+    case class CustomFunctionImpl(name: String, resultType: TYPE, args: List[(String, TYPE)], ev: List[Any] => Either[String, Any])
+        extends CustomFunction {
+      override def eval(args: List[Any]): TrampolinedExecResult[resultType.Underlying] = {
+        EitherT.fromEither[Coeval](ev(args).map(_.asInstanceOf[resultType.Underlying]))
       }
-      override lazy val types = (args.map(_._2), resultType)
+      override lazy val types: (List[TYPE], TYPE) = (args.map(_._2), resultType)
     }
 
-    def apply(name: String, resultType: TYPE, args: List[(String, TYPE)])(ev: List[Any] => Either[String,resultType.Underlying]): CustomFunction
-        = CustomFunctionImpl(name, resultType, args, ev)
+    def apply(name: String, resultType: TYPE, args: List[(String, TYPE)])(ev: List[Any] => Either[String, resultType.Underlying]): CustomFunction =
+      CustomFunctionImpl(name, resultType, args, ev)
 
   }
 
@@ -49,6 +52,5 @@ object Context {
   }
 
   case class Obj(fields: Map[String, LazyVal])
-
 
 }
