@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import cats.data.EitherT
 import com.wavesplatform.lang.Context._
 import com.wavesplatform.lang.Terms.Typed._
 import com.wavesplatform.lang.Terms._
@@ -114,7 +115,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("custom type field access") {
     val pointType     = CustomType("Point", List("X" -> INT, "Y"                     -> INT))
-    val pointInstance = Obj(Map("X"                  -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
+    val pointInstance = Obj(Map("X"                  -> LazyVal(INT)(EitherT.pure(3)), "Y" -> LazyVal(INT)(EitherT.pure(4))))
     ev(
       context = Context(
         typeDefs = Map(pointType.name -> pointType),
@@ -127,7 +128,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("lazy let evaluation doesn't throw if not used") {
     val pointType     = CustomType("Point", List(("X", INT), ("Y", INT)))
-    val pointInstance = Obj(Map(("X", LazyVal(INT)(Coeval(3))), ("Y", LazyVal(INT)(Coeval(4)))))
+    val pointInstance = Obj(Map(("X", LazyVal(INT)(EitherT.pure(3))), ("Y", LazyVal(INT)(EitherT.pure(4)))))
     ev(
       context = Context(
         typeDefs = Map((pointType.name, pointType)),

@@ -15,13 +15,13 @@ import scorex.settings.TestFunctionalitySettings
 import scorex.transaction._
 import scorex.transaction.assets.{ScriptTransferTransaction, TransferTransaction}
 import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.smart.{Script, SetScriptTransaction, Verifier}
+import scorex.transaction.smart.{Script, SetScriptTransaction, WavesContext}
 
 class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
   private val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
 
-  private val context = TypeChecker.TypeCheckerContext.fromContext(Verifier.buildContext(Coeval(???), Coeval(???)))
+  private val context = TypeChecker.TypeCheckerContext.fromContext(WavesContext.build(Coeval(???), Coeval(???)))
 
   def preconditionsTransferAndLease(code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = {
     val untyped = Parser(code).get.value

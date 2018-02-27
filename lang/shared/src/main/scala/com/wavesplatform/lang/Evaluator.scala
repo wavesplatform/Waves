@@ -9,8 +9,8 @@ import scala.util.{Failure, Success, Try}
 
 object Evaluator {
 
-  type ExcecutionError          = String
-  type TrampolinedExecResult[T] = EitherT[Coeval, ExcecutionError, T]
+  type ExecutionError          = String
+  type TrampolinedExecResult[T] = EitherT[Coeval, ExecutionError, T]
 
   private def r[T](ctx: Context, t: TrampolinedExecResult[Typed.EXPR]): TrampolinedExecResult[T] =
     t flatMap { (typedExpr: Typed.EXPR) =>
@@ -97,8 +97,8 @@ object Evaluator {
         case Typed.SOME(b, tpe) => r[tpe.Underlying](ctx, EitherT.pure(b)).map(Some(_))
         case Typed.GETTER(expr, field, _) =>
           r[Obj](ctx, EitherT.pure(expr)).flatMap { (obj: Obj) =>
-            val value: EitherT[Coeval, ExcecutionError, Any] = obj.fields.find(_._1 == field) match {
-              case Some((_, lzy)) => EitherT(lzy.value.map(Right(_).asInstanceOf[Either[ExcecutionError, Any]]))
+            val value: EitherT[Coeval, ExecutionError, Any] = obj.fields.find(_._1 == field) match {
+              case Some((_, lzy)) => lzy.value.map(_.asInstanceOf[Any])
               case None           => EitherT.leftT[Coeval, Any](s"field '$field' not found")
             }
             value
@@ -128,7 +128,7 @@ object Evaluator {
       }).map(_.asInstanceOf[T])
     }
 
-  def apply[A](c: Context, expr: Typed.EXPR): Either[ExcecutionError, A] = {
+  def apply[A](c: Context, expr: Typed.EXPR): Either[ExecutionError, A] = {
     def result = r[A](c, EitherT.pure(expr)).value.apply()
     Try(result) match {
       case Failure(ex)  => Left(ex.toString)

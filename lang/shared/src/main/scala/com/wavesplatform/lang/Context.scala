@@ -40,15 +40,15 @@ object Context {
 
   sealed trait LazyVal {
     val tpe: TYPE
-    val value: Coeval[tpe.Underlying]
+    val value: TrampolinedExecResult[tpe.Underlying]
   }
 
   object LazyVal {
-    private case class LazyValImpl(tpe: TYPE, v: Coeval[Any]) extends LazyVal {
-      override val value: Coeval[tpe.Underlying] = v.map(_.asInstanceOf[tpe.Underlying])
+    private case class LazyValImpl(tpe: TYPE, v: TrampolinedExecResult[Any]) extends LazyVal {
+      override val value: TrampolinedExecResult[tpe.Underlying] = v.map(_.asInstanceOf[tpe.Underlying])
     }
 
-    def apply(t: TYPE)(v: Coeval[t.Underlying]): LazyVal = LazyValImpl(t, v)
+    def apply(t: TYPE)(v: TrampolinedExecResult[t.Underlying]): LazyVal = LazyValImpl(t, v.map(_.asInstanceOf[Any]))
   }
 
   case class Obj(fields: Map[String, LazyVal])
