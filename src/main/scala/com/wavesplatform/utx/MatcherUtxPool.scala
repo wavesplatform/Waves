@@ -43,11 +43,10 @@ class MatcherUtxPool(underlying: UtxPool, events: EventStream) extends UtxPool w
   override def batched[Result](f: UtxBatchOps => Result): Result = {
     val ops = new BatchOpsImpl(underlying.createBatchOps)
     val r = f(ops)
-    val msg = ops.message
-    if (msg.isEmpty) log.debug("No changes")
-    else {
-      log.debug(s"Sending $msg")
-      events.publish(msg)
+    val xs = ops.messages
+    if (xs.nonEmpty) {
+      log.debug(s"Changed ${xs.map(_.changesByAddress.size).sum} accounts")
+      xs.foreach(events.publish)
     }
     r
   }
@@ -57,7 +56,7 @@ class MatcherUtxPool(underlying: UtxPool, events: EventStream) extends UtxPool w
   private class BatchOpsImpl(underlying: UtxBatchOps) extends UtxBatchOps {
     private val accountInfos: mutable.Map[String, Portfolio] = mutable.Map.empty
 
-    def message: BalanceChanged = BalanceChanged(accountInfos.toMap)
+    def messages: Seq[BalanceChanged] = accountInfos.toMap.grouped(3).map(BalanceChanged(_)).toSeq
 
     override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = underlying
       .putIfNew(tx)
