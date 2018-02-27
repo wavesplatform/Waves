@@ -21,7 +21,7 @@ object Context {
     val args: List[(String, TYPE)]
     val resultType: TYPE
     def eval(args: List[Any]): TrampolinedExecResult[resultType.Underlying]
-    val types: (List[TYPE], TYPE)
+    val signature: (List[TYPE], TYPE)
   }
   object PredefFunction {
 
@@ -30,7 +30,7 @@ object Context {
       override def eval(args: List[Any]): TrampolinedExecResult[resultType.Underlying] = {
         EitherT.fromEither[Coeval](ev(args).map(_.asInstanceOf[resultType.Underlying]))
       }
-      override lazy val types: (List[TYPE], TYPE) = (args.map(_._2), resultType)
+      override lazy val signature: (List[TYPE], TYPE) = (args.map(_._2), resultType)
     }
 
     def apply(name: String, resultType: TYPE, args: List[(String, TYPE)])(ev: List[Any] => Either[String, resultType.Underlying]): PredefFunction =

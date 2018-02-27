@@ -85,7 +85,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   )
 
   treeTypeTest("MULTIPLY(1,2)")(
-    ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(multiplierFunction.name -> multiplierFunction.types)),
+    ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(multiplierFunction.name -> multiplierFunction.signature)),
     expr = Untyped.FUNCTION_CALL(multiplierFunction.name, List(Untyped.CONST_INT(1), Untyped.CONST_INT(2))),
     expectedResult = Right(Typed.FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_INT(1), Typed.CONST_INT(2)), INT))
   )
@@ -115,7 +115,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   private def errorTests(exprs: ((String, String), Untyped.EXPR)*): Unit = exprs.foreach {
     case ((label, error), input) =>
       property(s"Error: $label") {
-        TypeChecker(TypeCheckerContext(Map.empty, Map.empty, Map(multiplierFunction.name -> multiplierFunction.types)), input) should produce(error)
+        TypeChecker(TypeCheckerContext(Map.empty, Map.empty, Map(multiplierFunction.name -> multiplierFunction.signature)), input) should produce(error)
       }
   }
 

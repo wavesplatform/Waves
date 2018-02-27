@@ -20,7 +20,7 @@ object TypeChecker {
     def fromContext(ctx: Context): TypeCheckerContext =
       TypeCheckerContext(predefTypes = ctx.typeDefs,
                          varDefs = ctx.letDefs.mapValues(_._1),
-                         functionDefs = ctx.functions.mapValues(_.types))
+                         functionDefs = ctx.functions.mapValues(_.signature))
   }
 
   type TypeResolutionError      = String
@@ -67,7 +67,7 @@ object TypeChecker {
                 case ((e, tpe)) =>
                   findCommonType(e.tpe, tpe) match {
                     case Some(_) => Right(e)
-                    case None    => Left(s"Types of arguments of function call '$name' don't match")
+                    case None    => Left(s"Types of arguments of function call '$name'have no common parent. Expected: $tpe, Actual: ${e.tpe}")
                   }
               }
               matches.find(_.isLeft) match {

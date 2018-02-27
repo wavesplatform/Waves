@@ -31,9 +31,8 @@ abstract class ParserImpl { this: Base58 =>
   private def someP: P[SOME]           = P("Some" ~ "(" ~ block ~ ")").map(x => SOME(x))
   private def noneP: P[NONE.type]      = P("None").map(_ => NONE)
 
-  private def functionCallArgs : P[Seq[EXPR]] = (expr.rep(exactly=1) ~ P("," ~ expr).rep()).map {
-    case (arg0, argsOther) => arg0 ++ argsOther
-  }
+  private def functionCallArgs : P[Seq[EXPR]] = expr.rep(min = 0, sep = ",")
+
   private def functionCallP : P[FUNCTION_CALL] = P(varName ~ "(" ~ functionCallArgs ~ ")").map {
     case (functionName, args) => FUNCTION_CALL(functionName,args.toList)
   }
