@@ -126,12 +126,12 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   }
 
   property("lazy let evaluation doesn't throw if not used") {
-    val pointType     = CustomType("Point", List("X" -> INT, "Y"                     -> INT))
-    val pointInstance = Obj(Map("X"                  -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
+    val pointType     = CustomType("Point", List(("X", INT), ("Y", INT)))
+    val pointInstance = Obj(Map(("X", LazyVal(INT)(Coeval(3))), ("Y", LazyVal(INT)(Coeval(4)))))
     ev(
       context = Context(
-        typeDefs = Map(pointType.name -> pointType),
-        letDefs = Map("p"             -> (TYPEREF(pointType.name), Coeval.evalOnce(pointInstance)), "badVal" -> (INT, Coeval(???))),
+        typeDefs = Map((pointType.name, pointType)),
+        letDefs = Map(("p", (TYPEREF(pointType.name), Coeval.evalOnce(pointInstance))), ("badVal", (INT, Coeval(???)))),
         functions = Map.empty
       ),
       expr = BLOCK(Some(LET("Z", REF("badVal", INT))), BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", INT), SUM_OP, CONST_INT(2), INT), INT)
