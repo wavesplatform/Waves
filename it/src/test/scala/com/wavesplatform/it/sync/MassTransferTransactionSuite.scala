@@ -161,10 +161,11 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     val alias = "masstest_alias"
     
-    if (!sender.aliasByAddress(secondAddress).exists(_.endsWith(alias))){
+    val aliasFee = if (!sender.aliasByAddress(secondAddress).exists(_.endsWith(alias))){
       val aliasId = sender.createAlias(secondAddress, alias, transferFee).id
       nodes.waitForHeightAraiseAndTxPresent(aliasId)
-    }
+      transferFee
+    } else 0
 
     val aliasFull = sender.aliasByAddress(secondAddress).find(_.endsWith(alias)).get
 
@@ -175,6 +176,6 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     nodes.waitForHeightAraiseAndTxPresent(transferId)
 
     notMiner.assertBalances(firstAddress, balance1 - massTransferTransactionFee - transferAmount, eff1 - massTransferTransactionFee - transferAmount)
-    notMiner.assertBalances(secondAddress, balance2 + transferAmount - transferFee, eff2 + transferAmount - transferFee)
+    notMiner.assertBalances(secondAddress, balance2 + transferAmount - aliasFee, eff2 + transferAmount - aliasFee)
   }
 }
