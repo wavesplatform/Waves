@@ -161,8 +161,10 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     val alias = "masstest_alias"
     
-    val aliasId = sender.createAlias(secondAddress, alias, transferFee).id
-    nodes.waitForHeightAraiseAndTxPresent(aliasId)
+    if (!sender.aliasByAddress(secondAddress).exists(_.endsWith(alias))){
+      val aliasId = sender.createAlias(secondAddress, alias, transferFee).id
+      nodes.waitForHeightAraiseAndTxPresent(aliasId)
+    }
 
     val aliasFull = sender.aliasByAddress(secondAddress).find(_.endsWith(alias)).get
 
