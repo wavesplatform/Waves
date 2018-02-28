@@ -6,6 +6,7 @@ import scorex.account.Address
 import scorex.transaction._
 
 trait UtxPool extends AutoCloseable {
+  self =>
 
   def putIfNew(tx: Transaction): Either[ValidationError, Boolean]
 
@@ -23,7 +24,9 @@ trait UtxPool extends AutoCloseable {
 
   def batched[Result](f: UtxBatchOps => Result): Result = f(createBatchOps)
 
-  private[utx] def createBatchOps: UtxBatchOps
+  private[utx] def createBatchOps: UtxBatchOps = new UtxBatchOps {
+    override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = self.putIfNew(tx)
+  }
 
 }
 

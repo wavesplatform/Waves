@@ -40,6 +40,7 @@ class OrderHistorySpecification extends PropSpec
     oh.openVolume(AssetAcc(ord1.senderPublicKey, None)) shouldBe ord1.matcherFee
 
     oh.orderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
+    oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
   }
 
   property("New sell order added") {
@@ -52,6 +53,7 @@ class OrderHistorySpecification extends PropSpec
     oh.openVolume(AssetAcc(ord1.senderPublicKey, None)) shouldBe ord1.matcherFee
 
     oh.orderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
+    oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
   }
 
   property("New buy WAVES order added") {
@@ -65,6 +67,7 @@ class OrderHistorySpecification extends PropSpec
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 8L
 
     oh.orderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
+    oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
   }
 
   property("New sell WAVES order added") {
@@ -77,9 +80,10 @@ class OrderHistorySpecification extends PropSpec
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 0L
 
     oh.orderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
+    oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
   }
 
-  property("New buy and sell WAVES order  added") {
+  property("New buy and sell WAVES order added") {
     val pk = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
     val ord1 = buy(pair, 0.0008, 100000000, Some(pk))
@@ -97,6 +101,7 @@ class OrderHistorySpecification extends PropSpec
       ord1.getSpendAmount(ord1.price, ord1.amount).right.get
 
     oh.orderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr(), ord2.idStr())
+    oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr(), ord2.idStr())
   }
 
   property("Buy WAVES order filled") {
@@ -113,11 +118,12 @@ class OrderHistorySpecification extends PropSpec
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 0L
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 0L
     oh.orderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
+    oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe empty
 
     oh.openVolume(AssetAcc(ord2.senderPublicKey, pair.amountAsset)) shouldBe 0L
     oh.openVolume(AssetAcc(ord2.senderPublicKey, pair.priceAsset)) shouldBe 0L
     oh.orderIdsByAddress(ord2.senderPublicKey.address) shouldBe Set(ord2.idStr())
-
+    oh.activeOrderIdsByAddress(ord2.senderPublicKey.address) shouldBe empty
   }
 
   property("Sell WAVES order - filled, buy order - partial") {
@@ -136,12 +142,13 @@ class OrderHistorySpecification extends PropSpec
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 0L
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 0L
     oh.orderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
+    oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe empty
 
     oh.openVolume(AssetAcc(ord2.senderPublicKey, pair.amountAsset)) shouldBe
       math.max(0L, OrderInfo.safeSum(ord2.matcherFee * 2 / 12, -20000000L))
     oh.openVolume(AssetAcc(ord2.senderPublicKey, pair.priceAsset)) shouldBe 0.00085 * 20000000L
     oh.orderIdsByAddress(ord2.senderPublicKey.address) shouldBe Set(ord2.idStr())
-
+    oh.activeOrderIdsByAddress(ord2.senderPublicKey.address) shouldBe Set(ord2.idStr())
   }
 
   property("Buy WAVES order - filled with 2 steps, sell order - partial") {
@@ -167,16 +174,17 @@ class OrderHistorySpecification extends PropSpec
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 0L
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 0L
     oh.orderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
-
+    oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe empty
 
     oh.openVolume(AssetAcc(ord2.senderPublicKey, pair.priceAsset)) shouldBe 0L
     oh.openVolume(AssetAcc(ord2.senderPublicKey, pair.amountAsset)) shouldBe 0L
     oh.orderIdsByAddress(ord2.senderPublicKey.address) shouldBe Set(ord2.idStr())
+    oh.activeOrderIdsByAddress(ord2.senderPublicKey.address) shouldBe empty
 
     oh.openVolume(AssetAcc(ord3.senderPublicKey, pair.amountAsset)) shouldBe ord3.matcherFee * 3 / 8 + 30000000L
     oh.openVolume(AssetAcc(ord3.senderPublicKey, pair.priceAsset)) shouldBe 0L
     oh.orderIdsByAddress(ord3.senderPublicKey.address) shouldBe Set(ord3.idStr())
-
+    oh.activeOrderIdsByAddress(ord3.senderPublicKey.address) shouldBe Set(ord3.idStr())
   }
 
   property("Partially with own order") {
@@ -196,6 +204,7 @@ class OrderHistorySpecification extends PropSpec
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 110000000L + ord2.matcherFee * 11 / 21
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 0L
     oh.orderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr(), ord2.idStr())
+    oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord2.idStr())
   }
 
   property("Cancel buy order") {
@@ -209,6 +218,7 @@ class OrderHistorySpecification extends PropSpec
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 0L
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 0L
     oh.orderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
+    oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe empty
   }
 
   property("Cancel sell order") {
@@ -222,6 +232,7 @@ class OrderHistorySpecification extends PropSpec
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 0L
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 0L
     oh.orderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
+    oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe empty
   }
 
   property("Cancel partially executed order") {
@@ -240,7 +251,9 @@ class OrderHistorySpecification extends PropSpec
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 0L
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 0L
     oh.orderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
+    oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe empty
     oh.orderIdsByAddress(ord2.senderPublicKey.address) shouldBe Set(ord2.idStr())
+    oh.activeOrderIdsByAddress(ord2.senderPublicKey.address) shouldBe empty
   }
 
   property("Delete order") {
@@ -264,6 +277,8 @@ class OrderHistorySpecification extends PropSpec
     oh.deleteOrder(ord2.senderPublicKey.address, ord2.idStr()) shouldBe true
 
     oh.orderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
+    oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
+    oh.activeOrderIdsByAddress(ord2.senderPublicKey.address) shouldBe Set(ord1.idStr())
   }
 
   property("Sorting by status then timestamp") {
@@ -284,7 +299,7 @@ class OrderHistorySpecification extends PropSpec
     oh.orderAccepted(OrderAdded(LimitOrder(ord5)))
 
     oh.fetchAllOrderHistory(ord1.senderPublicKey.address).map(_._1) shouldBe
-      Seq(ord5.idStr(), ord4.idStr(), ord2.idStr(), ord3.idStr(), ord1.idStr())
+      Seq(ord5.idStr(), ord4.idStr(), ord2.idStr(), ord3.idStr(), ord1.idStr()))
   }
 
   property("History with more than max limit") {

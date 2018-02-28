@@ -83,11 +83,9 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
       case (orderId, (o, oi)) => (orderId, (o, orderInfo(orderId).combine(oi)))
     }
 
-    updatedInfo.foreach { case (orderId, (o, oi)) =>
-      val combinedOi = orderInfo(orderId).combine(oi)
-
-      put(makeKey(OrdersInfoPrefix, orderId), combinedOi.jsonStr.getBytes(Charset), None)
-      log.debug(s"Changed OrderInfo for: $orderId -> " + orderInfo(orderId))
+    updatedInfo.foreach { case (orderId, (_, oi)) =>
+      put(makeKey(OrdersInfoPrefix, orderId), oi.jsonStr.getBytes(Charset), None)
+      log.debug(s"Changed OrderInfo for: $orderId -> $oi")
     }
 
     updatedInfo
@@ -137,7 +135,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     saveOpenPortfolio(event)
 
     updatedInfo.foreach { case (orderId, (o, oi)) =>
-      if (oi.status.isFinal) deleteFromActiveOnly(o.senderPublicKey.address, orderId)
+      if (oi.status.isFinal) deleteFromActive(o.senderPublicKey.address, orderId)
     }
   }
 
@@ -146,7 +144,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     saveOpenPortfolio(event)
 
     updatedInfo.foreach { case (orderId, (o, oi)) =>
-      if (oi.status.isFinal) deleteFromActiveOnly(o.senderPublicKey.address, orderId)
+      if (oi.status.isFinal) deleteFromActive(o.senderPublicKey.address, orderId)
     }
   }
 
@@ -186,6 +184,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
         deleteFromOrders(orderId)
         deleteFromOrdersInfo(orderId)
         deleteFromAddress(address, orderId)
+        deleteFromActive(address, orderId)
         true
       case _ =>
         false
@@ -216,7 +215,6 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
 
   private def deleteFromAddress(address: String, orderId: String): Unit = {
     deleteOrderFromAddress(AddressToOrdersPrefix, address, orderId)
-    deleteOrderFromAddress(AddressToActiveOrdersPrefix, address, orderId)
   }
 
   private def addToActive(address: String, orderId: String): Unit =  {
@@ -225,7 +223,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     put(key, OrderIdsCodec.encode(orig :+ orderId), None)
   }
 
-  private def deleteFromActiveOnly(address: String, orderId: String): Unit = {
+  private def deleteFromActive(address: String, orderId: String): Unit = {
     deleteOrderFromAddress(AddressToActiveOrdersPrefix, address, orderId)
   }
 
