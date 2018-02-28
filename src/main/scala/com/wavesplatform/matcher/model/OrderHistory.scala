@@ -220,14 +220,12 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
   }
 
   private def addToActive(address: String, orderId: String): Unit =  {
-    log.debug(s"addToActive($address, $orderId)")
     val key = makeKey(AddressToActiveOrdersPrefix, address)
     val orig = get(OrderIdsCodec)(key).getOrElse(Array.empty)
     put(key, OrderIdsCodec.encode(orig :+ orderId), None)
   }
 
   private def deleteFromActiveOnly(address: String, orderId: String): Unit = {
-    log.debug(s"deleteFromActiveOnly($address, $orderId)")
     deleteOrderFromAddress(AddressToActiveOrdersPrefix, address, orderId)
   }
 

@@ -108,9 +108,7 @@ class UtxPoolImpl(time: Time,
   override def portfolio(addr: Address): Portfolio = {
     val base = stateReader().accountPortfolio(addr)
     val foundInUtx = pessimisticPortfolios.getAggregated(addr)
-    val r = Monoid.combine(base, foundInUtx)
-    log.debug(s"\nbase=$base,\nfoundInUtx=$foundInUtx,\nr=$r")
-    r
+    Monoid.combine(base, foundInUtx)
   }
 
   override def all: Seq[Transaction] = {

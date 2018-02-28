@@ -329,7 +329,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
       "leased waves, insufficient fee" in {
         val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
-        println(s"bobBalance: $bobBalance")
         val oldestOrderId = bobPlacesAssetOrder(1000)
         val newestOrderId = bobPlacesAssetOrder(1000)
 
@@ -352,7 +351,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
       "moved waves, insufficient fee" in {
         val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
-        println(s"bobBalance: $bobBalance")
         val oldestOrderId = bobPlacesAssetOrder(1000)
         val newestOrderId = bobPlacesAssetOrder(1000)
 
@@ -378,7 +376,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       "leased waves, insufficient fee" in {
         // Amount of waves in order is smaller than fee
         val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
-        println(s"bobBalance: $bobBalance")
 
         val price = TransactionFee / 2
         val orderId = bobPlacesWavesOrder(price * Order.PriceConstant, 1)
@@ -398,7 +395,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
       "leased waves, insufficient waves" in {
         val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
-        println(s"bobBalance: $bobBalance")
 
         val price = 1 * Waves
         val orderId = bobPlacesWavesOrder(price * Order.PriceConstant, 1)
@@ -419,7 +415,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       "moved waves, insufficient fee" in {
         // Amount of waves in order is smaller than fee
         val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
-        println(s"bobBalance: $bobBalance")
 
         val price = TransactionFee / 2
         val orderId = bobPlacesWavesOrder(price * Order.PriceConstant, 1)

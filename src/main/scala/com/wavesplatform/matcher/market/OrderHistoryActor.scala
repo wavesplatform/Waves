@@ -16,14 +16,14 @@ import scorex.account.Address
 import scorex.transaction.AssetAcc
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.utils.{NTP, ScorexLogging}
+import scorex.utils.NTP
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxPool, val wallet: Wallet)
-  extends Actor with OrderValidator with ScorexLogging {
+  extends Actor with OrderValidator {
 
   val orderHistory = OrderHistoryImpl(db, settings)
 
@@ -31,12 +31,6 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
     context.system.eventStream.subscribe(self, classOf[OrderAdded])
     context.system.eventStream.subscribe(self, classOf[OrderExecuted])
     context.system.eventStream.subscribe(self, classOf[OrderCanceled])
-    log.debug("preStart")
-  }
-
-  override def postStop(): Unit = {
-    super.postStop()
-    log.debug("postStop")
   }
 
   def processExpirableRequest(r: Any): Unit = r match {
@@ -51,7 +45,6 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
     case req: DeleteOrderFromHistory =>
       deleteFromOrderHistory(req)
     case GetOrderStatus(_, id, _) =>
-      log.debug(s"Order status for $id: ${orderHistory.orderStatus(id)}, ${orderHistory.orderInfo(id)}")
       sender() ! GetOrderStatusResponse(orderHistory.orderStatus(id))
     case GetTradableBalance(assetPair, addr, _) =>
       sender() ! getPairTradableBalance(assetPair, addr)
@@ -72,11 +65,9 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       orderHistory.orderCanceled(ev)
     case RecoverFromOrderBook(ob) =>
       recoverFromOrderBook(ob)
-    case msg@ForceCancelOrderFromHistory(id) =>
-      log.debug(s"Received cancel request: $msg")
+    case ForceCancelOrderFromHistory(id) =>
       forceCancelOrder(id)
-    case msg@GetActiveOrdersByAddress(requestId, addr) =>
-      log.debug(s"Received $msg")
+    case GetActiveOrdersByAddress(requestId, addr) =>
       val active: Seq[LimitOrder] = orderHistory.activeOrderIdsByAddress(addr)
         .view
         .map { id => id -> orderHistory.orderInfo(id) }
@@ -85,9 +76,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
         }
         .force[LimitOrder, Seq[LimitOrder]](collection.breakOut)
 
-      val sendMsg = GetActiveOrdersByAddressResponse(requestId, addr, active)
-      log.debug(s"Sending $sendMsg")
-      sender.forward(sendMsg)
+      sender().forward(GetActiveOrdersByAddressResponse(requestId, addr, active))
   }
 
   def fetchOrderHistory(req: GetOrderHistory): Unit = {
@@ -101,7 +90,6 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   def forceCancelOrder(id: String): Unit = {
     orderHistory.order(id).map((_, orderHistory.orderInfo(id))) match {
       case Some((o, oi)) =>
-        log.info(s"Cancelled $id: ${OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, o))}")
         orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, o)))
         sender() ! o
       case None =>

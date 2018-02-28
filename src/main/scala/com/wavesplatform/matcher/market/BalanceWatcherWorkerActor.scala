@@ -20,31 +20,18 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
   private var requestIdCounter = 0L
 
   override def receive: Receive = {
-    case x @ BalanceChanged(changes) =>
-      log.debug(s"Received in receive: $x")
-      becomeWorking(changes)
+    case BalanceChanged(changes) => becomeWorking(changes)
   }
 
   private def waitOrders(taskId: Long,
                          stashedChanges: ChangesByAddress,
                          changesByAddress: ChangesByAddress,
                          waitOrdersTimeout: Cancellable): Receive = {
-    case x @ GetActiveOrdersByAddressResponse(`taskId`, address, orders) =>
-      log.debug(s"Received in waitOrders: $x")
-      // just check portfolio without any arithmetic operations
-      ordersToDelete(changesByAddress, address, orders) // ERROR
-      //        .map(Function.tupled(ForceCancelOrder))
-      //          .map { x =>
-      //            log.debug(s"Sending to matcher: $x")
-      //            x
-      //          }
-      // .foreach(matcher ! _)
+    case GetActiveOrdersByAddressResponse(`taskId`, address, orders) =>
+      ordersToDelete(changesByAddress, address, orders)
         .foreach {
           case (pair, id) =>
-            log.debug(s"Sending to history: $id")
             orderHistory ! ForceCancelOrderFromHistory(id)
-
-            log.debug(s"Sending to matcher: $id")
             matcher ! ForceCancelOrder(pair, id)
         }
 
@@ -55,7 +42,6 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
       } else context.become(waitOrders(taskId, stashedChanges, updated, reschedule(waitOrdersTimeout)))
 
     case x: BalanceChanged =>
-      log.debug(s"Received in waitOrders: $x")
       context.become(
         waitOrders(
           taskId = taskId,
@@ -73,9 +59,6 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
   private def becomeWorking(changes: ChangesByAddress): Unit = {
     changes.keys
       .map(GetActiveOrdersByAddress(requestIdCounter, _))
-      .map { x =>
-        log.debug(s"Sending to orderHistory: $x"); x
-      }
       .foreach(orderHistory ! _)
 
     context.become(waitOrders(requestIdCounter, Map.empty, changes, reschedule(EmptyCancellable)))
@@ -98,13 +81,12 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
         val ordersByPriority = orders.sortBy(_.order.timestamp)(Ordering[Long].reverse)
         val (_, r) = ordersByPriority.foldLeft((portfolio, List.empty: OrdersToDelete)) {
           case ((restPortfolio, toDelete), limitOrder) =>
-            val updatedPortfolio1 = restPortfolio.copy(balance = restPortfolio.balance - restPortfolio.leaseInfo.leaseOut)
-            val updatedPortfolio2 = updatedPortfolio1.remove(limitOrder.spentAcc.assetId, limitOrder.getSpendAmount)
-            val updatedPortfolio3 = updatedPortfolio2.flatMap(_.remove(None, limitOrder.remainingFee))
+            val updatedPortfolio = restPortfolio
+              .copy(balance = restPortfolio.balance - restPortfolio.leaseInfo.leaseOut)
+              .remove(limitOrder.spentAcc.assetId, limitOrder.getSpendAmount)
+              .flatMap(_.remove(None, limitOrder.remainingFee))
 
-            log.debug(s"$restPortfolio -> $updatedPortfolio1 -> $updatedPortfolio2 -> $updatedPortfolio3")
-
-            updatedPortfolio3 match {
+            updatedPortfolio match {
               case Some(x) => (x, toDelete)
               case None =>
                 (restPortfolio, (limitOrder.order.assetPair -> limitOrder.order.idStr()) :: toDelete)
