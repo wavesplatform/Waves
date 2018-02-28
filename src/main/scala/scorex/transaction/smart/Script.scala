@@ -17,8 +17,8 @@ case class Script(script: Typed.EXPR) {
   val text: String = script.toString
 
   val bytes: Coeval[ByteStr] = Coeval.evalOnce {
-    val s = Serde.codec.encode(script).require.toByteArray
-    ByteStr(Array(version) ++ s ++ crypto.secureHash(s).take(checksumLength))
+    val s = Array(version) ++ Serde.codec.encode(script).require.toByteArray
+    ByteStr(s ++ crypto.secureHash(s).take(checksumLength))
   }
 
   override def toString: String = s"Script(base58=${bytes()}, $text"
@@ -37,7 +37,7 @@ object Script {
     for {
       _ <- Either.cond(checkSum.sameElements(computedCheckSum), (), ScriptParseError("Invalid checksum"))
       _ <- Either.cond(version == 1, (), ScriptParseError(s"Invalid version: $version"))
-      r <- Serde.codec.decode(scodec.bits.BitVector(scriptBytes.dropRight(checksumLength))) match {
+      r <- Serde.codec.decode(scodec.bits.BitVector(scriptBytes)) match {
         case Successful(value: DecodeResult[Typed.EXPR]) => Right(Script(value.value))
         case Failure(cause) => Left(ScriptParseError(cause.toString))
       }
