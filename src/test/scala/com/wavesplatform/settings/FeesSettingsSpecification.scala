@@ -1,6 +1,6 @@
 package com.wavesplatform.settings
 
-import com.typesafe.config.ConfigException.{BadValue, WrongType}
+import com.typesafe.config.ConfigException.WrongType
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{FlatSpec, Matchers}
 
