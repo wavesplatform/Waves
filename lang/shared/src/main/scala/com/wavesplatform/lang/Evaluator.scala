@@ -1,7 +1,7 @@
 package com.wavesplatform.lang
 
 import cats.data.EitherT
-import com.wavesplatform.lang.Context.Obj
+import com.wavesplatform.lang.Context.{LazyVal, Obj}
 import com.wavesplatform.lang.Terms._
 import monix.eval.Coeval
 
@@ -9,7 +9,7 @@ import scala.util.{Failure, Success, Try}
 
 object Evaluator {
 
-  type ExecutionError          = String
+  type ExecutionError           = String
   type TrampolinedExecResult[T] = EitherT[Coeval, ExecutionError, T]
 
   private def r[T](ctx: Context, t: TrampolinedExecResult[Typed.EXPR]): TrampolinedExecResult[T] =
@@ -24,18 +24,14 @@ object Evaluator {
                 case None =>
                   val varBlockTpe                                                  = newVarBlock.tpe
                   val eitherTCoeval: TrampolinedExecResult[varBlockTpe.Underlying] = r[varBlockTpe.Underlying](ctx, EitherT.pure(newVarBlock))
-                  val calculatedValue: Coeval[varBlockTpe.Underlying] = eitherTCoeval.value.flatMap {
-                    case Left(err) => Coeval(???)
-                    case Right(v)  => Coeval(v)
-                  }
-                  val updatedCtx: Context = ctx.copy(letDefs = ctx.letDefs.updated(newVarName, (varBlockTpe, calculatedValue)))
+                  val updatedCtx: Context                                          = ctx.copy(letDefs = ctx.letDefs.updated(newVarName, LazyVal(varBlockTpe)(eitherTCoeval)))
                   r[blockTpe.Underlying](updatedCtx, EitherT.pure(inner))
               }
           }
         case Typed.REF(str, _) =>
           ctx.letDefs.get(str) match {
-            case Some((tpe, lzy)) => EitherT.rightT[Coeval, String](lzy().asInstanceOf[tpe.Underlying])
-            case None             => EitherT.leftT[Coeval, T](s"A definition of '$str' is not found")
+            case Some(lzy) => lzy.value
+            case None      => EitherT.leftT[Coeval, T](s"A definition of '$str' is not found")
           }
 
         case Typed.CONST_INT(v)        => EitherT.rightT[Coeval, String](v)
@@ -117,7 +113,7 @@ object Evaluator {
               val argsSequenced = argsVector.sequence[TrampolinedExecResult, Any]
               for {
                 actualArgs <- argsSequenced
-                r <- func.eval(actualArgs.toList)
+                r          <- func.eval(actualArgs.toList)
               } yield r
             case None => EitherT.leftT[Coeval, Any](s"function '$name' not found")
           }

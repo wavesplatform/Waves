@@ -76,8 +76,8 @@ object WavesContext {
     val returnType = OPTION(TYPEREF(transactionType.name))
     PredefFunction("GETTRANSACTIONBYID", returnType, List(("id", BYTEVECTOR))) {
       case (id: ByteVector) :: Nil =>
-        val maybeTx: Option[Transaction]           = state.transactionInfo(ByteStr(id.toArray)).map(_._2.get)
-        val maybeDomainTx                          = maybeTx.map(transactionObject)
+        val maybeTx: Option[Transaction] = state.transactionInfo(ByteStr(id.toArray)).map(_._2.get)
+        val maybeDomainTx                = maybeTx.map(transactionObject)
         Right(maybeDomainTx).map(_.asInstanceOf[returnType.Underlying])
       case _ => ???
     }
@@ -88,10 +88,7 @@ object WavesContext {
 
     Context(
       Map(transactionType.name -> transactionType),
-      Map(
-        ("H", (INT, height)),
-        ("TX", (TYPEREF(transactionType.name), tx.map(transactionObject)))
-      ),
+      Map(("H", LazyVal(INT)(EitherT.right(height))), ("TX", LazyVal(TYPEREF(transactionType.name))(EitherT.right(tx.map(transactionObject))))),
       Map(sigVerify.name -> sigVerify, txById.name -> txById)
     )
   }

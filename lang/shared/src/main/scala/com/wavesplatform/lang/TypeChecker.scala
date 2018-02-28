@@ -19,7 +19,7 @@ object TypeChecker {
 
     def fromContext(ctx: Context): TypeCheckerContext =
       TypeCheckerContext(predefTypes = ctx.typeDefs,
-                         varDefs = ctx.letDefs.mapValues(_._1),
+                         varDefs = ctx.letDefs.mapValues(_.tpe),
                          functionDefs = ctx.functions.mapValues(_.signature))
   }
 

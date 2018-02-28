@@ -4,7 +4,6 @@ import cats.data.EitherT
 import com.wavesplatform.lang.Context._
 import com.wavesplatform.lang.Terms.Typed._
 import com.wavesplatform.lang.Terms._
-import monix.eval.Coeval
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
@@ -114,12 +113,12 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   }
 
   property("custom type field access") {
-    val pointType     = PredefType("Point", List("X" -> INT, "Y"                     -> INT))
+    val pointType     = PredefType("Point", List("X" -> INT, "Y"                           -> INT))
     val pointInstance = Obj(Map("X"                  -> LazyVal(INT)(EitherT.pure(3)), "Y" -> LazyVal(INT)(EitherT.pure(4))))
     ev(
       context = Context(
         typeDefs = Map(pointType.name -> pointType),
-        letDefs = Map(("p", (TYPEREF(pointType.name), Coeval.evalOnce(pointInstance)))),
+        letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance)))),
         functions = Map.empty
       ),
       expr = BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", INT), SUM_OP, CONST_INT(2), INT)
@@ -129,12 +128,13 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   property("lazy let evaluation doesn't throw if not used") {
     val pointType     = PredefType("Point", List(("X", INT), ("Y", INT)))
     val pointInstance = Obj(Map(("X", LazyVal(INT)(EitherT.pure(3))), ("Y", LazyVal(INT)(EitherT.pure(4)))))
+    val context = Context(
+      typeDefs = Map((pointType.name, pointType)),
+      letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance))), ("badVal", LazyVal(INT)(EitherT.leftT("Error")))),
+      functions = Map.empty
+    )
     ev(
-      context = Context(
-        typeDefs = Map((pointType.name, pointType)),
-        letDefs = Map(("p", (TYPEREF(pointType.name), Coeval.evalOnce(pointInstance))), ("badVal", (INT, Coeval(???)))),
-        functions = Map.empty
-      ),
+      context = context,
       expr = BLOCK(Some(LET("Z", REF("badVal", INT))), BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", INT), SUM_OP, CONST_INT(2), INT), INT)
     ) shouldBe Right(5)
   }

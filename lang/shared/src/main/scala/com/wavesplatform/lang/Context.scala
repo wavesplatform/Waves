@@ -10,7 +10,7 @@ case class Context(typeDefs: Map[String, PredefType], letDefs: Defs, functions: 
 
 object Context {
 
-  type Defs = Map[String, (TYPE, Coeval[Any])]
+  type Defs = Map[String, LazyVal]
 
   val empty = Context(Map.empty, Map.empty, Map.empty)
 
