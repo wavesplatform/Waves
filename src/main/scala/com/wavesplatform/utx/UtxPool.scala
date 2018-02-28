@@ -23,7 +23,7 @@ trait UtxPool extends AutoCloseable {
 
   def batched[Result](f: UtxBatchOps => Result): Result = f(createBatchOps)
 
-  protected def createBatchOps: UtxBatchOps
+  private[utx] def createBatchOps: UtxBatchOps
 
 }
 

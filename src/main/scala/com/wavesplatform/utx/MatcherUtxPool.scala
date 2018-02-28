@@ -51,7 +51,7 @@ class MatcherUtxPool(underlying: UtxPool, events: EventStream) extends UtxPool w
     r
   }
 
-  override def createBatchOps: UtxBatchOps = new BatchOpsImpl(underlying.createBatchOps)
+  override private[utx] def createBatchOps: UtxBatchOps = new BatchOpsImpl(underlying.createBatchOps)
 
   private class BatchOpsImpl(underlying: UtxBatchOps) extends UtxBatchOps {
     private val accountInfos: mutable.Map[String, Portfolio] = mutable.Map.empty

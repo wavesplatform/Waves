@@ -148,7 +148,7 @@ class UtxPoolImpl(time: Time,
     (txs, finalConstraint)
   }
 
-  override def createBatchOps: UtxBatchOps = new BatchOpsImpl(stateReader())
+  override private[utx] def createBatchOps: UtxBatchOps = new BatchOpsImpl(stateReader())
 
   private class BatchOpsImpl(s: SnapshotStateReader) extends UtxBatchOps {
     override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = outer.putIfNew(s, tx)
