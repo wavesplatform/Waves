@@ -46,8 +46,8 @@ object SetScriptTransaction {
   def parseTail(bytes: Array[Byte]): Try[SetScriptTransaction] = Try {
     val version = bytes(0)
     val chainId = bytes(1)
-    val sender = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
-    val (scriptOptEi: Option[Either[ValidationError.ScriptParseError, Script]], scriptEnd) = Deser.parseOption(bytes, KeyLength + 1)(str => Script.fromBytes(Deser.parseArraySize(str, 0)._1))
+    val sender = PublicKeyAccount(bytes.slice(2, KeyLength + 2))
+    val (scriptOptEi: Option[Either[ValidationError.ScriptParseError, Script]], scriptEnd) = Deser.parseOption(bytes, KeyLength + 2)(str => Script.fromBytes(Deser.parseArraySize(str, 0)._1))
     val scriptEiOpt = scriptOptEi match {
       case None => Right(None)
       case Some(Right(sc)) => Right(Some(sc))
