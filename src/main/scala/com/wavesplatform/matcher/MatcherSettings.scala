@@ -30,7 +30,8 @@ case class MatcherSettings(enable: Boolean,
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
                            maxOrdersPerRequest: Int,
-                           blacklistedAddresses: Set[String])
+                           blacklistedAddresses: Set[String],
+                           enableBalanceWatching: Boolean)
 
 
 object MatcherSettings {
@@ -63,10 +64,11 @@ object MatcherSettings {
     val blacklistedAddresses = config.as[List[String]](s"$configPath.blacklisted-addresses")
 
     val isMigrateToNewOrderHistoryStorage = !new File(dataDirectory).exists()
+    val enableBalanceWatching = config.as[Boolean](s"$configPath.enable-balance-watching")
 
     MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, dataDirectory, levelDbCacheSize,
       isMigrateToNewOrderHistoryStorage, journalDirectory, snapshotsDirectory, snapshotsInterval, orderCleanupInterval,
       maxOpenOrders, baseAssets, basePairs, maxTimestampDiff, blacklistedAssets.toSet, blacklistedNames,
-      maxOrdersPerRequest, blacklistedAddresses.toSet)
+      maxOrdersPerRequest, blacklistedAddresses.toSet, enableBalanceWatching)
   }
 }

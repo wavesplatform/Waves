@@ -34,7 +34,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
 
   val storedState: SnapshotStateReader = stub[SnapshotStateReader]
 
-  val settings = matcherSettings.copy(account = MatcherAccount.address)
+  val settings = matcherSettings.copy(account = MatcherAccount.address, enableBalanceWatching = false)
   val history = stub[History]
   val functionalitySettings = TestFunctionalitySettings.Stub
   val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))

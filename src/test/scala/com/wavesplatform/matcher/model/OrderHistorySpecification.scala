@@ -299,7 +299,7 @@ class OrderHistorySpecification extends PropSpec
     oh.orderAccepted(OrderAdded(LimitOrder(ord5)))
 
     oh.fetchAllOrderHistory(ord1.senderPublicKey.address).map(_._1) shouldBe
-      Seq(ord5.idStr(), ord4.idStr(), ord2.idStr(), ord3.idStr(), ord1.idStr()))
+      Seq(ord5.idStr(), ord4.idStr(), ord2.idStr(), ord3.idStr(), ord1.idStr())
   }
 
   property("History with more than max limit") {

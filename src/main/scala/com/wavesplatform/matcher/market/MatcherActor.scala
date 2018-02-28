@@ -170,7 +170,7 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
     case RecoveryCompleted =>
       log.info("MatcherActor - Recovery completed!")
       initPredefinedPairs()
-      createBalanceWatcher()
+      if (settings.enableBalanceWatching) createBalanceWatcher()
   }
 
   override def receiveCommand: Receive = forwardToOrderBook
