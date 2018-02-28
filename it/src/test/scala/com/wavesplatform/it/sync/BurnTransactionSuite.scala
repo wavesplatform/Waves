@@ -3,7 +3,7 @@ package com.wavesplatform.it.transactions
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
 
-class BurnTransactionSuite2 extends BaseTransactionSuite {
+class BurnTransactionSuite extends BaseTransactionSuite {
 
   private val defaultQuantity = 100000
   private val decimals: Byte = 2
