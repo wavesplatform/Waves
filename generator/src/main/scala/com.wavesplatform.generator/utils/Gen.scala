@@ -6,7 +6,7 @@ import com.wavesplatform.generator.utils.Implicits._
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
-import scorex.transaction.{Transaction, TransactionParser}
+import scorex.transaction.{Proofs, Transaction, TransactionParser}
 
 object Gen {
   private def random = ThreadLocalRandom.current
@@ -40,7 +40,7 @@ object Gen {
     senderGen.zip(transferCountGen).map { case (sender, count) =>
       val transfers = List.tabulate(count)(_ => ParsedTransfer(recipientGen.next(), amountGen.next()))
       val fee = 100000 + count * 50000
-      MassTransferTransaction.create(None, sender, transfers, System.currentTimeMillis, fee, Array.emptyByteArray)
+      MassTransferTransaction.selfSigned(Proofs.Version, None, sender, transfers, System.currentTimeMillis, fee, Array.emptyByteArray)
     }.collect { case Right(tx) => tx }
   }
 

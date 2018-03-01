@@ -1,13 +1,13 @@
 package scorex.api.http.assets
 
+import cats.implicits._
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Format, Json}
 import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
-import scorex.transaction.TransactionParser.SignatureStringLength
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
-import scorex.transaction.{AssetIdStringLength, ValidationError}
+import scorex.transaction.{AssetIdStringLength, Proofs, ValidationError}
 
 object SignedMassTransferRequest {
   implicit val jsonFormat: Format[SignedMassTransferRequest] = Json.format
@@ -27,13 +27,14 @@ case class SignedMassTransferRequest(@ApiModelProperty(value = "Base58 encoded s
                                      @ApiModelProperty(value = "Base58 encoded attachment")
                                      attachment: Option[String],
                                      @ApiModelProperty(required = true)
-                                     signature: String) extends BroadcastRequest {
+                                     proofs: List[String]) extends BroadcastRequest {
   def toTx: Either[ValidationError, MassTransferTransaction] = for {
     _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
     _assetId <- parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
-    _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
+    _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofSize))
+    _proofs <- Proofs.create(_proofBytes)
     _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
     _transfers <- MassTransferTransaction.parseTransfersList(transfers)
-    t <- MassTransferTransaction.create(_assetId, _sender, _transfers, timestamp, fee, _attachment.arr, _signature)
+    t <- MassTransferTransaction.create(Proofs.Version, _assetId, _sender, _transfers, timestamp, fee, _attachment.arr, _proofs)
   } yield t
 }

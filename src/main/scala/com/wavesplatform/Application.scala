@@ -75,7 +75,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val checkpointService = new CheckpointServiceImpl(db, settings.checkpointsSettings)
   private val (history, featureProvider, stateReader, blockchainUpdater, blockchainDebugInfo) = storage()
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
-  private val wallet: Wallet = Wallet(settings.walletSettings)
+
+  private val wallet: Wallet = try {
+    Wallet(settings.walletSettings)
+  } catch {
+    case e: IllegalStateException =>
+      log.error(s"Failed to open wallet file '${settings.walletSettings.file.get.getAbsolutePath}")
+      throw e
+  }
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
   private val extensionLoaderScheduler = Scheduler.singleThread("tx-extension-loader", reporter = UncaughtExceptionReporter { ex => log.error(s"ExtensionLoader: $ex") })

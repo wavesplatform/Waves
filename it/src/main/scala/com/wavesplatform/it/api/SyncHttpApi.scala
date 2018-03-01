@@ -33,6 +33,12 @@ object SyncHttpApi extends Assertions{
     def assertAssetBalance(acc: String, assetIdString: String, balance: Long): Unit =
       Await.result(async(n).assertAssetBalance(acc, assetIdString, balance), RequestAwaitTime)
 
+    def assetBalance(address: String, asset: String): AssetBalance =
+      Await.result(async(n).assetBalance(address, asset), RequestAwaitTime)
+
+    def assetsBalance(address: String): FullAssetsInfo =
+      Await.result(async(n).assetsBalance(address), RequestAwaitTime)
+
     def issue(sourceAddress: String, name: String, description: String, quantity: Long, decimals: Byte, reissuable: Boolean, fee: Long): Transaction =
       Await.result(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee), RequestAwaitTime)
 
@@ -63,7 +69,7 @@ object SyncHttpApi extends Assertions{
     import com.wavesplatform.it.api.AsyncHttpApi.{NodesAsyncHttpApi => async}
 
 
-    private val TxInBlockchainAwaitTime = 2 * nodes.head.blockDelay
+    private val TxInBlockchainAwaitTime = 3 * nodes.head.blockDelay
     private val ConditionAwaitTime = 5.minutes
 
 

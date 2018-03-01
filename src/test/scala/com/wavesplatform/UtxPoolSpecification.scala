@@ -20,7 +20,7 @@ import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.ValidationError.SenderIsBlacklisted
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
-import scorex.transaction.{FeeCalculator, Transaction}
+import scorex.transaction.{FeeCalculator, Proofs, Transaction}
 import scorex.utils.Time
 
 import scala.concurrent.duration._
@@ -70,7 +70,7 @@ class UtxPoolSpecification extends FreeSpec
     val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
     val txs = for {
       fee <- chooseNum(1, amount)
-    } yield MassTransferTransaction.create(None, sender, transfers, time.getTimestamp(), fee, Array.empty[Byte]).right.get
+    } yield MassTransferTransaction.selfSigned(Proofs.Version, None, sender, transfers, time.getTimestamp(), fee, Array.empty[Byte]).right.get
     txs.label("transferWithRecipient")
   }
 
