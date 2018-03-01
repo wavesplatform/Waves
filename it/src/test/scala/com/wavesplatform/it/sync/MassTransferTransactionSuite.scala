@@ -153,4 +153,29 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
       proofs.base58().toList
     )
   }
+
+  test("try to make mass transfer if use alias for address") {
+
+    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
+    val (balance2, eff2) = notMiner.accountBalances(secondAddress)
+
+    val alias = "masstest_alias"
+    
+    val aliasFee = if (!sender.aliasByAddress(secondAddress).exists(_.endsWith(alias))){
+      val aliasId = sender.createAlias(secondAddress, alias, transferFee).id
+      nodes.waitForHeightAraiseAndTxPresent(aliasId)
+      transferFee
+    } else 0
+
+    val aliasFull = sender.aliasByAddress(secondAddress).find(_.endsWith(alias)).get
+
+    val transfers = List(Transfer(firstAddress, 0), Transfer(aliasFull, transferAmount))
+
+    val massTransferTransactionFee = calcFee(transfers.size)
+    val transferId = sender.massTransfer(firstAddress, transfers, massTransferTransactionFee).id
+    nodes.waitForHeightAraiseAndTxPresent(transferId)
+
+    notMiner.assertBalances(firstAddress, balance1 - massTransferTransactionFee - transferAmount, eff1 - massTransferTransactionFee - transferAmount)
+    notMiner.assertBalances(secondAddress, balance2 + transferAmount - aliasFee, eff2 + transferAmount - aliasFee)
+  }
 }

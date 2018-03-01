@@ -48,6 +48,9 @@ object SyncHttpApi extends Assertions{
     def createAlias(targetAddress: String, alias: String, fee: Long): Transaction =
       Await.result(async(n).createAlias(targetAddress, alias, fee), RequestAwaitTime)
 
+    def aliasByAddress(targetAddress: String): Seq[String] =
+      Await.result(async(n).aliasByAddress(targetAddress), RequestAwaitTime)
+
     def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None): Transaction =
       Await.result(async(n).transfer(sourceAddress, recipient, amount, fee, assetId), RequestAwaitTime)
 
