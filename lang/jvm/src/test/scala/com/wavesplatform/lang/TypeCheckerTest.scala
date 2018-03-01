@@ -1,16 +1,16 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.lang.Context.{PredefFunction, PredefType}
 import com.wavesplatform.lang.Terms._
-import com.wavesplatform.lang.TypeChecker.{Context, Defs, TypeCheckResult}
+import com.wavesplatform.lang.TypeChecker.{TypeCheckResult, TypeCheckerContext, TypeDefs}
 import monix.eval.Coeval
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
-import scorex.crypto.encode.Base58
 
 class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private val pointType = CUSTOMTYPE("Point", List("x" -> INT, "y" -> INT))
+  private val pointType = PredefType("Point", List("x" -> INT, "y" -> INT))
 
   rootTypeTest("successful on very deep expressions (stack overflow check)")(
     expr = (1 to 100000).foldLeft[Untyped.EXPR](Untyped.CONST_INT(0))((acc, _) => Untyped.BINARY_OP(acc, SUM_OP, Untyped.CONST_INT(1))),
@@ -33,14 +33,9 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       "EQ(BOOL)"         -> BINARY_OP(TRUE, EQ_OP, FALSE, BOOLEAN),
       "GT"               -> BINARY_OP(CONST_INT(0), GT_OP, CONST_INT(1), BOOLEAN),
       "GE"               -> BINARY_OP(CONST_INT(0), GE_OP, CONST_INT(1), BOOLEAN),
-      "SIG_VERIFY" -> SIG_VERIFY(
-        message = CONST_BYTEVECTOR(ByteVector(Base58.decode("333").get)),
-        signature = CONST_BYTEVECTOR(ByteVector(Base58.decode("222").get)),
-        publicKey = CONST_BYTEVECTOR(ByteVector(Base58.decode("111").get))
-      ),
       "IS_DEFINED(NONE)" -> IS_DEFINED(NONE),
       "IS_DEFINED(SOME)" -> IS_DEFINED(SOME(TRUE, OPTION(BOOLEAN))),
-      "LET"        -> LET("x", CONST_INT(0)),
+      "LET"              -> LET("x", CONST_INT(0)),
       "BLOCK" -> BLOCK(
         let = None,
         body = CONST_INT(0),
@@ -54,7 +49,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       ),
       "GET(SOME)" -> GET(SOME(TRUE, OPTION(BOOLEAN)), BOOLEAN),
       "GET(NONE)" -> GET(NONE, NOTHING),
-      "SOME" -> SOME(TRUE, OPTION(BOOLEAN)),
+      "SOME"      -> SOME(TRUE, OPTION(BOOLEAN)),
       "BLOCK(LET(X), REF(y) = x)" -> BLOCK(
         let = Some(LET("x", CONST_INT(0))),
         body = LET("y", REF("x", INT)),
@@ -64,8 +59,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   treeTypeTest("GETTER")(
-    predefTypes = Map(pointType.name -> pointType),
-    varDefs = Map("p"                -> TYPEREF("Point")),
+    ctx = TypeCheckerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> TYPEREF("Point")), functionDefs = Map.empty),
     expr = Untyped.GETTER(
       ref = Untyped.REF("p"),
       field = "x"
@@ -79,33 +73,70 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   )
 
   treeTypeTest("REF(OBJECT)")(
-    predefTypes = Map(pointType.name -> pointType),
-    varDefs = Map("p"                -> TYPEREF("Point")),
+    ctx = TypeCheckerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> TYPEREF("Point")), functionDefs = Map.empty),
     expr = Untyped.REF("p"),
     expectedResult = Right(Typed.REF("p", TYPEREF("Point")))
   )
 
   treeTypeTest("REF x = y")(
-    predefTypes = Map(pointType.name -> pointType),
-    varDefs = Map("p"                -> TYPEREF("Point")),
+    ctx = TypeCheckerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> TYPEREF("Point")), functionDefs = Map.empty),
     expr = Untyped.REF("p"),
     expectedResult = Right(Typed.REF("p", TYPEREF("Point")))
+  )
+
+  treeTypeTest("MULTIPLY(1,2)")(
+    ctx =
+      TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(multiplierFunction.name -> multiplierFunction.signature)),
+    expr = Untyped.FUNCTION_CALL(multiplierFunction.name, List(Untyped.CONST_INT(1), Untyped.CONST_INT(2))),
+    expectedResult = Right(Typed.FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_INT(1), Typed.CONST_INT(2)), INT))
+  )
+
+  private val optFunc  = PredefFunction("OPTFUNC", UNIT, List(("opt", OPTION(OPTION(INT)))))(_ => Right(()))
+  private val noneFunc = PredefFunction("NONEFUNC", UNIT, List(("opt", OPTION(NOTHING))))(_ => Right(()))
+
+  treeTypeTest(s"NONEFUNC(NONE)")(
+    ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(noneFunc.name -> noneFunc.signature)),
+    expr = Untyped.FUNCTION_CALL(noneFunc.name, List(Untyped.NONE)),
+    expectedResult = Right(Typed.FUNCTION_CALL(noneFunc.name, List(Typed.NONE), UNIT))
+  )
+
+  treeTypeTest(s"OPTFUNC(NONE)")(
+    ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(optFunc.name -> optFunc.signature)),
+    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.NONE)),
+    expectedResult = Right(Typed.FUNCTION_CALL(optFunc.name, List(Typed.NONE), UNIT))
+  )
+
+  treeTypeTest(s"OPTFUNC(SOME(NONE))")(
+    ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(optFunc.name -> optFunc.signature)),
+    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.SOME(Untyped.NONE))),
+    expectedResult = Right(Typed.FUNCTION_CALL(optFunc.name, List(Typed.SOME(Typed.NONE, OPTION(OPTION(NOTHING)))), UNIT))
+  )
+
+  treeTypeTest(s"OPTFUNC(SOME(CONST_INT(3)))")(
+    ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(optFunc.name -> optFunc.signature)),
+    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.SOME(Untyped.SOME(Untyped.CONST_INT(3))))),
+    expectedResult =
+      Right(Typed.FUNCTION_CALL(optFunc.name, List(Typed.SOME(Typed.SOME(Typed.CONST_INT(3), OPTION(INT)), OPTION(OPTION(INT)))), UNIT))
   )
 
   {
     import Untyped._
 
     errorTests(
-      "BINARY_OP wrong types" -> "The first operand is expected to be INT" -> BINARY_OP(TRUE, SUM_OP, CONST_INT(1)),
-      "IF con't find common" -> "Can't find common type" -> IF(TRUE, TRUE, CONST_INT(0))
+      "BINARY_OP with wrong types"                   -> "The first operand is expected to be INT" -> BINARY_OP(TRUE, SUM_OP, CONST_INT(1)),
+      "IF can't find common"                         -> "Can't find common type" -> IF(TRUE, TRUE, CONST_INT(0)),
+      "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(multiplierFunction.name, List(CONST_INT(0))),
+      "FUNCTION_CALL with upper type"                -> "do not match types required" -> FUNCTION_CALL(noneFunc.name, List(SOME(CONST_INT(3)))),
+      "FUNCTION_CALL with wrong type of argument"    -> "Types of arguments of function call" -> FUNCTION_CALL(multiplierFunction.name,
+                                                                                                            List(CONST_INT(0), FALSE))
     )
   }
 
   private def rootTypeTest(propertyName: String)(expr: Untyped.EXPR,
                                                  expectedResult: TypeCheckResult[TYPE],
-                                                 varDefs: Defs = Map.empty,
-                                                 predefTypes: Map[String, CUSTOMTYPE] = Map.empty): Unit = property(propertyName) {
-    TypeChecker(Context(predefTypes, varDefs), expr).map(_.tpe) match {
+                                                 varDefs: TypeDefs = Map.empty,
+                                                 predefTypes: Map[String, PredefType] = Map.empty): Unit = property(propertyName) {
+    TypeChecker(TypeCheckerContext(predefTypes, varDefs, Map.empty), expr).map(_.tpe) match {
       case Right(x)    => Right(x) shouldBe expectedResult
       case e @ Left(_) => e shouldBe expectedResult
     }
@@ -114,22 +145,26 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   private def errorTests(exprs: ((String, String), Untyped.EXPR)*): Unit = exprs.foreach {
     case ((label, error), input) =>
       property(s"Error: $label") {
-        TypeChecker(Context.empty, input) should produce(error)
+        TypeChecker(TypeCheckerContext(Map.empty,
+                                       Map.empty,
+                                       Map(
+                                         multiplierFunction.name -> multiplierFunction.signature,
+                                         noneFunc.name           -> noneFunc.signature
+                                       )),
+                    input) should produce(error)
       }
   }
 
-  private def treeTypeTest(propertyName: String)(expr: Untyped.EXPR,
-                                                 expectedResult: TypeCheckResult[Typed.EXPR],
-                                                 predefTypes: Map[String, CUSTOMTYPE],
-                                                 varDefs: Defs): Unit = property(propertyName) {
-    TypeChecker(Context(predefTypes, varDefs), expr) shouldBe expectedResult
-  }
+  private def treeTypeTest(propertyName: String)(expr: Untyped.EXPR, expectedResult: TypeCheckResult[Typed.EXPR], ctx: TypeCheckerContext): Unit =
+    property(propertyName) {
+      TypeChecker(ctx, expr) shouldBe expectedResult
+    }
 
   private def treeTypeErasureTests(exprs: (String, Typed.EXPR)*): Unit = exprs.foreach {
     case (exprName, expected) =>
       property(exprName) {
         val erased = erase(expected)
-        TypeChecker(Context.empty, erased) shouldBe Right(expected)
+        TypeChecker(TypeCheckerContext.empty, erased) shouldBe Right(expected)
       }
   }
 
@@ -146,7 +181,6 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
 
         case getter: Typed.GETTER        => aux(getter.ref).map(Untyped.GETTER(_, getter.field))
         case binaryOp: Typed.BINARY_OP   => (aux(binaryOp.a), aux(binaryOp.b)).mapN(Untyped.BINARY_OP(_, binaryOp.kind, _))
-        case sigVerify: Typed.SIG_VERIFY => (aux(sigVerify.message), aux(sigVerify.signature), aux(sigVerify.publicKey)).mapN(Untyped.SIG_VERIFY)
         case isDefined: Typed.IS_DEFINED => aux(isDefined.opt).map(Untyped.IS_DEFINED)
         case let: Typed.LET              => aux(let.value).map(Untyped.LET(let.name, _))
         case block: Typed.BLOCK =>
@@ -161,10 +195,11 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
                 }
             }
           }
-        case ifExpr: Typed.IF => (aux(ifExpr.cond), aux(ifExpr.ifTrue), aux(ifExpr.ifFalse)).mapN(Untyped.IF)
-        case ref: Typed.REF   => Coeval(Untyped.REF(ref.key))
-        case get: Typed.GET   => aux(get.opt).map(Untyped.GET)
-        case some: Typed.SOME => aux(some.t).map(Untyped.SOME)
+        case ifExpr: Typed.IF       => (aux(ifExpr.cond), aux(ifExpr.ifTrue), aux(ifExpr.ifFalse)).mapN(Untyped.IF)
+        case ref: Typed.REF         => Coeval(Untyped.REF(ref.key))
+        case get: Typed.GET         => aux(get.opt).map(Untyped.GET)
+        case some: Typed.SOME       => aux(some.t).map(Untyped.SOME)
+        case f: Typed.FUNCTION_CALL => ???
       })
 
     aux(expr)()

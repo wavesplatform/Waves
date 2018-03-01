@@ -1,16 +1,16 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.Evaluator.{Context, Defs}
+import cats.data.EitherT
+import com.wavesplatform.lang.Context._
 import com.wavesplatform.lang.Terms.Typed._
 import com.wavesplatform.lang.Terms._
-import monix.eval.Coeval
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
 class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def ev(predefTypes: Map[String, CUSTOMTYPE] = Map.empty, defs: Defs = Map.empty, expr: EXPR): Either[_, _] = {
-    Evaluator(Context(predefTypes, defs), expr)
+  private def ev(context: Context = Context.empty, expr: EXPR): Either[_, _] = {
+    Evaluator(context, expr)
   }
 
   private def simpleDeclarationAndUsage(i: Int) = BLOCK(Some(LET("x", CONST_INT(i))), REF("x", INT), INT)
@@ -29,15 +29,28 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
       )) shouldBe Right(3)
   }
 
+  property("successful on some expr") {
+    ev(expr = SOME(CONST_INT(4), OPTION(INT))) shouldBe Right(Some(4))
+  }
+
+  property("successful on some block") {
+    ev(
+      expr = BLOCK(
+        None,
+        SOME(CONST_INT(3), OPTION(INT)),
+        OPTION(INT)
+      )) shouldBe Right(Some(3))
+  }
+
   property("successful on x = y") {
     ev(
       expr = BLOCK(Some(LET("x", CONST_INT(3))),
-        BLOCK(
-          Some(LET("y", REF("x", INT))),
-          BINARY_OP(REF("x", INT), SUM_OP, REF("y", INT), INT),
-          INT
-        ),
-        INT)) shouldBe Right(6)
+                   BLOCK(
+                     Some(LET("y", REF("x", INT))),
+                     BINARY_OP(REF("x", INT), SUM_OP, REF("y", INT), INT),
+                     INT
+                   ),
+                   INT)) shouldBe Right(6)
   }
 
   property("successful on simple get") {
@@ -76,7 +89,8 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   }
 
   property("successful on same value names in different branches") {
-    ev(expr = IF(BINARY_OP(CONST_INT(1), EQ_OP, CONST_INT(2), INT), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4), INT)) shouldBe Right(4)
+    ev(expr = IF(BINARY_OP(CONST_INT(1), EQ_OP, CONST_INT(2), INT), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4), INT)) shouldBe Right(
+      4)
   }
 
   property("fails if override") {
@@ -99,13 +113,94 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   }
 
   property("custom type field access") {
-    val pointType = CUSTOMTYPE("Point", List("X" -> INT, "Y" -> INT))
-    val pointInstance = OBJECT(Map("X" -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
+    val pointType     = PredefType("Point", List("X" -> INT, "Y"                           -> INT))
+    val pointInstance = Obj(Map("X"                  -> LazyVal(INT)(EitherT.pure(3)), "Y" -> LazyVal(INT)(EitherT.pure(4))))
     ev(
-      predefTypes = Map(pointType.name -> pointType),
-      defs = Map(("p", (TYPEREF(pointType.name), pointInstance))),
+      context = Context(
+        typeDefs = Map(pointType.name -> pointType),
+        letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance)))),
+        functions = Map.empty
+      ),
       expr = BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", INT), SUM_OP, CONST_INT(2), INT)
     ) shouldBe Right(5)
+  }
 
+  property("lazy let evaluation doesn't throw if not used") {
+    val pointType     = PredefType("Point", List(("X", INT), ("Y", INT)))
+    val pointInstance = Obj(Map(("X", LazyVal(INT)(EitherT.pure(3))), ("Y", LazyVal(INT)(EitherT.pure(4)))))
+    val context = Context(
+      typeDefs = Map((pointType.name, pointType)),
+      letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance))), ("badVal", LazyVal(INT)(EitherT.leftT("Error")))),
+      functions = Map.empty
+    )
+    ev(
+      context = context,
+      expr = BLOCK(Some(LET("Z", REF("badVal", INT))), BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", INT), SUM_OP, CONST_INT(2), INT), INT)
+    ) shouldBe Right(5)
+  }
+
+  property("field and value are evaluated maximum once") {
+    var fieldCalculated = 0
+    var valueCalculated  = 0
+
+    val pointType = PredefType("Point", List(("X", INT), ("Y", INT)))
+    val pointInstance = Obj(Map(("X", LazyVal(INT)(EitherT.pure {
+      fieldCalculated = fieldCalculated + 1
+      3
+    })), ("Y", LazyVal(INT)(EitherT.pure(4)))))
+    val context = Context(
+      typeDefs = Map((pointType.name, pointType)),
+      letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance))), ("h", LazyVal(INT)(EitherT.pure {
+        valueCalculated = valueCalculated + 1
+        4
+      }))),
+      functions = Map.empty
+    )
+    ev(
+      context = context,
+      expr = BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", INT), SUM_OP, GETTER(REF("p", TYPEREF("Point")), "X", INT), INT)
+    ) shouldBe Right(6)
+
+    ev(
+      context = context,
+      expr = BINARY_OP(REF("h", INT), SUM_OP, REF("h", INT), INT)
+    ) shouldBe Right(8)
+
+    fieldCalculated shouldBe 1
+    valueCalculated shouldBe 1
+  }
+
+  property("let is evaluated maximum once") {
+    var functionEvaluated = 0
+
+    val f = PredefFunction("F", INT, List(("_", INT))) {
+      case _ =>
+        functionEvaluated = functionEvaluated + 1
+        Right(1)
+    }
+
+    val context = Context(
+      typeDefs = Map.empty,
+      letDefs = Map.empty,
+      functions = Map(f.name -> f)
+    )
+    ev(
+      context = context,
+      expr = BLOCK(Some(LET("X", FUNCTION_CALL("F", List(CONST_INT(1000)), INT))), BINARY_OP(REF("X", INT), SUM_OP, REF("X", INT), INT), INT)
+    ) shouldBe Right(2)
+
+    functionEvaluated shouldBe 1
+
+  }
+
+  property("successful on simple function evaluation") {
+    ev(
+      context = Context(
+        typeDefs = Map.empty,
+        letDefs = Map.empty,
+        functions = Map(multiplierFunction.name -> multiplierFunction)
+      ),
+      expr = FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_INT(3), Typed.CONST_INT(4)), INT)
+    ) shouldBe Right(12)
   }
 }

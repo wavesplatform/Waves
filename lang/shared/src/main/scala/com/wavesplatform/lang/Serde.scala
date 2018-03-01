@@ -13,7 +13,6 @@ object Serde {
   implicit def dConstByteVector = d.bind[Typed.CONST_BYTEVECTOR](1)
   implicit def dBinaryOp        = d.bind[Typed.BINARY_OP](2)
   implicit def dIf              = d.bind[Typed.IF](3)
-  implicit def dSigVerify       = d.bind[Typed.SIG_VERIFY](4)
   implicit def dLet             = d.bind[Typed.LET](5)
   implicit def dComposite       = d.bind[Typed.BLOCK](6)
   implicit def dRef             = d.bind[Typed.REF](7)
@@ -24,6 +23,7 @@ object Serde {
   implicit def dSome            = d.bind[Typed.SOME](12)
   implicit def dNone            = d.bind[Typed.NONE.type](13)
   implicit def dGetter          = d.bind[Typed.GETTER](14)
+  implicit def dFunctionCall    = d.bind[Typed.FUNCTION_CALL](15)
 
   implicit def bkD    = Discriminated[BINARY_OP_KIND, Int](uint8)
   implicit def bkDSum = bkD.bind[SUM_OP.type](0)
