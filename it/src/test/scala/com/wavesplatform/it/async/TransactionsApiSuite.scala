@@ -141,7 +141,8 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       "sender" -> firstAddress,
       "transfers" -> Json.toJson(Seq(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))),
       "fee" -> 200000,
-      "attachment" -> Base58.encode("masspay".getBytes)))
+      "attachment" -> Base58.encode("masspay".getBytes)),
+    usesProofs = true)
   }
 
   test("/transactions/sign should produce lease/cancel transactions that are good for /transactions/broadcast") {
@@ -167,12 +168,16 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       "fee" -> 100000))
   }
 
-  private def signAndBroadcast(json: JsObject): String = {
+  private def signAndBroadcast(json: JsObject, usesProofs: Boolean = false): String = {
     val f = for {
       rs <- sender.postJsonWithApiKey("/transactions/sign", json)
       _ = assert(rs.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
       body = Json.parse(rs.getResponseBody)
-      _ = assert((body \ "signature").as[String].nonEmpty)
+      signed: Boolean = if (usesProofs) {
+        val proofs = (body \ "proofs").as[Seq[String]]
+        proofs.lengthCompare(1) == 0 && proofs.head.nonEmpty
+      } else (body \ "signature").as[String].nonEmpty
+      _ = assert(signed)
       rb <- sender.postJson("/transactions/broadcast", body)
       _ = assert(rb.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
       id = (Json.parse(rb.getResponseBody) \ "id").as[String]
@@ -184,26 +189,33 @@ class TransactionsApiSuite extends BaseTransactionSuite {
   }
 
   test("reporting MassTransfer transactions") {
-    val transfers = List(Transfer(secondAddress, 2.waves), Transfer(thirdAddress, 3.waves))
+    val transfers = List(Transfer(firstAddress, 5.waves), Transfer(secondAddress, 2.waves), Transfer(thirdAddress, 3.waves))
     val f = for {
-      txId <- sender.massTransfer(firstAddress, transfers, 200000).map(_.id)
+      txId <- sender.massTransfer(firstAddress, transfers, 250000).map(_.id)
       _ <- nodes.waitForHeightAraiseAndTxPresent(txId)
 
       // /transactions/txInfo should return complete list of transfers
       txInfo <- sender.get(s"/transactions/info/$txId").as[MassTransferRequest]
-      _ = assert(txInfo.transfers.size == 2)
+      _ = assert(txInfo.transfers.size == 3)
 
       // /transactions/address should return complete transfers list for the sender...
       txSender <- sender.get(s"/transactions/address/$firstAddress/limit/1").as[JsArray].map(_.apply(0)(0))
-      _ = assert(txSender.as[MassTransferRequest].transfers.size == 2)
-      _ = assert((txSender \ "transferCount").as[Int] == 2)
-      _ = assert((txSender \ "totalAmount").as[Long] == 5.waves)
+      _ = assert(txSender.as[MassTransferRequest].transfers.size == 3)
+      _ = assert((txSender \ "transferCount").as[Int] == 3)
+      _ = assert((txSender \ "totalAmount").as[Long] == 10.waves)
+      transfersAfterTrans = txSender.as[MassTransferRequest].transfers
+
+      _ = assert((transfers.equals(transfersAfterTrans)))
 
       // ...and compact list for recipients
       txRecipient <- sender.get(s"/transactions/address/$secondAddress/limit/1").as[JsArray].map(_.apply(0)(0))
       _ = assert(txRecipient.as[MassTransferRequest].transfers.size == 1)
-      _ = assert((txRecipient \ "transferCount").as[Int] == 2)
-      _ = assert((txRecipient \ "totalAmount").as[Long] == 5.waves)
+      _ = assert((txRecipient \ "transferCount").as[Int] == 3)
+      _ = assert((txRecipient \ "totalAmount").as[Long] == 10.waves)
+      transferToSecond = txRecipient.as[MassTransferRequest].transfers.head
+
+      _ = assert(transfers contains transferToSecond)
+
     } yield succeed
 
     Await.result(f, timeout)

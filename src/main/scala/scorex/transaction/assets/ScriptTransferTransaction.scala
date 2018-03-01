@@ -33,14 +33,14 @@ case class ScriptTransferTransaction private(version: Byte,
     val amountBytes = Longs.toByteArray(amount)
     val feeBytes = Longs.toByteArray(fee)
 
-    Bytes.concat(Bytes.concat(Array(version),
+    Bytes.concat(Array(version),
       sender.publicKey,
       assetIdBytes,
       timestampBytes,
       amountBytes,
       feeBytes,
       recipient.bytes.arr,
-      Deser.serializeArray(attachment)))
+      Deser.serializeArray(attachment))
   }
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(

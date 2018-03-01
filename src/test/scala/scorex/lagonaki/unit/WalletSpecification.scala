@@ -21,10 +21,10 @@ class WalletSpecification extends FunSuite with Matchers {
 
     val head = w.privateKeyAccounts.head
     w.deleteAccount(head)
-    assert(w.privateKeyAccounts.size == walletSize - 1)
+    assert(w.privateKeyAccounts.lengthCompare(walletSize - 1) == 0)
 
     w.deleteAccount(w.privateKeyAccounts.head)
-    assert(w.privateKeyAccounts.size == walletSize - 2)
+    assert(w.privateKeyAccounts.lengthCompare(walletSize - 2) == 0)
 
     w.privateKeyAccounts.foreach(w.deleteAccount)
 
@@ -43,5 +43,15 @@ class WalletSpecification extends FunSuite with Matchers {
     w2.privateKeyAccounts.nonEmpty shouldBe true
     w2.privateKeyAccounts shouldEqual w1privateKeyAccounts
     w2.nonce shouldBe w1nonce
+  }
+
+  test("reopen with incorrect password") {
+    val file = Some(scorex.createTestTemporaryFile("wallet", ".dat"))
+    val w1 = Wallet(WalletSettings(file, "password", ByteStr.decodeBase58("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").toOption))
+    w1.generateNewAccounts(3)
+
+    assertThrows[IllegalStateException] {
+      Wallet(WalletSettings(file, "incorrect password", None))
+    }
   }
 }

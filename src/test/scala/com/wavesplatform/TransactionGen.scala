@@ -37,9 +37,11 @@ trait TransactionGen extends ScriptGen {
 
   val aliasSymbolChar: Gen[Char] = Gen.oneOf('.', '@', '_', '-')
 
+  val invalidAliasSymbolChar: Gen[Char] = Gen.oneOf('~', '`', '!', '#', '$', '%', '^', '&', '*', '=', '+')
+
   val aliasAlphabetGen: Gen[Char] = frequency((1, numChar), (1, aliasSymbolChar), (9, alphaLowerChar))
 
-  val invalidAliasAlphabetGen: Gen[Char] = frequency((1, numChar), (1, aliasSymbolChar), (9, alphaUpperChar))
+  val invalidAliasAlphabetGen: Gen[Char] = frequency((1, numChar), (3, invalidAliasSymbolChar), (9, alphaUpperChar))
 
   val validAliasStringGen: Gen[String] = for {
     length <- Gen.chooseNum(Alias.MinLength, Alias.MaxLength)
@@ -186,7 +188,7 @@ trait TransactionGen extends ScriptGen {
 
   def massTransferGeneratorP(sender: PrivateKeyAccount, transfers: List[ParsedTransfer], assetId: Option[AssetId]): Gen[MassTransferTransaction] = for {
     (_, _, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
-  } yield MassTransferTransaction.create(assetId, sender, transfers, timestamp, feeAmount, attachment).right.get
+  } yield MassTransferTransaction.selfSigned(Proofs.Version, assetId, sender, transfers, timestamp, feeAmount, attachment).right.get
 
   def createWavesTransfer(sender: PrivateKeyAccount, recipient: Address,
                           amount: Long, fee: Long, timestamp: Long): Either[ValidationError, TransferTransaction] =
@@ -225,7 +227,7 @@ trait TransactionGen extends ScriptGen {
         amount <- Gen.choose(1L, Long.MaxValue / MaxTransferCount)
       } yield ParsedTransfer(recipient, amount)
       recipients <- Gen.listOfN(transferCount, transferGen)
-    } yield MassTransferTransaction.create(assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
+    } yield MassTransferTransaction.selfSigned(Proofs.Version, assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
   }.label("massTransferTransaction")
 
   val MinIssueFee = 100000000

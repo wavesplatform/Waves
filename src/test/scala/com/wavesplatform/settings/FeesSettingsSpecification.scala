@@ -1,6 +1,6 @@
 package com.wavesplatform.settings
 
-import com.typesafe.config.ConfigException.BadValue
+import com.typesafe.config.ConfigException.WrongType
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -91,9 +91,15 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
   it should "fail on incorrect long values" in {
     val config = ConfigFactory.parseString("waves.fees.payment.WAVES=N/A").resolve()
 
-    intercept[BadValue] {
+    intercept[WrongType] {
       FeesSettings.fromConfig(config)
     }
+  }
+
+  it should "not fail on long values as strings" in {
+    val config = ConfigFactory.parseString("waves.fees.transfer.WAVES=\"1000\"").resolve()
+    val settings = FeesSettings.fromConfig(config)
+    settings.fees(4).toSet should equal(Set(FeeSettings("WAVES", 1000)))
   }
 
   it should "fail on unknown transaction type" in {
