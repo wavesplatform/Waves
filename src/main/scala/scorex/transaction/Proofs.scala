@@ -18,7 +18,7 @@ object Proofs {
 
   val Version = 1: Byte
   val MaxProofs = 8
-  val MaxProofSize = 512
+  val MaxProofSize = 64
   val MaxProofStringSize = base58Length(MaxProofSize)
 
   lazy val empty = create(Seq.empty).explicitGet()

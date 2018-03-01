@@ -2,7 +2,9 @@ package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.it.Node
+import org.asynchttpclient.Response
 import org.scalatest.{Assertion, Assertions, Matchers}
+import play.api.libs.json.Writes
 import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 
@@ -23,6 +25,12 @@ object SyncHttpApi extends Assertions{
     import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
 
     private val RequestAwaitTime = 15.seconds
+
+    def postJson[A: Writes](path: String, body: A): Response =
+      Await.result(async(n).postJson(path, body), RequestAwaitTime)
+
+    def postJsonWithApiKey[A: Writes](path: String, body: A): Response =
+      Await.result(async(n).postJsonWithApiKey(path, body), RequestAwaitTime)
 
     def accountBalances(acc: String): (Long, Long) =
       Await.result(async(n).accountBalances(acc), RequestAwaitTime)
@@ -47,6 +55,9 @@ object SyncHttpApi extends Assertions{
 
     def createAlias(targetAddress: String, alias: String, fee: Long): Transaction =
       Await.result(async(n).createAlias(targetAddress, alias, fee), RequestAwaitTime)
+
+    def aliasByAddress(targetAddress: String): Seq[String] =
+      Await.result(async(n).aliasByAddress(targetAddress), RequestAwaitTime)
 
     def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None): Transaction =
       Await.result(async(n).transfer(sourceAddress, recipient, amount, fee, assetId), RequestAwaitTime)
