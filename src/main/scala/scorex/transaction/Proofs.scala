@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.state2._
+import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
@@ -17,7 +18,8 @@ object Proofs {
 
   val Version = 1: Byte
   val MaxProofs = 8
-  val MaxProofSize = 512
+  val MaxProofSize = 64
+  val MaxProofStringSize = base58Length(MaxProofSize)
 
   lazy val empty = create(Seq.empty).explicitGet()
 

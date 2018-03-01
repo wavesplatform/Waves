@@ -47,6 +47,7 @@ case class MassTransferTransaction private(version: Byte,
   }
 
   override def jsonBase(): JsObject = super.jsonBase() ++ Json.obj(
+    "version" -> version,
     "assetId" -> assetId.map(_.base58),
     "attachment" -> Base58.encode(attachment),
     "transferCount" -> transfers.size,
