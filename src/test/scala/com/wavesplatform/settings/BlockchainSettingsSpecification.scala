@@ -28,7 +28,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        minimal-generating-balance-after = 5
         |        allow-transactions-from-future-until = 6
         |        allow-unissued-assets-until = 7
-        |        require-payment-unique-id-after = 9
         |        allow-invalid-reissue-in-same-block-until-timestamp = 12
         |        allow-multiple-lease-cancel-transaction-until-timestamp = 14
         |        reset-effective-balances-at-height = 15
@@ -68,7 +67,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.minimalGeneratingBalanceAfter should be(5)
     settings.functionalitySettings.allowTransactionsFromFutureUntil should be(6)
     settings.functionalitySettings.allowUnissuedAssetsUntil should be(7)
-    settings.functionalitySettings.requirePaymentUniqueIdAfter should be(9)
     settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp should be(12)
     settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp should be(14)
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(15)
@@ -109,7 +107,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.minimalGeneratingBalanceAfter should be(0)
     settings.functionalitySettings.allowTransactionsFromFutureUntil should be(1478100000000L)
     settings.functionalitySettings.allowUnissuedAssetsUntil should be(1479416400000L)
-    settings.functionalitySettings.requirePaymentUniqueIdAfter should be(1485942685000L)
     settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp should be(1492560000000L)
     settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp should be(1492560000000L)
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(51500)
@@ -153,7 +150,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp should be(1492768800000L)
     settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp should be(1492768800000L)
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(462000)
-    settings.functionalitySettings.requirePaymentUniqueIdAfter should be(1491192000000L)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1465742577614L)
     settings.genesisSettings.signature should be(ByteStr.decodeBase58("FSH8eAAzZNqnG8xgTZtz5xuLqXySsXgAjmFEC25hXMbEufiGjqWPnGCZFt6gLiVLJny16ipxRNAkkzjjhqTjBE2").toOption)

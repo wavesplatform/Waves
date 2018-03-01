@@ -10,7 +10,6 @@ object TestFunctionalitySettings {
     requireSortedTransactionsAfter = 0L, generationBalanceDepthFrom50To1000AfterHeight = 0,
     minimalGeneratingBalanceAfter = 0L,
     allowTransactionsFromFutureUntil = Long.MaxValue, allowUnissuedAssetsUntil = 0L,
-    requirePaymentUniqueIdAfter = 0L,
     allowInvalidReissueInSameBlockUntilTimestamp = 0L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 0L, resetEffectiveBalancesAtHeight = 0,
     blockVersion3AfterHeight = 0,
