@@ -61,13 +61,17 @@ object Terms {
 
   }
 
-  def findCommonType(t1: TYPE, t2: TYPE): Option[TYPE] =
-    if (t1 == NOTHING) Some(t2)
-    else if (t2 == NOTHING) Some(t1)
-    else if (t1 == t2) Some(t1)
+  def findCommonType(t1: TYPE, t2: TYPE): Option[TYPE] = findCommonType(t1, t2, biDirectional = true)
+
+  def matchType(required: TYPE, actual: TYPE): Option[TYPE] = findCommonType(required, actual, biDirectional = false)
+
+  private def findCommonType(required: TYPE, actual: TYPE, biDirectional: Boolean): Option[TYPE] =
+    if (actual == NOTHING) Some(required)
+    else if (required == NOTHING && biDirectional) Some(actual)
+    else if (required == actual) Some(required)
     else
-      (t1, t2) match {
-        case (OPTION(it1), OPTION(it2)) => findCommonType(it1, it2).map(OPTION)
+      (required, actual) match {
+        case (OPTION(it1), OPTION(it2)) => findCommonType(it1, it2, biDirectional).map(OPTION)
         case _                          => None
       }
 

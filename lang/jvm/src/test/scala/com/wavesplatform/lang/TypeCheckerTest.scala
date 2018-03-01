@@ -1,6 +1,6 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.Context.PredefType
+import com.wavesplatform.lang.Context.{PredefFunction, PredefType}
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.TypeChecker.{TypeCheckResult, TypeCheckerContext, TypeDefs}
 import monix.eval.Coeval
@@ -85,9 +85,38 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   )
 
   treeTypeTest("MULTIPLY(1,2)")(
-    ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(multiplierFunction.name -> multiplierFunction.signature)),
+    ctx =
+      TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(multiplierFunction.name -> multiplierFunction.signature)),
     expr = Untyped.FUNCTION_CALL(multiplierFunction.name, List(Untyped.CONST_INT(1), Untyped.CONST_INT(2))),
     expectedResult = Right(Typed.FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_INT(1), Typed.CONST_INT(2)), INT))
+  )
+
+  private val optFunc  = PredefFunction("OPTFUNC", UNIT, List(("opt", OPTION(OPTION(INT)))))(_ => Right(()))
+  private val noneFunc = PredefFunction("NONEFUNC", UNIT, List(("opt", OPTION(NOTHING))))(_ => Right(()))
+
+  treeTypeTest(s"NONEFUNC(NONE)")(
+    ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(noneFunc.name -> noneFunc.signature)),
+    expr = Untyped.FUNCTION_CALL(noneFunc.name, List(Untyped.NONE)),
+    expectedResult = Right(Typed.FUNCTION_CALL(noneFunc.name, List(Typed.NONE), UNIT))
+  )
+
+  treeTypeTest(s"OPTFUNC(NONE)")(
+    ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(optFunc.name -> optFunc.signature)),
+    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.NONE)),
+    expectedResult = Right(Typed.FUNCTION_CALL(optFunc.name, List(Typed.NONE), UNIT))
+  )
+
+  treeTypeTest(s"OPTFUNC(SOME(NONE))")(
+    ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(optFunc.name -> optFunc.signature)),
+    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.SOME(Untyped.NONE))),
+    expectedResult = Right(Typed.FUNCTION_CALL(optFunc.name, List(Typed.SOME(Typed.NONE, OPTION(OPTION(NOTHING)))), UNIT))
+  )
+
+  treeTypeTest(s"OPTFUNC(SOME(CONST_INT(3)))")(
+    ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(optFunc.name -> optFunc.signature)),
+    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.SOME(Untyped.SOME(Untyped.CONST_INT(3))))),
+    expectedResult =
+      Right(Typed.FUNCTION_CALL(optFunc.name, List(Typed.SOME(Typed.SOME(Typed.CONST_INT(3), OPTION(INT)), OPTION(OPTION(INT)))), UNIT))
   )
 
   {
@@ -97,6 +126,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       "BINARY_OP with wrong types"                   -> "The first operand is expected to be INT" -> BINARY_OP(TRUE, SUM_OP, CONST_INT(1)),
       "IF can't find common"                         -> "Can't find common type" -> IF(TRUE, TRUE, CONST_INT(0)),
       "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(multiplierFunction.name, List(CONST_INT(0))),
+      "FUNCTION_CALL with upper type"                -> "do not match types required" -> FUNCTION_CALL(noneFunc.name, List(SOME(CONST_INT(3)))),
       "FUNCTION_CALL with wrong type of argument"    -> "Types of arguments of function call" -> FUNCTION_CALL(multiplierFunction.name,
                                                                                                             List(CONST_INT(0), FALSE))
     )
@@ -115,7 +145,13 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   private def errorTests(exprs: ((String, String), Untyped.EXPR)*): Unit = exprs.foreach {
     case ((label, error), input) =>
       property(s"Error: $label") {
-        TypeChecker(TypeCheckerContext(Map.empty, Map.empty, Map(multiplierFunction.name -> multiplierFunction.signature)), input) should produce(error)
+        TypeChecker(TypeCheckerContext(Map.empty,
+                                       Map.empty,
+                                       Map(
+                                         multiplierFunction.name -> multiplierFunction.signature,
+                                         noneFunc.name           -> noneFunc.signature
+                                       )),
+                    input) should produce(error)
       }
   }
 
@@ -159,10 +195,10 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
                 }
             }
           }
-        case ifExpr: Typed.IF => (aux(ifExpr.cond), aux(ifExpr.ifTrue), aux(ifExpr.ifFalse)).mapN(Untyped.IF)
-        case ref: Typed.REF   => Coeval(Untyped.REF(ref.key))
-        case get: Typed.GET   => aux(get.opt).map(Untyped.GET)
-        case some: Typed.SOME => aux(some.t).map(Untyped.SOME)
+        case ifExpr: Typed.IF       => (aux(ifExpr.cond), aux(ifExpr.ifTrue), aux(ifExpr.ifFalse)).mapN(Untyped.IF)
+        case ref: Typed.REF         => Coeval(Untyped.REF(ref.key))
+        case get: Typed.GET         => aux(get.opt).map(Untyped.GET)
+        case some: Typed.SOME       => aux(some.t).map(Untyped.SOME)
         case f: Typed.FUNCTION_CALL => ???
       })
 

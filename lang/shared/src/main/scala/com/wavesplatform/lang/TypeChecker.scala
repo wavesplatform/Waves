@@ -65,9 +65,9 @@ object TypeChecker {
             sequencedActualArgTypes.subflatMap { v: Seq[(Typed.EXPR, TYPE)] =>
               val matches = v.map {
                 case ((e, tpe)) =>
-                  findCommonType(e.tpe, tpe) match {
+                  matchType(tpe,e.tpe) match {
                     case Some(_) => Right(e)
-                    case None    => Left(s"Types of arguments of function call '$name'have no common parent. Expected: $tpe, Actual: ${e.tpe}")
+                    case None    => Left(s"Types of arguments of function call '$name' do not match types required in signature. Expected: $tpe, Actual: ${e.tpe}")
                   }
               }
               matches.find(_.isLeft) match {
@@ -104,9 +104,10 @@ object TypeChecker {
                 else Right(operands -> BOOLEAN)
 
               case EQ_OP =>
-                findCommonType(aTpe, bTpe)
-                  .map(_ => Right(operands -> BOOLEAN))
-                  .getOrElse(Left(s"Can't find common type for $aTpe and $bTpe: $a and $b in $expr"))
+                findCommonType(aTpe, bTpe) match {
+                  case Some(_) => Right(operands -> BOOLEAN)
+                  case None => Left(s"Can't find common type for $aTpe and $bTpe: $a and $b in $expr")
+                }
             }
         }
         .map { case (operands, tpe) => Typed.BINARY_OP(operands._1, op, operands._2, tpe) }
@@ -147,8 +148,8 @@ object TypeChecker {
           case (resolvedCond, resolvedIfTrue, resolvedIfFalse) =>
             val ifTrueTpe  = resolvedIfTrue.tpe
             val ifFalseTpe = resolvedIfFalse.tpe
-            findCommonType(ifTrueTpe, ifFalseTpe)
-              .map { tpe =>
+            findCommonType(ifTrueTpe, ifFalseTpe) match {
+              case Some(tpe) =>
                 Right(
                   Typed.IF(
                     cond = resolvedCond,
@@ -156,9 +157,10 @@ object TypeChecker {
                     ifFalse = resolvedIfFalse,
                     tpe = tpe
                   ))
-              }
-              .getOrElse(Left(s"Can't find common type for $ifTrueTpe and $ifFalseTpe"))
+              case None => Left(s"Can't find common type for $ifTrueTpe and $ifFalseTpe")
+            }
         }
+
 
     case ref: Untyped.REF =>
       EitherT.fromEither {
