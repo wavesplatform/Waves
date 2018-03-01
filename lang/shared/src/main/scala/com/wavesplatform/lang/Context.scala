@@ -45,7 +45,7 @@ object Context {
 
   object LazyVal {
     private case class LazyValImpl(tpe: TYPE, v: TrampolinedExecResult[Any]) extends LazyVal {
-      override val value: TrampolinedExecResult[tpe.Underlying] = v.map(_.asInstanceOf[tpe.Underlying])
+      override val value: TrampolinedExecResult[tpe.Underlying] = EitherT(Coeval.evalOnce(v.map(_.asInstanceOf[tpe.Underlying]).value.apply()))
     }
 
     def apply(t: TYPE)(v: TrampolinedExecResult[t.Underlying]): LazyVal = LazyValImpl(t, v.map(_.asInstanceOf[Any]))

@@ -139,6 +139,60 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ) shouldBe Right(5)
   }
 
+  property("field and value are evaluated maximum once") {
+    var fieldCalculated = 0
+    var valueCalculated  = 0
+
+    val pointType = PredefType("Point", List(("X", INT), ("Y", INT)))
+    val pointInstance = Obj(Map(("X", LazyVal(INT)(EitherT.pure {
+      fieldCalculated = fieldCalculated + 1
+      3
+    })), ("Y", LazyVal(INT)(EitherT.pure(4)))))
+    val context = Context(
+      typeDefs = Map((pointType.name, pointType)),
+      letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance))), ("h", LazyVal(INT)(EitherT.pure {
+        valueCalculated = valueCalculated + 1
+        4
+      }))),
+      functions = Map.empty
+    )
+    ev(
+      context = context,
+      expr = BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", INT), SUM_OP, GETTER(REF("p", TYPEREF("Point")), "X", INT), INT)
+    ) shouldBe Right(6)
+
+    ev(
+      context = context,
+      expr = BINARY_OP(REF("h", INT), SUM_OP, REF("h", INT), INT)
+    ) shouldBe Right(8)
+
+    fieldCalculated shouldBe 1
+    valueCalculated shouldBe 1
+  }
+
+  property("let is evaluated maximum once") {
+    var functionEvaluated = 0
+
+    val f = PredefFunction("F", INT, List(("_", INT))) {
+      case _ =>
+        functionEvaluated = functionEvaluated + 1
+        Right(1)
+    }
+
+    val context = Context(
+      typeDefs = Map.empty,
+      letDefs = Map.empty,
+      functions = Map(f.name -> f)
+    )
+    ev(
+      context = context,
+      expr = BLOCK(Some(LET("X", FUNCTION_CALL("F", List(CONST_INT(1000)), INT))), BINARY_OP(REF("X", INT), SUM_OP, REF("X", INT), INT), INT)
+    ) shouldBe Right(2)
+
+    functionEvaluated shouldBe 1
+
+  }
+
   property("successful on simple function evaluation") {
     ev(
       context = Context(
