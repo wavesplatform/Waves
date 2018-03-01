@@ -2,14 +2,15 @@ package scorex.transaction.smart
 
 import cats.data.EitherT
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.Context._
-import com.wavesplatform.lang.Evaluator.TrampolinedExecResult
+import com.wavesplatform.lang.ctx._
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang._
+import com.wavesplatform.lang.ctx.Context
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Coeval
 import scodec.bits.ByteVector
+import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{Authorized, ProvenTransaction, Transaction}
 
@@ -30,6 +31,15 @@ object WavesContext {
       "ASSETID"   -> optionByteVector
     )
   )
+
+  private def hashFunction(name: String)(h: Array[Byte] => Array[Byte]) = PredefFunction(name, BYTEVECTOR, List(("bytes", BYTEVECTOR))) {
+    case (m: ByteVector) :: Nil => Right(ByteVector(h(m.toArray)))
+    case _                      => ???
+  }
+
+  private val keccack256 = hashFunction("keccack256")(Keccak256.hash)
+  private val blake2b256 = hashFunction("blake2b256")(Blake2b256.hash)
+  private val sha256     = hashFunction("sha256")(Sha256.hash)
 
   val sigVerify: PredefFunction = PredefFunction("SIGVERIFY", BOOLEAN, List(("message", BYTEVECTOR), ("sig", BYTEVECTOR), ("pub", BYTEVECTOR))) {
     case (m: ByteVector) :: (s: ByteVector) :: (p: ByteVector) :: Nil =>
@@ -89,7 +99,13 @@ object WavesContext {
     Context(
       Map(transactionType.name -> transactionType),
       Map(("H", LazyVal(INT)(EitherT.right(height))), ("TX", LazyVal(TYPEREF(transactionType.name))(EitherT.right(tx.map(transactionObject))))),
-      Map(sigVerify.name -> sigVerify, txById.name -> txById)
+      Map(
+        sigVerify.name  -> sigVerify,
+        txById.name     -> txById,
+        keccack256.name -> keccack256,
+        blake2b256.name -> blake2b256,
+        sha256.name     -> sha256
+      )
     )
   }
 
