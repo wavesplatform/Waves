@@ -42,7 +42,7 @@ case class SignedMassTransferRequest(@ApiModelProperty(value = "Base58 encoded s
   def toTx: Either[ValidationError, MassTransferTransaction] = for {
     _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
     _assetId <- parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
-    _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofSize))
+    _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
     _proofs <- Proofs.create(_proofBytes)
     _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
     _transfers <- MassTransferTransaction.parseTransfersList(transfers)

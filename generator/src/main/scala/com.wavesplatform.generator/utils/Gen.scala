@@ -17,9 +17,7 @@ object Gen {
           recipientGen: Iterator[Address]): Iterator[Transaction] = {
     val senderGen = Iterator.randomContinually(senderAccounts)
     val feeGen = Iterator.continually(minFee + random.nextLong(maxFee - minFee))
-    transfers(senderGen, recipientGen, feeGen)
-      .zip(massTransfers(senderGen, recipientGen, feeGen))
-      .flatMap { case (tt, mtt) => Iterator(mtt, tt) }
+    massTransfers(senderGen, recipientGen, feeGen)
   }
 
   def transfers(senderGen: Iterator[PrivateKeyAccount],
