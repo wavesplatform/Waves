@@ -6,7 +6,7 @@ import com.wavesplatform.lang.Terms.Typed.TRUE
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Inside, Matchers, PropSpec}
@@ -20,7 +20,7 @@ import scorex.transaction.smart.{Script, SetScriptTransaction}
 import scorex.transaction.{GenesisTransaction, ValidationError}
 
 class ExchangeTransactionDiffTest
-  extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink with WithDB {
+  extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
 
   property("preserves waves invariant, stores match info, rewards matcher") {
 
@@ -38,13 +38,13 @@ class ExchangeTransactionDiffTest
     } yield (gen1, gen2, issue1, issue2, exchange)
 
     forAll(preconditionsAndExchange) { case ((gen1, gen2, issue1, issue2, exchange)) =>
-      assertDiffAndState(db, Seq(TestBlock.create(Seq(gen1, gen2, issue1, issue2))), TestBlock.create(Seq(exchange))) { case (blockDiff, state) =>
-        val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
+      assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1, issue2))), TestBlock.create(Seq(exchange))) { case (blockDiff, state) =>
+        val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe 0
         totalPortfolioDiff.effectiveBalance shouldBe 0
         totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-        blockDiff.txsDiff.portfolios(exchange.sender).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee
+        blockDiff.portfolios(exchange.sender).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee
       }
     }
   }
@@ -69,7 +69,7 @@ class ExchangeTransactionDiffTest
     } yield (gen1, gen2, setScript, issue1, issue2, exchange)
 
     forAll(preconditionsAndExchange) { case ((gen1, gen2, setScript, issue1, issue2, exchange)) =>
-      assertLeft(db, Seq(TestBlock.create(Seq(gen1, gen2, setScript, issue1, issue2))), TestBlock.create(Seq(exchange)), fs)("can't participate in ExchangeTransaction")
+      assertLeft(Seq(TestBlock.create(Seq(gen1, gen2, setScript, issue1, issue2))), TestBlock.create(Seq(exchange)), fs)("can't participate in ExchangeTransaction")
     }
   }
 
@@ -86,13 +86,13 @@ class ExchangeTransactionDiffTest
 
     forAll(preconditions) { case ((gen1, gen2, issue1, exchange)) =>
       whenever(exchange.amount > 300000) {
-        assertDiffAndState(db, Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(exchange))) { case (blockDiff, state) =>
-          val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
+        assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(exchange))) { case (blockDiff, state) =>
+          val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
           totalPortfolioDiff.balance shouldBe 0
           totalPortfolioDiff.effectiveBalance shouldBe 0
           totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-          blockDiff.txsDiff.portfolios(exchange.sender).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee
+          blockDiff.portfolios(exchange.sender).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee
         }
       }
     }
@@ -131,9 +131,9 @@ class ExchangeTransactionDiffTest
       val buy = Order.buy(buyer, matcher, assetPair, price, 1000000L, Ts, Ts + 1, MatcherFee)
       val sell = Order.sell(seller, matcher, assetPair, price, 1L, Ts, Ts + 1, MatcherFee)
       val tx = createExTx(buy, sell, price, matcher, Ts).explicitGet()
-      assertDiffAndState(db, Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(tx))) { case (blockDiff, state) =>
-        blockDiff.txsDiff.portfolios(tx.sender).balance shouldBe tx.buyMatcherFee + tx.sellMatcherFee - tx.fee
-        state.accountPortfolio(tx.sender).balance shouldBe 0L
+      assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(tx))) { case (blockDiff, state) =>
+        blockDiff.portfolios(tx.sender).balance shouldBe tx.buyMatcherFee + tx.sellMatcherFee - tx.fee
+        state.portfolio(tx.sender).balance shouldBe 0L
       }
     }
   }
@@ -157,7 +157,7 @@ class ExchangeTransactionDiffTest
       val buy = Order.buy(buyer, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
       val sell = Order.sell(seller, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
       val tx = createExTx(buy, sell, price, matcher, Ts).explicitGet()
-      assertDiffEi(db, Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(tx))) { totalDiffEi =>
+      assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(tx))) { totalDiffEi =>
         inside(totalDiffEi) { case Left(TransactionValidationError(AccountBalanceError(errs), _)) =>
           errs should contain key seller.toAddress
         }

@@ -1,10 +1,8 @@
 package scorex.transaction
 
-import com.google.common.base.Throwables
 import com.wavesplatform.crypto
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.StateReader
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.account.{Address, PublicKeyAccount}
 import scorex.block.Block
@@ -12,7 +10,6 @@ import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
-import scala.util.{Failure, Success, Try}
 
 object PoSCalc extends ScorexLogging {
 
@@ -64,27 +61,27 @@ object PoSCalc extends ScorexLogging {
     }
   }
 
-  def generatingBalance(state: SnapshotStateReader, fs: FunctionalitySettings, account: Address, atHeight: Int): Try[Long] = {
+  def generatingBalance(state: SnapshotStateReader, fs: FunctionalitySettings, account: Address, atHeight: Int): Long = {
     val generatingBalanceDepth = if (atHeight >= fs.generationBalanceDepthFrom50To1000AfterHeight) 1000 else 50
-    state.effectiveBalanceAtHeightWithConfirmations(account, atHeight, generatingBalanceDepth)
+    state.effectiveBalance(account, atHeight, generatingBalanceDepth)
   }
 
-  def nextBlockGenerationTime(height: Int, state: StateReader, fs: FunctionalitySettings, block: Block,
-                              account: PublicKeyAccount, featureProvider: FeatureProvider): Either[String, (Long, Long)] = {
-    generatingBalance(state(), fs, account, height) match {
-      case Success(balance) => for {
-        _ <- Either.cond((!featureProvider.isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance, height) && balance >= MinimalEffectiveBalanceForGenerator1) ||
-          (featureProvider.isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance, height) && balance >= MinimalEffectiveBalanceForGenerator2), (),
-          s"Balance $balance of ${account.address} is lower than required for generation")
-        cData = block.consensusData
-        hit = calcHit(cData, account)
-        t = cData.baseTarget
-        calculatedTs = (hit * 1000) / (BigInt(t) * balance) + block.timestamp
-        _ <- Either.cond(0 < calculatedTs && calculatedTs < Long.MaxValue, (), s"Invalid next block generation time: $calculatedTs")
-      } yield (balance, calculatedTs.toLong)
-      case Failure(exc) =>
-        log.error("Critical error calculating nextBlockGenerationTime", exc)
-        Left(Throwables.getStackTraceAsString(exc))
+  def nextBlockGenerationTime(height: Int, state: SnapshotStateReader, fs: FunctionalitySettings,
+                              block: Block, account: PublicKeyAccount, featureProvider: FeatureProvider): Either[String, (Long, Long)] = {
+    val balance = generatingBalance(state, fs, account, height)
+       Either.cond((!featureProvider.isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance, height) &&balance >= MinimalEffectiveBalanceForGenerator1) ||
+          (featureProvider.isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance, height) && balance >= MinimalEffectiveBalanceForGenerator2),
+      balance,    s"Balance $balance of ${account.address} is lower than required for generation")
+       .flatMap { _ =>
+         val cData = block.consensusData
+         val hit = calcHit(cData, account)
+         val t = cData.baseTarget
+         val calculatedTs = (hit * 1000) / (BigInt(t) * balance) + block.timestamp
+         if (0 < calculatedTs && calculatedTs < Long.MaxValue) {
+           Right((balance, calculatedTs.toLong))
+         } else {
+           Left(s"Invalid next block generation time: $calculatedTs")
+         }
     }
   }
 

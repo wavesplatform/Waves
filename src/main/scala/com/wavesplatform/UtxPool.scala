@@ -4,14 +4,13 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats._
 import com.wavesplatform.UtxPoolImpl.PessimisticPortfolios
-import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.mining.TwoDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{ByteStr, Diff, Portfolio, StateReader}
+import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
 import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
 import monix.eval.Task
@@ -53,9 +52,8 @@ trait UtxBatchOps {
 }
 
 class UtxPoolImpl(time: Time,
-                  stateReader: StateReader,
+                  stateReader: SnapshotStateReader,
                   history: History,
-                  featureProvider: FeatureProvider,
                   feeCalculator: FeeCalculator,
                   fs: FunctionalitySettings,
                   utxSettings: UtxSettings) extends ScorexLogging with Instrumented with AutoCloseable with UtxPool {
@@ -67,7 +65,7 @@ class UtxPoolImpl(time: Time,
   private val pessimisticPortfolios = new PessimisticPortfolios
 
   private val removeInvalid = Task {
-    val state = stateReader()
+    val state = stateReader
     val transactionsToRemove = transactions.values.asScala.filter(t => state.containsTransaction(t.id()))
     removeAll(transactionsToRemove)
   }.delayExecution(utxSettings.cleanupInterval)
@@ -94,7 +92,7 @@ class UtxPoolImpl(time: Time,
       }
   }
 
-  override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = putIfNew(stateReader(), tx)
+  override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = putIfNew(stateReader, tx)
 
   private def checkNotBlacklisted(tx: Transaction): Either[ValidationError, Unit] = {
     if (utxSettings.blacklistSenderAddresses.isEmpty) {
@@ -130,16 +128,11 @@ class UtxPoolImpl(time: Time,
     removeExpired(time.correctedTime())
   }
 
-  override def portfolio(addr: Address): Portfolio = {
-    val base = stateReader().accountPortfolio(addr)
-    val foundInUtx = pessimisticPortfolios.getAggregated(addr)
+  override def portfolio(addr: Address): Portfolio =
+    Monoid.combine(stateReader.portfolio(addr), pessimisticPortfolios.getAggregated(addr))
 
-    Monoid.combine(base, foundInUtx)
-  }
-
-  override def all: Seq[Transaction] = {
+  override def all: Seq[Transaction] =
     transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
-  }
 
   override def size: Int = transactions.size
 
@@ -148,15 +141,15 @@ class UtxPoolImpl(time: Time,
   override def packUnconfirmed(rest: TwoDimensionalMiningConstraint, sortInBlock: Boolean): (Seq[Transaction], TwoDimensionalMiningConstraint) = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
-    val s = stateReader()
-    val differ = TransactionDiffer(fs, history.lastBlockTimestamp(), currentTs, s.height) _
+    val s = stateReader
+    val differ = TransactionDiffer(fs, history.lastBlockTimestamp, currentTs, s.height) _
     val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = transactions
       .values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
         case (curr@(_, _, _, _, skip), _) if skip => curr
         case ((invalid, valid, diff, currRest, _), tx) =>
-          differ(composite(diff.asBlockDiff, s), featureProvider, tx) match {
+          differ(composite(s, diff), history, tx) match {
             case Right(newDiff) =>
               val updatedRest = currRest.put(tx)
               if (updatedRest.isOverfilled) (invalid, valid, diff, currRest, true)
@@ -174,7 +167,7 @@ class UtxPoolImpl(time: Time,
     (txs, finalConstraint)
   }
 
-  override def batched(f: UtxBatchOps => Unit): Unit = f(new BatchOpsImpl(stateReader()))
+  override def batched(f: UtxBatchOps => Unit): Unit = f(new BatchOpsImpl(stateReader))
 
   private class BatchOpsImpl(s: SnapshotStateReader) extends UtxBatchOps {
     override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = outer.putIfNew(s, tx)
@@ -187,7 +180,7 @@ class UtxPoolImpl(time: Time,
         _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
         _ <- checkNotBlacklisted(tx)
         _ <- feeCalculator.enoughFee(tx)
-        diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, featureProvider, tx)
+        diff <- TransactionDiffer(fs, history.lastBlockTimestamp, time.correctedTime(), history.height)(s, history, tx)
       } yield {
         utxPoolSizeStats.increment()
         pessimisticPortfolios.add(tx.id(), diff)

@@ -4,6 +4,7 @@ import java.net.{InetAddress, SocketTimeoutException}
 
 import monix.eval.Task
 import monix.execution.Scheduler
+import monix.execution.schedulers.SchedulerService
 import org.apache.commons.net.ntp.NTPUDPClient
 
 import scala.concurrent.duration.DurationInt
@@ -14,7 +15,7 @@ trait Time {
   def getTimestamp(): Long
 }
 
-class TimeImpl extends Time with ScorexLogging {
+class TimeImpl extends Time with ScorexLogging with AutoCloseable {
 
   private val offsetPanicThreshold = 1000000L
   private val ExpirationTimeout = 60.seconds
@@ -22,7 +23,7 @@ class TimeImpl extends Time with ScorexLogging {
   private val ResponseTimeout = 10.seconds
   private val NtpServer = "pool.ntp.org"
 
-  private implicit val scheduler = Scheduler.singleThread(name = "time-impl")
+  private implicit val scheduler: SchedulerService = Scheduler.singleThread(name = "time-impl")
 
   private val client = new NTPUDPClient()
   client.setDefaultTimeout(ResponseTimeout.toMillis.toInt)
@@ -47,11 +48,12 @@ class TimeImpl extends Time with ScorexLogging {
     }
 
     newOffsetTask.flatMap {
-      case None => updateTask.delayExecution(RetryDelay)
-      case Some(newOffset) =>
+      case None if !scheduler.isShutdown => updateTask.delayExecution(RetryDelay)
+      case Some(newOffset) if !scheduler.isShutdown =>
         log.trace(s"Adjusting time with $newOffset milliseconds.")
         offset = newOffset
         updateTask.delayExecution(ExpirationTimeout)
+      case _ => Task.unit
     }
   }
 
@@ -64,8 +66,12 @@ class TimeImpl extends Time with ScorexLogging {
     txTime
   }
 
-  updateTask.runAsyncLogErr
+  private val taskHandle = updateTask.runAsyncLogErr
 
+  override def close(): Unit = {
+    taskHandle.cancel()
+    scheduler.shutdown()
+  }
 }
 
 object NTP extends TimeImpl

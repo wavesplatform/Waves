@@ -24,8 +24,8 @@ object TransactionDiffer {
       t2 <- CommonValidation.disallowTxFromPast(prevBlockTimestamp, t1)
       t3 <- CommonValidation.disallowBeforeActivationTime(fp, currentBlockHeight, t2)
       t4 <- CommonValidation.disallowDuplicateIds(s, settings, currentBlockHeight, t3)
-      t5 <- CommonValidation.disallowSendingGreaterThanBalance(s, settings, currentBlockTimestamp, t4)
-      diff <- t5 match {
+      t5 <- CommonValidation.disallowSendingGreaterThanBalance(s, settings, currentBlockTimestamp, t3)
+      diff <- t4 match {
         case gtx: GenesisTransaction => GenesisTransactionDiff(currentBlockHeight)(gtx)
         case ptx: PaymentTransaction => PaymentTransactionDiff(s, currentBlockHeight, settings, currentBlockTimestamp)(ptx)
         case itx: IssueTransaction => AssetTransactionsDiff.issue(currentBlockHeight)(itx)
@@ -41,7 +41,7 @@ object TransactionDiffer {
         case sttx: ScriptTransferTransaction => ScriptTransferTransactionDiff(s, currentBlockHeight)(sttx)
         case _ => Left(UnsupportedTransactionType)
       }
-      positiveDiff <- BalanceDiffValidation(s, settings)(diff)
+      positiveDiff <- BalanceDiffValidation(s, currentBlockHeight, settings)(diff)
     } yield positiveDiff
   }.left.map(TransactionValidationError(_, tx))
 }

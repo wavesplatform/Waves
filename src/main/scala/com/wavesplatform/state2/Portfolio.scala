@@ -2,27 +2,27 @@ package com.wavesplatform.state2
 
 import cats._
 import cats.kernel.instances.map._
-import cats.Monoid
 import scorex.block.Block.Fraction
 
-case class Portfolio(balance: Long, leaseInfo: LeaseInfo, assets: Map[ByteStr, Long]) {
-  lazy val effectiveBalance: Long = safeSum(balance, leaseInfo.leaseIn) - leaseInfo.leaseOut
-  lazy val spendableBalance: Long = balance - leaseInfo.leaseOut
+case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[ByteStr, Long]) {
+  lazy val effectiveBalance: Long = safeSum(balance, lease.in) - lease.out
+  lazy val spendableBalance: Long = balance - lease.out
 
-  lazy val isEmpty: Boolean = this == Portfolio.portfolioMonoid.empty
+  lazy val isEmpty: Boolean = this == Portfolio.empty
 }
 
 object Portfolio {
+  val empty = Portfolio(0L, Monoid[LeaseBalance].empty, Map.empty)
 
   implicit val longSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
 
-  implicit val portfolioMonoid = new Monoid[Portfolio] {
-    override val empty: Portfolio = Portfolio(0L, Monoid[LeaseInfo].empty, Map.empty)
+  implicit val monoid: Monoid[Portfolio] = new Monoid[Portfolio] {
+    override val empty: Portfolio = Portfolio.empty
 
     override def combine(older: Portfolio, newer: Portfolio): Portfolio
     = Portfolio(
       balance = safeSum(older.balance, newer.balance),
-      leaseInfo = Monoid.combine(older.leaseInfo, newer.leaseInfo),
+      lease = Monoid.combine(older.lease, newer.lease),
       assets = Monoid.combine(older.assets, newer.assets))
   }
 
@@ -30,18 +30,18 @@ object Portfolio {
 
     def pessimistic: Portfolio = Portfolio(
       balance = Math.min(self.balance, 0),
-      leaseInfo = LeaseInfo(
-        leaseIn = 0,
-        leaseOut = Math.max(self.leaseInfo.leaseOut, 0)
+      lease = LeaseBalance(
+        in = 0,
+        out = Math.max(self.lease.out, 0)
       ),
       assets = self.assets.filter { case (_, v) => v < 0 }
     )
 
     def multiply(f: Fraction): Portfolio =
-      Portfolio(f(self.balance), LeaseInfo.empty, self.assets.mapValues(f.apply))
+      Portfolio(f(self.balance), LeaseBalance.empty, self.assets.mapValues(f.apply))
 
     def minus(other: Portfolio): Portfolio =
-      Portfolio(self.balance - other.balance, LeaseInfo.empty,
+      Portfolio(self.balance - other.balance, LeaseBalance.empty,
         Monoid.combine(self.assets, other.assets.mapValues(-_)))
   }
 

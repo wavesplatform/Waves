@@ -3,6 +3,7 @@ package com.wavesplatform.network
 import com.wavesplatform.network.RxExtensionLoader.ApplierState.Buffer
 import com.wavesplatform.network.RxExtensionLoader.LoaderState.WithPeer
 import com.wavesplatform.network.RxScoreObserver.{ChannelClosedAndSyncWith, SyncWith}
+import com.wavesplatform.state2.ByteStr
 import io.netty.channel._
 import monix.eval.{Coeval, Task}
 import monix.execution.CancelableFuture
@@ -12,8 +13,8 @@ import monix.reactive.subjects.ConcurrentSubject
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.transaction.History.BlockchainScore
+import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.{NgHistory, ValidationError}
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
@@ -22,8 +23,8 @@ object RxExtensionLoader extends ScorexLogging {
 
   type ApplyExtensionResult = Either[ValidationError, Option[BlockchainScore]]
 
-  def apply(maxRollback: Int, syncTimeOut: FiniteDuration,
-            history: NgHistory,
+  def apply(syncTimeOut: FiniteDuration,
+            lastBlockIds: Coeval[Seq[ByteStr]],
             peerDatabase: PeerDatabase,
             invalidBlocks: InvalidBlockStorage,
             blocks: Observable[(Channel, Block)],
@@ -55,7 +56,7 @@ object RxExtensionLoader extends ScorexLogging {
               state
             case LoaderState.Idle =>
               val maybeKnownSigs = state.applierState match {
-                case ApplierState.Idle => Some((history.lastBlockIds(maxRollback), false))
+                case ApplierState.Idle => Some((lastBlockIds(), false))
                 case ApplierState.Applying(None, ext) => Some((ext.blocks.map(_.uniqueId), true))
                 case _ => None
               }

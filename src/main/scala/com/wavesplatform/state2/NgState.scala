@@ -13,22 +13,22 @@ import scorex.utils.ScorexLogging
 
 import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
 
-class NgState(val base: Block, val baseBlockDiff: BlockDiff, val acceptedFeatures: Set[Short], totalBlockEstimator: Estimator) extends ScorexLogging {
+class NgState(val base: Block, val baseBlockDiff: Diff, val approvedFeatures: Set[Short], estimator: Estimator) extends ScorexLogging {
 
   private val MaxTotalDiffs = 3
 
-  private var constraint = OneDimensionalMiningConstraint.full(totalBlockEstimator).put(base)
-  private val microDiffs: MMap[BlockId, (BlockDiff, Long)] = MMap.empty
+  private var constraint = OneDimensionalMiningConstraint.full(estimator).put(base)
+  private val microDiffs: MMap[BlockId, (Diff, Long)] = MMap.empty
   private val micros: MList[MicroBlock] = MList.empty // fresh head
   private val totalBlockDiffCache = CacheBuilder.newBuilder()
     .maximumSize(MaxTotalDiffs)
     .expireAfterWrite(10, TimeUnit.MINUTES)
-    .build[BlockId, BlockDiff]()
+    .build[BlockId, Diff]()
 
 
   def microBlockIds: Seq[BlockId] = micros.map(_.totalResBlockSig).toList
 
-  private def diffFor(totalResBlockSig: BlockId): BlockDiff =
+  private def diffFor(totalResBlockSig: BlockId): Diff =
     if (totalResBlockSig == base.uniqueId)
       baseBlockDiff
     else Option(totalBlockDiffCache.getIfPresent(totalResBlockSig)) match {
@@ -57,10 +57,10 @@ class NgState(val base: Block, val baseBlockDiff: BlockDiff, val acceptedFeature
         transactionData = transactions)
     }
 
-  def totalDiffOf(id: BlockId): Option[(Block, BlockDiff, DiscardedMicroBlocks)] =
+  def totalDiffOf(id: BlockId): Option[(Block, Diff, DiscardedMicroBlocks)] =
     forgeBlock(id).map { case (b, txs) => (b, diffFor(id), txs) }
 
-  def bestLiquidDiff: BlockDiff = micros.headOption.map(m => totalDiffOf(m.totalResBlockSig).get._2).getOrElse(baseBlockDiff)
+  def bestLiquidDiff: Diff = micros.headOption.map(m => totalDiffOf(m.totalResBlockSig).get._2).getOrElse(baseBlockDiff)
 
   def contains(blockId: BlockId): Boolean = base.uniqueId == blockId || microDiffs.contains(blockId)
 
@@ -96,7 +96,7 @@ class NgState(val base: Block, val baseBlockDiff: BlockDiff, val acceptedFeature
     BlockMinerInfo(base.consensusData, base.timestamp, blockId)
   }
 
-  def append(m: MicroBlock, diff: BlockDiff, timestamp: Long): Boolean = {
+  def append(m: MicroBlock, diff: Diff, timestamp: Long): Boolean = {
     val updatedConstraint = m.transactionData.foldLeft(constraint)(_.put(_))
     val successful = !updatedConstraint.isOverfilled
     if (successful) {

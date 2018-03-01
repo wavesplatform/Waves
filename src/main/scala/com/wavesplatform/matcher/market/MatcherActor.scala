@@ -3,12 +3,13 @@ package com.wavesplatform.matcher.market
 import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence.{PersistentActor, RecoveryCompleted}
+import com.google.common.base.Charsets
 import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{DeleteOrderBookRequest, GetOrderBookResponse, OrderBookRequest}
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.account.Address
@@ -22,7 +23,7 @@ import scorex.wallet.Wallet
 import scala.collection.{immutable, mutable}
 import scala.language.reflectiveCalls
 
-class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup,
+class MatcherActor(orderHistory: ActorRef, storedState: SnapshotStateReader, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup,
                    settings: MatcherSettings, history: History, functionalitySettings: FunctionalitySettings)
   extends PersistentActor with ScorexLogging {
 
@@ -31,15 +32,15 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   val tradedPairs = mutable.Map.empty[AssetPair, MarketData]
 
   def getAssetName(asset: Option[AssetId]): String =
-    asset.map(storedState().getAssetName).getOrElse(AssetPair.WavesName)
+    asset.fold(AssetPair.WavesName) { aid =>
+      // fixme: the following line will throw an exception when asset name bytes are not a valid UTF-8
+      storedState.assetDescription(aid).fold("Unknown")(d => new String(d.name, Charsets.UTF_8))
+    }
 
   def createOrderBook(pair: AssetPair): ActorRef = {
-    val s = storedState()
-    def getAssetName(asset: Option[AssetId]): String = asset.map(s.getAssetName).getOrElse(AssetPair.WavesName)
-
     val md = MarketData(pair, getAssetName(pair.amountAsset), getAssetName(pair.priceAsset), NTP.correctedTime(),
-      pair.amountAsset.flatMap(s.getIssueTransaction).map(t => AssetInfo(t.decimals)),
-      pair.priceAsset.flatMap(s.getIssueTransaction).map(t => AssetInfo(t.decimals)))
+      pair.amountAsset.flatMap(storedState.assetDescription).map(t => AssetInfo(t.decimals)),
+      pair.priceAsset.flatMap(storedState.assetDescription).map(t => AssetInfo(t.decimals)))
     tradedPairs += pair -> md
 
     context.actorOf(OrderBookActor.props(pair, orderHistory, storedState, settings, wallet, utx, allChannels, history, functionalitySettings),
@@ -47,11 +48,11 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   }
 
   def basicValidation(msg: {def assetPair: AssetPair}): Validation = {
-    val s = storedState()
+    val s = storedState
     def isAssetsExist: Validation = {
-      msg.assetPair.priceAsset.forall(s.assetExists(_)) :|
+      msg.assetPair.priceAsset.forall(s.assetDescription(_).isDefined) :|
         s"Unknown Asset ID: ${msg.assetPair.priceAssetStr}" &&
-        msg.assetPair.amountAsset.forall(s.assetExists(_)) :|
+        msg.assetPair.amountAsset.forall(s.assetDescription(_).isDefined) :|
           s"Unknown Asset ID: ${msg.assetPair.amountAssetStr}"
     }
 
@@ -178,7 +179,7 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
 object MatcherActor {
   def name = "matcher"
 
-  def props(orderHistoryActor: ActorRef, storedState: StateReader, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup,
+  def props(orderHistoryActor: ActorRef, storedState: SnapshotStateReader, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup,
             settings: MatcherSettings, history: History, functionalitySettings: FunctionalitySettings): Props =
     Props(new MatcherActor(orderHistoryActor, storedState, wallet, utx, allChannels,settings, history, functionalitySettings))
 

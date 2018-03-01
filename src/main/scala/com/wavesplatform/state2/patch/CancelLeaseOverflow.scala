@@ -1,34 +1,35 @@
 package com.wavesplatform.state2.patch
 
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{Diff, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{ByteStr, Diff, LeaseBalance, Portfolio}
 import scorex.account.Address
-import scorex.transaction.lease.LeaseTransaction
+import cats.implicits._
+import cats.kernel.Monoid
+import scorex.utils.ScorexLogging
 
-object CancelLeaseOverflow {
+object CancelLeaseOverflow extends ScorexLogging {
   def apply(s: SnapshotStateReader): Diff = {
+    log.debug("Cancelling all lease overflows for sender")
 
-    def cancelLeaseOut(l: LeaseInfo): LeaseInfo = LeaseInfo(0, -l.leaseOut)
+    val (status, portfolio) = s.activeLeases.foldLeft((Map.newBuilder[ByteStr, Boolean], Map.empty[Address, Portfolio])) {
+      case ((st, p), lt) =>
+        val senderPortfolio = s.portfolio(lt.sender.toAddress)
+        if (senderPortfolio.lease.out > senderPortfolio.balance) {
+          st += lt.id() -> false
 
-    val portfolioUpd = s.accountPortfolios
-      .collect { case (acc, pf) if pf.spendableBalance < 0 =>
-        acc -> Portfolio(0, cancelLeaseOut(pf.leaseInfo), Map.empty)
-      }
+          (st, Monoid.combine(p, Map(lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount), Map.empty))))
+        }
+        (st, p)
+    }
 
-    val cancelledLeases = for {
-      a <- portfolioUpd.keys
-      txId <- s.accountTransactionIds(a, Int.MaxValue)
-      leaseId <- s.transactionInfo(txId).collect {
-        case (_, Some(l: LeaseTransaction)) if (l.sender: Address) == a => l.id()
-      }
-    } yield (leaseId, false)
+    log.debug("Finished cancelling all lease overflows for sender")
 
     Diff(transactions = Map.empty,
-      portfolios = portfolioUpd,
+      portfolios = portfolio,
       issuedAssets = Map.empty,
       aliases = Map.empty,
       orderFills = Map.empty,
-      leaseState = cancelledLeases.toMap,
+      leaseState = status.result(),
       scripts = Map.empty)
   }
 }

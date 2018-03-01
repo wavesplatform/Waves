@@ -11,9 +11,9 @@ class PortfolioTest extends FunSuite with Matchers {
 
     val orig = Portfolio(
       balance = -10,
-      leaseInfo = LeaseInfo(
-        leaseIn = 11,
-        leaseOut = 12
+      lease = LeaseBalance(
+        in = 11,
+        out = 12
       ),
       assets = Map(
         fooKey -> -13,
@@ -24,8 +24,8 @@ class PortfolioTest extends FunSuite with Matchers {
 
     val p = orig.pessimistic
     p.balance shouldBe orig.balance
-    p.leaseInfo.leaseIn shouldBe 0
-    p.leaseInfo.leaseOut shouldBe orig.leaseInfo.leaseOut
+    p.lease.in shouldBe 0
+    p.lease.out shouldBe orig.lease.out
     p.assets(fooKey) shouldBe orig.assets(fooKey)
     p.assets shouldNot contain(barKey)
     p.assets shouldNot contain(bazKey)
@@ -34,7 +34,7 @@ class PortfolioTest extends FunSuite with Matchers {
   test("pessimistic - positive balance is turned into zero") {
     val orig = Portfolio(
       balance = 10,
-      leaseInfo = LeaseInfo(0, 0),
+      lease = LeaseBalance(0, 0),
       assets = Map.empty
     )
 
@@ -44,8 +44,8 @@ class PortfolioTest extends FunSuite with Matchers {
 
   test("prevents overflow of assets") {
     val assetId = ByteStr(Array.empty)
-    val arg1 = Portfolio(0L, LeaseInfo.empty, Map(assetId -> (Long.MaxValue - 1L)))
-    val arg2 = Portfolio(0L, LeaseInfo.empty, Map(assetId -> (Long.MaxValue - 2L)))
+    val arg1 = Portfolio(0L, LeaseBalance.empty, Map(assetId -> (Long.MaxValue - 1L)))
+    val arg2 = Portfolio(0L, LeaseBalance.empty, Map(assetId -> (Long.MaxValue - 2L)))
     Monoid.combine(arg1, arg2).assets(assetId) shouldBe Long.MinValue
   }
 }

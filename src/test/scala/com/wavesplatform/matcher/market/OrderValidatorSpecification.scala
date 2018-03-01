@@ -4,7 +4,7 @@ import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
 import com.wavesplatform.settings.{Constants, WalletSettings}
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{ByteStr, LeaseBalance, Portfolio}
 import com.wavesplatform.{UtxPool, WithDB}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
@@ -27,9 +27,9 @@ class OrderValidatorSpecification extends WordSpec
   val utxPool: UtxPool = stub[UtxPool]
 
   val ss: SnapshotStateReader = stub[SnapshotStateReader]
-  (ss.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
+//  (ss.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
   val i1: IssueTransaction = IssueTransaction.create(PrivateKeyAccount(Array.empty), "WBTC".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
-  (ss.transactionInfo _).when(*).returns(Some((1, Some(i1))))
+  (ss.transactionInfo _).when(*).returns(Some((1, i1)))
 
   val s: MatcherSettings = matcherSettings.copy(account = MatcherAccount.address)
   val w = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
@@ -59,13 +59,13 @@ class OrderValidatorSpecification extends WordSpec
 
   "OrderValidator" should {
     "allows buy WAVES for BTC without balance for order fee" in {
-      validateNewOrderTest(Portfolio(0, LeaseInfo.empty, Map(
+      validateNewOrderTest(Portfolio(0, LeaseBalance.empty, Map(
         wbtc -> 10 * Constants.UnitsInWave
       ))) shouldBe an[Right[_, _]]
     }
 
     "does not allow buy WAVES for BTC when assets number is negative" in {
-      validateNewOrderTest(Portfolio(0, LeaseInfo.empty, Map(
+      validateNewOrderTest(Portfolio(0, LeaseBalance.empty, Map(
         wbtc -> -10 * Constants.UnitsInWave
       ))) shouldBe a[Left[_, _]]
     }

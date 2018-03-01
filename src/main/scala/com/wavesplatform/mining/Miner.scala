@@ -2,12 +2,13 @@ package com.wavesplatform.mining
 
 import cats.data.EitherT
 import com.wavesplatform.UtxPool
-import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics.{BlockStats, HistogramExt, Instrumented}
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.appender.{BlockAppender, MicroblockAppender}
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import kamon.metric.instrument
@@ -56,7 +57,7 @@ class MinerImpl(allChannels: ChannelGroup,
                 checkpoint: CheckpointService,
                 history: NgHistory,
                 featureProvider: FeatureProvider,
-                stateReader: StateReader,
+                stateReader: SnapshotStateReader,
                 settings: WavesSettings,
                 timeService: Time,
                 utx: UtxPool,
@@ -93,45 +94,45 @@ class MinerImpl(allChannels: ChannelGroup,
   private def ngEnabled: Boolean = featureProvider.featureActivationHeight(BlockchainFeatures.NG.id).exists(history.height > _ + 1)
 
   private def generateOneBlockTask(account: PrivateKeyAccount, balance: Long)(delay: FiniteDuration): Task[Either[String, (MiningEstimators, Block, MiningConstraint)]] = Task {
-    history.read { implicit l =>
-      // should take last block right at the time of mining since microblocks might have been added
-      val height = history.height()
-      val version = if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion else NgBlockVersion
-      val lastBlock = history.lastBlock.get
-      val greatGrandParentTimestamp = history.parent(lastBlock, 2).map(_.timestamp)
-      val referencedBlockInfo = history.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
-      val pc = allChannels.size()
-      lazy val currentTime = timeService.correctedTime()
-      lazy val h = calcHit(referencedBlockInfo.consensus, account)
-      lazy val t = calcTarget(referencedBlockInfo.timestamp, referencedBlockInfo.consensus.baseTarget, currentTime, balance)
-      measureSuccessful(blockBuildTimeStats, for {
-        _ <- Either.cond(pc >= minerSettings.quorum, (), s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
-        _ <- Either.cond(h < t, (), s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.address}")
-        _ = log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${referencedBlockInfo.blockId}")
-        _ = log.debug(s"Previous block ID ${referencedBlockInfo.blockId} at $height with target ${referencedBlockInfo.consensus.baseTarget}")
-        block <- {
-          val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
-          val btg = calcBaseTarget(avgBlockDelay, height, referencedBlockInfo.consensus.baseTarget, referencedBlockInfo.timestamp, greatGrandParentTimestamp, currentTime)
-          val gs = calcGeneratorSignature(referencedBlockInfo.consensus, account)
-          val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
-          val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
+    // should take last block right at the time of mining since microblocks might have been added
+    val height = history.height
+    val version = if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion else NgBlockVersion
+    val lastBlock = history.lastBlock.get
+    val greatGrandParentTimestamp = history.parent(lastBlock.uniqueId, 2).map(_.timestamp)
+    val referencedBlockInfo = history.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
+    val pc = allChannels.size()
+    lazy val currentTime = timeService.correctedTime()
+    lazy val h = calcHit(referencedBlockInfo.consensus, account)
+    lazy val t = calcTarget(referencedBlockInfo.timestamp, referencedBlockInfo.consensus.baseTarget, currentTime, balance)
+    measureSuccessful(blockBuildTimeStats, for {
+      _ <- Either.cond(pc >= minerSettings.quorum, (), s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
+      _ <- Either.cond(h < t, (), s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.address}")
+      _ = log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${referencedBlockInfo.blockId}")
+      _ = log.debug(s"Previous block ID ${referencedBlockInfo.blockId} at $height with target ${referencedBlockInfo.consensus.baseTarget}")
+      block <- {
+        val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
+        val btg = calcBaseTarget(avgBlockDelay, height, referencedBlockInfo.consensus.baseTarget, referencedBlockInfo.timestamp, greatGrandParentTimestamp, currentTime)
+        val gs = calcGeneratorSignature(referencedBlockInfo.consensus, account)
+        val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
+          val sortInBlock = history.height <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
 
           val estimators = MiningEstimators(minerSettings, featureProvider, height)
           val mdConstraint = TwoDimensionalMiningConstraint.full(estimators.total, estimators.keyBlock)
           val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint, sortInBlock)
 
-          val features = if (version > 2) settings.featuresSettings.supported
-            .filter(featureProvider.featureStatus(_, height) == BlockchainFeatureStatus.Undefined)
-            .toSet.intersect(BlockchainFeatures.implemented) else Set.empty[Short]
+        val features = if (version <= 2) Set.empty[Short]
+          else settings.featuresSettings.supported
+            .filterNot(featureProvider.approvedFeatures().keySet)
+            .filter(BlockchainFeatures.implemented)
+            .toSet
 
-          log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-          Block.buildAndSign(version.toByte, currentTime, referencedBlockInfo.blockId, consensusData, unconfirmed, account, features) match {
-            case Left(e) => Left(e.err)
-            case Right(x) => Right((estimators, x, updatedMdConstraint.first))
-          }
+        log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
+        Block.buildAndSign(version.toByte, currentTime, referencedBlockInfo.blockId, consensusData, unconfirmed, account, features) match {
+          case Left(e) => Left(e.err)
+          case Right(x) => Right((estimators, x, updatedMdConstraint.first))
         }
-      } yield block)
-    }
+      }
+    } yield block)
   }.delayExecution(delay)
 
 
@@ -202,11 +203,11 @@ class MinerImpl(allChannels: ChannelGroup,
   }
 
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = {
-    history.read { implicit l =>
-      val height = history.height()
+    {
+      val height = history.height
       val lastBlock = history.lastBlock.get
       for {
-        _ <- checkAge(height, history.lastBlockTimestamp().get)
+        _ <- checkAge(height, history.lastBlockTimestamp.get)
         balanceAndTs <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account, featureProvider)
         (balance, ts) = balanceAndTs
         offset = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
@@ -222,7 +223,7 @@ class MinerImpl(allChannels: ChannelGroup,
               case Left(err) => log.warn("Error mining Block: " + err.toString)
               case Right(Some(score)) =>
                 log.debug(s"Forged and applied $block by ${account.address} with cumulative score $score")
-                BlockStats.mined(block, history.height())
+                BlockStats.mined(block, history.height)
                 allChannels.broadcast(BlockForged(block))
                 scheduleMining()
                 if (ngEnabled && !totalConstraint.isEmpty) startMicroBlockMining(account, block, estimators.micro, totalConstraint)

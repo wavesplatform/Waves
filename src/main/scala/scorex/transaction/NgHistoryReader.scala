@@ -1,108 +1,104 @@
 package scorex.transaction
 
-import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import cats.implicits._
-import com.wavesplatform.features.{FeatureProvider, FeaturesProperties}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
-import com.wavesplatform.utils.HeightInfo
 import scorex.block.Block.BlockId
 import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.transaction.History.{BlockMinerInfo, BlockchainScore}
 
-class NgHistoryReader(ngState: () => Option[NgState], inner: History with FeatureProvider, settings: FunctionalitySettings) extends History with NgHistory with DebugNgHistory with FeatureProvider {
+class NgHistoryReader(ngState: () => Option[NgState], inner: History, fs: FunctionalitySettings)
+  extends History with NgHistory with DebugNgHistory {
 
-  private val featuresProperties = FeaturesProperties(settings)
+  private def newlyApprovedFeatures = ngState().fold(Map.empty[Short, Int])(_.approvedFeatures.map(_ -> height).toMap)
 
-  override def activationWindowSize(h: Int): Int = featuresProperties.featureCheckBlocksPeriodAtHeight(h)
+  override def approvedFeatures(): Map[Short, Int] = newlyApprovedFeatures ++ inner.approvedFeatures()
 
-  override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
+  override def activatedFeatures(): Map[Short, Int] =
+    newlyApprovedFeatures.mapValues(_ + fs.activationWindowSize(height)) ++ inner.activatedFeatures()
 
-  override def height(): Int = read { implicit l =>
-    inner.height() + ngState().map(_ => 1).getOrElse(0)
-  }
-
-  override def blockBytes(height: Int): Option[Array[Byte]] = read { implicit l =>
-    inner.blockBytes(height).orElse(if (height == inner.height() + 1) ngState().map(_.bestLiquidBlock.bytes()) else None)
-  }
-
-  override def scoreOf(blockId: BlockId): Option[BlockchainScore] = read { implicit l =>
-    inner.scoreOf(blockId)
-      .orElse(ngState() match {
-        case Some(ng) if ng.contains(blockId) => Some(inner.score() + ng.base.blockScore())
-        case _ => None
-      })
-  }
-
-  override def heightOf(blockId: BlockId): Option[Int] = read { implicit l =>
-    lazy val innerHeight = inner.height()
-    inner.heightOf(blockId).orElse(ngState() match {
-      case Some(ng) if ng.contains(blockId) => Some(innerHeight + 1)
-      case _ => None
-    })
-  }
-
-  override def lastBlockIds(howMany: Int): Seq[BlockId] = read { implicit l =>
+  override def featureVotes(height: Int): Map[Short, Int] = {
+    val innerVotes = inner.featureVotes(height)
     ngState() match {
-      case Some(ng) =>
-        ng.bestLiquidBlockId +: inner.lastBlockIds(howMany - 1)
-      case None =>
-        inner.lastBlockIds(howMany)
+      case Some(ng) if this.height <= height =>
+        val ngVotes = ng.base
+          .featureVotes
+          .map { featureId => featureId -> (innerVotes.getOrElse(featureId, 0) + 1) }.toMap
+
+        innerVotes  ++ ngVotes
+      case _ => innerVotes
     }
   }
 
-  override def microBlock(id: BlockId): Option[MicroBlock] = read { implicit l =>
+  private def liquidBlockHeaderAndSize() = ngState().map { s => (s.bestLiquidBlock, s.bestLiquidBlock.bytes().length) }
+
+  override def blockHeaderAndSize(blockId: BlockId): Option[(BlockHeader, Int)] =
+    liquidBlockHeaderAndSize().filter(_._1.uniqueId == blockId) orElse inner.blockHeaderAndSize(blockId)
+
+  override def height: Int = inner.height + ngState().fold(0)(_ => 1)
+
+  override def blockBytes(height: Int): Option[Array[Byte]] =
+    inner.blockBytes(height)
+      .orElse(ngState().collect { case ng if height == inner.height + 1 => ng.bestLiquidBlock.bytes() })
+
+  override def scoreOf(blockId: BlockId): Option[BlockchainScore] =
+    inner.scoreOf(blockId)
+      .orElse(ngState().collect { case ng if ng.contains(blockId) => inner.score + ng.base.blockScore()})
+
+  override def heightOf(blockId: BlockId): Option[Int] =
+    inner.heightOf(blockId)
+      .orElse(ngState().collect { case ng if ng.contains(blockId) => this.height })
+
+  override def lastBlockIds(howMany: Int): Seq[BlockId] =
+    ngState().fold(inner.lastBlockIds(howMany))(_.bestLiquidBlockId +: inner.lastBlockIds(howMany - 1))
+
+  override def microBlock(id: BlockId): Option[MicroBlock] =
     for {
       ng <- ngState()
       mb <- ng.microBlock(id)
     } yield mb
-  }
 
-  override def lastBlockTimestamp(): Option[Long] = read { implicit l =>
-    ngState().map(_.base.timestamp).orElse(inner.lastBlockTimestamp())
-  }
+  def lastBlockTimestamp: Option[Long] = ngState().map(_.base.timestamp).orElse(inner.lastBlockTimestamp)
 
-  override def lastBlockId(): Option[AssetId] = read { implicit l =>
-    ngState().map(_.bestLiquidBlockId).orElse(inner.lastBlockId())
-  }
+  def lastBlockId: Option[AssetId] = ngState().map(_.bestLiquidBlockId).orElse(inner.lastBlockId)
 
-  override def blockAt(height: Int): Option[Block] = read { implicit l =>
-    if (height == inner.height() + 1)
+  def blockAt(height: Int): Option[Block] =
+    if (height == this.height)
       ngState().map(_.bestLiquidBlock)
     else
       inner.blockAt(height)
-  }
 
-  override def lastPersistedBlockIds(count: Int): Seq[BlockId] = read { implicit l =>
+  override def lastPersistedBlockIds(count: Int): Seq[BlockId] = {
     inner.lastBlockIds(count)
   }
 
-  override def microblockIds(): Seq[BlockId] = read { implicit l =>
-    ngState().toSeq.flatMap(_.microBlockIds)
-  }
+  override def microblockIds(): Seq[BlockId] = ngState().fold(Seq.empty[BlockId])(_.microBlockIds)
 
-  override def bestLastBlockInfo(maxTimestamp: Long): Option[BlockMinerInfo] = read { implicit l =>
+  override def bestLastBlockInfo(maxTimestamp: Long): Option[BlockMinerInfo] = {
     ngState().map(_.bestLastBlockInfo(maxTimestamp))
       .orElse(inner.lastBlock.map(b => BlockMinerInfo(b.consensusData, b.timestamp, b.uniqueId)))
   }
 
-  override def approvedFeatures(): Map[Short, Int] = {
-    lazy val h = height()
-    ngState().map(_.acceptedFeatures.map(_ -> h).toMap).getOrElse(Map.empty) ++ inner.approvedFeatures()
-  }
+  override def score: BlockchainScore = inner.score + ngState().fold(BigInt(0))(_.bestLiquidBlock.blockScore())
 
-  override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit l =>
-    val ngVotes = ngState().map(_.base.featureVotes.map(_ -> 1).toMap).getOrElse(Map.empty)
-    inner.featureVotesCountWithinActivationWindow(height) |+| ngVotes
-  }
+  override def lastBlock: Option[Block] = ngState().map(_.bestLiquidBlock).orElse(inner.lastBlock)
 
-  override def blockHeaderAndSizeAt(height: Int): Option[(BlockHeader, Int)] = read { implicit l =>
-    if (height == inner.height() + 1)
+  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = (for {
+    ng <- ngState()
+    (block, _, _) <- ng.totalDiffOf(blockId)
+  } yield block.bytes()).orElse(inner.blockBytes(blockId))
+
+  override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Seq[ByteStr] = ???
+
+  override def parent(childId: ByteStr, back: Int): Option[Block] =
+    ngState().filter(_.contains(childId)).fold(inner.parent(childId, back)) {
+      ng => inner.parent(ng.base.reference, back - 1)
+    }
+
+  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
+    if (height == inner.height + 1)
       ngState().map(x => (x.bestLiquidBlock, x.bestLiquidBlock.bytes().length))
     else
-      inner.blockHeaderAndSizeAt(height)
+      inner.blockHeaderAndSize(height)
   }
-
-  override def debugInfo: HeightInfo = inner.debugInfo
 }

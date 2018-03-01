@@ -10,7 +10,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
   private val wavesSettings = WavesSettings.fromConfig(sampleConfig)
   private val configObject = sampleConfig.root()
   private val route = DebugApiRoute(wavesSettings.restAPISettings,
-    null, null, null, null, null, null, null, null, null, null, null, null, null, null, configObject).route
+    null, null, null, null, null, null, null, null, null, null, null, null, null, configObject).route
 
   routePath("/configInfo") - {
     "requires api-key header" in {

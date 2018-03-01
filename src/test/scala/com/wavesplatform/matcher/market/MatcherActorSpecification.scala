@@ -15,12 +15,11 @@ import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, Valida
 import com.wavesplatform.matcher.model.LevelAgg
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{AssetDescription, ByteStr, LeaseBalance, Portfolio}
 import io.netty.channel.group.ChannelGroup
-import monix.eval.Coeval
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
-import scorex.account.PrivateKeyAccount
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -28,9 +27,15 @@ import scorex.transaction.{AssetId, History}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
-class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"))
-  with WordSpecLike with Matchers with BeforeAndAfterAll with ImplicitSender with MatcherTestData
-  with BeforeAndAfterEach with ScorexLogging with PathMockFactory {
+class MatcherActorSpecification extends TestKit(ActorSystem("MatcherTest2"))
+  with WordSpecLike
+  with Matchers
+  with BeforeAndAfterAll
+  with ImplicitSender
+  with MatcherTestData
+  with BeforeAndAfterEach
+  with ScorexLogging
+  with PathMockFactory {
 
   val storedState: SnapshotStateReader = stub[SnapshotStateReader]
 
@@ -46,15 +51,14 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
       case _ =>
     }
   })
-  var actor: ActorRef = system.actorOf(Props(new MatcherActor(orderHistoryRef, Coeval.now(storedState), wallet,
+  var actor: ActorRef = system.actorOf(Props(new MatcherActor(orderHistoryRef, storedState, wallet,
     mock[UtxPool], mock[ChannelGroup], settings, history, functionalitySettings) with RestartableActor))
 
-  (storedState.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
   val i1 = IssueTransaction.create(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
   val i2 = IssueTransaction.create(PrivateKeyAccount(Array.empty), "ForbiddenName".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
-  (storedState.transactionInfo _).when(i2.id()).returns(Some((1, Some(i2))))
-  (storedState.transactionInfo _).when(*).returns(Some((1, Some(i1))))
-  (storedState.accountPortfolio _).when(*).returns(Portfolio(Long.MaxValue, LeaseInfo.empty, Map(ByteStr("123".getBytes) -> Long.MaxValue)))
+  (storedState.assetDescription _).when(i2.id()).returns(Some(AssetDescription(i2.sender, "ForbiddenName".getBytes, 8, false)))
+  (storedState.assetDescription _).when(*).returns(Some(AssetDescription(PublicKeyAccount(Array(0: Byte)), "Unknown".getBytes, 8, false)))
+  (storedState.portfolio _).when(*).returns(Portfolio(Long.MaxValue, LeaseBalance.empty, Map(ByteStr("123".getBytes) -> Long.MaxValue)))
 
   override protected def beforeEach() = {
     val tp = TestProbe()
@@ -62,7 +66,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     tp.expectMsg(akka.actor.Status.Success(""))
     super.beforeEach()
 
-    actor = system.actorOf(Props(new MatcherActor(orderHistoryRef, Coeval.now(storedState), wallet, mock[UtxPool], mock[ChannelGroup],
+    actor = system.actorOf(Props(new MatcherActor(orderHistoryRef, storedState, wallet, mock[UtxPool], mock[ChannelGroup],
       settings, history, functionalitySettings) with RestartableActor))
   }
 
