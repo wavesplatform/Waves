@@ -92,6 +92,6 @@ object TransactionFactory {
   def data(request: DataRequest, wallet: Wallet, time: Time): Either[ValidationError, DataTransaction] = for {///better name?
     pk <- wallet.findWallet(request.sender)
     timestamp = request.timestamp.getOrElse(time.getTimestamp())
-    tx <- DataTransaction.create(pk, request.data, request.fee, timestamp)
+    tx <- DataTransaction.selfSigned(Proofs.Version, pk, request.data, request.fee, timestamp)
   } yield tx
 }

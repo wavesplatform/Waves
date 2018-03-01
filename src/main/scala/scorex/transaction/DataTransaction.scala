@@ -2,7 +2,7 @@ package scorex.transaction
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.crypto
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2._
 import monix.eval.Coeval
 import play.api.libs.json._
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
@@ -12,18 +12,19 @@ import scorex.transaction.TransactionParser._
 
 import scala.util.{Failure, Success, Try}
 
-case class DataTransaction private(sender: PublicKeyAccount,
+case class DataTransaction private(version: Byte,
+                                   sender: PublicKeyAccount,
                                    data: Data,
                                    fee: Long,
                                    timestamp: Long,
-                                   signature: ByteStr) extends SignedTransaction with FastHashId { ///is it ok for id?
+                                   proofs: Proofs) extends ProvenTransaction with FastHashId { ///is it ok for id?
   override val transactionType: TransactionType.Value = TransactionType.DataTransaction
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
-  ///version, proofs
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(
     Array(transactionType.id.toByte),
+    Array(version),
     sender.publicKey,
     ///data.toSeq.sortBy(_._1),
     Longs.toByteArray(timestamp),
@@ -32,10 +33,12 @@ case class DataTransaction private(sender: PublicKeyAccount,
   implicit val typedValueFormat = DataTransaction.TypedValueFormat
 
   override val json: Coeval[JsObject] = Coeval.evalOnce {
-    jsonBase() ++ Json.obj("data" -> Json.toJson(data))
+    jsonBase() ++ Json.obj(
+      "data" -> Json.toJson(data),
+      "version" -> version)
   }
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), signature.arr))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), proofs.bytes()))
 }
 
 object DataTransaction {
@@ -67,35 +70,39 @@ object DataTransaction {
   }
 
   def parseTail(bytes: Array[Byte]): Try[DataTransaction] = Try {
-    val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
+    val version = bytes(0)
+    val s0 = KeyLength + 1
+    val sender = PublicKeyAccount(bytes.slice(1, s0))
     val data = Map("parsed from binary" -> BooleanValue(true)) ///
-    val s0 = KeyLength
     val timestamp = Longs.fromByteArray(bytes.slice(s0, s0 + 8))
     val feeAmount = Longs.fromByteArray(bytes.slice(s0 + 8, s0 + 16))
-    val signature = ByteStr(bytes.slice(s0 + 16, s0 + 16 + SignatureLength))
-
-    DataTransaction.create(sender, data, feeAmount, timestamp, signature)
-      .fold(left => Failure(new Exception(left.toString)), right => Success(right))
+    val tx = for {
+      proofs <- Proofs.fromBytes(bytes.drop(s0 + 16))
+      dt <- DataTransaction.create(version, sender, data, feeAmount, timestamp, proofs)
+    } yield dt
+    tx.fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
-  def create(sender: PublicKeyAccount,
+  def create(version: Byte,
+             sender: PublicKeyAccount,
              data: Data,
              feeAmount: Long,
              timestamp: Long,
-             signature: ByteStr): Either[ValidationError, DataTransaction] = {
+             proofs: Proofs): Either[ValidationError, DataTransaction] = {
     if (feeAmount <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {
-      Right(DataTransaction(sender, data, feeAmount, timestamp, signature))
+      Right(DataTransaction(version, sender, data, feeAmount, timestamp, proofs))
     }
   }
 
-  def create(sender: PrivateKeyAccount,
-             data: Data,
-             feeAmount: Long,
-             timestamp: Long): Either[ValidationError, DataTransaction] = {
-    create(sender, data, feeAmount, timestamp, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
+  def selfSigned(version: Byte,
+                 sender: PrivateKeyAccount,
+                 data: Data,
+                 feeAmount: Long,
+                 timestamp: Long): Either[ValidationError, DataTransaction] = {
+    create(version, sender, data, feeAmount, timestamp, Proofs.empty).right.map { unsigned =>
+      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes())))).explicitGet())
     }
   }
 }
