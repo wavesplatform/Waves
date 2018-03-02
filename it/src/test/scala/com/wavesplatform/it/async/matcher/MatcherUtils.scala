@@ -7,8 +7,9 @@ import scorex.transaction.assets.exchange.Order
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.Duration
 import com.wavesplatform.it.api.AsyncHttpApi._
-import scala.concurrent.ExecutionContext.Implicits.global
+import com.wavesplatform.it.util._
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 trait MatcherUtils {
@@ -57,6 +58,19 @@ trait MatcherUtils {
         _.status == expectedStatus, 5.seconds),
     timeout
   )
+
+  def checkOrderStatusDontChange(matcherNode: Node, asset: String, orderId: String, expectedStatus: String, times: Int = 5, interval: FiniteDuration = 1.second): Unit = {
+    def aux(rest: Int, acc: Future[Unit]): Future[Unit] = {
+      if (rest == 0) acc
+      else for {
+        _ <- acc
+        _ <- GlobalTimer.instance.schedule(Future.successful(()), interval)
+        r <- matcherNode.getOrderStatus(asset, orderId)
+      } yield assert(r.status == expectedStatus, s"${r.status} == $expectedStatus of $orderId")
+    }
+
+    Await.result(aux(times, Future.successful(())), times * interval + 1.second)
+  }
 
   def matcherGetOrderBook(matcherNode: Node, assetId: String): OrderBookResponse = {
     val futureResult = matcherNode.getOrderBook(assetId)
