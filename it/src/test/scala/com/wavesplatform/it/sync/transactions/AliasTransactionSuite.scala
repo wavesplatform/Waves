@@ -4,6 +4,8 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import org.scalatest.prop.TableDrivenPropertyChecks
+import scala.util.Random
+
 
 
 class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
@@ -33,7 +35,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   }
 
   test("Not able to create same aliases to same address") {
-    val alias = "test_alias2"
+    val alias = randomAlias()
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val aliasFee = calcAliasFee(firstAddress, alias)
     notMiner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
@@ -43,7 +45,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   }
 
   test("Not able to create aliases to other addresses") {
-    val alias = "test_alias3"
+    val alias = randomAlias()
 
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val aliasFee = calcAliasFee(firstAddress, alias)
@@ -52,8 +54,8 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   }
 
   test("Able to create several different aliases to same addresses") {
-    val firstAlias = "test_alias4"
-    val secondAlias = "test_alias5"
+    val firstAlias = randomAlias()
+    val secondAlias = randomAlias()
 
     val (balance1, eff1) = notMiner.accountBalances(secondAddress)
 
@@ -69,12 +71,11 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   }
 
   val aliases_names =
-    Table("aliasName",
-      "aaaa",
-      "sixteen_chars_al",
-      "....",
-      "1234567890123456",
-      "@.@-@_@")
+    Table(s"aliasName${randomAlias()}",
+      s"aaaa${randomAlias()}",
+      s"....${randomAlias()}",
+      s"1234567890.${randomAlias()}",
+      s"@.@-@_@${randomAlias()}")
 
   aliases_names.foreach { alias =>
     test(s"create alias named $alias") {
@@ -101,7 +102,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   }
 
   test("Able to lease by alias") {
-    val thirdAddressAlias = "leasing_alias"
+    val thirdAddressAlias = randomAlias()
 
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val (balance3, eff3) = notMiner.accountBalances(thirdAddress)
@@ -121,7 +122,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
    //previous test should not be commented to run this one
   test("Not able to create aliase when insufficient funds") {
-    val alias = "test_alias7"
+    val alias = randomAlias()
     assertBadRequestAndMessage2(sender.createAlias(firstAddress, alias, transferFee),
         "State check failed. Reason: negative effective balance")
   }
@@ -136,6 +137,10 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
   private def fullAliasByAddress(address: String, alias: String): String = {
     sender.aliasByAddress(address).find(_.endsWith(alias)).get
+  }
+  
+  private def randomAlias(): String = {
+    s"testalias.${Random.alphanumeric take 9 mkString}".toLowerCase
   }
 
 }
