@@ -84,7 +84,10 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
             val updatedPortfolio = restPortfolio
               .copy(balance = restPortfolio.balance - restPortfolio.leaseInfo.leaseOut)
               .remove(limitOrder.spentAcc.assetId, limitOrder.getSpendAmount)
-              .flatMap(_.remove(None, limitOrder.remainingFee))
+              .flatMap { p =>
+                if (limitOrder.rcvAsset == AssetPair.WavesName && limitOrder.getReceiveAmount >= limitOrder.remainingFee) Some(p)
+                else p.remove(None, limitOrder.remainingFee)
+              }
 
             updatedPortfolio match {
               case Some(x) => (x, toDelete)

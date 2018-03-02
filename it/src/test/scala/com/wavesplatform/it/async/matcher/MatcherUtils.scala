@@ -35,13 +35,12 @@ trait MatcherUtils {
   def issueAsset(node: Node, name: String, amount: Long): String = {
     val description = "asset for integration tests of matcher"
     val fee = 100000000L
-    val futureIssueTransaction: Future[Transaction] = for {
+    val futureIssueTransaction: Future[String] = for {
       a <- node.issueAsset(node.address, name, description, amount, 0, fee, reissuable = false)
       _ <- node.waitForTransaction(a.id)
-    } yield a
+    } yield a.id
 
-    val issueTransaction = Await.result(futureIssueTransaction, 1.minute)
-    issueTransaction.id
+    Await.result(futureIssueTransaction, 1.minute)
   }
 
   def matcherCheckOrderStatus(matcherNode: Node, assetId: String, orderId: String): String = {
