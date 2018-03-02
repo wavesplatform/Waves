@@ -47,7 +47,8 @@ case class DataTransaction private(version: Byte,
 }
 
 object DataTransaction {
-  val MaxKeySize = Byte.MaxValue ///unsigned?
+  val MaxDataSize = Byte.MaxValue ///unsigned?
+  val MaxKeySize = Byte.MaxValue
   val MaxValueSize = Short.MaxValue
   type Data = Map[String, TypedValue[_]] ///move somewhere, make class?
 
@@ -60,11 +61,19 @@ object DataTransaction {
   }
 
   case class Item(key: String, `type`: String, value: String) {
-    def parse: Validation[ParsedItem] =
-      Try(java.lang.Long.parseLong(value))
-        .map(n => ParsedItem(key, IntegerValue(n))) ///Ints only
-        .toEither.left.map(ex => ValidationError.GenericError(ex))
+    def parse: Validation[ParsedItem] = {
+      val typedValueEi = `type` match {
+        case "integer" => Try(java.lang.Long.parseLong(value)).map(n => IntegerValue(n))
+        case "boolean" => Try(java.lang.Boolean.parseBoolean(value)).map(b => BooleanValue(b))
+        case "binary" => Base58.decode(value).map(arr => BinaryValue(ByteStr(arr)))
+      }
+      typedValueEi.toEither
+        .map(ParsedItem(key, _))
+        .left.map(ValidationError.GenericError(_))
+    }
   }
+
+  implicit val itemReads: Reads[Item] = Json.reads[Item]
 
   implicit val itemFormat: Format[Item] = Json.format
 
@@ -73,6 +82,8 @@ object DataTransaction {
       Array(key.length.toByte),
       key.getBytes(UTF8),
       value.toBytes)
+
+    def valid: Boolean = key.getBytes(UTF8).length <= MaxKeySize && value.valid
   }
 
   implicit val parsedItemWrites: Writes[ParsedItem] = (item: ParsedItem) =>
@@ -87,7 +98,8 @@ object DataTransaction {
   }
 
   sealed abstract class TypedValue[T](typestring: String, marshaller: T => JsValue, value: T) {
-    def toJson: JsObject = Json.obj("type" -> typestring, "value" -> marshaller(value))
+    def valid: Boolean = true
+    def toJson: JsObject = Json.obj("type" -> typestring, "value" -> value.toString)
     def toBytes: Array[Byte]
   }
 
@@ -100,33 +112,36 @@ object DataTransaction {
         (BinaryValue(ByteStr(blob)), pos)
     }
 
-    implicit object Format extends Format[TypedValue[_]] {
-      def reads(jsv: JsValue): JsResult[TypedValue[_]] = {
-        val valueTry = (jsv \ "type", jsv \ "value") match {
-          case (JsDefined(JsString("int")), JsDefined(JsNumber(n))) => Success(IntegerValue(n.toLong))
-          case (JsDefined(JsString("bool")), JsDefined(JsBoolean(b))) => Success(BooleanValue(b))
-          case (JsDefined(JsString("bin")), JsDefined(JsString(base58))) => Base58.decode(base58).map(arr => BinaryValue(ByteStr(arr)))
-          case (JsDefined(t), JsDefined(v)) => Failure(new Throwable(s"Value $v does not match type $t"))
-          case _ => Failure(new Throwable("Malformed JSON"))
-        }
-        valueTry.fold(ex => JsError(ex.getMessage), value => JsSuccess(value))
-      }
+    implicit val typedValueWrites: Writes[TypedValue[_]] = _.toJson
 
-      def writes(tv: TypedValue[_]): JsValue = tv.toJson
-    }
+//    implicit object Format extends Format[TypedValue[_]] {
+//      def reads(jsv: JsValue): JsResult[TypedValue[_]] = {
+//        val valueTry = (jsv \ "type", jsv \ "value") match {
+//          case (JsDefined(JsString("int")), JsDefined(JsNumber(n))) => Success(IntegerValue(n.toLong))
+//          case (JsDefined(JsString("bool")), JsDefined(JsBoolean(b))) => Success(BooleanValue(b))
+//          case (JsDefined(JsString("bin")), JsDefined(JsString(base58))) => Base58.decode(base58).map(arr => BinaryValue(ByteStr(arr)))
+//          case (JsDefined(t), JsDefined(v)) => Failure(new Throwable(s"Value $v does not match type $t"))
+//          case _ => Failure(new Throwable("Malformed JSON"))
+//        }
+//        valueTry.fold(ex => JsError(ex.getMessage), value => JsSuccess(value))
+//      }
+//
+//      def writes(tv: TypedValue[_]): JsValue = tv.toJson
+//    }
   }
 
   import Type._
-  case class IntegerValue(value: Long) extends TypedValue[Long]("int", JsNumber(_), value) {
+  case class IntegerValue(value: Long) extends TypedValue[Long]("integer", JsNumber(_), value) {
     override def toBytes: Array[Byte] = Array(Integer.id.toByte) ++ Longs.toByteArray(value)
   }
 
-  case class BooleanValue(value: Boolean) extends TypedValue[Boolean]("bool", JsBoolean.apply, value) {
+  case class BooleanValue(value: Boolean) extends TypedValue[Boolean]("boolean", JsBoolean.apply, value) {
     override def toBytes: Array[Byte] = Array(Boolean.id.toByte) ++ Array((if (value) 1 else 0): Byte)
   }
 
-  case class BinaryValue(value: ByteStr) extends TypedValue[ByteStr]("bin", bstr => JsString(Base58.encode(bstr.arr)), value) {///accept Array[Byte]?
+  case class BinaryValue(value: ByteStr) extends TypedValue[ByteStr]("binary", bstr => JsString(Base58.encode(bstr.arr)), value) {///accept Array[Byte]?
     override def toBytes: Array[Byte] = Array(Binary.id.toByte) ++ Deser.serializeArray(value.arr)
+    override def valid: Boolean = value.arr.length <= MaxValueSize
   }
 
   def parseTail(bytes: Array[Byte]): Try[DataTransaction] = Try {
@@ -154,7 +169,9 @@ object DataTransaction {
              feeAmount: Long,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, DataTransaction] = {
-    if (feeAmount <= 0) {
+    if (data.lengthCompare(MaxDataSize) > 0 || data.exists(! _.valid)) {
+      Left(ValidationError.TooBigArray) ///better diagnostics
+    } else if (feeAmount <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {
       Right(DataTransaction(version, sender, data, feeAmount, timestamp, proofs))

@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.state2.ByteStr
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{Format, Json, Writes}
@@ -46,47 +47,39 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
 
     forAll(dataTransactionGen) { tx0: DataTransaction =>
       val json0 = tx0.json()
-//      val tx1 = json0.as[DataTransaction]
-//      val json1 = tx1.json()
+      Console.err.println("json " + json0)///
+      //      val tx1 = json0.as[DataTransaction]
+      //      val json1 = tx1.json()
       tx0.toString shouldEqual json0.toString
 
       val req = json0.as[SignedDataRequest]
-      Console.err.println("json " + json0)
-      Console.err.println("req " + req)
+      Console.err.println("req " + req)///
 
     }
   }
 
-//  property("property validation") {
-//    import MassTransferTransaction.create
-//    forAll(massTransferGen) {
-//      case MassTransferTransaction(version, assetId, sender, transfers, timestamp, fee, attachment, proofs) =>
-//        val tooManyTransfers = List.fill(MaxTransferCount + 1)(ParsedTransfer(sender.toAddress, 1L))
-//        val tooManyTransfersEi = create(version, assetId, sender, tooManyTransfers, timestamp, fee, attachment, proofs)
-//        tooManyTransfersEi shouldBe Left(GenericError(s"Number of transfers is greater than $MaxTransferCount"))
-//
-//        val negativeTransfer = List(ParsedTransfer(sender.toAddress, -1L))
-//        val negativeTransferEi = create(version, assetId, sender, negativeTransfer, timestamp, fee, attachment, proofs)
-//        negativeTransferEi shouldBe Left(GenericError("One of the transfers has negative amount"))
-//
-//        val oneHalf = Long.MaxValue / 2 + 1
-//        val overflow = List.fill(2)(ParsedTransfer(sender.toAddress, oneHalf))
-//        val overflowEi = create(version, assetId, sender, overflow, timestamp, fee, attachment, proofs)
-//        overflowEi shouldBe Left(ValidationError.OverflowError)
-//
-//        val feeOverflow = List(ParsedTransfer(sender.toAddress, oneHalf))
-//        val feeOverflowEi = create(version, assetId, sender, feeOverflow, timestamp, oneHalf, attachment, proofs)
-//        feeOverflowEi shouldBe Left(ValidationError.OverflowError)
-//
-//        val longAttachment = Array.fill(TransferTransaction.MaxAttachmentSize + 1)(1: Byte)
-//        val longAttachmentEi = create(version, assetId, sender, transfers, timestamp, fee, longAttachment, proofs)
-//        longAttachmentEi shouldBe Left(ValidationError.TooBigArray)
-//
-//        val noFeeEi = create(version, assetId, sender, feeOverflow, timestamp, 0, attachment, proofs)
-//        noFeeEi shouldBe Left(ValidationError.InsufficientFee)
-//
-//        val negativeFeeEi = create(version, assetId, sender, feeOverflow, timestamp, -100, attachment, proofs)
-//        negativeFeeEi shouldBe Left(ValidationError.InsufficientFee)
-//    }
-//  }
+  property("property validation") {
+    import DataTransaction._
+
+    forAll(dataTransactionGen) {
+      case DataTransaction(version, sender, data, fee, timestamp, proofs) =>
+        val dataTooBig = List.fill(MaxDataSize + 1)(ParsedItem("key", IntegerValue(4)))
+        val dataTooBigEi = create(version, sender, dataTooBig, fee, timestamp, proofs)
+        dataTooBigEi shouldBe Left(ValidationError.TooBigArray)
+
+        val keyTooLong = data :+ ParsedItem("a" * (MaxKeySize + 1), BooleanValue(true))
+        val keyTooLongEi = create(version, sender, keyTooLong, fee, timestamp, proofs)
+        keyTooLongEi shouldBe Left(ValidationError.TooBigArray)
+
+        val valueTooLong = data :+ ParsedItem("key", BinaryValue(ByteStr(Array.fill(MaxValueSize + 1)(1: Byte))))
+        val valueTooLongEi = create(version, sender, keyTooLong, fee, timestamp, proofs)
+        valueTooLongEi shouldBe Left(ValidationError.TooBigArray)
+
+        val noFeeEi = create(version, sender, data, 0, timestamp, proofs)
+        noFeeEi shouldBe Left(ValidationError.InsufficientFee)
+
+        val negativeFeeEi = create(version, sender, data, -100, timestamp, proofs)
+        negativeFeeEi shouldBe Left(ValidationError.InsufficientFee)
+    }
+  }
 }
