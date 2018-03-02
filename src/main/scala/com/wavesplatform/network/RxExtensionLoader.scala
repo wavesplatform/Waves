@@ -7,8 +7,8 @@ import io.netty.channel._
 import monix.eval.{Coeval, Task}
 import monix.execution.CancelableFuture
 import monix.execution.schedulers.SchedulerService
+import monix.reactive.subjects.{ConcurrentSubject, Subject}
 import monix.reactive.{Observable, Observer}
-import monix.reactive.subjects.ConcurrentSubject
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.transaction.History.BlockchainScore
@@ -29,7 +29,8 @@ object RxExtensionLoader extends ScorexLogging {
             blocks: Observable[(Channel, Block)],
             signatures: Observable[(Channel, Signatures)],
             syncWithChannelClosed: Observable[ChannelClosedAndSyncWith],
-            scheduler: SchedulerService)
+            scheduler: SchedulerService,
+            timeoutSubject: Subject[Channel, Channel])
            (extensionApplier: (Channel, ExtensionBlocks) => Task[ApplyExtensionResult]): (Observable[(Channel, Block)], Coeval[State], RxExtensionLoaderShutdownHook) = {
 
     implicit val schdlr = scheduler
@@ -40,6 +41,7 @@ object RxExtensionLoader extends ScorexLogging {
     val lastSyncWith: Coeval[Option[SyncWith]] = lastObserved(syncWithChannelClosed.map(_.syncWith))
 
     def scheduleBlacklist(ch: Channel, reason: String): Task[Unit] = Task {
+      timeoutSubject.onNext(ch)
       peerDatabase.blacklistAndClose(ch, reason)
     }.delayExecution(syncTimeOut)
 

@@ -32,10 +32,11 @@ class RxExtensionLoaderSpec extends FreeSpec with Matchers with TransactionGen w
     val blocks = PublishSubject[(Channel, Block)]
     val sigs = PublishSubject[(Channel, Signatures)]
     val ccsw = PublishSubject[ChannelClosedAndSyncWith]
+    val timeout = PublishSubject[Channel]
     val history = new TestHistory
     val op = PeerDatabase.NoOp
     val invBlockStorage = new InMemoryInvalidBlockStorage
-    val (singleBlocks, _, _) = RxExtensionLoader(MaxRollback, timeOut, history, op, invBlockStorage, blocks, sigs, ccsw, testScheduler)(applier)
+    val (singleBlocks, _, _) = RxExtensionLoader(MaxRollback, timeOut, history, op, invBlockStorage, blocks, sigs, ccsw, testScheduler, timeout)(applier)
 
     try {
       f(history, invBlockStorage, blocks, sigs, ccsw, singleBlocks)
@@ -44,6 +45,7 @@ class RxExtensionLoaderSpec extends FreeSpec with Matchers with TransactionGen w
       blocks.onComplete()
       sigs.onComplete()
       ccsw.onComplete()
+      timeout.onComplete()
     }
   }
 
