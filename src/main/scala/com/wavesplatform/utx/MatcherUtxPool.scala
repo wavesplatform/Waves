@@ -5,6 +5,7 @@ import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.mining.TwoDimensionalMiningConstraint
 import com.wavesplatform.state2.{ByteStr, Portfolio}
 import scorex.account.Address
+import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.{Authorized, Transaction, ValidationError}
 import scorex.utils.ScorexLogging
 
@@ -17,8 +18,9 @@ class MatcherUtxPool(underlying: UtxPool, events: EventStream) extends UtxPool w
       .map { r =>
         if (r) {
           tx match {
-            case tx: Authorized => events.publish(BalanceChanged(Map(tx.sender.address -> portfolio(tx.sender))))
-            case _              =>
+            case _: ExchangeTransaction => // Ignoring, because the sender is the matcher
+            case tx: Authorized         => events.publish(BalanceChanged(Map(tx.sender.address -> portfolio(tx.sender))))
+            case _                      =>
           }
         }
         r
