@@ -12,6 +12,6 @@ class LeaseTransactionSuite extends BaseTransactionSuite {
 
   test("can't lease more than you have") {
     val (balance, _) = notMiner.accountBalances(firstAddress)
-    assertBadRequest2(sender.lease(firstAddress, secondAddress, balance - defaultFee + 1, defaultFee))
+    assertBadRequest(sender.lease(firstAddress, secondAddress, balance - defaultFee + 1, defaultFee))
   }
 }
