@@ -93,6 +93,16 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
       4)
   }
 
+  property("foo") {
+    val foo: PredefFunction = PredefFunction("foo", UNIT, List(("p1", OPTION(TYPEPARAM("T")))))(x => {
+      println(x)
+      Right(())
+    })
+    val ctx = Context(Map.empty, Map.empty, functions = Map((foo.name, foo)))
+    //println(ev(expr = SOME(CONST_INT(1), INT)))
+    //println(ev(ctx, expr = FUNCTION_CALL(foo.name, List(SOME(CONST_INT(1), INT)), INT)))
+  }
+
   property("fails if override") {
     ev(
       expr = BLOCK(
@@ -141,7 +151,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("field and value are evaluated maximum once") {
     var fieldCalculated = 0
-    var valueCalculated  = 0
+    var valueCalculated = 0
 
     val pointType = PredefType("Point", List(("X", INT), ("Y", INT)))
     val pointInstance = Obj(Map(("X", LazyVal(INT)(EitherT.pure {

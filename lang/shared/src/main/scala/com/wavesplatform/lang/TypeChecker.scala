@@ -11,7 +11,7 @@ import scala.util.{Failure, Success, Try}
 object TypeChecker {
 
   type TypeDefs     = Map[String, TYPE]
-  type FunctionSigs = Map[String, (List[TYPE], TYPE)]
+  type FunctionSigs = Map[String, FUNCTION]
   case class TypeCheckerContext(predefTypes: Map[String, PredefType], varDefs: TypeDefs, functionDefs: FunctionSigs)
 
   object TypeCheckerContext {
@@ -20,7 +20,7 @@ object TypeChecker {
     def fromContext(ctx: Context): TypeCheckerContext =
       TypeCheckerContext(predefTypes = ctx.typeDefs,
                          varDefs = ctx.letDefs.mapValues(_.tpe),
-                         functionDefs = ctx.functions.mapValues(_.signature))
+                         functionDefs = ctx.functions.mapValues(x => FUNCTION(x.typeParams, x.args.map(y => y._2), x.resultType)))
   }
 
   type TypeResolutionError      = String
@@ -55,24 +55,41 @@ object TypeChecker {
 
     case expr @ Untyped.FUNCTION_CALL(name, args) =>
       val value: EitherT[Coeval, String, Typed.EXPR] = ctx.functionDefs.get(name) match {
-        case Some((argTypes, resultType)) =>
+        case Some(FUNCTION(genericParams, argTypes, resultType)) =>
           if (args.lengthCompare(argTypes.size) != 0)
             EitherT.fromEither[Coeval](Left(s"Function '$name' requires ${argTypes.size} arguments, but ${args.size} are provided"))
           else {
             import cats.instances.vector._
             val actualArgTypes: Vector[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg))).toVector
-            val sequencedActualArgTypes                           = actualArgTypes.sequence[SetTypeResult, Typed.EXPR].map(_.zip(argTypes))
+            val sequencedActualArgTypes                           = actualArgTypes.sequence[SetTypeResult, Typed.EXPR].map(x => x.zip(argTypes))
+
             sequencedActualArgTypes.subflatMap { v: Seq[(Typed.EXPR, TYPE)] =>
+              val typeParameters = v.flatMap {
+                case (e, TYPEREF(n)) => Some((n, e.tpe))
+                case _                    => None
+              }
+
+              //generics checks
+
               val matches = v.map {
                 case ((e, tpe)) =>
-                  matchType(tpe,e.tpe) match {
+                  matchType(tpe, e.tpe) match {
                     case Some(_) => Right(e)
-                    case None    => Left(s"Types of arguments of function call '$name' do not match types required in signature. Expected: $tpe, Actual: ${e.tpe}")
+                    case None =>
+                      Left(s"Types of arguments of function call '$name' do not match types required in signature. Expected: $tpe, Actual: ${e.tpe}")
                   }
               }
               matches.find(_.isLeft) match {
                 case Some(left) => left
-                case None       => Right(Typed.FUNCTION_CALL(name, v.map(_._1).toList, resultType))
+                case None =>
+                  resultType match {
+                    case TYPEREF(n) =>
+                      typeParameters.find(_._1 == n) match {
+                        case Some(g) => Right(Typed.FUNCTION_CALL(name, v.map(_._1).toList, g._2))
+                        case None    => Left(s"Type parameter $n not found")
+                      }
+                    case _ => Right(Typed.FUNCTION_CALL(name, v.map(_._1).toList, resultType))
+                  }
               }
             }
           }
@@ -106,7 +123,7 @@ object TypeChecker {
               case EQ_OP =>
                 findCommonType(aTpe, bTpe) match {
                   case Some(_) => Right(operands -> BOOLEAN)
-                  case None => Left(s"Can't find common type for $aTpe and $bTpe: $a and $b in $expr")
+                  case None    => Left(s"Can't find common type for $aTpe and $bTpe: $a and $b in $expr")
                 }
             }
         }
@@ -160,7 +177,6 @@ object TypeChecker {
               case None => Left(s"Can't find common type for $ifTrueTpe and $ifFalseTpe")
             }
         }
-
 
     case ref: Untyped.REF =>
       EitherT.fromEither {

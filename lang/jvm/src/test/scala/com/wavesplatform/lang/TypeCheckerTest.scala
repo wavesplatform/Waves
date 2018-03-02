@@ -2,7 +2,7 @@ package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Context.{PredefFunction, PredefType}
 import com.wavesplatform.lang.Terms._
-import com.wavesplatform.lang.TypeChecker.{TypeCheckResult, TypeCheckerContext, TypeDefs}
+import com.wavesplatform.lang.TypeChecker.{TypeCheckerContext, TypeCheckResult, TypeDefs}
 import monix.eval.Coeval
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -11,6 +11,26 @@ import scodec.bits.ByteVector
 class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   private val pointType = PredefType("Point", List("x" -> INT, "y" -> INT))
+
+  property("foo") {
+    import Untyped._
+
+    val foo: PredefFunction = PredefFunction("foo", TYPEREF("T"), List(("p1", TYPEREF("T")))) {
+      case v :: Nil => Right(v)
+      case _        => ???
+    }
+
+    val ctx = Context(Map.empty, Map.empty, functions = Map((foo.name, foo)))
+
+    TypeChecker(TypeCheckerContext.fromContext(ctx),
+
+      BINARY_OP(CONST_INT(1), EQ_OP, FUNCTION_CALL(foo.name, List(CONST_INT(1))))) //true
+
+      .flatMap(Evaluator(ctx, _)) shouldBe Right(true)
+
+    //println(ev(expr = SOME(CONST_INT(1), INT)))
+    //println(ev(ctx, expr = FUNCTION_CALL(foo.name, List(SOME(CONST_INT(1), INT)), INT)))
+  }
 
   rootTypeTest("successful on very deep expressions (stack overflow check)")(
     expr = (1 to 100000).foldLeft[Untyped.EXPR](Untyped.CONST_INT(0))((acc, _) => Untyped.BINARY_OP(acc, SUM_OP, Untyped.CONST_INT(1))),
