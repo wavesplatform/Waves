@@ -16,13 +16,13 @@ import scala.util.{Failure, Try}
 
 object SyncHttpApi extends Assertions{
 
-  def assertBadRequest2[R](f: => R): Assertion = Try(f) match {
+  def assertBadRequest[R](f: => R): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Assertions.assert(statusCode == StatusCodes.BadRequest.intValue)
     case Failure(e) => Assertions.fail(e)
     case _ => Assertions.fail(s"Expecting bad request")
   }
 
-  def assertBadRequestAndMessage2[R](f: => R, errorMessage: String): Assertion = Try(f) match {
+  def assertBadRequestAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
       Assertions.assert(statusCode == StatusCodes.BadRequest.intValue && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
