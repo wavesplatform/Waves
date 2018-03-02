@@ -9,9 +9,11 @@ import org.iq80.leveldb.{DB, WriteBatch}
 import scorex.account.{Address, Alias}
 import scorex.serialization.Deser
 import scorex.transaction.DataTransaction
+import scorex.transaction.DataTransaction.TypedValue
 import scorex.transaction.smart.Script
 import scorex.utils.{NTP, Time}
 
+import scala.collection.SortedMap
 import scala.util.Try
 
 class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") with PropertiesStorage with VersionedStorage {
@@ -163,7 +165,7 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
     } else None
   }
 
-  def getAccountData(acc: Address): DataTransaction.Data = {
+  def getAccountData(acc: Address): Map[String, TypedValue[_]] = {
     Map("SS stub" -> DataTransaction.BooleanValue(true), "parsed" -> DataTransaction.BooleanValue(false))///
   }
 

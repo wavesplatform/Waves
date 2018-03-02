@@ -1,5 +1,6 @@
 package scorex.transaction
 
+import cats.implicits._
 import com.google.common.base.Charsets
 import com.wavesplatform.state2.ByteStr
 import scorex.account._
@@ -91,7 +92,8 @@ object TransactionFactory {
 
   def data(request: DataRequest, wallet: Wallet, time: Time): Either[ValidationError, DataTransaction] = for {///better name?
     pk <- wallet.findWallet(request.sender)
+    data <- request.data.traverse(_.parse)
     timestamp = request.timestamp.getOrElse(time.getTimestamp())
-    tx <- DataTransaction.selfSigned(Proofs.Version, pk, request.data, request.fee, timestamp)
+    tx <- DataTransaction.selfSigned(Proofs.Version, pk, data, request.fee, timestamp)
   } yield tx
 }

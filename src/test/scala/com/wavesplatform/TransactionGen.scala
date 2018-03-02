@@ -7,6 +7,8 @@ import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PublicKeyAccount._
 import scorex.account._
+import scorex.crypto.encode.Base58
+import scorex.transaction.DataTransaction.{BinaryValue, BooleanValue, IntegerValue, ParsedItem}
 import scorex.transaction._
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
@@ -365,4 +367,9 @@ trait TransactionGen extends ScriptGen {
     ts <- positiveIntGen
   } yield GenesisTransaction.create(recipient, amt, ts).right.get
 
+  val dataTransactionGen = (for {
+    (_, sender, _, _, timestamp, _, feeAmount, _) <- transferParamGen
+    data = List(ParsedItem("ten", IntegerValue(10)), ParsedItem("minus seven", IntegerValue(-7)))///
+  } yield DataTransaction.selfSigned(Proofs.Version, sender, data, feeAmount, timestamp).right.get)
+    .label("DataTransaction")
 }
