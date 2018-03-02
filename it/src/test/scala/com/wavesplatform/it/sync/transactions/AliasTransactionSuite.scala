@@ -7,7 +7,6 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 import scala.util.Random
 
 
-
 class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
 
   private val transferFee = 1.waves
@@ -15,7 +14,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   private val transferAmount = 1.waves
 
   test("Able to send money to an alias") {
-    val alias = "test_alias"
+    val alias = randomAlias()
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
 
     val aliasFee = calcAliasFee(firstAddress, alias)
