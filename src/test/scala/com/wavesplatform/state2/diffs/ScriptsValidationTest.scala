@@ -3,6 +3,7 @@ package com.wavesplatform.state2.diffs
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang._
+import com.wavesplatform.lang.ctx.Context
 import com.wavesplatform.state2._
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB, crypto}
 import monix.eval.Coeval
@@ -15,17 +16,18 @@ import scorex.settings.TestFunctionalitySettings
 import scorex.transaction._
 import scorex.transaction.assets.{ScriptTransferTransaction, TransferTransaction}
 import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.smart.{Script, SetScriptTransaction, WavesContext}
+import scorex.transaction.smart.{ConsensusContext, Script, SetScriptTransaction}
 
 class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
   private val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
 
-  private val context = TypeChecker.TypeCheckerContext.fromContext(WavesContext.build(Coeval(???), Coeval(???), null))
+  private val context: Context = new ConsensusContext(Coeval(???), Coeval(???), null).build()
+  private val tCContext = TypeChecker.TypeCheckerContext.fromContext(context)
 
   def preconditionsTransferAndLease(code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = {
     val untyped = Parser(code).get.value
-    val typed   = TypeChecker(context, untyped).explicitGet()
+    val typed   = TypeChecker(tCContext, untyped).explicitGet()
     preconditionsTransferAndLease(typed)
   }
 
@@ -87,7 +89,7 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
            |
       """.stripMargin
       val untyped = Parser(script).get.value
-      TypeChecker(context, untyped).explicitGet()
+      TypeChecker(tCContext, untyped).explicitGet()
     }
 
     val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, ScriptTransferTransaction, Seq[ByteStr])] = for {
