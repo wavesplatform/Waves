@@ -8,6 +8,7 @@ import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
+import play.api.libs.json.JsNumber
 import scorex.BroadcastRoute
 import scorex.account.Address
 import scorex.api.http._
@@ -67,10 +68,14 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, state: Snaps
       new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "string", paramType = "path")
     ))
   def active: Route = (pathPrefix("active") & get) {
-    pathPrefix(Segment) { address =>
-      complete(Address.fromString(address) match {
-        case Left(e)  => ApiError.fromValidationError(e)
-        case Right(a) => state.allActiveLeases.filter(_.sender.address == address)
+    pathPrefix(Segment) { address => complete(
+      Address.fromString(address) match {
+        case Left(e) => ApiError.fromValidationError(e)
+        case Right(a) =>
+          state().accountTransactionIds(a, Int.MaxValue)
+            .flatMap(state().transactionInfo)
+            .collect { case (h, Some(lt: LeaseTransaction)) if lt.sender.address == address && state().isLeaseActive(lt) => (h, lt) }
+            .map { case (h, lt) => lt.json() + ("height" -> JsNumber(h)) }
       })
     }
   }
