@@ -3,18 +3,16 @@ package com.wavesplatform.it.transactions
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json._
 import scorex.account.AddressOrAlias
 import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.Proofs
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.MassTransferTransaction
-import scorex.transaction.assets.MassTransferTransaction.MaxTransferCount
-import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, Transfer}
+import scorex.transaction.assets.MassTransferTransaction.{MaxTransferCount, ParsedTransfer, Transfer}
+import scorex.transaction.assets.TransferTransaction.MaxAttachmentSize
 
 import scala.concurrent.duration._
-import scorex.transaction.assets.TransferTransaction.MaxAttachmentSize
 
 class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
@@ -140,36 +138,6 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     nodes.waitForHeightAraiseAndTxPresent(transferId)
     notMiner.assertBalances(firstAddress, balance1 - fee, eff1 - fee)
-  }
-
-  test("transaction requires either proofs or signature") {
-    val fee = calcFee(2)
-    val transfers = Seq(Transfer(secondAddress, transferAmount), Transfer(thirdAddress, transferAmount))
-    def signedMassTransfer(): JsObject = {
-      val rs = sender.postJsonWithApiKey("/transactions/sign", Json.obj(
-        "type" -> TransactionType.MassTransferTransaction.id,
-        "sender" -> firstAddress,
-        "transfers" -> transfers,
-        "fee" -> fee))
-      Json.parse(rs.getResponseBody).as[JsObject]
-    }
-    def id(obj: JsObject) = obj.value("id").as[String]
-
-    val noProof = signedMassTransfer() - "proofs"
-    assertBadRequest2(sender.postJson("/transactions/broadcast", noProof))
-    nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
-
-    val withProof = signedMassTransfer()
-    assert((withProof \ "proofs").as[Seq[String]].lengthCompare(1) == 0)
-    sender.postJson("/transactions/broadcast", withProof)
-    nodes.waitForHeightAraiseAndTxPresent(id(withProof))
-
-    val signed = signedMassTransfer()
-    val proofs = (signed \ "proofs").as[Seq[String]]
-    assert(proofs.lengthCompare(1) == 0)
-    val withSignature = signed - "proofs" + ("signature" -> JsString(proofs.head))
-    sender.postJson("/transactions/broadcast", withSignature)
-    nodes.waitForHeightAraiseAndTxPresent(id(withSignature))
   }
 
   private def createSignedMassTransferRequest(tx: MassTransferTransaction): SignedMassTransferRequest = {
