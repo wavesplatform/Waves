@@ -4,6 +4,7 @@ import cats.data.EitherT
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.ctx._
 import com.wavesplatform.lang.traits.{Crypto, Emulator, Transaction}
+import monix.eval.Coeval
 import scodec.bits.ByteVector
 
 abstract class WavesContextImpl { this: Crypto with Emulator =>
@@ -19,7 +20,7 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
 
   val sigVerifyF: PredefFunction = PredefFunction("SIGVERIFY", BOOLEAN, List(("message", BYTEVECTOR), ("sig", BYTEVECTOR), ("pub", BYTEVECTOR))) {
     case (m: ByteVector) :: (s: ByteVector) :: (p: ByteVector) :: Nil =>
-      Right(this.curve25519verify(s.toArray, m.toArray, p.toArray))
+      Right(this.curve25519verify(m.toArray, s.toArray, p.toArray))
     case _ => ???
   }
 
@@ -70,9 +71,14 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
   }
 
   def build(): Context = {
+    val txCoeval : Coeval[Either[String,Obj]] = Coeval.evalOnce(Right(transactionObject(transaction)))
+    val heightCoeval : Coeval[Either[String,Int]] = Coeval.evalOnce(Right(height))
     Context(
       Map(transactionType.name -> transactionType),
-      Map(("H", LazyVal(INT)(EitherT.pure(height))), ("TX", LazyVal(TYPEREF(transactionType.name))(EitherT.pure(transactionObject(transaction))))),
+      Map(
+        ("H", LazyVal(INT)(EitherT(heightCoeval))),
+        ("TX", LazyVal(TYPEREF(transactionType.name))(EitherT(txCoeval)))
+      ),
       Map(
         sigVerifyF.name  -> sigVerifyF,
         txByIdF.name     -> txByIdF,

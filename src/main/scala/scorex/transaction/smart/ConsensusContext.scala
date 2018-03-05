@@ -28,7 +28,10 @@ object ConsensusContext {
 
   def convert(tx: Transaction): ContractTransaction = new ContractTransaction {
 
-    override def bodyBytes: Either[String, ByteVector] = Right(ByteVector(tx.bytes()))
+    override def bodyBytes: Either[String, ByteVector] =  tx match {
+      case pt: ProvenTransaction => Right(ByteVector(pt.bodyBytes()))
+      case _                     => Left("Transaction is not Proven, doesn't contain bodyBytes")
+    }
 
     override def transactionType: Int = tx.transactionType.id
 
