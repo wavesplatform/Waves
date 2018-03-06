@@ -8,7 +8,6 @@ import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.http.api_key
 import com.wavesplatform.it.Node
-import com.wavesplatform.it.RequestErrorAssert.ErrorMessage
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
