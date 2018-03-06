@@ -38,6 +38,9 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object AsyncHttpApi extends Assertions {
+  case class ErrorMessage(error: Int, message: String)
+
+  implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
 
   def assertBadRequest(f: Future[_]): Future[Assertion] = f transform {
     case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Success(Assertions.assert(statusCode == StatusCodes.BadRequest.intValue))
