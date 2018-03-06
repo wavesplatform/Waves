@@ -5,7 +5,9 @@ import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.state2.{AssetInfo, ByteStr, OrderFillInfo}
 import scorex.account.Alias
+import scorex.transaction.AssetId
 
+import scala.collection.generic.CanBuildFrom
 import scala.util.Try
 
 case class CodecFailure(reason: String) {
@@ -81,6 +83,21 @@ object CheckpointCodec extends Codec[Checkpoint] {
   }
 }
 
+case class TupleCodec[A, B](aCodec: Codec[A], bCodec: Codec[B]) extends Codec[(A, B)] {
+  override def encode(value: (A, B)): Array[Byte] = {
+    val builder = Array.newBuilder[Byte]
+    val (a, b) = value
+    builder ++= aCodec.encode(a)
+    builder ++= bCodec.encode(b)
+    builder.result()
+  }
+
+  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[(A, B)]] = for {
+    a <- aCodec.decode(bytes)
+    b <- bCodec.decode(bytes.slice(a.length, bytes.length))
+  } yield DecodeResult(a.length + b.length, (a.value, b.value))
+}
+
 case class SeqCodec[A](valueCodec: Codec[A]) extends Codec[Seq[A]] {
   override def encode(value: Seq[A]): Array[Byte] = {
     val builder = Array.newBuilder[Byte]
@@ -115,6 +132,60 @@ case class SeqCodec[A](valueCodec: Codec[A]) extends Codec[Seq[A]] {
       val result = builder.result()
       Either.cond(!error && expectedLength == result.length, DecodeResult(i, result), CodecFailure(s"failed to deserialize $expectedLength items"))
     } else Left(n.left.get)
+  }
+}
+
+case class ColCodec[Col[BB] <: TraversableOnce[BB], A](valueCodec: Codec[A])(implicit cbf: CanBuildFrom[Col[A], A, Col[A]]) extends Codec[Col[A]] {
+  override def encode(value: Col[A]): Array[Byte] = {
+    val builder = Array.newBuilder[Byte]
+    value.foreach[Unit] { item: A =>
+      builder.++=(valueCodec.encode(item))
+    }
+    val bytes = builder.result()
+    val len = bytes.length
+    val result = new Array[Byte](Ints.BYTES + len)
+    System.arraycopy(Ints.toByteArray(value.size), 0, result, 0, Ints.BYTES)
+    System.arraycopy(bytes, 0, result, Ints.BYTES, len)
+    result
+  }
+
+  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Col[A]]] = {
+    val n = Try(Ints.fromByteArray(bytes.take(Ints.BYTES))).toEither.left.map(e => CodecFailure(e.getMessage))
+    if (n.isRight) {
+      val expectedLength = n.right.get
+      val builder = cbf()
+      var i = Ints.BYTES
+      var error = false
+      while (i < bytes.length && !error) {
+        val r = valueCodec.decode(bytes.slice(i, bytes.length))
+        if (r.isRight) {
+          val rr = r.right.get
+          i = i + rr.length
+          builder.+=(rr.value)
+        } else {
+          error = true
+        }
+      }
+      val result = builder.result()
+      println(s"Result of $expectedLength: $result")
+      Either.cond(!error && expectedLength == result.size, DecodeResult(i, result), CodecFailure(s"failed to deserialize $expectedLength items"))
+    } else Left(n.left.get)
+  }
+}
+
+case class OptionCodec[A](valueCodec: Codec[A]) extends Codec[Option[A]] {
+  override def encode(value: Option[A]): Array[Byte] = value match {
+    case Some(x) => Array.concat(encodeBoolean(true), valueCodec.encode(x))
+    case None => encodeBoolean(false)
+  }
+
+  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Option[A]]] = {
+    decodeBoolean(bytes).flatMap {
+      case true => valueCodec.decode(bytes.slice(1, bytes.length)).map { x =>
+        DecodeResult(1 + x.length, Some(x.value))
+      }
+      case false => Right(DecodeResult(1, None))
+    }
   }
 }
 
@@ -287,6 +358,10 @@ object OrderIdsCodec extends Codec[Array[String]] {
   override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Array[String]]] = itemsCodec.decode(bytes)
     .right.map(r => DecodeResult(r.length, r.value.toArray))
 }
+
+object AssetIdOrderIdCodec extends TupleCodec(OptionCodec[AssetId](ByteStrCodec), StringCodec)
+
+object AssetIdOrderIdSetCodec extends ColCodec[Set, (Option[AssetId], String)](AssetIdOrderIdCodec)
 
 object PortfolioItemCodec extends Codec[(String, Long)] {
   override def encode(value: (String, Long)): Array[Byte] = {

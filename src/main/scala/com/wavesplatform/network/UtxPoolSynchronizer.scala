@@ -42,7 +42,7 @@ object UtxPoolSynchronizer {
                   val channelMatcher: ChannelMatcher = { (_: Channel) != sender }
                   xs.foreach { case (_, tx) =>
                     ops.putIfNew(tx) match {
-                      case Right(true) => allChannels.write(RawBytes(TransactionSpec.messageCode, tx.bytes()), channelMatcher)
+                      case Right((true, _)) => allChannels.write(RawBytes(TransactionSpec.messageCode, tx.bytes()), channelMatcher)
                       case _ =>
                     }
                   }

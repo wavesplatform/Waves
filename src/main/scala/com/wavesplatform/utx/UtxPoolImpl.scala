@@ -69,7 +69,7 @@ class UtxPoolImpl(time: Time,
       }
   }
 
-  override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = putIfNew(stateReader(), tx)
+  override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = putIfNew(stateReader(), tx)
 
   private def checkNotBlacklisted(tx: Transaction): Either[ValidationError, Unit] = {
     if (utxSettings.blacklistSenderAddresses.isEmpty) {
@@ -105,10 +105,11 @@ class UtxPoolImpl(time: Time,
     removeExpired(time.correctedTime())
   }
 
+  override def accountPortfolio(addr: Address): Portfolio = stateReader().accountPortfolio(addr)
+
   override def portfolio(addr: Address): Portfolio = {
-    val base = stateReader().accountPortfolio(addr)
     val foundInUtx = pessimisticPortfolios.getAggregated(addr)
-    Monoid.combine(base, foundInUtx)
+    Monoid.combine(accountPortfolio(addr), foundInUtx)
   }
 
   override def all: Seq[Transaction] = {
@@ -151,10 +152,10 @@ class UtxPoolImpl(time: Time,
   override private[utx] def createBatchOps: UtxBatchOps = new BatchOpsImpl(stateReader())
 
   private class BatchOpsImpl(s: SnapshotStateReader) extends UtxBatchOps {
-    override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = outer.putIfNew(s, tx)
+    override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = outer.putIfNew(s, tx)
   }
 
-  private def putIfNew(s: SnapshotStateReader, tx: Transaction): Either[ValidationError, Boolean] = {
+  private def putIfNew(s: SnapshotStateReader, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
     putRequestStats.increment()
     measureSuccessful(processingTimeStats, {
       for {
@@ -165,7 +166,7 @@ class UtxPoolImpl(time: Time,
       } yield {
         utxPoolSizeStats.increment()
         pessimisticPortfolios.add(tx.id(), diff)
-        Option(transactions.put(tx.id(), tx)).isEmpty
+        (Option(transactions.put(tx.id(), tx)).isEmpty, diff)
       }
     })
   }

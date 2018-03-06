@@ -7,6 +7,8 @@ import com.wavesplatform.matcher.market.OrderHistoryActor.{ForceCancelOrderFromH
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.matcher.model.LimitOrder
 import com.wavesplatform.state2.Portfolio
+import scorex.account.Address
+import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.AssetPair
 import scorex.utils.ScorexLogging
 
@@ -15,7 +17,7 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) extends Actor with ScorexLogging {
 
   private type OrdersToDelete   = List[(AssetPair, String)]
-  private type ChangesByAddress = Map[String, Portfolio]
+  private type ChangesByAddress = Map[Address, Portfolio]
 
   private var requestIdCounter = 0L
 
@@ -42,6 +44,7 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
       } else context.become(waitOrders(taskId, stashedChanges, updated, reschedule(waitOrdersTimeout)))
 
     case x: BalanceChanged =>
+      log.debug(s"Got $x")
       context.become(
         waitOrders(
           taskId = taskId,
@@ -57,8 +60,9 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
   }
 
   private def becomeWorking(changes: ChangesByAddress): Unit = {
+    val assets: Set[Option[AssetId]] = changes.flatMap { case (_, p) => p.assets.keys.map(Some(_)) }(collection.breakOut)
     changes.keys
-      .map(GetActiveOrdersByAddress(requestIdCounter, _))
+      .map(GetActiveOrdersByAddress(requestIdCounter, _, assets + None))
       .foreach(orderHistory ! _)
 
     context.become(waitOrders(requestIdCounter, Map.empty, changes, reschedule(EmptyCancellable)))
@@ -74,7 +78,7 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
 
   private def replaceChanges(orig: ChangesByAddress, replacement: ChangesByAddress): ChangesByAddress = orig ++ replacement
 
-  private def ordersToDelete(portfolios: Map[String, Portfolio], ownerAddress: String, orders: Seq[LimitOrder]): OrdersToDelete = {
+  private def ordersToDelete(portfolios: ChangesByAddress, ownerAddress: Address, orders: Seq[LimitOrder]): OrdersToDelete = {
     portfolios
       .get(ownerAddress)
       .map { portfolio =>

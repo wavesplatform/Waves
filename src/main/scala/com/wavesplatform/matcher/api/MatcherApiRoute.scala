@@ -128,7 +128,10 @@ case class MatcherApiRoute(wallet: Wallet,
       json[CancelOrderRequest] { req =>
         (matcher ? CancelOrder(pair, req))
           .mapTo[MatcherResponse]
-          .map(r => r.code -> r.json)
+          .map { r =>
+            println(s"Response for cancel: $r")
+            r.code -> r.json
+          }
       }
     }
   }

@@ -126,7 +126,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       Some(m)
     } else None
 
-    val utxStorage = matcher.map(_ => new MatcherUtxPool(innerUtxStorage, actorSystem.eventStream)).getOrElse(innerUtxStorage)
+    val utxStorage = if (settings.matcherSettings.enable) new MatcherUtxPool(innerUtxStorage, settings.matcherSettings, actorSystem.eventStream) else innerUtxStorage
     maybeUtx = Some(utxStorage)
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)

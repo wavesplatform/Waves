@@ -5,6 +5,7 @@ import cats.implicits._
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.state2.Portfolio
 import play.api.libs.json.{JsObject, JsValue, Json}
+import scorex.account.Address
 import scorex.transaction.AssetAcc
 import scorex.transaction.assets.exchange._
 
@@ -121,7 +122,7 @@ object Events {
 
   case class ExchangeTransactionCreated(tx: ExchangeTransaction)
 
-  case class BalanceChanged(changesByAddress: Map[String, Portfolio]) {
+  case class BalanceChanged(changesByAddress: Map[Address, Portfolio]) {
     def isEmpty: Boolean = changesByAddress.isEmpty
   }
   object BalanceChanged {

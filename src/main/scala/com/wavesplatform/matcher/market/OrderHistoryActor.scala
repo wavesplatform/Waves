@@ -13,7 +13,7 @@ import com.wavesplatform.utx.UtxPool
 import org.iq80.leveldb.DB
 import play.api.libs.json._
 import scorex.account.Address
-import scorex.transaction.AssetAcc
+import scorex.transaction.{AssetAcc, AssetId}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.NTP
@@ -67,10 +67,10 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       recoverFromOrderBook(ob)
     case ForceCancelOrderFromHistory(id) =>
       forceCancelOrder(id)
-    case GetActiveOrdersByAddress(requestId, addr) =>
-      val active: Seq[LimitOrder] = orderHistory.activeOrderIdsByAddress(addr)
+    case GetActiveOrdersByAddress(requestId, addr, assets) =>
+      val active: Seq[LimitOrder] = orderHistory.activeOrderIdsByAddress(addr.stringRepr)
         .view
-        .map { id => id -> orderHistory.orderInfo(id) }
+        .collect { case (assetId, id) if assets.contains(assetId) => id -> orderHistory.orderInfo(id) }
         .flatMap { case (id, info) =>
           orderHistory.order(id).map { order => LimitOrder(order).partial(info.remaining) }
         }
@@ -159,9 +159,9 @@ object OrderHistoryActor {
 
   case class GetOrderStatus(assetPair: AssetPair, id: String, ts: Long) extends ExpirableOrderHistoryRequest
 
-  case class GetActiveOrdersByAddress(requestId: Long, address: String)
+  case class GetActiveOrdersByAddress(requestId: Long, address: Address, assets: Set[Option[AssetId]])
 
-  case class GetActiveOrdersByAddressResponse(requestId: Long, address: String, orders: Seq[LimitOrder])
+  case class GetActiveOrdersByAddressResponse(requestId: Long, address: Address, orders: Seq[LimitOrder])
 
   case class DeleteOrderFromHistory(assetPair: AssetPair, address: String, id: String, ts: Long) extends ExpirableOrderHistoryRequest
 
