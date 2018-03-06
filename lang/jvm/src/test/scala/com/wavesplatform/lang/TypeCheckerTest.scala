@@ -23,12 +23,15 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("should infer inner types") {
     import Untyped._
-    val genericFunc: PredefFunction = PredefFunction("genericFunc", TYPEREF("T"), List("p1" -> OPTION(TYPEREF("T")))){
+    val genericFunc: PredefFunction = PredefFunction("genericFunc", TYPEREF("T"), List("p1" -> OPTION(TYPEREF("T")))) {
       case Some(vl) :: Nil => Right(vl)
-      case _        => Left("extracting from empty option")
+      case _               => Left("extracting from empty option")
     }
-    val ctx                         = Context(Map.empty, Map.empty, functions = Map((genericFunc.name, genericFunc)))
-    val Right(v)                    = TypeChecker(TypeCheckerContext.fromContext(ctx), FUNCTION_CALL(genericFunc.name, List(SOME(CONST_INT(1)))))
+
+    var optionFunc = PredefFunction("optionFunc", OPTION(INT), List.empty)(null)
+
+    val ctx      = Context(Map.empty, Map.empty, functions = Map((genericFunc.name, genericFunc), (optionFunc.name, optionFunc)))
+    val Right(v) = TypeChecker(TypeCheckerContext.fromContext(ctx), FUNCTION_CALL(genericFunc.name, List(FUNCTION_CALL(optionFunc.name, List.empty))))
 
     v.tpe shouldBe INT
   }
@@ -152,7 +155,8 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       "FUNCTION_CALL with wrong type of argument"    -> "Types of arguments of function call" -> FUNCTION_CALL(multiplierFunction.name,
                                                                                                             List(CONST_INT(0), FALSE)),
       "FUNCTION_CALL with uncommon types for parameter T" -> "is no common type" -> FUNCTION_CALL(genericFunc.name,
-                                                                                          List(CONST_INT(1), CONST_BYTEVECTOR(ByteVector.empty)))
+                                                                                                  List(CONST_INT(1),
+                                                                                                       CONST_BYTEVECTOR(ByteVector.empty)))
     )
   }
 
