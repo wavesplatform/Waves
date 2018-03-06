@@ -54,6 +54,8 @@ trait SnapshotStateReader extends Synchronized {
   def accountScript(address: Address): Option[Script]
 
   def accountData(acc: Address): Map[String, TypedValue[_]]
+
+  def accountData(acc: Address, key: String): Option[TypedValue[_]]
 }
 
 object SnapshotStateReader {

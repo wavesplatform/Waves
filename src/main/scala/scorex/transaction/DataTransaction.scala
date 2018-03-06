@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.crypto
@@ -52,7 +52,7 @@ object DataTransaction {
   val MaxValueSize = Short.MaxValue
   type Data = Map[String, TypedValue[_]] ///move somewhere, make class?
 
-  private val UTF8 = Charset.forName("UTF-8")
+  private val UTF8 = StandardCharsets.UTF_8
 
   object Type extends Enumeration {
     val Integer = Value(0)

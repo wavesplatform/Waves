@@ -6,7 +6,7 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Address, Alias}
-import scorex.transaction.DataTransaction.TypedValue
+import scorex.transaction.DataTransaction.{ParsedItem, TypedValue}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.Script
 import scorex.transaction.{DataTransaction, Transaction, TransactionParser}
@@ -94,6 +94,10 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   }
 
   override def accountData(acc: Address): Map[String, TypedValue[_]] = read { implicit l =>
-    sp().getAccountData(acc)
+    sp().getAccountData(acc).map { case ParsedItem(k, tv) => k -> tv }.toMap
+  }
+
+  override def accountData(acc: Address, key: String): Option[TypedValue[_]] = read { implicit l =>
+    sp().getAccountData(acc, key)
   }
 }

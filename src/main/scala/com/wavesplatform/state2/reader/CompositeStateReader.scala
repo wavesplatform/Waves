@@ -99,6 +99,11 @@ class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockD
     val fromDiff = blockDiff.txsDiff.accountData.getOrElse(acc, Map())
     fromInner ++ fromDiff
   }
+
+  override def accountData(acc: Address, key: String): Option[TypedValue[_]] = {
+    val diffData = blockDiff.txsDiff.accountData.getOrElse(acc, Map())
+    diffData.get(key).orElse(inner.accountData(acc, key))
+  }
 }
 
 object CompositeStateReader {

@@ -1,5 +1,7 @@
 package com.wavesplatform.state2
 
+import java.nio.charset.StandardCharsets
+
 import cats.Monoid
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Ints, Longs}
@@ -9,7 +11,7 @@ import org.iq80.leveldb.{DB, WriteBatch}
 import scorex.account.{Address, Alias}
 import scorex.serialization.Deser
 import scorex.transaction.DataTransaction
-import scorex.transaction.DataTransaction.TypedValue
+import scorex.transaction.DataTransaction.{Data, ParsedItem, TypedValue}
 import scorex.transaction.smart.Script
 import scorex.utils.{NTP, Time}
 
@@ -39,6 +41,7 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
   private val AddressToAliasPrefix = "address-alias".getBytes(Charset)
   private val LeaseStatePrefix = "lease-state".getBytes(Charset)
   private val LeaseIndexPrefix = "lease-idx".getBytes(Charset)
+  private val AddressDataPrefix = "address-data".getBytes(Charset)
   private val MaxAddress = "max-address"
   private val LeasesCount = "leases-count"
   private val AddressScriptPrefix = "address-script".getBytes(Charset)
@@ -78,6 +81,7 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
     putAliases(b, diff.aliases)
     putLeases(b, diff.leaseState)
     putScripts(b, diff.scripts)
+    putAccountData(b, diff.accountData)
   }
 
   def getWavesBalance(address: Address): Option[(Long, Long, Long)] =
@@ -165,8 +169,29 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
     } else None
   }
 
-  def getAccountData(acc: Address): Map[String, TypedValue[_]] = {
-    Map("SS stub" -> DataTransaction.BooleanValue(true), "parsed" -> DataTransaction.BooleanValue(false))///
+  def getAccountData(address: Address): Seq[ParsedItem] = {
+    val k = makeKey(AddressDataPrefix, address.bytes.arr)
+    val keys = get(k).map(StringSeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty) ///same as in method below
+    for {
+      key <- keys
+      tv <- get(k ++ key.getBytes(Charset)).map(b => TypedValue.fromBytes(b, 0)._1)
+    } yield ParsedItem(key, tv)
+  }
+
+  def getAccountData(address: Address, key: String): Option[TypedValue[_]] = {
+    val k = makeKey(AddressDataPrefix, address.bytes.arr ++ key.getBytes(Charset))
+    get(k).map(b => TypedValue.fromBytes(b, 0)._1)
+  }
+
+  def putAccountData(b: Option[WriteBatch], data: Map[Address, Data]): Unit = { ///Map -> Seq[TypedValue] ?  may lose a tx if 2 data txs in block
+    data.foreach { case (addr, items)  =>
+      val k = makeKey(AddressDataPrefix, addr.bytes.arr)
+      val keys = get(k).map(StringSeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty) /// => no empty keys allowed
+      val updatedKeys = (keys ++ items.keySet).distinct
+      if (updatedKeys.lengthCompare(keys.size) > 0)
+        put(k, StringSeqCodec.encode(updatedKeys), b)
+      items.foreach { case (key, value) => put(k ++ key.getBytes(Charset), value.toBytes, b) }
+    }
   }
 
   override def removeEverything(b: Option[WriteBatch]): Unit = {

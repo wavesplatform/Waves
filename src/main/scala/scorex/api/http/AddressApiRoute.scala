@@ -34,7 +34,7 @@ case class AddressApiRoute(settings: RestAPISettings, functionalitySettings: Fun
   override lazy val route =
     pathPrefix("addresses") {
       validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
-        signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ postData
+        signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ getDataItem ~ postData
     } ~ root ~ create
 
   @Path("/{address}")
@@ -225,10 +225,17 @@ case class AddressApiRoute(settings: RestAPISettings, functionalitySettings: Fun
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
-  def getData: Route = {
-    path("data" / Segment) { address =>
-      complete(accountData(address))
-    }
+  def getData: Route = (path("data" / Segment) & get) { address =>
+    complete(accountData(address))
+  }
+
+  @Path("/data/{address}/{key}")
+  @ApiOperation(value = "Create", notes = "Create a new account in the wallet(if it exists)", httpMethod = "GET")///words
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
+  ))
+  def getDataItem: Route = (path("data" / Segment / Segment) & get) { case (address, key) =>
+    complete(accountData(address, key)) ///handle nonexisting key
   }
 
   @Path("/")
@@ -310,6 +317,13 @@ case class AddressApiRoute(settings: RestAPISettings, functionalitySettings: Fun
     val s = state()
     s.read { _ =>
       Address.fromString(address).map(acc => ToResponseMarshallable(s.accountData(acc))).getOrElse(InvalidAddress)
+    }
+  }
+
+  private def accountData(address: String, key: String): ToResponseMarshallable = {
+    val s = state()
+    s.read { _ =>
+      Address.fromString(address).map(acc => ToResponseMarshallable(s.accountData(acc, key))).getOrElse(InvalidAddress)
     }
   }
 
