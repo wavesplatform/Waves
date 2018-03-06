@@ -26,7 +26,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
   test("Able to create asset with the same name") {
     val assetName = "myasset1"
-    val assetDescription = "my asset description"
+    val assetDescription = "my asset description 1"
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
 
     val issuedAssetId = sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = false, assetFee).id
