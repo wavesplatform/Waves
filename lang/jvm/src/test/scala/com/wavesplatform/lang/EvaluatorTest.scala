@@ -15,6 +15,9 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   private def simpleDeclarationAndUsage(i: Int) = BLOCK(Some(LET("x", CONST_INT(i))), REF("x", INT), INT)
 
+
+
+
   property("successful on very deep expressions (stack overflow check)") {
     val term = (1 to 100000).foldLeft[EXPR](CONST_INT(0))((acc, _) => BINARY_OP(acc, SUM_OP, CONST_INT(1), INT))
     ev(expr = term) shouldBe Right(100000)
@@ -91,16 +94,6 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   property("successful on same value names in different branches") {
     ev(expr = IF(BINARY_OP(CONST_INT(1), EQ_OP, CONST_INT(2), INT), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4), INT)) shouldBe Right(
       4)
-  }
-
-  property("foo") {
-    val foo: PredefFunction = PredefFunction("foo", UNIT, List(("p1", OPTION(TYPEPARAM("T")))))(x => {
-      println(x)
-      Right(())
-    })
-    val ctx = Context(Map.empty, Map.empty, functions = Map((foo.name, foo)))
-    //println(ev(expr = SOME(CONST_INT(1), INT)))
-    //println(ev(ctx, expr = FUNCTION_CALL(foo.name, List(SOME(CONST_INT(1), INT)), INT)))
   }
 
   property("fails if override") {

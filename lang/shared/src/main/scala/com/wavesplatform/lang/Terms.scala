@@ -1,18 +1,19 @@
 package com.wavesplatform.lang
+import com.wavesplatform.lang.Terms.Typed.EXPR
 import scodec.bits.ByteVector
 
 object Terms {
 
-  case class FUNCTION(typeParams: List[TYPEREF], args: List[TYPE], result: TYPE)
+  case class FUNCTION(args: List[TYPE], result: TYPE)
 
   sealed trait TYPE { type Underlying }
-  case object NOTHING                extends TYPE { type Underlying = Nothing              }
-  case object UNIT                   extends TYPE { type Underlying = Unit                 }
-  case object INT                    extends TYPE { type Underlying = Int                  }
-  case object BYTEVECTOR             extends TYPE { type Underlying = ByteVector           }
-  case object BOOLEAN                extends TYPE { type Underlying = Boolean              }
-  case class OPTION(t: TYPE)         extends TYPE { type Underlying = Option[t.Underlying] }
-  case class TYPEREF(name: String)   extends TYPE { type Underlying = Any                  }
+  case object NOTHING              extends TYPE { type Underlying = Nothing              }
+  case object UNIT                 extends TYPE { type Underlying = Unit                 }
+  case object INT                  extends TYPE { type Underlying = Int                  }
+  case object BYTEVECTOR           extends TYPE { type Underlying = ByteVector           }
+  case object BOOLEAN              extends TYPE { type Underlying = Boolean              }
+  case class OPTION(t: TYPE)       extends TYPE { type Underlying = Option[t.Underlying] }
+  case class TYPEREF(name: String) extends TYPE { type Underlying = Any                  }
 
   sealed trait BINARY_OP_KIND
   case object SUM_OP extends BINARY_OP_KIND
@@ -67,7 +68,6 @@ object Terms {
 
   private def findCommonType(required: TYPE, actual: TYPE, biDirectional: Boolean): Option[TYPE] =
     if (actual == NOTHING) Some(required)
-    else if (required.isInstanceOf[TYPEREF]) Some(actual)
     else if (required == NOTHING && biDirectional) Some(actual)
     else if (required == actual) Some(required)
     else
@@ -76,4 +76,11 @@ object Terms {
         case _                          => None
       }
 
+  def inferTypeParams(actual: TYPE, expected: TYPE): List[(String, TYPE)] =
+    (actual, expected) match {
+      case (actualType, TYPEREF(name)) => List((name, actualType))
+      case (actualType, TYPEREF(name)) => List((name, actualType))
+      case (OPTION(t1), OPTION(t2)) => inferTypeParams(t1, t2)
+      case _ => List.empty
+    }
 }

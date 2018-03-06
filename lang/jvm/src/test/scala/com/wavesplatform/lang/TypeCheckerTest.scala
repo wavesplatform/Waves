@@ -12,24 +12,25 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
 
   private val pointType = PredefType("Point", List("x" -> INT, "y" -> INT))
 
-  property("foo") {
+  property("should infer generic function return type") {
     import Untyped._
+    val genericFunc: PredefFunction = PredefFunction("genericFunc", TYPEREF("T"), List("p1" -> TYPEREF("T")))(Right(_))
+    val ctx                         = Context(Map.empty, Map.empty, functions = Map((genericFunc.name, genericFunc)))
+    val Right(v)                    = TypeChecker(TypeCheckerContext.fromContext(ctx), FUNCTION_CALL(genericFunc.name, List(CONST_INT(1))))
 
-    val foo: PredefFunction = PredefFunction("foo", TYPEREF("T"), List(("p1", TYPEREF("T")))) {
-      case v :: Nil => Right(v)
-      case _        => ???
+    v.tpe shouldBe INT
+  }
+
+  property("should infer inner types") {
+    import Untyped._
+    val genericFunc: PredefFunction = PredefFunction("genericFunc", TYPEREF("T"), List("p1" -> OPTION(TYPEREF("T")))){
+      case Some(vl) :: Nil => Right(vl)
+      case _        => Left("extracting from empty option")
     }
+    val ctx                         = Context(Map.empty, Map.empty, functions = Map((genericFunc.name, genericFunc)))
+    val Right(v)                    = TypeChecker(TypeCheckerContext.fromContext(ctx), FUNCTION_CALL(genericFunc.name, List(SOME(CONST_INT(1)))))
 
-    val ctx = Context(Map.empty, Map.empty, functions = Map((foo.name, foo)))
-
-    TypeChecker(TypeCheckerContext.fromContext(ctx),
-
-      BINARY_OP(CONST_INT(1), EQ_OP, FUNCTION_CALL(foo.name, List(CONST_INT(1))))) //true
-
-      .flatMap(Evaluator(ctx, _)) shouldBe Right(true)
-
-    //println(ev(expr = SOME(CONST_INT(1), INT)))
-    //println(ev(ctx, expr = FUNCTION_CALL(foo.name, List(SOME(CONST_INT(1), INT)), INT)))
+    v.tpe shouldBe INT
   }
 
   rootTypeTest("successful on very deep expressions (stack overflow check)")(
@@ -111,8 +112,9 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     expectedResult = Right(Typed.FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_INT(1), Typed.CONST_INT(2)), INT))
   )
 
-  private val optFunc  = PredefFunction("OPTFUNC", UNIT, List(("opt", OPTION(OPTION(INT)))))(_ => Right(()))
-  private val noneFunc = PredefFunction("NONEFUNC", UNIT, List(("opt", OPTION(NOTHING))))(_ => Right(()))
+  private val optFunc     = PredefFunction("OPTFUNC", UNIT, List("opt"            -> OPTION(OPTION(INT))))(_ => Right(()))
+  private val noneFunc    = PredefFunction("NONEFUNC", UNIT, List("opt"           -> OPTION(NOTHING)))(_ => Right(()))
+  private val genericFunc = PredefFunction("genericFunc", TYPEREF("T"), List("p1" -> TYPEREF("T"), "p2" -> TYPEREF("T")))(Right(_))
 
   treeTypeTest(s"NONEFUNC(NONE)")(
     ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(noneFunc.name -> noneFunc.signature)),
@@ -148,7 +150,9 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(multiplierFunction.name, List(CONST_INT(0))),
       "FUNCTION_CALL with upper type"                -> "do not match types required" -> FUNCTION_CALL(noneFunc.name, List(SOME(CONST_INT(3)))),
       "FUNCTION_CALL with wrong type of argument"    -> "Types of arguments of function call" -> FUNCTION_CALL(multiplierFunction.name,
-                                                                                                            List(CONST_INT(0), FALSE))
+                                                                                                            List(CONST_INT(0), FALSE)),
+      "FUNCTION_CALL with uncommon types for parameter T" -> "is no common type" -> FUNCTION_CALL(genericFunc.name,
+                                                                                          List(CONST_INT(1), CONST_BYTEVECTOR(ByteVector.empty)))
     )
   }
 
@@ -165,13 +169,18 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   private def errorTests(exprs: ((String, String), Untyped.EXPR)*): Unit = exprs.foreach {
     case ((label, error), input) =>
       property(s"Error: $label") {
-        TypeChecker(TypeCheckerContext(Map.empty,
-                                       Map.empty,
-                                       Map(
-                                         multiplierFunction.name -> multiplierFunction.signature,
-                                         noneFunc.name           -> noneFunc.signature
-                                       )),
-                    input) should produce(error)
+        TypeChecker(
+          TypeCheckerContext(
+            Map.empty,
+            Map.empty,
+            Map(
+              multiplierFunction.name -> multiplierFunction.signature,
+              noneFunc.name           -> noneFunc.signature,
+              genericFunc.name        -> genericFunc.signature
+            )
+          ),
+          input
+        ) should produce(error)
       }
   }
 

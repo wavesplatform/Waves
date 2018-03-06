@@ -18,7 +18,6 @@ object Context {
 
   sealed trait PredefFunction {
     val name: String
-    val typeParams: List[TYPEREF]
     val args: List[(String, TYPE)]
     val resultType: TYPE
     def eval(args: List[Any]): TrampolinedExecResult[resultType.Underlying]
@@ -29,19 +28,18 @@ object Context {
 
     case class PredefFunctionImpl(name: String,
                                   resultType: TYPE,
-                                  typeParams: List[TYPEREF],
                                   args: List[(String, TYPE)],
                                   ev: List[Any] => Either[String, Any])
         extends PredefFunction {
       override def eval(args: List[Any]): TrampolinedExecResult[resultType.Underlying] = {
         EitherT.fromEither[Coeval](ev(args).map(_.asInstanceOf[resultType.Underlying]))
       }
-      override lazy val signature: FUNCTION = FUNCTION(typeParams, args.map(_._2), resultType)
+      override lazy val signature: FUNCTION = FUNCTION(args.map(_._2), resultType)
     }
 
-    def apply(name: String, resultType: TYPE, args: List[(String, TYPE)], genericParams: List[TYPEREF] = List.empty)(
+    def apply(name: String, resultType: TYPE, args: List[(String, TYPE)])(
         ev: List[Any] => Either[String, resultType.Underlying]): PredefFunction =
-      PredefFunctionImpl(name, resultType, genericParams, args, ev)
+      PredefFunctionImpl(name, resultType, args, ev)
 
   }
 
