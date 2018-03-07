@@ -4,7 +4,8 @@ import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.it.Node
 import org.asynchttpclient.Response
 import org.scalatest.{Assertion, Assertions, Matchers}
-import play.api.libs.json.Writes
+import play.api.libs.json.Json.parse
+import play.api.libs.json.{Format, Json, Writes}
 import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 
@@ -13,12 +14,24 @@ import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Try}
 
 object SyncHttpApi extends Assertions{
+  case class ErrorMessage(error: Int, message: String)
 
-  def assertBadRequest2[R](f: => R): Assertion = Try(f) match {
+  implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
+
+
+  def assertBadRequest[R](f: => R): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Assertions.assert(statusCode == StatusCodes.BadRequest.intValue)
     case Failure(e) => Assertions.fail(e)
     case _ => Assertions.fail(s"Expecting bad request")
   }
+
+  def assertBadRequestAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
+    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+      Assertions.assert(statusCode == StatusCodes.BadRequest.intValue && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
+    case Failure(e) => Assertions.fail(e)
+    case _ => Assertions.fail(s"Expecting bad request")
+  }
+
 
   implicit class NodeExtSync(n: Node) extends Assertions with Matchers {
 
@@ -75,15 +88,13 @@ object SyncHttpApi extends Assertions{
       Await.result(async(n).ensureTxDoesntExist(txId), RequestAwaitTime)
   }
 
+
   implicit class NodesExtSync(nodes: Seq[Node]) {
 
     import com.wavesplatform.it.api.AsyncHttpApi.{NodesAsyncHttpApi => async}
 
-
     private val TxInBlockchainAwaitTime = 3 * nodes.head.blockDelay
     private val ConditionAwaitTime = 5.minutes
-
-
 
     def waitForHeightAraiseAndTxPresent(transactionId: String): Unit =
       Await.result(async(nodes).waitForHeightAraiseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
@@ -99,3 +110,4 @@ object SyncHttpApi extends Assertions{
   }
 
 }
+

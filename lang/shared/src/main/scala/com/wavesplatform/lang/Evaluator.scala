@@ -1,16 +1,13 @@
 package com.wavesplatform.lang
 
 import cats.data.EitherT
-import com.wavesplatform.lang.Context.{LazyVal, Obj}
 import com.wavesplatform.lang.Terms._
+import com.wavesplatform.lang.ctx._
 import monix.eval.Coeval
 
 import scala.util.{Failure, Success, Try}
 
 object Evaluator {
-
-  type ExecutionError           = String
-  type TrampolinedExecResult[T] = EitherT[Coeval, ExecutionError, T]
 
   private def r[T](ctx: Context, t: TrampolinedExecResult[Typed.EXPR]): TrampolinedExecResult[T] =
     t flatMap { (typedExpr: Typed.EXPR) =>
@@ -24,7 +21,8 @@ object Evaluator {
                 case None =>
                   val varBlockTpe                                                  = newVarBlock.tpe
                   val eitherTCoeval: TrampolinedExecResult[varBlockTpe.Underlying] = r[varBlockTpe.Underlying](ctx, EitherT.pure(newVarBlock))
-                  val updatedCtx: Context                                          = ctx.copy(letDefs = ctx.letDefs.updated(newVarName, LazyVal(varBlockTpe)(eitherTCoeval)))
+                  val lz: LazyVal = LazyVal(varBlockTpe)(eitherTCoeval)
+                  val updatedCtx: Context                                          = ctx.copy(letDefs = ctx.letDefs.updated(newVarName, lz))
                   r[blockTpe.Underlying](updatedCtx, EitherT.pure(inner))
               }
           }

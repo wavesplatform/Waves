@@ -27,7 +27,6 @@ object CancelLeaseOverflow {
       portfolios = portfolioUpd,
       issuedAssets = Map.empty,
       aliases = Map.empty,
-      paymentTransactionIdsByHashes = Map.empty,
       orderFills = Map.empty,
       leaseState = cancelledLeases.toMap,
       scripts = Map.empty)

@@ -60,22 +60,23 @@ class HandshakeTimeoutHandler(handshakeTimeout: FiniteDuration) extends ChannelI
 }
 
 abstract class HandshakeHandler(
-    localHandshake: Handshake,
-    establishedConnections: ConcurrentMap[Channel, PeerInfo],
-    peerConnections: ConcurrentMap[PeerKey, Channel],
-    peerDatabase: PeerDatabase,
-    allChannels: ChannelGroup) extends ChannelInboundHandlerAdapter with ScorexLogging {
+                                 localHandshake: Handshake,
+                                 establishedConnections: ConcurrentMap[Channel, PeerInfo],
+                                 peerConnections: ConcurrentMap[PeerKey, Channel],
+                                 peerDatabase: PeerDatabase,
+                                 allChannels: ChannelGroup) extends ChannelInboundHandlerAdapter with ScorexLogging {
+
   import HandshakeHandler._
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case HandshakeTimeoutExpired =>
-      peerDatabase.blacklistAndClose(ctx.channel(),"Timeout expired while waiting for handshake")
+      peerDatabase.blacklistAndClose(ctx.channel(), "Timeout expired while waiting for handshake")
     case remoteHandshake: Handshake =>
       if (localHandshake.applicationName != remoteHandshake.applicationName)
-        peerDatabase.blacklistAndClose(ctx.channel(),s"Remote application name ${remoteHandshake.applicationName} does not match local ${localHandshake.applicationName}")
-       else if (!versionIsSupported(remoteHandshake.applicationVersion))
-        peerDatabase.blacklistAndClose(ctx.channel(),s"Remote application version ${remoteHandshake.applicationVersion } is not supported")
-       else {
+        peerDatabase.blacklistAndClose(ctx.channel(), s"Remote application name ${remoteHandshake.applicationName} does not match local ${localHandshake.applicationName}")
+      else if (!versionIsSupported(remoteHandshake.applicationVersion))
+        peerDatabase.blacklistAndClose(ctx.channel(), s"Remote application version ${remoteHandshake.applicationVersion} is not supported")
+      else {
         PeerKey(ctx, remoteHandshake.nodeNonce) match {
           case None =>
             log.warn(s"Can't get PeerKey from ${id(ctx)}")
@@ -91,7 +92,8 @@ abstract class HandshakeHandler(
               ctx.channel().attr(NodeNameAttributeKey).set(remoteHandshake.nodeName)
               ctx.channel().closeFuture().addListener { f: ChannelFuture =>
                 peerConnections.remove(key, f.channel())
-                establishedConnections.remove(ctx.channel())
+                establishedConnections.remove(f.channel())
+                log.trace(s"${id(f.channel())} was closed")
               }
 
               connectionNegotiated(ctx)
@@ -138,11 +140,11 @@ object HandshakeHandler extends ScorexLogging {
 
   @Sharable
   class Server(
-      handshake: Handshake,
-      establishedConnections: ConcurrentMap[Channel, PeerInfo],
-      peerConnections: ConcurrentMap[PeerKey, Channel],
-      peerDatabase: PeerDatabase,
-      allChannels: ChannelGroup)
+                handshake: Handshake,
+                establishedConnections: ConcurrentMap[Channel, PeerInfo],
+                peerConnections: ConcurrentMap[PeerKey, Channel],
+                peerDatabase: PeerDatabase,
+                allChannels: ChannelGroup)
     extends HandshakeHandler(handshake, establishedConnections, peerConnections, peerDatabase, allChannels) {
     override protected def connectionNegotiated(ctx: ChannelHandlerContext): Unit = {
       sendLocalHandshake(ctx)
@@ -152,15 +154,16 @@ object HandshakeHandler extends ScorexLogging {
 
   @Sharable
   class Client(
-      handshake: Handshake,
-      establishedConnections: ConcurrentMap[Channel, PeerInfo],
-      peerConnections: ConcurrentMap[PeerKey, Channel],
-      peerDatabase: PeerDatabase,
-      allChannels: ChannelGroup)
+                handshake: Handshake,
+                establishedConnections: ConcurrentMap[Channel, PeerInfo],
+                peerConnections: ConcurrentMap[PeerKey, Channel],
+                peerDatabase: PeerDatabase,
+                allChannels: ChannelGroup)
     extends HandshakeHandler(handshake, establishedConnections, peerConnections, peerDatabase, allChannels) {
     override protected def channelActive(ctx: ChannelHandlerContext): Unit = {
       sendLocalHandshake(ctx)
       super.channelActive(ctx)
     }
   }
+
 }

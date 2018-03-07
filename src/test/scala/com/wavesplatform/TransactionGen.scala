@@ -1,6 +1,7 @@
 package com.wavesplatform
 
-import com.wavesplatform.lang.{ScriptGen, TypeChecker}
+import com.wavesplatform.lang.TypeChecker
+import com.wavesplatform.lang.testing.ScriptGen
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state2._
 import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}

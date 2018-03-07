@@ -1,5 +1,4 @@
 package com.wavesplatform.lang
-import com.wavesplatform.lang.Terms.Typed.EXPR
 import scodec.bits.ByteVector
 
 object Terms {

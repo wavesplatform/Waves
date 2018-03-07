@@ -1,8 +1,10 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.Context.{PredefFunction, PredefType}
+import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.ctx._
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.TypeChecker.{TypeCheckerContext, TypeCheckResult, TypeDefs}
+import com.wavesplatform.lang.testing.ScriptGen
 import monix.eval.Coeval
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
