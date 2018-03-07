@@ -8,8 +8,8 @@ import cats.kernel.Monoid
 import com.wavesplatform.state2._
 import monix.eval.Coeval
 import scorex.account.{Address, Alias}
-import scorex.transaction.DataTransaction.TypedValue
-import scorex.transaction.{DataTransaction, Transaction}
+import scorex.transaction.DataTransaction.DataItem
+import scorex.transaction.Transaction
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.Script
 
@@ -94,14 +94,18 @@ class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockD
     }
   }
 
-  override def accountData(acc: Address): Map[String, TypedValue[_]] = {
+  override def accountData(acc: Address): AccountDataInfo = {
     val fromInner = inner.accountData(acc)
-    val fromDiff = blockDiff.txsDiff.accountData.getOrElse(acc, Map())
-    fromInner ++ fromDiff
+    Console.err.println(s"CSR inner $fromInner") ///
+    val fromDiff = blockDiff.txsDiff.accountData.get(acc).orEmpty
+    Console.err.println(s"CSR diff $fromDiff") ///
+    val r = fromInner.combine(fromDiff)
+    Console.err.println(s"CSR res $r") ///
+    r
   }
 
-  override def accountData(acc: Address, key: String): Option[TypedValue[_]] = {
-    val diffData = blockDiff.txsDiff.accountData.getOrElse(acc, Map())
+  override def accountData(acc: Address, key: String): Option[DataItem[_]] = {
+    val diffData = blockDiff.txsDiff.accountData.get(acc).orEmpty
     diffData.get(key).orElse(inner.accountData(acc, key))
   }
 }

@@ -2,18 +2,18 @@ package scorex.api.http
 
 import cats.implicits._
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
-import play.api.libs.json.{Format, Json}
+import play.api.libs.json.{Json, Reads}
 import scorex.account.PublicKeyAccount
+import scorex.transaction.DataTransaction.DataItemSpec
 import scorex.transaction.{DataTransaction, Proofs, ValidationError}
-import scorex.transaction.DataTransaction.Item
 
 object DataRequest {
-  implicit val unsignedFormat: Format[DataRequest] = Json.format
-  implicit val signedFormat: Format[SignedDataRequest] = Json.format
+  implicit val unsignedReads: Reads[DataRequest] = Json.reads
+  implicit val signedReads: Reads[SignedDataRequest] = Json.reads
 }
 
 case class DataRequest(sender: String,
-                       data: List[Item],
+                       data: List[DataItemSpec],
                        fee: Long,
                        timestamp: Option[Long] = None)
 
@@ -21,7 +21,7 @@ case class DataRequest(sender: String,
 case class SignedDataRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                              senderPublicKey: String,
                              @ApiModelProperty(value = "///", required = true)
-                             data: List[Item],
+                             data: List[DataItemSpec],
                              @ApiModelProperty(required = true)
                              fee: Long,
                              @ApiModelProperty(required = true)

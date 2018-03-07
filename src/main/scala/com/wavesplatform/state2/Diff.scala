@@ -3,7 +3,7 @@ package com.wavesplatform.state2
 import cats.Monoid
 import cats.implicits._
 import scorex.account.{Address, Alias}
-import scorex.transaction.DataTransaction.Data
+import scorex.transaction.DataTransaction.DataItem
 import scorex.transaction.Transaction
 import scorex.transaction.smart.Script
 
@@ -41,6 +41,19 @@ object AssetInfo {
   }
 }
 
+case class AccountDataInfo(data: Map[String, DataItem[_]]) {
+  def get(key: String): Option[DataItem[_]] = data.get(key)
+  /// +keySet, foreach
+}
+
+object AccountDataInfo {
+  implicit val accountDataInfoMonoid = new Monoid[AccountDataInfo] {
+    override def empty: AccountDataInfo = AccountDataInfo(Map.empty)
+
+    override def combine(x: AccountDataInfo, y: AccountDataInfo): AccountDataInfo = AccountDataInfo(x.data ++ y.data)
+  }
+}
+
 case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 portfolios: Map[Address, Portfolio],
                 issuedAssets: Map[ByteStr, AssetInfo],
@@ -49,7 +62,7 @@ case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 orderFills: Map[ByteStr, OrderFillInfo],
                 leaseState: Map[ByteStr, Boolean],
                 scripts: Map[Address, Option[Script]],
-                accountData: Map[Address, Data]) {
+                accountData: Map[Address, AccountDataInfo]) {
 
   lazy val accountTransactionIds: Map[Address, List[ByteStr]] = {
     val map: List[(Address, Set[(Int, Long, ByteStr)])] = transactions.toList
@@ -72,7 +85,7 @@ object Diff {
             paymentTransactionIdsByHashes: Map[ByteStr, ByteStr] = Map.empty,
             leaseState: Map[ByteStr, Boolean] = Map.empty,
             scripts: Map[Address, Option[Script]] = Map.empty,
-            accountData: Map[Address, Data] = Map.empty): Diff = Diff(
+            accountData: Map[Address, AccountDataInfo] = Map.empty): Diff = Diff(
     transactions = Map((tx.id(), (height, tx, portfolios.keys.toSet))),
     portfolios = portfolios,
     issuedAssets = assetInfos,
@@ -101,6 +114,12 @@ object Diff {
       orderFills = older.orderFills.combine(newer.orderFills),
       leaseState = older.leaseState ++ newer.leaseState,
       scripts = older.scripts ++ newer.scripts,
-      accountData = older.accountData ++ newer.accountData)
+      accountData = {///
+        val x= older.accountData.combine(newer.accountData)
+        Console.err.println(s"combine older: ${older.accountData}")
+        Console.err.println(s"combine newer: ${newer.accountData}")
+        Console.err.println(s"combine res: $x")
+        x
+      })
   }
 }

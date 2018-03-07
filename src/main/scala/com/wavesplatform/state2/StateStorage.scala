@@ -1,7 +1,5 @@
 package com.wavesplatform.state2
 
-import java.nio.charset.StandardCharsets
-
 import cats.Monoid
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Ints, Longs}
@@ -10,12 +8,10 @@ import com.wavesplatform.utils._
 import org.iq80.leveldb.{DB, WriteBatch}
 import scorex.account.{Address, Alias}
 import scorex.serialization.Deser
-import scorex.transaction.DataTransaction
-import scorex.transaction.DataTransaction.{Data, ParsedItem, TypedValue}
+import scorex.transaction.DataTransaction.DataItem
 import scorex.transaction.smart.Script
 import scorex.utils.{NTP, Time}
 
-import scala.collection.SortedMap
 import scala.util.Try
 
 class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") with PropertiesStorage with VersionedStorage {
@@ -169,28 +165,33 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
     } else None
   }
 
-  def getAccountData(address: Address): Seq[ParsedItem] = {
-    val k = makeKey(AddressDataPrefix, address.bytes.arr)
-    val keys = get(k).map(StringSeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty) ///same as in method below
-    for {
-      key <- keys
-      tv <- get(k ++ key.getBytes(Charset)).map(b => TypedValue.fromBytes(b, 0)._1)
-    } yield ParsedItem(key, tv)
-  }
-
-  def getAccountData(address: Address, key: String): Option[TypedValue[_]] = {
+  def getAccountData(address: Address, key: String): Option[DataItem[_]] = {
     val k = makeKey(AddressDataPrefix, address.bytes.arr ++ key.getBytes(Charset))
-    get(k).map(b => TypedValue.fromBytes(b, 0)._1)
+    get(k).map(b => DataItem.parse(key, b, 0)._1)
   }
 
-  def putAccountData(b: Option[WriteBatch], data: Map[Address, Data]): Unit = { ///Map -> Seq[TypedValue] ?  may lose a tx if 2 data txs in block
-    data.foreach { case (addr, items)  =>
+  def getAccountData(address: Address): AccountDataInfo = {
+    val data = for {
+      keys <- get(makeKey(AddressDataPrefix, address.bytes.arr)).map(StringSeqCodec.decode).map(_.explicitGet().value).toSeq
+      key <- keys
+      item <- getAccountData(address, key)
+    } yield key -> item
+    AccountDataInfo(data.toMap)
+  }
+
+  private def putAccountData(b: Option[WriteBatch], data: Map[Address, AccountDataInfo]): Unit = {
+    data.foreach { case (addr, dataInfo)  =>
       val k = makeKey(AddressDataPrefix, addr.bytes.arr)
-      val keys = get(k).map(StringSeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty) /// => no empty keys allowed
-      val updatedKeys = (keys ++ items.keySet).distinct
+      val keys = {
+        val kk = get(k).map(StringSeqCodec.decode).map(_.explicitGet().value)
+        Console.err.println("SS keys = " + kk)///
+        kk.getOrElse(Seq.empty)
+      } /// => no empty keys allowed
+      val updatedKeys = (keys ++ dataInfo.data.keySet).distinct
+      Console.err.println("SS upKeys = " + updatedKeys)///
       if (updatedKeys.lengthCompare(keys.size) > 0)
         put(k, StringSeqCodec.encode(updatedKeys), b)
-      items.foreach { case (key, value) => put(k ++ key.getBytes(Charset), value.toBytes, b) }
+      dataInfo.data.foreach { case (key, value) => put(k ++ key.getBytes(Charset), value.valueBytes, b) }
     }
   }
 

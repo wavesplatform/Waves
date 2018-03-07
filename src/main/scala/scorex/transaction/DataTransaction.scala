@@ -10,7 +10,7 @@ import play.api.libs.json._
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
-import scorex.transaction.DataTransaction.ParsedItem
+import scorex.transaction.DataTransaction.DataItem
 import scorex.transaction.TransactionParser.{KeyLength, TransactionType}
 import scorex.transaction.ValidationError.Validation
 
@@ -18,7 +18,7 @@ import scala.util.{Failure, Success, Try}
 
 case class DataTransaction private(version: Byte,
                                    sender: PublicKeyAccount,
-                                   data: List[ParsedItem],
+                                   data: List[DataItem[_]],
                                    fee: Long,
                                    timestamp: Long,
                                    proofs: Proofs) extends ProvenTransaction with FastHashId { ///is it ok for id?
@@ -50,69 +50,81 @@ object DataTransaction {
   val MaxDataSize = Byte.MaxValue ///unsigned?
   val MaxKeySize = Byte.MaxValue
   val MaxValueSize = Short.MaxValue
-  type Data = Map[String, TypedValue[_]] ///move somewhere, make class?
 
   private val UTF8 = StandardCharsets.UTF_8
 
-  object Type extends Enumeration {
-    val Integer = Value(0)
-    val Boolean = Value(1)
-    val Binary = Value(2)
-  }
-
-  case class Item(key: String, `type`: String, value: String) {
-    def parse: Validation[ParsedItem] = {
+  case class DataItemSpec(key: String, `type`: String, value: String) {///converge w/ DataItem
+    def parse: Validation[DataItem[_]] = {
       val typedValueEi = `type` match {
-        case "integer" => Try(java.lang.Long.parseLong(value)).map(n => IntegerValue(n))
-        case "boolean" => Try(java.lang.Boolean.parseBoolean(value)).map(b => BooleanValue(b))
-        case "binary" => Base58.decode(value).map(arr => BinaryValue(ByteStr(arr)))
+        case "integer" => Try(java.lang.Long.parseLong(value)).map(IntegerDataItem(key, _))
+        case "boolean" => Try(java.lang.Boolean.parseBoolean(value)).map(BooleanDataItem(key, _))
+        case "binary" => Base58.decode(value).map(BinaryDataItem(key, _))
       }
-      typedValueEi.toEither
-        .map(ParsedItem(key, _))
-        .left.map(ValidationError.GenericError(_))
+      typedValueEi.toEither.left.map(ValidationError.GenericError(_))
     }
   }
 
-  implicit val itemReads: Reads[Item] = Json.reads[Item]
+  implicit val dataItemReads: Reads[DataItemSpec] = Json.reads[DataItemSpec]
 
-  implicit val itemFormat: Format[Item] = Json.format
+  sealed abstract class DataItem[T](val key: String, val value: T) {
+    def valueBytes: Array[Byte]
 
-  case class ParsedItem(key: String, value: TypedValue[_]) {
-    def toBytes: Array[Byte] = Bytes.concat(
-      Array(key.length.toByte),
-      key.getBytes(UTF8),
-      value.toBytes)
-
-    def valid: Boolean = key.getBytes(UTF8).length <= MaxKeySize && value.valid
-  }
-
-  implicit val parsedItemWrites: Writes[ParsedItem] = (item: ParsedItem) =>
-    Json.obj("key" -> item.key) ++ item.value.toJson
-
-  def parseItem(b: Array[Byte], p: Int): (ParsedItem, Int) = {
-    val keyLength = b(p)
-    val s0 = p + 1 + keyLength
-    val key = new String(b.slice(p + 1, s0), UTF8)
-    val (tv, p1) = TypedValue.fromBytes(b, s0)
-    (ParsedItem(key, tv), p1)
-  }
-
-  sealed abstract class TypedValue[T](typestring: String, marshaller: T => JsValue, value: T) {
-    def valid: Boolean = true
-    def toJson: JsObject = Json.obj("type" -> typestring, "value" -> value.toString)
-    def toBytes: Array[Byte]
-  }
-
-  object TypedValue {
-    def fromBytes(b: Array[Byte], position: Int): (TypedValue[_], Int) = b(position) match {
-      case t if t == Type.Integer.id => (IntegerValue(Longs.fromByteArray(b.drop(position + 1))), position + 9)
-      case t if t == Type.Boolean.id => (BooleanValue(b(position + 1) != 0), position + 2)
-      case t if t == Type.Binary.id =>
-        val (blob, pos) = Deser.parseArraySize(b, position + 1)
-        (BinaryValue(ByteStr(blob)), pos)
+    def toBytes: Array[Byte] = {
+      val keyBytes = key.getBytes(UTF8)
+      Bytes.concat(Array(keyBytes.length.toByte), keyBytes, valueBytes)
     }
 
-    implicit val typedValueWrites: Writes[TypedValue[_]] = _.toJson
+    def toJson: JsObject = Json.obj("key" -> key)
+
+    def valid: Boolean = key.getBytes(UTF8).length <= MaxKeySize
+  }
+
+  object DataItem {
+    object Type extends Enumeration {
+      val Integer = Value(0)
+      val Boolean = Value(1)
+      val Binary = Value(2)
+    }
+
+    def parse(bytes: Array[Byte], p: Int): (DataItem[_], Int) = {
+      val keyLength = bytes(p)
+      val key = new String(bytes, p + 1, keyLength, UTF8)
+      parse(key, bytes, p + 1 + keyLength)
+    }
+
+    def parse(key: String, bytes: Array[Byte], p: Int): (DataItem[_], Int) = {
+      bytes(p) match {
+        case t if t == Type.Integer.id => (IntegerDataItem(key, Longs.fromByteArray(bytes.drop(p + 1))), p + 9)
+        case t if t == Type.Boolean.id => (BooleanDataItem(key, bytes(p + 1) != 0), p + 2)
+        case t if t == Type.Binary.id =>
+          val (blob, p1) = Deser.parseArraySize(bytes, p + 1)
+          (BinaryDataItem(key, blob), p1)
+        /// case _ => Validation
+      }
+    }
+  }
+
+  case class IntegerDataItem(k: String, v: Long) extends DataItem[Long](k, v) {
+    override def valueBytes: Array[Byte] = DataItem.Type.Integer.id.toByte +: Longs.toByteArray(value)
+
+    override def toJson: JsObject = super.toJson + ("type" -> JsString("integer")) + ("value" -> JsString(value.toString))
+  }
+
+  case class BooleanDataItem(k: String, v: Boolean) extends DataItem[Boolean](k, v) {
+    override def valueBytes: Array[Byte] = Array(DataItem.Type.Boolean.id, if (value) 1 else 0).map(_.toByte)
+
+    override def toJson: JsObject = super.toJson + ("type" -> JsString("boolean")) + ("value" -> JsString(value.toString))
+  }
+
+  case class BinaryDataItem(k: String, v: Array[Byte]) extends DataItem[Array[Byte]](k, v) {
+    override def valueBytes: Array[Byte] = DataItem.Type.Binary.id.toByte +: Deser.serializeArray(value)
+
+    override def toJson: JsObject = super.toJson + ("type" -> JsString("binary")) + ("value" -> JsString(Base58.encode(value)))
+
+    override def valid: Boolean = value.length <= MaxValueSize
+  }
+
+  implicit val dataItemWrites: Writes[DataItem[_]] = _.toJson
 
 //    implicit object Format extends Format[TypedValue[_]] {
 //      def reads(jsv: JsValue): JsResult[TypedValue[_]] = {
@@ -128,36 +140,21 @@ object DataTransaction {
 //
 //      def writes(tv: TypedValue[_]): JsValue = tv.toJson
 //    }
-  }
-
-  import Type._
-  case class IntegerValue(value: Long) extends TypedValue[Long]("integer", JsNumber(_), value) {
-    override def toBytes: Array[Byte] = Array(Integer.id.toByte) ++ Longs.toByteArray(value)
-  }
-
-  case class BooleanValue(value: Boolean) extends TypedValue[Boolean]("boolean", JsBoolean.apply, value) {
-    override def toBytes: Array[Byte] = Array(Boolean.id.toByte) ++ Array((if (value) 1 else 0): Byte)
-  }
-
-  case class BinaryValue(value: ByteStr) extends TypedValue[ByteStr]("binary", bstr => JsString(Base58.encode(bstr.arr)), value) {///accept Array[Byte]?
-    override def toBytes: Array[Byte] = Array(Binary.id.toByte) ++ Deser.serializeArray(value.arr)
-    override def valid: Boolean = value.arr.length <= MaxValueSize
-  }
 
   def parseTail(bytes: Array[Byte]): Try[DataTransaction] = Try {
     val version = bytes(0)
-    val s0 = KeyLength + 1
-    val sender = PublicKeyAccount(bytes.slice(1, s0))
+    val p0 = KeyLength + 1
+    val sender = PublicKeyAccount(bytes.slice(1, p0))
 
-    val itemCount = Shorts.fromByteArray(bytes.slice(s0, s0 + 2))
-    val itemList = List.iterate(parseItem(bytes, s0 + 2), itemCount) { case (pair, pos) => parseItem(bytes, pos) }
+    val itemCount = Shorts.fromByteArray(bytes.slice(p0, p0 + 2))
+    val itemList = List.iterate(DataItem.parse(bytes, p0 + 2), itemCount) { case (pair, pos) => DataItem.parse(bytes, pos) }
     val items = itemList.map(_._1)
     Console.err.println("READ " + items)///
-    val s1 = itemList.lastOption.map(_._2).getOrElse(s0 + 2)
-    val timestamp = Longs.fromByteArray(bytes.slice(s1, s1 + 8))
-    val feeAmount = Longs.fromByteArray(bytes.slice(s1 + 8, s1 + 16))
+    val p1 = itemList.lastOption.map(_._2).getOrElse(p0 + 2)
+    val timestamp = Longs.fromByteArray(bytes.slice(p1, p1 + 8))
+    val feeAmount = Longs.fromByteArray(bytes.slice(p1 + 8, p1 + 16))
     val txEi = for {
-      proofs <- Proofs.fromBytes(bytes.drop(s1 + 16))
+      proofs <- Proofs.fromBytes(bytes.drop(p1 + 16))
       tx <- create(version, sender, items, feeAmount, timestamp, proofs)
     } yield tx
     txEi.fold(left => Failure(new Exception(left.toString)), right => Success(right))
@@ -165,7 +162,7 @@ object DataTransaction {
 
   def create(version: Byte,
              sender: PublicKeyAccount,
-             data: List[ParsedItem],
+             data: List[DataItem[_]],
              feeAmount: Long,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, DataTransaction] = {
@@ -180,7 +177,7 @@ object DataTransaction {
 
   def selfSigned(version: Byte,
                  sender: PrivateKeyAccount,
-                 data: List[ParsedItem],
+                 data: List[DataItem[_]],
                  feeAmount: Long,
                  timestamp: Long): Either[ValidationError, DataTransaction] = {
     create(version, sender, data, feeAmount, timestamp, Proofs.empty).right.map { unsigned =>

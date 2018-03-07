@@ -3,7 +3,7 @@ package com.wavesplatform.state2.reader
 import com.google.common.base.Charsets
 import com.wavesplatform.state2._
 import scorex.account.{Address, AddressOrAlias, Alias}
-import scorex.transaction.DataTransaction.TypedValue
+import scorex.transaction.DataTransaction.DataItem
 import scorex.transaction.ValidationError.AliasNotExists
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
@@ -53,9 +53,9 @@ trait SnapshotStateReader extends Synchronized {
 
   def accountScript(address: Address): Option[Script]
 
-  def accountData(acc: Address): Map[String, TypedValue[_]]
+  def accountData(acc: Address): AccountDataInfo
 
-  def accountData(acc: Address, key: String): Option[TypedValue[_]]
+  def accountData(acc: Address, key: String): Option[DataItem[_]]
 }
 
 object SnapshotStateReader {

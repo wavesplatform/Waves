@@ -316,7 +316,7 @@ case class AddressApiRoute(settings: RestAPISettings, functionalitySettings: Fun
   private def accountData(address: String): ToResponseMarshallable = {
     val s = state()
     s.read { _ =>
-      Address.fromString(address).map(acc => ToResponseMarshallable(s.accountData(acc))).getOrElse(InvalidAddress)
+      Address.fromString(address).map(acc => ToResponseMarshallable(s.accountData(acc).data)).getOrElse(InvalidAddress)
     }
   }
 

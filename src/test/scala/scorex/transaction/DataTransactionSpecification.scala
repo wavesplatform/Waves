@@ -1,16 +1,13 @@
 package scorex.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.state2.ByteStr
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import play.api.libs.json.{Format, Json, Writes}
+import play.api.libs.json.Json
 import scorex.api.http.SignedDataRequest
-import scorex.transaction.DataTransaction.ParsedItem
+import scorex.crypto.encode.Base58
+import scorex.transaction.DataTransaction.DataItemSpec
 import scorex.transaction.TransactionParser.TransactionType
-import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
-import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 
 class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -23,9 +20,9 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
       recovered.timestamp shouldEqual tx.timestamp
       recovered.fee shouldEqual tx.fee
 
-      recovered.data.zip(tx.data).foreach { case (ParsedItem(rk, rv), ParsedItem(tk, tv)) =>
-        rk shouldEqual tk
-        rv shouldEqual tv
+      recovered.data.zip(tx.data).foreach { case (r, t) =>
+        r.key shouldEqual t.key
+        r.value shouldEqual t.value
       }
 
       recovered.bytes() shouldEqual tx.bytes()
@@ -40,21 +37,21 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   }
 
   property("JSON roundtrip") {///needed?
-    import scorex.api.http.DataRequest.signedFormat
+    implicit val specFormat = Json.format[DataItemSpec]
+    implicit val signedFormat = Json.format[SignedDataRequest]
 //    import DataTransaction.itemFormat
 //
 //    implicit val dataTransactionFormat: Format[DataTransaction] = Json.format
 
     forAll(dataTransactionGen) { tx0: DataTransaction =>
       val json0 = tx0.json()
-      Console.err.println("json " + json0)///
+//      Console.err.println("json " + json0)///
       //      val tx1 = json0.as[DataTransaction]
       //      val json1 = tx1.json()
       tx0.toString shouldEqual json0.toString
 
       val req = json0.as[SignedDataRequest]
-      Console.err.println("req " + req)///
-
+//      Console.err.println("req " + req)///
     }
   }
 
@@ -63,16 +60,16 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
 
     forAll(dataTransactionGen) {
       case DataTransaction(version, sender, data, fee, timestamp, proofs) =>
-        val dataTooBig = List.fill(MaxDataSize + 1)(ParsedItem("key", IntegerValue(4)))
+        val dataTooBig = List.fill(MaxDataSize + 1)(IntegerDataItem("key", 4))
         val dataTooBigEi = create(version, sender, dataTooBig, fee, timestamp, proofs)
         dataTooBigEi shouldBe Left(ValidationError.TooBigArray)
 
-        val keyTooLong = data :+ ParsedItem("a" * (MaxKeySize + 1), BooleanValue(true))
+        val keyTooLong = data :+ BooleanDataItem("a" * (MaxKeySize + 1), true)
         val keyTooLongEi = create(version, sender, keyTooLong, fee, timestamp, proofs)
         keyTooLongEi shouldBe Left(ValidationError.TooBigArray)
 
-        val valueTooLong = data :+ ParsedItem("key", BinaryValue(ByteStr(Array.fill(MaxValueSize + 1)(1: Byte))))
-        val valueTooLongEi = create(version, sender, keyTooLong, fee, timestamp, proofs)
+        val valueTooLong = data :+ BinaryDataItem("key", Array.fill(MaxValueSize + 1)(1: Byte))
+        val valueTooLongEi = create(version, sender, valueTooLong, fee, timestamp, proofs)
         valueTooLongEi shouldBe Left(ValidationError.TooBigArray)
 
         val noFeeEi = create(version, sender, data, 0, timestamp, proofs)
