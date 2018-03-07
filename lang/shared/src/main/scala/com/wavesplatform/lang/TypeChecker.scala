@@ -5,6 +5,7 @@ import cats.syntax.all._
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.ctx.{Context, PredefType}
 import monix.eval.Coeval
+import ctx._
 
 import scala.util.{Failure, Success, Try}
 

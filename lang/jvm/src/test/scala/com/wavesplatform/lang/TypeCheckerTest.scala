@@ -30,7 +30,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       case _               => Left("extracting from empty option")
     }
 
-    var optionFunc = PredefFunction("optionFunc", OPTION(INT), List.empty)(null)
+    val optionFunc = PredefFunction("optionFunc", OPTION(INT), List.empty)(null)
 
     val ctx      = Context(Map.empty, Map.empty, functions = Map((genericFunc.name, genericFunc), (optionFunc.name, optionFunc)))
     val Right(v) = TypeChecker(TypeCheckerContext.fromContext(ctx), FUNCTION_CALL(genericFunc.name, List(FUNCTION_CALL(optionFunc.name, List.empty))))

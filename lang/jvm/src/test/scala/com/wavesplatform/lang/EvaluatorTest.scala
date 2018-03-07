@@ -4,7 +4,7 @@ import cats.data.EitherT
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Terms.Typed._
 import com.wavesplatform.lang.Terms._
-import com.wavesplatform.lang.ctx.{Context, _}
+import com.wavesplatform.lang.ctx._
 import com.wavesplatform.lang.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
