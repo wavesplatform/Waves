@@ -5,7 +5,6 @@ import cats.syntax.all._
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.ctx.{Context, PredefType}
 import monix.eval.Coeval
-import ctx._
 
 import scala.util.{Failure, Success, Try}
 
@@ -22,7 +21,7 @@ object TypeChecker {
       TypeCheckerContext(
         predefTypes = ctx.typeDefs,
         varDefs = ctx.letDefs.mapValues(_.tpe),
-        functionDefs = ctx.functions.mapValues(x => FUNCTION(x.args.map(y => y._2), x.resultType))
+        functionDefs = ctx.functions.mapValues(x => x.signature)
       )
   }
 
@@ -77,19 +76,23 @@ object TypeChecker {
             sequencedActualArgTypes.subflatMap { v: Seq[(Typed.EXPR, TYPE)] =>
               val typeParameters = v.flatMap(x => inferTypeParams(x._1.tpe, x._2))
 
+              //Grouping type params by names "T1", "B" ect
+              //and finding common type per group
               val resolvedTypes = typeParameters
-                .groupBy { case (n, _) => n }
-                .map(
-                  g =>
-                    (g._1,
-                     g._2
+                .groupBy { case (typeArgName, _) => typeArgName }
+                .map {
+                  case (groupKey, types) =>
+                    (groupKey,
+                     types
                        .drop(1)
-                       .foldLeft(Either.right[String, TYPE](g._2.head._2))((a, b) =>
+                       .foldLeft(Either.right[String, TYPE](types.head._2))((a, b) =>
                          a.flatMap(t1 =>
                            findCommonType(t1, b._2)
-                             .toRight(s"There is no common type among (${g._2.map(_._2).mkString(", ")}) for ${g._1} type param")))))
+                             .toRight(s"There is no common type among (${types.map(_._2).mkString(", ")}) for $groupKey type param"))))
+                }
 
-              val matches = v.map(x => (x._1, resolveTypes(x._2, resolvedTypes)))
+              val matches = v
+                .map(x => (x._1, resolveTypes(x._2, resolvedTypes)))
                 .map {
                   case ((e, Right(tpe))) =>
                     matchType(tpe, e.tpe) match {

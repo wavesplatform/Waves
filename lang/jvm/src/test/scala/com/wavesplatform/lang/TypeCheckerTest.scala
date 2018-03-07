@@ -16,24 +16,26 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("should infer generic function return type") {
     import Untyped._
-    val genericFunc: PredefFunction = PredefFunction("genericFunc", TYPEREF("T"), List("p1" -> TYPEREF("T")))(Right(_))
-    val ctx                         = Context(Map.empty, Map.empty, functions = Map((genericFunc.name, genericFunc)))
-    val Right(v)                    = TypeChecker(TypeCheckerContext.fromContext(ctx), FUNCTION_CALL(genericFunc.name, List(CONST_INT(1))))
+    val genericFuncWithTwoTypeParams = PredefFunction("genericFunc", TYPEREF("T"), List("p1" -> TYPEREF("T")))(Right(_))
+    val ctx                          = Context(Map.empty, Map.empty, functions = Map((genericFuncWithTwoTypeParams.name, genericFuncWithTwoTypeParams)))
+    val Right(v)                     = TypeChecker(TypeCheckerContext.fromContext(ctx), FUNCTION_CALL(genericFuncWithTwoTypeParams.name, List(CONST_INT(1))))
 
     v.tpe shouldBe INT
   }
 
   property("should infer inner types") {
     import Untyped._
-    val genericFunc: PredefFunction = PredefFunction("genericFunc", TYPEREF("T"), List("p1" -> OPTION(TYPEREF("T")))) {
+    val genericFuncWithOptionParam = PredefFunction("genericFunc", TYPEREF("T"), List("p1" -> OPTION(TYPEREF("T")))) {
       case Some(vl) :: Nil => Right(vl)
       case _               => Left("extracting from empty option")
     }
 
     val optionFunc = PredefFunction("optionFunc", OPTION(INT), List.empty)(null)
 
-    val ctx      = Context(Map.empty, Map.empty, functions = Map((genericFunc.name, genericFunc), (optionFunc.name, optionFunc)))
-    val Right(v) = TypeChecker(TypeCheckerContext.fromContext(ctx), FUNCTION_CALL(genericFunc.name, List(FUNCTION_CALL(optionFunc.name, List.empty))))
+    val ctx =
+      Context(Map.empty, Map.empty, functions = Map((genericFuncWithOptionParam.name, genericFuncWithOptionParam), (optionFunc.name, optionFunc)))
+    val Right(v) = TypeChecker(TypeCheckerContext.fromContext(ctx),
+                               FUNCTION_CALL(genericFuncWithOptionParam.name, List(FUNCTION_CALL(optionFunc.name, List.empty))))
 
     v.tpe shouldBe INT
   }

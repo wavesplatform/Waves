@@ -78,7 +78,6 @@ object Terms {
   def inferTypeParams(actual: TYPE, expected: TYPE): List[(String, TYPE)] =
     (actual, expected) match {
       case (actualType, TYPEREF(name)) => List((name, actualType))
-      case (actualType, TYPEREF(name)) => List((name, actualType))
       case (OPTION(t1), OPTION(t2)) => inferTypeParams(t1, t2)
       case _ => List.empty
     }
