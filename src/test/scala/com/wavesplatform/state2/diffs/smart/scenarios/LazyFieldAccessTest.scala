@@ -2,6 +2,7 @@ package com.wavesplatform.state2.diffs.smart.scenarios
 
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import com.wavesplatform.state2.diffs.{assertDiffAndState, assertDiffEi, produce}
+import com.wavesplatform.state2.diffs.smart._
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
 import scorex.lagonaki.mocks.TestBlock

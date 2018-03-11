@@ -1,26 +1,17 @@
 package com.wavesplatform.state2.diffs.smart
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Terms.Typed
 import com.wavesplatform.lang.{Parser, TypeChecker}
-import com.wavesplatform.lang.ctx.Context
-import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.diffs.ENOUGH_AMT
 import com.wavesplatform.state2._
-import monix.eval.Coeval
+import com.wavesplatform.state2.diffs.ENOUGH_AMT
 import org.scalacheck.Gen
-import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.smart.{ConsensusContext, Script, SetScriptTransaction}
+import scorex.transaction.smart.{Script, SetScriptTransaction}
 
 package object scenarios extends TransactionGen {
-  val fs: FunctionalitySettings                               = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
-  val dummyContext: Context                                   = new ConsensusContext(Coeval(???), Coeval(???), null).build()
-  val dummyTypeCheckerContext: TypeChecker.TypeCheckerContext = TypeChecker.TypeCheckerContext.fromContext(dummyContext)
-
   def preconditionsTransferAndLease(code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = {
     val untyped = Parser(code).get.value
     val typed   = TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()

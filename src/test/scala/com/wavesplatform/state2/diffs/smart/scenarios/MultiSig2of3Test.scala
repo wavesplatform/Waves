@@ -3,7 +3,8 @@ package com.wavesplatform.state2.diffs.smart.scenarios
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang._
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs.{ENOUGH_AMT, assertDiffAndState, assertLeft}
+import com.wavesplatform.state2.diffs._
+import com.wavesplatform.state2.diffs.smart._
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB, crypto}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks

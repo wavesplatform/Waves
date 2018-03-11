@@ -1,7 +1,8 @@
 package com.wavesplatform.state2.diffs.smart.scenarios
 
 import com.wavesplatform.lang.Terms._
-import com.wavesplatform.state2.diffs.{assertDiffAndState, assertDiffEi, produce}
+import com.wavesplatform.state2.diffs._
+import com.wavesplatform.state2.diffs.smart._
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
