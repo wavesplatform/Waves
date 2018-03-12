@@ -2,6 +2,7 @@ package com.wavesplatform.state2
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
+import cats.Monoid
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.settings.FunctionalitySettings
@@ -67,6 +68,13 @@ package object diffs extends Matchers {
     val compositeState = composite(preconditionDiff, newState(db))
     val totalDiff2 = differ(compositeState, block).explicitGet()
     assertion(totalDiff2, composite(totalDiff2, compositeState))
+  }
+
+  def assertBalanceInvariant(totalDiff: BlockDiff): Unit = {
+    val totalPortfolioDiff = Monoid.combineAll(totalDiff.txsDiff.portfolios.values)
+    totalPortfolioDiff.balance shouldBe 0
+    totalPortfolioDiff.effectiveBalance shouldBe 0
+    totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
   }
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)

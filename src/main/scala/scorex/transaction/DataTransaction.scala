@@ -47,7 +47,7 @@ case class DataTransaction private(version: Byte,
 }
 
 object DataTransaction {
-  val MaxDataSize = Byte.MaxValue ///unsigned?
+  val MaxDataItemCount = Byte.MaxValue
   val MaxKeySize = Byte.MaxValue
   val MaxValueSize = Short.MaxValue
 
@@ -166,7 +166,7 @@ object DataTransaction {
              feeAmount: Long,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, DataTransaction] = {
-    if (data.lengthCompare(MaxDataSize) > 0 || data.exists(! _.valid)) {
+    if (data.lengthCompare(MaxDataItemCount) > 0 || data.exists(! _.valid)) {
       Left(ValidationError.TooBigArray) ///better diagnostics
     } else if (feeAmount <= 0) {
       Left(ValidationError.InsufficientFee)
