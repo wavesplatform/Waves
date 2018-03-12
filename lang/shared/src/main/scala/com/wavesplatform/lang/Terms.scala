@@ -1,6 +1,6 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.Context.Obj
+import com.wavesplatform.lang.ctx.Obj
 import scodec.bits.ByteVector
 
 object Terms {

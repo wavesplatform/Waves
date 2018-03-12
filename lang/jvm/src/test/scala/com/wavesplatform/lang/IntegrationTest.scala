@@ -2,12 +2,14 @@ package com.wavesplatform.lang
 
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.ctx._
 
 class IntegrationTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
 
   private def eval(code: String) = {
     val untyped = Parser(code).get.value
-    val ctx = Context(Map.empty, Map.empty, Map(multiplierFunction.name -> multiplierFunction))
+    val ctx     = Context(Map.empty, Map.empty, Map(multiplierFunction.name -> multiplierFunction))
     val typed   = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(ctx), untyped)
     typed.flatMap(Evaluator(ctx, _))
   }

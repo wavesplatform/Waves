@@ -13,7 +13,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers with ScalaFutures
-  with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationTestsScheme
+  with IntegrationPatience with RecoverMethods with IntegrationTestsScheme
   with Nodes with ScorexLogging {
   this: Suite =>
 

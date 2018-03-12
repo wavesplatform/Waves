@@ -19,12 +19,14 @@ object Verifier {
       }
   }
 
-  def verify[T <: ProvenTransaction](s: SnapshotStateReader, script: Script, height: Int, transaction: T): Either[ValidationError, T] =
-    Evaluator[Boolean](WavesContext.build(Coeval.evalOnce(transaction), Coeval.evalOnce(height), s), script.script) match {
+  def verify[T <: ProvenTransaction](s: SnapshotStateReader, script: Script, height: Int, transaction: T): Either[ValidationError, T] = {
+    val context = new ConsensusContext(Coeval.evalOnce(transaction), Coeval.evalOnce(height), s).build()
+    Evaluator[Boolean](context, script.script) match {
       case Left(execError) => Left(GenericError(s"Script execution error: $execError"))
-      case Right(false)    => Left(TransactionNotAllowedByScript(transaction))
-      case Right(true)     => Right(transaction)
+      case Right(false) => Left(TransactionNotAllowedByScript(transaction))
+      case Right(true) => Right(transaction)
     }
+  }
 
   def verifyAsEllipticCurveSignature[T <: ProvenTransaction](pt: T): Either[ValidationError, T] =
     Either.cond(
