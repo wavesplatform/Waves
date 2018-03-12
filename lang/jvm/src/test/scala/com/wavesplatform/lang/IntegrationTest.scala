@@ -14,42 +14,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with Matchers with No
     typed.flatMap(Evaluator(ctx, _))
   }
 
-  property("pattern matching") {
-    eval("""
-           |let MULTICHARVARNAME = Some(500)
-           |
-           |let Z = match(MULTICHARVARNAME) {
-           | case None => 8
-           | case Some(B) => B + B
-           | }
-           |
-           | get(Some(Z)) + 1
-           |
-      """.stripMargin) shouldBe Right(1001)
-
-    eval("""
-           |
-           | let X = Some(10)
-           |
-           |match(X) {
-           |  case None => 0
-           |  case Some(V) => V + V + V + V
-           |}
-         """.stripMargin) shouldBe Right(40)
-
-    eval("""
-           |
-           |let X = Some(10)
-           |
-           |match(X) {
-           |  case Some(V) => V + V + V + V
-           |  case None => 0
-           |}
-         """.stripMargin) shouldBe Right(40)
-  }
-
   property("function call") {
     eval("MULTIPLY(3,4)".stripMargin) shouldBe Right(12)
-
   }
 }
