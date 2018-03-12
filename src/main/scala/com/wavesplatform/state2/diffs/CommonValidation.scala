@@ -85,9 +85,9 @@ object CommonValidation {
       case _: LeaseCancelTransaction => Right(tx)
       case _: CreateAliasTransaction => Right(tx)
       case _: MassTransferTransaction => activationBarrier(BlockchainFeatures.MassTransfer)
+      case _: DataTransaction => activationBarrier(BlockchainFeatures.DataTransaction)
       case _: SetScriptTransaction => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: ScriptTransferTransaction => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: DataTransaction => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }

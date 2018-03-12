@@ -22,9 +22,9 @@ object TransactionParser {
     val LeaseCancelTransaction = Value(9)
     val CreateAliasTransaction = Value(10)
     val MassTransferTransaction = Value(11)
-    val SetScriptTransaction = Value(12)
-    val ScriptTransferTransaction = Value(13)
-    val DataTransaction = Value(14)
+    val DataTransaction = Value(12)
+    val SetScriptTransaction = Value(13)
+    val ScriptTransferTransaction = Value(14)
   }
 
   val TimestampLength = 8

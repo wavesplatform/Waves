@@ -13,7 +13,7 @@ import scorex.transaction.{DataTransaction, GenesisTransaction, Proofs}
 
 class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
-  val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
+  val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.DataTransaction.id -> 0))
 
   val baseSetup: Gen[(GenesisTransaction, PrivateKeyAccount, Long)] = for {
     master <- accountGen
@@ -98,7 +98,7 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
       fee <- smallFeeGen
       dataTx = data(master, List(), fee, ts + 10000)
     } yield (genesis, dataTx)
-    val settings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 10))
+    val settings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.DataTransaction.id -> 10))
 
     forAll(setup) { case (genesis, data) =>
       assertDiffEi(db, Seq(block(Seq(genesis))), block(Seq(data)), settings) { blockDiffEi =>
