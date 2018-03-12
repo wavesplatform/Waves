@@ -6,7 +6,7 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
 import scorex.api.http.SignedDataRequest
 import scorex.crypto.encode.Base58
-import scorex.transaction.DataTransaction.DataItemSpec
+import scorex.transaction.DataTransaction.BinaryDataItem
 import scorex.transaction.TransactionParser.TransactionType
 
 class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -37,7 +37,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   }
 
   property("JSON roundtrip") {///needed?
-    implicit val specFormat = Json.format[DataItemSpec]
+//    implicit val specFormat = Json.format[DataItemSpec]
     implicit val signedFormat = Json.format[SignedDataRequest]
 //    import DataTransaction.itemFormat
 //
@@ -45,13 +45,25 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
 
     forAll(dataTransactionGen) { tx0: DataTransaction =>
       val json0 = tx0.json()
-//      Console.err.println("json " + json0)///
-      //      val tx1 = json0.as[DataTransaction]
-      //      val json1 = tx1.json()
+      Console.err.println("json " + json0)///
+//      val tx1 = json0.as[DataTransaction]
+//      val json1 = tx1.json()
       tx0.toString shouldEqual json0.toString
 
       val req = json0.as[SignedDataRequest]
-//      Console.err.println("req " + req)///
+      req.senderPublicKey shouldEqual Base58.encode(tx0.sender.publicKey)
+      req.fee shouldEqual tx0.fee
+      req.timestamp shouldEqual tx0.timestamp
+
+      val reqData = req.data//.map(_.parse.right.get)
+      reqData(0) shouldEqual tx0.data(0)
+      reqData(1) shouldEqual tx0.data(1)
+      reqData.zip(tx0.data).apply(2) match {
+        case (BinaryDataItem(rk, rv), BinaryDataItem(tk, tv)) =>
+          rk shouldEqual tk
+          rv shouldEqual tv
+        case _ => fail
+      }
     }
   }
 
@@ -60,11 +72,23 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
 
     forAll(dataTransactionGen) {
       case DataTransaction(version, sender, data, fee, timestamp, proofs) =>
+        /// move positive cases to IT?
+        val emptyEi = create(version, sender, List.empty, fee, timestamp, proofs)
+        emptyEi shouldBe Right(DataTransaction(version, sender, List.empty, fee, timestamp, proofs))
+
+        val sameKey = List.fill(4)(data.head)
+        val sameKeyEi = create(version, sender, sameKey, fee, timestamp, proofs)
+        sameKeyEi shouldBe Right(DataTransaction(version, sender, sameKey, fee, timestamp, proofs))
+
+        val emptyBinaryData = List(BinaryDataItem("bin", Array.empty))
+        val emptyBinaryDataEi = create(version, sender, emptyBinaryData, fee, timestamp, proofs)
+        emptyBinaryDataEi shouldBe Right(DataTransaction(version, sender, emptyBinaryData, fee, timestamp, proofs))
+
         val dataTooBig = List.fill(MaxDataItemCount + 1)(IntegerDataItem("key", 4))
         val dataTooBigEi = create(version, sender, dataTooBig, fee, timestamp, proofs)
         dataTooBigEi shouldBe Left(ValidationError.TooBigArray)
 
-        val keyTooLong = data :+ BooleanDataItem("a" * (MaxKeySize + 1), true)
+        val keyTooLong = data :+ BinaryDataItem("a" * (MaxKeySize + 1), Array(1, 2))
         val keyTooLongEi = create(version, sender, keyTooLong, fee, timestamp, proofs)
         keyTooLongEi shouldBe Left(ValidationError.TooBigArray)
 

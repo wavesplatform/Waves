@@ -4,7 +4,7 @@ import cats.implicits._
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Json, Reads}
 import scorex.account.PublicKeyAccount
-import scorex.transaction.DataTransaction.DataItemSpec
+import scorex.transaction.DataTransaction.DataItem
 import scorex.transaction.{DataTransaction, Proofs, ValidationError}
 
 object DataRequest {
@@ -13,7 +13,7 @@ object DataRequest {
 }
 
 case class DataRequest(sender: String,
-                       data: List[DataItemSpec],
+                       data: List[DataItem[_]],
                        fee: Long,
                        timestamp: Option[Long] = None)
 
@@ -21,7 +21,7 @@ case class DataRequest(sender: String,
 case class SignedDataRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                              senderPublicKey: String,
                              @ApiModelProperty(value = "///", required = true)
-                             data: List[DataItemSpec],
+                             data: List[DataItem[_]],
                              @ApiModelProperty(required = true)
                              fee: Long,
                              @ApiModelProperty(required = true)
@@ -30,9 +30,8 @@ case class SignedDataRequest(@ApiModelProperty(value = "Base58 encoded sender pu
                              proofs: List[String]) extends BroadcastRequest {
   def toTx: Either[ValidationError, DataTransaction] = for {
     _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
-    _data <- data.traverse(_.parse)
     _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
     _proofs <- Proofs.create(_proofBytes)
-    t <- DataTransaction.create(Proofs.Version, _sender, _data, timestamp, fee, _proofs) ///data
+    t <- DataTransaction.create(Proofs.Version, _sender, data, timestamp, fee, _proofs)
   } yield t
 }
