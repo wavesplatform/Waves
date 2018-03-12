@@ -59,7 +59,7 @@ object CommonValidation {
     } else Right(tx)
 
   def disallowDuplicateIds[T <: Transaction](state: SnapshotStateReader, settings: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = tx match {
-    case ptx: PaymentTransaction if ptx.timestamp < settings.requirePaymentUniqueIdAfter => Right(tx)
+    case ptx: PaymentTransaction => Right(tx)
     case _ =>
       state.transactionInfo(tx.id()) match {
         case Some((txHeight, _)) => Left(AlreadyInTheState(tx.id(), txHeight))

@@ -30,7 +30,6 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
   private val AssetsPrefix = "assets".getBytes(Charset)
   private val OrderFillsPrefix = "ord-fls".getBytes(Charset)
   private val AccountTransactionIdsPrefix = "acc-ids".getBytes(Charset)
-  private val PaymentTransactionHashesPrefix = "pmt-hash".getBytes(Charset)
   private val BalanceSnapshotsPrefix = "bal-snap".getBytes(Charset)
   private val LastBalanceHeightPrefix = "bal-h".getBytes(Charset)
   private val AliasToAddressPrefix = "alias-address".getBytes(Charset)
@@ -69,11 +68,6 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
     putPortfolios(b, diff.portfolios)
     putIssuedAssets(b, diff.issuedAssets)
     putAccountTransactionsIds(b, diff.accountTransactionIds)
-
-    diff.paymentTransactionIdsByHashes.foreach { case (hash, id) =>
-      put(makeKey(PaymentTransactionHashesPrefix, hash.arr), id.arr, b)
-    }
-
     putAliases(b, diff.aliases)
     putLeases(b, diff.leaseState)
     putScripts(b, diff.scripts)
@@ -105,9 +99,6 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
     updateAddressesIndex(Seq(address.bytes.arr), b)
     put(makeKey(WavesBalancePrefix, address.bytes.arr), WavesBalanceValueCodec.encode(value), b)
   }
-
-  def getPaymentTransactionHashes(hash: ByteStr): Option[ByteStr] =
-    get(makeKey(PaymentTransactionHashesPrefix, hash.arr)).map(b => ByteStr(b))
 
   def getAddressOfAlias(alias: Alias): Option[Address] =
     get(makeKey(AliasToAddressPrefix, alias.bytes.arr)).map(b => Address.fromBytes(b).explicitGet())

@@ -46,11 +46,6 @@ class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockD
   override def snapshotAtHeight(acc: Address, h: Int): Option[Snapshot] =
     blockDiff.snapshots.get(acc).flatMap(_.get(h)).orElse(inner.snapshotAtHeight(acc, h))
 
-  override def paymentTransactionIdByHash(hash: ByteStr): Option[ByteStr]
-  = blockDiff.txsDiff.paymentTransactionIdsByHashes.get(hash)
-    .orElse(inner.paymentTransactionIdByHash(hash))
-
-
   override def aliasesOfAddress(a: Address): Seq[Alias] =
     txDiff.aliases.filter(_._2 == a).keys.toSeq ++ inner.aliasesOfAddress(a)
 

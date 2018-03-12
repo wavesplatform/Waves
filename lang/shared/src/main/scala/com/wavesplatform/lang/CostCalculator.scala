@@ -10,7 +10,6 @@ object CostCalculator {
     case Typed.CONST_BYTEVECTOR(_)          => 1
     case typed: Typed.BINARY_OP             => 2 + apply(typed.a) + apply(typed.b)
     case Typed.IF(cond, ifTrue, ifFalse, _) => 2 + apply(cond) + Math.max(apply(ifTrue), apply(ifFalse))
-    case Typed.SIG_VERIFY(_, _, _)          => 100
     case _                                  => ???
   }
 }

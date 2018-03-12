@@ -1,6 +1,5 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.Evaluator.Context
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.Terms.Untyped._
 import org.scalatest.prop.PropertyChecks
@@ -34,19 +33,13 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("bytestr expressions") {
-    parse("checkSig(base58'333', base58'222', base58'111')") shouldBe SIG_VERIFY(
-      CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("333").get)),
-      CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("222").get)),
-      CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("111").get))
-    )
-
-    parse("false || checkSig(base58'333', base58'222', base58'111')") shouldBe BINARY_OP(
+    parse("false || SIGVERIFY(base58'333', base58'222', base58'111')") shouldBe BINARY_OP(
       FALSE,
       OR_OP,
-      SIG_VERIFY(
+      FUNCTION_CALL( "SIGVERIFY", List(
         CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("333").get)),
         CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("222").get)),
-        CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("111").get))
+        CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("111").get)))
       )
     )
   }
@@ -137,60 +130,27 @@ X > Y
         |
         |let W = TX.BODYBYTES
         |let P = TX.PROOF
-        |let V = checkSig(W,P,A)
+        |let V = SIGVERIFY(W,P,A)
         |
         |let AC = if(V) then 1 else 0
-        |let BC = if(checkSig(TX.BODYBYTES,TX.PROOF,B)) then 1 else 0
-        |let CC = if(checkSig(TX.BODYBYTES,TX.PROOF,C)) then 1 else 0
+        |let BC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOF,B)) then 1 else 0
+        |let CC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOF,C)) then 1 else 0
         |
         | AC + BC+ CC >= 2
         |
       """.stripMargin
-    parse(script)
+    parse(script) // gets parsed, but later will fail on type check!
   }
+
+  property("function call") {
+    parse("FOO(1,2)".stripMargin) shouldBe FUNCTION_CALL("FOO", List(CONST_INT(1),CONST_INT(2)))
+    parse("FOO(X)".stripMargin) shouldBe FUNCTION_CALL("FOO", List(REF("X")))
+  }
+
 
   property("isDefined/get") {
     parse("isDefined(X)") shouldBe IS_DEFINED(REF("X"))
     parse("if(isDefined(X)) then get(X) else Y") shouldBe IF(IS_DEFINED(REF("X")), GET(REF("X")), REF("Y"))
   }
 
-  property("EVALUATE patmat") {
-    eval("""
-          |let MULTICHARVARNAME = Some(500)
-          |
-          |let Z = match(MULTICHARVARNAME) {
-          | case None => 8
-          | case Some(B) => B + B
-          | }
-          |
-          | get(Some(Z)) + 1
-          |
-      """.stripMargin) shouldBe Right(1001)
-
-    eval("""
-          |
-          |let X = Some(10)
-          |
-          |match(X) {
-          |  case None => 0
-          |  case Some(V) => V + V + V + V
-          |}
-        """.stripMargin) shouldBe Right(40)
-
-    eval("""
-          |
-          |let X = Some(10)
-          |
-          |match(X) {
-          |  case Some(V) => V + V + V + V
-          |  case None => 0
-          |}
-        """.stripMargin) shouldBe Right(40)
-  }
-
-  private def eval(code: String) = {
-    val untyped = parse(code)
-    val typed   = TypeChecker(TypeChecker.Context.empty, untyped)
-    typed.flatMap(Evaluator(Context.empty, _))
-  }
 }
