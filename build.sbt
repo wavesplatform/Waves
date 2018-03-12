@@ -53,6 +53,10 @@ inThisBuild(Seq(
 resolvers += Resolver.bintrayRepo("ethereum", "maven")
 
 fork in run := true
+javaOptions in run ++= Seq(
+  "-XX:+IgnoreUnrecognizedVMOptions",
+  "--add-modules=java.xml.bind"
+)
 
 inTask(assembly)(Seq(
   test := {},

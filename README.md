@@ -50,6 +50,11 @@ If you prefer to work with _SBT_ in the interactive mode, open it with settings:
 SBT_OPTS="${SBT_OPTS} -Xms512M -Xmx1536M -Xss1M -XX:+CMSClassUnloadingEnabled" sbt
 ```
 
+For Java9 it should be:
+```
+SBT_OPTS="${SBT_OPTS} -Xms512M -Xmx1536M -Xss1M -XX:+CMSClassUnloadingEnabled --add-modules=java.xml.bind --add-exports java.base/jdk.internal.ref=ALL-UNNAMED" sbt
+```
+
 to solve the `Metaspace error` problem.
 
 # Running Integration Tests
