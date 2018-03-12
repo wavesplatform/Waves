@@ -207,8 +207,8 @@ object AsyncHttpApi extends Assertions {
 
     def effectiveBalance(address: String): Future[Balance] = get(s"/addresses/effectiveBalance/$address").as[Balance]
 
-    def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None): Future[Transaction] =
-      postJson("/assets/transfer", TransferRequest(assetId, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
+    def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None, feeAssetId: Option[String] = None): Future[Transaction] =
+      postJson("/assets/transfer", TransferRequest(assetId, feeAssetId, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
     def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Future[Transaction] =
       postJson("/assets/masstransfer", MassTransferRequest(assetId, sourceAddress, transfers, fee, None)).as[Transaction]
@@ -245,6 +245,10 @@ object AsyncHttpApi extends Assertions {
 
     def signedMassTransfer(req: SignedMassTransferRequest): Future[Transaction] = {
       postJson("/transactions/broadcast", req).as[Transaction]
+    }
+
+    def signedIssue(issue: SignedIssueRequest): Future[Transaction] = {
+      postJson("/assets/broadcast/issue", issue).as[Transaction]
     }
 
     def batchSignedTransfer(transfers: Seq[SignedTransferRequest], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
