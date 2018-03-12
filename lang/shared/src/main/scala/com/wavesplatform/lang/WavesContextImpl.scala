@@ -24,6 +24,11 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
     case _ => ???
   }
 
+  val extract: PredefFunction = PredefFunction("EXTRACT", TYPEREF("T"), List(("opt", OPTION(TYPEREF("T"))))) {
+    case Some(v) :: Nil => Right(v)
+    case _              => Left("Extract from empty option")
+  }
+
   val optionByteVector = OPTION(BYTEVECTOR)
 
   val transactionType = PredefType(
@@ -71,8 +76,8 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
   }
 
   def build(): Context = {
-    val txCoeval : Coeval[Either[String,Obj]] = Coeval.evalOnce(Right(transactionObject(transaction)))
-    val heightCoeval : Coeval[Either[String,Int]] = Coeval.evalOnce(Right(height))
+    val txCoeval: Coeval[Either[String, Obj]]     = Coeval.evalOnce(Right(transactionObject(transaction)))
+    val heightCoeval: Coeval[Either[String, Int]] = Coeval.evalOnce(Right(height))
     Context(
       Map(transactionType.name -> transactionType),
       Map(
@@ -80,8 +85,10 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
         ("TX", LazyVal(TYPEREF(transactionType.name))(EitherT(txCoeval)))
       ),
       Map(
-        sigVerifyF.name  -> sigVerifyF,
-        txByIdF.name     -> txByIdF,
+        sigVerifyF.name -> sigVerifyF,
+        txByIdF.name    -> txByIdF,
+        extract.name    -> extract,
+        //hashing
         keccack256F.name -> keccack256F,
         blake2b256F.name -> blake2b256F,
         sha256F.name     -> sha256F

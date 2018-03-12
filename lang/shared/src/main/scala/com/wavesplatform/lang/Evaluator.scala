@@ -21,7 +21,7 @@ object Evaluator {
                 case None =>
                   val varBlockTpe                                                  = newVarBlock.tpe
                   val eitherTCoeval: TrampolinedExecResult[varBlockTpe.Underlying] = r[varBlockTpe.Underlying](ctx, EitherT.pure(newVarBlock))
-                  val lz: LazyVal = LazyVal(varBlockTpe)(eitherTCoeval)
+                  val lz: LazyVal                                                  = LazyVal(varBlockTpe)(eitherTCoeval)
                   val updatedCtx: Context                                          = ctx.copy(letDefs = ctx.letDefs.updated(newVarName, lz))
                   r[blockTpe.Underlying](updatedCtx, EitherT.pure(inner))
               }
@@ -125,7 +125,7 @@ object Evaluator {
   def apply[A](c: Context, expr: Typed.EXPR): Either[ExecutionError, A] = {
     def result = r[A](c, EitherT.pure(expr)).value.apply()
     Try(result) match {
-      case Failure(ex)  => Left(ex.toString)
+      case Failure(ex) => Left(ex.toString)
       case Success(res) => res
     }
   }
