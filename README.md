@@ -57,11 +57,11 @@ to solve the `Metaspace error` problem.
 ## TL;DR
 
  * Make sure you have [Docker](https://www.docker.com/get-docker) and SBT. 
- * `sbt it:test`
+ * `sbt it/test`
  
 ## Customizing Tests
 
-By default, `it:test` will do the following: 
+By default, `it/test` will do the following: 
 * Build a container image with the fat jar and a [template.conf](src/it/resources/template.conf). The newly-built image
   will be registered with the local Docker daemon. This image is built with [sbt-docker](https://github.com/marcuslonnberg/sbt-docker)
   plugin. 
