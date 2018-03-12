@@ -207,6 +207,7 @@ class MinerImpl(allChannels: ChannelGroup,
       val lastBlock = history.lastBlock.get
       for {
         _ <- checkAge(height, history.lastBlockTimestamp().get)
+        _ <- Either.cond(stateReader().accountScript(account).isEmpty, (), s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
         balanceAndTs <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account, featureProvider)
         (balance, ts) = balanceAndTs
         offset = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)

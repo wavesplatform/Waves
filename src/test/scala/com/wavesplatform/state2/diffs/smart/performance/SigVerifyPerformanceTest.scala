@@ -54,8 +54,8 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
 
     forAll(differentTransfers(typedScript)) {
       case (gen, setScript, transfers, scriptTransfers) =>
-        def simpleCheck(): Unit = assertDiffAndState(db, Seq(TestBlock.create(Seq(gen))), TestBlock.create(transfers), fs) { case _ => }
-        def scriptedCheck(): Unit = assertDiffAndState(db, Seq(TestBlock.create(Seq(gen, setScript))), TestBlock.create(scriptTransfers), fs) {
+        def simpleCheck(): Unit = assertDiffAndState(db, Seq(TestBlock.create(Seq(gen))), TestBlock.create(transfers), smartEnabledFS) { case _ => }
+        def scriptedCheck(): Unit = assertDiffAndState(db, Seq(TestBlock.create(Seq(gen, setScript))), TestBlock.create(scriptTransfers), smartEnabledFS) {
           case _ =>
         }
 
