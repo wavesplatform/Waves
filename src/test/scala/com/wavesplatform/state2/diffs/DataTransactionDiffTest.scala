@@ -1,6 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
@@ -8,7 +9,6 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock.{create => block}
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.DataTransaction.{BinaryDataItem, BooleanDataItem, DataItem, IntegerDataItem}
 import scorex.transaction.{DataTransaction, GenesisTransaction, Proofs}
 
 class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
@@ -21,7 +21,7 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
   } yield (genesis, master, ts)
 
-  def data(sender: PrivateKeyAccount, data: List[DataItem[_]], fee: Long, timestamp: Long): DataTransaction =
+  def data(sender: PrivateKeyAccount, data: List[DataEntry[_]], fee: Long, timestamp: Long): DataTransaction =
     DataTransaction.selfSigned(Proofs.Version, sender, data, fee, timestamp).right.get
 
   property("state invariants hold") {
@@ -30,18 +30,18 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
 
       key1 <- validAliasStringGen
       value1 <- positiveLongGen
-      item1 = IntegerDataItem(key1, value1)
+      item1 = IntegerDataEntry(key1, value1)
       fee1 <- smallFeeGen
       dataTx1 = data(master, List(item1), fee1, ts + 10000)
 
       key2 <- validAliasStringGen
       value2 <- Arbitrary.arbitrary[Boolean]
-      item2 = BooleanDataItem(key2, value2)
+      item2 = BooleanDataEntry(key2, value2)
       fee2 <- smallFeeGen
       dataTx2 = data(master, List(item2), fee2, ts + 20000)
 
       value3 <- positiveLongGen
-      item3 = IntegerDataItem(key1, value3)
+      item3 = IntegerDataEntry(key1, value3)
       fee3 <- smallFeeGen
       dataTx3 = data(master, List(item3), fee3, ts + 30000)
     } yield (genesis, Seq(item1, item2, item3), Seq(dataTx1, dataTx2, dataTx3))
@@ -82,7 +82,7 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
       key <- validAliasStringGen
       value <- bytes64gen
       feeOverhead <- Gen.choose[Long](1, ENOUGH_AMT)
-      dataTx = data(master, List(BinaryDataItem(key, value)), ENOUGH_AMT + feeOverhead, ts + 10000)
+      dataTx = data(master, List(BinaryDataEntry(key, value)), ENOUGH_AMT + feeOverhead, ts + 10000)
     } yield (genesis, dataTx)
 
     forAll(setup) { case (genesis, dataTx) =>

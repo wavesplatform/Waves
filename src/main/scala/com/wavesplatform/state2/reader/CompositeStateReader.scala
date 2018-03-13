@@ -8,7 +8,6 @@ import cats.kernel.Monoid
 import com.wavesplatform.state2._
 import monix.eval.Coeval
 import scorex.account.{Address, Alias}
-import scorex.transaction.DataTransaction.DataItem
 import scorex.transaction.Transaction
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.Script
@@ -99,7 +98,7 @@ class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockD
     r
   }
 
-  override def accountData(acc: Address, key: String): Option[DataItem[_]] = {
+  override def accountData(acc: Address, key: String): Option[DataEntry[_]] = {
     val diffData = blockDiff.txsDiff.accountData.get(acc).orEmpty
     diffData.get(key).orElse(inner.accountData(acc, key))
   }

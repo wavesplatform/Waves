@@ -8,7 +8,6 @@ import com.wavesplatform.utils._
 import org.iq80.leveldb.{DB, WriteBatch}
 import scorex.account.{Address, Alias}
 import scorex.serialization.Deser
-import scorex.transaction.DataTransaction.DataItem
 import scorex.transaction.smart.Script
 import scorex.utils.{NTP, Time}
 
@@ -156,9 +155,9 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
     } else None
   }
 
-  def getAccountData(address: Address, key: String): Option[DataItem[_]] = {
+  def getAccountData(address: Address, key: String): Option[DataEntry[_]] = {
     val k = makeKey(AddressDataPrefix, address.bytes.arr ++ key.getBytes(Charset))
-    get(k).map(b => DataItem.parse(key, b, 0)._1)
+    get(k).map(b => DataEntry.parse(key, b, 0)._1)
   }
 
   def getAccountData(address: Address): AccountDataInfo = {

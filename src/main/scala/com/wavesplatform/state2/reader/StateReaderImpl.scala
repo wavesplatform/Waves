@@ -6,7 +6,6 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Address, Alias}
-import scorex.transaction.DataTransaction.DataItem
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.Script
 import scorex.transaction.{Transaction, TransactionParser}
@@ -93,7 +92,7 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
     sp().getAccountData(acc)
   }
 
-  override def accountData(acc: Address, key: String): Option[DataItem[_]] = read { implicit l =>
+  override def accountData(acc: Address, key: String): Option[DataEntry[_]] = read { implicit l =>
     sp().getAccountData(acc, key)
   }
 }

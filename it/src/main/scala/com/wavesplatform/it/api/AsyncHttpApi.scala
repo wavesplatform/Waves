@@ -10,7 +10,7 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.state2.{ByteStr, Portfolio}
+import com.wavesplatform.state2.{ByteStr, DataEntry, Portfolio}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
@@ -22,7 +22,6 @@ import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
-import scorex.transaction.DataTransaction.DataItem
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 import scorex.transaction.assets.exchange.Order
 import scorex.waves.http.DebugApiRoute._
@@ -213,12 +212,12 @@ object AsyncHttpApi {
     def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
-    def putData(sourceAddress: String, data: List[DataItem[_]], fee: Long): Future[Transaction] =
+    def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Future[Transaction] =
       postJson("/addresses/data", DataRequest(sourceAddress, data, fee)).as[Transaction]
 
-    def getData(address: String): Future[List[DataItem[_]]] = get(s"/addresses/data/$address").as[List[DataItem[_]]]
+    def getData(address: String): Future[List[DataEntry[_]]] = get(s"/addresses/data/$address").as[List[DataEntry[_]]]
 
-    def getData(address: String, key: String): Future[DataItem[_]] = get(s"/addresses/data/$address/$key").as[DataItem[_]]
+    def getData(address: String, key: String): Future[DataEntry[_]] = get(s"/addresses/data/$address/$key").as[DataEntry[_]]
 
     def signedTransfer(transfer: SignedTransferRequest): Future[Transaction] =
       postJson("/assets/broadcast/transfer", transfer).as[Transaction]

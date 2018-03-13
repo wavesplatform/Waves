@@ -1,12 +1,12 @@
 package scorex.transaction
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.state2.{BinaryDataEntry, DataEntry, IntegerDataEntry}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
 import scorex.api.http.SignedDataRequest
 import scorex.crypto.encode.Base58
-import scorex.transaction.DataTransaction.BinaryDataItem
 import scorex.transaction.TransactionParser.TransactionType
 
 class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -59,7 +59,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
       reqData(0) shouldEqual tx0.data(0)
       reqData(1) shouldEqual tx0.data(1)
       reqData.zip(tx0.data).apply(2) match {
-        case (BinaryDataItem(rk, rv), BinaryDataItem(tk, tv)) =>
+        case (BinaryDataEntry(rk, rv), BinaryDataEntry(tk, tv)) =>
           rk shouldEqual tk
           rv shouldEqual tv
         case _ => fail
@@ -69,6 +69,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
 
   property("property validation") {
     import DataTransaction._
+    import com.wavesplatform.state2.DataEntry._
 
     forAll(dataTransactionGen) {
       case DataTransaction(version, sender, data, fee, timestamp, proofs) =>
@@ -76,23 +77,23 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         val emptyEi = create(version, sender, List.empty, fee, timestamp, proofs)
         emptyEi shouldBe Right(DataTransaction(version, sender, List.empty, fee, timestamp, proofs))
 
-        val sameKey = List.fill(4)(data.head)
+        val sameKey = List.fill[DataEntry[_]](4)(data.head)
         val sameKeyEi = create(version, sender, sameKey, fee, timestamp, proofs)
         sameKeyEi shouldBe Right(DataTransaction(version, sender, sameKey, fee, timestamp, proofs))
 
-        val emptyBinaryData = List(BinaryDataItem("bin", Array.empty))
+        val emptyBinaryData = List(BinaryDataEntry("bin", Array.empty))
         val emptyBinaryDataEi = create(version, sender, emptyBinaryData, fee, timestamp, proofs)
         emptyBinaryDataEi shouldBe Right(DataTransaction(version, sender, emptyBinaryData, fee, timestamp, proofs))
 
-        val dataTooBig = List.fill(MaxDataItemCount + 1)(IntegerDataItem("key", 4))
+        val dataTooBig = List.fill(MaxDataItemCount + 1)(IntegerDataEntry("key", 4))
         val dataTooBigEi = create(version, sender, dataTooBig, fee, timestamp, proofs)
         dataTooBigEi shouldBe Left(ValidationError.TooBigArray)
 
-        val keyTooLong = data :+ BinaryDataItem("a" * (MaxKeySize + 1), Array(1, 2))
+        val keyTooLong = data :+ BinaryDataEntry("a" * (MaxKeySize + 1), Array(1, 2))
         val keyTooLongEi = create(version, sender, keyTooLong, fee, timestamp, proofs)
         keyTooLongEi shouldBe Left(ValidationError.TooBigArray)
 
-        val valueTooLong = data :+ BinaryDataItem("key", Array.fill(MaxValueSize + 1)(1: Byte))
+        val valueTooLong = data :+ BinaryDataEntry("key", Array.fill(MaxValueSize + 1)(1: Byte))
         val valueTooLongEi = create(version, sender, valueTooLong, fee, timestamp, proofs)
         valueTooLongEi shouldBe Left(ValidationError.TooBigArray)
 

@@ -3,7 +3,6 @@ package com.wavesplatform.state2
 import cats.Monoid
 import cats.implicits._
 import scorex.account.{Address, Alias}
-import scorex.transaction.DataTransaction.DataItem
 import scorex.transaction.Transaction
 import scorex.transaction.smart.Script
 
@@ -41,8 +40,8 @@ object AssetInfo {
   }
 }
 
-case class AccountDataInfo(data: Map[String, DataItem[_]]) {
-  def get(key: String): Option[DataItem[_]] = data.get(key)
+case class AccountDataInfo(data: Map[String, DataEntry[_]]) {
+  def get(key: String): Option[DataEntry[_]] = data.get(key)
   /// +keySet, foreach
 }
 

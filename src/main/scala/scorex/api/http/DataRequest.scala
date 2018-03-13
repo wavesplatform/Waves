@@ -1,10 +1,10 @@
 package scorex.api.http
 
 import cats.implicits._
+import com.wavesplatform.state2.DataEntry
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Format, Json}
 import scorex.account.PublicKeyAccount
-import scorex.transaction.DataTransaction.DataItem
 import scorex.transaction.{DataTransaction, Proofs, ValidationError}
 
 object DataRequest {
@@ -13,7 +13,7 @@ object DataRequest {
 }
 
 case class DataRequest(sender: String,
-                       data: List[DataItem[_]],
+                       data: List[DataEntry[_]],
                        fee: Long,
                        timestamp: Option[Long] = None)
 
@@ -21,7 +21,7 @@ case class DataRequest(sender: String,
 case class SignedDataRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                              senderPublicKey: String,
                              @ApiModelProperty(value = "///", required = true)
-                             data: List[DataItem[_]],
+                             data: List[DataEntry[_]],
                              @ApiModelProperty(required = true)
                              fee: Long,
                              @ApiModelProperty(required = true)

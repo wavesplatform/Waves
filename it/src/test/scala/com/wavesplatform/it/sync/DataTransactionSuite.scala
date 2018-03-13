@@ -3,11 +3,11 @@ package com.wavesplatform.it.transactions
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import com.wavesplatform.it.util._
+import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry}
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
 import scorex.account.AddressOrAlias
 import scorex.crypto.encode.Base58
-import scorex.transaction.DataTransaction.{BinaryDataItem, BooleanDataItem, DataItem, IntegerDataItem}
 import scorex.transaction.Proofs
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.MassTransferTransaction
@@ -29,12 +29,12 @@ class DataTransactionSuite extends BaseTransactionSuite {
   private val fee = 100000
 
 
-  private def calcFee(data: List[DataItem[_]]): Long = 100000///
+  private def calcFee(data: List[DataEntry[_]]): Long = 100000///
 
   test("sender's waves balance is decreased by fee.") {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
 
-    val data = List(IntegerDataItem("int", 0xcafebabe))
+    val data = List(IntegerDataEntry("int", 0xcafebabe))
     val fee = calcFee(data)
     val txId = sender.putData(firstAddress, data, fee).id
     nodes.waitForHeightAraiseAndTxPresent(txId)
@@ -45,7 +45,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
   test("cannot transact without having enough waves") {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
 
-    val data = List(BooleanDataItem("bool", false))
+    val data = List(BooleanDataEntry("bool", false))
     assertBadRequest2(sender.putData(firstAddress, data, balance1 + 1))
     nodes.waitForHeightAraise()
     notMiner.assertBalances(firstAddress, balance1, eff1)
@@ -63,7 +63,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
   test("cannot transact with fee less then mininal ") {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
 
-    val data = List(BinaryDataItem("blob", Base58.decode("mbwana").get))
+    val data = List(BinaryDataEntry("blob", Base58.decode("mbwana").get))
     assertBadRequest2(sender.putData(firstAddress, data, calcFee(data) / 2))
 
     nodes.waitForHeightAraise()
@@ -94,7 +94,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
   test("data can be defined and retrieved") {
     // define first data item
-    val item1 = IntegerDataItem("int", 8)
+    val item1 = IntegerDataEntry("int", 8)
     val tx1 = sender.putData(secondAddress, List(item1), fee).id
     nodes.waitForHeightAraiseAndTxPresent(tx1)
 
@@ -104,7 +104,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     data1 shouldBe List(item1)
 
     // define another one
-    val item2 = BooleanDataItem("bool", true)
+    val item2 = BooleanDataEntry("bool", true)
     val tx2 = sender.putData(secondAddress, List(item2), fee).id
     nodes.waitForHeightAraiseAndTxPresent(tx2)
 
@@ -115,7 +115,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     data2 shouldBe List(item2, item1)
 
     // redefine item 1
-    val item11 = IntegerDataItem("int", 10)
+    val item11 = IntegerDataEntry("int", 10)
     val tx3 = sender.putData(secondAddress, List(item11), fee).id
     nodes.waitForHeightAraiseAndTxPresent(tx3)
 

@@ -2,11 +2,11 @@ package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.it.Node
+import com.wavesplatform.state2.DataEntry
 import org.asynchttpclient.Response
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Writes
 import scorex.api.http.assets.SignedMassTransferRequest
-import scorex.transaction.DataTransaction.DataItem
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 
 import scala.concurrent.duration._
@@ -79,13 +79,13 @@ object SyncHttpApi extends Assertions{
     def lease(sourceAddress:String, recipient: String, leasingAmount: Long, leasingFee: Long): Transaction =
       Await.result(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee), RequestAwaitTime)
 
-    def putData(sourceAddress:String, data: List[DataItem[_]], fee: Long): Transaction =
+    def putData(sourceAddress:String, data: List[DataEntry[_]], fee: Long): Transaction =
       Await.result(async(n).putData(sourceAddress, data, fee), RequestAwaitTime)
 
-    def getData(sourceAddress:String): List[DataItem[_]] =
+    def getData(sourceAddress:String): List[DataEntry[_]] =
       Await.result(async(n).getData(sourceAddress), RequestAwaitTime)
 
-    def getData(sourceAddress:String, key: String): DataItem[_] =
+    def getData(sourceAddress:String, key: String): DataEntry[_] =
       Await.result(async(n).getData(sourceAddress, key), RequestAwaitTime)
 
     def signedMassTransfer(tx: SignedMassTransferRequest): Transaction =
