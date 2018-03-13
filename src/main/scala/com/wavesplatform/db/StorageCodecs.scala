@@ -83,7 +83,7 @@ object CheckpointCodec extends Codec[Checkpoint] {
   }
 }
 
-case class TupleCodec[A, B](aCodec: Codec[A], bCodec: Codec[B]) extends Codec[(A, B)] {
+case class Tuple2Codec[A, B](aCodec: Codec[A], bCodec: Codec[B]) extends Codec[(A, B)] {
   override def encode(value: (A, B)): Array[Byte] = {
     val builder = Array.newBuilder[Byte]
     val (a, b) = value
@@ -98,41 +98,8 @@ case class TupleCodec[A, B](aCodec: Codec[A], bCodec: Codec[B]) extends Codec[(A
   } yield DecodeResult(a.length + b.length, (a.value, b.value))
 }
 
-case class SeqCodec[A](valueCodec: Codec[A]) extends Codec[Seq[A]] {
-  override def encode(value: Seq[A]): Array[Byte] = {
-    val builder = Array.newBuilder[Byte]
-    value.foreach { item =>
-      builder.++=(valueCodec.encode(item))
-    }
-    val bytes = builder.result()
-    val len = bytes.length
-    val result = new Array[Byte](Ints.BYTES + len)
-    System.arraycopy(Ints.toByteArray(value.length), 0, result, 0, Ints.BYTES)
-    System.arraycopy(bytes, 0, result, Ints.BYTES, len)
-    result
-  }
-
-  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Seq[A]]] = {
-    val n = Try(Ints.fromByteArray(bytes.take(Ints.BYTES))).toEither.left.map(e => CodecFailure(e.getMessage))
-    if (n.isRight) {
-      val expectedLength = n.right.get
-      val builder = Seq.newBuilder[A]
-      var i = Ints.BYTES
-      var error = false
-      while (i < bytes.length && !error) {
-        val r = valueCodec.decode(bytes.slice(i, bytes.length))
-        if (r.isRight) {
-          val rr = r.right.get
-          i = i + rr.length
-          builder.+=(rr.value)
-        } else {
-          error = true
-        }
-      }
-      val result = builder.result()
-      Either.cond(!error && expectedLength == result.length, DecodeResult(i, result), CodecFailure(s"failed to deserialize $expectedLength items"))
-    } else Left(n.left.get)
-  }
+object SeqCodec {
+  def apply[A](valueCodec: Codec[A]): ColCodec[Seq, A] = ColCodec(valueCodec)
 }
 
 case class ColCodec[Col[BB] <: TraversableOnce[BB], A](valueCodec: Codec[A])(implicit cbf: CanBuildFrom[Col[A], A, Col[A]]) extends Codec[Col[A]] {
@@ -167,7 +134,6 @@ case class ColCodec[Col[BB] <: TraversableOnce[BB], A](valueCodec: Codec[A])(imp
         }
       }
       val result = builder.result()
-      println(s"Result of $expectedLength: $result")
       Either.cond(!error && expectedLength == result.size, DecodeResult(i, result), CodecFailure(s"failed to deserialize $expectedLength items"))
     } else Left(n.left.get)
   }
@@ -359,7 +325,7 @@ object OrderIdsCodec extends Codec[Array[String]] {
     .right.map(r => DecodeResult(r.length, r.value.toArray))
 }
 
-object AssetIdOrderIdCodec extends TupleCodec(OptionCodec[AssetId](ByteStrCodec), StringCodec)
+object AssetIdOrderIdCodec extends Tuple2Codec(OptionCodec[AssetId](ByteStrCodec), StringCodec)
 
 object AssetIdOrderIdSetCodec extends ColCodec[Set, (Option[AssetId], String)](AssetIdOrderIdCodec)
 

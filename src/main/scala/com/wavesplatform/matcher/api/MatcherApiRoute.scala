@@ -126,13 +126,9 @@ case class MatcherApiRoute(wallet: Wallet,
   def cancel: Route = (path("orderbook" / Segment / Segment / "cancel") & post) { (a1, a2) =>
     withAssetPair(a1, a2) { pair =>
       json[CancelOrderRequest] { req =>
-        println(s"Got cancel request: $req, orderId: ${Base58.encode(req.orderId)}")
         (matcher ? CancelOrder(pair, req))
           .mapTo[MatcherResponse]
-          .map { r =>
-            println(s"Response for cancel: $r")
-            r.code -> r.json
-          }
+          .map(r => r.code -> r.json)
       }
     }
   }

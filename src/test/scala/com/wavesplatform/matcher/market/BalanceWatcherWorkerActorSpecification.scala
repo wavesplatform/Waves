@@ -28,31 +28,31 @@ class BalanceWatcherWorkerActorSpecification
   "BalanceWatcherWorkerActor" when {
     "becomes working" should {
       "ask active orders from the history" in withActors { actors =>
-        actors.balanceWatcher ! BalanceChanged(Map(fooAddr -> Monoid.empty[Portfolio]))
+        actors.balanceWatcher ! noChanges(fooAddr)
         actors.history.expectMsgPF(hint = "ask active orders") {
-          case GetActiveOrdersByAddress(_, `fooAddr`) => true
+          case GetActiveOrdersByAddress(_, `fooAddr`, _) => true
         }
       }
 
       "increment an ask id" in withActors { actors =>
-        actors.balanceWatcher ! BalanceChanged(Map(fooAddr -> Monoid.empty[Portfolio]))
-        actors.history.expectMsg(GetActiveOrdersByAddress(0, fooAddr))
+        actors.balanceWatcher ! noChanges(fooAddr)
+        actors.history.expectMsg(GetActiveOrdersByAddress(0, fooAddr, Set.empty))
         actors.history.send(actors.balanceWatcher, GetActiveOrdersByAddressResponse(0, fooAddr, Seq.empty))
 
-        actors.balanceWatcher ! BalanceChanged(Map(barAddr -> Monoid.empty[Portfolio]))
-        actors.history.expectMsg(GetActiveOrdersByAddress(1, barAddr))
+        actors.balanceWatcher ! noChanges(barAddr)
+        actors.history.expectMsg(GetActiveOrdersByAddress(1, barAddr, Set.empty))
       }
 
       "stash all incoming balance changes and then become working again" in withActors { actors =>
-        actors.balanceWatcher ! BalanceChanged(Map(fooAddr -> Monoid.empty[Portfolio]))
+        actors.balanceWatcher ! noChanges(fooAddr)
         actors.history.expectMsgType[GetActiveOrdersByAddress]
 
-        actors.balanceWatcher ! BalanceChanged(Map(barAddr -> Monoid.empty[Portfolio]))
-        actors.balanceWatcher ! BalanceChanged(Map(bazAddr -> Monoid.empty[Portfolio]))
+        actors.balanceWatcher ! noChanges(barAddr)
+        actors.balanceWatcher ! noChanges(bazAddr)
 
         actors.history.send(actors.balanceWatcher, GetActiveOrdersByAddressResponse(0, fooAddr, Seq.empty))
-        actors.history.expectMsg(GetActiveOrdersByAddress(1, barAddr))
-        actors.history.expectMsg(GetActiveOrdersByAddress(1, bazAddr))
+        actors.history.expectMsg(GetActiveOrdersByAddress(1, barAddr, Set.empty))
+        actors.history.expectMsg(GetActiveOrdersByAddress(1, bazAddr, Set.empty))
       }
     }
 
@@ -70,14 +70,14 @@ class BalanceWatcherWorkerActorSpecification
       )
 
       "send a cancel request to the matcher" in withActors { actors =>
-        actors.balanceWatcher ! BalanceChanged(Map(fooAddr -> Monoid.empty[Portfolio]))
+        actors.balanceWatcher ! noChanges(fooAddr)
         actors.history.send(actors.balanceWatcher, brokenOrderResponse)
 
         actors.matcher.expectMsg(ForceCancelOrder(brokenOrder.assetPair, brokenOrder.idStr()))
       }
 
       "send a cancel request to the history" in withActors { actors =>
-        actors.balanceWatcher ! BalanceChanged(Map(fooAddr -> Monoid.empty[Portfolio]))
+        actors.balanceWatcher ! noChanges(fooAddr)
 
         actors.history.expectMsgType[GetActiveOrdersByAddress]
         actors.history.send(actors.balanceWatcher, brokenOrderResponse)
@@ -102,27 +102,30 @@ class BalanceWatcherWorkerActorSpecification
       )
 
       "not cancel a valid order" in withActors { actors =>
-        actors.balanceWatcher ! BalanceChanged(Map(fooAddr -> Portfolio(1000, LeaseInfo(0, 0), Map.empty)))
+        actors.balanceWatcher ! BalanceChanged(Map(fooAddr -> BalanceChanged.Changes(Portfolio(1000, LeaseInfo(0, 0), Map.empty), Set(None))))
         actors.history.send(actors.balanceWatcher, GetActiveOrdersByAddressResponse(0, fooAddr, Seq(LimitOrder(validOrder))))
 
         actors.matcher.expectNoMsg(100.millis)
       }
     }
 
+    // @TODO decrease timeout
     "reaches a processing timeout" should {
       "become inactive" in withActors { actors =>
-        actors.balanceWatcher ! BalanceChanged(Map(fooAddr -> Monoid.empty[Portfolio]))
+        actors.balanceWatcher ! noChanges(fooAddr)
         actors.history.expectMsgType[GetActiveOrdersByAddress]
 
         actors.history.expectNoMsg(BalanceWatcherWorkerActor.TimeoutToProcessChanges + 100.millis)
 
-        actors.balanceWatcher ! BalanceChanged(Map(barAddr -> Monoid.empty[Portfolio]))
+        actors.balanceWatcher ! noChanges(fooAddr)
         actors.history.expectMsgType[GetActiveOrdersByAddress]
       }
     }
   }
 
-  private def addr(x: String): Address = Address.fromBytes(x.getBytes).right.get
+  private def noChanges(addr: Address) = BalanceChanged(Map(addr -> BalanceChanged.Changes(Monoid.empty[Portfolio], Set.empty)))
+
+  private def addr(x: String): Address = PrivateKeyAccount.fromSeed(x).right.get.toAddress
 
   private def withActors(f: TestActors => Unit): Unit = {
     val matcher    = TestProbe("matcher")

@@ -21,9 +21,7 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
   private var requestIdCounter = 0L
 
   override def receive: Receive = {
-    case x: BalanceChanged =>
-      log.debug(s"Got in receive: $x")
-      becomeWorking(x)
+    case x: BalanceChanged => becomeWorking(x)
   }
 
   private def waitOrders(taskId: Long,
@@ -31,24 +29,23 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
                          unprocessed: BalanceChanged,
                          waitOrdersTimeout: Cancellable): Receive = {
     case x@GetActiveOrdersByAddressResponse(`taskId`, address, orders) =>
-      log.debug(s"Got in waitOrders: $x")
       ordersToDelete(unprocessed, address, orders)
         .foreach {
           case (pair, id) =>
-            log.debug(s"Cancelling $id in ${pair.key}")
+            log.info(s"Order '$id' is no longer valid, canceling it")
             orderHistory ! ForceCancelOrderFromHistory(id)
             matcher ! ForceCancelOrder(pair, id)
         }
 
       val updated = unprocessed.copy(changes = unprocessed.changes - address)
-      log.debug(s"updated in waitOrders: $updated, stashed: $stashed")
       if (updated.isEmpty) {
-        if (stashed.isEmpty) context.become(receive)
+        if (stashed.isEmpty) {
+          context.become(receive)
+        }
         else becomeWorking(stashed)
       } else context.become(waitOrders(taskId, stashed, updated, reschedule(waitOrdersTimeout)))
 
     case x: BalanceChanged =>
-      log.debug(s"Got in waitOrders: $x")
       context.become(
         waitOrders(
           taskId = taskId,
@@ -58,7 +55,6 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
         ))
 
     case _: ReceiveTimeout =>
-      log.warn(s"Timeout to process orders for ${unprocessed.changes.size} addresses has been reached")
       if (stashed.isEmpty) context.become(receive)
       else becomeWorking(stashed)
   }
