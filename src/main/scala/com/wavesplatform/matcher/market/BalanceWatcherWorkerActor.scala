@@ -6,7 +6,7 @@ import com.wavesplatform.matcher.market.OrderBookActor.ForceCancelOrder
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ForceCancelOrderFromHistory, GetActiveOrdersByAddress, GetActiveOrdersByAddressResponse}
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.matcher.model.LimitOrder
-import com.wavesplatform.state2.Portfolio
+import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import scorex.account.Address
 import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.AssetPair
@@ -22,29 +22,34 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
   private var requestIdCounter = 0L
 
   override def receive: Receive = {
-    case BalanceChanged(changes) => becomeWorking(changes)
+    case x@BalanceChanged(changes) =>
+      log.debug(s"Got in receive: $x")
+      becomeWorking(changes)
   }
 
   private def waitOrders(taskId: Long,
                          stashedChanges: ChangesByAddress,
                          changesByAddress: ChangesByAddress,
                          waitOrdersTimeout: Cancellable): Receive = {
-    case GetActiveOrdersByAddressResponse(`taskId`, address, orders) =>
+    case x@GetActiveOrdersByAddressResponse(`taskId`, address, orders) =>
+      log.debug(s"Got in waitOrders: $x")
       ordersToDelete(changesByAddress, address, orders)
         .foreach {
           case (pair, id) =>
+            log.debug(s"Cancelling $id in ${pair.key}")
             orderHistory ! ForceCancelOrderFromHistory(id)
             matcher ! ForceCancelOrder(pair, id)
         }
 
       val updated = changesByAddress - address
+      log.debug(s"updated in waitOrders: $updated, stashedChanges: $stashedChanges")
       if (updated.isEmpty) {
         if (stashedChanges.isEmpty) context.become(receive)
         else becomeWorking(stashedChanges)
       } else context.become(waitOrders(taskId, stashedChanges, updated, reschedule(waitOrdersTimeout)))
 
     case x: BalanceChanged =>
-      log.debug(s"Got $x")
+      log.debug(s"Got in waitOrders: $x")
       context.become(
         waitOrders(
           taskId = taskId,
@@ -85,13 +90,21 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
         val ordersByPriority = orders.sortBy(_.order.timestamp)(Ordering[Long].reverse)
         val (_, r) = ordersByPriority.foldLeft((portfolio, List.empty: OrdersToDelete)) {
           case ((restPortfolio, toDelete), limitOrder) =>
-            val updatedPortfolio = restPortfolio
-              .copy(balance = restPortfolio.balance - restPortfolio.leaseInfo.leaseOut)
-              .remove(limitOrder.spentAcc.assetId, limitOrder.getSpendAmount)
-              .flatMap { p =>
+            val updatedPortfolio1 = restPortfolio
+              .copy(balance = restPortfolio.balance - restPortfolio.leaseInfo.leaseOut, leaseInfo = LeaseInfo.empty)
+            val updatedPortfolio2 = updatedPortfolio1.remove(limitOrder.spentAcc.assetId, limitOrder.getSpendAmount)
+            val updatedPortfolio3 = updatedPortfolio2.flatMap { p =>
                 if (limitOrder.rcvAsset == AssetPair.WavesName && limitOrder.getReceiveAmount >= limitOrder.remainingFee) Some(p)
                 else p.remove(None, limitOrder.remainingFee)
               }
+            val updatedPortfolio = updatedPortfolio3
+
+            log.debug(
+              s"""=== ${ownerAddress.stringRepr} ===
+                 |restPortfolio = $restPortfolio
+                 |updatedPortfolio1 = $updatedPortfolio1
+                 |updatedPortfolio2 = $updatedPortfolio2
+                 |updatedPortfolio3 = $updatedPortfolio3""".stripMargin)
 
             updatedPortfolio match {
               case Some(x) => (x, toDelete)

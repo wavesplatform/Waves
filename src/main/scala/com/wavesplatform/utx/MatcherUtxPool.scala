@@ -5,7 +5,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.mining.TwoDimensionalMiningConstraint
-import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
+import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
 import scorex.account.Address
 import scorex.transaction.{Authorized, Transaction, ValidationError}
 import scorex.utils.ScorexLogging
@@ -19,9 +19,14 @@ class MatcherUtxPool(underlying: UtxPool, matcherSettings: MatcherSettings, even
       .map {
         case r @ (isNew, txDiff) =>
           if (isNew) {
-            val xs = txDiff.portfolios.filterNot { case (addr, _) => addr.stringRepr == matcherSettings.account }
+            val xs = txDiff.portfolios.collect {
+              case (addr, p) if addr.stringRepr != matcherSettings.account => (addr, p.pessimistic) // TODO: also filter != 0
+            }
+
             if (xs.nonEmpty) {
-              events.publish(BalanceChanged(enrichWithAccountPortfolio(xs)))
+              val msg = BalanceChanged(enrichWithAccountPortfolio(xs))
+              log.debug(s"Sending to event bus: $msg")
+              events.publish(msg)
             }
           }
           r
@@ -83,11 +88,15 @@ class MatcherUtxPool(underlying: UtxPool, matcherSettings: MatcherSettings, even
         case (addr, txPortfolio) =>
           if (addr.stringRepr != matcherSettings.account) {
             val prevPortfolio = accountInfos.getOrElse(addr, Monoid[Portfolio].empty)
-            val overriddenPortfolio = prevPortfolio.assets.foldLeft(txPortfolio) {
-              case (r, (assetId, balance)) =>
-                val fallbackBalance = r.assets.getOrElse(assetId, balance)
-                r.copy(assets = r.assets.updated(assetId, fallbackBalance))
-            }
+
+//            val overriddenPortfolio = prevPortfolio.assets.foldLeft(txPortfolio) {
+//              case (r, (assetId, balance)) if balance < 0 =>
+//                val fallbackBalance = r.assets.getOrElse(assetId, balance)
+//                r.copy(assets = r.assets.updated(assetId, fallbackBalance))
+//
+//              case (r, _) => r
+//            }
+            val overriddenPortfolio = Monoid.combine(prevPortfolio, txPortfolio.pessimistic)
             accountInfos.update(addr, overriddenPortfolio)
           }
       }
@@ -96,11 +105,22 @@ class MatcherUtxPool(underlying: UtxPool, matcherSettings: MatcherSettings, even
 
   private def enrichWithAccountPortfolio(changes: Map[Address, Portfolio]): Map[Address, Portfolio] = {
     changes.map { case (addr, portfolio) =>
+      // check only:
+      // if portfolio.balance < 0
+      // if portfolio.assets.balance < 0
+      // TODO: also filter != 0
       val accPortfolio = accountPortfolio(addr)
-      val filteredPortfolio = accPortfolio.copy(assets = accPortfolio.assets.filter {
+      val filteredPortfolio1 = accPortfolio.copy(assets = accPortfolio.assets.filter {
         case (assetId, _) => portfolio.assets.contains(assetId)
       })
-      addr -> Monoid.combine(portfolio, filteredPortfolio)
+
+      val filteredPortfolio2 = if (portfolio.balance == 0 && portfolio.leaseInfo.leaseOut == 0) {
+        accPortfolio.copy(balance = 0, leaseInfo = LeaseInfo.empty)
+      } else accPortfolio
+
+      val combined = Monoid.combine(portfolio, filteredPortfolio2)
+      log.debug(s"\n=== $addr ====\naccPortfolio: $accPortfolio\nfilteredPortfolio1: $filteredPortfolio1\nfilteredPortfolio2: $filteredPortfolio2\nportfolio: $portfolio\ncombined: $combined")
+      addr -> combined
     }
   }
 }

@@ -385,7 +385,8 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         val oldestOrderId = bobPlacesAssetOrder(1000)
         val newestOrderId = bobPlacesAssetOrder(1000)
 
-        val leaseAmount = bobBalance - MatcherFee - TransactionFee
+        // TransactionFee for leasing, MatcherFee for one order
+        val leaseAmount = bobBalance - TransactionFee - MatcherFee
         val leaseId = lease(bobNode, aliceNode, leaseAmount)
 
         withClue(s"The oldest order '$oldestOrderId' was cancelled") {
@@ -407,7 +408,8 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         val oldestOrderId = bobPlacesAssetOrder(1000)
         val newestOrderId = bobPlacesAssetOrder(1000)
 
-        val transferAmount = bobBalance - MatcherFee - TransactionFee
+        // TransactionFee for leasing, MatcherFee for one order
+        val transferAmount = bobBalance - TransactionFee - MatcherFee
         transfer(bobNode, aliceNode, None, transferAmount)
 
         withClue(s"The oldest order '$oldestOrderId' was cancelled") {
@@ -495,7 +497,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
     def bobPlacesAssetOrder(bobCoinAmount: Int): String = {
       val bobOrder = if (twoAssetsPair.amountAsset.contains(bobAssetId)) {
-        prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.SELL, 1 * Order.PriceConstant, bobCoinAmount)
+        prepareOrder(bobNode, matcherNode, twoAssetsPair, OrderType.SELL, 1 * Order.PriceConstant, bobCoinAmount)
       } else {
         prepareOrder(bobNode, matcherNode, twoAssetsPair, OrderType.BUY, bobCoinAmount * Order.PriceConstant, 1)
       }

@@ -203,7 +203,7 @@ class OrderBookActor(assetPair: AssetPair,
         log.debug(s"Order rejected: $err.err")
         apiSender.foreach(_ ! OrderRejected(err.err))
       case Right(o) =>
-        log.debug(s"Order accepted: ${o.idStr()}, trying to match ...")
+        log.debug(s"Order accepted: '${o.idStr()}' in '${o.assetPair.key}', trying to match ...")
         apiSender.foreach(_ ! OrderAccepted(o))
         matchOrder(LimitOrder(o))
     }
@@ -380,6 +380,10 @@ object OrderBookActor {
   case class GetOrderBookResponse(pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends MatcherResponse {
     val json: JsValue = Json.toJson(OrderBookResult(NTP.correctedTime(), pair, bids, asks))
     val code = StatusCodes.OK
+  }
+
+  object GetOrderBookResponse {
+    def empty(pair: AssetPair): GetOrderBookResponse = GetOrderBookResponse(pair, Seq(), Seq())
   }
 
   // Direct requests

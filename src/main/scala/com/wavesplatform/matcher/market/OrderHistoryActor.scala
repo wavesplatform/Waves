@@ -68,14 +68,18 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
     case ForceCancelOrderFromHistory(id) =>
       forceCancelOrder(id)
     case GetActiveOrdersByAddress(requestId, addr, assets) =>
-      val active: Seq[LimitOrder] = orderHistory.activeOrderIdsByAddress(addr.stringRepr)
-        .view
-        .collect { case (assetId, id) if assets.contains(assetId) => id -> orderHistory.orderInfo(id) }
-        .flatMap { case (id, info) =>
-          orderHistory.order(id).map { order => LimitOrder(order).partial(info.remaining) }
-        }
-        .force[LimitOrder, Seq[LimitOrder]](collection.breakOut)
+      // Because all orders spend waves for fee
+      val filter: Option[AssetId] => Boolean = if (assets.contains(None)) { _ => true } else assets.contains
 
+      val activeOrders = orderHistory.activeOrderIdsByAddress(addr.stringRepr)
+      val activeOrdersByAssets = activeOrders
+        .collect { case (assetId, id) if filter(assetId) => id -> orderHistory.orderInfo(id) }
+
+      val active: Seq[LimitOrder] = activeOrdersByAssets.flatMap { case (id, info) =>
+        orderHistory.order(id).map { order => LimitOrder(order).partial(info.remaining) }
+      }(collection.breakOut)
+
+      println(s"OrderHistoryActor: GetActiveOrdersByAddress(requestId, $addr, $assets):\nactiveOrders: $active\nactiveOrdersByAssets: $activeOrdersByAssets\nactive: $active")
       sender().forward(GetActiveOrdersByAddressResponse(requestId, addr, active))
   }
 

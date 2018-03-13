@@ -6,7 +6,7 @@ import akka.persistence.{PersistentActor, RecoveryCompleted}
 import akka.routing.FromConfig
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
-import com.wavesplatform.matcher.market.OrderBookActor.{DeleteOrderBookRequest, GetOrderBookResponse, OrderBookRequest}
+import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.StateReader
@@ -103,7 +103,8 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   }
 
   def returnEmptyOrderBook(pair: AssetPair): Unit = {
-    sender() ! GetOrderBookResponse(pair, Seq(), Seq())
+    log.debug(s"Order book ${pair.key} is empty")
+    sender() ! GetOrderBookResponse.empty(pair)
   }
 
   def forwardReq(req: Any)(orderBook: ActorRef): Unit = orderBook forward req
@@ -129,6 +130,7 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   def forwardToOrderBook: Receive = {
     case GetMarkets =>
       sender() ! GetMarketsResponse(getMatcherPublicKey, tradedPairs.values.toSeq)
+
     case order: Order =>
       checkAssetPair(order) {
         checkBlacklistedAddress(order.senderPublicKey) {
@@ -136,12 +138,28 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
             .fold(createAndForward(order))(forwardReq(order))
         }
       }
+
     case ob: DeleteOrderBookRequest =>
       checkAssetPair(ob) {
         context.child(OrderBookActor.name(ob.assetPair))
           .fold(returnEmptyOrderBook(ob.assetPair))(forwardReq(ob))
         removeOrderBook(ob.assetPair)
       }
+
+    case x: CancelOrder =>
+      checkAssetPair(x) {
+        context.child(OrderBookActor.name(x.assetPair)).fold {
+          sender() ! OrderCancelRejected(s"Order '${x.orderId}' is already cancelled or never existed in '${x.assetPair.key}' pair")
+        }(forwardReq(x))
+      }
+
+    case x: ForceCancelOrder =>
+      checkAssetPair(x) {
+        context.child(OrderBookActor.name(x.assetPair)).fold {
+          sender() ! OrderCancelRejected(s"Order '${x.orderId}' is already cancelled or never existed in '${x.assetPair.key}' pair")
+        }(forwardReq(x))
+      }
+
     case ob: OrderBookRequest =>
       checkAssetPair(ob) {
         context.child(OrderBookActor.name(ob.assetPair))
