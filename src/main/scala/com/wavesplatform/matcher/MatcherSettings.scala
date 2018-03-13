@@ -39,7 +39,7 @@ case class MatcherSettings(enable: Boolean,
 
 object MatcherSettings {
 
-  private implicit val chosenCase: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+  implicit val chosenCase: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
   val configPath: String = "waves.matcher"
 
   def fromConfig(config: Config): MatcherSettings = {
