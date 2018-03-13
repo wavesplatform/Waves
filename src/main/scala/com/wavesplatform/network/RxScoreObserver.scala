@@ -54,6 +54,7 @@ object RxScoreObserver extends ScorexLogging {
             localScores: Observable[BlockchainScore],
             remoteScores: ChannelObservable[BlockchainScore],
             channelClosed: Observable[Channel],
+            channelTimeout: Observable[Channel],
             scheduler: Scheduler): (Observable[ChannelClosedAndSyncWith], Coeval[Stats]) = {
 
     var localScore: BlockchainScore = initalLocalScore
@@ -89,7 +90,7 @@ object RxScoreObserver extends ScorexLogging {
         None
       }
 
-    def cc: Observable[Option[Channel]] = channelClosed
+    def cc: Observable[Option[Channel]] = Observable.merge(channelClosed, channelTimeout)
       .observeOn(scheduler)
       .map { ch =>
         scores.invalidate(ch)

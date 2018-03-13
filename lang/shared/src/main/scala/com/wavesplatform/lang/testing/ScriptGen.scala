@@ -1,4 +1,4 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.testing
 
 import com.wavesplatform.lang.Terms.Untyped._
 import com.wavesplatform.lang.Terms._

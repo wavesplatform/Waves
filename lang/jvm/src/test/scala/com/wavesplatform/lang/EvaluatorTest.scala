@@ -1,9 +1,11 @@
 package com.wavesplatform.lang
 
 import cats.data.EitherT
-import com.wavesplatform.lang.Context._
+import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Terms.Typed._
 import com.wavesplatform.lang.Terms._
+import com.wavesplatform.lang.ctx.{Context, _}
+import com.wavesplatform.lang.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
@@ -141,7 +143,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("field and value are evaluated maximum once") {
     var fieldCalculated = 0
-    var valueCalculated  = 0
+    var valueCalculated = 0
 
     val pointType = PredefType("Point", List(("X", INT), ("Y", INT)))
     val pointInstance = Obj(Map(("X", LazyVal(INT)(EitherT.pure {
@@ -173,10 +175,9 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   property("let is evaluated maximum once") {
     var functionEvaluated = 0
 
-    val f = PredefFunction("F", INT, List(("_", INT))) {
-      case _ =>
-        functionEvaluated = functionEvaluated + 1
-        Right(1)
+    val f = PredefFunction("F", INT, List(("_", INT))) { _ =>
+      functionEvaluated = functionEvaluated + 1
+      Right(1)
     }
 
     val context = Context(

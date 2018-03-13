@@ -4,6 +4,7 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeoutException
 
+import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.http.api_key
 import com.wavesplatform.it.Node
@@ -14,9 +15,10 @@ import com.wavesplatform.state2.{ByteStr, DataEntry, Portfolio}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
-import org.scalatest.{Assertions, Matchers}
+import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json._
+import scorex.api.http.ApiErrorResponse
 import scorex.api.http.DataRequest
 import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.api.http.alias.CreateAliasRequest
@@ -35,7 +37,34 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-object AsyncHttpApi {
+object AsyncHttpApi extends Assertions {
+  case class ErrorMessage(error: Int, message: String)
+
+  implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
+
+  def assertBadRequest(f: Future[_]): Future[Assertion] = f transform {
+    case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Success(Assertions.assert(statusCode == StatusCodes.BadRequest.intValue))
+    case Failure(e) => Success(Assertions.fail(e))
+    case _ => Success(Assertions.fail(s"Expecting bad request"))
+  }
+
+  def expectErrorResponse(f: Future[_])(isExpected: ApiErrorResponse => Boolean): Future[Assertion] = f transform {
+    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+      val parsedError = Json.parse(responseBody).validate[ApiErrorResponse].asOpt
+      parsedError match {
+        case None => Success(Assertions.fail(s"Expecting bad request"))
+        case Some(err) => Success(Assertions.assert(statusCode == StatusCodes.BadRequest.intValue && isExpected(err)))
+      }
+    case Failure(e) => Success(Assertions.fail(e))
+    case _ => Success(Assertions.fail(s"Expecting bad request"))
+  }
+
+  def assertBadRequestAndMessage(f: Future[_], errorMessage: String): Future[Assertion] = f transform {
+    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+      Success(Assertions.assert(statusCode == StatusCodes.BadRequest.intValue && parse(responseBody).as[ErrorMessage].message.contains(errorMessage)))
+    case Failure(e) => Success[Assertion](Assertions.fail(e))
+    case _ => Success[Assertion](Assertions.fail(s"Expecting bad request"))
+  }
 
   implicit class NodeAsyncHttpApi(n: Node) extends Assertions with Matchers {
 

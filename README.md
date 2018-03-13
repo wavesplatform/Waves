@@ -50,6 +50,11 @@ If you prefer to work with _SBT_ in the interactive mode, open it with settings:
 SBT_OPTS="${SBT_OPTS} -Xms512M -Xmx1536M -Xss1M -XX:+CMSClassUnloadingEnabled" sbt
 ```
 
+For Java9 it should be:
+```
+SBT_OPTS="${SBT_OPTS} -Xms512M -Xmx1536M -Xss1M -XX:+CMSClassUnloadingEnabled --add-modules=java.xml.bind --add-exports java.base/jdk.internal.ref=ALL-UNNAMED" sbt
+```
+
 to solve the `Metaspace error` problem.
 
 # Running Integration Tests
@@ -57,11 +62,11 @@ to solve the `Metaspace error` problem.
 ## TL;DR
 
  * Make sure you have [Docker](https://www.docker.com/get-docker) and SBT. 
- * `sbt it:test`
+ * `sbt it/test`
  
 ## Customizing Tests
 
-By default, `it:test` will do the following: 
+By default, `it/test` will do the following: 
 * Build a container image with the fat jar and a [template.conf](src/it/resources/template.conf). The newly-built image
   will be registered with the local Docker daemon. This image is built with [sbt-docker](https://github.com/marcuslonnberg/sbt-docker)
   plugin. 

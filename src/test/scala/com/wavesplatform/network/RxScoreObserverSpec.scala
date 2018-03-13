@@ -18,14 +18,18 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
     val localScores = PublishSubject[BlockchainScore]
     val remoteScores = PublishSubject[(Channel, BlockchainScore)]
     val channelClosed = PublishSubject[Channel]
+    val timeout = PublishSubject[Channel]
 
-    val (syncWith, _) = RxScoreObserver(1.minute, 0.seconds, 0, localScores, remoteScores, channelClosed, testScheduler)
+    val (syncWith, _) = RxScoreObserver(1.minute, 0.seconds, 0, localScores, remoteScores, channelClosed, timeout, testScheduler)
 
-    try { f(newItems(syncWith.map(_.syncWith))(implicitScheduler), localScores, remoteScores, channelClosed) }
+    try {
+      f(newItems(syncWith.map(_.syncWith))(implicitScheduler), localScores, remoteScores, channelClosed)
+    }
     finally {
       localScores.onComplete()
       remoteScores.onComplete()
       channelClosed.onComplete()
+      timeout.onComplete()
     }
   }
 
@@ -128,7 +132,7 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
         } yield ())
       }
 
-      "indirectly"  in withObserver { (newSyncWith, localScores, remoteScores, _) =>
+      "indirectly" in withObserver { (newSyncWith, localScores, remoteScores, _) =>
         val ch100 = new LocalChannel()
 
         test(for {

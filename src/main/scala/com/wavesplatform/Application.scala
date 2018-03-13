@@ -32,6 +32,7 @@ import monix.execution.Scheduler.global
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{Scheduler, UncaughtExceptionReporter}
 import monix.reactive.Observable
+import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
 import org.slf4j.bridge.SLF4JBridgeHandler
 import scorex.account.AddressScheme
@@ -149,12 +150,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     maybeNetwork = Some(network)
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses, transactions) = network.messages
 
+    val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]
+
     val (syncWithChannelClosed, scoreStatsReporter) = RxScoreObserver(settings.synchronizationSettings.scoreTTL, 1.second,
-      history.score(), lastScore, blockchainScores, network.closedChannels, scoreObserverScheduler)
+      history.score(), lastScore, blockchainScores, network.closedChannels, timeoutSubject, scoreObserverScheduler)
     val (microblockDatas, mbSyncCacheSizes) = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer,
       peerDatabase, lastBlockInfo.map(_.id), microblockInvs, microblockResponses, microblockSynchronizerScheduler)
     val (newBlocks, extLoaderState, sh) = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
-      history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed, extensionLoaderScheduler) { case ((c, b)) => processFork(c, b.blocks) }
+      history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed, extensionLoaderScheduler, timeoutSubject) { case ((c, b)) => processFork(c, b.blocks) }
 
     rxExtensionLoaderShutdown = Some(sh)
 

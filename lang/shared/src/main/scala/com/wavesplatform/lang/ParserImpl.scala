@@ -39,25 +39,6 @@ abstract class ParserImpl { this: Base58 =>
 
   private def getterP: P[GETTER] = P(refP ~ "." ~ varName).map { case ((b, f)) => GETTER(b, f) }
 
-  private def patmat1P: P[BLOCK] =
-    P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "None" ~ "=>" ~ block ~ "case" ~ "Some" ~ "(" ~ varName ~ ")" ~ "=>" ~ block ~ "}")
-      .map { case ((exp, ifNone, ref, ifSome)) => patmat(exp, ref, ifSome, ifNone) }
-
-  private def patmat2P: P[BLOCK] =
-    P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "Some" ~ "(" ~ varName ~ ")" ~ "=>" ~ block ~ "case" ~ "None" ~ "=>" ~ block ~ "}")
-      .map { case ((exp, ref, ifSome, ifNone)) => patmat(exp, ref, ifSome, ifNone) }
-
-  def patmat(exp: EXPR, ref: String, ifSome: EXPR, ifNone: EXPR): BLOCK =
-    BLOCK(
-      Some(LET("@exp", exp)),
-      IF(IS_DEFINED(REF("@exp")),
-        BLOCK(
-          Some(LET(ref, GET(REF("@exp")))),
-          ifSome
-        ),
-        ifNone)
-    )
-
   private def byteVectorP: P[CONST_BYTEVECTOR] =
     P("base58'" ~ CharsWhileIn(Base58Chars).! ~ "'").map(x => CONST_BYTEVECTOR(ByteVector(base58Decode(x).get)))
 
@@ -89,7 +70,7 @@ abstract class ParserImpl { this: Base58 =>
   private def expr = P(binaryOp(opsByPriority) | atom)
 
   private def atom =
-    P(functionCallP | ifP | patmat1P | patmat2P | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | getterP | refP | isDefined | getP )
+    P(functionCallP | ifP | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | getterP | refP | isDefined | getP )
 
   def apply(str: String): core.Parsed[EXPR, Char, String] = P(block ~ End).parse(str)
 }

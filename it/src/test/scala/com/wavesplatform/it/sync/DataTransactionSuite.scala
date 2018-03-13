@@ -46,7 +46,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
 
     val data = List(BooleanDataEntry("bool", false))
-    assertBadRequest2(sender.putData(firstAddress, data, balance1 + 1))
+    assertBadRequest(sender.putData(firstAddress, data, balance1 + 1))
     nodes.waitForHeightAraise()
     notMiner.assertBalances(firstAddress, balance1, eff1)
 
@@ -55,7 +55,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val leaseId = sender.lease(firstAddress, secondAddress, leaseAmount, leaseFee).id
     nodes.waitForHeightAraiseAndTxPresent(leaseId)
 
-    assertBadRequest2(sender.putData(firstAddress, data, balance1 - leaseAmount))
+    assertBadRequest(sender.putData(firstAddress, data, balance1 - leaseAmount))
     nodes.waitForHeightAraise()
     notMiner.assertBalances(firstAddress, balance1 - leaseFee, eff1 - leaseAmount - leaseFee)
   }
@@ -64,7 +64,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
 
     val data = List(BinaryDataEntry("blob", Base58.decode("mbwana").get))
-    assertBadRequest2(sender.putData(firstAddress, data, calcFee(data) / 2))
+    assertBadRequest(sender.putData(firstAddress, data, calcFee(data) / 2))
 
     nodes.waitForHeightAraise()
     notMiner.assertBalances(firstAddress, balance1, eff1)
