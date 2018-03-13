@@ -32,8 +32,6 @@ abstract class ParserImpl { this: Base58 =>
   private def letP: P[LET]          = P("let " ~ varName ~ "=" ~ block).map { case ((x, y)) => LET(x, y) }
   private def refP: P[REF]          = P(varName).map(x => REF(x))
   private def ifP: P[IF]            = P("if" ~ "(" ~ block ~ ")" ~ "then" ~ block ~ "else" ~ block).map { case (x, y, z) => IF(x, y, z) }
-  //private def isDefined: P[IS_DEFINED] = P("isDefined" ~ "(" ~ block ~ ")").map(b => IS_DEFINED(b))
-  //private def getP: P[GET]             = P("extract" ~ "(" ~ block ~ ")").map(b => GET(b))
   private def someP: P[SOME]      = P("Some" ~ "(" ~ block ~ ")").map(x => SOME(x))
   private def noneP: P[NONE.type] = P("None").map(_ => NONE)
 
@@ -75,7 +73,7 @@ abstract class ParserImpl { this: Base58 =>
   private def expr = P(binaryOp(opsByPriority) | atom)
 
   private def atom =
-    P(ifP | functionCallP | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | getterP | refP) // | isDefined | getP )
+    P(ifP | functionCallP | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | getterP | refP)
 
   def apply(str: String): core.Parsed[EXPR, Char, String] = P(block ~ End).parse(str)
 }

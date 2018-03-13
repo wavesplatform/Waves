@@ -77,16 +77,6 @@ object Evaluator {
             i2 <- r[tpe.Underlying](ctx, EitherT.pure(it2))
           } yield i1 == i2
 
-        case isDefined @ Typed.IS_DEFINED(opt) =>
-          r[isDefined.tpe.Underlying](ctx, EitherT.pure(opt)).flatMap {
-            case x: Option[_] => EitherT.rightT[Coeval, String](x.isDefined)
-            case _            => EitherT.leftT[Coeval, Boolean]("IS_DEFINED invoked on non-option type")
-          }
-        case Typed.GET(opt, tpe) =>
-          r[tpe.Underlying](ctx, EitherT.pure(opt)) flatMap {
-            case Some(x) => EitherT.rightT[Coeval, String](x)
-            case _       => EitherT.leftT[Coeval, Any]("GET(NONE)")
-          }
         case Typed.NONE         => EitherT.rightT[Coeval, String](None)
         case Typed.SOME(b, tpe) => r[tpe.Underlying](ctx, EitherT.pure(b)).map(Some(_))
         case Typed.GETTER(expr, field, _) =>
@@ -125,7 +115,7 @@ object Evaluator {
   def apply[A](c: Context, expr: Typed.EXPR): Either[ExecutionError, A] = {
     def result = r[A](c, EitherT.pure(expr)).value.apply()
     Try(result) match {
-      case Failure(ex) => Left(ex.toString)
+      case Failure(ex)  => Left(ex.toString)
       case Success(res) => res
     }
   }

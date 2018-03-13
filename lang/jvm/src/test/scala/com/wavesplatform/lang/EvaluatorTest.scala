@@ -111,12 +111,6 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(expr = BINARY_OP(REF("x", INT), SUM_OP, CONST_INT(2), INT)) should produce("A definition of 'x' is not found")
   }
 
-  property("successful GET/IS_DEFINED") {
-    ev(expr = IS_DEFINED(NONE)) shouldBe Right(false)
-    ev(expr = IS_DEFINED(SOME(CONST_INT(1), OPTION(INT)))) shouldBe Right(true)
-    ev(expr = GET(SOME(CONST_INT(1), OPTION(INT)), INT)) shouldBe Right(1)
-  }
-
   property("custom type field access") {
     val pointType     = PredefType("Point", List("X" -> INT, "Y"                           -> INT))
     val pointInstance = Obj(Map("X"                  -> LazyVal(INT)(EitherT.pure(3)), "Y" -> LazyVal(INT)(EitherT.pure(4))))

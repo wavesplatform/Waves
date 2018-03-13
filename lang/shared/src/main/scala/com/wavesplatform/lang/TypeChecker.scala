@@ -153,9 +153,6 @@ object TypeChecker {
         }
         .map { case (operands, tpe) => Typed.BINARY_OP(operands._1, op, operands._2, tpe) }
 
-    case isDefined: Untyped.IS_DEFINED =>
-      setType(ctx, EitherT.pure(isDefined.opt)).map(of => Typed.IS_DEFINED(of))
-
     case let: Untyped.LET =>
       setType(ctx, EitherT.pure(let.value)).map(value => Typed.LET(name = let.name, value = value))
 
@@ -210,14 +207,6 @@ object TypeChecker {
             Typed.REF(key = ref.key, tpe = tpe)
           }
           .toRight(s"A definition of '${ref.key}' is not found")
-      }
-
-    case get: Untyped.GET =>
-      setType(ctx, EitherT.pure(get.opt)).subflatMap { expr =>
-        expr.tpe match {
-          case OPTION(in) => Right(Typed.GET(opt = expr, tpe = in))
-          case x          => Left(s"GET called on $x, but only call on OPTION[_] is allowed")
-        }
       }
 
     case some: Untyped.SOME => setType(ctx, EitherT.pure(some.t)).map(t => Typed.SOME(t = t, tpe = OPTION(t.tpe)))
