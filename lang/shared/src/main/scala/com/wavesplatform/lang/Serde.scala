@@ -13,7 +13,6 @@ object Serde {
   implicit def dConstByteVector = d.bind[Typed.CONST_BYTEVECTOR](1)
   implicit def dBinaryOp        = d.bind[Typed.BINARY_OP](2)
   implicit def dIf              = d.bind[Typed.IF](3)
-  implicit def dLet             = d.bind[Typed.LET](5)
   implicit def dComposite       = d.bind[Typed.BLOCK](6)
   implicit def dRef             = d.bind[Typed.REF](7)
   implicit def dGet             = d.bind[Typed.GET](8)

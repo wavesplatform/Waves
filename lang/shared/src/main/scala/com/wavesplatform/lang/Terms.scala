@@ -23,13 +23,13 @@ object Terms {
   case object GE_OP  extends BINARY_OP_KIND
 
   object Untyped {
+    case class LET(name: String, value: EXPR)
     sealed trait EXPR
     case class CONST_INT(t: Int)                                     extends EXPR
     case class GETTER(ref: EXPR, field: String)                      extends EXPR
     case class CONST_BYTEVECTOR(bs: ByteVector)                      extends EXPR
     case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR)     extends EXPR
     case class IS_DEFINED(opt: EXPR)                                 extends EXPR
-    case class LET(name: String, value: EXPR)                        extends EXPR
     case class BLOCK(let: Option[LET], body: EXPR)                   extends EXPR
     case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)           extends EXPR
     case class REF(key: String)                                      extends EXPR
@@ -42,13 +42,13 @@ object Terms {
   }
 
   object Typed {
+    case class LET(name: String, value: EXPR)
     sealed abstract class EXPR(val tpe: TYPE)
     case class CONST_INT(t: Int)                                                             extends EXPR(INT)
     case class GETTER(ref: EXPR, field: String, override val tpe: TYPE)                      extends EXPR(tpe)
     case class CONST_BYTEVECTOR(bs: ByteVector)                                              extends EXPR(BYTEVECTOR)
     case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR, override val tpe: TYPE)     extends EXPR(tpe)
     case class IS_DEFINED(opt: EXPR)                                                         extends EXPR(BOOLEAN)
-    case class LET(name: String, value: EXPR)                                                extends EXPR(UNIT)
     case class BLOCK(let: Option[LET], body: EXPR, override val tpe: TYPE)                   extends EXPR(tpe)
     case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, override val tpe: TYPE)           extends EXPR(tpe)
     case class REF(key: String, override val tpe: TYPE)                                      extends EXPR(tpe)
