@@ -6,17 +6,16 @@ import com.wavesplatform.matcher.market.OrderBookActor.ForceCancelOrder
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ForceCancelOrderFromHistory, GetActiveOrdersByAddress, GetActiveOrdersByAddressResponse}
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.matcher.model.LimitOrder
-import com.wavesplatform.state2.{LeaseInfo, Portfolio}
+import com.wavesplatform.state2.LeaseInfo
 import scorex.account.Address
 import scorex.transaction.assets.exchange.AssetPair
 import scorex.utils.ScorexLogging
 
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
 
-class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) extends Actor with ScorexLogging {
+class BalanceWatcherWorkerActor(settings: Settings, matcher: ActorRef, orderHistory: ActorRef) extends Actor with ScorexLogging {
 
-  private type OrdersToDelete   = List[(AssetPair, String)]
-  private type ChangesByAddress = Map[Address, Portfolio]
+  private type OrdersToDelete = List[(AssetPair, String)]
 
   private var requestIdCounter = 0L
 
@@ -58,7 +57,7 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
   private def becomeWorking(event: BalanceChanged): Unit = {
     event.changes.foreach {
       case (addr, changes) =>
-        orderHistory ! GetActiveOrdersByAddress(requestIdCounter, addr, changes.changedAssets)
+        orderHistory ! GetActiveOrdersByAddress(requestIdCounter, addr, changes.changedAssets, System.currentTimeMillis())
     }
 
     context.become(waitOrders(requestIdCounter, BalanceChanged.empty, event, reschedule(EmptyCancellable)))
@@ -69,7 +68,7 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
     import context.dispatcher
 
     old.cancel()
-    context.system.scheduler.scheduleOnce(TimeoutToProcessChanges, self, ReceiveTimeout)
+    context.system.scheduler.scheduleOnce(settings.oneAddressProcessingTimeout, self, ReceiveTimeout)
   }
 
   private def replaceChanges(orig: BalanceChanged, replacement: BalanceChanged) = BalanceChanged(orig.changes ++ replacement.changes)
@@ -105,12 +104,13 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
 }
 
 object BalanceWatcherWorkerActor {
-  val TimeoutToProcessChanges: FiniteDuration = 1.minute
-
   val EmptyCancellable: Cancellable = new Cancellable {
     override def cancel(): Boolean    = true
     override def isCancelled: Boolean = true
   }
 
-  def props(matcher: ActorRef, orderHistory: ActorRef): Props = Props(new BalanceWatcherWorkerActor(matcher, orderHistory))
+  case class Settings(enable: Boolean, oneAddressProcessingTimeout: FiniteDuration)
+
+  def props(settings: Settings, matcher: ActorRef, orderHistory: ActorRef): Props =
+    Props(new BalanceWatcherWorkerActor(settings, matcher, orderHistory))
 }

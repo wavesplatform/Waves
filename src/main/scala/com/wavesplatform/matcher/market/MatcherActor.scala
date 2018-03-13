@@ -187,15 +187,15 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
     case RecoveryCompleted =>
       log.info("MatcherActor - Recovery completed!")
       initPredefinedPairs()
-      if (settings.enableBalanceWatching) createBalanceWatcher()
+      createBalanceWatcher()
   }
 
   override def receiveCommand: Receive = forwardToOrderBook
 
   override def persistenceId: String = "matcher"
 
-  private def createBalanceWatcher(): Unit = {
-    val balanceWatcherMaster = context.actorOf(FromConfig.props(BalanceWatcherWorkerActor.props(self, orderHistory)), "order-watcher-router")
+  private def createBalanceWatcher(): Unit = if (settings.balanceWatching.enable) {
+    val balanceWatcherMaster = context.actorOf(FromConfig.props(BalanceWatcherWorkerActor.props(settings.balanceWatching, self, orderHistory)), "order-watcher-router")
     context.system.eventStream.subscribe(balanceWatcherMaster, classOf[BalanceChanged])
   }
 }

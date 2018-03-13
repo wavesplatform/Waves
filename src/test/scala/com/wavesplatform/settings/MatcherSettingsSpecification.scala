@@ -3,6 +3,7 @@ package com.wavesplatform.settings
 import scala.concurrent.duration._
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.matcher.MatcherSettings
+import com.wavesplatform.matcher.market.BalanceWatcherWorkerActor
 import org.scalatest.{FlatSpec, Matchers}
 import scorex.transaction.assets.exchange.AssetPair
 
@@ -36,7 +37,10 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    blacklisted-assets: ["a"]
         |    blacklisted-names: ["b"]
         |    blacklisted-addresses: ["c"]
-        |    enable-balance-watching: yes
+        |    balance-watching {
+        |      enable: yes
+        |      one-address-processing-timeout: 32s
+        |    }
         |  }
         |}""".stripMargin))
 
@@ -62,6 +66,9 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.blacklistedAssets shouldBe Set("a")
     settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")
     settings.blacklistedAddresses shouldBe Set("c")
-    settings.enableBalanceWatching shouldBe true
+    settings.balanceWatching shouldBe BalanceWatcherWorkerActor.Settings(
+      enable = true,
+      oneAddressProcessingTimeout = 32.seconds
+    )
   }
 }

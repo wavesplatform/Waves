@@ -12,7 +12,7 @@ import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 class BalanceWatcherWorkerActorSpecification
     extends TestKit(ActorSystem("BalanceWatcherWorkerActorSpecification"))
@@ -30,17 +30,21 @@ class BalanceWatcherWorkerActorSpecification
       "ask active orders from the history" in withActors { actors =>
         actors.balanceWatcher ! noChanges(fooAddr)
         actors.history.expectMsgPF(hint = "ask active orders") {
-          case GetActiveOrdersByAddress(_, `fooAddr`, _) => true
+          case GetActiveOrdersByAddress(_, `fooAddr`, _, _) => true
         }
       }
 
       "increment an ask id" in withActors { actors =>
         actors.balanceWatcher ! noChanges(fooAddr)
-        actors.history.expectMsg(GetActiveOrdersByAddress(0, fooAddr, Set.empty))
+        actors.history.expectMsgPF(hint = "counter = 0") {
+          case GetActiveOrdersByAddress(0, `fooAddr`, _, _) => true
+        }
         actors.history.send(actors.balanceWatcher, GetActiveOrdersByAddressResponse(0, fooAddr, Seq.empty))
 
         actors.balanceWatcher ! noChanges(barAddr)
-        actors.history.expectMsg(GetActiveOrdersByAddress(1, barAddr, Set.empty))
+        actors.history.expectMsgPF(hint = "counter = 1") {
+          case GetActiveOrdersByAddress(1, `barAddr`, _, _) => true
+        }
       }
 
       "stash all incoming balance changes and then become working again" in withActors { actors =>
@@ -51,8 +55,12 @@ class BalanceWatcherWorkerActorSpecification
         actors.balanceWatcher ! noChanges(bazAddr)
 
         actors.history.send(actors.balanceWatcher, GetActiveOrdersByAddressResponse(0, fooAddr, Seq.empty))
-        actors.history.expectMsg(GetActiveOrdersByAddress(1, barAddr, Set.empty))
-        actors.history.expectMsg(GetActiveOrdersByAddress(1, bazAddr, Set.empty))
+        actors.history.expectMsgPF(hint = "first request") {
+          case GetActiveOrdersByAddress(1, `barAddr`, _, _) => true
+        }
+        actors.history.expectMsgPF(hint = "second request") {
+          case GetActiveOrdersByAddress(1, `bazAddr`, _, _) => true
+        }
       }
     }
 
@@ -109,13 +117,13 @@ class BalanceWatcherWorkerActorSpecification
       }
     }
 
-    // @TODO decrease timeout
     "reaches a processing timeout" should {
-      "become inactive" in withActors { actors =>
+      val timeoutToProcessChanges = 3.seconds
+      "become inactive" in timedWithActors(timeoutToProcessChanges) { actors =>
         actors.balanceWatcher ! noChanges(fooAddr)
         actors.history.expectMsgType[GetActiveOrdersByAddress]
 
-        actors.history.expectNoMsg(BalanceWatcherWorkerActor.TimeoutToProcessChanges + 100.millis)
+        actors.history.expectNoMsg(timeoutToProcessChanges + 100.millis)
 
         actors.balanceWatcher ! noChanges(fooAddr)
         actors.history.expectMsgType[GetActiveOrdersByAddress]
@@ -127,13 +135,24 @@ class BalanceWatcherWorkerActorSpecification
 
   private def addr(x: String): Address = PrivateKeyAccount.fromSeed(x).right.get.toAddress
 
-  private def withActors(f: TestActors => Unit): Unit = {
-    val matcher    = TestProbe("matcher")
-    val history    = TestProbe("history")
-    val testActors = TestActors(matcher, history, TestActorRef(BalanceWatcherWorkerActor.props(matcher.ref, history.ref)))
+  private def timedWithActors(oneAddressProcessingTimeout: FiniteDuration)(f: TestActors => Unit): Unit = {
+    val matcher = TestProbe("matcher")
+    val history = TestProbe("history")
+    val testActors = TestActors(
+      matcher,
+      history,
+      TestActorRef(
+        BalanceWatcherWorkerActor.props(
+          BalanceWatcherWorkerActor.Settings(enable = true, oneAddressProcessingTimeout = oneAddressProcessingTimeout),
+          matcher.ref,
+          history.ref
+        ))
+    )
     f(testActors)
     testActors.stop()
   }
+
+  private def withActors(f: TestActors => Unit): Unit = timedWithActors(1.minute)(f)
 
   override protected def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)

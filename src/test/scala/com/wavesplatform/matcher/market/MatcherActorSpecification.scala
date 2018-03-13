@@ -28,13 +28,18 @@ import scorex.transaction.{AssetId, History}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
+import scala.concurrent.duration.DurationInt
+
 class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"))
   with WordSpecLike with Matchers with BeforeAndAfterAll with ImplicitSender with MatcherTestData
   with BeforeAndAfterEach with ScorexLogging with PathMockFactory {
 
   val storedState: SnapshotStateReader = stub[SnapshotStateReader]
 
-  val settings = matcherSettings.copy(account = MatcherAccount.address, enableBalanceWatching = false)
+  val settings = matcherSettings.copy(
+    account = MatcherAccount.address,
+    balanceWatching = BalanceWatcherWorkerActor.Settings(enable = false, oneAddressProcessingTimeout = 1.second)
+  )
   val history = stub[History]
   val functionalitySettings = TestFunctionalitySettings.Stub
   val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))

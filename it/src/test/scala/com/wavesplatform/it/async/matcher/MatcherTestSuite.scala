@@ -631,7 +631,7 @@ object MatcherTestSuite {
        |  bind-address = "0.0.0.0"
        |  order-match-tx-fee = 300000
        |  blacklisted-assets = ["$ForbiddenAssetId"]
-       |  enable-balance-watching = yes
+       |  balance-watching.enable = yes
        |}
        |waves.miner.enable = no
       """.stripMargin)

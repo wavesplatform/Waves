@@ -50,6 +50,18 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       sender() ! getPairTradableBalance(assetPair, addr)
     case GetMatcherBalance(addr, _) =>
       sender() ! getMatcherBalance(addr)
+    case GetActiveOrdersByAddress(requestId, addr, assets, _) =>
+      // Because all orders spend waves for fee
+      val wasAssetChanged: Option[AssetId] => Boolean = if (assets.contains(None)) { _ => true } else assets.contains
+
+      val allActiveOrders = orderHistory.activeOrderIdsByAddress(addr.stringRepr)
+      val activeOrdersByAssets = allActiveOrders.collect { case (assetId, id) if wasAssetChanged(assetId) => id -> orderHistory.orderInfo(id) }
+
+      val active: Seq[LimitOrder] = activeOrdersByAssets.flatMap { case (id, info) =>
+        orderHistory.order(id).map { order => LimitOrder(order).partial(info.remaining) }
+      }(collection.breakOut)
+
+      sender().forward(GetActiveOrdersByAddressResponse(requestId, addr, active))
   }
 
   override def receive: Receive = {
@@ -67,18 +79,6 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       recoverFromOrderBook(ob)
     case ForceCancelOrderFromHistory(id) =>
       forceCancelOrder(id)
-    case GetActiveOrdersByAddress(requestId, addr, assets) =>
-      // Because all orders spend waves for fee
-      val wasAssetChanged: Option[AssetId] => Boolean = if (assets.contains(None)) { _ => true } else assets.contains
-
-      val allActiveOrders = orderHistory.activeOrderIdsByAddress(addr.stringRepr)
-      val activeOrdersByAssets = allActiveOrders.collect { case (assetId, id) if wasAssetChanged(assetId) => id -> orderHistory.orderInfo(id) }
-
-      val active: Seq[LimitOrder] = activeOrdersByAssets.flatMap { case (id, info) =>
-        orderHistory.order(id).map { order => LimitOrder(order).partial(info.remaining) }
-      }(collection.breakOut)
-
-      sender().forward(GetActiveOrdersByAddressResponse(requestId, addr, active))
   }
 
   def fetchOrderHistory(req: GetOrderHistory): Unit = {
@@ -161,7 +161,7 @@ object OrderHistoryActor {
 
   case class GetOrderStatus(assetPair: AssetPair, id: String, ts: Long) extends ExpirableOrderHistoryRequest
 
-  case class GetActiveOrdersByAddress(requestId: Long, address: Address, assets: Set[Option[AssetId]])
+  case class GetActiveOrdersByAddress(requestId: Long, address: Address, assets: Set[Option[AssetId]], ts: Long) extends ExpirableOrderHistoryRequest
 
   case class GetActiveOrdersByAddressResponse(requestId: Long, address: Address, orders: Seq[LimitOrder])
 
