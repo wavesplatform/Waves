@@ -103,7 +103,6 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   }
 
   def returnEmptyOrderBook(pair: AssetPair): Unit = {
-    log.debug(s"Order book ${pair.key} is empty")
     sender() ! GetOrderBookResponse.empty(pair)
   }
 

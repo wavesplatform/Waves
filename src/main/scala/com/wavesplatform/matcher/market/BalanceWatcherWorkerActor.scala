@@ -24,11 +24,8 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
     case x: BalanceChanged => becomeWorking(x)
   }
 
-  private def waitOrders(taskId: Long,
-                         stashed: BalanceChanged,
-                         unprocessed: BalanceChanged,
-                         waitOrdersTimeout: Cancellable): Receive = {
-    case x@GetActiveOrdersByAddressResponse(`taskId`, address, orders) =>
+  private def waitOrders(taskId: Long, stashed: BalanceChanged, unprocessed: BalanceChanged, waitOrdersTimeout: Cancellable): Receive = {
+    case GetActiveOrdersByAddressResponse(`taskId`, address, orders) =>
       ordersToDelete(unprocessed, address, orders)
         .foreach {
           case (pair, id) =>
@@ -41,8 +38,7 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
       if (updated.isEmpty) {
         if (stashed.isEmpty) {
           context.become(receive)
-        }
-        else becomeWorking(stashed)
+        } else becomeWorking(stashed)
       } else context.become(waitOrders(taskId, stashed, updated, reschedule(waitOrdersTimeout)))
 
     case x: BalanceChanged =>
@@ -60,8 +56,9 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
   }
 
   private def becomeWorking(event: BalanceChanged): Unit = {
-    event.changes.foreach { case (addr, changes) =>
-      orderHistory ! GetActiveOrdersByAddress(requestIdCounter, addr, changes.changedAssets)
+    event.changes.foreach {
+      case (addr, changes) =>
+        orderHistory ! GetActiveOrdersByAddress(requestIdCounter, addr, changes.changedAssets)
     }
 
     context.become(waitOrders(requestIdCounter, BalanceChanged.empty, event, reschedule(EmptyCancellable)))
@@ -82,24 +79,17 @@ class BalanceWatcherWorkerActor(matcher: ActorRef, orderHistory: ActorRef) exten
       .get(ownerAddress)
       .map { changes =>
         val portfolio = changes.updatedPortfolio
+
         val ordersByPriority = orders.sortBy(_.order.timestamp)(Ordering[Long].reverse)
         val (_, r) = ordersByPriority.foldLeft((portfolio, List.empty: OrdersToDelete)) {
           case ((restPortfolio, toDelete), limitOrder) =>
-            val updatedPortfolio1 = restPortfolio
+            val updatedPortfolio = restPortfolio
               .copy(balance = restPortfolio.balance - restPortfolio.leaseInfo.leaseOut, leaseInfo = LeaseInfo.empty)
-            val updatedPortfolio2 = updatedPortfolio1.remove(limitOrder.spentAcc.assetId, limitOrder.getSpendAmount)
-            val updatedPortfolio3 = updatedPortfolio2.flatMap { p =>
+              .remove(limitOrder.spentAcc.assetId, limitOrder.getSpendAmount)
+              .flatMap { p =>
                 if (limitOrder.rcvAsset == AssetPair.WavesName && limitOrder.getReceiveAmount >= limitOrder.remainingFee) Some(p)
                 else p.remove(None, limitOrder.remainingFee)
               }
-            val updatedPortfolio = updatedPortfolio3
-
-            log.debug(
-              s"""=== ${ownerAddress.stringRepr} ===
-                 |restPortfolio = $restPortfolio
-                 |updatedPortfolio1 = $updatedPortfolio1
-                 |updatedPortfolio2 = $updatedPortfolio2
-                 |updatedPortfolio3 = $updatedPortfolio3""".stripMargin)
 
             updatedPortfolio match {
               case Some(x) => (x, toDelete)
