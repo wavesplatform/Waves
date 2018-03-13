@@ -3,7 +3,7 @@ package com.wavesplatform.state2.diffs.smart.predef
 import com.wavesplatform.{NoShrink, TransactionGen}
 import com.wavesplatform.lang.Evaluator
 import com.wavesplatform.state2.diffs._
-import com.wavesplatform.state2.diffs.smart.{dummyTypeCheckerContext, dummyContext}
+import com.wavesplatform.state2.diffs.smart.dummyTypeCheckerContext
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval
 import org.scalatest.{Matchers, PropSpec}
@@ -17,21 +17,21 @@ class OptionTest extends PropSpec with PropertyChecks with Matchers with Transac
   private val extractScript =
     """
       |
-      | EXTRACT(TX.ASSETID)
+      | extract(TX.ASSETID)
       |
     """.stripMargin
 
   private val isDefinedScript =
     """
       |
-      | ISDEFINED(TX.ASSETID)
+      | isDefined(TX.ASSETID)
       |
     """.stripMargin
 
   private def runScript[T](script: String, tx: Transaction): Either[String, T] = {
     val Success(expr, _) = com.wavesplatform.lang.Parser(script)
     val Right(typedExpr) = com.wavesplatform.lang.TypeChecker(dummyTypeCheckerContext, expr)
-    Evaluator[T](dummyContext, typedExpr)
+    Evaluator[T](new ConsensusContext(Coeval(tx), Coeval(???), null).build(), typedExpr)
   }
 
   property("should extract transaction assetId if exists") {

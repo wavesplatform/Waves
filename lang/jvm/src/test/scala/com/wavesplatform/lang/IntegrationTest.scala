@@ -23,7 +23,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with Matchers with No
            | case Some(B) => B + B
            | }
            |
-           | get(Some(Z)) + 1
+           | extract(Some(Z)) + 1
            |
       """.stripMargin) shouldBe Right(1001)
 

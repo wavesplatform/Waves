@@ -24,12 +24,12 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
     case _ => ???
   }
 
-  val extract: PredefFunction = PredefFunction("EXTRACT", TYPEREF("T"), List(("opt", OPTION(TYPEREF("T"))))) {
+  val extract: PredefFunction = PredefFunction("extract", TYPEREF("T"), List(("opt", OPTION(TYPEREF("T"))))) {
     case Some(v) :: Nil => Right(v)
     case _              => Left("Extract from empty option")
   }
 
-  val isDefined: PredefFunction = PredefFunction("ISDEFINED", BOOLEAN, List(("opt", OPTION(TYPEREF("T"))))) {
+  val isDefined: PredefFunction = PredefFunction("isDefined", BOOLEAN, List(("opt", OPTION(TYPEREF("T"))))) {
     case Some(_) :: Nil => Right(true)
     case None :: Nil    => Right(false)
     case x              => Left(s"Invalid function call, params: $x")
