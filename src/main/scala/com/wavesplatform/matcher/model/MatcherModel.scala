@@ -6,7 +6,7 @@ import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.state2.Portfolio
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.account.Address
-import scorex.transaction.AssetAcc
+import scorex.transaction.{AssetAcc, AssetId}
 import scorex.transaction.assets.exchange._
 
 import scala.util.Try
@@ -122,11 +122,12 @@ object Events {
 
   case class ExchangeTransactionCreated(tx: ExchangeTransaction)
 
-  case class BalanceChanged(changesByAddress: Map[Address, Portfolio]) {
-    def isEmpty: Boolean = changesByAddress.isEmpty
+  case class BalanceChanged(changes: Map[Address, BalanceChanged.Changes]) {
+    def isEmpty: Boolean = changes.isEmpty
   }
   object BalanceChanged {
     val empty: BalanceChanged = BalanceChanged(Map.empty)
+    case class Changes(updatedPortfolio: Portfolio, changedAssets: Set[Option[AssetId]])
   }
 
   def createOrderInfo(event: Event): Map[String, (Order, OrderInfo)] = {

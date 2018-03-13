@@ -5,9 +5,9 @@ import cats.kernel.Monoid
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.mining.TwoDimensionalMiningConstraint
-import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
 import scorex.account.Address
-import scorex.transaction.{Authorized, Transaction, ValidationError}
+import scorex.transaction.{AssetId, Authorized, Transaction, ValidationError}
 import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
@@ -19,12 +19,10 @@ class MatcherUtxPool(underlying: UtxPool, matcherSettings: MatcherSettings, even
       .map {
         case r @ (isNew, txDiff) =>
           if (isNew) {
-            val xs = txDiff.portfolios.collect {
-              case (addr, p) if addr.stringRepr != matcherSettings.account => (addr, p.pessimistic) // TODO: also filter != 0
+            val msg = enrichWithAccountPortfolio {
+              txDiff.portfolios.collect { case (addr, p) if addr.stringRepr != matcherSettings.account => (addr, p.pessimistic) }
             }
-
-            if (xs.nonEmpty) {
-              val msg = BalanceChanged(enrichWithAccountPortfolio(xs))
+            if (!msg.isEmpty) {
               log.debug(s"Sending to event bus: $msg")
               events.publish(msg)
             }
@@ -55,7 +53,7 @@ class MatcherUtxPool(underlying: UtxPool, matcherSettings: MatcherSettings, even
     val r   = f(ops)
     val xs  = ops.messages
     if (xs.nonEmpty) {
-      log.debug(s"Changed ${xs.map(_.changesByAddress.size).sum} accounts")
+      log.debug(s"Changed ${xs.map(_.changes.size).sum} accounts")
       xs.foreach(events.publish)
     }
     r
@@ -66,7 +64,7 @@ class MatcherUtxPool(underlying: UtxPool, matcherSettings: MatcherSettings, even
   private class BatchOpsImpl(underlying: UtxBatchOps) extends UtxBatchOps {
     private val accountInfos: mutable.Map[Address, Portfolio] = mutable.Map.empty
 
-    def messages: Seq[BalanceChanged] = enrichWithAccountPortfolio(accountInfos.toMap).grouped(3).map(BalanceChanged(_)).toSeq
+    def messages: Seq[BalanceChanged] = accountInfos.toMap.grouped(3).map(enrichWithAccountPortfolio).toSeq
 
     override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] =
       underlying
@@ -88,14 +86,6 @@ class MatcherUtxPool(underlying: UtxPool, matcherSettings: MatcherSettings, even
         case (addr, txPortfolio) =>
           if (addr.stringRepr != matcherSettings.account) {
             val prevPortfolio = accountInfos.getOrElse(addr, Monoid[Portfolio].empty)
-
-//            val overriddenPortfolio = prevPortfolio.assets.foldLeft(txPortfolio) {
-//              case (r, (assetId, balance)) if balance < 0 =>
-//                val fallbackBalance = r.assets.getOrElse(assetId, balance)
-//                r.copy(assets = r.assets.updated(assetId, fallbackBalance))
-//
-//              case (r, _) => r
-//            }
             val overriddenPortfolio = Monoid.combine(prevPortfolio, txPortfolio.pessimistic)
             accountInfos.update(addr, overriddenPortfolio)
           }
@@ -103,24 +93,23 @@ class MatcherUtxPool(underlying: UtxPool, matcherSettings: MatcherSettings, even
     }
   }
 
-  private def enrichWithAccountPortfolio(changes: Map[Address, Portfolio]): Map[Address, Portfolio] = {
-    changes.map { case (addr, portfolio) =>
-      // check only:
-      // if portfolio.balance < 0
-      // if portfolio.assets.balance < 0
-      // TODO: also filter != 0
-      val accPortfolio = accountPortfolio(addr)
-      val filteredPortfolio1 = accPortfolio.copy(assets = accPortfolio.assets.filter {
-        case (assetId, _) => portfolio.assets.contains(assetId)
-      })
+  private def enrichWithAccountPortfolio(changes: Map[Address, Portfolio]): BalanceChanged = BalanceChanged {
+    changes
+      .flatMap {
+        case (addr, portfolio) =>
+          val changedAssets: Set[Option[AssetId]] = portfolio.assets.keySet.map(Some(_)) ++ {
+            if (portfolio.effectiveBalance == 0) List.empty
+            else List(None)
+          }
 
-      val filteredPortfolio2 = if (portfolio.balance == 0 && portfolio.leaseInfo.leaseOut == 0) {
-        accPortfolio.copy(balance = 0, leaseInfo = LeaseInfo.empty)
-      } else accPortfolio
+          if (changedAssets.isEmpty) List.empty
+          else {
+            val accPortfolio = accountPortfolio(addr)
+            val combined = Monoid.combine(portfolio, accPortfolio)
 
-      val combined = Monoid.combine(portfolio, filteredPortfolio2)
-      log.debug(s"\n=== $addr ====\naccPortfolio: $accPortfolio\nfilteredPortfolio1: $filteredPortfolio1\nfilteredPortfolio2: $filteredPortfolio2\nportfolio: $portfolio\ncombined: $combined")
-      addr -> combined
-    }
+            log.debug(s"\n=== $addr ====\naccPortfolio: $accPortfolio\nportfolio: $portfolio\ncombined: $combined")
+            List(addr -> BalanceChanged.Changes(combined, changedAssets))
+          }
+      }
   }
 }
