@@ -2,7 +2,7 @@ package com.wavesplatform.lang
 
 import com.wavesplatform.lang.ctx.PredefFunction
 import org.scalacheck.Shrink
-import org.scalatest.matchers.{MatchResult, Matcher}
+import org.scalatest.matchers.{Matcher, MatchResult}
 
 import scala.util.{Left, Right, Try}
 

@@ -16,25 +16,29 @@ abstract class ParserImpl { this: Base58 =>
   import White._
   import fastparse.noApi._
 
-  private val varName = CharIn('A' to 'Z').rep(1).!
+  private val keywords = Set("let", "base58", "true", "false", "if", "then", "else")
 
-  private def numberP: P[CONST_INT]    = P(CharIn('0' to '9').rep(min = 1).!.map(t => CONST_INT(t.toInt)))
-  private def trueP: P[TRUE.type]      = P("true").map(_ => TRUE)
-  private def falseP: P[FALSE.type]    = P("false").map(_ => FALSE)
-  private def bracesP: P[EXPR]         = P("(" ~ block ~ ")")
-  private def curlyBracesP: P[EXPR]    = P("{" ~ block ~ "}")
-  private def letP: P[LET]             = P("let " ~ varName ~ "=" ~ block).map { case ((x, y)) => LET(x, y) }
-  private def refP: P[REF]             = P(varName).map(x => REF(x))
-  private def ifP: P[IF]               = P("if" ~ "(" ~ block ~ ")" ~ "then" ~ block ~ "else" ~ block).map { case (x, y, z) => IF(x, y, z) }
-  private def isDefined: P[IS_DEFINED] = P("isDefined" ~ "(" ~ block ~ ")").map(b => IS_DEFINED(b))
-  private def getP: P[GET]             = P("get" ~ "(" ~ block ~ ")").map(b => GET(b))
-  private def someP: P[SOME]           = P("Some" ~ "(" ~ block ~ ")").map(x => SOME(x))
-  private def noneP: P[NONE.type]      = P("None").map(_ => NONE)
+  private val lowerChar = CharIn('a' to 'z')
+  private val upperChar = CharIn('A' to 'Z')
+  private val char      = lowerChar | upperChar
+  private val digit     = CharIn('0' to '9')
+  private val varName   = (char.repX(min = 1, max = 1) ~~ (digit | char).repX()).!.filter(!keywords.contains(_))
 
-  private def functionCallArgs : P[Seq[EXPR]] = expr.rep(min = 0, sep = ",")
+  private def numberP: P[CONST_INT] = P(digit.rep(min = 1).!.map(t => CONST_INT(t.toInt)))
+  private def trueP: P[TRUE.type]   = P("true").map(_ => TRUE)
+  private def falseP: P[FALSE.type] = P("false").map(_ => FALSE)
+  private def bracesP: P[EXPR]      = P("(" ~ block ~ ")")
+  private def curlyBracesP: P[EXPR] = P("{" ~ block ~ "}")
+  private def letP: P[LET]          = P("let " ~ varName ~ "=" ~ block).map { case ((x, y)) => LET(x, y) }
+  private def refP: P[REF]          = P(varName).map(x => REF(x))
+  private def ifP: P[IF]            = P("if" ~ "(" ~ block ~ ")" ~ "then" ~ block ~ "else" ~ block).map { case (x, y, z) => IF(x, y, z) }
+  private def someP: P[SOME]      = P("Some" ~ "(" ~ block ~ ")").map(x => SOME(x))
+  private def noneP: P[NONE.type] = P("None").map(_ => NONE)
 
-  private def functionCallP : P[FUNCTION_CALL] = P(varName ~ "(" ~ functionCallArgs ~ ")").map {
-    case (functionName, args) => FUNCTION_CALL(functionName,args.toList)
+  private def functionCallArgs: P[Seq[EXPR]] = expr.rep(min = 0, sep = ",")
+
+  private def functionCallP: P[FUNCTION_CALL] = P(varName ~ "(" ~ functionCallArgs ~ ")").map {
+    case (functionName, args) => FUNCTION_CALL(functionName, args.toList)
   }
 
   private def getterP: P[GETTER] = P(refP ~ "." ~ varName).map { case ((b, f)) => GETTER(b, f) }
@@ -45,7 +49,6 @@ abstract class ParserImpl { this: Base58 =>
   private def block: P[EXPR] = P("\n".rep ~ letP.rep ~ expr ~ ";".rep).map {
     case ((Nil, y)) => y
     case ((all, y)) => all.foldRight(y) { case (r, curr) => BLOCK(Some(r), curr) }
-
   }
 
   private val opsByPriority = List[(String, BINARY_OP_KIND)](
@@ -53,8 +56,8 @@ abstract class ParserImpl { this: Base58 =>
     "&&" -> AND_OP,
     "==" -> EQ_OP,
     ">=" -> GE_OP,
-    ">" -> GT_OP,
-    "+" -> SUM_OP
+    ">"  -> GT_OP,
+    "+"  -> SUM_OP
   )
 
   private def binaryOp(rest: List[(String, BINARY_OP_KIND)]): P[EXPR] = rest match {
@@ -70,7 +73,7 @@ abstract class ParserImpl { this: Base58 =>
   private def expr = P(binaryOp(opsByPriority) | atom)
 
   private def atom =
-    P(functionCallP | ifP | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | getterP | refP | isDefined | getP )
+    P(ifP | functionCallP | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | getterP | refP)
 
   def apply(str: String): core.Parsed[EXPR, Char, String] = P(block ~ End).parse(str)
 }
