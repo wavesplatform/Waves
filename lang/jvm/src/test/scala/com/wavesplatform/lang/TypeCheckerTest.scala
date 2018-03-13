@@ -1,8 +1,8 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.ctx._
 import com.wavesplatform.lang.Terms._
+import com.wavesplatform.lang.ctx._
 import com.wavesplatform.lang.TypeChecker.{TypeCheckerContext, TypeCheckResult, TypeDefs}
 import com.wavesplatform.lang.testing.ScriptGen
 import monix.eval.Coeval
@@ -61,7 +61,6 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       "EQ(BOOL)"         -> BINARY_OP(TRUE, EQ_OP, FALSE, BOOLEAN),
       "GT"               -> BINARY_OP(CONST_INT(0), GT_OP, CONST_INT(1), BOOLEAN),
       "GE"               -> BINARY_OP(CONST_INT(0), GE_OP, CONST_INT(1), BOOLEAN),
-      "LET"              -> LET("x", CONST_INT(0)),
       "BLOCK" -> BLOCK(
         let = None,
         body = CONST_INT(0),
@@ -74,11 +73,6 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
         tpe = OPTION(BOOLEAN)
       ),
       "SOME"      -> SOME(TRUE, OPTION(BOOLEAN)),
-      "BLOCK(LET(X), REF(y) = x)" -> BLOCK(
-        let = Some(LET("x", CONST_INT(0))),
-        body = LET("y", REF("x", INT)),
-        tpe = UNIT
-      )
     )
   }
 
@@ -214,14 +208,13 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
 
         case getter: Typed.GETTER        => aux(getter.ref).map(Untyped.GETTER(_, getter.field))
         case binaryOp: Typed.BINARY_OP   => (aux(binaryOp.a), aux(binaryOp.b)).mapN(Untyped.BINARY_OP(_, binaryOp.kind, _))
-        case let: Typed.LET              => aux(let.value).map(Untyped.LET(let.name, _))
         case block: Typed.BLOCK =>
           aux(block.body).flatMap { t =>
             val x = Untyped.BLOCK(let = None, body = t)
             block.let match {
               case None => Coeval(x)
               case Some(let) =>
-                aux(let).map {
+                aux(let.value).map {
                   case let: Untyped.LET => x.copy(let = Some(let))
                   case _                => throw new IllegalStateException()
                 }
@@ -230,7 +223,12 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
         case ifExpr: Typed.IF       => (aux(ifExpr.cond), aux(ifExpr.ifTrue), aux(ifExpr.ifFalse)).mapN(Untyped.IF)
         case ref: Typed.REF         => Coeval(Untyped.REF(ref.key))
         case some: Typed.SOME       => aux(some.t).map(Untyped.SOME)
-        case f: Typed.FUNCTION_CALL => ???
+        case f: Typed.FUNCTION_CALL =>
+          import cats.instances.vector._
+          import cats.syntax.all._
+          val auxedArgs: Vector[Coeval[Untyped.EXPR]] = f.args.map(aux).toVector
+          val sequencedAuxedArgs: Coeval[Vector[Untyped.EXPR]] = auxedArgs.sequence
+          sequencedAuxedArgs.map(args => Untyped.FUNCTION_CALL(f.functionName,args.toList))
       })
 
     aux(expr)()
