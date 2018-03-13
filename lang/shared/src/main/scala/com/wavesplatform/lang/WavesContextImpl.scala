@@ -29,6 +29,12 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
     case _              => Left("Extract from empty option")
   }
 
+  val isDefined: PredefFunction = PredefFunction("ISDEFINED", BOOLEAN, List(("opt", OPTION(TYPEREF("T"))))) {
+    case Some(_) :: Nil => Right(true)
+    case None :: Nil    => Right(false)
+    case x              => Left(s"Invalid function call, params: $x")
+  }
+
   val optionByteVector = OPTION(BYTEVECTOR)
 
   val transactionType = PredefType(
@@ -88,6 +94,7 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
         sigVerifyF.name -> sigVerifyF,
         txByIdF.name    -> txByIdF,
         extract.name    -> extract,
+        isDefined.name    -> isDefined,
         //hashing
         keccack256F.name -> keccack256F,
         blake2b256F.name -> blake2b256F,

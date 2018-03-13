@@ -2,9 +2,8 @@ package com.wavesplatform.state2.diffs.smart.predef
 
 import com.wavesplatform.{NoShrink, TransactionGen}
 import com.wavesplatform.lang.Evaluator
-import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
-import com.wavesplatform.state2.diffs.smart.dummyTypeCheckerContext
+import com.wavesplatform.state2.diffs.smart.{dummyTypeCheckerContext, dummyContext}
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval
 import org.scalatest.{Matchers, PropSpec}
@@ -30,9 +29,9 @@ class OptionTest extends PropSpec with PropertyChecks with Matchers with Transac
     """.stripMargin
 
   private def runScript[T](script: String, tx: Transaction): Either[String, T] = {
-    val Success(expr, index) = com.wavesplatform.lang.Parser(script)
-    val Right(typedExpr)     = com.wavesplatform.lang.TypeChecker(dummyTypeCheckerContext, expr)
-    Evaluator[T](new ConsensusContext(Coeval(tx), Coeval(???), null).build(), typedExpr)
+    val Success(expr, _) = com.wavesplatform.lang.Parser(script)
+    val Right(typedExpr) = com.wavesplatform.lang.TypeChecker(dummyTypeCheckerContext, expr)
+    Evaluator[T](dummyContext, typedExpr)
   }
 
   property("should extract transaction assetId if exists") {
@@ -40,9 +39,17 @@ class OptionTest extends PropSpec with PropertyChecks with Matchers with Transac
       case (transfer) =>
         val result = runScript[ByteVector](extractScript, transfer)
         transfer.assetId match {
-          case Some(v) => v.arr sameElements transfer.assetId.get.arr
+          case Some(v) => result.right.get.toArray sameElements v.arr
           case None    => result should produce("from empty option")
         }
+    }
+  }
+
+  property("isDefined should return true if assetId exists") {
+    forAll(transferGen) {
+      case (transfer) =>
+        val result = runScript[Boolean](isDefinedScript, transfer)
+        transfer.assetId.isDefined shouldEqual result.right.get
     }
   }
 }
