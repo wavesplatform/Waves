@@ -24,7 +24,7 @@ object TransactionParser {
     val MassTransferTransaction = Value(11)
     val SetScriptTransaction = Value(12)
     val ScriptTransferTransaction = Value(13)
-
+    val SmartIssueTransaction = Value(14)
   }
 
   val TimestampLength = 8
