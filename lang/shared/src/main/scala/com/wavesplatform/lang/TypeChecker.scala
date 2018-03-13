@@ -18,9 +18,7 @@ object TypeChecker {
     val empty = TypeCheckerContext(Map.empty, Map.empty, Map.empty)
 
     def fromContext(ctx: Context): TypeCheckerContext =
-      TypeCheckerContext(predefTypes = ctx.typeDefs,
-                         varDefs = ctx.letDefs.mapValues(_.tpe),
-                         functionDefs = ctx.functions.mapValues(_.signature))
+      TypeCheckerContext(predefTypes = ctx.typeDefs, varDefs = ctx.letDefs.mapValues(_.tpe), functionDefs = ctx.functions.mapValues(_.signature))
   }
 
   type TypeResolutionError      = String
@@ -65,9 +63,10 @@ object TypeChecker {
             sequencedActualArgTypes.subflatMap { v: Seq[(Typed.EXPR, TYPE)] =>
               val matches = v.map {
                 case ((e, tpe)) =>
-                  matchType(tpe,e.tpe) match {
+                  matchType(tpe, e.tpe) match {
                     case Some(_) => Right(e)
-                    case None    => Left(s"Types of arguments of function call '$name' do not match types required in signature. Expected: $tpe, Actual: ${e.tpe}")
+                    case None =>
+                      Left(s"Types of arguments of function call '$name' do not match types required in signature. Expected: $tpe, Actual: ${e.tpe}")
                   }
               }
               matches.find(_.isLeft) match {
@@ -106,7 +105,7 @@ object TypeChecker {
               case EQ_OP =>
                 findCommonType(aTpe, bTpe) match {
                   case Some(_) => Right(operands -> BOOLEAN)
-                  case None => Left(s"Can't find common type for $aTpe and $bTpe: $a and $b in $expr")
+                  case None    => Left(s"Can't find common type for $aTpe and $bTpe: $a and $b in $expr")
                 }
             }
         }
@@ -114,9 +113,6 @@ object TypeChecker {
 
     case isDefined: Untyped.IS_DEFINED =>
       setType(ctx, EitherT.pure(isDefined.opt)).map(of => Typed.IS_DEFINED(of))
-
-    case let: Untyped.LET =>
-      setType(ctx, EitherT.pure(let.value)).map(value => Typed.LET(name = let.name, value = value))
 
     case block: Untyped.BLOCK =>
       block.let match {
@@ -126,20 +122,17 @@ object TypeChecker {
           }
 
         case Some(let) =>
-          setType(ctx, EitherT.pure(let))
-            .flatMap {
-              case letExpr: Typed.LET =>
-                val updatedCtx = ctx.copy(varDefs = ctx.varDefs + (let.name -> letExpr.value.tpe))
-                setType(updatedCtx, EitherT.pure(block.body))
-                  .map { inExpr =>
-                    Typed.BLOCK(
-                      let = Some(letExpr),
-                      body = inExpr,
-                      tpe = inExpr.tpe
-                    )
-                  }
-              case x => EitherT.fromEither(Left(s"Inferred '$x' during type check. Expected LET"))
-            }
+          setType(ctx, EitherT.pure(let.value)).flatMap { exprTpe =>
+            val updatedCtx = ctx.copy(varDefs = ctx.varDefs + (let.name -> exprTpe.tpe))
+            setType(updatedCtx, EitherT.pure(block.body))
+              .map { inExpr =>
+                Typed.BLOCK(
+                  let = Some(Typed.LET(let.name, exprTpe)),
+                  body = inExpr,
+                  tpe = inExpr.tpe
+                )
+              }
+          }
       }
 
     case ifExpr: Untyped.IF =>
@@ -160,7 +153,6 @@ object TypeChecker {
               case None => Left(s"Can't find common type for $ifTrueTpe and $ifFalseTpe")
             }
         }
-
 
     case ref: Untyped.REF =>
       EitherT.fromEither {

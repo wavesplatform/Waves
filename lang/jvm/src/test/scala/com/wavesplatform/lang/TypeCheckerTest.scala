@@ -37,7 +37,6 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       "GE"               -> BINARY_OP(CONST_INT(0), GE_OP, CONST_INT(1), BOOLEAN),
       "IS_DEFINED(NONE)" -> IS_DEFINED(NONE),
       "IS_DEFINED(SOME)" -> IS_DEFINED(SOME(TRUE, OPTION(BOOLEAN))),
-      "LET"              -> LET("x", CONST_INT(0)),
       "BLOCK" -> BLOCK(
         let = None,
         body = CONST_INT(0),
@@ -52,11 +51,6 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       "GET(SOME)" -> GET(SOME(TRUE, OPTION(BOOLEAN)), BOOLEAN),
       "GET(NONE)" -> GET(NONE, NOTHING),
       "SOME"      -> SOME(TRUE, OPTION(BOOLEAN)),
-      "BLOCK(LET(X), REF(y) = x)" -> BLOCK(
-        let = Some(LET("x", CONST_INT(0))),
-        body = LET("y", REF("x", INT)),
-        tpe = UNIT
-      )
     )
   }
 
@@ -184,14 +178,13 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
         case getter: Typed.GETTER        => aux(getter.ref).map(Untyped.GETTER(_, getter.field))
         case binaryOp: Typed.BINARY_OP   => (aux(binaryOp.a), aux(binaryOp.b)).mapN(Untyped.BINARY_OP(_, binaryOp.kind, _))
         case isDefined: Typed.IS_DEFINED => aux(isDefined.opt).map(Untyped.IS_DEFINED)
-        case let: Typed.LET              => aux(let.value).map(Untyped.LET(let.name, _))
         case block: Typed.BLOCK =>
           aux(block.body).flatMap { t =>
             val x = Untyped.BLOCK(let = None, body = t)
             block.let match {
               case None => Coeval(x)
               case Some(let) =>
-                aux(let).map {
+                aux(let.value).map {
                   case let: Untyped.LET => x.copy(let = Some(let))
                   case _                => throw new IllegalStateException()
                 }
