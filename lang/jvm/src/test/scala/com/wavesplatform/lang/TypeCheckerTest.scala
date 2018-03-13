@@ -72,7 +72,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
         ifFalse = NONE,
         tpe = OPTION(BOOLEAN)
       ),
-      "SOME"      -> SOME(TRUE, OPTION(BOOLEAN)),
+      "SOME"      -> SOME(TRUE, OPTION(BOOLEAN))
     )
   }
 

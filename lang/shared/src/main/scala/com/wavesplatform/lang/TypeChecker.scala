@@ -87,7 +87,8 @@ object TypeChecker {
                          a.flatMap(t1 =>
                            findCommonType(t1, b._2)
                              .toRight(s"There is no common type among (${types.map(_._2).mkString(", ")}) for $groupKey type param"))))
-                }val matches = v.map(x => (x._1, resolveTypes(x._2, resolvedTypes))).map {
+                }
+              val matches = v.map(x => (x._1, resolveTypes(x._2, resolvedTypes))).map {
                 case ((e, Right(tpe))) =>
                   matchType(tpe,e.tpe) match {
                     case Some(_) => Right(e)
