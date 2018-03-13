@@ -1,9 +1,9 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.ctx._
 import com.wavesplatform.lang.Terms._
-import com.wavesplatform.lang.TypeChecker.{TypeCheckResult, TypeCheckerContext, TypeDefs}
+import com.wavesplatform.lang.TypeChecker._
+import com.wavesplatform.lang.ctx._
 import com.wavesplatform.lang.testing.ScriptGen
 import monix.eval.Coeval
 import org.scalatest.prop.PropertyChecks
@@ -201,7 +201,12 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
         case ref: Typed.REF         => Coeval(Untyped.REF(ref.key))
         case get: Typed.GET         => aux(get.opt).map(Untyped.GET)
         case some: Typed.SOME       => aux(some.t).map(Untyped.SOME)
-        case f: Typed.FUNCTION_CALL => ???
+        case f: Typed.FUNCTION_CALL =>
+          import cats.instances.vector._
+          import cats.syntax.all._
+          val auxedArgs: Vector[Coeval[Untyped.EXPR]] = f.args.map(aux).toVector
+          val sequencedAuxedArgs: Coeval[Vector[Untyped.EXPR]] = auxedArgs.sequence
+          sequencedAuxedArgs.map(args => Untyped.FUNCTION_CALL(f.functionName,args.toList))
       })
 
     aux(expr)()
