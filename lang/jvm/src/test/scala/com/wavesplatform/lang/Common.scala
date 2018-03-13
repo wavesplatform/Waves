@@ -1,8 +1,11 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.ctx.PredefFunction
+import fastparse.core.Parsed
+import fastparse.core.Parsed.{Failure, Success}
 import org.scalacheck.Shrink
-import org.scalatest.matchers.{MatchResult, Matcher}
+import org.scalatest.matchers.{Matcher, MatchResult}
+import shapeless.Nat._0
 
 import scala.util.{Left, Right, Try}
 

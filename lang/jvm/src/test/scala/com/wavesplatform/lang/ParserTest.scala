@@ -4,6 +4,7 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Terms.Untyped._
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.testing.ScriptGen
+import fastparse.core.Parsed.{Failure, Success}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
@@ -12,6 +13,10 @@ import scorex.crypto.encode.{Base58 => ScorexBase58}
 class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   def parse(x: String): EXPR = Parser(x).get.value
+  def isParsed(x: String): Boolean = Parser(x) match {
+    case Success(_, _)    => true
+    case Failure(_, _, _) => false
+  }
 
   property("simple expressions") {
     parse("10") shouldBe CONST_INT(10)
@@ -131,6 +136,18 @@ X > Y
       """.stripMargin) shouldBe GETTER(REF("X"), "Y")
   }
 
+  property("reserved keywords are invalid variable names") {
+    def script(keyword: String): String =
+      s"""
+        |
+        |let $keyword = 1
+        |$keyword + 1
+        |
+      """.stripMargin
+
+    List("if", "then", "else", "true", "false").foreach(kv => isParsed(script(kv)) shouldBe false)
+  }
+
   property("multisig sample") {
     val script =
       """
@@ -159,8 +176,10 @@ X > Y
   }
 
   property("isDefined/extract") {
-    parse("isDefined(X)") shouldBe FUNCTION_CALL("ISDEFINED", List(REF("X")))
-    parse("if(isDefined(X)) then get(X) else Y") shouldBe IF(IS_DEFINED(REF("X")), GET(REF("X")), REF("Y"))
+    parse("isDefined(X)") shouldBe FUNCTION_CALL("isDefined", List(REF("X")))
+    parse("if(isDefined(X)) then extract(X) else Y") shouldBe IF(FUNCTION_CALL("isDefined", List(REF("X"))),
+                                                                 FUNCTION_CALL("extract", List(REF("X"))),
+                                                                 REF("Y"))
   }
 
 }

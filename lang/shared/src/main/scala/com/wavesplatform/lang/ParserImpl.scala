@@ -16,11 +16,13 @@ abstract class ParserImpl { this: Base58 =>
   import White._
   import fastparse.noApi._
 
+  private val keywords = Set("let", "base58", "true", "false", "if", "then", "else")
+
   private val lowerChar = CharIn('a' to 'z')
   private val upperChar = CharIn('A' to 'Z')
   private val char      = lowerChar | upperChar
   private val digit     = CharIn('0' to '9')
-  private val varName   = (char.rep(min = 1) ~ (digit | char).rep()).!
+  private val varName   = (char.repX(min = 1, max = 1) ~~ (digit | char).repX()).!.filter(!keywords.contains(_))
 
   private def numberP: P[CONST_INT] = P(digit.rep(min = 1).!.map(t => CONST_INT(t.toInt)))
   private def trueP: P[TRUE.type]   = P("true").map(_ => TRUE)
@@ -42,25 +44,6 @@ abstract class ParserImpl { this: Base58 =>
   }
 
   private def getterP: P[GETTER] = P(refP ~ "." ~ varName).map { case ((b, f)) => GETTER(b, f) }
-
-  private def patmat1P: P[BLOCK] =
-    P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "None" ~ "=>" ~ block ~ "case" ~ "Some" ~ "(" ~ varName ~ ")" ~ "=>" ~ block ~ "}")
-      .map { case ((exp, ifNone, ref, ifSome)) => patmat(exp, ref, ifSome, ifNone) }
-
-  private def patmat2P: P[BLOCK] =
-    P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "Some" ~ "(" ~ varName ~ ")" ~ "=>" ~ block ~ "case" ~ "None" ~ "=>" ~ block ~ "}")
-      .map { case ((exp, ref, ifSome, ifNone)) => patmat(exp, ref, ifSome, ifNone) }
-
-  def patmat(exp: EXPR, ref: String, ifSome: EXPR, ifNone: EXPR): BLOCK =
-    BLOCK(
-      Some(LET("@exp", exp)),
-      IF(IS_DEFINED(REF("@exp")),
-         BLOCK(
-           Some(LET(ref, GET(REF("@exp")))),
-           ifSome
-         ),
-         ifNone)
-    )
 
   private def byteVectorP: P[CONST_BYTEVECTOR] =
     P("base58'" ~ CharsWhileIn(Base58Chars).! ~ "'").map(x => CONST_BYTEVECTOR(ByteVector(base58Decode(x).get)))
@@ -92,7 +75,7 @@ abstract class ParserImpl { this: Base58 =>
   private def expr = P(binaryOp(opsByPriority) | atom)
 
   private def atom =
-    P(functionCallP | ifP | patmat1P | patmat2P | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | getterP | refP) // | isDefined | getP )
+    P(ifP | functionCallP | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | getterP | refP) // | isDefined | getP )
 
   def apply(str: String): core.Parsed[EXPR, Char, String] = P(block ~ End).parse(str)
 }
