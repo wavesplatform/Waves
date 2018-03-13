@@ -1,9 +1,9 @@
 package com.wavesplatform.lang
-
-import com.wavesplatform.lang.ctx.Obj
 import scodec.bits.ByteVector
 
 object Terms {
+
+  case class FUNCTION(args: List[TYPE], result: TYPE)
 
   sealed trait TYPE { type Underlying }
   case object NOTHING              extends TYPE { type Underlying = Nothing              }
@@ -12,7 +12,7 @@ object Terms {
   case object BYTEVECTOR           extends TYPE { type Underlying = ByteVector           }
   case object BOOLEAN              extends TYPE { type Underlying = Boolean              }
   case class OPTION(t: TYPE)       extends TYPE { type Underlying = Option[t.Underlying] }
-  case class TYPEREF(name: String) extends TYPE { type Underlying = Obj                  }
+  case class TYPEREF(name: String) extends TYPE { type Underlying = Any                  }
 
   sealed trait BINARY_OP_KIND
   case object SUM_OP extends BINARY_OP_KIND
@@ -29,11 +29,9 @@ object Terms {
     case class GETTER(ref: EXPR, field: String)                      extends EXPR
     case class CONST_BYTEVECTOR(bs: ByteVector)                      extends EXPR
     case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR)     extends EXPR
-    case class IS_DEFINED(opt: EXPR)                                 extends EXPR
     case class BLOCK(let: Option[LET], body: EXPR)                   extends EXPR
     case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)           extends EXPR
     case class REF(key: String)                                      extends EXPR
-    case class GET(opt: EXPR)                                        extends EXPR
     case object TRUE                                                 extends EXPR
     case object FALSE                                                extends EXPR
     case object NONE                                                 extends EXPR
@@ -48,17 +46,14 @@ object Terms {
     case class GETTER(ref: EXPR, field: String, override val tpe: TYPE)                      extends EXPR(tpe)
     case class CONST_BYTEVECTOR(bs: ByteVector)                                              extends EXPR(BYTEVECTOR)
     case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR, override val tpe: TYPE)     extends EXPR(tpe)
-    case class IS_DEFINED(opt: EXPR)                                                         extends EXPR(BOOLEAN)
     case class BLOCK(let: Option[LET], body: EXPR, override val tpe: TYPE)                   extends EXPR(tpe)
     case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, override val tpe: TYPE)           extends EXPR(tpe)
     case class REF(key: String, override val tpe: TYPE)                                      extends EXPR(tpe)
-    case class GET(opt: EXPR, override val tpe: TYPE)                                        extends EXPR(tpe)
     case object TRUE                                                                         extends EXPR(BOOLEAN)
     case object FALSE                                                                        extends EXPR(BOOLEAN)
     case object NONE                                                                         extends EXPR(OPTION(NOTHING))
     case class SOME(t: EXPR, override val tpe: TYPE)                                         extends EXPR(tpe)
     case class FUNCTION_CALL(functionName: String, args: List[EXPR], override val tpe: TYPE) extends EXPR(tpe)
-
   }
 
   def findCommonType(t1: TYPE, t2: TYPE): Option[TYPE] = findCommonType(t1, t2, biDirectional = true)
@@ -75,4 +70,10 @@ object Terms {
         case _                          => None
       }
 
+  def inferTypeParams(actual: TYPE, expected: TYPE): List[(String, TYPE)] =
+    (actual, expected) match {
+      case (actualType, TYPEREF(name)) => List((name, actualType))
+      case (OPTION(t1), OPTION(t2))    => inferTypeParams(t1, t2)
+      case _                           => List.empty
+    }
 }

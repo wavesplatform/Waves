@@ -21,7 +21,8 @@ object Evaluator {
                 case None =>
                   val varBlockTpe                                                  = newVarBlock.tpe
                   val eitherTCoeval: TrampolinedExecResult[varBlockTpe.Underlying] = r[varBlockTpe.Underlying](ctx, EitherT.pure(newVarBlock))
-                  val updatedCtx: Context                                          = ctx.copy(letDefs = ctx.letDefs.updated(newVarName, LazyVal(varBlockTpe)(eitherTCoeval)))
+                  val lz: LazyVal                                                  = LazyVal(varBlockTpe)(eitherTCoeval)
+                  val updatedCtx: Context                                          = ctx.copy(letDefs = ctx.letDefs.updated(newVarName, lz))
                   r[blockTpe.Underlying](updatedCtx, EitherT.pure(inner))
               }
           }
@@ -76,16 +77,6 @@ object Evaluator {
             i2 <- r[tpe.Underlying](ctx, EitherT.pure(it2))
           } yield i1 == i2
 
-        case isDefined @ Typed.IS_DEFINED(opt) =>
-          r[isDefined.tpe.Underlying](ctx, EitherT.pure(opt)).flatMap {
-            case x: Option[_] => EitherT.rightT[Coeval, String](x.isDefined)
-            case _            => EitherT.leftT[Coeval, Boolean]("IS_DEFINED invoked on non-option type")
-          }
-        case Typed.GET(opt, tpe) =>
-          r[tpe.Underlying](ctx, EitherT.pure(opt)) flatMap {
-            case Some(x) => EitherT.rightT[Coeval, String](x)
-            case _       => EitherT.leftT[Coeval, Any]("GET(NONE)")
-          }
         case Typed.NONE         => EitherT.rightT[Coeval, String](None)
         case Typed.SOME(b, tpe) => r[tpe.Underlying](ctx, EitherT.pure(b)).map(Some(_))
         case Typed.GETTER(expr, field, _) =>

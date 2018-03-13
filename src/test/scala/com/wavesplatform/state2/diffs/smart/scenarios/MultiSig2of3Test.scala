@@ -75,10 +75,10 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
         )
 
         validProofs.foreach { tx =>
-          assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)), fs) { case _ => () }
+          assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)), smartEnabledFS) { case _ => () }
         }
         invalidProofs.foreach { tx =>
-          assertLeft(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)), fs)("TransactionNotAllowedByScript")
+          assertLeft(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)), smartEnabledFS)("TransactionNotAllowedByScript")
         }
     }
   }

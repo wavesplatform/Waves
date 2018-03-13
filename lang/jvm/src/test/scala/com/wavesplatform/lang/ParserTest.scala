@@ -4,6 +4,7 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Terms.Untyped._
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.testing.ScriptGen
+import fastparse.core.Parsed.{Failure, Success}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
@@ -12,6 +13,10 @@ import scorex.crypto.encode.{Base58 => ScorexBase58}
 class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   def parse(x: String): EXPR = Parser(x).get.value
+  def isParsed(x: String): Boolean = Parser(x) match {
+    case Success(_, _)    => true
+    case Failure(_, _, _) => false
+  }
 
   property("simple expressions") {
     parse("10") shouldBe CONST_LONG(10)
@@ -38,10 +43,13 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parse("false || SIGVERIFY(base58'333', base58'222', base58'111')") shouldBe BINARY_OP(
       FALSE,
       OR_OP,
-      FUNCTION_CALL( "SIGVERIFY", List(
-        CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("333").get)),
-        CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("222").get)),
-        CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("111").get)))
+      FUNCTION_CALL(
+        "SIGVERIFY",
+        List(
+          CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("333").get)),
+          CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("222").get)),
+          CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("111").get))
+        )
       )
     )
   }
@@ -52,7 +60,8 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       """.stripMargin) shouldBe BLOCK(Some(LET("X", CONST_LONG(10))), BINARY_OP(CONST_LONG(3), GT_OP, CONST_LONG(2)))
 
     parse("(let X = 10; 3 > 2)") shouldBe BLOCK(Some(LET("X", CONST_LONG(10))), BINARY_OP(CONST_LONG(3), GT_OP, CONST_LONG(2)))
-    parse("(let X = 3 + 2; 3 > 2)") shouldBe BLOCK(Some(LET("X", BINARY_OP(CONST_LONG(3), SUM_OP, CONST_LONG(2)))), BINARY_OP(CONST_LONG(3), GT_OP, CONST_LONG(2)))
+    parse("(let X = 3 + 2; 3 > 2)") shouldBe BLOCK(Some(LET("X", BINARY_OP(CONST_LONG(3), SUM_OP, CONST_LONG(2)))),
+                                                   BINARY_OP(CONST_LONG(3), GT_OP, CONST_LONG(2)))
     parse("(let X = if(true) then true else false; false)") shouldBe BLOCK(Some(LET("X", IF(TRUE, TRUE, FALSE))), FALSE)
 
     val expr = parse("""let X = 10;
@@ -122,6 +131,18 @@ X > Y
       """.stripMargin) shouldBe GETTER(REF("X"), "Y")
   }
 
+  property("reserved keywords are invalid variable names") {
+    def script(keyword: String): String =
+      s"""
+        |
+        |let $keyword = 1
+        |$keyword + 1
+        |
+      """.stripMargin
+
+    List("if", "then", "else", "true", "false").foreach(kv => isParsed(script(kv)) shouldBe false)
+  }
+
   property("multisig sample") {
     val script =
       """
@@ -149,10 +170,11 @@ X > Y
     parse("FOO(X)".stripMargin) shouldBe FUNCTION_CALL("FOO", List(REF("X")))
   }
 
-
-  property("isDefined/get") {
-    parse("isDefined(X)") shouldBe IS_DEFINED(REF("X"))
-    parse("if(isDefined(X)) then get(X) else Y") shouldBe IF(IS_DEFINED(REF("X")), GET(REF("X")), REF("Y"))
+  property("isDefined/extract") {
+    parse("isDefined(X)") shouldBe FUNCTION_CALL("isDefined", List(REF("X")))
+    parse("if(isDefined(X)) then extract(X) else Y") shouldBe IF(FUNCTION_CALL("isDefined", List(REF("X"))),
+                                                                 FUNCTION_CALL("extract", List(REF("X"))),
+                                                                 REF("Y"))
   }
 
 }
