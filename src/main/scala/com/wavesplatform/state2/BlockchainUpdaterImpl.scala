@@ -158,7 +158,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
                 Some((diff, ng.transactions))
               }
             } else if (areVersionsOfSameBlock(block, ng.base)) {
-              if (block.transactionData.size <= ng.transactions.size) {
+              if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
                 log.trace(s"Existing liquid block is better than new one, discarding $block")
                 Right(None)
               } else {
