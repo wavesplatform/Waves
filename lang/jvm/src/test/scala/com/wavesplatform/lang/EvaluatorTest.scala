@@ -15,47 +15,47 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     Evaluator(context, expr)
   }
 
-  private def simpleDeclarationAndUsage(i: Int) = BLOCK(Some(LET("x", CONST_INT(i))), REF("x", INT), INT)
+  private def simpleDeclarationAndUsage(i: Int) = BLOCK(Some(LET("x", CONST_LONG(i))), REF("x", LONG), LONG)
 
 
 
 
   property("successful on very deep expressions (stack overflow check)") {
-    val term = (1 to 100000).foldLeft[EXPR](CONST_INT(0))((acc, _) => BINARY_OP(acc, SUM_OP, CONST_INT(1), INT))
+    val term = (1 to 100000).foldLeft[EXPR](CONST_LONG(0))((acc, _) => BINARY_OP(acc, SUM_OP, CONST_LONG(1), LONG))
     ev(expr = term) shouldBe Right(100000)
   }
 
   property("successful on unused let") {
     ev(
       expr = BLOCK(
-        Some(LET("x", CONST_INT(3))),
-        CONST_INT(3),
-        INT
+        Some(LET("x", CONST_LONG(3))),
+        CONST_LONG(3),
+        LONG
       )) shouldBe Right(3)
   }
 
   property("successful on some expr") {
-    ev(expr = SOME(CONST_INT(4), OPTION(INT))) shouldBe Right(Some(4))
+    ev(expr = SOME(CONST_LONG(4), OPTION(LONG))) shouldBe Right(Some(4))
   }
 
   property("successful on some block") {
     ev(
       expr = BLOCK(
         None,
-        SOME(CONST_INT(3), OPTION(INT)),
-        OPTION(INT)
+        SOME(CONST_LONG(3), OPTION(LONG)),
+        OPTION(LONG)
       )) shouldBe Right(Some(3))
   }
 
   property("successful on x = y") {
     ev(
-      expr = BLOCK(Some(LET("x", CONST_INT(3))),
+      expr = BLOCK(Some(LET("x", CONST_LONG(3))),
                    BLOCK(
-                     Some(LET("y", REF("x", INT))),
-                     BINARY_OP(REF("x", INT), SUM_OP, REF("y", INT), INT),
-                     INT
+                     Some(LET("y", REF("x", LONG))),
+                     BINARY_OP(REF("x", LONG), SUM_OP, REF("y", LONG), LONG),
+                     LONG
                    ),
-                   INT)) shouldBe Right(6)
+                   LONG)) shouldBe Right(6)
   }
 
   property("successful on simple get") {
@@ -65,76 +65,76 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   property("successful on get used further in expr") {
     ev(
       expr = BLOCK(
-        Some(LET("x", CONST_INT(3))),
-        BINARY_OP(REF("x", INT), EQ_OP, CONST_INT(2), INT),
-        INT
+        Some(LET("x", CONST_LONG(3))),
+        BINARY_OP(REF("x", LONG), EQ_OP, CONST_LONG(2), LONG),
+        LONG
       )) shouldBe Right(false)
   }
 
   property("successful on multiple lets") {
     ev(
       expr = BLOCK(
-        Some(LET("x", CONST_INT(3))),
-        BLOCK(Some(LET("y", CONST_INT(3))), BINARY_OP(REF("x", INT), EQ_OP, REF("y", INT), INT), INT),
-        INT
+        Some(LET("x", CONST_LONG(3))),
+        BLOCK(Some(LET("y", CONST_LONG(3))), BINARY_OP(REF("x", LONG), EQ_OP, REF("y", LONG), LONG), LONG),
+        LONG
       )) shouldBe Right(true)
   }
 
   property("successful on multiple lets with expression") {
     ev(
       expr = BLOCK(
-        Some(LET("x", CONST_INT(3))),
-        BLOCK(Some(LET("y", BINARY_OP(CONST_INT(3), SUM_OP, CONST_INT(0), INT))), BINARY_OP(REF("x", INT), EQ_OP, REF("y", INT), INT), INT),
-        INT
+        Some(LET("x", CONST_LONG(3))),
+        BLOCK(Some(LET("y", BINARY_OP(CONST_LONG(3), SUM_OP, CONST_LONG(0), LONG))), BINARY_OP(REF("x", LONG), EQ_OP, REF("y", LONG), LONG), LONG),
+        LONG
       )) shouldBe Right(true)
   }
 
   property("successful on deep type resolution") {
-    ev(expr = IF(BINARY_OP(CONST_INT(1), EQ_OP, CONST_INT(2), INT), simpleDeclarationAndUsage(3), CONST_INT(4), INT)) shouldBe Right(4)
+    ev(expr = IF(BINARY_OP(CONST_LONG(1), EQ_OP, CONST_LONG(2), LONG), simpleDeclarationAndUsage(3), CONST_LONG(4), LONG)) shouldBe Right(4)
   }
 
   property("successful on same value names in different branches") {
-    ev(expr = IF(BINARY_OP(CONST_INT(1), EQ_OP, CONST_INT(2), INT), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4), INT)) shouldBe Right(
+    ev(expr = IF(BINARY_OP(CONST_LONG(1), EQ_OP, CONST_LONG(2), LONG), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4), LONG)) shouldBe Right(
       4)
   }
 
   property("fails if override") {
     ev(
       expr = BLOCK(
-        Some(LET("x", CONST_INT(3))),
-        BLOCK(Some(LET("x", BINARY_OP(CONST_INT(3), SUM_OP, CONST_INT(0), INT))), BINARY_OP(REF("x", INT), EQ_OP, CONST_INT(1), INT), INT),
-        INT
+        Some(LET("x", CONST_LONG(3))),
+        BLOCK(Some(LET("x", BINARY_OP(CONST_LONG(3), SUM_OP, CONST_LONG(0), LONG))), BINARY_OP(REF("x", LONG), EQ_OP, CONST_LONG(1), LONG), LONG),
+        LONG
       )) should produce("already defined")
   }
 
   property("fails if definition not found") {
-    ev(expr = BINARY_OP(REF("x", INT), SUM_OP, CONST_INT(2), INT)) should produce("A definition of 'x' is not found")
+    ev(expr = BINARY_OP(REF("x", LONG), SUM_OP, CONST_LONG(2), LONG)) should produce("A definition of 'x' is not found")
   }
 
   property("custom type field access") {
-    val pointType     = PredefType("Point", List("X" -> INT, "Y"                           -> INT))
-    val pointInstance = Obj(Map("X"                  -> LazyVal(INT)(EitherT.pure(3)), "Y" -> LazyVal(INT)(EitherT.pure(4))))
+    val pointType     = PredefType("Point", List("X" -> LONG, "Y"                           -> LONG))
+    val pointInstance = Obj(Map("X"                  -> LazyVal(LONG)(EitherT.pure(3)), "Y" -> LazyVal(LONG)(EitherT.pure(4))))
     ev(
       context = Context(
         typeDefs = Map(pointType.name -> pointType),
         letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance)))),
         functions = Map.empty
       ),
-      expr = BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", INT), SUM_OP, CONST_INT(2), INT)
+      expr = BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", LONG), SUM_OP, CONST_LONG(2), LONG)
     ) shouldBe Right(5)
   }
 
   property("lazy let evaluation doesn't throw if not used") {
-    val pointType     = PredefType("Point", List(("X", INT), ("Y", INT)))
-    val pointInstance = Obj(Map(("X", LazyVal(INT)(EitherT.pure(3))), ("Y", LazyVal(INT)(EitherT.pure(4)))))
+    val pointType     = PredefType("Point", List(("X", LONG), ("Y", LONG)))
+    val pointInstance = Obj(Map(("X", LazyVal(LONG)(EitherT.pure(3))), ("Y", LazyVal(LONG)(EitherT.pure(4)))))
     val context = Context(
       typeDefs = Map((pointType.name, pointType)),
-      letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance))), ("badVal", LazyVal(INT)(EitherT.leftT("Error")))),
+      letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance))), ("badVal", LazyVal(LONG)(EitherT.leftT("Error")))),
       functions = Map.empty
     )
     ev(
       context = context,
-      expr = BLOCK(Some(LET("Z", REF("badVal", INT))), BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", INT), SUM_OP, CONST_INT(2), INT), INT)
+      expr = BLOCK(Some(LET("Z", REF("badVal", LONG))), BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", LONG), SUM_OP, CONST_LONG(2), LONG), LONG)
     ) shouldBe Right(5)
   }
 
@@ -142,14 +142,14 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     var fieldCalculated = 0
     var valueCalculated = 0
 
-    val pointType = PredefType("Point", List(("X", INT), ("Y", INT)))
-    val pointInstance = Obj(Map(("X", LazyVal(INT)(EitherT.pure {
+    val pointType = PredefType("Point", List(("X", LONG), ("Y", LONG)))
+    val pointInstance = Obj(Map(("X", LazyVal(LONG)(EitherT.pure {
       fieldCalculated = fieldCalculated + 1
       3
-    })), ("Y", LazyVal(INT)(EitherT.pure(4)))))
+    })), ("Y", LazyVal(LONG)(EitherT.pure(4)))))
     val context = Context(
       typeDefs = Map((pointType.name, pointType)),
-      letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance))), ("h", LazyVal(INT)(EitherT.pure {
+      letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance))), ("h", LazyVal(LONG)(EitherT.pure {
         valueCalculated = valueCalculated + 1
         4
       }))),
@@ -157,12 +157,12 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     )
     ev(
       context = context,
-      expr = BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", INT), SUM_OP, GETTER(REF("p", TYPEREF("Point")), "X", INT), INT)
+      expr = BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", LONG), SUM_OP, GETTER(REF("p", TYPEREF("Point")), "X", LONG), LONG)
     ) shouldBe Right(6)
 
     ev(
       context = context,
-      expr = BINARY_OP(REF("h", INT), SUM_OP, REF("h", INT), INT)
+      expr = BINARY_OP(REF("h", LONG), SUM_OP, REF("h", LONG), LONG)
     ) shouldBe Right(8)
 
     fieldCalculated shouldBe 1
@@ -172,7 +172,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   property("let is evaluated maximum once") {
     var functionEvaluated = 0
 
-    val f = PredefFunction("F", INT, List(("_", INT))) { _ =>
+    val f = PredefFunction("F", LONG, List(("_", LONG))) { _ =>
       functionEvaluated = functionEvaluated + 1
       Right(1)
     }
@@ -184,7 +184,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     )
     ev(
       context = context,
-      expr = BLOCK(Some(LET("X", FUNCTION_CALL("F", List(CONST_INT(1000)), INT))), BINARY_OP(REF("X", INT), SUM_OP, REF("X", INT), INT), INT)
+      expr = BLOCK(Some(LET("X", FUNCTION_CALL("F", List(CONST_LONG(1000)), LONG))), BINARY_OP(REF("X", LONG), SUM_OP, REF("X", LONG), LONG), LONG)
     ) shouldBe Right(2)
 
     functionEvaluated shouldBe 1
@@ -198,7 +198,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
         letDefs = Map.empty,
         functions = Map(multiplierFunction.name -> multiplierFunction)
       ),
-      expr = FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_INT(3), Typed.CONST_INT(4)), INT)
+      expr = FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_LONG(3), Typed.CONST_LONG(4)), LONG)
     ) shouldBe Right(12)
   }
 }
