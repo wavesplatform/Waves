@@ -29,7 +29,7 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
   val transactionType = PredefType(
     "Transaction",
     List(
-      "TYPE"      -> INT,
+      "TYPE"      -> LONG,
       "ID"        -> BYTEVECTOR,
       "BODYBYTES" -> BYTEVECTOR,
       "SENDERPK"  -> BYTEVECTOR,
@@ -50,7 +50,7 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
   private def transactionObject(tx: Transaction): Obj =
     Obj(
       Map(
-        "TYPE"      -> LazyVal(INT)(EitherT.pure(tx.transactionType)),
+        "TYPE"      -> LazyVal(LONG)(EitherT.pure(tx.transactionType)),
         "ID"        -> LazyVal(BYTEVECTOR)(EitherT.pure(tx.id)),
         "BODYBYTES" -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.bodyBytes)),
         "SENDERPK"  -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.senderPk)),
@@ -72,11 +72,11 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
 
   def build(): Context = {
     val txCoeval : Coeval[Either[String,Obj]] = Coeval.evalOnce(Right(transactionObject(transaction)))
-    val heightCoeval : Coeval[Either[String,Int]] = Coeval.evalOnce(Right(height))
+    val heightCoeval : Coeval[Either[String,Long]] = Coeval.evalOnce(Right(height))
     Context(
       Map(transactionType.name -> transactionType),
       Map(
-        ("H", LazyVal(INT)(EitherT(heightCoeval))),
+        ("H", LazyVal(LONG)(EitherT(heightCoeval))),
         ("TX", LazyVal(TYPEREF(transactionType.name))(EitherT(txCoeval)))
       ),
       Map(

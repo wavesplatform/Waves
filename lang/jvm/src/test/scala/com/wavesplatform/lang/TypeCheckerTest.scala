@@ -12,36 +12,36 @@ import scodec.bits.ByteVector
 
 class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private val pointType = PredefType("Point", List("x" -> INT, "y" -> INT))
+  private val pointType = PredefType("Point", List("x" -> LONG, "y" -> LONG))
 
   rootTypeTest("successful on very deep expressions (stack overflow check)")(
-    expr = (1 to 100000).foldLeft[Untyped.EXPR](Untyped.CONST_INT(0))((acc, _) => Untyped.BINARY_OP(acc, SUM_OP, Untyped.CONST_INT(1))),
-    expectedResult = Right(INT)
+    expr = (1 to 100000).foldLeft[Untyped.EXPR](Untyped.CONST_LONG(0))((acc, _) => Untyped.BINARY_OP(acc, SUM_OP, Untyped.CONST_LONG(1))),
+    expectedResult = Right(LONG)
   )
 
   {
     import Typed._
 
     treeTypeErasureTests(
-      "CONST_INT"        -> CONST_INT(0),
+      "CONST_INT"        -> CONST_LONG(0),
       "CONST_BYTEVECTOR" -> CONST_BYTEVECTOR(ByteVector(1, 2, 3)),
       "TRUE"             -> TRUE,
       "FALSE"            -> FALSE,
       "NONE"             -> NONE,
-      "SUM"              -> BINARY_OP(CONST_INT(0), SUM_OP, CONST_INT(1), INT),
+      "SUM"              -> BINARY_OP(CONST_LONG(0), SUM_OP, CONST_LONG(1), LONG),
       "AND"              -> BINARY_OP(TRUE, AND_OP, FALSE, BOOLEAN),
       "OR"               -> BINARY_OP(TRUE, OR_OP, FALSE, BOOLEAN),
-      "EQ(INT)"          -> BINARY_OP(CONST_INT(0), EQ_OP, CONST_INT(1), BOOLEAN),
+      "EQ(INT)"          -> BINARY_OP(CONST_LONG(0), EQ_OP, CONST_LONG(1), BOOLEAN),
       "EQ(BOOL)"         -> BINARY_OP(TRUE, EQ_OP, FALSE, BOOLEAN),
-      "GT"               -> BINARY_OP(CONST_INT(0), GT_OP, CONST_INT(1), BOOLEAN),
-      "GE"               -> BINARY_OP(CONST_INT(0), GE_OP, CONST_INT(1), BOOLEAN),
+      "GT"               -> BINARY_OP(CONST_LONG(0), GT_OP, CONST_LONG(1), BOOLEAN),
+      "GE"               -> BINARY_OP(CONST_LONG(0), GE_OP, CONST_LONG(1), BOOLEAN),
       "IS_DEFINED(NONE)" -> IS_DEFINED(NONE),
       "IS_DEFINED(SOME)" -> IS_DEFINED(SOME(TRUE, OPTION(BOOLEAN))),
-      "LET"              -> LET("x", CONST_INT(0)),
+      "LET"              -> LET("x", CONST_LONG(0)),
       "BLOCK" -> BLOCK(
         let = None,
-        body = CONST_INT(0),
-        tpe = INT
+        body = CONST_LONG(0),
+        tpe = LONG
       ),
       "IF" -> IF(
         cond = TRUE,
@@ -53,8 +53,8 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       "GET(NONE)" -> GET(NONE, NOTHING),
       "SOME"      -> SOME(TRUE, OPTION(BOOLEAN)),
       "BLOCK(LET(X), REF(y) = x)" -> BLOCK(
-        let = Some(LET("x", CONST_INT(0))),
-        body = LET("y", REF("x", INT)),
+        let = Some(LET("x", CONST_LONG(0))),
+        body = LET("y", REF("x", LONG)),
         tpe = UNIT
       )
     )
@@ -70,7 +70,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       Typed.GETTER(
         ref = Typed.REF("p", TYPEREF("Point")),
         field = "x",
-        tpe = INT
+        tpe = LONG
       ))
   )
 
@@ -89,11 +89,11 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   treeTypeTest("MULTIPLY(1,2)")(
     ctx =
       TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(multiplierFunction.name -> multiplierFunction.signature)),
-    expr = Untyped.FUNCTION_CALL(multiplierFunction.name, List(Untyped.CONST_INT(1), Untyped.CONST_INT(2))),
-    expectedResult = Right(Typed.FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_INT(1), Typed.CONST_INT(2)), INT))
+    expr = Untyped.FUNCTION_CALL(multiplierFunction.name, List(Untyped.CONST_LONG(1), Untyped.CONST_LONG(2))),
+    expectedResult = Right(Typed.FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_LONG(1), Typed.CONST_LONG(2)), LONG))
   )
 
-  private val optFunc  = PredefFunction("OPTFUNC", UNIT, List(("opt", OPTION(OPTION(INT)))))(_ => Right(()))
+  private val optFunc  = PredefFunction("OPTFUNC", UNIT, List(("opt", OPTION(OPTION(LONG)))))(_ => Right(()))
   private val noneFunc = PredefFunction("NONEFUNC", UNIT, List(("opt", OPTION(NOTHING))))(_ => Right(()))
 
   treeTypeTest(s"NONEFUNC(NONE)")(
@@ -116,21 +116,21 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
 
   treeTypeTest(s"OPTFUNC(SOME(CONST_INT(3)))")(
     ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(optFunc.name -> optFunc.signature)),
-    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.SOME(Untyped.SOME(Untyped.CONST_INT(3))))),
+    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.SOME(Untyped.SOME(Untyped.CONST_LONG(3))))),
     expectedResult =
-      Right(Typed.FUNCTION_CALL(optFunc.name, List(Typed.SOME(Typed.SOME(Typed.CONST_INT(3), OPTION(INT)), OPTION(OPTION(INT)))), UNIT))
+      Right(Typed.FUNCTION_CALL(optFunc.name, List(Typed.SOME(Typed.SOME(Typed.CONST_LONG(3), OPTION(LONG)), OPTION(OPTION(LONG)))), UNIT))
   )
 
   {
     import Untyped._
 
     errorTests(
-      "BINARY_OP with wrong types"                   -> "The first operand is expected to be INT" -> BINARY_OP(TRUE, SUM_OP, CONST_INT(1)),
-      "IF can't find common"                         -> "Can't find common type" -> IF(TRUE, TRUE, CONST_INT(0)),
-      "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(multiplierFunction.name, List(CONST_INT(0))),
-      "FUNCTION_CALL with upper type"                -> "do not match types required" -> FUNCTION_CALL(noneFunc.name, List(SOME(CONST_INT(3)))),
+      "BINARY_OP with wrong types"                   -> "The first operand is expected to be LONG" -> BINARY_OP(TRUE, SUM_OP, CONST_LONG(1)),
+      "IF can't find common"                         -> "Can't find common type" -> IF(TRUE, TRUE, CONST_LONG(0)),
+      "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(multiplierFunction.name, List(CONST_LONG(0))),
+      "FUNCTION_CALL with upper type"                -> "do not match types required" -> FUNCTION_CALL(noneFunc.name, List(SOME(CONST_LONG(3)))),
       "FUNCTION_CALL with wrong type of argument"    -> "Types of arguments of function call" -> FUNCTION_CALL(multiplierFunction.name,
-                                                                                                            List(CONST_INT(0), FALSE))
+                                                                                                            List(CONST_LONG(0), FALSE))
     )
   }
 
@@ -175,7 +175,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
 
     def aux(root: Typed.EXPR): Coeval[Untyped.EXPR] =
       Coeval.defer(root match {
-        case x: Typed.CONST_INT        => Coeval(Untyped.CONST_INT(x.t))
+        case x: Typed.CONST_LONG        => Coeval(Untyped.CONST_LONG(x.t))
         case x: Typed.CONST_BYTEVECTOR => Coeval(Untyped.CONST_BYTEVECTOR(x.bs))
         case Typed.TRUE                => Coeval(Untyped.TRUE)
         case Typed.FALSE               => Coeval(Untyped.FALSE)

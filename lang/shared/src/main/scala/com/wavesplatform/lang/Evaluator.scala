@@ -31,21 +31,21 @@ object Evaluator {
             case None      => EitherT.leftT[Coeval, T](s"A definition of '$str' is not found")
           }
 
-        case Typed.CONST_INT(v)        => EitherT.rightT[Coeval, String](v)
+        case Typed.CONST_LONG(v)        => EitherT.rightT[Coeval, String](v)
         case Typed.CONST_BYTEVECTOR(v) => EitherT.rightT[Coeval, String](v)
         case Typed.TRUE                => EitherT.rightT[Coeval, String](true)
         case Typed.FALSE               => EitherT.rightT[Coeval, String](false)
 
-        case Typed.BINARY_OP(a, SUM_OP, b, INT) =>
+        case Typed.BINARY_OP(a, SUM_OP, b, LONG) =>
           for {
-            evaluatedA <- r[Int](ctx, EitherT.pure(a))
-            evaluatedB <- r[Int](ctx, EitherT.pure(b))
+            evaluatedA <- r[Long](ctx, EitherT.pure(a))
+            evaluatedB <- r[Long](ctx, EitherT.pure(b))
           } yield evaluatedA + evaluatedB
 
         case Typed.BINARY_OP(a, op @ (GE_OP | GT_OP), b, BOOLEAN) =>
           for {
-            evaluatedA <- r[Int](ctx, EitherT.pure(a))
-            evaluatedB <- r[Int](ctx, EitherT.pure(b))
+            evaluatedA <- r[Long](ctx, EitherT.pure(a))
+            evaluatedB <- r[Long](ctx, EitherT.pure(b))
           } yield
             op match {
               case GE_OP => evaluatedA >= evaluatedB
@@ -114,8 +114,8 @@ object Evaluator {
               } yield r
             case None => EitherT.leftT[Coeval, Any](s"function '$name' not found")
           }
-        case Typed.BINARY_OP(_, SUM_OP, _, tpe) if tpe != INT             => EitherT.leftT[Coeval, Any](s"Expected INT, but got $tpe: $t")
-        case Typed.BINARY_OP(_, GE_OP | GT_OP, _, tpe) if tpe != BOOLEAN  => EitherT.leftT[Coeval, Any](s"Expected INT, but got $tpe: $t")
+        case Typed.BINARY_OP(_, SUM_OP, _, tpe) if tpe != LONG             => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
+        case Typed.BINARY_OP(_, GE_OP | GT_OP, _, tpe) if tpe != BOOLEAN  => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
         case Typed.BINARY_OP(_, AND_OP | OR_OP, _, tpe) if tpe != BOOLEAN => EitherT.leftT[Coeval, Any](s"Expected BOOLEAN, but got $tpe: $t")
 
       }).map(_.asInstanceOf[T])

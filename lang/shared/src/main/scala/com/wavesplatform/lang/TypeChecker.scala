@@ -28,7 +28,7 @@ object TypeChecker {
   private type SetTypeResult[T] = EitherT[Coeval, String, T]
 
   private def setType(ctx: TypeCheckerContext, t: SetTypeResult[Untyped.EXPR]): SetTypeResult[Typed.EXPR] = t.flatMap {
-    case x: Untyped.CONST_INT        => EitherT.pure(Typed.CONST_INT(x.t))
+    case x: Untyped.CONST_LONG        => EitherT.pure(Typed.CONST_LONG(x.t))
     case x: Untyped.CONST_BYTEVECTOR => EitherT.pure(Typed.CONST_BYTEVECTOR(x.bs))
     case Untyped.TRUE                => EitherT.pure(Typed.TRUE)
     case Untyped.FALSE               => EitherT.pure(Typed.FALSE)
@@ -89,13 +89,13 @@ object TypeChecker {
 
             op match {
               case SUM_OP =>
-                if (aTpe != INT) Left(s"The first operand is expected to be INT, but got $aTpe: $a in $expr")
-                else if (bTpe != INT) Left(s"The second operand is expected to be INT, but got $bTpe: $b in $expr")
-                else Right(operands -> INT)
+                if (aTpe != LONG) Left(s"The first operand is expected to be LONG, but got $aTpe: $a in $expr")
+                else if (bTpe != LONG) Left(s"The second operand is expected to be LONG, but got $bTpe: $b in $expr")
+                else Right(operands -> LONG)
 
               case GT_OP | GE_OP =>
-                if (aTpe != INT) Left(s"The first operand is expected to be INT, but got $aTpe: $a in $expr")
-                else if (bTpe != INT) Left(s"The second operand is expected to be INT, but got $bTpe: $b in $expr")
+                if (aTpe != LONG) Left(s"The first operand is expected to be LONG, but got $aTpe: $a in $expr")
+                else if (bTpe != LONG) Left(s"The second operand is expected to be LONG, but got $bTpe: $b in $expr")
                 else Right(operands -> BOOLEAN)
 
               case AND_OP | OR_OP =>

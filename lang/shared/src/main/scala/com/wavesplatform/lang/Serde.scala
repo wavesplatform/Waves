@@ -9,7 +9,7 @@ object Serde {
   import codecs.implicits._
 
   implicit def d                = Discriminated[Typed.EXPR, Int](uint8)
-  implicit def dConstInt        = d.bind[Typed.CONST_INT](0)
+  implicit def dConstInt        = d.bind[Typed.CONST_LONG](0)
   implicit def dConstByteVector = d.bind[Typed.CONST_BYTEVECTOR](1)
   implicit def dBinaryOp        = d.bind[Typed.BINARY_OP](2)
   implicit def dIf              = d.bind[Typed.IF](3)
@@ -36,7 +36,7 @@ object Serde {
   implicit def tD           = Discriminated[TYPE, Int](uint8)
   implicit def tDNothing    = tD.bind[NOTHING.type](0)
   implicit def tDUnit       = tD.bind[UNIT.type](1)
-  implicit def tDInt        = tD.bind[INT.type](2)
+  implicit def tDInt        = tD.bind[LONG.type](2)
   implicit def tDByteVector = tD.bind[BYTEVECTOR.type](3)
   implicit def tDBoolean    = tD.bind[BOOLEAN.type](4)
   implicit def tDOption     = tD.bind[OPTION](5)

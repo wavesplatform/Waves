@@ -8,7 +8,7 @@ object Terms {
   sealed trait TYPE { type Underlying }
   case object NOTHING              extends TYPE { type Underlying = Nothing              }
   case object UNIT                 extends TYPE { type Underlying = Unit                 }
-  case object INT                  extends TYPE { type Underlying = Int                  }
+  case object LONG                 extends TYPE { type Underlying = Long                 }
   case object BYTEVECTOR           extends TYPE { type Underlying = ByteVector           }
   case object BOOLEAN              extends TYPE { type Underlying = Boolean              }
   case class OPTION(t: TYPE)       extends TYPE { type Underlying = Option[t.Underlying] }
@@ -24,7 +24,7 @@ object Terms {
 
   object Untyped {
     sealed trait EXPR
-    case class CONST_INT(t: Int)                                     extends EXPR
+    case class CONST_LONG(t: Long)                                    extends EXPR
     case class GETTER(ref: EXPR, field: String)                      extends EXPR
     case class CONST_BYTEVECTOR(bs: ByteVector)                      extends EXPR
     case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR)     extends EXPR
@@ -43,7 +43,7 @@ object Terms {
 
   object Typed {
     sealed abstract class EXPR(val tpe: TYPE)
-    case class CONST_INT(t: Int)                                                             extends EXPR(INT)
+    case class CONST_LONG(t: Long)                                                           extends EXPR(LONG)
     case class GETTER(ref: EXPR, field: String, override val tpe: TYPE)                      extends EXPR(tpe)
     case class CONST_BYTEVECTOR(bs: ByteVector)                                              extends EXPR(BYTEVECTOR)
     case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR, override val tpe: TYPE)     extends EXPR(tpe)

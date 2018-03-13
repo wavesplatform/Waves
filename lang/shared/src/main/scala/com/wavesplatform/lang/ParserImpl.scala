@@ -18,7 +18,7 @@ abstract class ParserImpl { this: Base58 =>
 
   private val varName = CharIn('A' to 'Z').rep(1).!
 
-  private def numberP: P[CONST_INT]    = P(CharIn('0' to '9').rep(min = 1).!.map(t => CONST_INT(t.toInt)))
+  private def numberP: P[CONST_LONG]    = P(CharIn('0' to '9').rep(min = 1).!.map(t => CONST_LONG(t.toInt)))
   private def trueP: P[TRUE.type]      = P("true").map(_ => TRUE)
   private def falseP: P[FALSE.type]    = P("false").map(_ => FALSE)
   private def bracesP: P[EXPR]         = P("(" ~ block ~ ")")
