@@ -242,7 +242,9 @@ class MinerImpl(allChannels: ChannelGroup,
 
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()
-    scheduledAttempts := CompositeCancelable.fromSet(wallet.privateKeyAccounts.map(generateBlockTask).map(_.runAsyncLogErr).toSet)
+    val reader = stateReader()
+    val nonScriptedAccounts = wallet.privateKeyAccounts.filter(acc => reader.accountScript(acc).isEmpty)
+    scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map(generateBlockTask).map(_.runAsyncLogErr).toSet)
     microBlockAttempt := SerialCancelable()
     debugState = MinerDebugInfo.MiningBlocks
   }
