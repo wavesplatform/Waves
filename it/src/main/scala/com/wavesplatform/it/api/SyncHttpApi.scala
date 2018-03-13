@@ -6,6 +6,7 @@ import org.asynchttpclient.Response
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Writes
 import scorex.api.http.assets.SignedMassTransferRequest
+import scorex.transaction.DataTransaction.DataItem
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 
 import scala.concurrent.duration._
@@ -17,7 +18,14 @@ object SyncHttpApi extends Assertions{
   def assertBadRequest2[R](f: => R): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Assertions.assert(statusCode == StatusCodes.BadRequest.intValue)
     case Failure(e) => Assertions.fail(e)
-    case _ => Assertions.fail(s"Expecting bad request")
+    case _ => Assertions.fail("Expecting bad request")
+  }
+
+  def assertBadRequestAndMessageSync[R](f: => R, errorMessage: String): Assertion = Try(f) match {
+    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+      Assertions.assert(statusCode == StatusCodes.BadRequest.intValue && responseBody.contains(errorMessage))
+    case Failure(e) => Assertions.fail(e)
+    case _ => Assertions.fail("Expecting bad request")
   }
 
   implicit class NodeExtSync(n: Node) extends Assertions with Matchers {
@@ -25,6 +33,9 @@ object SyncHttpApi extends Assertions{
     import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
 
     private val RequestAwaitTime = 15.seconds
+
+    def get(path: String): Response =
+      Await.result(async(n).get(path), RequestAwaitTime)
 
     def postJson[A: Writes](path: String, body: A): Response =
       Await.result(async(n).postJson(path, body), RequestAwaitTime)
@@ -67,6 +78,15 @@ object SyncHttpApi extends Assertions{
 
     def lease(sourceAddress:String, recipient: String, leasingAmount: Long, leasingFee: Long): Transaction =
       Await.result(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee), RequestAwaitTime)
+
+    def putData(sourceAddress:String, data: List[DataItem[_]], fee: Long): Transaction =
+      Await.result(async(n).putData(sourceAddress, data, fee), RequestAwaitTime)
+
+    def getData(sourceAddress:String): List[DataItem[_]] =
+      Await.result(async(n).getData(sourceAddress), RequestAwaitTime)
+
+    def getData(sourceAddress:String, key: String): DataItem[_] =
+      Await.result(async(n).getData(sourceAddress, key), RequestAwaitTime)
 
     def signedMassTransfer(tx: SignedMassTransferRequest): Transaction =
       Await.result(async(n).signedMassTransfer(tx), RequestAwaitTime)

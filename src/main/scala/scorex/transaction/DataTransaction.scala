@@ -133,7 +133,8 @@ object DataTransaction {
                 arr => JsSuccess(BinaryDataItem(key, arr)))
               case _ => JsError("value is missing or not a string")
             }
-            case t => JsError(s"unknown type $t")
+            case JsDefined(JsString(t)) => JsError(s"unknown type $t")
+            case _ => JsError("type is missing")
           }
         case _ => JsError("key is missing")
       }

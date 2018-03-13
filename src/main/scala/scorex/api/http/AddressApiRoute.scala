@@ -316,14 +316,20 @@ case class AddressApiRoute(settings: RestAPISettings, functionalitySettings: Fun
   private def accountData(address: String): ToResponseMarshallable = {
     val s = state()
     s.read { _ =>
-      Address.fromString(address).map(acc => ToResponseMarshallable(s.accountData(acc).data)).getOrElse(InvalidAddress)
+      Address.fromString(address).map { acc =>
+        ToResponseMarshallable(s.accountData(acc).data.values.toSeq.sortBy(_.key))
+      }.getOrElse(InvalidAddress)
     }
   }
 
   private def accountData(address: String, key: String): ToResponseMarshallable = {
     val s = state()
     s.read { _ =>
-      Address.fromString(address).map(acc => ToResponseMarshallable(s.accountData(acc, key))).getOrElse(InvalidAddress)
+      val result = for {
+        addr <- Address.fromString(address).left.map(_ => InvalidAddress)
+        value <- s.accountData(addr, key).toRight(DataKeyNotExists)
+      } yield value
+      ToResponseMarshallable(result)
     }
   }
 
