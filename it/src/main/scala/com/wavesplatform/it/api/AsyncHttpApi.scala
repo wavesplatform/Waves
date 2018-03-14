@@ -247,6 +247,10 @@ object AsyncHttpApi extends Assertions {
       postJson("/transactions/broadcast", req).as[Transaction]
     }
 
+    def signedSetScriptRequest(req: SignedSetScriptRequest): Future[Transaction] = {
+      postJson("/transactions/broadcast", req).as[Transaction]
+    }
+
     def signedIssue(issue: SignedIssueRequest): Future[Transaction] = {
       postJson("/assets/broadcast/issue", issue).as[Transaction]
     }

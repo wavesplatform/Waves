@@ -6,7 +6,7 @@ import org.asynchttpclient.Response
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
 import play.api.libs.json.{Format, Json, Writes}
-import scorex.api.http.assets.{SignedIssueRequest, SignedMassTransferRequest}
+import scorex.api.http.assets.{SignedIssueRequest, SignedMassTransferRequest, SignedSetScriptRequest}
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 
 import scala.concurrent.duration._
@@ -83,6 +83,9 @@ object SyncHttpApi extends Assertions{
 
     def signedMassTransfer(tx: SignedMassTransferRequest): Transaction =
       Await.result(async(n).signedMassTransfer(tx), RequestAwaitTime)
+
+    def signedSetScript(tx: SignedSetScriptRequest): Transaction =
+      Await.result(async(n).signedSetScriptRequest(tx), RequestAwaitTime)
 
     def signedIssue(tx: SignedIssueRequest): Transaction =
       Await.result(async(n).signedIssue(tx), RequestAwaitTime)

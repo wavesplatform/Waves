@@ -157,6 +157,7 @@ case class TransactionsApiRoute(
           case LeaseTransaction => TransactionFactory.lease(jsv.as[LeaseRequest], wallet, time)
           case LeaseCancelTransaction => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
           case CreateAliasTransaction => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
+          case SetScriptTransaction => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
           case t => Left(GenericError(s"Bad transaction type: $t"))
         }
         txEi match {
@@ -185,6 +186,7 @@ case class TransactionsApiRoute(
           case LeaseTransaction => jsv.as[SignedLeaseRequest].toTx
           case LeaseCancelTransaction => jsv.as[SignedLeaseCancelRequest].toTx
           case CreateAliasTransaction => jsv.as[SignedCreateAliasRequest].toTx
+          case SetScriptTransaction=> jsv.as[SignedSetScriptRequest].toTx
           case t => Left(GenericError(s"Bad transaction type: $t"))
         }
         doBroadcast(req)

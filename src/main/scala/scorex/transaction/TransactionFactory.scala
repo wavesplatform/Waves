@@ -9,6 +9,7 @@ import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.smart.{Script, SetScriptTransaction}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
@@ -34,14 +35,31 @@ object TransactionFactory {
       senderPrivateKey <- wallet.findWallet(request.sender)
       transfers <- MassTransferTransaction.parseTransfersList(request.transfers)
       tx <- MassTransferTransaction.selfSigned(
-        Proofs.Version,
-        request.assetId.map(s => ByteStr.decodeBase58(s).get),
-        senderPrivateKey,
-        transfers,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        request.fee,
-        request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
+        version = Proofs.Version,
+        assetId = request.assetId.map(s => ByteStr.decodeBase58(s).get),
+        sender = senderPrivateKey,
+        transfers = transfers,
+        timestamp = request.timestamp.getOrElse(time.getTimestamp()),
+        feeAmount = request.fee,
+        attachment = request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
     } yield tx
+
+
+  def setScript(request: SetScriptRequest, wallet: Wallet, time: Time): Either[ValidationError, SetScriptTransaction] =
+    for {
+      senderPrivateKey <- wallet.findWallet(request.sender)
+      script <- request.script match {
+        case None => Right(None)
+        case Some(s) => Script.fromBase58String(s).map(Some(_))
+      }
+      tx <- SetScriptTransaction.selfSigned(
+        sender = senderPrivateKey,
+        script = script,
+        fee = request.fee,
+        timestamp = request.timestamp.getOrElse(time.getTimestamp()),
+        )
+    } yield tx
+
 
   def issueAsset(request: IssueRequest, wallet: Wallet, time: Time): Either[ValidationError, IssueTransaction] =
     for {

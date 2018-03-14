@@ -100,7 +100,7 @@ trait TransactionGen extends ScriptGen {
   def selfSignedSetScriptTransactionGenP(sender: PrivateKeyAccount, s: Script): Gen[SetScriptTransaction] = for {
     fee <- smallFeeGen
     timestamp <- timestampGen
-  } yield SetScriptTransaction.selfSigned(sender, s, fee, timestamp).explicitGet()
+  } yield SetScriptTransaction.selfSigned(sender, Some(s), fee, timestamp).explicitGet()
 
 
   val paymentGen: Gen[PaymentTransaction] = for {

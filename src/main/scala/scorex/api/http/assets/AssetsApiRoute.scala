@@ -29,7 +29,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistribution
+      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistribution ~ setScript
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -106,6 +106,27 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
   ))
   def massTransfer: Route =
     processRequest("masstransfer", (t: MassTransferRequest) => doBroadcast(TransactionFactory.massTransferAsset(t, wallet, time)))
+
+
+  @Path("/setscript")
+  @ApiOperation(value = "Set Script",
+    notes = "Set script for account",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.api.http.assets.MassTransferRequest",
+      defaultValue = "{\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"script\": \"scptscptscptscpt\", \"fee\":100000,\"timestamp\":1517315595291}"
+    )
+  ))
+  def setScript: Route =
+    processRequest("setScript", (t: SetScriptRequest) => doBroadcast(TransactionFactory.setScript(t, wallet, time)))
+
 
   @Path("/issue")
   @ApiOperation(value = "Issue Asset",
