@@ -8,6 +8,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import play.api.libs.json.{Json}
+import scorex.transaction.lease.LeaseTransaction.Status.Active
 
 class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure {
 
