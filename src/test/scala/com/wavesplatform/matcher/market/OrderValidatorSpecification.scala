@@ -5,7 +5,8 @@ import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
 import com.wavesplatform.settings.{Constants, WalletSettings}
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
-import com.wavesplatform.{UtxPool, WithDB}
+import com.wavesplatform.WithDB
+import com.wavesplatform.utx.UtxPool
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks

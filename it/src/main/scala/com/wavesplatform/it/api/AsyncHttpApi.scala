@@ -22,7 +22,7 @@ import scorex.api.http.ApiErrorResponse
 import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
-import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
+import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 import scorex.transaction.assets.exchange.Order
 import scorex.waves.http.DebugApiRoute._
@@ -243,6 +243,12 @@ object AsyncHttpApi extends Assertions {
     def signedTransfer(transfer: SignedTransferRequest): Future[Transaction] =
       postJson("/assets/broadcast/transfer", transfer).as[Transaction]
 
+    def signedLease(lease: SignedLeaseRequest): Future[Transaction] =
+      postJson("/leasing/broadcast/lease", lease).as[Transaction]
+
+    def signedLeaseCancel(leaseCancel: SignedLeaseCancelRequest): Future[Transaction] =
+      postJson("/leasing/broadcast/cancel", leaseCancel).as[Transaction]
+
     def signedMassTransfer(req: SignedMassTransferRequest): Future[Transaction] = {
       postJson("/transactions/broadcast", req).as[Transaction]
     }
@@ -312,6 +318,11 @@ object AsyncHttpApi extends Assertions {
       currentBlock <- lastBlock
       actualBlock <- findBlock(_.height > currentBlock.height, currentBlock.height)
     } yield actualBlock
+
+    def waitForHeightArise: Future[Int] = for {
+      height <- height
+      newHeight <- waitForHeight(height + 1)
+    } yield newHeight
 
     def findBlock(cond: Block => Boolean, from: Int = 1, to: Int = Int.MaxValue): Future[Block] = {
       def load(_from: Int, _to: Int): Future[Block] = blockSeq(_from, _to).flatMap { blocks =>

@@ -1,13 +1,13 @@
 package com.wavesplatform.state2.appender
 
 import cats.data.EitherT
-import com.wavesplatform.UtxPool
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.StateReader
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon

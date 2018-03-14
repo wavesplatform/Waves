@@ -7,7 +7,8 @@ import java.util.concurrent.ConcurrentHashMap
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network.MessageObserver.Messages
 import com.wavesplatform.settings._
-import com.wavesplatform.{UtxPool, Version}
+import com.wavesplatform.Version
+import com.wavesplatform.utx.UtxPool
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
 import io.netty.channel.group.ChannelGroup

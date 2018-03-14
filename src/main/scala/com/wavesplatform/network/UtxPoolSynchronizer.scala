@@ -3,9 +3,9 @@ package com.wavesplatform.network
 import java.util.concurrent.TimeUnit
 
 import com.google.common.cache.CacheBuilder
-import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.SynchronizationSettings.UtxSynchronizerSettings
 import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.{ChannelGroup, ChannelMatcher}
 import monix.execution.{CancelableFuture, Scheduler}
@@ -42,7 +42,7 @@ object UtxPoolSynchronizer {
                   val channelMatcher: ChannelMatcher = { (_: Channel) != sender }
                   xs.foreach { case (_, tx) =>
                     ops.putIfNew(tx) match {
-                      case Right(true) => allChannels.write(RawBytes(TransactionSpec.messageCode, tx.bytes()), channelMatcher)
+                      case Right((true, _)) => allChannels.write(RawBytes(TransactionSpec.messageCode, tx.bytes()), channelMatcher)
                       case _ =>
                     }
                   }
