@@ -5,9 +5,9 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state2._
 import monix.eval.Coeval
 import play.api.libs.json.Json
+import scorex.account.PublicKeyAccount.KeyLength
 import scorex.account._
 import scorex.serialization.Deser
-import scorex.transaction.TransactionParsers.KeyLength
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 

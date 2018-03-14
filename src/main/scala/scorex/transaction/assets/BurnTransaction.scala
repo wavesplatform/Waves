@@ -5,6 +5,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
+import scorex.account.PublicKeyAccount.KeyLength
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.transaction.TransactionParsers._
 import scorex.transaction.{ValidationError, _}

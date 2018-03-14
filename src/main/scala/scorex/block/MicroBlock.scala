@@ -71,7 +71,7 @@ object MicroBlock extends ScorexLogging {
       _ <- Either.cond(totalResBlockSig.arr.length == SignatureLength,
                        (),
                        GenericError(s"Incorrect totalResBlockSig: ${totalResBlockSig.arr.length}"))
-      _ <- Either.cond(generator.publicKey.length == TransactionParsers.KeyLength,
+      _ <- Either.cond(generator.publicKey.length == PublicKeyAccount.KeyLength,
                        (),
                        GenericError(s"Incorrect generator.publicKey: ${generator.publicKey.length}"))
       nonSigned <- create(version = 3: Byte, generator, transactionData, prevResBlockSig, totalResBlockSig, ByteStr.empty)
@@ -100,8 +100,8 @@ object MicroBlock extends ScorexLogging {
       val txBlockField = transParseBytes(version, tBytes).get
       position += tBytesLength
 
-      val genPK = bytes.slice(position, position + TransactionParsers.KeyLength)
-      position += TransactionParsers.KeyLength
+      val genPK = bytes.slice(position, position + PublicKeyAccount.KeyLength)
+      position += PublicKeyAccount.KeyLength
 
       val signature = ByteStr(bytes.slice(position, position + SignatureLength))
 

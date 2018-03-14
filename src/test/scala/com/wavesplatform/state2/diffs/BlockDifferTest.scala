@@ -9,18 +9,18 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.Diff
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import org.scalatest.{FreeSpecLike, Matchers}
-import scorex.account.PrivateKeyAccount
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{GenesisTransaction, TransactionParsers, ValidationError}
+import scorex.transaction.{GenesisTransaction, ValidationError}
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with WithState {
 
   private val TransactionFee = 10
 
   def randomPrivateKeyAccount(): PrivateKeyAccount = {
-    val seed = Array.ofDim[Byte](TransactionParsers.KeyLength)
+    val seed = Array.ofDim[Byte](PublicKeyAccount.KeyLength)
     ThreadLocalRandom.current().nextBytes(seed)
     PrivateKeyAccount(seed)
   }

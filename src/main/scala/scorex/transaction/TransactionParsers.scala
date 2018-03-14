@@ -15,8 +15,6 @@ object TransactionParsers {
   val TypeLength                 = 1
   val SignatureLength            = 64
   val SignatureStringLength: Int = base58Length(SignatureLength)
-  val KeyLength                  = 32
-  val KeyStringLength: Int       = base58Length(KeyLength)
 
   private val old: Map[Byte, TransactionParser] = Seq[TransactionParser](
     GenesisTransaction,

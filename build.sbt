@@ -232,3 +232,7 @@ lazy val it = project
 lazy val generator = project
   .dependsOn(it)
   .settings(libraryDependencies += "com.github.scopt" %% "scopt" % "3.6.0")
+
+lazy val benchmark = project
+  .enablePlugins(JmhPlugin)
+  .dependsOn(node % "compile->compile;test->test")

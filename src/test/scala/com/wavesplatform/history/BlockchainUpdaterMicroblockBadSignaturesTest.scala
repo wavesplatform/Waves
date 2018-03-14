@@ -6,10 +6,10 @@ import com.wavesplatform.state2.diffs._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.account.PrivateKeyAccount
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.lagonaki.mocks.TestBlock
+import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.TransferTransaction
-import scorex.transaction.{GenesisTransaction, TransactionParsers}
 
 class BlockchainUpdaterMicroblockBadSignaturesTest
     extends PropSpec
@@ -54,7 +54,7 @@ class BlockchainUpdaterMicroblockBadSignaturesTest
   property("other sender") {
     scenario(preconditionsAndPayments) {
       case (domain, (genesis, payment, payment2)) =>
-        val otherSigner = PrivateKeyAccount(TestBlock.randomOfLength(TransactionParsers.KeyLength).arr)
+        val otherSigner = PrivateKeyAccount(TestBlock.randomOfLength(PublicKeyAccount.KeyLength).arr)
         val block0      = buildBlockOfTxs(randomSig, Seq(genesis))
         val block1      = buildBlockOfTxs(block0.uniqueId, Seq(payment))
         val badSigMicro = buildMicroBlockOfTxs(block0.uniqueId, block1, Seq(payment2), otherSigner)._2
