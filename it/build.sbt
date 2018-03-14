@@ -14,18 +14,20 @@ concurrentRestrictions in Global := {
 }
 enablePlugins(sbtdocker.DockerPlugin)
 
+val aspectjRedistDir = Def.setting(baseDirectory.value / ".." / "third-party" / "aspectj")
 val yourKitRedistDir = Def.setting(baseDirectory.value / ".." / "third-party" / "yourkit")
 
 inTask(docker)(Seq(
   dockerfile := {
     val configTemplate = (Compile / resourceDirectory).value / "template.conf"
     val startWaves = sourceDirectory.value / "container" / "start-waves.sh"
+    val aspectjAgent = aspectjRedistDir.value / "aspectjweaver-1.8.13.jar"
     val profilerAgent = yourKitRedistDir.value / "libyjpagent.so"
 
     new Dockerfile {
       from("anapsix/alpine-java:8_server-jre")
       add((assembly in LocalProject("node")).value, "/opt/waves/waves.jar")
-      add(Seq(configTemplate, startWaves, profilerAgent), "/opt/waves/")
+      add(Seq(configTemplate, startWaves, profilerAgent, aspectjAgent), "/opt/waves/")
       add(profilerAgent, "/opt/waves/")
       run("chmod", "+x", "/opt/waves/start-waves.sh")
       entryPoint("/opt/waves/start-waves.sh")

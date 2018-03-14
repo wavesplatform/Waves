@@ -214,7 +214,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
     val configOverrides = {
       val common = s"$javaOptions ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))} " +
-        s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dwaves.network.declared-address=$ip:$networkPort"
+        s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dwaves.network.declared-address=$ip:$networkPort " +
+        s"-javaagent:$ContainerRoot/aspectjweaver-1.8.13.jar "
 
       val additional = profilerController().fold("") { _ =>
         s"-agentpath:$ContainerRoot/libyjpagent.so=listen=0.0.0.0:$ProfilerPort," +
@@ -450,7 +451,14 @@ object Docker {
     propsMapper.writeValueAsProperties(jsonMapper.readTree(jsonConfig))
   }
 
-  private def renderProperties(p: Properties) = p.asScala.map { case (k, v) => s"-D$k=$v" } mkString " "
+  private def renderProperties(p: Properties) = p.asScala
+    //.map { case (k, v) => k -> v.replaceAll("""([\*#:=])""", """\\$1""") }
+    .map {
+      case (k, v) if v.contains(" ") => k -> s""""$v""""
+      case x => x
+    }
+    .map { case (k, v) => s"-D$k=$v" }
+    .mkString(" ")
 
   private def extractHostPort(m: JMap[String, JList[PortBinding]], containerPort: Int) =
     m.get(s"$containerPort/tcp").get(0).hostPort().toInt
