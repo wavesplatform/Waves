@@ -2,7 +2,7 @@ package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.it.Node
-import org.asynchttpclient.Response
+import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
 import play.api.libs.json.{Format, Json, Writes}
@@ -38,6 +38,9 @@ object SyncHttpApi extends Assertions{
     import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
 
     private val RequestAwaitTime = 15.seconds
+
+    def get(path: String): Response =
+      Await.result(async(n).get(path), RequestAwaitTime)
 
     def postJson[A: Writes](path: String, body: A): Response =
       Await.result(async(n).postJson(path, body), RequestAwaitTime)
