@@ -367,7 +367,8 @@ trait TransactionGen extends ScriptGen {
   } yield GenesisTransaction.create(recipient, amt, ts).right.get
 
   val dataTransactionGen = (for {
-    (_, sender, _, _, timestamp, _, feeAmount, _) <- transferParamGen
+    (_, sender, _, _, timestamp, _, _, _) <- transferParamGen
+    feeAmount <- Gen.choose[Long](1, 200000)
     data = List(
       IntegerDataEntry("ten", 10),
       BooleanDataEntry("DataTx works!", true),

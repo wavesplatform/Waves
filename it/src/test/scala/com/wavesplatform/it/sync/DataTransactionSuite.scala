@@ -20,13 +20,10 @@ import scala.util.{Failure, Try}
 class DataTransactionSuite extends BaseTransactionSuite {
   private val fee = 100000
 
-  private def calcFee(data: List[DataEntry[_]]): Long = 100000///
-
   test("sender's waves balance is decreased by fee.") {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
 
     val data = List(IntegerDataEntry("int", 0xcafebabe))
-    val fee = calcFee(data)
     val txId = sender.putData(firstAddress, data, fee).id
     nodes.waitForHeightAraiseAndTxPresent(txId)
 
@@ -55,7 +52,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
 
     val data = List(BinaryDataEntry("blob", Base58.decode("mbwana").get))
-    assertBadRequest(sender.putData(firstAddress, data, calcFee(data) / 2))
+    assertBadRequest(sender.putData(firstAddress, data, fee / 2))
 
     nodes.waitForHeightAraise()
     notMiner.assertBalances(firstAddress, balance1, eff1)
