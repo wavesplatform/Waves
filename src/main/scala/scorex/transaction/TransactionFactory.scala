@@ -34,7 +34,7 @@ object TransactionFactory {
       senderPrivateKey <- wallet.findWallet(request.sender)
       transfers <- MassTransferTransaction.parseTransfersList(request.transfers)
       tx <- MassTransferTransaction.selfSigned(
-        Proofs.Version,
+        request.version,
         request.assetId.map(s => ByteStr.decodeBase58(s).get),
         senderPrivateKey,
         transfers,

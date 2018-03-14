@@ -20,7 +20,8 @@ import play.api.libs.json._
 import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
-import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
+import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
+import scorex.transaction.Proofs
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 import scorex.transaction.assets.exchange.Order
 import scorex.waves.http.DebugApiRoute._
@@ -34,7 +35,34 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-object AsyncHttpApi {
+object AsyncHttpApi extends Assertions {
+  case class ErrorMessage(error: Int, message: String)
+
+  implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
+
+  def assertBadRequest(f: Future[_]): Future[Assertion] = f transform {
+    case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Success(Assertions.assert(statusCode == StatusCodes.BadRequest.intValue))
+    case Failure(e) => Success(Assertions.fail(e))
+    case _ => Success(Assertions.fail(s"Expecting bad request"))
+  }
+
+  def expectErrorResponse(f: Future[_])(isExpected: ApiErrorResponse => Boolean): Future[Assertion] = f transform {
+    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+      val parsedError = Json.parse(responseBody).validate[ApiErrorResponse].asOpt
+      parsedError match {
+        case None => Success(Assertions.fail(s"Expecting bad request"))
+        case Some(err) => Success(Assertions.assert(statusCode == StatusCodes.BadRequest.intValue && isExpected(err)))
+      }
+    case Failure(e) => Success(Assertions.fail(e))
+    case _ => Success(Assertions.fail(s"Expecting bad request"))
+  }
+
+  def assertBadRequestAndMessage(f: Future[_], errorMessage: String): Future[Assertion] = f transform {
+    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+      Success(Assertions.assert(statusCode == StatusCodes.BadRequest.intValue && parse(responseBody).as[ErrorMessage].message.contains(errorMessage)))
+    case Failure(e) => Success[Assertion](Assertions.fail(e))
+    case _ => Success[Assertion](Assertions.fail(s"Expecting bad request"))
+  }
 
   implicit class NodeAsyncHttpApi(n: Node) extends Assertions with Matchers {
 
@@ -178,11 +206,11 @@ object AsyncHttpApi {
 
     def effectiveBalance(address: String): Future[Balance] = get(s"/addresses/effectiveBalance/$address").as[Balance]
 
-    def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None): Future[Transaction] =
-      postJson("/assets/transfer", TransferRequest(assetId, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
+    def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None, feeAssetId: Option[String] = None): Future[Transaction] =
+      postJson("/assets/transfer", TransferRequest(assetId, feeAssetId, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
     def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Future[Transaction] =
-      postJson("/assets/masstransfer", MassTransferRequest(assetId, sourceAddress, transfers, fee, None)).as[Transaction]
+      postJson("/assets/masstransfer", MassTransferRequest(Proofs.Version, assetId, sourceAddress, transfers, fee, None)).as[Transaction]
 
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson("/waves/payment", PaymentRequest(amount, fee, sourceAddress, recipient)).as[Transaction]
@@ -214,8 +242,18 @@ object AsyncHttpApi {
     def signedTransfer(transfer: SignedTransferRequest): Future[Transaction] =
       postJson("/assets/broadcast/transfer", transfer).as[Transaction]
 
+    def signedLease(lease: SignedLeaseRequest): Future[Transaction] =
+      postJson("/leasing/broadcast/lease", lease).as[Transaction]
+
+    def signedLeaseCancel(leaseCancel: SignedLeaseCancelRequest): Future[Transaction] =
+      postJson("/leasing/broadcast/cancel", leaseCancel).as[Transaction]
+
     def signedMassTransfer(req: SignedMassTransferRequest): Future[Transaction] = {
       postJson("/transactions/broadcast", req).as[Transaction]
+    }
+
+    def signedIssue(issue: SignedIssueRequest): Future[Transaction] = {
+      postJson("/assets/broadcast/issue", issue).as[Transaction]
     }
 
     def batchSignedTransfer(transfers: Seq[SignedTransferRequest], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
@@ -279,6 +317,11 @@ object AsyncHttpApi {
       currentBlock <- lastBlock
       actualBlock <- findBlock(_.height > currentBlock.height, currentBlock.height)
     } yield actualBlock
+
+    def waitForHeightArise: Future[Int] = for {
+      height <- height
+      newHeight <- waitForHeight(height + 1)
+    } yield newHeight
 
     def findBlock(cond: Block => Boolean, from: Int = 1, to: Int = Int.MaxValue): Future[Block] = {
       def load(_from: Int, _to: Int): Future[Block] = blockSeq(_from, _to).flatMap { blocks =>
