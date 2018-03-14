@@ -203,7 +203,7 @@ trait TransactionGen extends ScriptGen {
   val scriptTransferGen = (for {
     (assetId, sender, recipient, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
     proofs <- proofsGen
-  } yield ScriptTransferTransaction.create(1, assetId, sender, recipient, amount, timestamp, feeAmount, attachment, proofs).explicitGet())
+  } yield VersionedTransferTransaction.create(2, assetId, sender, recipient, amount, timestamp, feeAmount, attachment, proofs).explicitGet())
     .label("scriptTransferTransaction")
 
   val transferWithWavesFeeGen = for {

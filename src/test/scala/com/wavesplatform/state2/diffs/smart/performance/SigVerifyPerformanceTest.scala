@@ -13,7 +13,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.{ScriptTransferTransaction, TransferTransaction}
+import scorex.transaction.assets.{VersionedTransferTransaction, TransferTransaction}
 import scorex.transaction.smart.Script
 
 class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
@@ -26,11 +26,11 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
       fee <- smallFeeGen
     } yield TransferTransaction.create(None, from, to.toAddress, amt, ts, None, fee, Array.emptyByteArray).explicitGet()
 
-  private def scriptedSendGen(from: PrivateKeyAccount, to: PublicKeyAccount, ts: Long): Gen[ScriptTransferTransaction] =
+  private def scriptedSendGen(from: PrivateKeyAccount, to: PublicKeyAccount, ts: Long): Gen[VersionedTransferTransaction] =
     for {
       amt <- smallFeeGen
       fee <- smallFeeGen
-    } yield ScriptTransferTransaction.selfSigned(1, None, from, to.toAddress, amt, ts, fee, Array.emptyByteArray).explicitGet()
+    } yield VersionedTransferTransaction.selfSigned(1, None, from, to.toAddress, amt, ts, fee, Array.emptyByteArray).explicitGet()
 
   private def differentTransfers(typed: Typed.EXPR) =
     for {

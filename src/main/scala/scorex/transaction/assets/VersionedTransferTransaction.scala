@@ -9,21 +9,22 @@ import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
 import scorex.transaction.TransactionParser._
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
-case class ScriptTransferTransaction private(version: Byte,
-                                             sender: PublicKeyAccount,
-                                             recipient: AddressOrAlias,
-                                             assetId: Option[AssetId],
-                                             amount: Long,
-                                             timestamp: Long,
-                                             fee: Long,
-                                             attachment: Array[Byte],
-                                             proofs: Proofs)
+case class VersionedTransferTransaction private(version: Byte,
+                                                sender: PublicKeyAccount,
+                                                recipient: AddressOrAlias,
+                                                assetId: Option[AssetId],
+                                                amount: Long,
+                                                timestamp: Long,
+                                                fee: Long,
+                                                attachment: Array[Byte],
+                                                proofs: Proofs)
   extends ProvenTransaction with FastHashId {
-  override val transactionType: TransactionType.Value = TransactionType.ScriptTransferTransaction
+  override val transactionType: TransactionType.Value = TransactionType.VersionedTransferTransaction
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
@@ -56,9 +57,9 @@ case class ScriptTransferTransaction private(version: Byte,
 }
 
 
-object ScriptTransferTransaction {
+object VersionedTransferTransaction {
 
-  def parseTail(bytes: Array[Byte]): Try[ScriptTransferTransaction] = Try {
+  def parseTail(bytes: Array[Byte]): Try[VersionedTransferTransaction] = Try {
     val version = bytes(0)
     val sender = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
     val (assetIdOpt, s0) = Deser.parseByteArrayOption(bytes, KeyLength + 1, AssetIdLength)
@@ -71,7 +72,7 @@ object ScriptTransferTransaction {
       (recipient, recipientEnd) = recRes
       (attachment, attachEnd) = Deser.parseArraySize(bytes, recipientEnd)
       proofs <- Proofs.fromBytes(bytes.drop(attachEnd))
-      tt <- ScriptTransferTransaction.create(version, assetIdOpt.map(ByteStr(_)), sender, recipient, amount, timestamp, feeAmount, attachment, proofs)
+      tt <- VersionedTransferTransaction.create(version, assetIdOpt.map(ByteStr(_)), sender, recipient, amount, timestamp, feeAmount, attachment, proofs)
     } yield tt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
@@ -83,8 +84,10 @@ object ScriptTransferTransaction {
              timestamp: Long,
              feeAmount: Long,
              attachment: Array[Byte],
-             proofs: Proofs): Either[ValidationError, ScriptTransferTransaction] = {
-    if (attachment.length > TransferTransaction.MaxAttachmentSize) {
+             proofs: Proofs): Either[ValidationError, VersionedTransferTransaction] = {
+    if (version != 2.toByte) {
+      Left(GenericError("Version must be 2"))
+    } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
       Left(ValidationError.TooBigArray)
     } else if (amount <= 0) {
       Left(ValidationError.NegativeAmount(amount, "waves"))
@@ -93,7 +96,7 @@ object ScriptTransferTransaction {
     } else if (feeAmount <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {
-      Right(ScriptTransferTransaction(version, sender, recipient, assetId, amount, timestamp, feeAmount, attachment, proofs))
+      Right(VersionedTransferTransaction(version, sender, recipient, assetId, amount, timestamp, feeAmount, attachment, proofs))
     }
   }
 
@@ -104,7 +107,7 @@ object ScriptTransferTransaction {
                  amount: Long,
                  timestamp: Long,
                  feeAmount: Long,
-                 attachment: Array[Byte]): Either[ValidationError, ScriptTransferTransaction] = {
+                 attachment: Array[Byte]): Either[ValidationError, VersionedTransferTransaction] = {
     create(version, assetId, sender, recipient, amount, timestamp, feeAmount, attachment, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes())))).explicitGet())
     }

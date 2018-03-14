@@ -13,25 +13,23 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Try}
 
-object SyncHttpApi extends Assertions{
+object SyncHttpApi extends Assertions {
   case class ErrorMessage(error: Int, message: String)
 
   implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
 
-
   def assertBadRequest[R](f: => R): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Assertions.assert(statusCode == StatusCodes.BadRequest.intValue)
-    case Failure(e) => Assertions.fail(e)
-    case _ => Assertions.fail(s"Expecting bad request")
+    case Failure(e)                                               => Assertions.fail(e)
+    case _                                                        => Assertions.fail(s"Expecting bad request")
   }
 
   def assertBadRequestAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
       Assertions.assert(statusCode == StatusCodes.BadRequest.intValue && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
-    case _ => Assertions.fail(s"Expecting bad request")
+    case _          => Assertions.fail(s"Expecting bad request")
   }
-
 
   implicit class NodeExtSync(n: Node) extends Assertions with Matchers {
 
@@ -72,13 +70,18 @@ object SyncHttpApi extends Assertions{
     def aliasByAddress(targetAddress: String): Seq[String] =
       Await.result(async(n).aliasByAddress(targetAddress), RequestAwaitTime)
 
-    def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None, feeAssetId: Option[String] = None): Transaction =
+    def transfer(sourceAddress: String,
+                 recipient: String,
+                 amount: Long,
+                 fee: Long,
+                 assetId: Option[String] = None,
+                 feeAssetId: Option[String] = None): Transaction =
       Await.result(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId), RequestAwaitTime)
 
     def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Transaction =
       Await.result(async(n).massTransfer(sourceAddress, transfers, fee, assetId), RequestAwaitTime)
 
-    def lease(sourceAddress:String, recipient: String, leasingAmount: Long, leasingFee: Long): Transaction =
+    def lease(sourceAddress: String, recipient: String, leasingAmount: Long, leasingFee: Long): Transaction =
       Await.result(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee), RequestAwaitTime)
 
     def signedMassTransfer(tx: SignedMassTransferRequest): Transaction =
@@ -92,15 +95,17 @@ object SyncHttpApi extends Assertions{
 
     def ensureTxDoesntExist(txId: String): Unit =
       Await.result(async(n).ensureTxDoesntExist(txId), RequestAwaitTime)
-  }
 
+    def createAddress(): String =
+      Await.result(async(n).createAddress, RequestAwaitTime)
+  }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
 
     import com.wavesplatform.it.api.AsyncHttpApi.{NodesAsyncHttpApi => async}
 
     private val TxInBlockchainAwaitTime = 3 * nodes.head.blockDelay
-    private val ConditionAwaitTime = 5.minutes
+    private val ConditionAwaitTime      = 5.minutes
 
     def waitForHeightAraiseAndTxPresent(transactionId: String): Unit =
       Await.result(async(nodes).waitForHeightAraiseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
@@ -112,8 +117,9 @@ object SyncHttpApi extends Assertions{
       Await.result(async(nodes).waitForSameBlocksAt(retryInterval, height), ConditionAwaitTime)
 
     def waitFor[A](desc: String)(retryInterval: FiniteDuration)(request: Node => A, cond: Iterable[A] => Boolean): Boolean =
-      Await.result(async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(scala.concurrent.ExecutionContext.Implicits.global), cond), ConditionAwaitTime)
+      Await.result(
+        async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(scala.concurrent.ExecutionContext.Implicits.global), cond),
+        ConditionAwaitTime)
   }
 
 }
-

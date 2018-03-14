@@ -1,4 +1,4 @@
-package com.wavesplatform.it.transactions
+package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
@@ -8,6 +8,7 @@ import scorex.transaction.assets.IssueTransaction
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.NodeConfigs
+import com.wavesplatform.it.transactions.BaseTransactionSuite
 import scorex.api.http.assets.SignedIssueRequest
 import scorex.crypto.encode.Base58
 
@@ -49,14 +50,14 @@ object CustomIssueTransactionTestSuite {
   val addressDefaultNode = Default(3).getString("address")
   private val seed = Default(3).getString("account-seed")
   private val pk = PrivateKeyAccount.fromSeed(seed).right.get
-  val assetTx = IssueTransaction.create(pk,
-    "asset".getBytes(),
-    "asset description".getBytes(),
-    1000000,
-    2,
-    false,
-    1.waves,
-    System.currentTimeMillis()).right.get
+  val assetTx = IssueTransaction.create(sender = pk,
+    name = "asset".getBytes(),
+    description = "asset description".getBytes(),
+    quantity = 1000000,
+    decimals = 2,
+    reissuable = false,
+    fee = 1.waves,
+    timestamp = System.currentTimeMillis()).right.get
 
   val assetId = assetTx.id()
   import NodeConfigs.Default
