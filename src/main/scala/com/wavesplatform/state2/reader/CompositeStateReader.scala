@@ -90,17 +90,13 @@ class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockD
 
   override def accountData(acc: Address): AccountDataInfo = {
     val fromInner = inner.accountData(acc)
-    Console.err.println(s"CSR inner $fromInner") ///
     val fromDiff = blockDiff.txsDiff.accountData.get(acc).orEmpty
-    Console.err.println(s"CSR diff $fromDiff") ///
-    val r = fromInner.combine(fromDiff)
-    Console.err.println(s"CSR res $r") ///
-    r
+    fromInner.combine(fromDiff)
   }
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = {
     val diffData = blockDiff.txsDiff.accountData.get(acc).orEmpty
-    diffData.get(key).orElse(inner.accountData(acc, key))
+    diffData.data.get(key).orElse(inner.accountData(acc, key))
   }
 }
 

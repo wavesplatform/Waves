@@ -16,7 +16,7 @@ case class DataTransaction private(version: Byte,
                                    data: List[DataEntry[_]],
                                    fee: Long,
                                    timestamp: Long,
-                                   proofs: Proofs) extends ProvenTransaction with FastHashId { ///is it ok for id?
+                                   proofs: Proofs) extends ProvenTransaction with FastHashId {
   override val transactionType: TransactionType.Value = TransactionType.DataTransaction
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
@@ -44,23 +44,23 @@ case class DataTransaction private(version: Byte,
 }
 
 object DataTransaction {
-  val MaxDataItemCount = Byte.MaxValue
+  val MaxEntryCount = Byte.MaxValue
 
   def parseTail(bytes: Array[Byte]): Try[DataTransaction] = Try {
     val version = bytes(0)
     val p0 = KeyLength + 1
     val sender = PublicKeyAccount(bytes.slice(1, p0))
 
-    val itemCount = Shorts.fromByteArray(bytes.drop(p0))
-    val itemList = List.iterate(DataEntry.parse(bytes, p0 + 2), itemCount) { case (pair, pos) => DataEntry.parse(bytes, pos) }
-    val items = itemList.map(_._1)
-    Console.err.println("READ " + items)///
-    val p1 = itemList.lastOption.map(_._2).getOrElse(p0 + 2)
+    val entryCount = Shorts.fromByteArray(bytes.drop(p0))
+    val (entries, p1) = (0 until entryCount).foldLeft((List.empty[DataEntry[_]], p0 + 2)) { case ((es, pos), _) =>
+      val (e, p) = DataEntry.parse(bytes, pos)
+      (e :: es, p)
+    }
     val timestamp = Longs.fromByteArray(bytes.drop(p1))
     val feeAmount = Longs.fromByteArray(bytes.drop(p1 + 8))
     val txEi = for {
       proofs <- Proofs.fromBytes(bytes.drop(p1 + 16))
-      tx <- create(version, sender, items, feeAmount, timestamp, proofs)
+      tx <- create(version, sender, entries.reverse, feeAmount, timestamp, proofs)
     } yield tx
     txEi.fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
@@ -71,8 +71,8 @@ object DataTransaction {
              feeAmount: Long,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, DataTransaction] = {
-    if (data.lengthCompare(MaxDataItemCount) > 0 || data.exists(! _.valid)) {
-      Left(ValidationError.TooBigArray) ///better diagnostics
+    if (data.lengthCompare(MaxEntryCount) > 0 || data.exists(! _.valid)) {
+      Left(ValidationError.TooBigArray)
     } else if (feeAmount <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {

@@ -24,7 +24,7 @@ sealed abstract class DataEntry[T](val key: String, val value: T) {
 
 object DataEntry {
   val MaxKeySize = Byte.MaxValue
-  val MaxValueSize = Short.MaxValue
+  val MaxValueSize = 1024
 
   private val UTF8 = StandardCharsets.UTF_8
 
@@ -47,7 +47,7 @@ object DataEntry {
       case t if t == Type.Binary.id =>
         val (blob, p1) = Deser.parseArraySize(bytes, p + 1)
         (BinaryDataEntry(key, blob), p1)
-      /// case _ => Validation
+      case t => throw new Exception(s"Unknown type $t")
     }
   }
 

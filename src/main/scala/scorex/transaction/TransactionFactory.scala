@@ -90,7 +90,7 @@ object TransactionFactory {
     tx <- BurnTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.fee, timestamp)
   } yield tx
 
-  def data(request: DataRequest, wallet: Wallet, time: Time): Either[ValidationError, DataTransaction] = for {///better name?
+  def data(request: DataRequest, wallet: Wallet, time: Time): Either[ValidationError, DataTransaction] = for {
     pk <- wallet.findWallet(request.sender)
     timestamp = request.timestamp.getOrElse(time.getTimestamp())
     tx <- DataTransaction.selfSigned(Proofs.Version, pk, request.data, request.fee, timestamp)

@@ -1,7 +1,9 @@
 package scorex.transaction
 
+import com.google.common.primitives.Shorts
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.state2.{BinaryDataEntry, DataEntry, IntegerDataEntry}
+import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry}
+import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
@@ -11,28 +13,44 @@ import scorex.transaction.TransactionParser.TransactionType
 
 class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
-  property("serialization roundtrip") {
-    forAll(dataTransactionGen) { tx: DataTransaction =>
-      require(tx.bytes().head == TransactionType.DataTransaction.id)
-      val recovered = DataTransaction.parseTail(tx.bytes().tail).get
+  private def checkSerialization(tx: DataTransaction): Assertion = {
+    require(tx.bytes().head == TransactionType.DataTransaction.id)
+    val parsed = DataTransaction.parseTail(tx.bytes().tail).get
 
-      recovered.sender.address shouldEqual tx.sender.address
-      recovered.timestamp shouldEqual tx.timestamp
-      recovered.fee shouldEqual tx.fee
+    parsed.sender.address shouldEqual tx.sender.address
+    parsed.timestamp shouldEqual tx.timestamp
+    parsed.fee shouldEqual tx.fee
 
-      recovered.data.zip(tx.data).foreach { case (r, t) =>
-        r.key shouldEqual t.key
-        r.value shouldEqual t.value
-      }
-
-      recovered.bytes() shouldEqual tx.bytes()
+    parsed.data.zip(tx.data).foreach { case (r, t) =>
+      r.key shouldEqual t.key
+      r.value shouldEqual t.value
     }
+
+    parsed.bytes() shouldEqual tx.bytes()
+  }
+
+  property("serialization roundtrip") {
+    forAll(dataTransactionGen)(checkSerialization)
   }
 
   property("serialization from TypedTransaction") {
     forAll(dataTransactionGen) { tx: DataTransaction =>
       val recovered = TransactionParser.parseBytes(tx.bytes()).get
       recovered.bytes() shouldEqual tx.bytes()
+    }
+  }
+
+  property("unknown type handing") {
+    val badTypeIdGen = Gen.choose[Byte](3, Byte.MaxValue)
+    forAll(dataTransactionGen, badTypeIdGen) { case (tx, badTypeId) =>
+      val bytes = tx.bytes()
+      val entryCount = Shorts.fromByteArray(bytes.drop(34))
+      if (entryCount > 0) {
+        val p = 36 + bytes(36) // bytes(36) is key#1 length
+        val parsed = DataTransaction.parseTail((bytes.tail.take(p) :+ badTypeId) ++ bytes.drop(p + 2))
+        parsed.isFailure shouldBe true
+        parsed.failed.get.getMessage shouldBe s"Unknown type $badTypeId"
+      }
     }
   }
 
@@ -67,25 +85,36 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     }
   }
 
-  property("property validation") {
+  property("positive validation cases") {
+    import DataTransaction._
+    import com.wavesplatform.state2.DataEntry._
+
+    val keyRepeatCountGen = Gen.choose(2, MaxEntryCount)
+    forAll(dataTransactionGen, keyRepeatCountGen) {
+      case (DataTransaction(version, sender, data, fee, timestamp, proofs), keyRepeatCount) =>
+        def check(data: List[DataEntry[_]]): Assertion = {
+          val txEi = create(version, sender, data, fee, timestamp, proofs)
+          txEi shouldBe Right(DataTransaction(version, sender, data, fee, timestamp, proofs))
+          checkSerialization(txEi.right.get)
+        }
+
+        check(List.empty)  // no data
+        check(List.tabulate(MaxEntryCount)(n => IntegerDataEntry(n.toString, n)))  // maximal data
+        check(List.fill[DataEntry[_]](keyRepeatCount)(data.head))  // repeating keys
+        check(List(BooleanDataEntry("", false)))  // empty key
+        check(List(IntegerDataEntry("a" * Byte.MaxValue, 0xa)))  // max key size
+        check(List(BinaryDataEntry("bin", Array.empty)))  // empty binary
+        check(List(BinaryDataEntry("bin", Array.fill(MaxValueSize)(1: Byte))))  // max binary value size
+    }
+  }
+
+  property("negative validation cases") {
     import DataTransaction._
     import com.wavesplatform.state2.DataEntry._
 
     forAll(dataTransactionGen) {
       case DataTransaction(version, sender, data, fee, timestamp, proofs) =>
-        /// move positive cases to IT?
-        val emptyEi = create(version, sender, List.empty, fee, timestamp, proofs)
-        emptyEi shouldBe Right(DataTransaction(version, sender, List.empty, fee, timestamp, proofs))
-
-        val sameKey = List.fill[DataEntry[_]](4)(data.head)
-        val sameKeyEi = create(version, sender, sameKey, fee, timestamp, proofs)
-        sameKeyEi shouldBe Right(DataTransaction(version, sender, sameKey, fee, timestamp, proofs))
-
-        val emptyBinaryData = List(BinaryDataEntry("bin", Array.empty))
-        val emptyBinaryDataEi = create(version, sender, emptyBinaryData, fee, timestamp, proofs)
-        emptyBinaryDataEi shouldBe Right(DataTransaction(version, sender, emptyBinaryData, fee, timestamp, proofs))
-
-        val dataTooBig = List.fill(MaxDataItemCount + 1)(IntegerDataEntry("key", 4))
+        val dataTooBig = List.fill(MaxEntryCount + 1)(IntegerDataEntry("key", 4))
         val dataTooBigEi = create(version, sender, dataTooBig, fee, timestamp, proofs)
         dataTooBigEi shouldBe Left(ValidationError.TooBigArray)
 

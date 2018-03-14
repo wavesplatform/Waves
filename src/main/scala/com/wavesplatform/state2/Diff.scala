@@ -40,10 +40,7 @@ object AssetInfo {
   }
 }
 
-case class AccountDataInfo(data: Map[String, DataEntry[_]]) {
-  def get(key: String): Option[DataEntry[_]] = data.get(key)
-  /// +keySet, foreach
-}
+case class AccountDataInfo(data: Map[String, DataEntry[_]])
 
 object AccountDataInfo {
   implicit val accountDataInfoMonoid = new Monoid[AccountDataInfo] {
@@ -109,12 +106,6 @@ object Diff {
       orderFills = older.orderFills.combine(newer.orderFills),
       leaseState = older.leaseState ++ newer.leaseState,
       scripts = older.scripts ++ newer.scripts,
-      accountData = {///
-        val x= older.accountData.combine(newer.accountData)
-        Console.err.println(s"combine older: ${older.accountData}")
-        Console.err.println(s"combine newer: ${newer.accountData}")
-        Console.err.println(s"combine res: $x")
-        x
-      })
+      accountData = older.accountData.combine(newer.accountData))
   }
 }

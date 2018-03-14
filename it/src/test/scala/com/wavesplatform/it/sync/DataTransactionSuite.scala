@@ -18,16 +18,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Try}
 
 class DataTransactionSuite extends BaseTransactionSuite {
-
-  private val assetQuantity = 100.waves
-  private val transferAmount = 5.waves
-  private val leasingAmount = 5.waves
-  private val leasingFee = 0.003.waves
-  private val transferFee = notMiner.settings.feesSettings.fees(TransactionType.TransferTransaction.id)(0).fee
-  private val massTransferFeePerTransfer = notMiner.settings.feesSettings.fees(TransactionType.MassTransferTransaction.id)(0).fee
-
   private val fee = 100000
-
 
   private def calcFee(data: List[DataEntry[_]]): Long = 100000///
 
@@ -92,7 +83,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 //    }
 //  }
 
-  test("data can be defined and retrieved") {
+  test("data definition and retrieval") {
     // define first data item
     val item1 = IntegerDataEntry("int", 8)
     val tx1 = sender.putData(secondAddress, List(item1), fee).id
@@ -137,6 +128,18 @@ class DataTransactionSuite extends BaseTransactionSuite {
     assertNotFound(s"/addresses/data/$secondAddress/foo")
     assertNotFound(s"/addresses/data/$thirdAddress/foo")
     sender.getData(thirdAddress) shouldBe List.empty
+  }
+
+  test("data definition corner cases") {
+    val noDataTx = sender.putData(thirdAddress, List.empty, fee).id
+    nodes.waitForHeightAraiseAndTxPresent(noDataTx)
+    sender.getData(thirdAddress) shouldBe List.empty
+
+    val key = "intKey"
+    val multiKey = List.tabulate(5)(IntegerDataEntry(key, _))
+    val twinKeyTx = sender.putData(thirdAddress, multiKey, fee).id
+    nodes.waitForHeightAraiseAndTxPresent(twinKeyTx)
+    sender.getData(thirdAddress, key) shouldBe IntegerDataEntry(key, multiKey.size - 1)
   }
 
   test("malformed JSON") {
