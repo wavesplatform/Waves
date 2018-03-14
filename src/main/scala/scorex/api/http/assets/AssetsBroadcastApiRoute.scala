@@ -118,7 +118,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings,
           utx.batched { ops =>
             xs.map {
               case Left(e) => Left(e)
-              case Right(tx) => ops.putIfNew(tx).map((tx, _))
+              case Right(tx) => ops.putIfNew(tx).map { case (isNew, _) => (tx, isNew) }
             }
           }
         }
