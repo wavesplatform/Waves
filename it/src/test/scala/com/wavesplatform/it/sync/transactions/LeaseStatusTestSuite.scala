@@ -19,7 +19,6 @@ class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure 
 
 
   test("verification of leasing status") {
-    nodes.waitForHeightAraise()
     val createdLeaseTxId = sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee = transferFee).id
     nodes.waitForHeightAraiseAndTxPresent(createdLeaseTxId)
     val status = getStatus(createdLeaseTxId)
