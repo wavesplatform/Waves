@@ -11,6 +11,8 @@ import org.scalatest.CancelAfterFailure
 import play.api.libs.json.{JsNumber, JsObject, Json}
 import scorex.account.PrivateKeyAccount
 import scorex.api.http.assets.{SignedSetScriptRequest, SignedVersionedTransferRequest}
+import scorex.api.http.assets.SignedSetScriptRequest.jsonFormat
+import scorex.api.http.assets.SignedVersionedTransferRequest.jsonFormat
 import scorex.transaction.Proofs
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.VersionedTransferTransaction
