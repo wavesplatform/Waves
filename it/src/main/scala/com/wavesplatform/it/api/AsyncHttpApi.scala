@@ -38,6 +38,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object AsyncHttpApi extends Assertions {
+
   case class ErrorMessage(error: Int, message: String)
 
   implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
@@ -250,13 +251,14 @@ object AsyncHttpApi extends Assertions {
     def signedLeaseCancel(leaseCancel: SignedLeaseCancelRequest): Future[Transaction] =
       postJson("/leasing/broadcast/cancel", leaseCancel).as[Transaction]
 
-    def signedMassTransfer(req: SignedMassTransferRequest): Future[Transaction] = {
+    def signedMassTransfer(req: SignedMassTransferRequest): Future[Transaction] =
       postJson("/transactions/broadcast", req).as[Transaction]
-    }
 
-    def signedIssue(issue: SignedIssueRequest): Future[Transaction] = {
+    def signedBroadcast(jsobj: JsObject): Future[Transaction] =
+      post("/transactions/broadcast", stringify(jsobj)).as[Transaction]
+
+    def signedIssue(issue: SignedIssueRequest): Future[Transaction] =
       postJson("/assets/broadcast/issue", issue).as[Transaction]
-    }
 
     def batchSignedTransfer(transfers: Seq[SignedTransferRequest], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
       val request = _post(s"${n.nodeApiEndpoint}/assets/broadcast/batch-transfer")
@@ -284,7 +286,7 @@ object AsyncHttpApi extends Assertions {
     def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
       postJson("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
 
-    def aliasByAddress(targetAddress: String) =
+    def aliasByAddress(targetAddress: String): Future[Seq[String]] =
       get(s"/alias/by-address/$targetAddress").as[Seq[String]]
 
     def addressByAlias(targetAlias: String): Future[Address] =
@@ -489,4 +491,5 @@ object AsyncHttpApi extends Assertions {
   implicit class RequestBuilderOps(self: RequestBuilder) {
     def withApiKey(x: String): RequestBuilder = self.setHeader(api_key.name, x)
   }
+
 }

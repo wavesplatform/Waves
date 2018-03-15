@@ -4,6 +4,7 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.lang.Terms.Typed
 import com.wavesplatform.lang.{Parser, TypeChecker}
 import com.wavesplatform.state2._
+import com.wavesplatform.utils._
 import com.wavesplatform.state2.diffs.ENOUGH_AMT
 import org.scalacheck.Gen
 import scorex.transaction.GenesisTransaction

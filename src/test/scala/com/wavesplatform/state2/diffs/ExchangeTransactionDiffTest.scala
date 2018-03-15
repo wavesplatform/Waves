@@ -60,7 +60,7 @@ class ExchangeTransactionDiffTest
       ts <- timestampGen
       gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).right.get
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
-      setScript = SetScriptTransaction.selfSigned(seller, Script(TRUE), fee, ts).explicitGet()
+      setScript = SetScriptTransaction.selfSigned(seller, Some(Script(TRUE)), fee, ts).explicitGet()
       issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1)
       issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1)
       maybeAsset1 <- Gen.option(issue1.id())

@@ -1,7 +1,7 @@
 package com.wavesplatform.it.matcher
 
 import com.wavesplatform.it.Node
-import com.wavesplatform.it.api.{AssetBalance, MatcherStatusResponse, OrderBookResponse, Transaction}
+import com.wavesplatform.it.api.{AssetBalance, MatcherStatusResponse, OrderBookResponse}
 import scorex.transaction.assets.exchange.Order
 
 import scala.concurrent.{Await, Future}
