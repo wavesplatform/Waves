@@ -30,6 +30,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
   private val transferAmount: Long = 1.waves
   private val fee: Long            = 0.001.waves
+  private val senderPublicKeyString: String = ByteStr(sender.publicKey.publicKey).base58
 
   test("set 2of2 multisig") {
 
@@ -52,7 +53,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val setScriptTransaction = SetScriptTransaction.selfSigned(sender.privateKey, Some(script), fee, System.currentTimeMillis()).explicitGet()
 
     val request = SignedSetScriptRequest(
-      senderPublicKey = ByteStr(sender.publicKey.publicKey).base58,
+      senderPublicKey = senderPublicKeyString,
       script = Some(script.bytes().base58),
       fee = setScriptTransaction.fee,
       timestamp = setScriptTransaction.timestamp,
@@ -70,7 +71,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   }
 
   test("can't send using old pk ") {
-    assertBadRequest(sender.transfer(sender.address, acc3.address, transferAmount, fee, None, None))
+    assertBadRequest(sender.transfer(senderPublicKeyString, acc3.address, transferAmount, fee, None, None))
   }
 
   test("can send using multisig") {
@@ -93,13 +94,13 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val sig2 = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
 
     val request = SignedVersionedTransferRequest(
-      senderPublicKey = ByteStr(sender.publicKey.publicKey).base58,
+      senderPublicKey = senderPublicKeyString,
       assetId = None,
-      recipient = acc3.address,
-      amount = transferAmount,
-      fee = fee,
-      timestamp = System.currentTimeMillis(),
-      version = 2,
+      recipient = unsigned.recipient.toString,
+      amount = unsigned.amount,
+      fee = unsigned.fee,
+      timestamp = unsigned.timestamp,
+      version = unsigned.version,
       attachment = None,
       proofs = List(sig1, sig2).map(_.base58)
     )
@@ -119,7 +120,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val sig2 = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
 
     val request = SignedSetScriptRequest(
-      senderPublicKey = ByteStr(sender.publicKey.publicKey).base58,
+      senderPublicKey = senderPublicKeyString,
       script = None,
       fee = unsigned.fee,
       timestamp = unsigned.timestamp,
