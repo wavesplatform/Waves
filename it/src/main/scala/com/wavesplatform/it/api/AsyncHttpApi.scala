@@ -21,7 +21,7 @@ import play.api.libs.json._
 import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
-import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
+import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.api.http.{ApiErrorResponse, DataRequest}
 import scorex.transaction.Proofs
 import scorex.transaction.assets.MassTransferTransaction.Transfer
@@ -242,7 +242,7 @@ object AsyncHttpApi extends Assertions {
       postJson("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
     def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Future[Transaction] =
-      postJson("/addresses/data", DataRequest(sourceAddress, data, fee)).as[Transaction]
+      postJson("/addresses/data", DataRequest(1, sourceAddress, data, fee)).as[Transaction]
 
     def getData(address: String): Future[List[DataEntry[_]]] = get(s"/addresses/data/$address").as[List[DataEntry[_]]]
 
@@ -250,6 +250,12 @@ object AsyncHttpApi extends Assertions {
 
     def signedTransfer(transfer: SignedTransferRequest): Future[Transaction] =
       postJson("/assets/broadcast/transfer", transfer).as[Transaction]
+
+    def signedLease(lease: SignedLeaseRequest): Future[Transaction] =
+      postJson("/leasing/broadcast/lease", lease).as[Transaction]
+
+    def signedLeaseCancel(leaseCancel: SignedLeaseCancelRequest): Future[Transaction] =
+      postJson("/leasing/broadcast/cancel", leaseCancel).as[Transaction]
 
     def broadcastRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
 

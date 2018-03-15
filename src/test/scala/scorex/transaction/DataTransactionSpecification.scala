@@ -112,9 +112,12 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     import DataTransaction._
     import com.wavesplatform.state2.DataEntry._
 
-    forAll(dataTransactionGen) {
-      case DataTransaction(version, sender, data, fee, timestamp, proofs) =>
-        /// bad version
+    val badVersionGen = Gen.choose(Proofs.Version + 1, Byte.MaxValue).map(_.toByte)
+    forAll(dataTransactionGen, badVersionGen) {
+      case (DataTransaction(version, sender, data, fee, timestamp, proofs), badVersion) =>
+        val badVersionEi = create(badVersion, sender, data, fee, timestamp, proofs)
+        badVersionEi shouldBe Left(ValidationError.UnsupportedVersion(badVersion))
+
         val dataTooBig = List.fill(MaxEntryCount + 1)(IntegerDataEntry("key", 4))
         val dataTooBigEi = create(version, sender, dataTooBig, fee, timestamp, proofs)
         dataTooBigEi shouldBe Left(ValidationError.TooBigArray)

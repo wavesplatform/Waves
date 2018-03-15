@@ -12,14 +12,15 @@ object DataRequest {
   implicit val signedFormat: Format[SignedDataRequest] = Json.format
 }
 
-case class DataRequest(///add version
+case class DataRequest(version: Byte,
                        sender: String,
                        data: List[DataEntry[_]],
                        fee: Long,
                        timestamp: Option[Long] = None)
 
 @ApiModel(value = "Signed Data transaction")
-case class SignedDataRequest(///add version
+case class SignedDataRequest(@ApiModelProperty(required = true)
+                             version: Byte,
                              @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                              senderPublicKey: String,
                              @ApiModelProperty(value = "///", required = true)
@@ -34,6 +35,6 @@ case class SignedDataRequest(///add version
     _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
     _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
     _proofs <- Proofs.create(_proofBytes)
-    t <- DataTransaction.create(Proofs.Version, _sender, data, fee, timestamp, _proofs)
+    t <- DataTransaction.create(version, _sender, data, fee, timestamp, _proofs)
   } yield t
 }

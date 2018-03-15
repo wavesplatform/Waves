@@ -598,7 +598,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       timestamp = System.currentTimeMillis(),
       fee = TransactionFee
     ).right.get
-    val tx = Await.result(matcherNode.broadcastRequest(createSignedLeaseRequest(leaseTx)), 1.minute)
+    val tx = Await.result(matcherNode.signedLease(createSignedLeaseRequest(leaseTx)), 1.minute)
     Await.result(matcherNode.waitForTransaction(tx.id), 1.minute)
     ByteStr(Base58.decode(tx.id).get)
   }
@@ -611,7 +611,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       timestamp = System.currentTimeMillis()
     ).right.get
 
-    val tx = Await.result(matcherNode.broadcastRequest(createSignedLeaseCancelRequest(cancelLeaseTx)), 1.minute)
+    val tx = Await.result(matcherNode.signedLeaseCancel(createSignedLeaseCancelRequest(cancelLeaseTx)), 1.minute)
     Await.result(matcherNode.waitForTransaction(tx.id), 1.minute)
   }
 

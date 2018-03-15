@@ -64,7 +64,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
       DataTransaction.selfSigned(version, sender.privateKey, entries, fee, timestamp).right.get
 
     def request(tx: DataTransaction): SignedDataRequest =
-      SignedDataRequest(Base58.encode(tx.sender.publicKey), tx.data, tx.fee, tx.timestamp, tx.proofs.base58().toList)
+      SignedDataRequest(1, Base58.encode(tx.sender.publicKey), tx.data, tx.fee, tx.timestamp, tx.proofs.base58().toList)
 
     val fromFuture = data(timestamp = System.currentTimeMillis + 1.day.toMillis)
     val insufficientFee = data(fee = 99999)
@@ -136,6 +136,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
   test("malformed JSON") {
     def request(item: JsObject) = Json.obj(
+      "version" -> 1,
       "sender" -> secondAddress,
       "fee" -> fee,
       "data" -> Seq(item))
