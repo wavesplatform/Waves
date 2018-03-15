@@ -228,7 +228,7 @@ trait TransactionGen extends ScriptGen {
         amount <- Gen.choose(1L, Long.MaxValue / MaxTransferCount)
       } yield ParsedTransfer(recipient, amount)
       recipients <- Gen.listOfN(transferCount, transferGen)
-    } yield MassTransferTransaction.selfSigned(Proofs.Version, assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
+    } yield MassTransferTransaction.selfSigned(MassTransferTransaction.Version, assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
   }.label("massTransferTransaction")
 
   val MinIssueFee = 100000000
@@ -373,6 +373,6 @@ trait TransactionGen extends ScriptGen {
       IntegerDataEntry("ten", 10),
       BooleanDataEntry("DataTx works!", true),
       BinaryDataEntry("bad-bytes", "carol".getBytes))///
-  } yield DataTransaction.selfSigned(Proofs.Version, sender, data, feeAmount, timestamp).right.get)
+  } yield DataTransaction.selfSigned(DataTransaction.Version, sender, data, feeAmount, timestamp).right.get)
     .label("DataTransaction")
 }

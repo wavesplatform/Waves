@@ -7,7 +7,6 @@ import play.api.libs.json.{JsNumber, JsObject, Json}
 import scorex.account.AddressOrAlias
 import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.crypto.encode.Base58
-import scorex.transaction.Proofs
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.MassTransferTransaction
 import scorex.transaction.assets.MassTransferTransaction.{MaxTransferCount, ParsedTransfer, Transfer}
@@ -109,7 +108,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     val address2 = AddressOrAlias.fromString(secondAddress).right.get
     val valid = MassTransferTransaction.selfSigned(
-      Proofs.Version, None, sender.privateKey,
+      MassTransferTransaction.Version, None, sender.privateKey,
       List(ParsedTransfer(address2, transferAmount)),
       System.currentTimeMillis,
       calcFee(1), Array.emptyByteArray).right.get
@@ -151,7 +150,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     def signedMassTransfer(): JsObject = {
       val rs = sender.postJsonWithApiKey("/transactions/sign", Json.obj(
         "type" -> TransactionType.MassTransferTransaction.id,
-        "version" -> Proofs.Version,
+        "version" -> MassTransferTransaction.Version,
         "sender" -> firstAddress,
         "transfers" -> transfers,
         "fee" -> fee))
@@ -172,7 +171,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   private def createSignedMassTransferRequest(tx: MassTransferTransaction): SignedMassTransferRequest = {
     import tx._
     SignedMassTransferRequest(
-      Proofs.Version,
+      MassTransferTransaction.Version,
       Base58.encode(tx.sender.publicKey),
       assetId.map(_.base58),
       transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) },

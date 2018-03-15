@@ -23,7 +23,7 @@ import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.api.http.{ApiErrorResponse, DataRequest}
-import scorex.transaction.Proofs
+import scorex.transaction.assets.MassTransferTransaction
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 import scorex.transaction.assets.exchange.Order
 import scorex.waves.http.DebugApiRoute._
@@ -240,7 +240,8 @@ object AsyncHttpApi extends Assertions {
 
     def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Future[Transaction] = {
       implicit val w = Json.writes[MassTransferRequest]
-      postJson("/assets/masstransfer", MassTransferRequest(Proofs.Version, assetId, sourceAddress, transfers, fee, None)).as[Transaction]
+      postJson("/assets/masstransfer",
+        MassTransferRequest(MassTransferTransaction.Version, assetId, sourceAddress, transfers, fee, None)).as[Transaction]
     }
 
     def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Future[Transaction] = {

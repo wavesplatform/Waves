@@ -9,7 +9,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock.{create => block}
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{DataTransaction, GenesisTransaction, Proofs}
+import scorex.transaction.{DataTransaction, GenesisTransaction}
 
 class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
@@ -22,7 +22,7 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
   } yield (genesis, master, ts)
 
   def data(sender: PrivateKeyAccount, data: List[DataEntry[_]], fee: Long, timestamp: Long): DataTransaction =
-    DataTransaction.selfSigned(Proofs.Version, sender, data, fee, timestamp).right.get
+    DataTransaction.selfSigned(DataTransaction.Version, sender, data, fee, timestamp).right.get
 
   property("state invariants hold") {
     val setup = for {

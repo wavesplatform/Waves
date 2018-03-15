@@ -8,8 +8,8 @@ import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
 import scorex.api.http.SignedDataRequest
 import scorex.crypto.encode.Base58
+import scorex.transaction.DataTransaction
 import scorex.transaction.TransactionParser.TransactionType
-import scorex.transaction.{DataTransaction, Proofs}
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Try}
@@ -49,11 +49,11 @@ class DataTransactionSuite extends BaseTransactionSuite {
     def data(entries: List[DataEntry[_]] = List(IntegerDataEntry("int", 177)),
              fee: Long = 100000,
              timestamp: Long = System.currentTimeMillis,
-             version: Byte = Proofs.Version): DataTransaction =
+             version: Byte = DataTransaction.Version): DataTransaction =
       DataTransaction.selfSigned(version, sender.privateKey, entries, fee, timestamp).right.get
 
     def request(tx: DataTransaction): SignedDataRequest =
-      SignedDataRequest(1, Base58.encode(tx.sender.publicKey), tx.data, tx.fee, tx.timestamp, tx.proofs.base58().toList)
+      SignedDataRequest(DataTransaction.Version, Base58.encode(tx.sender.publicKey), tx.data, tx.fee, tx.timestamp, tx.proofs.base58().toList)
 
     implicit val w = Json.writes[SignedDataRequest].transform((jsobj: JsObject) =>
       jsobj + ("type" -> JsNumber(TransactionType.DataTransaction.id)))
