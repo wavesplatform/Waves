@@ -83,6 +83,9 @@ object SyncHttpApi extends Assertions{
 
     def lease(sourceAddress:String, recipient: String, leasingAmount: Long, leasingFee: Long): Transaction =
       Await.result(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee), RequestAwaitTime)
+    
+    def cancelLease(sourceAddress: String, leaseId: String, fee: Long): Transaction =
+      Await.result(async(n).cancelLease(sourceAddress, leaseId, fee), RequestAwaitTime)
 
     def signedMassTransfer(tx: SignedMassTransferRequest): Transaction =
       Await.result(async(n).signedMassTransfer(tx), RequestAwaitTime)
