@@ -4,6 +4,7 @@ import com.wavesplatform.lang.Terms.Typed
 import com.wavesplatform.lang.{Parser, TypeChecker}
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state2._
+import com.wavesplatform.utils._
 import com.wavesplatform.state2.diffs._
 import com.wavesplatform.state2.diffs.smart._
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}

@@ -2,6 +2,7 @@ package com.wavesplatform.state2.diffs.smart.scenarios
 
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang._
+import com.wavesplatform.utils._
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
 import com.wavesplatform.state2.diffs.smart._

@@ -6,7 +6,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.{Parser, TypeChecker}
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs.smart.dummyTypeCheckerContext
+import com.wavesplatform.utils.dummyTypeCheckerContext
 import org.scalatest.CancelAfterFailure
 import scorex.account.PrivateKeyAccount
 import scorex.api.http.assets.{SignedSetScriptRequest, SignedVersionedTransferRequest}
