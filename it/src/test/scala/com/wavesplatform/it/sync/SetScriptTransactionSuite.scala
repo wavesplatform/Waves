@@ -11,7 +11,6 @@ import org.scalatest.CancelAfterFailure
 import play.api.libs.json.JsNumber
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.Proofs
-import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.VersionedTransferTransaction
 import scorex.transaction.smart.{Script, SetScriptTransaction}
 
@@ -30,7 +29,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   private val senderPublicKeyString: String = ByteStr(sender.publicKey.publicKey).base58
 
   test("set 2of2 multisig") {
-
     val scriptText = {
       val untyped = Parser(s"""
 
@@ -46,11 +44,13 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
     }
 
-    val script               = Script(scriptText)
-    val setScriptTransaction = SetScriptTransaction.selfSigned(sender.privateKey, Some(script), fee, System.currentTimeMillis()).explicitGet()
+    val script = Script(scriptText)
+    val setScriptTransaction = SetScriptTransaction
+      .selfSigned(SetScriptTransaction.supportedVersions.head, sender.privateKey, Some(script), fee, System.currentTimeMillis())
+      .explicitGet()
 
     val setScriptId = sender
-      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(TransactionType.SetScriptTransaction.id)))
+      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId)))
       .id
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
@@ -84,21 +84,28 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val signed = unsigned.copy(proofs = Proofs(Seq(sig1, sig2)))
 
     val versionedTransferId =
-      sender.signedBroadcast(signed.json() + ("type" -> JsNumber(TransactionType.VersionedTransferTransaction.id))).id
+      sender.signedBroadcast(signed.json() + ("type" -> JsNumber(VersionedTransferTransaction.typeId.toInt))).id
 
     nodes.waitForHeightAriseAndTxPresent(versionedTransferId)
   }
 
   test("can clear script") {
     val unsigned = SetScriptTransaction
-      .create(sender = sender.privateKey, script = None, fee = fee, timestamp = System.currentTimeMillis(), proofs = Proofs.empty)
+      .create(
+        version = SetScriptTransaction.supportedVersions.head,
+        sender = sender.privateKey,
+        script = None,
+        fee = fee,
+        timestamp = System.currentTimeMillis(),
+        proofs = Proofs.empty
+      )
       .explicitGet()
     val sig1 = ByteStr(crypto.sign(acc1, unsigned.bodyBytes()))
     val sig2 = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
 
     val signed = unsigned.copy(proofs = Proofs(Seq(sig1, sig2)))
     val clearScriptId = sender
-      .signedBroadcast(signed.json() + ("type" -> JsNumber(TransactionType.SetScriptTransaction.id)))
+      .signedBroadcast(signed.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
       .id
 
     nodes.waitForHeightAriseAndTxPresent(clearScriptId)

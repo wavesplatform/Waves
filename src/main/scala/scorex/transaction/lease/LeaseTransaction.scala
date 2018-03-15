@@ -6,67 +6,75 @@ import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Address, AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
-import scorex.transaction.TransactionParser._
+import scorex.transaction.TransactionParsers._
 import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
-case class LeaseTransaction private(sender: PublicKeyAccount,
-                                    amount: Long,
-                                    fee: Long,
-                                    timestamp: Long,
-                                    recipient: AddressOrAlias,
-                                    signature: ByteStr)
-  extends SignedTransaction with FastHashId {
+case class LeaseTransaction private (sender: PublicKeyAccount,
+                                     amount: Long,
+                                     fee: Long,
+                                     timestamp: Long,
+                                     recipient: AddressOrAlias,
+                                     signature: ByteStr)
+    extends SignedTransaction
+    with FastHashId {
 
-  override val transactionType: TransactionType.Value = TransactionType.LeaseTransaction
+  override val builder: TransactionParser = LeaseTransaction
+  override def version: Byte               = builder.supportedVersions.head
 
-  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte),
-    sender.publicKey,
-    recipient.bytes.arr,
-    Longs.toByteArray(amount),
-    Longs.toByteArray(fee),
-    Longs.toByteArray(timestamp)))
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
+    Bytes.concat(Array(builder.typeId),
+                 sender.publicKey,
+                 recipient.bytes.arr,
+                 Longs.toByteArray(amount),
+                 Longs.toByteArray(fee),
+                 Longs.toByteArray(timestamp)))
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
-    "amount" -> amount,
-    "recipient" -> recipient.stringRepr,
-    "fee" -> fee,
-    "timestamp" -> timestamp
-  ))
+  override val json: Coeval[JsObject] = Coeval.evalOnce(
+    jsonBase() ++ Json.obj(
+      "amount"    -> amount,
+      "recipient" -> recipient.stringRepr,
+      "fee"       -> fee,
+      "timestamp" -> timestamp
+    ))
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), signature.arr))
+  override val bytes: Coeval[Array[Byte]]        = Coeval.evalOnce(Bytes.concat(bodyBytes(), signature.arr))
 
 }
 
-object LeaseTransaction {
+object LeaseTransaction extends TransactionParserFor[LeaseTransaction] with TransactionParser.HardcodedVersion {
+
+  override val typeId: Byte  = 8
+  override val version: Byte = 1
 
   object Status {
-    val Active = "active"
+    val Active   = "active"
     val Canceled = "canceled"
   }
 
-  def parseTail(bytes: Array[Byte]): Try[LeaseTransaction] = Try {
-    val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
-    (for {
-      recRes <- AddressOrAlias.fromBytes(bytes, KeyLength)
-      (recipient, recipientEnd) = recRes
-      quantityStart = recipientEnd
-      quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
-      fee = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
-      timestamp = Longs.fromByteArray(bytes.slice(quantityStart + 16, quantityStart + 24))
-      signature = ByteStr(bytes.slice(quantityStart + 24, quantityStart + 24 + SignatureLength))
-      lt <- LeaseTransaction.create(sender, quantity, fee, timestamp, recipient, signature)
-    } yield lt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
-  }.flatten
+  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+    Try {
+      val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
+      (for {
+        recRes <- AddressOrAlias.fromBytes(bytes, KeyLength)
+        (recipient, recipientEnd) = recRes
+        quantityStart             = recipientEnd
+        quantity                  = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
+        fee                       = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
+        timestamp                 = Longs.fromByteArray(bytes.slice(quantityStart + 16, quantityStart + 24))
+        signature                 = ByteStr(bytes.slice(quantityStart + 24, quantityStart + 24 + SignatureLength))
+        lt <- LeaseTransaction.create(sender, quantity, fee, timestamp, recipient, signature)
+      } yield lt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
+    }.flatten
 
   def create(sender: PublicKeyAccount,
              amount: Long,
              fee: Long,
              timestamp: Long,
              recipient: AddressOrAlias,
-             signature: ByteStr): Either[ValidationError, LeaseTransaction] = {
+             signature: ByteStr): Either[ValidationError, TransactionT] = {
     if (amount <= 0) {
       Left(ValidationError.NegativeAmount(amount, "waves"))
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
@@ -84,7 +92,7 @@ object LeaseTransaction {
              amount: Long,
              fee: Long,
              timestamp: Long,
-             recipient: AddressOrAlias): Either[ValidationError, LeaseTransaction] = {
+             recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
     create(sender, amount, fee, timestamp, recipient, ByteStr.empty).right.map { unsigned =>
       unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
     }

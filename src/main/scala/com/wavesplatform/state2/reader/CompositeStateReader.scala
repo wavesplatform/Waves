@@ -3,10 +3,10 @@ package com.wavesplatform.state2.reader
 import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Address, Alias}
+import scorex.transaction.Transaction
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.Script
-import scorex.transaction.{Transaction, TransactionParser}
 
 class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff]) extends SnapshotStateReader {
 
@@ -40,19 +40,18 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
 
   override def height: Int = inner.height + (if (maybeDiff.isDefined) 1 else 0)
 
-  override def addressTransactions(address: Address, types: Set[TransactionParser.TransactionType.Value], from: Int, count: Int) = {
-    val transactionsFromDiff = diff.transactions.values.view
-      .collect {
-        case (height, tx, addresses) if addresses(address) && (types(tx.transactionType) || types.isEmpty) => (height, tx)
-      }
-      .slice(from, from + count)
-      .toSeq
+  override def addressTransactions(address: Address,
+                                   from: Int,
+                                   count: Int,
+                                   filter: Set[Transaction.Type]): Seq[(Int, Transaction)] = {
+    val transactionsFromDiff = diff.transactions.values.view.collect {
+      case (height, tx, addresses) if addresses(address) && (filter.isEmpty || filter.contains(tx.builder.typeId)) => (height, tx)
+    }.slice(from, from + count).toSeq
 
     val actualTxCount = transactionsFromDiff.length
 
-    if (actualTxCount == count) transactionsFromDiff
-    else {
-      transactionsFromDiff ++ inner.addressTransactions(address, types, 0, count - actualTxCount)
+    if (actualTxCount == count) transactionsFromDiff else {
+      transactionsFromDiff ++ inner.addressTransactions(address, 0, count - actualTxCount, filter)
     }
   }
 

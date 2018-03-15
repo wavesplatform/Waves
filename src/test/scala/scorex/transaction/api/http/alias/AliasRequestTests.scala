@@ -17,7 +17,7 @@ class AliasRequestTests extends FunSuite with Matchers {
 
     val req = Json.parse(json).validate[CreateAliasRequest].get
 
-    req shouldBe CreateAliasRequest("3Myss6gmMckKYtka3cKCM563TBJofnxvfD7", "ALIAS", 10000000)
+    req shouldBe CreateAliasRequest(None, "3Myss6gmMckKYtka3cKCM563TBJofnxvfD7", "ALIAS", 10000000)
   }
 
   test("SignedCreateAliasRequest") {

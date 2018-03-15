@@ -3,7 +3,7 @@ package scorex.network
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint, CheckpointSpec}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers, OneInstancePerTest}
-import scorex.transaction.TransactionParser._
+import scorex.transaction.TransactionParsers._
 
 class CheckpointSpecification extends FreeSpec
   with Matchers

@@ -10,7 +10,6 @@ import org.asynchttpclient._
 import org.slf4j.LoggerFactory
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
-import scorex.transaction.TransactionParser.TransactionType
 import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration.FiniteDuration
@@ -43,8 +42,8 @@ object Node {
 
     def publicKeyStr = Base58.encode(n.publicKey.publicKey)
 
-    def fee(txValue: TransactionType.Value, asset: String = "WAVES"): Long
-     = n.settings.feesSettings.fees(txValue.id).find(_.asset == asset).get.fee
+    def fee(txTypeId: Byte, asset: String = "WAVES"): Long
+     = n.settings.feesSettings.fees(txTypeId).find(_.asset == asset).get.fee
 
     def blockDelay: FiniteDuration = n.settings.blockchainSettings.genesisSettings.averageBlockDelay
   }

@@ -6,12 +6,11 @@ import cats.Show
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
 import org.slf4j.LoggerFactory
 import scorex.account.{Alias, PrivateKeyAccount}
-import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.{CreateAliasTransaction, Proofs, Transaction, ValidationError}
+import scorex.transaction._
 import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration._
@@ -60,12 +59,9 @@ class NarrowTransactionGenerator(settings: Settings,
       case ((allTxsWithValid, validIssueTxs, reissuableIssueTxs, activeLeaseTransactions, aliases), _) =>
         def moreThatStandartFee = 100000L + r.nextInt(100000)
 
-        val txType = typeGen.getRandom
-
         def ts = System.currentTimeMillis()
-
-        val tx = txType match {
-          case TransactionType.IssueTransaction =>
+        val tx = typeGen.getRandom match {
+          case IssueTransaction =>
             val sender = randomFrom(accounts).get
             val name = new Array[Byte](10)
             val description = new Array[Byte](10)
@@ -74,7 +70,7 @@ class NarrowTransactionGenerator(settings: Settings,
             val reissuable = r.nextBoolean()
             val amount = 100000000L + Random.nextInt(Int.MaxValue)
             logOption(IssueTransaction.create(sender, name, description, amount, Random.nextInt(9).toByte, reissuable, 100000000L + r.nextInt(100000000), ts))
-          case TransactionType.TransferTransaction =>
+          case TransferTransaction =>
             val useAlias = r.nextBoolean()
             val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
             val sendAsset = r.nextBoolean()
@@ -89,18 +85,18 @@ class NarrowTransactionGenerator(settings: Settings,
               logOption(TransferTransaction.create(asset, sender, recipient, r.nextInt(500000), ts, None, moreThatStandartFee,
                 Array.fill(r.nextInt(100))(r.nextInt().toByte)))
             }
-          case TransactionType.ReissueTransaction =>
+          case ReissueTransaction =>
             val reissuable = r.nextBoolean()
             randomFrom(reissuableIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
               logOption(ReissueTransaction.create(sender, assetTx.id(), Random.nextInt(Int.MaxValue), reissuable, moreThatStandartFee, ts))
             })
-          case TransactionType.BurnTransaction =>
+          case BurnTransaction =>
             randomFrom(validIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
               logOption(BurnTransaction.create(sender, assetTx.id(), Random.nextInt(1000), moreThatStandartFee, ts))
             })
-          case TransactionType.ExchangeTransaction =>
+          case ExchangeTransaction =>
             val matcher = randomFrom(accounts).get
             val seller = randomFrom(accounts).get
             val pair = AssetPair(None, Some(tradeAssetIssue.id()))
@@ -108,22 +104,22 @@ class NarrowTransactionGenerator(settings: Settings,
             val buyer = randomFrom(accounts).get
             val buyOrder = Order.buy(buyer, matcher, pair, 100000000, 1, ts, ts + 1.day.toMillis, moreThatStandartFee * 3)
             logOption(ExchangeTransaction.create(matcher, buyOrder, sellOrder, 100000000, 1, 300000, 300000, moreThatStandartFee * 3, ts))
-          case TransactionType.LeaseTransaction =>
+          case LeaseTransaction =>
             val sender = randomFrom(accounts).get
             val useAlias = r.nextBoolean()
             val recipientOpt = if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender)).map(_.alias) else randomFrom(accounts.filter(_ != sender).map(_.toAddress))
             recipientOpt.flatMap(recipient =>
               logOption(LeaseTransaction.create(sender, 1, moreThatStandartFee * 3, ts, recipient)))
-          case TransactionType.LeaseCancelTransaction =>
+          case LeaseCancelTransaction =>
             randomFrom(activeLeaseTransactions).flatMap(lease => {
               val sender = accounts.find(_.address == lease.sender.address).get
               logOption(LeaseCancelTransaction.create(sender, lease.id(), moreThatStandartFee * 3, ts))
             })
-          case TransactionType.CreateAliasTransaction =>
+          case CreateAliasTransaction =>
             val sender = randomFrom(accounts).get
             val aliasString = NarrowTransactionGenerator.generateAlias()
             logOption(CreateAliasTransaction.create(sender, Alias.buildWithCurrentNetworkByte(aliasString).right.get, 100000, ts))
-          case TransactionType.MassTransferTransaction =>
+          case MassTransferTransaction =>
             val transferCount = r.nextInt(MassTransferTransaction.MaxTransferCount)
             val transfers = for (i <- 0 to transferCount) yield {
               val useAlias = r.nextBoolean()
@@ -140,7 +136,7 @@ class NarrowTransactionGenerator(settings: Settings,
               })
             } else Some(randomFrom(accounts).get, None)
             senderAndAssetOpt.flatMap { case (sender, asset) =>
-              logOption(MassTransferTransaction.selfSigned(Proofs.Version, asset, sender, transfers.toList, ts, moreThatStandartFee,
+              logOption(MassTransferTransaction.selfSigned(asset, sender, transfers.toList, ts, moreThatStandartFee,
                 Array.fill(r.nextInt(100))(r.nextInt().toByte)))
             }
         }
@@ -172,7 +168,7 @@ class NarrowTransactionGenerator(settings: Settings,
 
 object NarrowTransactionGenerator {
 
-  case class Settings(transactions: Int, probabilities: Map[TransactionType.Value, Double])
+  case class Settings(transactions: Int, probabilities: Map[TransactionParser, Double])
 
   private val minAliasLength = 4
   private val maxAliasLength = 30

@@ -60,7 +60,7 @@ object BlockchainContext {
       case _                     => Left("Transaction is not Proven, doesn't contain bodyBytes")
     }
 
-    override def transactionType: Int = tx.transactionType.id
+    override def transactionType: Int = tx.builder.typeId
 
     override def senderPk: Either[String, ByteVector] = tx match {
       case pt: Authorized => Right(ByteVector(pt.sender.publicKey))
@@ -104,6 +104,7 @@ object BlockchainContext {
       case _: SetScriptTransaction         => Left("Transaction doesn't contain amount")
       case _: MassTransferTransaction      => Left("Transaction doesn't contain amount")
       case _: LeaseCancelTransaction       => Left("Transaction doesn't contain amount")
+      // DATA?
     }
 
     override def feeAssetId: Option[ByteVector] =

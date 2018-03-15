@@ -2,7 +2,8 @@ package scorex.api.http.assets
 
 import play.api.libs.json.{Format, Json}
 
-case class VersionedTransferRequest(assetId: Option[String],
+case class VersionedTransferRequest(version: Byte,
+                                    assetId: Option[String],
                                     amount: Long,
                                     fee: Long,
                                     sender: String,

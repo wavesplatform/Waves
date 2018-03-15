@@ -26,7 +26,7 @@ case class SignedVersionedTransferRequest(@ApiModelProperty(value = "Base58 enco
                                           @ApiModelProperty(required = true)
                                           timestamp: Long,
                                           @ApiModelProperty(required = true)
-                                          version: Int,
+                                          version: Byte,
                                           @ApiModelProperty(value = "Base58 encoded attachment")
                                           attachment: Option[String],
                                           @ApiModelProperty(required = true)
@@ -40,6 +40,6 @@ case class SignedVersionedTransferRequest(@ApiModelProperty(value = "Base58 enco
       _proofs     <- Proofs.create(_proofBytes)
       _recipient <- AddressOrAlias.fromString(recipient)
       _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
-      t           <- VersionedTransferTransaction.create(version.toByte, _assetId, _sender,_recipient, amount, timestamp, fee, _attachment.arr, _proofs)
+      t           <- VersionedTransferTransaction.create(version, _assetId, _sender,_recipient, amount, timestamp, fee, _attachment.arr, _proofs)
     } yield t
 }

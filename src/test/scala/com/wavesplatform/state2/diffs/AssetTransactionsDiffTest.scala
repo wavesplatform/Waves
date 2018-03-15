@@ -105,6 +105,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
   def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], SmartIssueTransaction, TransferTransaction, ReissueTransaction)] =
     for {
+      version            <- Gen.oneOf(SmartIssueTransaction.supportedVersions.toSeq)
       timestamp          <- timestampGen
       initialWavesAmount <- Gen.choose(Long.MaxValue / 1000, Long.MaxValue / 100)
       accountA           <- accountGen
@@ -115,17 +116,17 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       reissuable = true
       (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
       issue = SmartIssueTransaction
-        .selfSigned(1,
-                AddressScheme.current.chainId,
-                accountA,
-                assetName,
-                description,
-                quantity,
-                decimals,
-                reissuable,
-                Some(createScript(code)),
-                smallFee,
-                timestamp + 1)
+        .selfSigned(version,
+                    AddressScheme.current.chainId,
+                    accountA,
+                    assetName,
+                    description,
+                    quantity,
+                    decimals,
+                    reissuable,
+                    Some(createScript(code)),
+                    smallFee,
+                    timestamp + 1)
         .explicitGet()
       assetId = issue.id()
       transfer = TransferTransaction

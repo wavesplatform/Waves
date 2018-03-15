@@ -8,7 +8,7 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.serialization.Deser
-import scorex.transaction.TransactionParser._
+import scorex.transaction.TransactionParsers._
 import scorex.transaction.{ValidationError, _}
 
 import scala.util.{Failure, Success, Try}
@@ -25,14 +25,15 @@ case class IssueTransaction private (sender: PublicKeyAccount,
     extends SignedTransaction
     with FastHashId {
 
-  override val assetFee: (Option[AssetId], Long)      = (None, fee)
-  override val transactionType: TransactionType.Value = TransactionType.IssueTransaction
+  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override val builder: IssueTransaction.type    = IssueTransaction
+  override def version: Byte                     = builder.version
 
   val assetId = id
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(
-      Array(transactionType.id.toByte),
+      Array(builder.typeId),
       sender.publicKey,
       Deser.serializeArray(name),
       Deser.serializeArray(description),
@@ -53,26 +54,25 @@ case class IssueTransaction private (sender: PublicKeyAccount,
       "reissuable"  -> reissuable
     ))
 
-  override val bytes = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), signature.arr, bodyBytes()))
+  override val bytes = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), signature.arr, bodyBytes()))
 
 }
 
-object IssueTransaction {
+object IssueTransaction extends TransactionParserFor[IssueTransaction] with TransactionParser.HardcodedVersion {
+
+  override val typeId: Byte  = 3
+  override val version: Byte = 1
+
   val MaxDescriptionLength = 1000
   val MaxAssetNameLength   = 16
   val MinAssetNameLength   = 4
   val MaxDecimals          = 8
 
-  def parseBytes(bytes: Array[Byte]): Try[IssueTransaction] = Try {
-    require(bytes.head == TransactionType.IssueTransaction.id)
-    parseTail(bytes.tail).get
-  }
-
-  def parseTail(bytes: Array[Byte]): Try[IssueTransaction] =
+  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
       val signature = ByteStr(bytes.slice(0, SignatureLength))
       val txId      = bytes(SignatureLength)
-      require(txId == TransactionType.IssueTransaction.id.toByte, s"Signed tx id is not match")
+      require(txId == typeId, s"Signed tx id is not match")
       val sender                        = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
       val (assetName, descriptionStart) = Deser.parseArraySize(bytes, SignatureLength + KeyLength + 1)
       val (description, quantityStart)  = Deser.parseArraySize(bytes, descriptionStart)
@@ -94,7 +94,7 @@ object IssueTransaction {
              reissuable: Boolean,
              fee: Long,
              timestamp: Long,
-             signature: ByteStr): Either[ValidationError, IssueTransaction] =
+             signature: ByteStr): Either[ValidationError, TransactionT] =
     validateIssueParams(name, description, quantity, decimals, reissuable, fee: Long).map(_ =>
       IssueTransaction(sender, name, description, quantity, decimals, reissuable, fee, timestamp, signature))
 
@@ -105,7 +105,7 @@ object IssueTransaction {
              decimals: Byte,
              reissuable: Boolean,
              fee: Long,
-             timestamp: Long): Either[ValidationError, IssueTransaction] =
+             timestamp: Long): Either[ValidationError, TransactionT] =
     create(sender, name, description, quantity, decimals, reissuable, fee, timestamp, ByteStr.empty).right.map { unverified =>
       unverified.copy(signature = ByteStr(crypto.sign(sender, unverified.bodyBytes())))
     }

@@ -194,7 +194,6 @@ lazy val node = project.in(file("."))
       Dependencies.commons_net ++
       Dependencies.monix.value
   )
-  .aggregate(langJVM)
   .dependsOn(langJVM)
 
 lazy val discovery = project

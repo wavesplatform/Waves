@@ -35,7 +35,7 @@ object Checkpoint {
   implicit val byteArrayReads = new Reads[Array[Byte]] {
     def reads(json: JsValue) = json match {
       case JsString(s) => Base58.decode(s) match {
-        case Success(bytes) if bytes.length == scorex.transaction.TransactionParser.SignatureLength => JsSuccess(bytes)
+        case Success(bytes) if bytes.length == scorex.transaction.TransactionParsers.SignatureLength => JsSuccess(bytes)
         case Success(bytes) => JsError(JsonValidationError("error.incorrect.signatureLength", bytes.length.toString))
         case Failure(t) => JsError(JsonValidationError(Seq("error.incorrect.base58", t.getLocalizedMessage), s))
       }

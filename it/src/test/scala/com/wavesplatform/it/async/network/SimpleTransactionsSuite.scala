@@ -37,7 +37,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
       .right
       .get
     val f = for {
-      _  <- node.sendByNetwork(RawBytes(TransactionSpec.messageCode, tx.bytes()))
+      _ <- node.sendByNetwork(RawBytes.from(tx))
       tx <- node.waitForTransaction(tx.id().base58)
     } yield {
       tx shouldBe Transaction(tx.`type`, tx.id, tx.fee, tx.timestamp)
@@ -58,7 +58,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
       .right
       .get
     val f = for {
-      _         <- node.sendByNetwork(RawBytes(TransactionSpec.messageCode, tx.bytes()))
+      _ <- node.sendByNetwork(RawBytes.from(tx))
       maxHeight <- traverse(nodes)(_.height).map(_.max)
       _         <- traverse(nodes)(_.waitForHeight(maxHeight + 1))
       _         <- traverse(nodes)(_.ensureTxDoesntExist(tx.id().base58))
