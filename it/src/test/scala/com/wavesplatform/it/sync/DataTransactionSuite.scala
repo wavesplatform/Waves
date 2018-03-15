@@ -3,7 +3,7 @@ package com.wavesplatform.it.transactions
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import com.wavesplatform.it.util._
-import com.wavesplatform.state2.{BooleanDataEntry, DataEntry, IntegerDataEntry}
+import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry}
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
 import scorex.api.http.SignedDataRequest
@@ -70,6 +70,19 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     nodes.waitForHeightAraise()
     notMiner.assertBalances(firstAddress, balance1, eff1)
+  }
+
+  test("max transaction size") {
+    import DataTransaction.MaxEntryCount
+    import DataEntry.{MaxKeySize, MaxValueSize}
+
+    val maxKey = "a" * MaxKeySize
+    val data = List.tabulate(MaxEntryCount)(n => BinaryDataEntry(maxKey, Array.fill(MaxValueSize)(n.toByte)))
+    val kilobytes = (MaxEntryCount * (MaxKeySize + MaxValueSize + 3) + 120) / 1024 + 1
+    val fee = kilobytes * 100000
+    val txId = sender.putData(firstAddress, data, fee).id
+
+    nodes.waitForHeightAraiseAndTxPresent(txId)
   }
 
   test("data definition and retrieval") {

@@ -16,6 +16,8 @@ import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.{Script, SetScriptTransaction}
 import scorex.utils.NTP
 
+import scala.util.Random
+
 trait TransactionGen extends ScriptGen {
 
   def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.containerOfN[Array, Byte](length, Arbitrary.arbitrary[Byte])
@@ -366,13 +368,35 @@ trait TransactionGen extends ScriptGen {
     ts <- positiveIntGen
   } yield GenesisTransaction.create(recipient, amt, ts).right.get
 
-  val dataTransactionGen = (for {
-    (_, sender, _, _, timestamp, _, _, _) <- transferParamGen
-    feeAmount <- Gen.choose[Long](1, 200000)
-    data = List(
-      IntegerDataEntry("ten", 10),
-      BooleanDataEntry("DataTx works!", true),
-      BinaryDataEntry("bad-bytes", "carol".getBytes))///
-  } yield DataTransaction.selfSigned(DataTransaction.Version, sender, data, feeAmount, timestamp).right.get)
-    .label("DataTransaction")
+  val dataTransactionGen = {
+    import DataTransaction.MaxEntryCount
+    import DataEntry.{MaxKeySize, MaxValueSize}
+
+    val keyGen = for {
+      size <- Gen.choose[Byte](0, MaxKeySize)
+    } yield Random.alphanumeric.take(size).mkString
+
+    val integerEntryGen = for {
+      key <- keyGen
+      value <- Gen.choose[Long](Long.MinValue, Long.MaxValue)
+    } yield IntegerDataEntry(key, value)
+
+    val booleanEntryGen = for {
+      key <- keyGen
+      value <- Gen.oneOf(true, false)
+    } yield BooleanDataEntry(key, value)
+
+    val binaryEntryGen = for {
+      key <- keyGen
+      size <- Gen.choose(0, MaxValueSize)
+      value <- byteArrayGen(size)
+    } yield BinaryDataEntry(key, value)
+
+    (for {
+      (_, sender, _, _, timestamp, _, _, _) <- transferParamGen
+      size <- Gen.choose(0, MaxEntryCount)
+      data <- Gen.listOfN(size, Gen.oneOf(integerEntryGen, booleanEntryGen, binaryEntryGen))
+    } yield DataTransaction.selfSigned(DataTransaction.Version, sender, data, 15000000, timestamp).right.get)
+      .label("DataTransaction")
+  }
 }
