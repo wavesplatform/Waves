@@ -247,10 +247,7 @@ object AsyncHttpApi extends Assertions {
     def signedMassTransfer(req: SignedMassTransferRequest): Future[Transaction] =
       postJson("/transactions/broadcast", req).as[Transaction]
 
-    def signedVersionedTransfer(req: SignedVersionedTransferRequest): Future[Transaction] =
-      postJson("/transactions/broadcast", req).as[Transaction]
-
-    def signedSetScript(req: SignedSetScriptRequest): Future[Transaction] =
+    def signedBroadcast(req: JsObject): Future[Transaction] =
       postJson("/transactions/broadcast", req).as[Transaction]
 
     def signedIssue(issue: SignedIssueRequest): Future[Transaction] =

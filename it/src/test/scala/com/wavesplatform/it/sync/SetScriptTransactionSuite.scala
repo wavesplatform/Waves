@@ -8,9 +8,11 @@ import com.wavesplatform.lang.{Parser, TypeChecker}
 import com.wavesplatform.state2._
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import org.scalatest.CancelAfterFailure
+import play.api.libs.json.{JsNumber, JsObject, Json}
 import scorex.account.PrivateKeyAccount
 import scorex.api.http.assets.{SignedSetScriptRequest, SignedVersionedTransferRequest}
 import scorex.transaction.Proofs
+import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.VersionedTransferTransaction
 import scorex.transaction.smart.{Script, SetScriptTransaction}
 
@@ -55,7 +57,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       proofs = List(setScriptTransaction.proofs.proofs.head.base58)
     )
     val setScriptId = sender
-      .signedSetScript(request)
+      .signedBroadcast(Json.toJsObject(request) + ("type" -> JsNumber(TransactionType.SetScriptTransaction.id)))
       .id
 
     nodes.waitForHeightAraiseAndTxPresent(setScriptId)
@@ -98,7 +100,9 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       proofs = List(sig1, sig2).map(_.base58)
     )
 
-    val versionedTransferId = sender.signedVersionedTransfer(request).id
+    val versionedTransferId = sender.
+      signedBroadcast(Json.toJsObject(request) + ("type" -> JsNumber(TransactionType.VersionedTransferTransaction.id)))
+      .id
 
     nodes.waitForHeightAraiseAndTxPresent(versionedTransferId)
   }
@@ -118,7 +122,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       proofs = List(sig1, sig2) map (_.base58)
     )
     val clearScriptId = sender
-      .signedSetScript(request)
+      .signedBroadcast(Json.toJsObject(request) + ("type" -> JsNumber(TransactionType.SetScriptTransaction.id)))
       .id
 
     nodes.waitForHeightAraiseAndTxPresent(clearScriptId)

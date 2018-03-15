@@ -5,7 +5,7 @@ import com.wavesplatform.it.Node
 import org.asynchttpclient.Response
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
-import play.api.libs.json.{Format, Json, Writes}
+import play.api.libs.json.{Format, JsObject, Json, Writes}
 import scorex.api.http.assets.{SignedIssueRequest, SignedMassTransferRequest, SignedSetScriptRequest, SignedVersionedTransferRequest}
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 
@@ -87,11 +87,8 @@ object SyncHttpApi extends Assertions {
     def signedMassTransfer(tx: SignedMassTransferRequest): Transaction =
       Await.result(async(n).signedMassTransfer(tx), RequestAwaitTime)
 
-    def signedVersionedTransfer(tx: SignedVersionedTransferRequest) : Transaction =
-      Await.result(async(n).signedVersionedTransfer(tx), RequestAwaitTime)
-
-    def signedSetScript(tx: SignedSetScriptRequest): Transaction =
-      Await.result(async(n).signedSetScript(tx), RequestAwaitTime)
+    def signedBroadcast(tx: JsObject) : Transaction =
+      Await.result(async(n).signedBroadcast(tx), RequestAwaitTime)
 
     def signedIssue(tx: SignedIssueRequest): Transaction =
       Await.result(async(n).signedIssue(tx), RequestAwaitTime)
