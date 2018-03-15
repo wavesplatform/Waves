@@ -118,7 +118,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     for (tx <- invalidTransfers) {
       val id = tx.id()
       val req = createSignedMassTransferRequest(tx)
-      assertBadRequest(sender.signedMassTransfer(req))
+      assertBadRequest(sender.broadcastRequest(req))
       nodes.foreach(_.ensureTxDoesntExist(id.base58))
     }
   }

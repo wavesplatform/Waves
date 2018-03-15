@@ -114,6 +114,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
 
     forAll(dataTransactionGen) {
       case DataTransaction(version, sender, data, fee, timestamp, proofs) =>
+        /// bad version
         val dataTooBig = List.fill(MaxEntryCount + 1)(IntegerDataEntry("key", 4))
         val dataTooBigEi = create(version, sender, dataTooBig, fee, timestamp, proofs)
         dataTooBigEi shouldBe Left(ValidationError.TooBigArray)

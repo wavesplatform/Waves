@@ -6,13 +6,11 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry}
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
-import scorex.account.AddressOrAlias
+import scorex.api.http.DataRequest.signedFormat
+import scorex.api.http.SignedDataRequest
 import scorex.crypto.encode.Base58
-import scorex.transaction.Proofs
 import scorex.transaction.TransactionParser.TransactionType
-import scorex.transaction.assets.MassTransferTransaction
-import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
-import scorex.transaction.assets.TransferTransaction.MaxAttachmentSize
+import scorex.transaction.{DataTransaction, Proofs}
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Try}
@@ -58,27 +56,24 @@ class DataTransactionSuite extends BaseTransactionSuite {
     notMiner.assertBalances(firstAddress, balance1, eff1)
   }
 
-//  test("invalid transfer should not be in UTX or blockchain") {
-//    import scorex.transaction.assets.MassTransferTransaction.MaxTransferCount
-//    val address2 = AddressOrAlias.fromString(secondAddress).right.get
-//    val valid = MassTransferTransaction.selfSigned(
-//      Proofs.Version, None, sender.privateKey,
-//      List(ParsedTransfer(address2, transferAmount)),
-//      System.currentTimeMillis,
-//      calcFee(1), Array.emptyByteArray).right.get
-//    val fromFuture = valid.copy(timestamp = valid.timestamp + 1.day.toMillis)
-//    val tooManyTransfers = valid.copy(transfers = List.fill(MaxTransferCount + 1)(ParsedTransfer(address2, 1)), fee = calcFee(MaxTransferCount + 1))
-//    val negativeAmountTransfer = valid.copy(transfers = List(ParsedTransfer(address2, -1)))
-//    val negativeFee = valid.copy(fee = -1)
-//    val longAttachment = valid.copy(attachment = ("ab" * MaxAttachmentSize).getBytes)
-//    val invalidTransfers = Seq(fromFuture, tooManyTransfers, negativeAmountTransfer, negativeFee, longAttachment)
-//    for (tx <- invalidTransfers) {
-//      val id = tx.id()
-//      val req = createSignedMassTransferRequest(tx)
-//      assertBadRequest2(sender.signedMassTransfer(req))
-//      nodes.foreach(_.ensureTxDoesntExist(id.base58))
-//    }
-//  }
+  test("invalid transaction should not be in UTX or blockchain") {
+    def data(entries: List[DataEntry[_]] = List(IntegerDataEntry("int", 177)),
+             fee: Long = 100000,
+             timestamp: Long = System.currentTimeMillis,
+             version: Byte = Proofs.Version): DataTransaction =
+      DataTransaction.selfSigned(version, sender.privateKey, entries, fee, timestamp).right.get
+
+    def request(tx: DataTransaction): SignedDataRequest =
+      SignedDataRequest(Base58.encode(tx.sender.publicKey), tx.data, tx.fee, tx.timestamp, tx.proofs.base58().toList)
+
+    val fromFuture = data(timestamp = System.currentTimeMillis + 1.day.toMillis)
+    val insufficientFee = data(fee = 99999)
+    val invalidTransfers = Seq(fromFuture, insufficientFee)
+    for (tx <- invalidTransfers) {
+      assertBadRequest(sender.broadcastRequest(request(tx)))
+      nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
+    }
+  }
 
   test("data definition and retrieval") {
     // define first data item
@@ -170,84 +165,25 @@ class DataTransactionSuite extends BaseTransactionSuite {
       "value is missing or not an integer")
   }
 
-//
-//  test("huuuge transactions are allowed") {
-//    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
-//    val fee = calcFee(MaxTransferCount)
-//    val amount = (balance1 - fee) / MaxTransferCount
-//
-//    val transfers = List.fill(MaxTransferCount)(Transfer(firstAddress, amount))
-//    val transferId = sender.massTransfer(firstAddress, transfers, fee).id
-//
-//    nodes.waitForHeightAraiseAndTxPresent(transferId)
-//    notMiner.assertBalances(firstAddress, balance1 - fee, eff1 - fee)
-//  }
-//
-//  test("transaction requires either proofs or signature") {
-//    val fee = calcFee(2)
-//    val transfers = Seq(Transfer(secondAddress, transferAmount), Transfer(thirdAddress, transferAmount))
-//    def signedMassTransfer(): JsObject = {
-//      val rs = sender.postJsonWithApiKey("/transactions/sign", Json.obj(
-//        "type" -> TransactionType.MassTransferTransaction.id,
-//        "sender" -> firstAddress,
-//        "transfers" -> transfers,
-//        "fee" -> fee))
-//      Json.parse(rs.getResponseBody).as[JsObject]
-//    }
-//    def id(obj: JsObject) = obj.value("id").as[String]
-//
-//    val noProof = signedMassTransfer() - "proofs"
-//    assertBadRequest2(sender.postJson("/transactions/broadcast", noProof))
-//    nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
-//
-//    val withProof = signedMassTransfer()
-//    assert((withProof \ "proofs").as[Seq[String]].lengthCompare(1) == 0)
-//    sender.postJson("/transactions/broadcast", withProof)
-//    nodes.waitForHeightAraiseAndTxPresent(id(withProof))
-//
-//    val signed = signedMassTransfer()
-//    val proofs = (signed \ "proofs").as[Seq[String]]
-//    assert(proofs.lengthCompare(1) == 0)
-//    val withSignature = signed - "proofs" + ("signature" -> JsString(proofs.head))
-//    sender.postJson("/transactions/broadcast", withSignature)
-//    nodes.waitForHeightAraiseAndTxPresent(id(withSignature))
-//  }
-//
-//  private def createSignedMassTransferRequest(tx: MassTransferTransaction): SignedMassTransferRequest = {
-//    import tx._
-//    SignedMassTransferRequest(
-//      Base58.encode(tx.sender.publicKey),
-//      assetId.map(_.base58),
-//      transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) },
-//      fee,
-//      timestamp,
-//      attachment.headOption.map(_ => Base58.encode(attachment)),
-//      proofs.base58().toList
-//    )
-//  }
-//
-//  test("try to make mass transfer if use alias for address") {
-//
-//    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
-//    val (balance2, eff2) = notMiner.accountBalances(secondAddress)
-//
-//    val alias = "masstest_alias"
-//
-//    val aliasFee = if (!sender.aliasByAddress(secondAddress).exists(_.endsWith(alias))){
-//      val aliasId = sender.createAlias(secondAddress, alias, transferFee).id
-//      nodes.waitForHeightAraiseAndTxPresent(aliasId)
-//      transferFee
-//    } else 0
-//
-//    val aliasFull = sender.aliasByAddress(secondAddress).find(_.endsWith(alias)).get
-//
-//    val transfers = List(Transfer(firstAddress, 0), Transfer(aliasFull, transferAmount))
-//
-//    val massTransferTransactionFee = calcFee(transfers.size)
-//    val transferId = sender.massTransfer(firstAddress, transfers, massTransferTransactionFee).id
-//    nodes.waitForHeightAraiseAndTxPresent(transferId)
-//
-//    notMiner.assertBalances(firstAddress, balance1 - massTransferTransactionFee - transferAmount, eff1 - massTransferTransactionFee - transferAmount)
-//    notMiner.assertBalances(secondAddress, balance2 + transferAmount - aliasFee, eff2 + transferAmount - aliasFee)
-//  }
+  test("transaction requires a proof") {
+    def request: JsObject = {
+      val rs = sender.postJsonWithApiKey("/transactions/sign", Json.obj(
+        "version" -> 1,
+        "type" -> TransactionType.DataTransaction.id,
+        "sender" -> firstAddress,
+        "data" -> List(IntegerDataEntry("int", 333)),
+        "fee" -> 100000))
+      Json.parse(rs.getResponseBody).as[JsObject]
+    }
+    def id(obj: JsObject) = obj.value("id").as[String]
+
+    val noProof = request - "proofs"
+    assertBadRequest(sender.postJson("/transactions/broadcast", noProof))
+    nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
+
+    val withProof = request
+    assert((withProof \ "proofs").as[Seq[String]].lengthCompare(1) == 0)
+    sender.postJson("/transactions/broadcast", withProof)
+    nodes.waitForHeightAraiseAndTxPresent(id(withProof))
+  }
 }

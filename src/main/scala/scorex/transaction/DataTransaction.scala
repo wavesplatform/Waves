@@ -71,6 +71,7 @@ object DataTransaction {
              feeAmount: Long,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, DataTransaction] = {
+    ///check version==1 -> ValidationError.UnsupportedVersion once #904 is merged
     if (data.lengthCompare(MaxEntryCount) > 0 || data.exists(! _.valid)) {
       Left(ValidationError.TooBigArray)
     } else if (feeAmount <= 0) {

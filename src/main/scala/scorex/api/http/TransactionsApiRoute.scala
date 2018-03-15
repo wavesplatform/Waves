@@ -13,6 +13,7 @@ import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.BroadcastRoute
 import scorex.account.Address
+import scorex.api.http.DataRequest._
 import scorex.api.http.alias.{CreateAliasRequest, SignedCreateAliasRequest}
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
@@ -157,6 +158,7 @@ case class TransactionsApiRoute(
           case LeaseTransaction => TransactionFactory.lease(jsv.as[LeaseRequest], wallet, time)
           case LeaseCancelTransaction => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
           case CreateAliasTransaction => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
+          case DataTransaction => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
           case t => Left(GenericError(s"Bad transaction type: $t"))
         }
         txEi match {
@@ -185,6 +187,7 @@ case class TransactionsApiRoute(
           case LeaseTransaction => jsv.as[SignedLeaseRequest].toTx
           case LeaseCancelTransaction => jsv.as[SignedLeaseCancelRequest].toTx
           case CreateAliasTransaction => jsv.as[SignedCreateAliasRequest].toTx
+          case DataTransaction => jsv.as[SignedDataRequest].toTx
           case t => Left(GenericError(s"Bad transaction type: $t"))
         }
         doBroadcast(req)

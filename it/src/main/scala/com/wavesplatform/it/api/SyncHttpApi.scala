@@ -7,7 +7,6 @@ import org.asynchttpclient.Response
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
 import play.api.libs.json.{Format, Json, Writes}
-import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 
 import scala.concurrent.duration._
@@ -101,8 +100,8 @@ object SyncHttpApi extends Assertions{
     def getData(sourceAddress:String, key: String): DataEntry[_] =
       Await.result(async(n).getData(sourceAddress, key), RequestAwaitTime)
 
-    def signedMassTransfer(tx: SignedMassTransferRequest): Transaction =
-      Await.result(async(n).signedMassTransfer(tx), RequestAwaitTime)
+    def broadcastRequest[A: Writes](req: A): Transaction =
+      Await.result(async(n).broadcastRequest(req), RequestAwaitTime)
 
     def ensureTxDoesntExist(txId: String): Unit =
       Await.result(async(n).ensureTxDoesntExist(txId), RequestAwaitTime)
