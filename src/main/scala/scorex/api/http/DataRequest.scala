@@ -3,13 +3,13 @@ package scorex.api.http
 import cats.implicits._
 import com.wavesplatform.state2.DataEntry
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
-import play.api.libs.json.{Format, Json}
+import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
 import scorex.transaction.{DataTransaction, Proofs, ValidationError}
 
 object DataRequest {
-  implicit val unsignedFormat: Format[DataRequest] = Json.format
-  implicit val signedFormat: Format[SignedDataRequest] = Json.format
+  implicit val unsignedReads = Json.reads[DataRequest]
+  implicit val signedReads = Json.reads[SignedDataRequest]
 }
 
 case class DataRequest(version: Byte,

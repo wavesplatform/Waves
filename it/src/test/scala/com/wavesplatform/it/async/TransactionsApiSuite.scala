@@ -204,6 +204,8 @@ class TransactionsApiSuite extends BaseTransactionSuite {
   }
 
   test("reporting MassTransfer transactions") {
+    implicit val mtFormat = Json.format[MassTransferRequest]
+
     val transfers = List(Transfer(firstAddress, 5.waves), Transfer(secondAddress, 2.waves), Transfer(thirdAddress, 3.waves))
     val f = for {
       txId <- sender.massTransfer(firstAddress, transfers, 250000).map(_.id)

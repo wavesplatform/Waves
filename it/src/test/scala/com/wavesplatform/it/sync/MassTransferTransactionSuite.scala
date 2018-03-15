@@ -3,7 +3,7 @@ package com.wavesplatform.it.transactions
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json.{Json, JsObject}
+import play.api.libs.json.{JsNumber, JsObject, Json}
 import scorex.account.AddressOrAlias
 import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.crypto.encode.Base58
@@ -103,6 +103,10 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
 
   test("invalid transfer should not be in UTX or blockchain") {
     import scorex.transaction.assets.MassTransferTransaction.MaxTransferCount
+
+    implicit val w = Json.writes[SignedMassTransferRequest].transform((jsobj: JsObject) =>
+      jsobj + ("type" -> JsNumber(TransactionType.MassTransferTransaction.id)))
+
     val address2 = AddressOrAlias.fromString(secondAddress).right.get
     val valid = MassTransferTransaction.selfSigned(
       Proofs.Version, None, sender.privateKey,

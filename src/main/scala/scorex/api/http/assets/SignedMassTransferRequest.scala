@@ -10,7 +10,7 @@ import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 import scorex.transaction.{AssetIdStringLength, Proofs, ValidationError}
 
 object SignedMassTransferRequest {
-  implicit val jsonFormat: Format[SignedMassTransferRequest] = Json.format
+  implicit val reads = Json.reads[SignedMassTransferRequest]
 }
 
 @ApiModel(value = "Signed Asset transfer transaction")

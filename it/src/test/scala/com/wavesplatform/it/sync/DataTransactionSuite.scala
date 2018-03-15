@@ -3,17 +3,16 @@ package com.wavesplatform.it.transactions
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import com.wavesplatform.it.util._
-import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry}
+import com.wavesplatform.state2.{BooleanDataEntry, DataEntry, IntegerDataEntry}
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
-import scorex.api.http.DataRequest.signedFormat
 import scorex.api.http.SignedDataRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.{DataTransaction, Proofs}
 
 import scala.concurrent.duration._
-import scala.util.{Failure, Try}
+import scala.util.{Failure, Random, Try}
 
 class DataTransactionSuite extends BaseTransactionSuite {
   private val fee = 100000
@@ -32,7 +31,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
 
     val data = List(BooleanDataEntry("bool", false))
-    assertBadRequest(sender.putData(firstAddress, data, balance1 + 1))
+    assertBadRequestAndResponse(sender.putData(firstAddress, data, balance1 + 1), "negative waves balance")
     nodes.waitForHeightAraise()
     notMiner.assertBalances(firstAddress, balance1, eff1)
 
@@ -41,19 +40,9 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val leaseId = sender.lease(firstAddress, secondAddress, leaseAmount, leaseFee).id
     nodes.waitForHeightAraiseAndTxPresent(leaseId)
 
-    assertBadRequest(sender.putData(firstAddress, data, balance1 - leaseAmount))
+    assertBadRequestAndResponse(sender.putData(firstAddress, data, balance1 - leaseAmount), "negative effective balance")
     nodes.waitForHeightAraise()
     notMiner.assertBalances(firstAddress, balance1 - leaseFee, eff1 - leaseAmount - leaseFee)
-  }
-
-  test("cannot transact with fee less then mininal ") {
-    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
-
-    val data = List(BinaryDataEntry("blob", Base58.decode("mbwana").get))
-    assertBadRequest(sender.putData(firstAddress, data, fee / 2))
-
-    nodes.waitForHeightAraise()
-    notMiner.assertBalances(firstAddress, balance1, eff1)
   }
 
   test("invalid transaction should not be in UTX or blockchain") {
@@ -66,13 +55,21 @@ class DataTransactionSuite extends BaseTransactionSuite {
     def request(tx: DataTransaction): SignedDataRequest =
       SignedDataRequest(1, Base58.encode(tx.sender.publicKey), tx.data, tx.fee, tx.timestamp, tx.proofs.base58().toList)
 
-    val fromFuture = data(timestamp = System.currentTimeMillis + 1.day.toMillis)
-    val insufficientFee = data(fee = 99999)
-    val invalidTransfers = Seq(fromFuture, insufficientFee)
-    for (tx <- invalidTransfers) {
-      assertBadRequest(sender.broadcastRequest(request(tx)))
+    implicit val w = Json.writes[SignedDataRequest].transform((jsobj: JsObject) =>
+      jsobj + ("type" -> JsNumber(TransactionType.DataTransaction.id)))
+
+    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
+    val invalidTxs = Seq(
+      (data(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction .* is from far future"),
+      (data(fee = 99999), "Fee .* does not exceed minimal value"))
+
+    for ((tx, diag) <- invalidTxs) {
+      assertBadRequestAndResponse(sender.broadcastRequest(request(tx)), diag)
       nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
     }
+
+    nodes.waitForHeightAraise()
+    notMiner.assertBalances(firstAddress, balance1, eff1)
   }
 
   test("data definition and retrieval") {
@@ -145,28 +142,28 @@ class DataTransactionSuite extends BaseTransactionSuite {
       "type" -> "integer",
       "value" -> 8)
 
-    assertBadRequestAndMessageSync(
+    assertBadRequestAndResponse(
       sender.postJson("/addresses/data", request(validItem - "key")),
       "key is missing")
 
-    assertBadRequestAndMessageSync(
+    assertBadRequestAndResponse(
       sender.postJson("/addresses/data", request(validItem - "type")),
       "type is missing")
 
-    assertBadRequestAndMessageSync(
+    assertBadRequestAndResponse(
       sender.postJson("/addresses/data", request(validItem + ("type" -> JsString("falafel")))),
       "unknown type falafel")
 
-    assertBadRequestAndMessageSync(
+    assertBadRequestAndResponse(
       sender.postJson("/addresses/data", request(validItem - "value")),
       "value is missing")
 
-    assertBadRequestAndMessageSync(
+    assertBadRequestAndResponse(
       sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
       "value is missing or not an integer")
   }
 
-  test("transaction requires a proof") {
+  test("transaction requires a valid proof") {
     def request: JsObject = {
       val rs = sender.postJsonWithApiKey("/transactions/sign", Json.obj(
         "version" -> 1,
@@ -179,8 +176,12 @@ class DataTransactionSuite extends BaseTransactionSuite {
     def id(obj: JsObject) = obj.value("id").as[String]
 
     val noProof = request - "proofs"
-    assertBadRequest(sender.postJson("/transactions/broadcast", noProof))
+    assertBadRequestAndMessage(sender.postJson("/transactions/broadcast", noProof), "failed to parse json message")
     nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
+
+    val badProof = request ++ Json.obj("proofs" -> Seq(Base58.encode(Array.fill(64)(Random.nextInt.toByte))))
+    assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", badProof), "proof doesn't validate as signature")
+    nodes.foreach(_.ensureTxDoesntExist(id(badProof)))
 
     val withProof = request
     assert((withProof \ "proofs").as[Seq[String]].lengthCompare(1) == 0)
