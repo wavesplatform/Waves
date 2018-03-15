@@ -52,7 +52,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val setScriptTransaction = SetScriptTransaction.selfSigned(sender.privateKey, Some(script), fee, System.currentTimeMillis()).explicitGet()
 
     val request = SignedSetScriptRequest(
-      senderPublicKey = sender.address,
+      senderPublicKey = ByteStr(sender.publicKey.publicKey).base58,
       script = Some(script.bytes().base58),
       fee = setScriptTransaction.fee,
       timestamp = setScriptTransaction.timestamp,
@@ -60,10 +60,8 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     )
 
 
-    val jjj = Json.toJsObject(request) + ("type" -> JsNumber(TransactionType.SetScriptTransaction.id))
-    Console.err.println(s"jjj = $jjj")
     val setScriptId = sender
-      .signedBroadcast(jjj)
+      .signedBroadcast(Json.toJsObject(request) + ("type" -> JsNumber(TransactionType.SetScriptTransaction.id)))
       .id
 
     nodes.waitForHeightAraiseAndTxPresent(setScriptId)
@@ -95,7 +93,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val sig2 = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
 
     val request = SignedVersionedTransferRequest(
-      senderPublicKey = sender.address,
+      senderPublicKey = ByteStr(sender.publicKey.publicKey).base58,
       assetId = None,
       recipient = acc3.address,
       amount = transferAmount,
@@ -121,7 +119,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val sig2 = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
 
     val request = SignedSetScriptRequest(
-      senderPublicKey = sender.address,
+      senderPublicKey = ByteStr(sender.publicKey.publicKey).base58,
       script = None,
       fee = unsigned.fee,
       timestamp = unsigned.timestamp,
