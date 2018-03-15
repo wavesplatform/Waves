@@ -3,7 +3,6 @@ package com.wavesplatform.matcher.market
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
@@ -13,7 +12,8 @@ import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, WalletSettings}
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Coeval
 import org.scalamock.scalatest.PathMockFactory
@@ -95,7 +95,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     val functionalitySettings = TestFunctionalitySettings.Stub
 
     val utx = stub[UtxPool]
-    (utx.putIfNew _).when(*).onCall((tx: Transaction) => Right(true))
+    (utx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty)))
     val allChannels = stub[ChannelGroup]
     actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, Coeval.now(storedState),
       wallet, utx, allChannels, settings, history, functionalitySettings) with RestartableActor))
@@ -247,7 +247,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
     }
 
-    "place orders and restart without waiting for responce" in {
+    "place orders and restart without waiting for response" in {
       val ord1 = sell(pair, 100, 10 * Order.PriceConstant)
 
       (1 to 100).foreach({ i =>
@@ -279,7 +279,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       (pool.putIfNew _).when(*).onCall { (tx: Transaction) =>
         tx match {
           case om: ExchangeTransaction if om.buyOrder == ord2 => Left(ValidationError.GenericError("test"))
-          case _: Transaction => Right(true)
+          case _: Transaction => Right((true, Diff.empty))
         }
       }
       val allChannels = stub[ChannelGroup]

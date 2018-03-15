@@ -2,7 +2,6 @@ package com.wavesplatform.matcher.market
 
 import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{CancelOrder, GetOrderStatusResponse}
@@ -10,10 +9,11 @@ import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.Filled
 import com.wavesplatform.matcher.model._
+import com.wavesplatform.utx.UtxPool
 import org.iq80.leveldb.DB
 import play.api.libs.json._
 import scorex.account.Address
-import scorex.transaction.AssetAcc
+import scorex.transaction.{AssetAcc, AssetId}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.NTP
@@ -50,6 +50,18 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       sender() ! getPairTradableBalance(assetPair, addr)
     case GetMatcherBalance(addr, _) =>
       sender() ! getMatcherBalance(addr)
+    case GetActiveOrdersByAddress(requestId, addr, assets, _) =>
+      // Because all orders spend waves for fee
+      val wasAssetChanged: Option[AssetId] => Boolean = if (assets.contains(None)) { _ => true } else assets.contains
+
+      val allActiveOrders = orderHistory.activeOrderIdsByAddress(addr.stringRepr)
+      val activeOrdersByAssets = allActiveOrders.collect { case (assetId, id) if wasAssetChanged(assetId) => id -> orderHistory.orderInfo(id) }
+
+      val active: Seq[LimitOrder] = activeOrdersByAssets.flatMap { case (id, info) =>
+        orderHistory.order(id).map { order => LimitOrder(order).partial(info.remaining) }
+      }(collection.breakOut)
+
+      sender().forward(GetActiveOrdersByAddressResponse(requestId, addr, active))
   }
 
   override def receive: Receive = {
@@ -148,6 +160,10 @@ object OrderHistoryActor {
   case class GetAllOrderHistory(address: String, ts: Long) extends ExpirableOrderHistoryRequest
 
   case class GetOrderStatus(assetPair: AssetPair, id: String, ts: Long) extends ExpirableOrderHistoryRequest
+
+  case class GetActiveOrdersByAddress(requestId: Long, address: Address, assets: Set[Option[AssetId]], ts: Long) extends ExpirableOrderHistoryRequest
+
+  case class GetActiveOrdersByAddressResponse(requestId: Long, address: Address, orders: Seq[LimitOrder])
 
   case class DeleteOrderFromHistory(assetPair: AssetPair, address: String, id: String, ts: Long) extends ExpirableOrderHistoryRequest
 

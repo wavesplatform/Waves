@@ -21,7 +21,8 @@ object Evaluator {
                 case None =>
                   val varBlockTpe                                                  = newVarBlock.tpe
                   val eitherTCoeval: TrampolinedExecResult[varBlockTpe.Underlying] = r[varBlockTpe.Underlying](ctx, EitherT.pure(newVarBlock))
-                  val updatedCtx: Context                                          = ctx.copy(letDefs = ctx.letDefs.updated(newVarName, LazyVal(varBlockTpe)(eitherTCoeval)))
+                  val lz: LazyVal                                                  = LazyVal(varBlockTpe)(eitherTCoeval)
+                  val updatedCtx: Context                                          = ctx.copy(letDefs = ctx.letDefs.updated(newVarName, lz))
                   r[blockTpe.Underlying](updatedCtx, EitherT.pure(inner))
               }
           }
@@ -31,21 +32,21 @@ object Evaluator {
             case None      => EitherT.leftT[Coeval, T](s"A definition of '$str' is not found")
           }
 
-        case Typed.CONST_INT(v)        => EitherT.rightT[Coeval, String](v)
+        case Typed.CONST_LONG(v)        => EitherT.rightT[Coeval, String](v)
         case Typed.CONST_BYTEVECTOR(v) => EitherT.rightT[Coeval, String](v)
         case Typed.TRUE                => EitherT.rightT[Coeval, String](true)
         case Typed.FALSE               => EitherT.rightT[Coeval, String](false)
 
-        case Typed.BINARY_OP(a, SUM_OP, b, INT) =>
+        case Typed.BINARY_OP(a, SUM_OP, b, LONG) =>
           for {
-            evaluatedA <- r[Int](ctx, EitherT.pure(a))
-            evaluatedB <- r[Int](ctx, EitherT.pure(b))
+            evaluatedA <- r[Long](ctx, EitherT.pure(a))
+            evaluatedB <- r[Long](ctx, EitherT.pure(b))
           } yield evaluatedA + evaluatedB
 
         case Typed.BINARY_OP(a, op @ (GE_OP | GT_OP), b, BOOLEAN) =>
           for {
-            evaluatedA <- r[Int](ctx, EitherT.pure(a))
-            evaluatedB <- r[Int](ctx, EitherT.pure(b))
+            evaluatedA <- r[Long](ctx, EitherT.pure(a))
+            evaluatedB <- r[Long](ctx, EitherT.pure(b))
           } yield
             op match {
               case GE_OP => evaluatedA >= evaluatedB
@@ -76,16 +77,6 @@ object Evaluator {
             i2 <- r[tpe.Underlying](ctx, EitherT.pure(it2))
           } yield i1 == i2
 
-        case isDefined @ Typed.IS_DEFINED(opt) =>
-          r[isDefined.tpe.Underlying](ctx, EitherT.pure(opt)).flatMap {
-            case x: Option[_] => EitherT.rightT[Coeval, String](x.isDefined)
-            case _            => EitherT.leftT[Coeval, Boolean]("IS_DEFINED invoked on non-option type")
-          }
-        case Typed.GET(opt, tpe) =>
-          r[tpe.Underlying](ctx, EitherT.pure(opt)) flatMap {
-            case Some(x) => EitherT.rightT[Coeval, String](x)
-            case _       => EitherT.leftT[Coeval, Any]("GET(NONE)")
-          }
         case Typed.NONE         => EitherT.rightT[Coeval, String](None)
         case Typed.SOME(b, tpe) => r[tpe.Underlying](ctx, EitherT.pure(b)).map(Some(_))
         case Typed.GETTER(expr, field, _) =>
@@ -114,8 +105,8 @@ object Evaluator {
               } yield r
             case None => EitherT.leftT[Coeval, Any](s"function '$name' not found")
           }
-        case Typed.BINARY_OP(_, SUM_OP, _, tpe) if tpe != INT             => EitherT.leftT[Coeval, Any](s"Expected INT, but got $tpe: $t")
-        case Typed.BINARY_OP(_, GE_OP | GT_OP, _, tpe) if tpe != BOOLEAN  => EitherT.leftT[Coeval, Any](s"Expected INT, but got $tpe: $t")
+        case Typed.BINARY_OP(_, SUM_OP, _, tpe) if tpe != LONG             => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
+        case Typed.BINARY_OP(_, GE_OP | GT_OP, _, tpe) if tpe != BOOLEAN  => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
         case Typed.BINARY_OP(_, AND_OP | OR_OP, _, tpe) if tpe != BOOLEAN => EitherT.leftT[Coeval, Any](s"Expected BOOLEAN, but got $tpe: $t")
 
       }).map(_.asInstanceOf[T])

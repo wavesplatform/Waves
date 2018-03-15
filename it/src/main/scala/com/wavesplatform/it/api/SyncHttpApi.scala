@@ -7,6 +7,7 @@ import org.asynchttpclient.Response
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
 import play.api.libs.json.{Format, Json, Writes}
+import scorex.api.http.assets.SignedIssueRequest
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 
 import scala.concurrent.duration._
@@ -82,8 +83,8 @@ object SyncHttpApi extends Assertions{
     def aliasByAddress(targetAddress: String): Seq[String] =
       Await.result(async(n).aliasByAddress(targetAddress), RequestAwaitTime)
 
-    def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None): Transaction =
-      Await.result(async(n).transfer(sourceAddress, recipient, amount, fee, assetId), RequestAwaitTime)
+    def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None, feeAssetId: Option[String] = None): Transaction =
+      Await.result(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId), RequestAwaitTime)
 
     def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Transaction =
       Await.result(async(n).massTransfer(sourceAddress, transfers, fee, assetId), RequestAwaitTime)
@@ -102,6 +103,9 @@ object SyncHttpApi extends Assertions{
 
     def broadcastRequest[A: Writes](req: A): Transaction =
       Await.result(async(n).broadcastRequest(req), RequestAwaitTime)
+
+    def signedIssue(tx: SignedIssueRequest): Transaction =
+      Await.result(async(n).signedIssue(tx), RequestAwaitTime)
 
     def ensureTxDoesntExist(txId: String): Unit =
       Await.result(async(n).ensureTxDoesntExist(txId), RequestAwaitTime)

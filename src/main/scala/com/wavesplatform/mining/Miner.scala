@@ -1,13 +1,13 @@
 package com.wavesplatform.mining
 
 import cats.data.EitherT
-import com.wavesplatform.UtxPool
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics.{BlockStats, HistogramExt, Instrumented}
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.appender.{BlockAppender, MicroblockAppender}
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import kamon.metric.instrument
@@ -207,6 +207,7 @@ class MinerImpl(allChannels: ChannelGroup,
       val lastBlock = history.lastBlock.get
       for {
         _ <- checkAge(height, history.lastBlockTimestamp().get)
+        _ <- Either.cond(stateReader().accountScript(account).isEmpty, (), s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
         balanceAndTs <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account, featureProvider)
         (balance, ts) = balanceAndTs
         offset = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
@@ -241,7 +242,9 @@ class MinerImpl(allChannels: ChannelGroup,
 
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()
-    scheduledAttempts := CompositeCancelable.fromSet(wallet.privateKeyAccounts.map(generateBlockTask).map(_.runAsyncLogErr).toSet)
+    val reader = stateReader()
+    val nonScriptedAccounts = wallet.privateKeyAccounts.filter(acc => reader.accountScript(acc).isEmpty)
+    scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map(generateBlockTask).map(_.runAsyncLogErr).toSet)
     microBlockAttempt := SerialCancelable()
     debugState = MinerDebugInfo.MiningBlocks
   }

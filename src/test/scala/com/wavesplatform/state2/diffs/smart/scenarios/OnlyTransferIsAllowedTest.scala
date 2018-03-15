@@ -15,9 +15,9 @@ class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matche
 
     val onlySend: EXPR = BINARY_OP(
       BINARY_OP(
-        BINARY_OP(GETTER(REF("TX", TYPEREF("Transaction")), "TYPE", INT), EQ_OP, CONST_INT(4), BOOLEAN),
+        BINARY_OP(GETTER(REF("TX", TYPEREF("Transaction")), "TYPE", LONG), EQ_OP, CONST_LONG(4), BOOLEAN),
         OR_OP,
-        BINARY_OP(GETTER(REF("TX", TYPEREF("Transaction")), "TYPE", INT), EQ_OP, CONST_INT(11), BOOLEAN),
+        BINARY_OP(GETTER(REF("TX", TYPEREF("Transaction")), "TYPE", LONG), EQ_OP, CONST_LONG(11), BOOLEAN),
         BOOLEAN
       ),
       AND_OP,
@@ -34,8 +34,8 @@ class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matche
     )
     forAll(preconditionsTransferAndLease(onlySend)) {
       case ((genesis, script, lease, transfer)) =>
-        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), fs) { case _ => () }
-        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), fs)(totalDiffEi =>
+        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
+        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(totalDiffEi =>
           totalDiffEi should produce("TransactionNotAllowedByScript"))
     }
   }

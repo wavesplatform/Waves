@@ -12,7 +12,8 @@ import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio, StateReader}
-import com.wavesplatform.{UtxPool, crypto}
+import com.wavesplatform.crypto
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
@@ -170,7 +171,9 @@ case class DebugApiRoute(settings: RestAPISettings,
       case Right(blocks) =>
         allChannels.broadcast(LocalScoreChanged(history.score()))
         if (returnTransactionsToUtx) {
-          blocks.flatMap(_.transactionData).foreach(tx => utxStorage.putIfNew(tx))
+          utxStorage.batched { ops =>
+            blocks.flatMap(_.transactionData).foreach(ops.putIfNew)
+          }
         }
         miner.scheduleMining()
         Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable

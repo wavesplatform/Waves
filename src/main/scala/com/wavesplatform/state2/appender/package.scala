@@ -1,18 +1,18 @@
 package com.wavesplatform.state2
 
-import com.wavesplatform.UtxPool
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
 import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.PoSCalc._
-import scorex.transaction.ValidationError.{BlockFromFuture, GenericError}
+import scorex.transaction.ValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -55,16 +55,19 @@ package object appender extends ScorexLogging {
                                     stateReader: SnapshotStateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings,
                                     featureProvider: FeatureProvider)(block: Block): Either[ValidationError, Option[Int]] = for {
     _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
-      GenericError(s"Block $block at height ${history.height() + 1} is not valid w.r.t. checkpoint"))
+      BlockAppendError(s"Block $block at height ${history.height() + 1} is not valid w.r.t. checkpoint", block))
+    _ <- Either.cond(stateReader.accountScript(block.sender).isEmpty, (), BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block))
     _ <- blockConsensusValidation(history, featureProvider, settings, time.correctedTime(), block) { height =>
-      PoSCalc.generatingBalance(stateReader, settings.blockchainSettings.functionalitySettings, block.signerData.generator, height).toEither.left.map(_.toString)
+      PoSCalc.generatingBalance(stateReader, settings.blockchainSettings.functionalitySettings, block.sender, height).toEither.left.map(_.toString)
         .flatMap(validateEffectiveBalance(featureProvider, settings.blockchainSettings.functionalitySettings, block, height))
     }
     baseHeight = history.height()
     maybeDiscardedTxs <- blockchainUpdater.processBlock(block)
   } yield {
     utxStorage.removeAll(block.transactionData)
-    maybeDiscardedTxs.toSeq.flatten.foreach(utxStorage.putIfNew)
+    utxStorage.batched { ops =>
+      maybeDiscardedTxs.toSeq.flatten.foreach(ops.putIfNew)
+    }
     maybeDiscardedTxs.map(_ => baseHeight)
   }
 

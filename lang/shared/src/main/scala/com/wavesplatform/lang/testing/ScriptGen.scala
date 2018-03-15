@@ -6,14 +6,14 @@ import org.scalacheck._
 
 trait ScriptGen {
 
-  private def CONST_INTgen: Gen[EXPR] = Gen.choose(Int.MinValue, Int.MaxValue).map(CONST_INT)
+  private def CONST_LONGgen: Gen[EXPR] = Gen.choose(Long.MinValue, Long.MaxValue).map(CONST_LONG)
 
   private def SUMgen(gas: Int): Gen[EXPR] = for {
     i1 <- INTGen((gas - 2) / 2)
     i2 <- INTGen((gas - 2) / 2)
   } yield BINARY_OP(i1, SUM_OP, i2)
 
-  private def INTGen(gas: Int): Gen[EXPR] = if (gas > 0) Gen.oneOf(CONST_INTgen, SUMgen(gas - 1), IF_INTgen(gas - 1)) else CONST_INTgen
+  private def INTGen(gas: Int): Gen[EXPR] = if (gas > 0) Gen.oneOf(CONST_LONGgen, SUMgen(gas - 1), IF_INTgen(gas - 1)) else CONST_LONGgen
 
   private def GEgen(gas: Int): Gen[EXPR] = for {
     i1 <- INTGen((gas - 2) / 2)

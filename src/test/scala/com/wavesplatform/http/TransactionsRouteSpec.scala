@@ -4,7 +4,8 @@ import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen, UtxPool}
+import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Coeval
 import org.scalacheck.Gen._

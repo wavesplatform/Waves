@@ -3,7 +3,10 @@ package com.wavesplatform.matcher
 import java.io.File
 
 import com.typesafe.config.Config
+import com.wavesplatform.matcher.market.BalanceWatcherWorkerActor
 import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.readers.NameMapper
 import scorex.transaction.assets.exchange.AssetPair
 
 import scala.collection.JavaConverters._
@@ -30,10 +33,13 @@ case class MatcherSettings(enable: Boolean,
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
                            maxOrdersPerRequest: Int,
-                           blacklistedAddresses: Set[String])
+                           blacklistedAddresses: Set[String],
+                           balanceWatching: BalanceWatcherWorkerActor.Settings)
 
 
 object MatcherSettings {
+
+  implicit val chosenCase: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
   val configPath: String = "waves.matcher"
 
   def fromConfig(config: Config): MatcherSettings = {
@@ -63,10 +69,11 @@ object MatcherSettings {
     val blacklistedAddresses = config.as[List[String]](s"$configPath.blacklisted-addresses")
 
     val isMigrateToNewOrderHistoryStorage = !new File(dataDirectory).exists()
+    val balanceWatching = config.as[BalanceWatcherWorkerActor.Settings](s"$configPath.balance-watching")
 
     MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, dataDirectory, levelDbCacheSize,
       isMigrateToNewOrderHistoryStorage, journalDirectory, snapshotsDirectory, snapshotsInterval, orderCleanupInterval,
       maxOpenOrders, baseAssets, basePairs, maxTimestampDiff, blacklistedAssets.toSet, blacklistedNames,
-      maxOrdersPerRequest, blacklistedAddresses.toSet)
+      maxOrdersPerRequest, blacklistedAddresses.toSet, balanceWatching)
   }
 }

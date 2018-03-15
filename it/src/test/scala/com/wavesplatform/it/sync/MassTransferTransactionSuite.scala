@@ -141,12 +141,13 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     notMiner.assertBalances(firstAddress, balance1 - fee, eff1 - fee)
   }
 
-  test("transaction requires either proofs or signature") {
+  test("transaction requires a proof") {
     val fee = calcFee(2)
     val transfers = Seq(Transfer(secondAddress, transferAmount), Transfer(thirdAddress, transferAmount))
     def signedMassTransfer(): JsObject = {
       val rs = sender.postJsonWithApiKey("/transactions/sign", Json.obj(
         "type" -> TransactionType.MassTransferTransaction.id,
+        "version" -> Proofs.Version,
         "sender" -> firstAddress,
         "transfers" -> transfers,
         "fee" -> fee))
@@ -167,6 +168,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   private def createSignedMassTransferRequest(tx: MassTransferTransaction): SignedMassTransferRequest = {
     import tx._
     SignedMassTransferRequest(
+      Proofs.Version,
       Base58.encode(tx.sender.publicKey),
       assetId.map(_.base58),
       transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) },

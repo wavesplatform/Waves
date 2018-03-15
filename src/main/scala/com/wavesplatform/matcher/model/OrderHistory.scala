@@ -1,7 +1,7 @@
 package com.wavesplatform.matcher.model
 
 import cats.implicits._
-import com.wavesplatform.db.{OrderIdsCodec, PortfolioCodec, SubStorage}
+import com.wavesplatform.db.{AssetIdOrderIdSetCodec, Codec, OrderIdsCodec, PortfolioCodec, SubStorage}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.{Filled, OrderStatus}
@@ -9,8 +9,8 @@ import com.wavesplatform.matcher.model.OrderHistory.OrderHistoryOrdering
 import com.wavesplatform.state2._
 import org.iq80.leveldb.DB
 import play.api.libs.json.Json
-import scorex.transaction.AssetAcc
-import scorex.transaction.assets.exchange.{AssetPair, Order}
+import scorex.transaction.{AssetAcc, AssetId}
+import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.utils.ScorexLogging
 
 trait OrderHistory {
@@ -28,7 +28,9 @@ trait OrderHistory {
 
   def openVolumes(address: String): Option[Map[String, Long]]
 
-  def ordersByAddress(address: String): Set[String]
+  def orderIdsByAddress(address: String): Set[String]
+
+  def activeOrderIdsByAddress(address: String): Set[(Option[AssetId], String)]
 
   def fetchOrderHistoryByPair(assetPair: AssetPair, address: String): Seq[(String, OrderInfo, Option[Order])]
 
@@ -60,39 +62,43 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
   private val OrdersPrefix = "orders".getBytes(Charset)
   private val OrdersInfoPrefix = "infos".getBytes(Charset)
   private val AddressToOrdersPrefix = "addr-orders".getBytes(Charset)
+  private val AddressToActiveOrdersPrefix = "a-addr-orders".getBytes(Charset)
   private val AddressPortfolioPrefix = "portfolios".getBytes(Charset)
 
   def savePairAddress(address: String, orderId: String): Unit = {
-    get(makeKey(AddressToOrdersPrefix, address)) match {
-      case Some(valueBytes) =>
-        val prev = OrderIdsCodec.decode(valueBytes).explicitGet().value
-        var r = prev
-        if (prev.length >= settings.maxOrdersPerRequest) {
+    get(OrderIdsCodec)(makeKey(AddressToOrdersPrefix, address)) match {
+      case Some(prev) =>
+        val r = if (prev.length >= settings.maxOrdersPerRequest) {
           val (p1, p2) = prev.span(!orderStatus(_).isFinal)
-          r = if (p2.isEmpty) p1 else p1 ++ p2.tail
-        }
+          if (p2.isEmpty) p1 else p1 ++ p2.tail
+        } else prev
         put(makeKey(AddressToOrdersPrefix, address), OrderIdsCodec.encode(r :+ orderId), None)
       case _ =>
         put(makeKey(AddressToOrdersPrefix, address), OrderIdsCodec.encode(Array(orderId)), None)
     }
   }
 
-  def saveOrderInfo(event: Event): Unit = {
-    Events.createOrderInfo(event).foreach { case (orderId, oi) =>
-      put(makeKey(OrdersInfoPrefix, orderId), orderInfo(orderId).combine(oi).jsonStr.getBytes(Charset), None)
-      log.debug(s"Changed OrderInfo for: $orderId -> " + orderInfo(orderId))
+  private def saveOrderInfo(event: Event): Map[String, (Order, OrderInfo)] = {
+    val updatedInfo = Events.createOrderInfo(event).map {
+      case (orderId, (o, oi)) => (orderId, (o, orderInfo(orderId).combine(oi)))
     }
+
+    updatedInfo.foreach { case (orderId, (_, oi)) =>
+      put(makeKey(OrdersInfoPrefix, orderId), oi.jsonStr.getBytes(Charset), None)
+      log.debug(s"Changed OrderInfo for: $orderId -> $oi")
+    }
+
+    updatedInfo
   }
 
   def openPortfolio(address: String): OpenPortfolio = {
-    get(makeKey(AddressPortfolioPrefix, address)).map(PortfolioCodec.decode).map(_.explicitGet().value)
-      .map(OpenPortfolio.apply).getOrElse(OpenPortfolio.empty)
+    get(PortfolioCodec)(makeKey(AddressPortfolioPrefix, address)).map(OpenPortfolio.apply).getOrElse(OpenPortfolio.empty)
   }
 
   def saveOpenPortfolio(event: Event): Unit = {
     Events.createOpenPortfolio(event).foreach { case (address, op) =>
       val key = makeKey(AddressPortfolioPrefix, address)
-      val prev = get(key).map(PortfolioCodec.decode).map(_.explicitGet().value).map(OpenPortfolio.apply).getOrElse(OpenPortfolio.empty)
+      val prev = get(PortfolioCodec)(key).map(OpenPortfolio.apply).getOrElse(OpenPortfolio.empty)
       val updatedPortfolios = prev.combine(op)
       put(key, PortfolioCodec.encode(updatedPortfolios.orders), None)
       log.debug(s"Changed OpenPortfolio for: $address -> " + updatedPortfolios.toString)
@@ -112,22 +118,37 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
   override def orderAccepted(event: OrderAdded): Unit = {
     val lo = event.order
     saveOrder(lo.order)
-    saveOrderInfo(event)
+    val updatedInfo = saveOrderInfo(event)
     saveOpenPortfolio(event)
     savePairAddress(lo.order.senderPublicKey.address, lo.order.idStr())
+
+    updatedInfo.foreach { case (orderId, (o, oi)) =>
+      if (!oi.status.isFinal) {
+        val assetId = if (o.orderType == OrderType.BUY) o.assetPair.priceAsset else o.assetPair.amountAsset
+        addToActive(o.senderPublicKey.address, assetId, orderId)
+      }
+    }
   }
 
   override def orderExecuted(event: OrderExecuted): Unit = {
     saveOrder(event.submitted.order)
     savePairAddress(event.submitted.order.senderPublicKey.address, event.submitted.order.idStr())
-    saveOrderInfo(event)
+    val updatedInfo = saveOrderInfo(event)
     saveOpenPortfolio(OrderAdded(event.submittedExecuted))
     saveOpenPortfolio(event)
+
+    updatedInfo.foreach { case (orderId, (o, oi)) =>
+      if (oi.status.isFinal) deleteFromActive(o.senderPublicKey.address, orderId)
+    }
   }
 
   override def orderCanceled(event: OrderCanceled): Unit = {
-    saveOrderInfo(event)
+    val updatedInfo = saveOrderInfo(event)
     saveOpenPortfolio(event)
+
+    updatedInfo.foreach { case (orderId, (o, oi)) =>
+      if (oi.status.isFinal) deleteFromActive(o.senderPublicKey.address, orderId)
+    }
   }
 
   override def orderInfo(id: String): OrderInfo =
@@ -144,17 +165,20 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
 
   override def openVolume(assetAcc: AssetAcc): Long = {
     val asset = assetAcc.assetId.map(_.base58).getOrElse(AssetPair.WavesName)
-    get(makeKey(AddressPortfolioPrefix, assetAcc.account.address)).map(PortfolioCodec.decode).map(_.explicitGet().value)
+    get(PortfolioCodec)(makeKey(AddressPortfolioPrefix, assetAcc.account.address))
       .flatMap(_.get(asset)).map(math.max(0L, _)).getOrElse(0L)
   }
 
   override def openVolumes(address: String): Option[Map[String, Long]] = {
-    get(makeKey(AddressPortfolioPrefix, address)).map(PortfolioCodec.decode).map(_.explicitGet().value)
+    get(PortfolioCodec)(makeKey(AddressPortfolioPrefix, address))
   }
 
-  override def ordersByAddress(address: String): Set[String] = {
-    get(makeKey(AddressToOrdersPrefix, address)).map(OrderIdsCodec.decode).map(_.explicitGet().value)
-      .map(_.toSet).getOrElse(Set())
+  override def orderIdsByAddress(address: String): Set[String] = {
+    get(OrderIdsCodec)(makeKey(AddressToOrdersPrefix, address)).map(_.toSet).getOrElse(Set.empty)
+  }
+
+  override def activeOrderIdsByAddress(address: String): Set[(Option[AssetId], String)] = {
+    get(AssetIdOrderIdSetCodec)(makeKey(AddressToActiveOrdersPrefix, address)).getOrElse(Set.empty)
   }
 
   override def deleteOrder(address: String, orderId: String): Boolean = {
@@ -163,6 +187,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
         deleteFromOrders(orderId)
         deleteFromOrdersInfo(orderId)
         deleteFromAddress(address, orderId)
+        deleteFromActive(address, orderId)
         true
       case _ =>
         false
@@ -170,7 +195,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
   }
 
   override def fetchOrderHistoryByPair(assetPair: AssetPair, address: String): Seq[(String, OrderInfo, Option[Order])] = {
-    ordersByAddress(address)
+    orderIdsByAddress(address)
       .toSeq
       .map(id => (id, orderInfo(id), order(id)))
       .filter(_._3.exists(_.assetPair == assetPair))
@@ -180,7 +205,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
 
   override def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])] = {
     import OrderInfo.orderStatusOrdering
-    ordersByAddress(address)
+    orderIdsByAddress(address)
       .toSeq
       .map(id => (id, orderInfo(id)))
       .sortBy(_._2.status)
@@ -192,12 +217,33 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
   private def deleteFromOrdersInfo(orderId: String): Unit = delete(makeKey(OrdersInfoPrefix, orderId), None)
 
   private def deleteFromAddress(address: String, orderId: String): Unit = {
-    val key = makeKey(AddressToOrdersPrefix, address)
-    get(key) match {
-      case Some(bytes) =>
-        val prev = OrderIdsCodec.decode(bytes).explicitGet().value
-        if (prev.contains(orderId)) put(key, OrderIdsCodec.encode(prev.filterNot(_ == orderId)), None)
-      case _ =>
+    deleteOrderFromAddress(AddressToOrdersPrefix, address, orderId)
+  }
+
+  private def addToActive(address: String, assetId: Option[AssetId], orderId: String): Unit =  {
+    val key = makeKey(AddressToActiveOrdersPrefix, address)
+    val orig = get(AssetIdOrderIdSetCodec)(key).getOrElse(Set.empty)
+    put(key, AssetIdOrderIdSetCodec.encode(orig + (assetId -> orderId)), None)
+  }
+
+  private def deleteFromActive(address: String, orderId: String): Unit = {
+    update(AssetIdOrderIdSetCodec)(makeKey(AddressToActiveOrdersPrefix, address)) { orig =>
+      orig.filterNot { case (_, currOrderId) => currOrderId == orderId }
     }
+  }
+
+  private def deleteOrderFromAddress(keyPrefix: Array[Byte], address: String, orderId: String): Unit = {
+    update(OrderIdsCodec)(makeKey(keyPrefix, address)) { orig =>
+      if (orig.contains(orderId)) orig.filterNot(_ == orderId)
+      else orig
+    }
+  }
+
+  private def update[Content](codec: Codec[Content])(key: Array[Byte])(f: Content => Content): Unit = {
+    get(codec)(key).foreach { orig => put(key, codec.encode(f(orig)), None) }
+  }
+
+  private def get[Content](codec: Codec[Content])(key: Array[Byte]): Option[Content] = {
+    get(key).map { x => codec.decode(x).explicitGet().value }
   }
 }
