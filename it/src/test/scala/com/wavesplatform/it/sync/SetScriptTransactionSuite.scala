@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -8,18 +9,25 @@ import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.smart.dummyTypeCheckerContext
 import org.scalatest.CancelAfterFailure
 import scorex.account.PrivateKeyAccount
-import scorex.api.http.assets.SignedSetScriptRequest
+import scorex.api.http.assets.{SignedSetScriptRequest, SignedVersionedTransferRequest}
+import scorex.transaction.Proofs
+import scorex.transaction.assets.VersionedTransferTransaction
 import scorex.transaction.smart.{Script, SetScriptTransaction}
 
 import scala.util.Random
 
 class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  def randomPk = PrivateKeyAccount(Array.fill[Byte](32)(Random.nextInt(Byte.MaxValue).toByte))
+  private def randomPk = PrivateKeyAccount(Array.fill[Byte](32)(Random.nextInt(Byte.MaxValue).toByte))
+
+  private val acc1 = randomPk
+  private val acc2 = randomPk
+  private val acc3 = randomPk
+
+  private val transferAmount: Long = 1.waves
+  private val fee: Long            = 0.001.waves
 
   test("set 2of2 multisig") {
-    val acc1 = randomPk
-    val acc2 = randomPk
 
     val scriptText = {
       val untyped = Parser(s"""
@@ -37,7 +45,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     }
 
     val script               = Script(scriptText)
-    val setScriptTransaction = SetScriptTransaction.selfSigned(sender.privateKey, Some(script), 0.001.waves, System.currentTimeMillis()).explicitGet()
+    val setScriptTransaction = SetScriptTransaction.selfSigned(sender.privateKey, Some(script), fee, System.currentTimeMillis()).explicitGet()
 
     val setScriptId = sender
       .signedSetScript(
@@ -51,5 +59,35 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       .id
 
     nodes.waitForHeightAraiseAndTxPresent(setScriptId)
+
+    // get script by account
+  }
+
+  test("can't send using old pk ") {
+    assertBadRequest(sender.transfer(sender.address, acc3.address, transferAmount, fee, None, None))
+  }
+
+  test("can send using multisig") {
+
+    val unsigned =
+      VersionedTransferTransaction
+        .create(2, None, sender.publicKey, acc3, transferAmount, System.currentTimeMillis(), fee, Array.emptyByteArray, proofs = Proofs.empty)
+        .explicitGet()
+    val sig1 = ByteStr(crypto.sign(acc1, unsigned.bodyBytes()))
+    val sig2 = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
+
+    val request = SignedVersionedTransferRequest(sender.address,
+                                                 None,
+                                                 acc3.address,
+                                                 transferAmount,
+                                                 fee,
+                                                 System.currentTimeMillis(),
+                                                 2,
+                                                 None,
+                                                 List(sig1, sig2).map(_.base58))
+
+    val versionedTransferId = sender.signedVersionedTransfer(request).id
+
+    nodes.waitForHeightAraiseAndTxPresent(versionedTransferId)
   }
 }
