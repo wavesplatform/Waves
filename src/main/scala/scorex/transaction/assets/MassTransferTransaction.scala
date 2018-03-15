@@ -116,7 +116,9 @@ object MassTransferTransaction {
     }.fold(
       ex => Left(ValidationError.OverflowError),
       totalAmount =>
-        if (transfers.lengthCompare(MaxTransferCount) > 0) {
+        if (version != 1) {
+          Left(ValidationError.UnsupportedVersion(version))
+        } else if (transfers.lengthCompare(MaxTransferCount) > 0) {
           Left(ValidationError.GenericError(s"Number of transfers is greater than $MaxTransferCount"))
         } else if (transfers.exists(_.amount < 0)) {
           Left(ValidationError.GenericError("One of the transfers has negative amount"))

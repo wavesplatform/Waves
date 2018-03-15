@@ -138,6 +138,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
   test("/transactions/sign should produce mass transfer transaction that is good for /transactions/broadcast") {
     signAndBroadcast(Json.obj(
       "type" -> 11,
+      "version" -> 1,
       "sender" -> firstAddress,
       "transfers" -> Json.toJson(Seq(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))),
       "fee" -> 200000,
