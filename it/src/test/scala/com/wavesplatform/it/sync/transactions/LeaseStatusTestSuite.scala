@@ -5,25 +5,31 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import play.api.libs.json.{Json}
-import scorex.transaction.lease.LeaseTransaction.Status.Active
+import scorex.transaction.lease.LeaseTransaction.Status.{Active, Canceled}
 
 class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure {
+  import LeaseStatusTestSuiteObj._
+
+  override protected def nodeConfigs: Seq[Config] = Configs
 
   private val transferFee = 0.001.waves
   private val leasingAmount = 10.waves
 
-  private val blockGenerationOffest = "25000ms"
 
   test("verification of leasing status") {
     nodes.waitForHeightAraise()
     val createdLeaseTxId = sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee = transferFee).id
     nodes.waitForHeightAraiseAndTxPresent(createdLeaseTxId)
     val status = getStatus(createdLeaseTxId)
-
     status shouldBe Active
+
+    val cancelLesingTxId = sender.cancelLease(firstAddress, createdLeaseTxId, fee = transferFee).id
+    notMiner.waitForTransaction(cancelLesingTxId)
+    val status1 = getStatus(createdLeaseTxId)
+    status1 shouldBe Canceled
+
   }
 
   private def getStatus(txId: String): String = {
@@ -31,12 +37,20 @@ class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure 
     (Json.parse(r.getResponseBody) \ "status").as[String]
 
   }
+}
+
+object LeaseStatusTestSuiteObj {
+  private val blockGenerationOffest = "25000ms"
+  import com.wavesplatform.it.NodeConfigs.Default
 
   private val minerConfig = ConfigFactory.parseString(
     s"""waves {
        |   miner{
        |      enable = yes
        |      minimal-block-generation-offset = $blockGenerationOffest
+       |      quorum = 0
+       |      micro-block-interval = 3s
+       |      max-transactions-in-key-block = 0
        |   }
        |}
      """.stripMargin)
@@ -49,8 +63,9 @@ class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure 
        |}
      """.stripMargin)
 
-  override protected def nodeConfigs: Seq[Config] = Seq(
+  val Configs: Seq[Config] = Seq(
     minerConfig.withFallback(Default.head),
     notMinerConfig.withFallback(Default(1))
   )
+
 }
