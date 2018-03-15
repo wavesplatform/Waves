@@ -92,6 +92,9 @@ object SyncHttpApi extends Assertions{
 
     def ensureTxDoesntExist(txId: String): Unit =
       Await.result(async(n).ensureTxDoesntExist(txId), RequestAwaitTime)
+    
+    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Transaction =
+      Await.result(async(n).waitForTransaction(txId), RequestAwaitTime)
   }
 
 
