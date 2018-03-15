@@ -47,15 +47,15 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val script               = Script(scriptText)
     val setScriptTransaction = SetScriptTransaction.selfSigned(sender.privateKey, Some(script), fee, System.currentTimeMillis()).explicitGet()
 
+    val request = SignedSetScriptRequest(
+      senderPublicKey = sender.address,
+      script = Some(script.bytes().base58),
+      fee = setScriptTransaction.fee,
+      timestamp = setScriptTransaction.timestamp,
+      proofs = List(setScriptTransaction.proofs.proofs.head.base58)
+    )
     val setScriptId = sender
-      .signedSetScript(
-        SignedSetScriptRequest(
-          senderPublicKey = sender.address,
-          script = Some(script.bytes().base58),
-          fee = setScriptTransaction.fee,
-          timestamp = setScriptTransaction.timestamp,
-          proofs = List(setScriptTransaction.proofs.proofs.head.base58)
-        ))
+      .signedSetScript(request)
       .id
 
     nodes.waitForHeightAraiseAndTxPresent(setScriptId)
@@ -71,23 +71,64 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
     val unsigned =
       VersionedTransferTransaction
-        .create(2, None, sender.publicKey, acc3, transferAmount, System.currentTimeMillis(), fee, Array.emptyByteArray, proofs = Proofs.empty)
+        .create(
+          version = 2,
+          assetId = None,
+          sender = sender.publicKey,
+          recipient = acc3,
+          amount = transferAmount,
+          timestamp = System.currentTimeMillis(),
+          feeAmount = fee,
+          attachment = Array.emptyByteArray,
+          proofs = Proofs.empty
+        )
         .explicitGet()
     val sig1 = ByteStr(crypto.sign(acc1, unsigned.bodyBytes()))
     val sig2 = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
 
-    val request = SignedVersionedTransferRequest(sender.address,
-                                                 None,
-                                                 acc3.address,
-                                                 transferAmount,
-                                                 fee,
-                                                 System.currentTimeMillis(),
-                                                 2,
-                                                 None,
-                                                 List(sig1, sig2).map(_.base58))
+    val request = SignedVersionedTransferRequest(
+      senderPublicKey = sender.address,
+      assetId = None,
+      recipient = acc3.address,
+      amount = transferAmount,
+      fee = fee,
+      timestamp = System.currentTimeMillis(),
+      version = 2,
+      attachment = None,
+      proofs = List(sig1, sig2).map(_.base58)
+    )
 
     val versionedTransferId = sender.signedVersionedTransfer(request).id
 
     nodes.waitForHeightAraiseAndTxPresent(versionedTransferId)
+  }
+
+  test("can clear script") {
+    val unsigned = SetScriptTransaction
+      .create(sender = sender.privateKey, script = None, fee = fee, timestamp = System.currentTimeMillis(), proofs = Proofs.empty)
+      .explicitGet()
+    val sig1 = ByteStr(crypto.sign(acc1, unsigned.bodyBytes()))
+    val sig2 = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
+
+    val request = SignedSetScriptRequest(
+      senderPublicKey = sender.address,
+      script = None,
+      fee = unsigned.fee,
+      timestamp = unsigned.timestamp,
+      proofs = List(sig1, sig2) map (_.base58)
+    )
+    val clearScriptId = sender
+      .signedSetScript(request)
+      .id
+
+    nodes.waitForHeightAraiseAndTxPresent(clearScriptId)
+
+  }
+
+  test("can send using old pk again") {
+    val transferId = sender
+      .transfer(sourceAddress = sender.address, recipient = acc3.address, amount = transferAmount, fee = fee, assetId = None, feeAssetId = None)
+      .id
+    nodes.waitForHeightAraiseAndTxPresent(transferId)
   }
 }
