@@ -41,7 +41,7 @@ class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure 
 }
 
 object LeaseStatusTestSuiteConfig {
-  private val blockGenerationOffest = "25000ms"
+  private val blockGenerationOffest = "10000ms"
   import com.wavesplatform.it.NodeConfigs.Default
 
   private val minerConfig = ConfigFactory.parseString(
