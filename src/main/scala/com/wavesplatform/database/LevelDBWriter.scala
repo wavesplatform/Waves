@@ -13,6 +13,7 @@ import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}
 import scorex.transaction._
 import scorex.transaction.assets._
+import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.{Script, SetScriptTransaction}
 
@@ -91,15 +92,14 @@ object LevelDBWriter {
     }
 
     private def writeIntSeq(values: Seq[Int]): Array[Byte] = {
-      val ndo = newDataOutput()
-      ndo.writeInt(values.length)
+      val ndo = newDataOutput(4 * values.length)
       values.foreach(ndo.writeInt)
       ndo.toByteArray
     }
 
     private def readIntSeq(data: Array[Byte]): Seq[Int] = Option(data).fold(Seq.empty[Int]) { d =>
       val ndi = newDataInput(d)
-      (1 to ndi.readInt()).map(_ => ndi.readInt())
+      (1 to d.length / 4).map(_ => ndi.readInt())
     }
 
     private def readTxIds(data: Array[Byte]): Seq[ByteStr] = Option(data).fold(Seq.empty[ByteStr]) { d =>
@@ -161,8 +161,10 @@ object LevelDBWriter {
     private def blockAtHeight(height: Int) = h(3, height)
     def blockAt(height: Int) = Key.opt[Block](blockAtHeight(height), Block.parseBytes(_).get, _.bytes())
     def blockBytes(height: Int) = Key.opt[Array[Byte]](blockAtHeight(height), identity, identity)
-    def blockHeader(height: Int) =
-      Key.opt[(BlockHeader, Int)](blockAtHeight(height), b => (BlockHeader.parseBytes(b).get._1, b.length), _ => Array.empty)
+    def blockHeader(height: Int) = Key.opt[(BlockHeader, Int)](
+        blockAtHeight(height),
+        b => (BlockHeader.parseBytes(b).get._1, b.length),
+        _ => Array.empty) // this dummy encoder is never used: we omnly store blocks, not block headers
 
     def heightOf(blockId: ByteStr) = Key.opt[Int](hash(4, blockId), Ints.fromByteArray, Ints.toByteArray)
 
@@ -264,7 +266,7 @@ object LevelDBWriter {
     def changedAddresses(height: Int): Key[Seq[BigInt]] = Key(h(21, height), readBigIntSeq, writeBigIntSeq)
     def transactionIdsAtHeight(height: Int): Key[Seq[ByteStr]] = Key(h(22, height), readTxIds, writeTxIds)
 
-    def addressOfAlias(alias: Alias): Key[Option[Address]] = Key.opt(byteKey(23, alias.bytes.arr), Address.fromBytes(_).explicitGet(), _.bytes.arr)
+    def addressIdOfAlias(alias: Alias): Key[Option[BigInt]] = Key.opt(byteKey(23, alias.bytes.arr), BigInt(_), _.toByteArray)
 
     val lastAddressId: Key[Option[BigInt]] = Key.opt(Array[Byte](0, 24), BigInt(_), _.toByteArray)
     def addressId(address: Address): Key[Option[BigInt]] = Key.opt(byteKey(25, address.bytes.arr), BigInt(_), _.toByteArray)
@@ -303,7 +305,9 @@ object LevelDBWriter {
   private def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr) =
     db.get(k.leaseStatusHistory(leaseId)).headOption.fold(false)(h => db.get(k.leaseStatus(h, leaseId)))
 
-  private def resolveAlias(db: ReadOnlyDB, alias: Alias) = db.get(k.addressOfAlias(alias))
+  private def resolveAlias(db: ReadOnlyDB, alias: Alias) = {
+    db.get(k.addressIdOfAlias(alias)).map(addressId => db.get(k.idToAddress(addressId)))
+  }
 
   /** {{{
     * ([10, 7, 4], 5, 11) => [10, 7]
@@ -426,7 +430,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
                                   transactions: Map[ByteStr, (Transaction, Set[BigInt])],
                                   reissuedAssets: Map[ByteStr, AssetInfo],
                                   filledQuantity: Map[ByteStr, VolumeAndFee],
-                                  scripts: Map[BigInt, Option[Script]]): Unit = readWrite { rw =>
+                                  scripts: Map[BigInt, Option[Script]],
+                                  aliases: Map[Alias, BigInt]): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
     rw.put(k.height, height)
@@ -489,12 +494,11 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
       rw.put(k.addressTransactionIds(height, addressId), txs)
     }
 
-    for ((id, (tx, _)) <- transactions) {
-      tx match {
-        case ca: CreateAliasTransaction => rw.put(k.addressOfAlias(ca.alias), Some(ca.sender.toAddress))
-        case _ =>
-      }
+    for ((alias, addressId) <- aliases) {
+      rw.put(k.addressIdOfAlias(alias), Some(addressId))
+    }
 
+    for ((id, (tx, _)) <- transactions) {
       rw.put(k.transactionInfo(id), Some((height, tx)))
     }
 
@@ -525,20 +529,23 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
         currentHeight <- height until targetHeight by -1
         blockAtHeight <- rw.get(k.blockAt(currentHeight))
       } yield {
-        for (address <- rw.get(k.changedAddresses(currentHeight))) {
-          for (assetId <- rw.get(k.assetList(address))) {
-            rw.delete(k.assetBalance(currentHeight, address, assetId))
-            val kabh = k.assetBalanceHistory(address, assetId)
+        for (addressId <- rw.get(k.changedAddresses(currentHeight))) {
+          for (assetId <- rw.get(k.assetList(addressId))) {
+            rw.delete(k.assetBalance(currentHeight, addressId, assetId))
+            val kabh = k.assetBalanceHistory(addressId, assetId)
             rw.put(kabh, rw.get(kabh).filterNot(_ == currentHeight))
           }
 
-          rw.delete(k.wavesBalance(currentHeight, address))
-          val kwbh = k.wavesBalanceHistory(address)
+          rw.delete(k.wavesBalance(currentHeight, addressId))
+          val kwbh = k.wavesBalanceHistory(addressId)
           rw.put(kwbh, rw.get(kwbh).filterNot(_ == currentHeight))
 
-          rw.delete(k.leaseBalance(currentHeight, address))
-          val klbh = k.leaseBalanceHistory(address)
+          rw.delete(k.leaseBalance(currentHeight, addressId))
+          val klbh = k.leaseBalanceHistory(addressId)
           rw.put(klbh, rw.get(klbh).filterNot(_ == currentHeight))
+
+          portfolioCache.invalidate(rw.get(k.idToAddress(addressId)))
+
         }
 
         for (txId <- rw.get(k.transactionIdsAtHeight(currentHeight))) {
@@ -552,28 +559,52 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
           tx.transactionType match {
             case T.GenesisTransaction => // genesis transaction can not be rolled back
             case T.PaymentTransaction | T.TransferTransaction | T.VersionedTransferTransaction | T.MassTransferTransaction => // balances already restored
-            case T.IssueTransaction | T.ReissueTransaction | T.BurnTransaction =>
-              rw.delete(k.assetInfo(currentHeight, tx.id()))
-              val kaih = k.assetInfoHistory(tx.id())
-              rw.put(kaih, rw.get(kaih).filter(_ != currentHeight))
+            case T.IssueTransaction =>
+              rollbackAssetInfo(rw, tx.id(), currentHeight)
+            case T.ReissueTransaction =>
+              rollbackAssetInfo(rw, tx.asInstanceOf[ReissueTransaction].assetId, currentHeight)
+            case T.BurnTransaction =>
+              rollbackAssetInfo(rw, tx.asInstanceOf[BurnTransaction].assetId, currentHeight)
             case T.LeaseTransaction =>
               rw.delete(k.leaseStatus(currentHeight, tx.id()))
             case T.LeaseCancelTransaction =>
               rw.delete(k.leaseStatus(currentHeight, tx.asInstanceOf[LeaseCancelTransaction].leaseId))
             case T.SetScriptTransaction =>
-              addressIdCache.get(tx.asInstanceOf[SetScriptTransaction].sender.toAddress).foreach { addressId =>
+              val address = tx.asInstanceOf[SetScriptTransaction].sender.toAddress
+              scriptCache.invalidate(address)
+              addressIdCache.get(address).foreach { addressId =>
                 rw.delete(k.addressScript(currentHeight, addressId))
                 val kash = k.addressScriptHistory(addressId)
                 rw.put(kash, rw.get(kash).filter(_ != currentHeight))
+
               }
             case T.CreateAliasTransaction =>
-              rw.delete(k.addressOfAlias(tx.asInstanceOf[CreateAliasTransaction].alias))
+              rw.delete(k.addressIdOfAlias(tx.asInstanceOf[CreateAliasTransaction].alias))
+            case T.ExchangeTransaction =>
+              val et = tx.asInstanceOf[ExchangeTransaction]
+              rollbackOrderFill(rw, ByteStr(et.buyOrder.id()), currentHeight)
+              rollbackOrderFill(rw, ByteStr(et.sellOrder.id()), currentHeight)
           }
         }
 
         blockAtHeight
       }
     }
+  }
+
+  private def rollbackAssetInfo(rw: RW, assetId: ByteStr, currentHeight: Int): Unit = {
+    rw.delete(k.assetInfo(currentHeight, assetId))
+    val kaih = k.assetInfoHistory(assetId)
+    rw.put(kaih, rw.get(kaih).filter(_ != currentHeight))
+    assetInfoCache.invalidate(assetId)
+    assetDescriptionCache.invalidate(assetId)
+  }
+
+  private def rollbackOrderFill(rw: RW, orderId: ByteStr, currentHeight: Int): Unit = {
+    rw.delete(k.filledVolumeAndFee(currentHeight, orderId))
+    val kfvh = k.filledVolumeAndFeeHistory(orderId)
+    rw.put(kfvh, rw.get(kfvh).filter(_ != currentHeight))
+    volumeAndFeeCache.invalidate(orderId)
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(db => db.get(k.transactionInfo(id)))

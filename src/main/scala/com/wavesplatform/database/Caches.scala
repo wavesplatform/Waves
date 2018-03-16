@@ -6,7 +6,7 @@ import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{AssetDescription, AssetInfo, ByteStr, Diff, LeaseBalance, Portfolio, StateWriter, VolumeAndFee}
-import scorex.account.Address
+import scorex.account.{Address, Alias}
 import scorex.block.Block
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.smart.Script
@@ -80,7 +80,8 @@ trait Caches extends SnapshotStateReader with History with StateWriter {
                          transactions: Map[ByteStr, (Transaction, Set[BigInt])],
                          reissuedAssets: Map[ByteStr, AssetInfo],
                          filledQuantity: Map[ByteStr, VolumeAndFee],
-                         scripts: Map[BigInt, Option[Script]]): Unit
+                         scripts: Map[BigInt, Option[Script]],
+                         aliases: Map[Alias, BigInt]): Unit
 
   override def append(diff: Diff, block: Block): Unit = {
     heightCache += 1
@@ -156,7 +157,8 @@ trait Caches extends SnapshotStateReader with History with StateWriter {
 
     doAppend(block, newAddressIds, wavesBalances.result(), assetBalances.result(), leaseBalances.result(), diff.leaseState,
       newTransactions.result(), diff.issuedAssets, newFills.result(),
-      diff.scripts.map { case (address, s) => addressIdCache.get(address).get -> s })
+      diff.scripts.map { case (address, s) => addressIdCache.get(address).get -> s },
+      diff.aliases.map { case (a, address) => a -> addressIdCache.get(address).get })
   }
 
   protected def doRollback(targetBlockId: ByteStr): Seq[Block]
@@ -167,6 +169,9 @@ trait Caches extends SnapshotStateReader with History with StateWriter {
     heightCache = loadHeight()
     scoreCache = loadScore()
     lastBlockCache = loadLastBlock()
+
+    activatedFeaturesCache = loadActivatedFeatures()
+    approvedFeaturesCache = loadApprovedFeatures()
 
     discardedBlocks
   }
