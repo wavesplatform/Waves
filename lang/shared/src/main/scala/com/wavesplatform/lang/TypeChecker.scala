@@ -18,9 +18,7 @@ object TypeChecker {
     val empty = TypeCheckerContext(Map.empty, Map.empty, Map.empty)
 
     def fromContext(ctx: Context): TypeCheckerContext =
-      TypeCheckerContext(predefTypes = ctx.typeDefs,
-                         varDefs = ctx.letDefs.mapValues(_.tpe),
-                         functionDefs = ctx.functions.mapValues(x => x.signature))
+      TypeCheckerContext(predefTypes = ctx.typeDefs, varDefs = ctx.letDefs.mapValues(_.tpe), functionDefs = ctx.functions.mapValues(x => x.signature))
   }
 
   type TypeResolutionError      = String
@@ -36,7 +34,7 @@ object TypeChecker {
     }
 
   private def setType(ctx: TypeCheckerContext, t: SetTypeResult[Untyped.EXPR]): SetTypeResult[Typed.EXPR] = t.flatMap {
-    case x: Untyped.CONST_LONG        => EitherT.pure(Typed.CONST_LONG(x.t))
+    case x: Untyped.CONST_LONG       => EitherT.pure(Typed.CONST_LONG(x.t))
     case x: Untyped.CONST_BYTEVECTOR => EitherT.pure(Typed.CONST_BYTEVECTOR(x.bs))
     case Untyped.TRUE                => EitherT.pure(Typed.TRUE)
     case Untyped.FALSE               => EitherT.pure(Typed.FALSE)
@@ -89,11 +87,13 @@ object TypeChecker {
                 }
               val matches = v.map(x => (x._1, resolveTypes(x._2, resolvedTypes))).map {
                 case ((e, Right(tpe))) =>
-                  matchType(tpe,e.tpe) match {
+                  matchType(tpe, e.tpe) match {
                     case Some(_) => Right(e)
-                    case None    => Left(s"Types of arguments of function call '$name' do not match types required in signature. Expected: $tpe, Actual: ${e.tpe}")
+                    case None =>
+                      Left(s"Types of arguments of function call '$name' do not match types required in signature. Expected: $tpe, Actual: ${e.tpe}")
                   }
-              case (_, Left(l)) => Left(l)}
+                case (_, Left(l)) => Left(l)
+              }
               matches.find(_.isLeft) match {
                 case Some(left) => left
                 case None =>
@@ -152,15 +152,21 @@ object TypeChecker {
           }
 
         case Some(let) =>
-          setType(ctx, EitherT.pure(let.value)).flatMap { exprTpe =>
-            val updatedCtx = ctx.copy(varDefs = ctx.varDefs + (let.name -> exprTpe.tpe))
-            setType(updatedCtx, EitherT.pure(block.body))
-              .map { inExpr =>
-                Typed.BLOCK(
-                  let = Some(Typed.LET(let.name, exprTpe)),
-                  body = inExpr,
-                  tpe = inExpr.tpe
-                )
+          (ctx.varDefs.get(let.name), ctx.functionDefs.get(let.name)) match {
+            case (Some(_), _) => EitherT.leftT[Coeval, Typed.EXPR](s"Value '${let.name}' already defined in the scope")
+            case (_, Some(_)) =>
+              EitherT.leftT[Coeval, Typed.EXPR](s"Value '${let.name}' can't be defined because function with such name is predefined")
+            case (None, None) =>
+              setType(ctx, EitherT.pure(let.value)).flatMap { exprTpe =>
+                val updatedCtx = ctx.copy(varDefs = ctx.varDefs + (let.name -> exprTpe.tpe))
+                setType(updatedCtx, EitherT.pure(block.body))
+                  .map { inExpr =>
+                    Typed.BLOCK(
+                      let = Some(Typed.LET(let.name, exprTpe)),
+                      body = inExpr,
+                      tpe = inExpr.tpe
+                    )
+                  }
               }
           }
       }

@@ -16,9 +16,11 @@ object Evaluator {
           mayBeLet match {
             case None => r[blockTpe.Underlying](ctx, EitherT.pure(inner))
             case Some(Typed.LET(newVarName, newVarBlock)) =>
-              ctx.letDefs.get(newVarName) match {
-                case Some(_) => EitherT.leftT[Coeval, T](s"Value '$newVarName' already defined in the scope")
-                case None =>
+              (ctx.letDefs.get(newVarName), ctx.functions.get(newVarName)) match {
+                case (Some(_), _) => EitherT.leftT[Coeval, T](s"Value '$newVarName' already defined in the scope")
+                case (_, Some(_)) =>
+                  EitherT.leftT[Coeval, Typed.EXPR](s"Value '$newVarName' can't be defined because function with such name is predefined")
+                case (None, None) =>
                   val varBlockTpe                                                  = newVarBlock.tpe
                   val eitherTCoeval: TrampolinedExecResult[varBlockTpe.Underlying] = r[varBlockTpe.Underlying](ctx, EitherT.pure(newVarBlock))
                   val lz: LazyVal                                                  = LazyVal(varBlockTpe)(eitherTCoeval)
@@ -32,7 +34,7 @@ object Evaluator {
             case None      => EitherT.leftT[Coeval, T](s"A definition of '$str' is not found")
           }
 
-        case Typed.CONST_LONG(v)        => EitherT.rightT[Coeval, String](v)
+        case Typed.CONST_LONG(v)       => EitherT.rightT[Coeval, String](v)
         case Typed.CONST_BYTEVECTOR(v) => EitherT.rightT[Coeval, String](v)
         case Typed.TRUE                => EitherT.rightT[Coeval, String](true)
         case Typed.FALSE               => EitherT.rightT[Coeval, String](false)
@@ -103,7 +105,7 @@ object Evaluator {
               } yield r
             case None => EitherT.leftT[Coeval, Any](s"function '$name' not found")
           }
-        case Typed.BINARY_OP(_, SUM_OP, _, tpe) if tpe != LONG             => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
+        case Typed.BINARY_OP(_, SUM_OP, _, tpe) if tpe != LONG            => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
         case Typed.BINARY_OP(_, GE_OP | GT_OP, _, tpe) if tpe != BOOLEAN  => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
         case Typed.BINARY_OP(_, AND_OP | OR_OP, _, tpe) if tpe != BOOLEAN => EitherT.leftT[Coeval, Any](s"Expected BOOLEAN, but got $tpe: $t")
 

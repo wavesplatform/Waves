@@ -152,6 +152,13 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     import Untyped._
 
     errorTests(
+      "can't define LET with the same name as already defined in scope" -> "already defined in the scope" -> BLOCK(
+        Some(LET("X", CONST_LONG(1))),
+        BLOCK(Some(LET("X", CONST_LONG(2))), TRUE)),
+      "can't define LET with the same name as predefined constant" -> "already defined in the scope" -> BLOCK(Some(LET("None", CONST_LONG(2))), TRUE),
+      "can't define LET with the same name as predefined function" -> "function with such name is predefined" -> BLOCK(
+        Some(LET("Some", CONST_LONG(2))),
+        TRUE),
       "BINARY_OP with wrong types"                   -> "The first operand is expected to be LONG" -> BINARY_OP(TRUE, SUM_OP, CONST_LONG(1)),
       "IF can't find common"                         -> "Can't find common type" -> IF(TRUE, TRUE, CONST_LONG(0)),
       "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(multiplierFunction.name, List(CONST_LONG(0))),
@@ -230,8 +237,8 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
                 }
             }
           }
-        case ifExpr: Typed.IF => (aux(ifExpr.cond), aux(ifExpr.ifTrue), aux(ifExpr.ifFalse)).mapN(Untyped.IF)
-        case ref: Typed.REF   => Coeval(Untyped.REF(ref.key))
+        case ifExpr: Typed.IF       => (aux(ifExpr.cond), aux(ifExpr.ifTrue), aux(ifExpr.ifFalse)).mapN(Untyped.IF)
+        case ref: Typed.REF         => Coeval(Untyped.REF(ref.key))
         case f: Typed.FUNCTION_CALL =>
           import cats.instances.vector._
           import cats.syntax.all._
