@@ -34,8 +34,6 @@ object Terms {
     case class REF(key: String)                                      extends EXPR
     case object TRUE                                                 extends EXPR
     case object FALSE                                                extends EXPR
-    case object NONE                                                 extends EXPR
-    case class SOME(t: EXPR)                                         extends EXPR
     case class FUNCTION_CALL(functionName: String, args: List[EXPR]) extends EXPR
   }
 
@@ -51,8 +49,6 @@ object Terms {
     case class REF(key: String, override val tpe: TYPE)                                      extends EXPR(tpe)
     case object TRUE                                                                         extends EXPR(BOOLEAN)
     case object FALSE                                                                        extends EXPR(BOOLEAN)
-    case object NONE                                                                         extends EXPR(OPTION(NOTHING))
-    case class SOME(t: EXPR, override val tpe: TYPE)                                         extends EXPR(tpe)
     case class FUNCTION_CALL(functionName: String, args: List[EXPR], override val tpe: TYPE) extends EXPR(tpe)
   }
 
