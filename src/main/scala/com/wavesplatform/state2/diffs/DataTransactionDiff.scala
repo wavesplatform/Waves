@@ -8,7 +8,6 @@ object DataTransactionDiff {
 
   def apply(state: SnapshotStateReader, height: Int)(tx: DataTransaction): Either[ValidationError, Diff] = {
     val sender = tx.sender.toAddress
-    ///validate tx against state or rm state param
     Right(Diff(height, tx,
       portfolios = Map(sender -> Portfolio(-tx.fee, LeaseInfo.empty, Map.empty)),
       accountData = Map(sender -> AccountDataInfo(tx.data.map(item => item.key -> item).toMap))))

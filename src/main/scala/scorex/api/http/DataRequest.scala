@@ -23,7 +23,7 @@ case class SignedDataRequest(@ApiModelProperty(required = true)
                              version: Byte,
                              @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                              senderPublicKey: String,
-                             @ApiModelProperty(value = "///", required = true)
+                             @ApiModelProperty(value = "Data to put into blockchain", required = true)
                              data: List[DataEntry[_]],
                              @ApiModelProperty(required = true)
                              fee: Long,

@@ -156,32 +156,35 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
   }
 
   def getAccountData(address: Address, key: String): Option[DataEntry[_]] = {
-    val k = makeKey(AddressDataPrefix, address.bytes.arr ++ key.getBytes(Charset))
-    get(k).map(b => DataEntry.parse(key, b, 0)._1)
+    get(valueKey(addressKey(address), key)).map { b =>
+      DataEntry.parse(key, b, 0)._1
+    }
   }
 
   def getAccountData(address: Address): AccountDataInfo = {
     val data = for {
-      keys <- get(makeKey(AddressDataPrefix, address.bytes.arr)).map(StringSeqCodec.decode).map(_.explicitGet().value).toSeq
+      keys <- get(addressKey(address)).map(StringSeqCodec.decode).map(_.explicitGet().value).toSeq
       key <- keys
       item <- getAccountData(address, key)
     } yield key -> item
     AccountDataInfo(data.toMap)
   }
 
+  private def addressKey(address: Address) = makeKey(AddressDataPrefix, address.bytes.arr)
+
+  private def valueKey(prefix: Array[Byte], key: String) = {
+    val keyBytes = key.getBytes(Charset)
+    Bytes.concat(prefix, Array(keyBytes.length.toByte), keyBytes)
+  }
+
   private def putAccountData(b: Option[WriteBatch], data: Map[Address, AccountDataInfo]): Unit = {
     data.foreach { case (addr, dataInfo)  =>
-      val k = makeKey(AddressDataPrefix, addr.bytes.arr)
-      val keys = {
-        val kk = get(k).map(StringSeqCodec.decode).map(_.explicitGet().value)
-        Console.err.println("SS keys = " + kk)///
-        kk.getOrElse(Seq.empty)
-      } /// => no empty keys allowed
+      val k = addressKey(addr)
+      val keys = get(k).map(StringSeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty)
       val updatedKeys = (keys ++ dataInfo.data.keySet).distinct
-      Console.err.println("SS upKeys = " + updatedKeys)///
       if (updatedKeys.lengthCompare(keys.size) > 0)
         put(k, StringSeqCodec.encode(updatedKeys), b)
-      dataInfo.data.foreach { case (key, value) => put(k ++ key.getBytes(Charset), value.valueBytes, b) }
+        dataInfo.data.foreach { case (key, value) => put(valueKey(k, key), value.valueBytes, b) }
     }
   }
 

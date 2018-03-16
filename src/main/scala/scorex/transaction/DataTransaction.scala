@@ -53,15 +53,17 @@ object DataTransaction {
     val sender = PublicKeyAccount(bytes.slice(1, p0))
 
     val entryCount = Shorts.fromByteArray(bytes.drop(p0))
-    val (entries, p1) = (0 until entryCount).foldLeft((List.empty[DataEntry[_]], p0 + 2)) { case ((es, pos), _) =>
-      val (e, p) = DataEntry.parse(bytes, pos)
-      (e :: es, p)
-    }
+    val (entries, p1) =
+      if (entryCount > 0) {
+        val parsed = List.iterate(DataEntry.parse(bytes, p0 + 2), entryCount) { case (e, p) => DataEntry.parse(bytes, p) }
+        (parsed.map(_._1), parsed.last._2)
+      } else (List.empty, p0 + 2)
+
     val timestamp = Longs.fromByteArray(bytes.drop(p1))
     val feeAmount = Longs.fromByteArray(bytes.drop(p1 + 8))
     val txEi = for {
       proofs <- Proofs.fromBytes(bytes.drop(p1 + 16))
-      tx <- create(version, sender, entries.reverse, feeAmount, timestamp, proofs)
+      tx <- create(version, sender, entries, feeAmount, timestamp, proofs)
     } yield tx
     txEi.fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten

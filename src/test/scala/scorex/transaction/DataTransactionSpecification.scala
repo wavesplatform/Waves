@@ -2,6 +2,7 @@ package scorex.transaction
 
 import com.google.common.primitives.Shorts
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.state2.DataEntry._
 import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry}
 import org.scalacheck.Gen
 import org.scalatest._
@@ -9,6 +10,7 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
 import scorex.api.http.SignedDataRequest
 import scorex.crypto.encode.Base58
+import scorex.transaction.DataTransaction._
 import scorex.transaction.TransactionParser.TransactionType
 
 class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -54,41 +56,32 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     }
   }
 
-  property("JSON roundtrip") {///needed?
-//    implicit val specFormat = Json.format[DataItemSpec]
+  property("JSON roundtrip") {
     implicit val signedFormat = Json.format[SignedDataRequest]
-//    import DataTransaction.itemFormat
-//
-//    implicit val dataTransactionFormat: Format[DataTransaction] = Json.format
 
-    forAll(dataTransactionGen) { tx0: DataTransaction =>
-      val json0 = tx0.json()
-      Console.err.println("json " + json0)///
-//      val tx1 = json0.as[DataTransaction]
-//      val json1 = tx1.json()
-      tx0.toString shouldEqual json0.toString
+    forAll(dataTransactionGen) { tx =>
+      val json = tx.json()
+      json.toString shouldEqual tx.toString
 
-      val req = json0.as[SignedDataRequest]
-      req.senderPublicKey shouldEqual Base58.encode(tx0.sender.publicKey)
-      req.fee shouldEqual tx0.fee
-      req.timestamp shouldEqual tx0.timestamp
+      val req = json.as[SignedDataRequest]
+      req.senderPublicKey shouldEqual Base58.encode(tx.sender.publicKey)
+      req.fee shouldEqual tx.fee
+      req.timestamp shouldEqual tx.timestamp
 
-      val reqData = req.data//.map(_.parse.right.get)
-      reqData(0) shouldEqual tx0.data(0)
-      reqData(1) shouldEqual tx0.data(1)
-      reqData.zip(tx0.data).apply(2) match {
-        case (BinaryDataEntry(rk, rv), BinaryDataEntry(tk, tv)) =>
-          rk shouldEqual tk
-          rv shouldEqual tv
-        case _ => fail
+      req.data zip tx.data foreach { case (re, te) =>
+        re match {
+          case BinaryDataEntry(k, v) =>
+            k shouldEqual te.key
+            v shouldEqual te.value
+          case _: DataEntry[_] =>
+            re shouldEqual te
+          case _ => fail
+        }
       }
     }
   }
 
   property("positive validation cases") {
-    import DataTransaction._
-    import com.wavesplatform.state2.DataEntry._
-
     val keyRepeatCountGen = Gen.choose(2, MaxEntryCount)
     forAll(dataTransactionGen, keyRepeatCountGen) {
       case (DataTransaction(version, sender, data, fee, timestamp, proofs), keyRepeatCount) =>
@@ -109,9 +102,6 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   }
 
   property("negative validation cases") {
-    import DataTransaction._
-    import com.wavesplatform.state2.DataEntry._
-
     val badVersionGen = Gen.choose(DataTransaction.Version + 1, Byte.MaxValue).map(_.toByte)
     forAll(dataTransactionGen, badVersionGen) {
       case (DataTransaction(version, sender, data, fee, timestamp, proofs), badVersion) =>

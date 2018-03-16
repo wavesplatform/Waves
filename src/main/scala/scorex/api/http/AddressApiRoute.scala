@@ -203,7 +203,7 @@ case class AddressApiRoute(settings: RestAPISettings, functionalitySettings: Fun
   }
 
   @Path("/data")
-  @ApiOperation(value = "Posts data",///wording
+  @ApiOperation(value = "Post Data to Blockchain",
     httpMethod = "POST",
     produces = "application/json",
     consumes = "application/json")
@@ -221,21 +221,20 @@ case class AddressApiRoute(settings: RestAPISettings, functionalitySettings: Fun
   def postData: Route = processRequest("data", (req: DataRequest) => doBroadcast(TransactionFactory.data(req, wallet, time)))
 
   @Path("/data/{address}")
-  @ApiOperation(value = "Create", notes = "Create a new account in the wallet(if it exists)", httpMethod = "GET")///words
+  @ApiOperation(value = "Complete Data", notes = "Read all data posted by an account", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-  ))
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")))
   def getData: Route = (path("data" / Segment) & get) { address =>
     complete(accountData(address))
   }
 
   @Path("/data/{address}/{key}")
-  @ApiOperation(value = "Create", notes = "Create a new account in the wallet(if it exists)", httpMethod = "GET")///words
+  @ApiOperation(value = "Data by Key", notes = "Read data associated with an account and a key", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-  ))
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "key", value = "Data key", required = true, dataType = "string", paramType = "path")))
   def getDataItem: Route = (path("data" / Segment / Segment) & get) { case (address, key) =>
-    complete(accountData(address, key)) ///handle nonexisting key
+    complete(accountData(address, key))
   }
 
   @Path("/")
