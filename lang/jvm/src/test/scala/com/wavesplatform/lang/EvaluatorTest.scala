@@ -34,19 +34,6 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
       )) shouldBe Right(3)
   }
 
-  property("successful on some expr") {
-    ev(expr = SOME(CONST_LONG(4), OPTION(LONG))) shouldBe Right(Some(4))
-  }
-
-  property("successful on some block") {
-    ev(
-      expr = BLOCK(
-        None,
-        SOME(CONST_LONG(3), OPTION(LONG)),
-        OPTION(LONG)
-      )) shouldBe Right(Some(3))
-  }
-
   property("successful on x = y") {
     ev(
       expr = BLOCK(Some(LET("x", CONST_LONG(3))),

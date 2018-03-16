@@ -1,9 +1,11 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.lang
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.ctx._
-import com.wavesplatform.lang.TypeChecker.{TypeCheckerContext, TypeCheckResult, TypeDefs}
+import com.wavesplatform.lang.TypeChecker.{TypeCheckResult, TypeCheckerContext, TypeDefs}
+import com.wavesplatform.lang.WavesContextImpl.none
 import com.wavesplatform.lang.testing.ScriptGen
 import monix.eval.Coeval
 import org.scalatest.prop.PropertyChecks
@@ -33,7 +35,15 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     val optionFunc = PredefFunction("optionFunc", OPTION(LONG), List.empty)(null)
 
     val ctx =
-      Context(Map.empty, Map.empty, functions = Map((genericFuncWithOptionParam.name, genericFuncWithOptionParam), (optionFunc.name, optionFunc)))
+      Context(
+        Map.empty,
+        Map.empty,
+        functions = Map(
+          genericFuncWithOptionParam.name -> genericFuncWithOptionParam,
+          optionFunc.name                 -> optionFunc,
+          WavesContextImpl.some.name      -> WavesContextImpl.some
+        )
+      )
     val Right(v) = TypeChecker(TypeCheckerContext.fromContext(ctx),
                                FUNCTION_CALL(genericFuncWithOptionParam.name, List(FUNCTION_CALL(optionFunc.name, List.empty))))
 
@@ -49,15 +59,14 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     import Typed._
 
     treeTypeErasureTests(
-      "CONST_LONG"        -> CONST_LONG(0),
+      "CONST_LONG"       -> CONST_LONG(0),
       "CONST_BYTEVECTOR" -> CONST_BYTEVECTOR(ByteVector(1, 2, 3)),
       "TRUE"             -> TRUE,
       "FALSE"            -> FALSE,
-      "NONE"             -> NONE,
       "SUM"              -> BINARY_OP(CONST_LONG(0), SUM_OP, CONST_LONG(1), LONG),
       "AND"              -> BINARY_OP(TRUE, AND_OP, FALSE, BOOLEAN),
       "OR"               -> BINARY_OP(TRUE, OR_OP, FALSE, BOOLEAN),
-      "EQ(LONG)"          -> BINARY_OP(CONST_LONG(0), EQ_OP, CONST_LONG(1), BOOLEAN),
+      "EQ(LONG)"         -> BINARY_OP(CONST_LONG(0), EQ_OP, CONST_LONG(1), BOOLEAN),
       "EQ(BOOL)"         -> BINARY_OP(TRUE, EQ_OP, FALSE, BOOLEAN),
       "GT"               -> BINARY_OP(CONST_LONG(0), GT_OP, CONST_LONG(1), BOOLEAN),
       "GE"               -> BINARY_OP(CONST_LONG(0), GE_OP, CONST_LONG(1), BOOLEAN),
@@ -65,14 +74,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
         let = None,
         body = CONST_LONG(0),
         tpe = LONG
-      ),
-      "IF" -> IF(
-        cond = TRUE,
-        ifTrue = SOME(TRUE, OPTION(BOOLEAN)),
-        ifFalse = NONE,
-        tpe = OPTION(BOOLEAN)
-      ),
-      "SOME"      -> SOME(TRUE, OPTION(BOOLEAN))
+      )
     )
   }
 
@@ -109,33 +111,41 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     expectedResult = Right(Typed.FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_LONG(1), Typed.CONST_LONG(2)), LONG))
   )
 
-  private val optFunc     = PredefFunction("OPTFUNC", UNIT, List("opt"            -> OPTION(OPTION(LONG))))(_ => Right(()))
-  private val noneFunc    = PredefFunction("NONEFUNC", UNIT, List("opt"           -> OPTION(NOTHING)))(_ => Right(()))
-  private val genericFunc = PredefFunction("genericFunc", TYPEREF("T"), List("p1" -> TYPEREF("T"), "p2" -> TYPEREF("T")))(Right(_))
+  private val optFunc  = PredefFunction("OPTFUNC", UNIT, List("opt"  -> OPTION(OPTION(LONG))))(_ => Right(()))
+  private val noneFunc = PredefFunction("NONEFUNC", UNIT, List("opt" -> OPTION(NOTHING)))(_ => Right(()))
+  private val typeCheckerCtx = TypeCheckerContext(
+    predefTypes = Map.empty,
+    varDefs = Map(("None", none.tpe)),
+    functionDefs = Map(lang.WavesContextImpl.some.name -> lang.WavesContextImpl.some.signature,
+                       optFunc.name                    -> optFunc.signature,
+                       noneFunc.name                   -> noneFunc.signature)
+  )
 
+  private val genericFunc = PredefFunction("genericFunc", TYPEREF("T"), List("p1" -> TYPEREF("T"), "p2" -> TYPEREF("T")))(Right(_))
   treeTypeTest(s"NONEFUNC(NONE)")(
-    ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(noneFunc.name -> noneFunc.signature)),
-    expr = Untyped.FUNCTION_CALL(noneFunc.name, List(Untyped.NONE)),
-    expectedResult = Right(Typed.FUNCTION_CALL(noneFunc.name, List(Typed.NONE), UNIT))
+    ctx = typeCheckerCtx,
+    expr = Untyped.FUNCTION_CALL(noneFunc.name, List(Untyped.REF("None"))),
+    expectedResult = Right(Typed.FUNCTION_CALL(noneFunc.name, List(Typed.REF("None", OPTION(NOTHING))), UNIT))
   )
 
   treeTypeTest(s"OPTFUNC(NONE)")(
-    ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(optFunc.name -> optFunc.signature)),
-    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.NONE)),
-    expectedResult = Right(Typed.FUNCTION_CALL(optFunc.name, List(Typed.NONE), UNIT))
+    ctx = typeCheckerCtx,
+    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.REF("None"))),
+    expectedResult = Right(Typed.FUNCTION_CALL(optFunc.name, List(Typed.REF("None", OPTION(NOTHING))), UNIT))
   )
 
   treeTypeTest(s"OPTFUNC(SOME(NONE))")(
-    ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(optFunc.name -> optFunc.signature)),
-    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.SOME(Untyped.NONE))),
-    expectedResult = Right(Typed.FUNCTION_CALL(optFunc.name, List(Typed.SOME(Typed.NONE, OPTION(OPTION(NOTHING)))), UNIT))
+    ctx = typeCheckerCtx,
+    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.FUNCTION_CALL("Some", List(Untyped.REF("None"))))),
+    expectedResult = Right(
+      Typed.FUNCTION_CALL(optFunc.name, List(Typed.FUNCTION_CALL("Some", List(Typed.REF("None", OPTION(NOTHING))), OPTION(OPTION(NOTHING)))), UNIT))
   )
 
   treeTypeTest(s"OPTFUNC(SOME(CONST_LONG(3)))")(
-    ctx = TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(optFunc.name -> optFunc.signature)),
-    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.SOME(Untyped.SOME(Untyped.CONST_LONG(3))))),
+    ctx = typeCheckerCtx,
+    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.FUNCTION_CALL("Some", List(Untyped.FUNCTION_CALL("Some", List(Untyped.CONST_LONG(3))))))),
     expectedResult =
-      Right(Typed.FUNCTION_CALL(optFunc.name, List(Typed.SOME(Typed.SOME(Typed.CONST_LONG(3), OPTION(LONG)), OPTION(OPTION(LONG)))), UNIT))
+      Right(Typed.FUNCTION_CALL(optFunc.name, List(Typed.FUNCTION_CALL("Some", List(Typed.FUNCTION_CALL("Some", List(Typed.CONST_LONG(3)), OPTION(LONG))), OPTION(OPTION(LONG)))), UNIT))
   )
 
   {
@@ -145,8 +155,9 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       "BINARY_OP with wrong types"                   -> "The first operand is expected to be LONG" -> BINARY_OP(TRUE, SUM_OP, CONST_LONG(1)),
       "IF can't find common"                         -> "Can't find common type" -> IF(TRUE, TRUE, CONST_LONG(0)),
       "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(multiplierFunction.name, List(CONST_LONG(0))),
-      "FUNCTION_CALL with upper type"                -> "do not match types required" -> FUNCTION_CALL(noneFunc.name, List(SOME(CONST_LONG(3)))),
-      "FUNCTION_CALL with wrong type of argument"    -> "Types of arguments of function call" -> FUNCTION_CALL(multiplierFunction.name,
+      "FUNCTION_CALL with upper type"                -> "do not match types required" -> FUNCTION_CALL(noneFunc.name,
+                                                                                        List(FUNCTION_CALL("Some", List(CONST_LONG(3))))),
+      "FUNCTION_CALL with wrong type of argument" -> "Types of arguments of function call" -> FUNCTION_CALL(multiplierFunction.name,
                                                                                                             List(CONST_LONG(0), FALSE)),
       "FUNCTION_CALL with uncommon types for parameter T" -> "is no common type" -> FUNCTION_CALL(genericFunc.name,
                                                                                                   List(CONST_LONG(1),
@@ -170,11 +181,12 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
         TypeChecker(
           TypeCheckerContext(
             Map.empty,
-            Map.empty,
+            Map(("None", none.tpe)),
             Map(
-              multiplierFunction.name -> multiplierFunction.signature,
-              noneFunc.name           -> noneFunc.signature,
-              genericFunc.name        -> genericFunc.signature
+              multiplierFunction.name         -> multiplierFunction.signature,
+              noneFunc.name                   -> noneFunc.signature,
+              genericFunc.name                -> genericFunc.signature,
+              lang.WavesContextImpl.some.name -> lang.WavesContextImpl.some.signature
             )
           ),
           input
@@ -200,14 +212,12 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
 
     def aux(root: Typed.EXPR): Coeval[Untyped.EXPR] =
       Coeval.defer(root match {
-        case x: Typed.CONST_LONG        => Coeval(Untyped.CONST_LONG(x.t))
+        case x: Typed.CONST_LONG       => Coeval(Untyped.CONST_LONG(x.t))
         case x: Typed.CONST_BYTEVECTOR => Coeval(Untyped.CONST_BYTEVECTOR(x.bs))
         case Typed.TRUE                => Coeval(Untyped.TRUE)
         case Typed.FALSE               => Coeval(Untyped.FALSE)
-        case Typed.NONE                => Coeval(Untyped.NONE)
-
-        case getter: Typed.GETTER        => aux(getter.ref).map(Untyped.GETTER(_, getter.field))
-        case binaryOp: Typed.BINARY_OP   => (aux(binaryOp.a), aux(binaryOp.b)).mapN(Untyped.BINARY_OP(_, binaryOp.kind, _))
+        case getter: Typed.GETTER      => aux(getter.ref).map(Untyped.GETTER(_, getter.field))
+        case binaryOp: Typed.BINARY_OP => (aux(binaryOp.a), aux(binaryOp.b)).mapN(Untyped.BINARY_OP(_, binaryOp.kind, _))
         case block: Typed.BLOCK =>
           aux(block.body).flatMap { t =>
             val x = Untyped.BLOCK(let = None, body = t)
@@ -220,15 +230,14 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
                 }
             }
           }
-        case ifExpr: Typed.IF       => (aux(ifExpr.cond), aux(ifExpr.ifTrue), aux(ifExpr.ifFalse)).mapN(Untyped.IF)
-        case ref: Typed.REF         => Coeval(Untyped.REF(ref.key))
-        case some: Typed.SOME       => aux(some.t).map(Untyped.SOME)
+        case ifExpr: Typed.IF => (aux(ifExpr.cond), aux(ifExpr.ifTrue), aux(ifExpr.ifFalse)).mapN(Untyped.IF)
+        case ref: Typed.REF   => Coeval(Untyped.REF(ref.key))
         case f: Typed.FUNCTION_CALL =>
           import cats.instances.vector._
           import cats.syntax.all._
-          val auxedArgs: Vector[Coeval[Untyped.EXPR]] = f.args.map(aux).toVector
+          val auxedArgs: Vector[Coeval[Untyped.EXPR]]          = f.args.map(aux).toVector
           val sequencedAuxedArgs: Coeval[Vector[Untyped.EXPR]] = auxedArgs.sequence
-          sequencedAuxedArgs.map(args => Untyped.FUNCTION_CALL(f.functionName,args.toList))
+          sequencedAuxedArgs.map(args => Untyped.FUNCTION_CALL(f.functionName, args.toList))
       })
 
     aux(expr)()

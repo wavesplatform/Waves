@@ -77,8 +77,6 @@ object Evaluator {
             i2 <- r[tpe.Underlying](ctx, EitherT.pure(it2))
           } yield i1 == i2
 
-        case Typed.NONE         => EitherT.rightT[Coeval, String](None)
-        case Typed.SOME(b, tpe) => r[tpe.Underlying](ctx, EitherT.pure(b)).map(Some(_))
         case Typed.GETTER(expr, field, _) =>
           r[Obj](ctx, EitherT.pure(expr)).flatMap { (obj: Obj) =>
             val value: EitherT[Coeval, ExecutionError, Any] = obj.fields.find(_._1 == field) match {

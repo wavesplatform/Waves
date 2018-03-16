@@ -40,7 +40,6 @@ object TypeChecker {
     case x: Untyped.CONST_BYTEVECTOR => EitherT.pure(Typed.CONST_BYTEVECTOR(x.bs))
     case Untyped.TRUE                => EitherT.pure(Typed.TRUE)
     case Untyped.FALSE               => EitherT.pure(Typed.FALSE)
-    case Untyped.NONE                => EitherT.pure(Typed.NONE)
 
     case getter: Untyped.GETTER =>
       setType(ctx, EitherT.pure(getter.ref))
@@ -195,7 +194,6 @@ object TypeChecker {
           .toRight(s"A definition of '${ref.key}' is not found")
       }
 
-    case some: Untyped.SOME => setType(ctx, EitherT.pure(some.t)).map(t => Typed.SOME(t = t, tpe = OPTION(t.tpe)))
   }
 
   def apply(c: TypeCheckerContext, expr: Untyped.EXPR): TypeCheckResult[Typed.EXPR] = {
