@@ -34,17 +34,15 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings, sche
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case GetSignatures(otherSigs) => Task {
-      otherSigs.view
-        .map(parent => parent -> history.blockIdsAfter(parent, settings.maxChainLength))
-        .find(_._2.nonEmpty) match {
-        case Some((parent, extension)) =>
-          log.debug(s"${id(ctx)} Got GetSignatures with ${otherSigs.length}, found common parent $parent and sending ${extension.length} more signatures")
-          ctx.writeAndFlush(Signatures(parent +: extension))
-        case None if otherSigs.lengthCompare(1) == 0 && otherSigs.head == history.lastBlock.get.uniqueId =>
-          // this is the special case when both nodes only have genesis block
-          log.debug(s"${id(ctx)} Both local and remote nodes only have genesis block")
-          ctx.writeAndFlush(Signatures(otherSigs))
-        case _ =>
+      val nextIds = otherSigs.view
+        .map(id => id -> history.blockIdsAfter(id, settings.maxChainLength))
+        .collectFirst { case (parent, Some(ids)) => parent +: ids }
+
+      nextIds match {
+        case Some(extension) =>
+          log.debug(s"${id(ctx)} Got GetSignatures with ${otherSigs.length}, found common parent ${extension.head} and sending total of ${extension.length} signatures")
+          ctx.writeAndFlush(Signatures(extension))
+        case None =>
           log.debug(s"${id(ctx)} Got GetSignatures with ${otherSigs.length} signatures, but could not find an extension")
       }
     }.runAsyncLogErr
@@ -63,7 +61,7 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings, sche
 
     case _: Handshake => Task {
       if (ctx.channel().isOpen)
-        ctx.writeAndFlush(LocalScoreChanged(history.score()))
+        ctx.writeAndFlush(LocalScoreChanged(history.score))
     }.runAsyncLogErr
 
     case _ => super.channelRead(ctx, msg)

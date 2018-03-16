@@ -57,7 +57,7 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with CancelAfter
   "supported blocks counter resets on the next voting interval" in {
     val checkHeight: Int = votingInterval * 2 - blocksForActivation / 2
     val info = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
-    info.supportedBlocks.get shouldBe blocksForActivation / 2
+    info.supportingBlocks.get shouldBe blocksForActivation / 2
     info.blockchainStatus shouldBe BlockchainFeatureStatus.Undefined
   }
 

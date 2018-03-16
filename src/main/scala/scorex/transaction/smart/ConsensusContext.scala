@@ -20,7 +20,7 @@ class ConsensusContext(tx: Coeval[Transaction], h: Coeval[Int], state: SnapshotS
   override def transactionById(id: Array[Byte]): Option[ContractTransaction] =
     state
       .transactionInfo(ByteStr(id))
-      .map(_._2.get)
+      .map(_._2)
       .map(convert)
 }
 

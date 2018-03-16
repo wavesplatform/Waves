@@ -10,7 +10,7 @@ import com.wavesplatform.db._
 import com.wavesplatform.matcher.api.MatcherApiRoute
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderHistoryActor}
 import com.wavesplatform.settings.{BlockchainSettings, RestAPISettings}
-import com.wavesplatform.state2.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import scorex.api.http.CompositeHttpService
@@ -26,7 +26,7 @@ class Matcher(actorSystem: ActorSystem,
               wallet: Wallet,
               utx: UtxPool,
               allChannels: ChannelGroup,
-              stateReader: StateReader,
+              stateReader: SnapshotStateReader,
               history: History,
               blockchainSettings: BlockchainSettings,
               restAPISettings: RestAPISettings, matcherSettings: MatcherSettings) extends ScorexLogging {

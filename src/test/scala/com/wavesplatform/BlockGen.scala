@@ -2,12 +2,13 @@ package com.wavesplatform
 
 import com.wavesplatform.state2._
 import org.scalacheck.Gen
+import org.scalatest.Suite
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction.{SignedTransaction, Transaction}
 
-trait BlockGen extends TransactionGen {
+trait BlockGen extends TransactionGen { _: Suite =>
 
   import BlockGen._
 

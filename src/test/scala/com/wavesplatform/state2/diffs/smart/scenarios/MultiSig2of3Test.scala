@@ -6,7 +6,7 @@ import com.wavesplatform.utils._
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
 import com.wavesplatform.state2.diffs.smart._
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB, crypto}
+import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -16,7 +16,7 @@ import scorex.transaction._
 import scorex.transaction.assets.VersionedTransferTransaction
 import scorex.transaction.smart.{Script, SetScriptTransaction}
 
-class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
+class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   def multisigTypedExpr(pk0: PublicKeyAccount, pk1: PublicKeyAccount, pk2: PublicKeyAccount): Typed.EXPR = {
     val script =
@@ -76,10 +76,10 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
         )
 
         validProofs.foreach { tx =>
-          assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)), smartEnabledFS) { case _ => () }
+          assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)), smartEnabledFS) { case _ => () }
         }
         invalidProofs.foreach { tx =>
-          assertLeft(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)), smartEnabledFS)("TransactionNotAllowedByScript")
+          assertLeft(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)), smartEnabledFS)("TransactionNotAllowedByScript")
         }
     }
   }

@@ -1,6 +1,6 @@
 package com.wavesplatform.state2.diffs
 
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -11,7 +11,7 @@ import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.lease.LeaseTransaction
 
 class BalanceDiffValidationTest extends PropSpec
-  with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
+  with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   property("disallows overflow") {
     val preconditionsAndPayment: Gen[(GenesisTransaction, GenesisTransaction, TransferTransaction, TransferTransaction)] = for {
@@ -29,7 +29,7 @@ class BalanceDiffValidationTest extends PropSpec
 
 
     forAll(preconditionsAndPayment) { case ((gen1, gen2, transfer1, transfer2)) =>
-      assertDiffEi(db, Seq(TestBlock.create(Seq(gen1, gen2, transfer1))), TestBlock.create(Seq(transfer2))) { blockDiffEi =>
+      assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, transfer1))), TestBlock.create(Seq(transfer2))) { blockDiffEi =>
         blockDiffEi should produce("negative waves balance")
       }
     }
@@ -51,7 +51,7 @@ class BalanceDiffValidationTest extends PropSpec
     } yield (gen1, gen2, l1, l2)
 
     forAll(setup) { case (gen1, gen2, l1, l2) =>
-      assertDiffEi(db, Seq(TestBlock.create(Seq(gen1, gen2, l1))), TestBlock.create(Seq(l2)))(totalDiffEi =>
+      assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, l1))), TestBlock.create(Seq(l2)))(totalDiffEi =>
         totalDiffEi should produce("negative effective balance"))
     }
   }
@@ -78,7 +78,7 @@ class BalanceDiffValidationTest extends PropSpec
 
     forAll(ownLessThatLeaseOut) {
       case (genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice, aliceTransfersMoreThanOwnsMinusLeaseOut) =>
-        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice))),
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice))),
           TestBlock.create(Seq(aliceTransfersMoreThanOwnsMinusLeaseOut)),
           settings) { totalDiffEi =>
           totalDiffEi shouldBe 'right
@@ -91,7 +91,7 @@ class BalanceDiffValidationTest extends PropSpec
 
     forAll(ownLessThatLeaseOut) {
       case (genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice, aliceTransfersMoreThanOwnsMinusLeaseOut) =>
-        assertDiffEi(db,
+        assertDiffEi(
           Seq(
             TestBlock.create(Seq(genesis)),
             TestBlock.create(Seq()),

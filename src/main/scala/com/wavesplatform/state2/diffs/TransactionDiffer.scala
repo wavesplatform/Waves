@@ -19,13 +19,13 @@ object TransactionDiffer {
   def apply(settings: FunctionalitySettings, prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int)
            (s: SnapshotStateReader, fp: FeatureProvider, tx: Transaction): Either[ValidationError, Diff] = {
     for {
-      t0 <- Verifier(s, currentBlockHeight)(tx)
-      t1 <- CommonValidation.disallowTxFromFuture(settings, currentBlockTimestamp, t0)
-      t2 <- CommonValidation.disallowTxFromPast(prevBlockTimestamp, t1)
-      t3 <- CommonValidation.disallowBeforeActivationTime(fp, currentBlockHeight, t2)
-      t4 <- CommonValidation.disallowDuplicateIds(s, settings, currentBlockHeight, t3)
-      t5 <- CommonValidation.disallowSendingGreaterThanBalance(s, settings, currentBlockTimestamp, t4)
-      diff <- t5 match {
+      _ <- Verifier(s, currentBlockHeight)(tx)
+      _ <- CommonValidation.disallowTxFromFuture(settings, currentBlockTimestamp, tx)
+      _ <- CommonValidation.disallowTxFromPast(prevBlockTimestamp, tx)
+      _ <- CommonValidation.disallowBeforeActivationTime(fp, currentBlockHeight, tx)
+      _ <- CommonValidation.disallowDuplicateIds(s, settings, currentBlockHeight, tx)
+      _ <- CommonValidation.disallowSendingGreaterThanBalance(s, settings, currentBlockTimestamp, tx)
+      diff <- tx match {
         case gtx: GenesisTransaction => GenesisTransactionDiff(currentBlockHeight)(gtx)
         case ptx: PaymentTransaction => PaymentTransactionDiff(s, currentBlockHeight, settings, currentBlockTimestamp)(ptx)
         case itx: IssueTransaction => AssetTransactionsDiff.issue(currentBlockHeight)(itx)
@@ -41,7 +41,7 @@ object TransactionDiffer {
         case sttx: VersionedTransferTransaction => ScriptTransferTransactionDiff(s, currentBlockHeight)(sttx)
         case _ => Left(UnsupportedTransactionType)
       }
-      positiveDiff <- BalanceDiffValidation(s, settings)(diff)
+      positiveDiff <- BalanceDiffValidation(s, currentBlockHeight, settings)(diff)
     } yield positiveDiff
   }.left.map(TransactionValidationError(_, tx))
 }

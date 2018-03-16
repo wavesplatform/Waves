@@ -6,7 +6,7 @@ import com.wavesplatform.matcher.market.OrderBookActor.ForceCancelOrder
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ForceCancelOrderFromHistory, GetActiveOrdersByAddress, GetActiveOrdersByAddressResponse}
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.matcher.model.LimitOrder
-import com.wavesplatform.state2.LeaseInfo
+import com.wavesplatform.state2.LeaseBalance
 import scorex.account.Address
 import scorex.transaction.assets.exchange.AssetPair
 import scorex.utils.ScorexLogging
@@ -83,7 +83,7 @@ class BalanceWatcherWorkerActor(settings: Settings, matcher: ActorRef, orderHist
         val (_, r) = ordersByPriority.foldLeft((portfolio, List.empty: OrdersToDelete)) {
           case ((restPortfolio, toDelete), limitOrder) =>
             val updatedPortfolio = restPortfolio
-              .copy(balance = restPortfolio.balance - restPortfolio.leaseInfo.leaseOut, leaseInfo = LeaseInfo.empty)
+              .copy(balance = restPortfolio.balance - restPortfolio.lease.out, lease = LeaseBalance.empty)
               .remove(limitOrder.spentAcc.assetId, limitOrder.getSpendAmount)
               .flatMap { p =>
                 if (limitOrder.rcvAsset == AssetPair.WavesName && limitOrder.getReceiveAmount >= limitOrder.remainingFee) Some(p)

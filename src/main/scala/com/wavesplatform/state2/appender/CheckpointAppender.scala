@@ -18,7 +18,7 @@ object CheckpointAppender extends ScorexLogging {
     val t = Task(checkpointService.set(c).map { _ =>
       log.info(s"Processing checkpoint $c")
       makeBlockchainCompliantWith(history, blockchainUpdater)(c)
-      history.score()
+      history.score
     }).executeOn(scheduler).map(_.map(Some(_)))
     maybeChannel match {
       case None => t
