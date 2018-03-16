@@ -37,6 +37,9 @@ object SyncHttpApi extends Assertions {
 
     private val RequestAwaitTime = 15.seconds
 
+    def get(path: String): Response =
+      Await.result(async(n).get(path), RequestAwaitTime)
+
     def postJson[A: Writes](path: String, body: A): Response =
       Await.result(async(n).postJson(path, body), RequestAwaitTime)
 
@@ -84,6 +87,12 @@ object SyncHttpApi extends Assertions {
     def lease(sourceAddress: String, recipient: String, leasingAmount: Long, leasingFee: Long): Transaction =
       Await.result(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee), RequestAwaitTime)
 
+    def activeLeases(sourceAddress: String): Seq[Transaction] =
+      Await.result(async(n).activeLeases(sourceAddress), RequestAwaitTime)
+
+    def cancelLease(sourceAddress: String, leaseId: String, fee: Long): Transaction =
+      Await.result(async(n).cancelLease(sourceAddress, leaseId, fee), RequestAwaitTime)
+
     def signedMassTransfer(tx: SignedMassTransferRequest): Transaction =
       Await.result(async(n).signedMassTransfer(tx), RequestAwaitTime)
 
@@ -98,6 +107,9 @@ object SyncHttpApi extends Assertions {
 
     def createAddress(): String =
       Await.result(async(n).createAddress, RequestAwaitTime)
+
+    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Transaction =
+      Await.result(async(n).waitForTransaction(txId), RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
