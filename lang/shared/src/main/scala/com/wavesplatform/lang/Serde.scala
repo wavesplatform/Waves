@@ -17,8 +17,6 @@ object Serde {
   implicit def dRef             = d.bind[Typed.REF](7)
   implicit def dTrue            = d.bind[Typed.TRUE.type](8)
   implicit def dFalse           = d.bind[Typed.FALSE.type](9)
-  implicit def dSome            = d.bind[Typed.SOME](10)
-  implicit def dNone            = d.bind[Typed.NONE.type](11)
   implicit def dGetter          = d.bind[Typed.GETTER](12)
   implicit def dFunctionCall    = d.bind[Typed.FUNCTION_CALL](13)
 
