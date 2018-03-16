@@ -234,7 +234,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sna
     Address.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
       confirmations,
-      ???
+      state.balance(acc, state.height, confirmations)
     ))).getOrElse(InvalidAddress)
   }
 
@@ -253,7 +253,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sna
         portfolio.balance,
         PoSCalc.generatingBalance(state, functionalitySettings, account, state.height),
         portfolio.balance - portfolio.lease.out,
-        ???)
+        portfolio.effectiveBalance)
   }
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {

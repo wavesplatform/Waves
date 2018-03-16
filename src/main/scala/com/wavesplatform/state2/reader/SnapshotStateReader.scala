@@ -64,6 +64,12 @@ object SnapshotStateReader {
       if (balances.isEmpty) 0L else balances.view.map(_.effectiveBalance).min
     }
 
+    def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
+      val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
+      val balances = s.balanceSnapshots(address, bottomLimit, atHeight)
+      if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
+    }
+
     def aliasesOfAddress(address: Address): Seq[Alias] =
       s.addressTransactions(address, Set(TransactionType.CreateAliasTransaction), 0, Int.MaxValue)
       .collect { case (_, a: CreateAliasTransaction) => a.alias }
