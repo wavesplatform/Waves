@@ -28,6 +28,8 @@ class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure 
     notMiner.waitForTransaction(cancelLesingTxId)
     val status1 = getStatus(createdLeaseTxId)
     status1 shouldBe Canceled
+    val sizeActiveLeases = sender.activeLeases(firstAddress).size
+    sizeActiveLeases shouldBe 0
 
   }
 
@@ -58,9 +60,8 @@ object LeaseStatusTestSuiteObj {
   private val notMinerConfig = ConfigFactory.parseString(
     s"""waves {
        |   miner.enable = no
-       |   miner.minimal-block-generation-offset = $blockGenerationOffest
        |}
-     """.stripMargin)
+     """.stripMargin).withFallback(minerConfig)
 
   val Configs: Seq[Config] = Seq(
     minerConfig.withFallback(Default.head),
