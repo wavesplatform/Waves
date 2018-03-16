@@ -1,6 +1,7 @@
-package com.wavesplatform.it.transactions
+package com.wavesplatform.it.sync
 
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.{JsNumber, JsObject, Json}

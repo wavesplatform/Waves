@@ -3,7 +3,7 @@ package com.wavesplatform.state2.diffs.smart.predef
 import com.wavesplatform.{NoShrink, TransactionGen}
 import com.wavesplatform.lang.Evaluator
 import com.wavesplatform.state2.diffs._
-import com.wavesplatform.state2.diffs.smart.dummyTypeCheckerContext
+import com.wavesplatform.utils._
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval
 import org.scalatest.{Matchers, PropSpec}

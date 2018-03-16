@@ -24,7 +24,7 @@ object TransactionParser {
     val MassTransferTransaction = Value(11)
     val DataTransaction = Value(12)
     val SetScriptTransaction = Value(13)
-    val ScriptTransferTransaction = Value(14)
+    val VersionedTransferTransaction = Value(14)
   }
 
   val TimestampLength = 8
@@ -73,8 +73,8 @@ object TransactionParser {
       case txType: Byte if txType == TransactionType.SetScriptTransaction.id =>
         SetScriptTransaction.parseTail(data.tail)
 
-      case txType: Byte if txType == TransactionType.ScriptTransferTransaction.id =>
-        ScriptTransferTransaction.parseTail(data.tail)
+      case txType: Byte if txType == TransactionType.VersionedTransferTransaction.id =>
+        VersionedTransferTransaction.parseTail(data.tail)
 
       case txType: Byte if txType == TransactionType.DataTransaction.id =>
         DataTransaction.parseTail(data.tail)

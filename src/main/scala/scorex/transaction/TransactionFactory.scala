@@ -11,6 +11,7 @@ import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.smart.{Script, SetScriptTransaction}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
@@ -31,6 +32,22 @@ object TransactionFactory {
           request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
     } yield tx
 
+  def versionedTransfer(request: VersionedTransferRequest, wallet: Wallet, time: Time): Either[ValidationError, VersionedTransferTransaction] =
+    for {
+      senderPrivateKey <- wallet.findWallet(request.sender)
+      recipientAcc <- AddressOrAlias.fromString(request.recipient)
+      tx <- VersionedTransferTransaction
+        .selfSigned(2,
+          request.assetId.map(s => ByteStr.decodeBase58(s).get),
+          senderPrivateKey,
+          recipientAcc,
+          request.amount,
+          request.timestamp.getOrElse(time.getTimestamp()),
+          request.fee,
+          request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
+    } yield tx
+
+
   def massTransferAsset(request: MassTransferRequest, wallet: Wallet, time: Time): Either[ValidationError, MassTransferTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
@@ -44,6 +61,23 @@ object TransactionFactory {
         request.fee,
         request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
     } yield tx
+
+
+  def setScript(request: SetScriptRequest, wallet: Wallet, time: Time): Either[ValidationError, SetScriptTransaction] =
+    for {
+      senderPrivateKey <- wallet.findWallet(request.sender)
+      script <- request.script match {
+        case None => Right(None)
+        case Some(s) => Script.fromBase58String(s).map(Some(_))
+      }
+      tx <- SetScriptTransaction.selfSigned(
+        sender = senderPrivateKey,
+        script = script,
+        fee = request.fee,
+        timestamp = request.timestamp.getOrElse(time.getTimestamp()),
+        )
+    } yield tx
+
 
   def issueAsset(request: IssueRequest, wallet: Wallet, time: Time): Either[ValidationError, IssueTransaction] =
     for {

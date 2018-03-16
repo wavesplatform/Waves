@@ -78,9 +78,9 @@ object SetScriptTransaction {
 
 
   def selfSigned(sender: PrivateKeyAccount,
-                 script: Script,
+                 script: Option[Script],
                  fee: Long,
-                 timestamp: Long): Either[ValidationError, SetScriptTransaction] = create(sender, Some(script), fee, timestamp, Proofs.empty).right.map { unsigned =>
+                 timestamp: Long): Either[ValidationError, SetScriptTransaction] = create(sender, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
     unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes())))).explicitGet())
   }
 }
