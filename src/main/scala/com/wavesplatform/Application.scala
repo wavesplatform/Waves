@@ -24,6 +24,7 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.utils.{SystemInformationReporter, forceStopApplication}
+import com.wavesplatform.utx.{MatcherUtxPool, UtxPool, UtxPoolImpl}
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
@@ -96,7 +97,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private var matcher: Option[Matcher] = None
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
-  private var maybeUtx: Option[UtxPoolImpl] = None
+  private var maybeUtx: Option[UtxPool] = None
   private var maybeNetwork: Option[NS] = None
 
   def apiShutdown(): Unit = {
@@ -116,8 +117,18 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val time: Time = NTP
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val utxStorage = new UtxPoolImpl(time, stateReader, history, featureProvider, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+    val innerUtxStorage = new UtxPoolImpl(time, stateReader, history, featureProvider, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+
+    matcher = if (settings.matcherSettings.enable) {
+      val m = new Matcher(actorSystem, wallet, innerUtxStorage, allChannels, stateReader, history,
+        settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
+      m.runMatcher()
+      Some(m)
+    } else None
+
+    val utxStorage = if (settings.matcherSettings.enable) new MatcherUtxPool(innerUtxStorage, settings.matcherSettings, actorSystem.eventStream) else innerUtxStorage
     maybeUtx = Some(utxStorage)
+
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
     val miner = if (settings.minerSettings.enable)
       new MinerImpl(allChannels, blockchainUpdater, checkpointService, history, featureProvider, stateReader, settings,
@@ -229,19 +240,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       Metrics.shutdown()
       shutdown(utxStorage, network)
     }
-
-    matcher = if (settings.matcherSettings.enable) {
-      val m = new Matcher(actorSystem, wallet, utxStorage, allChannels, stateReader, history,
-        settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
-      m.runMatcher()
-      Some(m)
-    } else None
   }
 
   @volatile var shutdownInProgress = false
   @volatile var serverBinding: ServerBinding = _
 
-  def shutdown(utx: UtxPoolImpl, network: NS): Unit = {
+  def shutdown(utx: UtxPool, network: NS): Unit = {
     if (!shutdownInProgress) {
       shutdownInProgress = true
 

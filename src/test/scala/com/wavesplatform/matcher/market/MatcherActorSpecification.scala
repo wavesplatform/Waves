@@ -4,7 +4,6 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.model.StatusCodes
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.StatusCodeMatcherResponse
 import com.wavesplatform.matcher.fixtures.RestartableActor
@@ -16,6 +15,7 @@ import com.wavesplatform.matcher.model.LevelAgg
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Coeval
 import org.scalamock.scalatest.PathMockFactory
@@ -28,13 +28,18 @@ import scorex.transaction.{AssetId, History}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
+import scala.concurrent.duration.DurationInt
+
 class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"))
   with WordSpecLike with Matchers with BeforeAndAfterAll with ImplicitSender with MatcherTestData
   with BeforeAndAfterEach with ScorexLogging with PathMockFactory {
 
   val storedState: SnapshotStateReader = stub[SnapshotStateReader]
 
-  val settings = matcherSettings.copy(account = MatcherAccount.address)
+  val settings = matcherSettings.copy(
+    account = MatcherAccount.address,
+    balanceWatching = BalanceWatcherWorkerActor.Settings(enable = false, oneAddressProcessingTimeout = 1.second)
+  )
   val history = stub[History]
   val functionalitySettings = TestFunctionalitySettings.Stub
   val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))

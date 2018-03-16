@@ -14,7 +14,9 @@ object SignedMassTransferRequest {
 }
 
 @ApiModel(value = "Signed Asset transfer transaction")
-case class SignedMassTransferRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
+case class SignedMassTransferRequest(@ApiModelProperty(required = true)
+                                     version: Byte,
+                                     @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                                      senderPublicKey: String,
                                      @ApiModelProperty(value = "Base58 encoded Asset ID")
                                      assetId: Option[String],

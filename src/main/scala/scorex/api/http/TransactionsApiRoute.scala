@@ -5,9 +5,9 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
-import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.{ByteStr, StateReader}
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import play.api.libs.json._
@@ -157,6 +157,8 @@ case class TransactionsApiRoute(
           case LeaseTransaction => TransactionFactory.lease(jsv.as[LeaseRequest], wallet, time)
           case LeaseCancelTransaction => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
           case CreateAliasTransaction => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
+          case SetScriptTransaction => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
+          case VersionedTransferTransaction => TransactionFactory.versionedTransfer(jsv.as[VersionedTransferRequest], wallet, time)
           case t => Left(GenericError(s"Bad transaction type: $t"))
         }
         txEi match {
@@ -185,6 +187,8 @@ case class TransactionsApiRoute(
           case LeaseTransaction => jsv.as[SignedLeaseRequest].toTx
           case LeaseCancelTransaction => jsv.as[SignedLeaseCancelRequest].toTx
           case CreateAliasTransaction => jsv.as[SignedCreateAliasRequest].toTx
+          case SetScriptTransaction=> jsv.as[SignedSetScriptRequest].toTx
+          case VersionedTransferTransaction => jsv.as[SignedVersionedTransferRequest].toTx
           case t => Left(GenericError(s"Bad transaction type: $t"))
         }
         doBroadcast(req)

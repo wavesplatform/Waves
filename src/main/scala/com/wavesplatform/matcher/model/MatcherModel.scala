@@ -3,8 +3,10 @@ package com.wavesplatform.matcher.model
 import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.matcher.model.MatcherModel.Price
+import com.wavesplatform.state2.Portfolio
 import play.api.libs.json.{JsObject, JsValue, Json}
-import scorex.transaction.AssetAcc
+import scorex.account.Address
+import scorex.transaction.{AssetAcc, AssetId}
 import scorex.transaction.assets.exchange._
 
 import scala.util.Try
@@ -120,19 +122,26 @@ object Events {
 
   case class ExchangeTransactionCreated(tx: ExchangeTransaction)
 
-  def createOrderInfo(event: Event): Map[String, OrderInfo] = {
+  case class BalanceChanged(changes: Map[Address, BalanceChanged.Changes]) {
+    def isEmpty: Boolean = changes.isEmpty
+  }
+  object BalanceChanged {
+    val empty: BalanceChanged = BalanceChanged(Map.empty)
+    case class Changes(updatedPortfolio: Portfolio, changedAssets: Set[Option[AssetId]])
+  }
+
+  def createOrderInfo(event: Event): Map[String, (Order, OrderInfo)] = {
     event match {
       case OrderAdded(lo) =>
-        Map(lo.order.idStr() ->
-          OrderInfo(lo.order.amount, 0L, false))
+        Map((lo.order.idStr(), (lo.order, OrderInfo(lo.order.amount, 0L, false))))
       case oe: OrderExecuted =>
         val (o1, o2) = (oe.submittedExecuted, oe.counterExecuted)
-        Map(o1.order.idStr() -> OrderInfo(o1.order.amount, o1.amount, false),
-          o2.order.idStr() -> OrderInfo(o2.order.amount, o2.amount, false)
+        Map(
+          (o1.order.idStr(), (o1.order, OrderInfo(o1.order.amount, o1.amount, false))),
+          (o2.order.idStr(), (o2.order, OrderInfo(o2.order.amount, o2.amount, false)))
         )
       case OrderCanceled(lo) =>
-        Map(lo.order.idStr() ->
-          OrderInfo(lo.order.amount, 0, true))
+        Map((lo.order.idStr(), (lo.order, OrderInfo(lo.order.amount, 0, true))))
     }
   }
 

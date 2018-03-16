@@ -1,10 +1,10 @@
 package com.wavesplatform.matcher.model
 
 import cats.implicits._
-import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.matcher.model.Events.OrderAdded
+import com.wavesplatform.utx.UtxPool
 import scorex.account.PublicKeyAccount
 import scorex.transaction.AssetAcc
 import scorex.transaction.ValidationError.GenericError

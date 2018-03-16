@@ -22,7 +22,8 @@ import scorex.api.http.ApiErrorResponse
 import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
-import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
+import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
+import scorex.transaction.Proofs
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 import scorex.transaction.assets.exchange.Order
 import scorex.waves.http.DebugApiRoute._
@@ -37,6 +38,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object AsyncHttpApi extends Assertions {
+
   case class ErrorMessage(error: Int, message: String)
 
   implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
@@ -211,7 +213,7 @@ object AsyncHttpApi extends Assertions {
       postJson("/assets/transfer", TransferRequest(assetId, feeAssetId, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
     def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Future[Transaction] =
-      postJson("/assets/masstransfer", MassTransferRequest(assetId, sourceAddress, transfers, fee, None)).as[Transaction]
+      postJson("/assets/masstransfer", MassTransferRequest(Proofs.Version, assetId, sourceAddress, transfers, fee, None)).as[Transaction]
 
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson("/waves/payment", PaymentRequest(amount, fee, sourceAddress, recipient)).as[Transaction]
@@ -243,13 +245,20 @@ object AsyncHttpApi extends Assertions {
     def signedTransfer(transfer: SignedTransferRequest): Future[Transaction] =
       postJson("/assets/broadcast/transfer", transfer).as[Transaction]
 
-    def signedMassTransfer(req: SignedMassTransferRequest): Future[Transaction] = {
-      postJson("/transactions/broadcast", req).as[Transaction]
-    }
+    def signedLease(lease: SignedLeaseRequest): Future[Transaction] =
+      postJson("/leasing/broadcast/lease", lease).as[Transaction]
 
-    def signedIssue(issue: SignedIssueRequest): Future[Transaction] = {
+    def signedLeaseCancel(leaseCancel: SignedLeaseCancelRequest): Future[Transaction] =
+      postJson("/leasing/broadcast/cancel", leaseCancel).as[Transaction]
+
+    def signedMassTransfer(req: SignedMassTransferRequest): Future[Transaction] =
+      postJson("/transactions/broadcast", req).as[Transaction]
+
+    def signedBroadcast(jsobj: JsObject): Future[Transaction] =
+      post("/transactions/broadcast", stringify(jsobj)).as[Transaction]
+
+    def signedIssue(issue: SignedIssueRequest): Future[Transaction] =
       postJson("/assets/broadcast/issue", issue).as[Transaction]
-    }
 
     def batchSignedTransfer(transfers: Seq[SignedTransferRequest], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
       val request = _post(s"${n.nodeApiEndpoint}/assets/broadcast/batch-transfer")
@@ -277,7 +286,7 @@ object AsyncHttpApi extends Assertions {
     def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
       postJson("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
 
-    def aliasByAddress(targetAddress: String) =
+    def aliasByAddress(targetAddress: String): Future[Seq[String]] =
       get(s"/alias/by-address/$targetAddress").as[Seq[String]]
 
     def addressByAlias(targetAlias: String): Future[Address] =
@@ -312,6 +321,11 @@ object AsyncHttpApi extends Assertions {
       currentBlock <- lastBlock
       actualBlock <- findBlock(_.height > currentBlock.height, currentBlock.height)
     } yield actualBlock
+
+    def waitForHeightArise: Future[Int] = for {
+      height <- height
+      newHeight <- waitForHeight(height + 1)
+    } yield newHeight
 
     def findBlock(cond: Block => Boolean, from: Int = 1, to: Int = Int.MaxValue): Future[Block] = {
       def load(_from: Int, _to: Int): Future[Block] = blockSeq(_from, _to).flatMap { blocks =>
@@ -477,4 +491,5 @@ object AsyncHttpApi extends Assertions {
   implicit class RequestBuilderOps(self: RequestBuilder) {
     def withApiKey(x: String): RequestBuilder = self.setHeader(api_key.name, x)
   }
+
 }

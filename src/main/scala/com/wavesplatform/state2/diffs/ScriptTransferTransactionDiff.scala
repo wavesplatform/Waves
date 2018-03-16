@@ -6,10 +6,10 @@ import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.account.Address
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.ScriptTransferTransaction
+import scorex.transaction.assets.VersionedTransferTransaction
 
 object ScriptTransferTransactionDiff {
-  def apply(state: SnapshotStateReader, height: Int)(tx: ScriptTransferTransaction): Either[ValidationError, Diff] = {
+  def apply(state: SnapshotStateReader, height: Int)(tx: VersionedTransferTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender.publicKey)
     for {
       recipient <- state.resolveAliasEi(tx.recipient)

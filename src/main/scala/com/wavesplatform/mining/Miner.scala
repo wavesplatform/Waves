@@ -1,13 +1,13 @@
 package com.wavesplatform.mining
 
 import cats.data.EitherT
-import com.wavesplatform.UtxPool
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics.{BlockStats, HistogramExt, Instrumented}
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.appender.{BlockAppender, MicroblockAppender}
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import kamon.metric.instrument
