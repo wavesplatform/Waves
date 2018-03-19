@@ -27,7 +27,7 @@ class OrderValidatorSpecification extends WordSpec
   val utxPool: UtxPool = stub[UtxPool]
 
   val ss: SnapshotStateReader = stub[SnapshotStateReader]
-  (ss.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
+  (ss.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L, None)))
   val i1: IssueTransaction = IssueTransaction.create(PrivateKeyAccount(Array.empty), "WBTC".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
   (ss.transactionInfo _).when(*).returns(Some((1, Some(i1))))
 

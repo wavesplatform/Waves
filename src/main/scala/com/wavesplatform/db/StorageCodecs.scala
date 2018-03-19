@@ -5,6 +5,8 @@ import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.state2.{AssetInfo, ByteStr, OrderFillInfo}
 import scorex.account.Alias
+import scorex.serialization.Deser
+import scorex.transaction.smart.Script
 
 import scala.util.Try
 
@@ -39,8 +41,8 @@ trait Codec[A] {
 }
 
 object Codec {
-  val SignatureLength: Int = 64
-  val TrueBytes: Array[Byte] = Array[Byte](1.toByte)
+  val SignatureLength: Int    = 64
+  val TrueBytes: Array[Byte]  = Array[Byte](1.toByte)
   val FalseBytes: Array[Byte] = Array[Byte](0.toByte)
 }
 
@@ -55,7 +57,7 @@ object BlockCheckpointCodec extends Codec[BlockCheckpoint] {
   override def decode(arr: Array[Byte]): Either[CodecFailure, DecodeResult[BlockCheckpoint]] = {
     val len = Ints.BYTES + Codec.SignatureLength
     for {
-      height <- Try(Ints.fromByteArray(arr.take(Ints.BYTES))).toEither.left.map(e => CodecFailure(e.getMessage))
+      height    <- Try(Ints.fromByteArray(arr.take(Ints.BYTES))).toEither.left.map(e => CodecFailure(e.getMessage))
       signature <- Either.cond(arr.length >= len, arr.slice(Ints.BYTES, len), CodecFailure("not enough bytes for signature"))
     } yield DecodeResult(len, BlockCheckpoint(height, signature))
   }
@@ -65,7 +67,7 @@ object CheckpointCodec extends Codec[Checkpoint] {
   private val itemsCodec = SeqCodec(BlockCheckpointCodec)
 
   override def encode(value: Checkpoint): Array[Byte] = {
-    val r = itemsCodec.encode(value.items)
+    val r      = itemsCodec.encode(value.items)
     val result = new Array[Byte](Codec.SignatureLength + r.length)
     System.arraycopy(value.signature, 0, result, 0, Codec.SignatureLength)
     System.arraycopy(r, 0, result, Codec.SignatureLength, r.length)
@@ -75,7 +77,7 @@ object CheckpointCodec extends Codec[Checkpoint] {
   override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Checkpoint]] = {
     val signature = bytes.take(Codec.SignatureLength)
     for {
-      _ <- Either.cond(signature.length == Codec.SignatureLength, (), CodecFailure("incorrect signature length"))
+      _     <- Either.cond(signature.length == Codec.SignatureLength, (), CodecFailure("incorrect signature length"))
       items <- itemsCodec.decode(bytes.slice(Codec.SignatureLength, bytes.length))
     } yield DecodeResult(Codec.SignatureLength + items.length, Checkpoint(items.value, signature))
   }
@@ -87,8 +89,8 @@ case class SeqCodec[A](valueCodec: Codec[A]) extends Codec[Seq[A]] {
     value.foreach { item =>
       builder.++=(valueCodec.encode(item))
     }
-    val bytes = builder.result()
-    val len = bytes.length
+    val bytes  = builder.result()
+    val len    = bytes.length
     val result = new Array[Byte](Ints.BYTES + len)
     System.arraycopy(Ints.toByteArray(value.length), 0, result, 0, Ints.BYTES)
     System.arraycopy(bytes, 0, result, Ints.BYTES, len)
@@ -99,9 +101,9 @@ case class SeqCodec[A](valueCodec: Codec[A]) extends Codec[Seq[A]] {
     val n = Try(Ints.fromByteArray(bytes.take(Ints.BYTES))).toEither.left.map(e => CodecFailure(e.getMessage))
     if (n.isRight) {
       val expectedLength = n.right.get
-      val builder = Seq.newBuilder[A]
-      var i = Ints.BYTES
-      var error = false
+      val builder        = Seq.newBuilder[A]
+      var i              = Ints.BYTES
+      var error          = false
       while (i < bytes.length && !error) {
         val r = valueCodec.decode(bytes.slice(i, bytes.length))
         if (r.isRight) {
@@ -191,13 +193,15 @@ object VotesMapCodec extends Codec[Map[Short, Int]] {
 
   override def encode(value: Map[Short, Int]): Array[Byte] = itemsCodec.encode(value.toSeq)
 
-  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Map[Short, Int]]] = itemsCodec.decode(bytes)
-    .map(r => DecodeResult(r.length, r.value.toMap))
+  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Map[Short, Int]]] =
+    itemsCodec
+      .decode(bytes)
+      .map(r => DecodeResult(r.length, r.value.toMap))
 }
 
 object TransactionsValueCodec extends Codec[(Int, Array[Byte])] {
   override def encode(value: (Int, Array[Byte])): Array[Byte] = {
-    val len = value._2.length
+    val len    = value._2.length
     val result = new Array[Byte](2 * Ints.BYTES + len)
     System.arraycopy(Ints.toByteArray(value._1), 0, result, 0, Ints.BYTES)
     System.arraycopy(Ints.toByteArray(len), 0, result, Ints.BYTES, Ints.BYTES)
@@ -208,7 +212,7 @@ object TransactionsValueCodec extends Codec[(Int, Array[Byte])] {
   override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[(Int, Array[Byte])]] = {
     for {
       v1 <- decodeInt(bytes.take(Ints.BYTES))
-      l <- decodeInt(bytes.slice(Ints.BYTES, 2 * Ints.BYTES))
+      l  <- decodeInt(bytes.slice(Ints.BYTES, 2 * Ints.BYTES))
       a = bytes.slice(2 * Ints.BYTES, 2 * Ints.BYTES + l)
       _ <- Either.cond(a.length == l, (), CodecFailure("incorrect array length"))
     } yield DecodeResult(2 * Ints.BYTES + l, (v1, a))
@@ -217,9 +221,14 @@ object TransactionsValueCodec extends Codec[(Int, Array[Byte])] {
 
 object AssetInfoCodec extends Codec[AssetInfo] {
   override def encode(value: AssetInfo): Array[Byte] = {
-    val result = new Array[Byte](1 + Longs.BYTES)
+    val result = new Array[Byte](1 + Longs.BYTES + value.script.map(s => s.bytes().arr.length).getOrElse(0))
     System.arraycopy(encodeBoolean(value.isReissuable), 0, result, 0, 1)
     System.arraycopy(Longs.toByteArray(value.volume), 0, result, 1, Longs.BYTES)
+
+    value.script.foreach { s =>
+      val script = Deser.serializeArray(s.bytes().arr)
+      System.arraycopy(script, 0, result, 1 + Longs.BYTES, script.length)
+    }
     result
   }
 
@@ -227,7 +236,18 @@ object AssetInfoCodec extends Codec[AssetInfo] {
     for {
       v1 <- decodeBoolean(bytes.take(1))
       v2 <- decodeLong(bytes.slice(1, Longs.BYTES + 1))
-    } yield DecodeResult(Longs.BYTES + 1, AssetInfo(v1, v2))
+      v3 <- if (bytes.length > Longs.BYTES + 1)
+        Script
+          .fromBytes(Deser.parseArraySize(bytes, Longs.BYTES + 1)._1)
+          .map(Some(_))
+          .left
+          .map(e => CodecFailure(e.m))
+      else Right(None)
+    } yield
+      DecodeResult(
+        Longs.BYTES + 1,
+        AssetInfo(v1, v2, v3)
+      )
   }
 }
 
@@ -252,8 +272,8 @@ object AliasSeqCodec extends Codec[Seq[Alias]] {
 
 object StringCodec extends Codec[String] {
   override def encode(value: String): Array[Byte] = {
-    val bytes = value.getBytes(Charsets.UTF_8)
-    val len = bytes.length
+    val bytes  = value.getBytes(Charsets.UTF_8)
+    val len    = bytes.length
     val result = new Array[Byte](Ints.BYTES + len)
     System.arraycopy(Ints.toByteArray(len), 0, result, 0, Ints.BYTES)
     System.arraycopy(bytes, 0, result, Ints.BYTES, len)
@@ -275,8 +295,8 @@ object OrderToTxIdsCodec extends Codec[Set[String]] {
 
   override def encode(value: Set[String]): Array[Byte] = itemsCodec.encode(value.toSeq)
 
-  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Set[String]]] = itemsCodec.decode(bytes)
-    .right.map(r => DecodeResult(r.length, r.value.toSet))
+  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Set[String]]] =
+    itemsCodec.decode(bytes).right.map(r => DecodeResult(r.length, r.value.toSet))
 }
 
 object OrderIdsCodec extends Codec[Array[String]] {
@@ -284,14 +304,14 @@ object OrderIdsCodec extends Codec[Array[String]] {
 
   override def encode(value: Array[String]): Array[Byte] = itemsCodec.encode(value.toSeq)
 
-  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Array[String]]] = itemsCodec.decode(bytes)
-    .right.map(r => DecodeResult(r.length, r.value.toArray))
+  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Array[String]]] =
+    itemsCodec.decode(bytes).right.map(r => DecodeResult(r.length, r.value.toArray))
 }
 
 object PortfolioItemCodec extends Codec[(String, Long)] {
   override def encode(value: (String, Long)): Array[Byte] = {
-    val r = StringCodec.encode(value._1)
-    val len = r.length
+    val r      = StringCodec.encode(value._1)
+    val len    = r.length
     val result = new Array[Byte](len + Longs.BYTES)
     System.arraycopy(r, 0, result, 0, len)
     System.arraycopy(Longs.toByteArray(value._2), 0, result, len, Longs.BYTES)
@@ -300,7 +320,7 @@ object PortfolioItemCodec extends Codec[(String, Long)] {
 
   override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[(String, Long)]] = {
     for {
-      r <- StringCodec.decode(bytes)
+      r  <- StringCodec.decode(bytes)
       v2 <- decodeLong(bytes.slice(r.length, r.length + Longs.BYTES))
     } yield DecodeResult(r.length + Longs.BYTES, (r.value, v2))
   }
@@ -311,13 +331,13 @@ object PortfolioCodec extends Codec[Map[String, Long]] {
 
   override def encode(value: Map[String, Long]): Array[Byte] = itemsCodec.encode(value.toSeq)
 
-  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Map[String, Long]]] = itemsCodec.decode(bytes)
-    .right.map(r => DecodeResult(r.length, r.value.toMap))
+  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Map[String, Long]]] =
+    itemsCodec.decode(bytes).right.map(r => DecodeResult(r.length, r.value.toMap))
 }
 
 object ByteStrCodec extends Codec[ByteStr] {
   override def encode(value: ByteStr): Array[Byte] = {
-    val len = value.arr.length
+    val len    = value.arr.length
     val result = new Array[Byte](Ints.BYTES + len)
     System.arraycopy(Ints.toByteArray(len), 0, result, 0, Ints.BYTES)
     System.arraycopy(value.arr, 0, result, Ints.BYTES, len)

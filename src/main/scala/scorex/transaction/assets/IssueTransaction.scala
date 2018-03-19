@@ -6,11 +6,12 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import scorex.serialization.Deser
 import scorex.transaction.TransactionParser._
 import scorex.transaction.{ValidationError, _}
 import scorex.transaction.smart.Script
+import scorex.transaction.ValidationError.GenericError
 
 import scala.util.{Failure, Success, Try}
 
@@ -21,6 +22,7 @@ case class SmartIssueTransaction private (version: Byte,
                                           description: Array[Byte],
                                           quantity: Long,
                                           decimals: Byte,
+                                          reissuable: Boolean,
                                           script: Option[Script],
                                           fee: Long,
                                           timestamp: Long,
@@ -38,6 +40,7 @@ case class SmartIssueTransaction private (version: Byte,
       Deser.serializeArray(description),
       Longs.toByteArray(quantity),
       Array(decimals),
+      Deser.serializeBoolean(reissuable),
       Deser.serializeOption(script)(s => Deser.serializeArray(s.bytes().arr)),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
@@ -47,6 +50,63 @@ case class SmartIssueTransaction private (version: Byte,
   override val assetFee                   = (None, fee)
   override val json                       = Coeval.evalOnce(jsonBase() ++ Json.obj("version" -> version, "script" -> script.map(_.text)))
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), bodyBytes(), proofs.bytes()))
+}
+
+object SmartIssueTransaction {
+
+  private val networkByte = AddressScheme.current.chainId
+
+  def parseBytes(bytes: Array[Byte]): Try[SmartIssueTransaction] = Try {
+    require(bytes.head == TransactionType.SmartIssueTransaction.id)
+    parseTail(bytes.tail).get
+  }
+
+  def parseTail(bytes: Array[Byte]): Try[SmartIssueTransaction] =
+    Try {
+      val version                       = bytes(0)
+      val chainId                       = bytes(1)
+      val sender                        = PublicKeyAccount(bytes.slice(2, KeyLength + 2))
+      val (assetName, descriptionStart) = Deser.parseArraySize(bytes, KeyLength + 2)
+      val (description, quantityStart)  = Deser.parseArraySize(bytes, descriptionStart)
+      val quantity                      = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
+      val decimals                      = bytes.slice(quantityStart + 8, quantityStart + 9).head
+      val reissuable                    = bytes.slice(quantityStart + 9, quantityStart + 10).head == (1: Byte)
+      val (scriptOptEi: Option[Either[ValidationError.ScriptParseError, Script]], scriptEnd) =
+        Deser.parseOption(bytes, quantityStart + 10)(str => Script.fromBytes(Deser.parseArraySize(str, 0)._1))
+      val scriptEiOpt: Either[ValidationError.ScriptParseError, Option[Script]] = scriptOptEi match {
+        case None            => Right(None)
+        case Some(Right(sc)) => Right(Some(sc))
+        case Some(Left(err)) => Left(err)
+      }
+      val fee       = Longs.fromByteArray(bytes.slice(scriptEnd, scriptEnd + 8))
+      val timestamp = Longs.fromByteArray(bytes.slice(scriptEnd + 8, scriptEnd + 16))
+
+      (for {
+        proofs <- Proofs.fromBytes(bytes.drop(scriptEnd + 16))
+        script <- scriptEiOpt
+        tx <- SmartIssueTransaction
+          .create(version, chainId, sender, assetName, description, quantity, decimals, reissuable, script, fee, timestamp, proofs)
+      } yield tx).left.map(e => new Throwable(e.toString)).toTry
+
+    }.flatten
+
+  def create(version: Byte,
+             chainId: Byte,
+             sender: PublicKeyAccount,
+             name: Array[Byte],
+             description: Array[Byte],
+             quantity: Long,
+             decimals: Byte,
+             reissuable: Boolean,
+             script: Option[Script],
+             fee: Long,
+             timestamp: Long,
+             proofs: Proofs): Either[ValidationError, SmartIssueTransaction] =
+    for {
+      _ <- Either.cond(version == 1, (), GenericError(s"Unsupported SmartIssueTransaction version ${version.toInt}"))
+      _ <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
+      _ <- IssueTransaction.create(sender, name, description, quantity, decimals, reissuable, fee, timestamp, ByteStr.empty)
+    } yield SmartIssueTransaction(version, chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs)
 }
 
 case class IssueTransaction private (sender: PublicKeyAccount,
@@ -74,7 +134,7 @@ case class IssueTransaction private (sender: PublicKeyAccount,
       Deser.serializeArray(description),
       Longs.toByteArray(quantity),
       Array(decimals),
-      if (reissuable) Array(1: Byte) else Array(0: Byte),
+      Deser.serializeBoolean(reissuable),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     ))
@@ -131,19 +191,13 @@ object IssueTransaction {
              fee: Long,
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, IssueTransaction] =
-    if (quantity <= 0) {
-      Left(ValidationError.NegativeAmount(quantity, "assets"))
-    } else if (description.length > MaxDescriptionLength) {
-      Left(ValidationError.TooBigArray)
-    } else if (name.length < MinAssetNameLength || name.length > MaxAssetNameLength) {
-      Left(ValidationError.InvalidName)
-    } else if (decimals < 0 || decimals > MaxDecimals) {
-      Left(ValidationError.TooBigArray)
-    } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee)
-    } else {
-      Right(IssueTransaction(sender, name, description, quantity, decimals, reissuable, fee, timestamp, signature))
-    }
+    for {
+      _ <- Either.cond(quantity > 0, (), ValidationError.NegativeAmount(quantity, "assets"))
+      _ <- Either.cond(description.length <= MaxDescriptionLength, (), ValidationError.TooBigArray)
+      _ <- Either.cond(name.length >= MinAssetNameLength && name.length <= MaxAssetNameLength, (), ValidationError.InvalidName)
+      _ <- Either.cond(decimals >= 0 && decimals <= MaxDecimals, (), ValidationError.TooBigArray)
+      _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee)
+    } yield IssueTransaction(sender, name, description, quantity, decimals, reissuable, fee, timestamp, signature)
 
   def create(sender: PrivateKeyAccount,
              name: Array[Byte],

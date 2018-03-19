@@ -35,7 +35,16 @@ class AssetTransactionsDiffTest extends PropSpec
 
         val totalAssetVolume = issue.quantity + reissue.quantity - burn.amount
         newState.accountPortfolio(issue.sender).assets shouldBe Map(reissue.assetId -> totalAssetVolume)
-        newState.assetInfo(issue.id()) shouldBe Some(AssetInfo(reissue.reissuable, totalAssetVolume))
+        newState.assetInfo(issue.id()) shouldBe Some(AssetInfo(reissue.reissuable, totalAssetVolume, None))
+      }
+    }
+  }
+
+  property("SmartIssue") {
+    forAll(genesisGen, smartIssueTransactionGen) { case (gen, issue) =>
+      assertDiffAndState(db, Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(issue))) { case (blockDiff, newState) =>
+        val totalPortfolioDiff = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
+        //newState.assetInfo(issue.id()) shouldBe Some(AssetInfo(issue.reissuable, issue.quantity, issue.script))
       }
     }
   }
