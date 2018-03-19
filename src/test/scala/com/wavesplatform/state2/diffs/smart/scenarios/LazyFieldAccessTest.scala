@@ -12,14 +12,14 @@ class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers wit
   private val goodScript =
     """
       |
-      | if (TX.TYPE == 4) then (TX.ASSETID == None) else false
+      | if (tx.type == 4) then (tx.assetId == None) else false
       |
       """.stripMargin
 
   private val badScript =
     """
       |
-      | TX.ASSETID == None
+      | tx.assetId == None
       |
       """.stripMargin
 

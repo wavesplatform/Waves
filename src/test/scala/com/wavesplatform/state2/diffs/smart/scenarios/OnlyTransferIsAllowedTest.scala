@@ -15,18 +15,18 @@ class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matche
 
     val onlySend: EXPR = BINARY_OP(
       BINARY_OP(
-        BINARY_OP(GETTER(REF("TX", TYPEREF("Transaction")), "TYPE", LONG), EQ_OP, CONST_LONG(4), BOOLEAN),
+        BINARY_OP(GETTER(REF("tx", TYPEREF("Transaction")), "type", LONG), EQ_OP, CONST_LONG(4), BOOLEAN),
         OR_OP,
-        BINARY_OP(GETTER(REF("TX", TYPEREF("Transaction")), "TYPE", LONG), EQ_OP, CONST_LONG(11), BOOLEAN),
+        BINARY_OP(GETTER(REF("tx", TYPEREF("Transaction")), "type", LONG), EQ_OP, CONST_LONG(11), BOOLEAN),
         BOOLEAN
       ),
       AND_OP,
       FUNCTION_CALL(
-        "SIGVERIFY",
+        "sigVerify",
         List(
-          GETTER(REF("TX", TYPEREF("Transaction")), "BODYBYTES", BYTEVECTOR),
-          GETTER(REF("TX", TYPEREF("Transaction")), "PROOFA", BYTEVECTOR),
-          GETTER(REF("TX", TYPEREF("Transaction")), "SENDERPK", BYTEVECTOR)
+          GETTER(REF("tx", TYPEREF("Transaction")), "bodyBytes", BYTEVECTOR),
+          GETTER(REF("tx", TYPEREF("Transaction")), "proof0", BYTEVECTOR),
+          GETTER(REF("tx", TYPEREF("Transaction")), "senderPk", BYTEVECTOR)
         ),
         BOOLEAN
       ),

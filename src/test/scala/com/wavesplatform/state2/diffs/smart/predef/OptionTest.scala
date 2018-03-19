@@ -18,14 +18,14 @@ class OptionTest extends PropSpec with PropertyChecks with Matchers with Transac
   private val extractScript =
     """
       |
-      | extract(TX.ASSETID)
+      | extract(tx.assetId)
       |
     """.stripMargin
 
   private val isDefinedScript =
     """
       |
-      | isDefined(TX.ASSETID)
+      | isDefined(tx.assetId)
       |
     """.stripMargin
 

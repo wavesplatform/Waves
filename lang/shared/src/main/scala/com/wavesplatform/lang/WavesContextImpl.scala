@@ -15,7 +15,7 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
   val blake2b256F: PredefFunction = hashFunction("blake2b256")(this.blake2b256)
   val sha256F: PredefFunction     = hashFunction("sha256")(this.sha256)
 
-  val sigVerifyF: PredefFunction = PredefFunction("SIGVERIFY", BOOLEAN, List(("message", BYTEVECTOR), ("sig", BYTEVECTOR), ("pub", BYTEVECTOR))) {
+  val sigVerifyF: PredefFunction = PredefFunction("sigVerify", BOOLEAN, List(("message", BYTEVECTOR), ("sig", BYTEVECTOR), ("pub", BYTEVECTOR))) {
     case (m: ByteVector) :: (s: ByteVector) :: (p: ByteVector) :: Nil =>
       Right(this.curve25519verify(m.toArray, s.toArray, p.toArray))
     case _ => ???
@@ -31,14 +31,14 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
   private def transactionObject(tx: Transaction): Obj =
     Obj(
       Map(
-        "TYPE"      -> LazyVal(LONG)(EitherT.pure(tx.transactionType)),
-        "ID"        -> LazyVal(BYTEVECTOR)(EitherT.pure(tx.id)),
-        "BODYBYTES" -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.bodyBytes)),
-        "SENDERPK"  -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.senderPk)),
-        "ASSETID"   -> LazyVal(optionByteVector)(EitherT.fromEither(tx.assetId.map(_.asInstanceOf[optionByteVector.Underlying]))),
-        "PROOFA"    -> proofBinding(tx, 0),
-        "PROOFB"    -> proofBinding(tx, 1),
-        "PROOFC"    -> proofBinding(tx, 2)
+        "type"      -> LazyVal(LONG)(EitherT.pure(tx.transactionType)),
+        "id"        -> LazyVal(BYTEVECTOR)(EitherT.pure(tx.id)),
+        "bodyBytes" -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.bodyBytes)),
+        "senderPk"  -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.senderPk)),
+        "assetId"   -> LazyVal(optionByteVector)(EitherT.fromEither(tx.assetId.map(_.asInstanceOf[optionByteVector.Underlying]))),
+        "proof0"    -> proofBinding(tx, 0),
+        "proof1"    -> proofBinding(tx, 1),
+        "proof2"    -> proofBinding(tx, 2)
       ))
 
   private val txByIdF = {
@@ -59,7 +59,7 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
       Map(
         ("None", none),
         ("H", LazyVal(LONG)(EitherT(heightCoeval))),
-        ("TX", LazyVal(TYPEREF(transactionType.name))(EitherT(txCoeval)))
+        ("tx", LazyVal(TYPEREF(transactionType.name))(EitherT(txCoeval)))
       ),
       Map(
         sigVerifyF.name -> sigVerifyF,
@@ -90,14 +90,14 @@ object WavesContextImpl {
   val transactionType = PredefType(
     "Transaction",
     List(
-      "TYPE"      -> LONG,
-      "ID"        -> BYTEVECTOR,
-      "BODYBYTES" -> BYTEVECTOR,
-      "SENDERPK"  -> BYTEVECTOR,
-      "PROOFA"    -> BYTEVECTOR,
-      "PROOFB"    -> BYTEVECTOR,
-      "PROOFC"    -> BYTEVECTOR,
-      "ASSETID"   -> optionByteVector
+      "type"      -> LONG,
+      "id"        -> BYTEVECTOR,
+      "bodyBytes" -> BYTEVECTOR,
+      "senderPk"  -> BYTEVECTOR,
+      "proof0"    -> BYTEVECTOR,
+      "proof1"    -> BYTEVECTOR,
+      "proof2"    -> BYTEVECTOR,
+      "assetId"   -> optionByteVector
     )
   )
   val extract: PredefFunction = PredefFunction("extract", TYPEPARAM('T'), List(("opt", optionT))) {
