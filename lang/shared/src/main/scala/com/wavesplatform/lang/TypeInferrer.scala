@@ -31,7 +31,7 @@ object TypeInferrer {
         }
 
         resolved.find(_._2.isLeft) match {
-          case Some(left) => left.asInstanceOf[Left[String, Nothing]]
+          case Some((_,left)) => left.asInstanceOf[Left[String, Nothing]]
           case None => Right(resolved.mapValues(_.right.get))
         }
     }
