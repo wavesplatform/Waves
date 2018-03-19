@@ -18,16 +18,16 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("should infer generic function return type") {
     import Untyped._
-    val genericFuncWithTwoTypeParams = PredefFunction("genericFunc", TYPEREF("T"), List("p1" -> TYPEREF("T")))(Right(_))
-    val ctx                          = Context(Map.empty, Map.empty, functions = Map((genericFuncWithTwoTypeParams.name, genericFuncWithTwoTypeParams)))
-    val Right(v)                     = TypeChecker(TypeCheckerContext.fromContext(ctx), FUNCTION_CALL(genericFuncWithTwoTypeParams.name, List(CONST_LONG(1))))
+    val idFunction = PredefFunction("idFunc", TYPEPARAM('T'), List("p1" -> TYPEPARAM('T')))(Right(_))
+    val ctx                          = Context(Map.empty, Map.empty, functions = Map((idFunction.name, idFunction)))
+    val Right(v)                     = TypeChecker(TypeCheckerContext.fromContext(ctx), FUNCTION_CALL(idFunction.name, List(CONST_LONG(1))))
 
     v.tpe shouldBe LONG
   }
 
   property("should infer inner types") {
     import Untyped._
-    val genericFuncWithOptionParam = PredefFunction("genericFunc", TYPEREF("T"), List("p1" -> OPTION(TYPEREF("T")))) {
+    val genericFuncWithOptionParam = PredefFunction("idFunc", TYPEPARAM('T'), List("p1" -> OPTIONTYPEPARAM(TYPEPARAM('T')))) {
       case Some(vl) :: Nil => Right(vl)
       case _               => Left("extracting from empty option")
     }
@@ -121,7 +121,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
                        noneFunc.name                   -> noneFunc.signature)
   )
 
-  private val genericFunc = PredefFunction("genericFunc", TYPEREF("T"), List("p1" -> TYPEREF("T"), "p2" -> TYPEREF("T")))(Right(_))
+  private val genericFunc = PredefFunction("idFunc", TYPEPARAM('T'), List("p1" -> TYPEPARAM('T'), "p2" -> TYPEPARAM('T')))(Right(_))
   treeTypeTest(s"NONEFUNC(NONE)")(
     ctx = typeCheckerCtx,
     expr = Untyped.FUNCTION_CALL(noneFunc.name, List(Untyped.REF("None"))),
@@ -162,11 +162,11 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       "BINARY_OP with wrong types"                   -> "The first operand is expected to be LONG" -> BINARY_OP(TRUE, SUM_OP, CONST_LONG(1)),
       "IF can't find common"                         -> "Can't find common type" -> IF(TRUE, TRUE, CONST_LONG(0)),
       "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(multiplierFunction.name, List(CONST_LONG(0))),
-      "FUNCTION_CALL with upper type"                -> "do not match types required" -> FUNCTION_CALL(noneFunc.name,
+      "FUNCTION_CALL with upper type"                -> "Non-matching types" -> FUNCTION_CALL(noneFunc.name,
                                                                                         List(FUNCTION_CALL("Some", List(CONST_LONG(3))))),
-      "FUNCTION_CALL with wrong type of argument" -> "Types of arguments of function call" -> FUNCTION_CALL(multiplierFunction.name,
+      "FUNCTION_CALL with wrong type of argument" -> "Typecheck failed: Non-matching types: expected: LONG, actual: BOOLEAN" -> FUNCTION_CALL(multiplierFunction.name,
                                                                                                             List(CONST_LONG(0), FALSE)),
-      "FUNCTION_CALL with uncommon types for parameter T" -> "is no common type" -> FUNCTION_CALL(genericFunc.name,
+      "FUNCTION_CALL with uncommon types for parameter T" -> "Can't match inferred types" -> FUNCTION_CALL(genericFunc.name,
                                                                                                   List(CONST_LONG(1),
                                                                                                        CONST_BYTEVECTOR(ByteVector.empty)))
     )
