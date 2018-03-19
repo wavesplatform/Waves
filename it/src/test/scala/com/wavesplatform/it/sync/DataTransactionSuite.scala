@@ -19,12 +19,14 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
   test("sender's waves balance is decreased by fee.") {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
-
-    val data = List(IntegerDataEntry("int", 0xcafebabe))
-    val txId = sender.putData(firstAddress, data, fee).id
+    val entry = IntegerDataEntry("int", 0xcafebabe)
+    val size = entry.valueBytes.size
+    val data = List(entry)
+    val transferFee = calcDataFee(size)
+    val txId = sender.putData(firstAddress, data, transferFee).id
     nodes.waitForHeightAraiseAndTxPresent(txId)
-
-    notMiner.assertBalances(firstAddress, balance1 - fee, eff1 - fee)
+    
+    notMiner.assertBalances(firstAddress, balance1 - transferFee, eff1 - transferFee)
   }
 
   test("cannot transact without having enough waves") {
@@ -92,9 +94,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAraiseAndTxPresent(tx1)
 
     sender.getData(secondAddress, "int") shouldBe item1
-
-    val data1 = sender.getData(secondAddress)
-    data1 shouldBe List(item1)
+    sender.getData(secondAddress) shouldBe List(item1)
 
     // define another one
     val item2 = BooleanDataEntry("bool", true)
@@ -103,9 +103,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     sender.getData(secondAddress, "int") shouldBe item1
     sender.getData(secondAddress, "bool") shouldBe item2
-
-    val data2 = sender.getData(secondAddress)
-    data2 shouldBe List(item2, item1)
+    sender.getData(secondAddress) shouldBe List(item2, item1)
 
     // redefine item 1
     val item11 = IntegerDataEntry("int", 10)
@@ -114,9 +112,24 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     sender.getData(secondAddress, "int") shouldBe item11
     sender.getData(secondAddress, "bool") shouldBe item2
+    sender.getData(secondAddress) shouldBe List(item2, item11)
+    
+    // define tx with all types
+    val (balance2, eff2) = notMiner.accountBalances(secondAddress)
+    val item41 = IntegerDataEntry("int", -127)
+    val item42 = BooleanDataEntry("bool", false)
+    val item43 = BinaryDataEntry("blob", Array[Byte](127.toByte, 0, 1, 1))
+    val data = List(item41, item42, item43)
+    val txId = sender.putData(secondAddress, data, fee).id
+    nodes.waitForHeightAraiseAndTxPresent(txId)
 
-    val data3 = sender.getData(secondAddress)
-    data3 shouldBe List(item2, item11)
+    sender.getData(secondAddress, "int") shouldBe item41
+    sender.getData(secondAddress, "bool") shouldBe item42
+    sender.getData(secondAddress, "blob") shouldBe item43
+
+    sender.getData(secondAddress) shouldBe List(item41, item42, item43)
+
+    notMiner.assertBalances(secondAddress, balance2 - fee, eff2 - fee)
   }
 
   test("queries for nonexistent data") {
@@ -155,6 +168,9 @@ class DataTransactionSuite extends BaseTransactionSuite {
       "type" -> "integer",
       "value" -> 8)
 
+    //    where is a bug?
+    sender.postJson("/addresses/data", request(validItem + ("key" -> JsString("")))).getStatusCode shouldBe 200
+
     assertBadRequestAndResponse(
       sender.postJson("/addresses/data", request(validItem - "key")),
       "key is missing")
@@ -174,6 +190,37 @@ class DataTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndResponse(
       sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
       "value is missing or not an integer")
+    
+    val notValidIntValue = Json.obj(
+      "key" -> "key",
+      "type" -> "integer",
+      "value" -> JsNull)
+
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(notValidIntValue)),
+      "value is missing or not an integer")
+
+    val notValidBoolValue = Json.obj(
+      "key" -> "bool",
+      "type" -> "boolean",
+      "value" -> JsNull)
+
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(notValidBoolValue)),
+      "value is missing or not a boolean")
+
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(notValidBoolValue + ("value" -> JsString("true")))),
+      "value is missing or not a boolean")
+
+    val notValidBlobValue = Json.obj(
+      "key" -> "blob",
+      "type" -> "binary",
+      "value" -> JsNull)
+
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(notValidBlobValue)),
+      "value is missing or not a string")
   }
 
   test("transaction requires a valid proof") {
@@ -200,5 +247,11 @@ class DataTransactionSuite extends BaseTransactionSuite {
     assert((withProof \ "proofs").as[Seq[String]].lengthCompare(1) == 0)
     sender.postJson("/transactions/broadcast", withProof)
     nodes.waitForHeightAraiseAndTxPresent(id(withProof))
+  }
+  
+  private def calcDataFee(dataSize: Int): Long = {
+    if (dataSize > 1024) {
+      (fee * dataSize) / 1024
+    } else fee
   }
 }
