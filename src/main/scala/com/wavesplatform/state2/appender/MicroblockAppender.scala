@@ -22,8 +22,8 @@ object MicroblockAppender extends ScorexLogging with Instrumented {
   def apply(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, utxStorage: UtxPool,
             scheduler: Scheduler)
            (microBlock: MicroBlock): Task[Either[ValidationError, Unit]] = Task(measureSuccessful(microblockProcessingTimeStats, for {
-    _ <- Either.cond(checkpoint.isBlockValid(microBlock.totalResBlockSig, history.height() + 1), (),
-      MicroBlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", microBlock))
+    _ <- Either.cond(checkpoint.isBlockValid(microBlock.totalResBlockSig, history.height + 1), (),
+      MicroBlockAppendError(s"[h = ${history.height + 1}] is not valid with respect to checkpoint", microBlock))
     _ <- blockchainUpdater.processMicroBlock(microBlock)
   } yield utxStorage.removeAll(microBlock.transactionData))).executeOn(scheduler)
 

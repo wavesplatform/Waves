@@ -1,14 +1,12 @@
 package com.wavesplatform
 
 import java.io._
-import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.db._
-import com.wavesplatform.history.HistoryWriterImpl
+import com.wavesplatform.db.openDB
+import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state2.{BlockchainUpdaterImpl, StateStorage, StateWriterImpl}
 import com.wavesplatform.utils._
 import org.slf4j.bridge.SLF4JBridgeHandler
 import scorex.account.AddressScheme
@@ -24,7 +22,8 @@ object Importer extends ScorexLogging {
     SLF4JBridgeHandler.install()
 
     val configFilename = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
-    val settings = WavesSettings.fromConfig(loadConfig(ConfigFactory.parseFile(new File(configFilename))))
+    val config = loadConfig(ConfigFactory.parseFile(new File(configFilename)))
+    val settings = WavesSettings.fromConfig(config)
     AddressScheme.current = new AddressScheme {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
@@ -34,17 +33,18 @@ object Importer extends ScorexLogging {
         log.info(s"Loading file '$filename'")
         createInputStream(filename) match {
           case Success(inputStream) =>
-            val lock = new ReentrantReadWriteLock()
-            val db = openDB(settings.dataDirectory, settings.levelDbCacheSize, recreate = true)
-            val storage = StateStorage(db, dropExisting = false).get
-            val state = new StateWriterImpl(storage, lock)
-            val history = HistoryWriterImpl(db, lock, settings.blockchainSettings.functionalitySettings, settings.featuresSettings).get
-            val blockchainUpdater = BlockchainUpdaterImpl(state, history, settings, NTP, lock)
+            val db = openDB(settings.dataDirectory, settings.levelDbCacheSize)
+            val (history, _, blockchainUpdater) = StorageFactory(settings, db, NTP)
             checkGenesis(history, settings, blockchainUpdater)
             val bis = new BufferedInputStream(inputStream)
             var quit = false
             val lenBytes = new Array[Byte](Ints.BYTES)
             val start = System.currentTimeMillis()
+            var counter = 0
+            var blocksToSkip = history.height - 1
+
+            println(s"Skipping $blocksToSkip blocks(s)")
+
             while (!quit) {
               val s1 = bis.read(lenBytes)
               if (s1 == Ints.BYTES) {
@@ -52,21 +52,34 @@ object Importer extends ScorexLogging {
                 val buffer = new Array[Byte](len)
                 val s2 = bis.read(buffer)
                 if (s2 == len) {
-                  val block = Block.parseBytes(buffer).get
-                  val result = blockchainUpdater.processBlock(block)
-                  if (result.isLeft) {
-                    log.error(s"Error applying block: ${result.left}")
-                    quit = true
+                  if (blocksToSkip > 0) {
+                    blocksToSkip -= 1
+                  } else {
+                    val block = Block.parseBytes(buffer).get
+                    if (history.lastBlockId.contains(block.reference)) {
+                      blockchainUpdater.processBlock(block) match {
+                        case Left(ve) =>
+                          log.error(s"Error appending block: $ve")
+                          quit = true
+                        case _ =>
+                          counter = counter + 1
+                      }
+                    }
                   }
-                } else quit = true
-              } else quit = true
+                } else {
+                  println(s"$s2 != expected $len")
+                  quit = true
+                }
+              } else {
+                println(s"Expecting to read ${Ints.BYTES} but got $s1 (${bis.available()})")
+                quit = true
+              }
             }
             bis.close()
             inputStream.close()
             val duration = System.currentTimeMillis() - start
-            log.info(s"Imported in ${humanReadableDuration(duration)}")
-            db.close()
-          case Failure(ex) => log.error(s"Failed to open file '$filename'")
+            log.info(s"Imported $counter block(s) in ${humanReadableDuration(duration)}")
+          case Failure(ex) => log.error(s"Failed to open file '$filename")
         }
       case Failure(ex) => log.error(s"Failed to get input filename from second parameter: $ex")
     }

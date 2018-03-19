@@ -52,24 +52,24 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
       val blocks = txs.map(tx => block(Seq(tx)))
 
       val item1 = items.head
-      assertDiffAndState(db, Seq(genesis), blocks(0), fs) { case (totalDiff, state) =>
+      assertDiffAndState(Seq(genesis), blocks(0), fs) { case (totalDiff, state) =>
         assertBalanceInvariant(totalDiff)
-        state.accountPortfolio(sender).balance shouldBe (ENOUGH_AMT - txs(0).fee)
+        state.portfolio(sender).balance shouldBe (ENOUGH_AMT - txs(0).fee)
         state.accountData(sender).data.get(item1.key) shouldBe Some(item1)
       }
 
       val item2 = items(1)
-      assertDiffAndState(db, Seq(genesis, blocks(0)), blocks(1), fs) { case (totalDiff, state) =>
+      assertDiffAndState(Seq(genesis, blocks(0)), blocks(1), fs) { case (totalDiff, state) =>
         assertBalanceInvariant(totalDiff)
-        state.accountPortfolio(sender).balance shouldBe (ENOUGH_AMT - txs.take(2).map(_.fee).sum)
+        state.portfolio(sender).balance shouldBe (ENOUGH_AMT - txs.take(2).map(_.fee).sum)
         state.accountData(sender).data.get(item1.key) shouldBe Some(item1)
         state.accountData(sender).data.get(item2.key) shouldBe Some(item2)
       }
 
       val item3 = items(2)
-      assertDiffAndState(db, Seq(genesis, blocks(0), blocks(1)), blocks(2), fs) { case (totalDiff, state) =>
+      assertDiffAndState(Seq(genesis, blocks(0), blocks(1)), blocks(2), fs) { case (totalDiff, state) =>
         assertBalanceInvariant(totalDiff)
-        state.accountPortfolio(sender).balance shouldBe (ENOUGH_AMT - txs.map(_.fee).sum)
+        state.portfolio(sender).balance shouldBe (ENOUGH_AMT - txs.map(_.fee).sum)
         state.accountData(sender).data.get(item1.key) shouldBe Some(item3)
         state.accountData(sender).data.get(item2.key) shouldBe Some(item2)
       }
@@ -86,7 +86,7 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
     } yield (genesis, dataTx)
 
     forAll(setup) { case (genesis, dataTx) =>
-      assertDiffEi(db, Seq(block(Seq(genesis))), block(Seq(dataTx)), fs) { blockDiffEi =>
+      assertDiffEi(Seq(block(Seq(genesis))), block(Seq(dataTx)), fs) { blockDiffEi =>
         blockDiffEi should produce("negative waves balance")
       }
     }
@@ -101,7 +101,7 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
     val settings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.DataTransaction.id -> 10))
 
     forAll(setup) { case (genesis, data) =>
-      assertDiffEi(db, Seq(block(Seq(genesis))), block(Seq(data)), settings) { blockDiffEi =>
+      assertDiffEi(Seq(block(Seq(genesis))), block(Seq(data)), settings) { blockDiffEi =>
         blockDiffEi should produce("DataTransaction transaction has not been activated")
       }
     }

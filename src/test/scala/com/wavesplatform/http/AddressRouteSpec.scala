@@ -5,7 +5,6 @@ import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
 import io.netty.channel.group.ChannelGroup
-import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
@@ -25,8 +24,8 @@ class AddressRouteSpec
   private val allAccounts = testWallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.address)
 
-  private val route = AddressApiRoute(restAPISettings, TestFunctionalitySettings.Stub, testWallet,
-    mock[UtxPool], mock[ChannelGroup], new TestTime, Coeval.now(mock[SnapshotStateReader])).route
+  private val route = AddressApiRoute(restAPISettings, testWallet, mock[SnapshotStateReader],
+    mock[UtxPool], mock[ChannelGroup], new TestTime, TestFunctionalitySettings.Stub).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")

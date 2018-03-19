@@ -36,7 +36,7 @@ object ApiError {
     case ValidationError.GenericError(ge) => CustomValidationError(ge)
     case ValidationError.AlreadyInTheState(tx, txHeight) => CustomValidationError(s"Transaction $tx is already in the state on a height of $txHeight")
     case ValidationError.AccountBalanceError(errs) => CustomValidationError(errs.values.mkString(", "))
-    case ValidationError.AliasNotExists(tx) => AliasNotExists(tx)
+    case ValidationError.AliasNotExists(tx) => AliasDoesNotExist(tx)
     case ValidationError.OrderValidationError(_, m) => CustomValidationError(m)
     case ValidationError.UnsupportedTransactionType => CustomValidationError("UnsupportedTransactionType")
     case ValidationError.Mistiming(err) => Mistiming(err)
@@ -186,13 +186,13 @@ case class CustomValidationError(errorMessage: String) extends ApiError {
   override val code: StatusCode = StatusCodes.BadRequest
 }
 
-case object BlockNotExists extends ApiError {
+case object BlockDoesNotExist extends ApiError {
   override val id: Int = 301
   override val code = StatusCodes.NotFound
   override val message: String = "block does not exist"
 }
 
-case class AliasNotExists(aoa: AddressOrAlias) extends ApiError {
+case class AliasDoesNotExist(aoa: AddressOrAlias) extends ApiError {
   override val id: Int = 302
   override val code = StatusCodes.NotFound
   private lazy val msgReason = aoa match {

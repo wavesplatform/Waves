@@ -1,30 +1,26 @@
 package com.wavesplatform.state2.patch
 
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{Diff, LeaseInfo, Portfolio}
-import scorex.account.Address
+import com.wavesplatform.state2.{Diff, LeaseBalance, Portfolio}
+import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.lease.LeaseTransaction
+import scorex.utils.ScorexLogging
 
-object CancelLeaseOverflow {
+object CancelLeaseOverflow extends ScorexLogging {
   def apply(s: SnapshotStateReader): Diff = {
+    log.info("Cancelling all lease overflows for sender")
 
-    def cancelLeaseOut(l: LeaseInfo): LeaseInfo = LeaseInfo(0, -l.leaseOut)
-
-    val portfolioUpd = s.accountPortfolios
-      .collect { case (acc, pf) if pf.spendableBalance < 0 =>
-        acc -> Portfolio(0, cancelLeaseOut(pf.leaseInfo), Map.empty)
+    val addressesWithLeaseOverflow = s.collectPortfolios { p => p.balance < p.lease.out }
+    val leasesToCancel = addressesWithLeaseOverflow.keys.flatMap { a =>
+      s.addressTransactions(a, Set(TransactionType.LeaseTransaction), 0, Int.MaxValue).collect {
+        case (_, lt: LeaseTransaction) if lt.sender.toAddress == a => lt.id()
       }
+    }
 
-    val cancelledLeases = for {
-      a <- portfolioUpd.keys
-      txId <- s.accountTransactionIds(a, Int.MaxValue)
-      leaseId <- s.transactionInfo(txId).collect {
-        case (_, Some(l: LeaseTransaction)) if (l.sender: Address) == a => l.id()
-      }
-    } yield (leaseId, false)
+    log.info(s"Finished cancelling all lease overflows for sender. Transactions: ${leasesToCancel.mkString(", ")}\n${addressesWithLeaseOverflow.mkString("\n")}")
 
     Diff.empty.copy(
-      portfolios = portfolioUpd,
-      leaseState = cancelledLeases.toMap)
+      portfolios = addressesWithLeaseOverflow.mapValues(p => Portfolio(0, LeaseBalance(0, -p.lease.out), Map.empty)),
+      leaseState = leasesToCancel.map(_ -> false).toMap)
   }
 }

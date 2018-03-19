@@ -15,6 +15,7 @@ import com.wavesplatform.state2.{ByteStr, DataEntry, Portfolio}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
+import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json._
@@ -434,7 +435,7 @@ object AsyncHttpApi extends Assertions {
       n.balance(acc).map(_.balance).zip(n.effectiveBalance(acc).map(_.balance))
     }
 
-    def assertBalances(acc: String, balance: Long, effectiveBalance: Long): Future[Unit] = {
+    def assertBalances(acc: String, balance: Long, effectiveBalance: Long)(implicit pos: Position): Future[Unit] = {
       for {
         newBalance <- accountBalance(acc)
         newEffectiveBalance <- accountEffectiveBalance(acc)
@@ -448,7 +449,7 @@ object AsyncHttpApi extends Assertions {
       }
     }
 
-    def assertAssetBalance(acc: String, assetIdString: String, balance: Long): Future[Unit] = {
+    def assertAssetBalance(acc: String, assetIdString: String, balance: Long)(implicit pos: Position): Future[Unit] = {
       n.assetBalance(acc, assetIdString).map(_.balance shouldBe balance)
     }
 

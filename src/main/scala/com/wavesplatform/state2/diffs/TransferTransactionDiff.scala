@@ -19,28 +19,22 @@ object TransferTransactionDiff {
       recipient <- state.resolveAliasEi(tx.recipient)
       portfolios = (
         tx.assetId match {
-          case None => Map(sender -> Portfolio(-tx.amount, LeaseInfo.empty, Map.empty)).combine(
-            Map(recipient -> Portfolio(tx.amount, LeaseInfo.empty, Map.empty))
+          case None => Map(sender -> Portfolio(-tx.amount, LeaseBalance.empty, Map.empty)).combine(
+            Map(recipient -> Portfolio(tx.amount, LeaseBalance.empty, Map.empty))
           )
           case Some(aid) =>
-            Map(sender -> Portfolio(0, LeaseInfo.empty, Map(aid -> -tx.amount))).combine(
-              Map(recipient -> Portfolio(0, LeaseInfo.empty, Map(aid -> tx.amount)))
+            Map(sender -> Portfolio(0, LeaseBalance.empty, Map(aid -> -tx.amount))).combine(
+              Map(recipient -> Portfolio(0, LeaseBalance.empty, Map(aid -> tx.amount)))
             )
         }).combine(
         tx.feeAssetId match {
-          case None => Map(sender -> Portfolio(-tx.fee, LeaseInfo.empty, Map.empty))
+          case None => Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))
           case Some(aid) =>
-            Map(sender -> Portfolio(0, LeaseInfo.empty, Map(aid -> -tx.fee)))
+            Map(sender -> Portfolio(0, LeaseBalance.empty, Map(aid -> -tx.fee)))
         }
       )
-      assetIssued = tx.assetId match {
-        case None => true
-        case Some(aid) => state.assetInfo(aid).isDefined
-      }
-      feeAssetIssued = tx.feeAssetId match {
-        case None => true
-        case Some(aid) => state.assetInfo(aid).isDefined
-      }
+      assetIssued = tx.assetId.forall(state.assetDescription(_).isDefined)
+      feeAssetIssued = tx.feeAssetId.forall(state.assetDescription(_).isDefined)
     } yield (portfolios, blockTime > s.allowUnissuedAssetsUntil && !(assetIssued && feeAssetIssued))
 
     isInvalidEi match {

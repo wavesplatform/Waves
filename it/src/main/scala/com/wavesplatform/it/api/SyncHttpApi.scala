@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.it.Node
 import com.wavesplatform.state2.DataEntry
 import org.asynchttpclient.Response
+import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
 import play.api.libs.json.{Format, JsObject, Json, Writes}
@@ -59,10 +60,10 @@ object SyncHttpApi extends Assertions {
     def accountBalances(acc: String): (Long, Long) =
       Await.result(async(n).accountBalances(acc), RequestAwaitTime)
 
-    def assertBalances(acc: String, balance: Long, effectiveBalance: Long): Unit =
+    def assertBalances(acc: String, balance: Long, effectiveBalance: Long)(implicit pos: Position): Unit =
       Await.result(async(n).assertBalances(acc, balance, effectiveBalance), RequestAwaitTime)
 
-    def assertAssetBalance(acc: String, assetIdString: String, balance: Long): Unit =
+    def assertAssetBalance(acc: String, assetIdString: String, balance: Long)(implicit pos: Position): Unit =
       Await.result(async(n).assertAssetBalance(acc, assetIdString, balance), RequestAwaitTime)
 
     def assetBalance(address: String, asset: String): AssetBalance =

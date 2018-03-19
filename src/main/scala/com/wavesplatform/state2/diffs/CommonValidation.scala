@@ -25,33 +25,40 @@ object CommonValidation {
     if (blockTime >= settings.allowTemporaryNegativeUntil) {
       def checkTransfer(sender: Address, assetId: Option[AssetId], amount: Long, feeAssetId: Option[AssetId], feeAmount: Long) = {
         val amountDiff = assetId match {
-          case Some(aid) => Portfolio(0, LeaseInfo.empty, Map(aid -> -amount))
-          case None => Portfolio(-amount, LeaseInfo.empty, Map.empty)
+          case Some(aid) => Portfolio(0, LeaseBalance.empty, Map(aid -> -amount))
+          case None => Portfolio(-amount, LeaseBalance.empty, Map.empty)
         }
         val feeDiff = feeAssetId match {
-          case Some(aid) => Portfolio(0, LeaseInfo.empty, Map(aid -> -feeAmount))
-          case None => Portfolio(-feeAmount, LeaseInfo.empty, Map.empty)
+          case Some(aid) => Portfolio(0, LeaseBalance.empty, Map(aid -> -feeAmount))
+          case None => Portfolio(-feeAmount, LeaseBalance.empty, Map.empty)
         }
 
         val spendings = Monoid.combine(amountDiff, feeDiff)
-        val accountPortfolio = s.partialPortfolio(sender, spendings.assets.keySet)
+        val oldWavesBalance = s.portfolio(sender).balance
 
-        lazy val negativeAsset = spendings.assets.find { case (id, amt) => (accountPortfolio.assets.getOrElse(id, 0L) + amt) < 0L }.map { case (id, amt) => (id, accountPortfolio.assets.getOrElse(id, 0L), amt, accountPortfolio.assets.getOrElse(id, 0L) + amt) }
-        lazy val newWavesBalance = accountPortfolio.balance + spendings.balance
-        lazy val negativeWaves = newWavesBalance < 0
-        if (negativeWaves)
-          Left(GenericError(s"Attempt to transfer unavailable funds:" +
-            s" Transaction application leads to negative waves balance to (at least) temporary negative state, current balance equals ${accountPortfolio.balance}, spends equals ${spendings.balance}, result is $newWavesBalance"))
-        else if (negativeAsset.nonEmpty)
-          Left(GenericError(s"Attempt to transfer unavailable funds:" +
-            s" Transaction application leads to negative asset '${negativeAsset.get._1}' balance to (at least) temporary negative state, current balance is ${negativeAsset.get._2}, spends equals ${negativeAsset.get._3}, result is ${negativeAsset.get._4}"))
-        else Right(tx)
+        val newWavesBalance = oldWavesBalance + spendings.balance
+        if (newWavesBalance < 0) {
+          Left(GenericError("Attempt to transfer unavailable funds: Transaction application leads to " +
+            s"negative waves balance to (at least) temporary negative state, current balance equals $oldWavesBalance, " +
+            s"spends equals ${spendings.balance}, result is $newWavesBalance"))
+        } else if (spendings.assets.nonEmpty) {
+          val oldAssetBalances = s.portfolio(sender).assets
+          val balanceError = spendings.assets.collectFirst {
+            case (aid, delta) if oldAssetBalances.getOrElse(aid, 0L) + delta < 0 =>
+              val availableBalance = oldAssetBalances.getOrElse(aid, 0L)
+              GenericError("Attempt to transfer unavailable funds: Transaction application leads to negative asset " +
+                s"'$aid' balance to (at least) temporary negative state, current balance is $availableBalance, " +
+                s"spends equals $delta, result is ${availableBalance + delta}")
+          }
+
+          balanceError.fold[Either[ValidationError, T]](Right(tx))(Left(_))
+        } else Right(tx)
       }
 
       tx match {
-        case ptx: PaymentTransaction if s.partialPortfolio(ptx.sender).balance < (ptx.amount + ptx.fee) =>
-          Left(GenericError(s"Attempt to pay unavailable funds: balance " +
-            s"${s.partialPortfolio(ptx.sender).balance} is less than ${ptx.amount + ptx.fee}"))
+        case ptx: PaymentTransaction if s.portfolio(ptx.sender).balance < (ptx.amount + ptx.fee) =>
+          Left(GenericError("Attempt to pay unavailable funds: balance " +
+            s"${s.portfolio(ptx.sender).balance} is less than ${ptx.amount + ptx.fee}"))
         case ttx: TransferTransaction => checkTransfer(ttx.sender, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
         case mtx: MassTransferTransaction => checkTransfer(mtx.sender, mtx.assetId, mtx.transfers.map(_.amount).sum, None, mtx.fee)
         case _ => Right(tx)
@@ -59,12 +66,8 @@ object CommonValidation {
     } else Right(tx)
 
   def disallowDuplicateIds[T <: Transaction](state: SnapshotStateReader, settings: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = tx match {
-    case ptx: PaymentTransaction => Right(tx)
-    case _ =>
-      state.transactionInfo(tx.id()) match {
-        case Some((txHeight, _)) => Left(AlreadyInTheState(tx.id(), txHeight))
-        case None => Right(tx)
-      }
+    case _: PaymentTransaction => Right(tx)
+    case _ => if (state.containsTransaction(tx.id())) Left(AlreadyInTheState(tx.id(), 0)) else Right(tx)
   }
 
   def disallowBeforeActivationTime[T <: Transaction](featureProvider: FeatureProvider, height: Int, tx: T): Either[ValidationError, T] = {
