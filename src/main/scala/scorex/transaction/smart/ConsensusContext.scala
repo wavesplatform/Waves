@@ -6,8 +6,10 @@ import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Coeval
 import scodec.bits.ByteVector
-import scorex.transaction.assets.TransferTransaction
-import scorex.transaction.{Authorized, ProvenTransaction, Transaction}
+import scorex.transaction._
+import scorex.transaction.assets._
+import scorex.transaction.assets.exchange.ExchangeTransaction
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 class ConsensusContext(tx: Coeval[Transaction], h: Coeval[Int], state: SnapshotStateReader) extends WavesContext {
 
@@ -28,7 +30,7 @@ object ConsensusContext {
 
   def convert(tx: Transaction): ContractTransaction = new ContractTransaction {
 
-    override def bodyBytes: Either[String, ByteVector] =  tx match {
+    override def bodyBytes: Either[String, ByteVector] = tx match {
       case pt: ProvenTransaction => Right(ByteVector(pt.bodyBytes()))
       case _                     => Left("Transaction is not Proven, doesn't contain bodyBytes")
     }
@@ -51,5 +53,28 @@ object ConsensusContext {
     }
 
     override def id: ByteVector = ByteVector(tx.id().arr)
+
+    override def fee: Long = tx.assetFee._2
+
+    override def amount: Either[String, Long] = tx match {
+      case g: GenesisTransaction           => Right(g.amount)
+      case g: PaymentTransaction           => Right(g.amount)
+      case g: IssueTransaction             => Right(g.quantity)
+      case g: ReissueTransaction           => Right(g.quantity)
+      case g: BurnTransaction              => Right(g.amount)
+      case g: LeaseTransaction             => Right(g.amount)
+      case g: TransferTransaction          => Right(g.amount)
+      case g: VersionedTransferTransaction => Right(g.amount)
+      case g: ExchangeTransaction          => Right(g.amount)
+      case _: CreateAliasTransaction       => Left("Transaction doesn't contain amount")
+      case _: SetScriptTransaction         => Left("Transaction doesn't contain amount")
+      case _: MassTransferTransaction      => Left("Transaction doesn't contain amount")
+      case _: LeaseCancelTransaction       => Left("Transaction doesn't contain amount")
+    }
+
+    override def feeAssetId: Option[ByteVector] =
+      tx.assetFee._1.map(aid => ByteVector(aid.arr))
+
+    override def timestamp: Long = tx.timestamp
   }
 }

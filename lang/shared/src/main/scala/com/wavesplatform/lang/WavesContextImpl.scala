@@ -31,14 +31,23 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
   private def transactionObject(tx: Transaction): Obj =
     Obj(
       Map(
-        "type"      -> LazyVal(LONG)(EitherT.pure(tx.transactionType)),
-        "id"        -> LazyVal(BYTEVECTOR)(EitherT.pure(tx.id)),
-        "bodyBytes" -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.bodyBytes)),
-        "senderPk"  -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.senderPk)),
-        "assetId"   -> LazyVal(optionByteVector)(EitherT.fromEither(tx.assetId.map(_.asInstanceOf[optionByteVector.Underlying]))),
-        "proof0"    -> proofBinding(tx, 0),
-        "proof1"    -> proofBinding(tx, 1),
-        "proof2"    -> proofBinding(tx, 2)
+        "type"       -> LazyVal(LONG)(EitherT.pure(tx.transactionType)),
+        "id"         -> LazyVal(BYTEVECTOR)(EitherT.pure(tx.id)),
+        "fee"        -> LazyVal(LONG)(EitherT.pure(tx.fee)),
+        "amount"     -> LazyVal(LONG)(EitherT.fromEither(tx.amount)),
+        "feeAssetId" -> LazyVal(optionByteVector)(EitherT.pure(tx.feeAssetId.map(_.asInstanceOf[optionByteVector.innerType.Underlying]))),
+        "timestamp"  -> LazyVal(LONG)(EitherT.pure(tx.timestamp)),
+        "bodyBytes"  -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.bodyBytes)),
+        "senderPk"   -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.senderPk)),
+        "assetId"    -> LazyVal(optionByteVector)(EitherT.fromEither(tx.assetId.map(_.asInstanceOf[optionByteVector.Underlying]))),
+        "proof0"     -> proofBinding(tx, 0),
+        "proof1"     -> proofBinding(tx, 1),
+        "proof2"     -> proofBinding(tx, 2),
+        "proof3"     -> proofBinding(tx, 3),
+        "proof4"     -> proofBinding(tx, 4),
+        "proof5"     -> proofBinding(tx, 5),
+        "proof6"     -> proofBinding(tx, 6),
+        "proof7"     -> proofBinding(tx, 7),
       ))
 
   private val txByIdF = {
@@ -52,8 +61,8 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
   }
 
   def build(): Context = {
-    val txCoeval: Coeval[Either[String, Obj]]               = Coeval.evalOnce(Right(transactionObject(transaction)))
-    val heightCoeval: Coeval[Either[String, Long]]          = Coeval.evalOnce(Right(height))
+    val txCoeval: Coeval[Either[String, Obj]]      = Coeval.evalOnce(Right(transactionObject(transaction)))
+    val heightCoeval: Coeval[Either[String, Long]] = Coeval.evalOnce(Right(height))
     Context(
       Map(transactionType.name -> transactionType),
       Map(
@@ -78,26 +87,36 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
 object WavesContextImpl {
 
   private val noneCoeval: Coeval[Either[String, Option[Nothing]]] = Coeval.evalOnce(Right(None))
-  val none: LazyVal = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval))
-  private val optionByteVector = OPTION(BYTEVECTOR)
-  private val optionT          = OPTIONTYPEPARAM(TYPEPARAM('T'))
+  val none: LazyVal                                               = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval))
+  private val optionByteVector: OPTION = OPTION(BYTEVECTOR)
+  private val optionT                                             = OPTIONTYPEPARAM(TYPEPARAM('T'))
 
   private def hashFunction(name: String)(h: Array[Byte] => Array[Byte]) = PredefFunction(name, BYTEVECTOR, List(("bytes", BYTEVECTOR))) {
     case (m: ByteVector) :: Nil => Right(ByteVector(h(m.toArray)))
     case _                      => ???
   }
 
+  val blockType = PredefType("Block",
+    List(
+      "height" -> LONG,
+      "timestamp" -> LONG
+    ))
+
   val transactionType = PredefType(
     "Transaction",
     List(
-      "type"      -> LONG,
-      "id"        -> BYTEVECTOR,
-      "bodyBytes" -> BYTEVECTOR,
-      "senderPk"  -> BYTEVECTOR,
-      "proof0"    -> BYTEVECTOR,
-      "proof1"    -> BYTEVECTOR,
-      "proof2"    -> BYTEVECTOR,
-      "assetId"   -> optionByteVector
+      "type"       -> LONG,
+      "id"         -> BYTEVECTOR,
+      "fee"        -> LONG,
+      "feeAssetId" -> optionByteVector,
+      "timestamp"  -> LONG,
+      "amount"     -> LONG,
+      "bodyBytes"  -> BYTEVECTOR,
+      "senderPk"   -> BYTEVECTOR,
+      "proof0"     -> BYTEVECTOR,
+      "proof1"     -> BYTEVECTOR,
+      "proof2"     -> BYTEVECTOR,
+      "assetId"    -> optionByteVector
     )
   )
   val extract: PredefFunction = PredefFunction("extract", TYPEPARAM('T'), List(("opt", optionT))) {

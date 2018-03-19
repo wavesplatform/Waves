@@ -10,14 +10,14 @@ object Terms {
   case class TYPEPARAM(char: Char)               extends TYPEPLACEHOLDER
   case class OPTIONTYPEPARAM(t: TYPEPLACEHOLDER) extends TYPEPLACEHOLDER
 
-  sealed trait TYPE                extends TYPEPLACEHOLDER { type Underlying }
-  case object NOTHING              extends TYPE            { type Underlying = Nothing }
-  case object UNIT                 extends TYPE            { type Underlying = Unit }
-  case object LONG                 extends TYPE            { type Underlying = Long }
-  case object BYTEVECTOR           extends TYPE            { type Underlying = ByteVector }
-  case object BOOLEAN              extends TYPE            { type Underlying = Boolean }
-  case class OPTION(t: TYPE)       extends TYPE            { type Underlying = Option[t.Underlying] }
-  case class TYPEREF(name: String) extends TYPE            { type Underlying = Obj }
+  sealed trait TYPE                  extends TYPEPLACEHOLDER { type Underlying }
+  case object NOTHING                extends TYPE            { type Underlying = Nothing }
+  case object UNIT                   extends TYPE            { type Underlying = Unit }
+  case object LONG                   extends TYPE            { type Underlying = Long }
+  case object BYTEVECTOR             extends TYPE            { type Underlying = ByteVector }
+  case object BOOLEAN                extends TYPE            { type Underlying = Boolean }
+  case class OPTION(innerType: TYPE) extends TYPE            { type Underlying = Option[innerType.Underlying] }
+  case class TYPEREF(name: String)   extends TYPE            { type Underlying = Obj }
 
   sealed trait BINARY_OP_KIND
   case object SUM_OP extends BINARY_OP_KIND

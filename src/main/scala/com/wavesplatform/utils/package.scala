@@ -17,18 +17,19 @@ package object utils extends ScorexLogging {
 
   type HeightInfo = (Int, Long)
 
-  private val BytesMaxValue = 256
+  private val BytesMaxValue  = 256
   private val Base58MaxValue = 58
 
   private val BytesLog = math.log(BytesMaxValue)
-  private val BaseLog = math.log(Base58MaxValue)
+  private val BaseLog  = math.log(Base58MaxValue)
 
   val UncaughtExceptionsToLogReporter = UncaughtExceptionReporter(exc => log.error(Throwables.getStackTraceAsString(exc)))
 
   def base58Length(byteArrayLength: Int): Int = math.ceil(BytesLog / BaseLog * byteArrayLength).toInt
 
   def createWithVerification[A <: Storage with VersionedStorage](storage: => A): Try[A] = Try {
-    if (storage.isVersionValid) storage else {
+    if (storage.isVersionValid) storage
+    else {
       log.info(s"Re-creating storage")
       val b = storage.createBatch()
       storage.removeEverything(b)
@@ -37,9 +38,10 @@ package object utils extends ScorexLogging {
     }
   }
 
-  def forceStopApplication(reason: ApplicationStopReason = Default): Unit = new Thread(() => {
-    System.exit(reason.code)
-  }, "waves-platform-shutdown-thread").start()
+  def forceStopApplication(reason: ApplicationStopReason = Default): Unit =
+    new Thread(() => {
+      System.exit(reason.code)
+    }, "waves-platform-shutdown-thread").start()
 
   def humanReadableSize(bytes: Long, si: Boolean = true): String = {
     val (baseValue, unitStrings) =
@@ -55,8 +57,8 @@ package object utils extends ScorexLogging {
         getExponent(curBytes / (baseValue * newExponent), baseValue, newExponent)
       }
 
-    val exponent = getExponent(bytes, baseValue)
-    val divisor = Math.pow(baseValue, exponent)
+    val exponent   = getExponent(bytes, baseValue)
+    val divisor    = Math.pow(baseValue, exponent)
     val unitString = unitStrings(exponent)
 
     f"${bytes / divisor}%.1f $unitString"
