@@ -21,18 +21,20 @@ object TypeInferrer {
         // can lead to different interpretations of `T`.
         // `Nothing`, `TypeRef('XXX')` should find common type of `TypeRef('XXX')`
         val resolved = matchResults.mapValues {
-          case tpe :: Nil          => Right(tpe.tpe)
-          case headTpe :: restTpes =>
-            val maybeCommonType = restTpes.map(_.tpe).toVector.foldLeftM(headTpe.tpe)(findCommonType)
-            maybeCommonType match {
-              case None => Left(s"Can't match types ${headTpe :: restTpes}")
-              case Some(commonType) => Right(commonType)
+          matchResults =>
+            if (matchResults.size == 1) Right(matchResults.head.tpe)
+            else {
+              val maybeCommonType = matchResults.tail.map(_.tpe).toVector.foldLeftM(matchResults.head.tpe)(findCommonType)
+              maybeCommonType match {
+                case None => Left(s"Can't match inferred types of ${matchResults.head.name} over ${matchResults.map(_.tpe)}")
+                case Some(commonType) => Right(commonType)
+              }
             }
         }
 
         resolved.find(_._2.isLeft) match {
-          case Some((_,left)) => left.asInstanceOf[Left[String, Nothing]]
-          case None => Right(resolved.mapValues(_.right.get))
+          case Some((_, left)) => left.asInstanceOf[Left[String, Nothing]]
+          case None            => Right(resolved.mapValues(_.right.get))
         }
     }
   }
@@ -50,6 +52,18 @@ object TypeInferrer {
           case OPTION(t) => matchTypes(t, innerTypeParam)
           case _         => Left(err)
         }
+    }
+  }
+
+  def inferResultType(resultType: TYPEPLACEHOLDER, resolved: Map[TYPEPARAM, TYPE]): Either[String, TYPE] = {
+    resultType match {
+      case plainType: TYPE => Right(plainType)
+      case tp @ TYPEPARAM(_) =>
+        resolved.get(tp) match {
+          case None    => Left(s"Unknown functon return type $tp")
+          case Some(r) => Right(r)
+        }
+      case OPTIONTYPEPARAM(t) => inferResultType(t, resolved).map(OPTION)
     }
   }
 }

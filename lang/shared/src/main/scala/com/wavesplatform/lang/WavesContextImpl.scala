@@ -80,7 +80,7 @@ object WavesContextImpl {
   private val noneCoeval: Coeval[Either[String, Option[Nothing]]] = Coeval.evalOnce(Right(None))
   val none: LazyVal = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval))
   private val optionByteVector = OPTION(BYTEVECTOR)
-  private val optionT          = OPTION(TYPEREF("T"))
+  private val optionT          = OPTIONTYPEPARAM(TYPEPARAM('T'))
 
   private def hashFunction(name: String)(h: Array[Byte] => Array[Byte]) = PredefFunction(name, BYTEVECTOR, List(("bytes", BYTEVECTOR))) {
     case (m: ByteVector) :: Nil => Right(ByteVector(h(m.toArray)))
@@ -106,8 +106,8 @@ object WavesContextImpl {
     case _              => ???
   }
 
-  val some: PredefFunction = PredefFunction("Some", optionT, List(("obj", TYPEREF("T")))) {
-    case v :: Nil => Right(Some(v)).asInstanceOf[Either[String, optionT.Underlying]]
+  val some: PredefFunction = PredefFunction("Some", optionT, List(("obj", TYPEPARAM('T')))) {
+    case v :: Nil => Right(Some(v))
     case _        => ???
   }
 

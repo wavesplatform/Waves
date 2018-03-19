@@ -58,9 +58,9 @@ class TypeInferrerTest extends FreeSpec with Matchers {
 
       "fails if no common type" in {
         TypeInferrer(Seq((BYTEVECTOR, typeparamT), (BYTEVECTOR, OPTIONTYPEPARAM(typeparamT)))) should produce("Non-matching types")
-        TypeInferrer(Seq((LONG, typeparamT), (OPTION(OPTION(NOTHING)), OPTIONTYPEPARAM(typeparamT)))) should produce("Can't match types")
-        TypeInferrer(Seq((BYTEVECTOR, typeparamT), (OPTION(LONG), OPTIONTYPEPARAM(typeparamT)))) should produce("Can't match types")
-        TypeInferrer(Seq((OPTION(BYTEVECTOR), typeparamT), (OPTION(LONG), OPTIONTYPEPARAM(typeparamT)))) should produce("Can't match types")
+        TypeInferrer(Seq((LONG, typeparamT), (OPTION(OPTION(NOTHING)), OPTIONTYPEPARAM(typeparamT)))) should produce("Can't match inferred types")
+        TypeInferrer(Seq((BYTEVECTOR, typeparamT), (OPTION(LONG), OPTIONTYPEPARAM(typeparamT)))) should produce("Can't match inferred types")
+        TypeInferrer(Seq((OPTION(BYTEVECTOR), typeparamT), (OPTION(LONG), OPTIONTYPEPARAM(typeparamT)))) should produce("Can't match inferred types")
       }
     }
   }

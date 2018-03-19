@@ -56,53 +56,19 @@ object TypeChecker {
           if (args.lengthCompare(argTypes.size) != 0)
             EitherT.fromEither[Coeval](Left(s"Function '$name' requires ${argTypes.size} arguments, but ${args.size} are provided"))
           else {
-            ???
-//            import cats.instances.vector._
-//            val actualArgTypes: Vector[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg))).toVector
-//            val sequencedActualArgTypes                           = actualArgTypes.sequence[SetTypeResult, Typed.EXPR].map(x => x.zip(argTypes))
-//
-//            sequencedActualArgTypes.subflatMap { v: Seq[(Typed.EXPR, TYPEPLACEHOLDER)] =>
-//
-//
-//
-//              val typeParameters = v.flatMap(x => inferTypeParams(x._1.tpe, x._2))
-//
-//              //Grouping type params by names "T1", "B" ect
-//              //and finding common type per group
-//              val resolvedTypes = typeParameters
-//                .groupBy { case (typeArgName, _) => typeArgName }
-//                .map {
-//                  case (groupKey, types) =>
-//                    (groupKey,
-//                     types
-//                       .drop(1)
-//                       .foldLeft(Either.right[String, TYPE](types.head._2))((a, b) =>
-//                         a.flatMap(t1 =>
-//                           findCommonType(t1, b._2)
-//                             .toRight(s"There is no common type among (${types.map(_._2).mkString(", ")}) for $groupKey type param"))))
-//                }
-//              val matches = v.map(x => (x._1, resolveTypes(x._2, resolvedTypes))).map {
-//                case ((e, Right(tpe))) =>
-//                  matchType(tpe, e.tpe) match {
-//                    case Some(_) => Right(e)
-//                    case None =>
-//                      Left(s"Types of arguments of function call '$name' do not match types required in signature. Expected: $tpe, Actual: ${e.tpe}")
-//                  }
-//                case (_, Left(l)) => Left(l)
-//              }
-//              matches.find(_.isLeft) match {
-//                case Some(left) => left
-//                case None =>
-//                  resultType match {
-//                    case TYPEREF(n) =>
-//                      typeParameters.find(_._1 == n) match {
-//                        case Some(g) => Right(Typed.FUNCTION_CALL(name, v.map(_._1).toList, g._2))
-//                        case None    => Left(s"Type param $n not found")
-//                      }
-//                    case _ => Right(Typed.FUNCTION_CALL(name, v.map(_._1).toList, resultType))
-//                  }
-//              }
-//            }
+            import cats.instances.vector._
+            val actualArgTypes: Vector[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg))).toVector
+            val sequencedActualArgTypes                           = actualArgTypes.sequence[SetTypeResult, Typed.EXPR].map(x => x.zip(argTypes))
+
+            sequencedActualArgTypes
+              .subflatMap { typedExpressionArgumentsAndTypedPlaceholders =>
+                val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case ((typedExpr, tph)) => (typedExpr.tpe, tph) }
+                for {
+                  resolvedTypeParams <- TypeInferrer(typePairs)
+                  resolvedResultType <- TypeInferrer.inferResultType(resultType, resolvedTypeParams)
+                } yield Typed.FUNCTION_CALL(name, typedExpressionArgumentsAndTypedPlaceholders.map(_._1).toList, resolvedResultType)
+              }
+
           }
         case None => EitherT.fromEither[Coeval](Left(s"Function '$name' not found"))
       }
@@ -206,5 +172,7 @@ object TypeChecker {
       case Failure(ex)  => Left(ex.toString)
       case Success(res) => res
     }
+    result
+
   }
 }

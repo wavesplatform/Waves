@@ -161,7 +161,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
     val f = PredefFunction("F", LONG, List(("_", LONG))) { _ =>
       functionEvaluated = functionEvaluated + 1
-      Right(1)
+      Right(1L)
     }
 
     val context = Context(
@@ -172,7 +172,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(
       context = context,
       expr = BLOCK(Some(LET("X", FUNCTION_CALL("F", List(CONST_LONG(1000)), LONG))), BINARY_OP(REF("X", LONG), SUM_OP, REF("X", LONG), LONG), LONG)
-    ) shouldBe Right(2)
+    ) shouldBe Right(2L)
 
     functionEvaluated shouldBe 1
 
