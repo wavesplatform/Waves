@@ -100,7 +100,7 @@ object WavesContextImpl {
       "ASSETID"   -> optionByteVector
     )
   )
-  val extract: PredefFunction = PredefFunction("extract", TYPEREF("T"), List(("opt", optionT))) {
+  val extract: PredefFunction = PredefFunction("extract", TYPEPARAM('T'), List(("opt", optionT))) {
     case Some(v) :: Nil => Right(v)
     case None :: Nil    => Left("Extract from empty option")
     case _              => ???
