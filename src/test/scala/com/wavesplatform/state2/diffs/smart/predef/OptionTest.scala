@@ -3,6 +3,7 @@ package com.wavesplatform.state2.diffs.smart.predef
 import com.wavesplatform.{NoShrink, TransactionGen}
 import com.wavesplatform.lang.Evaluator
 import com.wavesplatform.state2.diffs._
+import com.wavesplatform.state2._
 import com.wavesplatform.utils._
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval
@@ -28,7 +29,7 @@ class OptionTest extends PropSpec with PropertyChecks with Matchers with Transac
       |
     """.stripMargin
 
-  private def runScript[T](script: String, tx: Transaction): Either[String, T] = {
+  private def runScript[T](script: String, tx: Transaction = null): Either[String, T] = {
     val Success(expr, _) = com.wavesplatform.lang.Parser(script)
     val Right(typedExpr) = com.wavesplatform.lang.TypeChecker(dummyTypeCheckerContext, expr)
     Evaluator[T](new ConsensusContext(Coeval(tx), Coeval(???), null).build(), typedExpr)
@@ -39,7 +40,7 @@ class OptionTest extends PropSpec with PropertyChecks with Matchers with Transac
       case (transfer) =>
         val result = runScript[ByteVector](extractScript, transfer)
         transfer.assetId match {
-          case Some(v) => result.right.get.toArray sameElements v.arr
+          case Some(v) => result.explicitGet().toArray sameElements v.arr
           case None    => result should produce("from empty option")
         }
     }
@@ -51,5 +52,16 @@ class OptionTest extends PropSpec with PropertyChecks with Matchers with Transac
         val result = runScript[Boolean](isDefinedScript, transfer)
         transfer.assetId.isDefined shouldEqual result.right.get
     }
+  }
+
+  property("Some/None/extract/isDefined") {
+    runScript("Some(3)".stripMargin) shouldBe Right(Some(3))
+    runScript("None".stripMargin) shouldBe Right(None)
+    runScript("isDefined(Some(3))".stripMargin) shouldBe Right(true)
+    runScript("isDefined(None)".stripMargin) shouldBe Right(false)
+    runScript("extract(Some(3))".stripMargin) shouldBe Right(3)
+    runScript("extract(None)".stripMargin) should produce("Extract from empty option")
+
+
   }
 }
