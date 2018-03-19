@@ -11,7 +11,6 @@ object TypeInferrer {
     matching.find(_.isLeft) match {
       case Some(left) => left.asInstanceOf[Left[String, Nothing]]
       case None =>
-        import cats.data._
         import cats.syntax.all._
         import cats.instances.option._
         import cats.instances.vector._
