@@ -1,13 +1,13 @@
 package com.wavesplatform.state2.diffs.smart.scenarios
 
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
-import com.wavesplatform.state2.diffs.{assertDiffAndState, assertDiffEi, produce}
 import com.wavesplatform.state2.diffs.smart._
-import org.scalatest.{Matchers, PropSpec}
+import com.wavesplatform.state2.diffs.{assertDiffAndState, assertDiffEi, produce}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 
-class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
+class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   private val goodScript =
     """
@@ -27,15 +27,15 @@ class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers wit
 
     forAll(preconditionsTransferAndLease(goodScript)) {
       case ((genesis, script, lease, transfer)) =>
-        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
-        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(totalDiffEi =>
+        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(totalDiffEi =>
           totalDiffEi should produce("TransactionNotAllowedByScript"))
     }
 
     forAll(preconditionsTransferAndLease(badScript)) {
       case ((genesis, script, lease, transfer)) =>
-        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
-        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(totalDiffEi =>
+        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(totalDiffEi =>
           totalDiffEi should produce("doesn't contain asset id"))
     }
   }

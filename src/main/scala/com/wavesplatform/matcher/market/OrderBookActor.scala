@@ -13,7 +13,7 @@ import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
@@ -30,7 +30,7 @@ import scala.concurrent.duration._
 
 class OrderBookActor(assetPair: AssetPair,
                      val orderHistory: ActorRef,
-                     val storedState: StateReader,
+                     val storedState: SnapshotStateReader,
                      val wallet: Wallet,
                      val utx: UtxPool,
                      val allChannels: ChannelGroup,
@@ -323,7 +323,7 @@ class OrderBookActor(assetPair: AssetPair,
 }
 
 object OrderBookActor {
-  def props(assetPair: AssetPair, orderHistory: ActorRef, storedState: StateReader, settings: MatcherSettings,
+  def props(assetPair: AssetPair, orderHistory: ActorRef, storedState: SnapshotStateReader, settings: MatcherSettings,
             wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, history: History,
             functionalitySettings: FunctionalitySettings): Props =
     Props(new OrderBookActor(assetPair, orderHistory, storedState, wallet, utx, allChannels, settings, history, functionalitySettings))

@@ -7,7 +7,7 @@ import com.wavesplatform.matcher.market.OrderBookActor.ForceCancelOrder
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ForceCancelOrderFromHistory, GetActiveOrdersByAddress, GetActiveOrdersByAddressResponse}
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.matcher.model.LimitOrder
-import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{ByteStr, LeaseBalance, Portfolio}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -110,7 +110,7 @@ class BalanceWatcherWorkerActorSpecification
       )
 
       "not cancel a valid order" in withActors { actors =>
-        actors.balanceWatcher ! BalanceChanged(Map(fooAddr -> BalanceChanged.Changes(Portfolio(1000, LeaseInfo(0, 0), Map.empty), Set(None))))
+        actors.balanceWatcher ! BalanceChanged(Map(fooAddr -> BalanceChanged.Changes(Portfolio(1000, LeaseBalance(0, 0), Map.empty), Set(None))))
         actors.history.send(actors.balanceWatcher, GetActiveOrdersByAddressResponse(0, fooAddr, Seq(LimitOrder(validOrder))))
 
         actors.matcher.expectNoMsg(100.millis)

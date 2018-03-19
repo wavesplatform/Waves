@@ -3,7 +3,7 @@ package com.wavesplatform.state2.diffs
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{Diff, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{Diff, LeaseBalance, Portfolio}
 import scorex.account.Address
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{PaymentTransaction, ValidationError}
@@ -23,11 +23,11 @@ object PaymentTransactionDiff {
         portfolios = Map(
           tx.recipient -> Portfolio(
             balance = tx.amount,
-            LeaseInfo.empty,
+            LeaseBalance.empty,
             assets = Map.empty)) combine Map(
           Address.fromPublicKey(tx.sender.publicKey) -> Portfolio(
             balance = -tx.amount - tx.fee,
-            LeaseInfo.empty,
+            LeaseBalance.empty,
             assets = Map.empty
           )),
       ))

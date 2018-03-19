@@ -2,7 +2,7 @@ package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{AssetInfo, Diff, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{AssetDescription, AssetInfo, Diff, LeaseBalance, Portfolio}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
 import scorex.transaction.{AssetId, SignedTransaction, ValidationError}
@@ -19,20 +19,19 @@ object AssetTransactionsDiff {
       tx = tx,
       portfolios = Map(tx.sender.toAddress -> Portfolio(
         balance = -tx.fee,
-        leaseInfo = LeaseInfo.empty,
+        lease = LeaseBalance.empty,
         assets = Map(tx.assetId() -> tx.quantity))),
       assetInfos = Map(tx.assetId() -> info)))
   }
 
-  def reissue(state: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(tx: ReissueTransaction): Either[ValidationError, Diff] = {
-    findReferencedAsset(tx, state, tx.assetId).flatMap(itx => {
-      val oldInfo = state.assetInfo(tx.assetId).get
-      if (oldInfo.isReissuable || blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) {
+  def reissue(state: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(tx: ReissueTransaction): Either[ValidationError, Diff] =
+    findReferencedAsset(tx, state, tx.assetId).flatMap { oldInfo =>
+      if (oldInfo.reissuable || blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) {
         Right(Diff(height = height,
           tx = tx,
           portfolios = Map(tx.sender.toAddress -> Portfolio(
             balance = -tx.fee,
-            leaseInfo = LeaseInfo.empty,
+            lease = LeaseBalance.empty,
             assets = Map(tx.assetId -> tx.quantity))),
           assetInfos = Map(tx.assetId -> AssetInfo(
             volume = tx.quantity,
@@ -41,27 +40,24 @@ object AssetTransactionsDiff {
         Left(GenericError(s"Asset is not reissuable and blockTime=$blockTime is greater than " +
           s"settings.allowInvalidReissueInSameBlockUntilTimestamp=${settings.allowInvalidReissueInSameBlockUntilTimestamp}"))
       }
-    })
-  }
+    }
 
-  def burn(state: SnapshotStateReader, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] = {
-    findReferencedAsset(tx, state, tx.assetId).map(itx => {
+  def burn(state: SnapshotStateReader, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] =
+    findReferencedAsset(tx, state, tx.assetId).map { _ =>
       Diff(height = height,
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(
           balance = -tx.fee,
-          leaseInfo = LeaseInfo.empty,
+          lease = LeaseBalance.empty,
           assets = Map(tx.assetId -> -tx.amount))),
         assetInfos = Map(tx.assetId -> AssetInfo(isReissuable = true, volume = -tx.amount)))
-    })
-  }
+    }
 
-  private def findReferencedAsset(tx: SignedTransaction, state: SnapshotStateReader, assetId: AssetId): Either[ValidationError, IssueTransaction] = {
-    state.findTransaction[IssueTransaction](assetId) match {
+  private def findReferencedAsset(tx: SignedTransaction, state: SnapshotStateReader, assetId: AssetId): Either[ValidationError, AssetDescription] = {
+    state.assetDescription(assetId) match {
       case None => Left(GenericError("Referenced assetId not found"))
-      case Some(itx) if !(itx.sender equals tx.sender) => Left(GenericError("Asset was issued by other address"))
+      case Some(ad) if !(ad.issuer equals tx.sender) => Left(GenericError("Asset was issued by another address"))
       case Some(itx) => Right(itx)
     }
   }
-
 }
