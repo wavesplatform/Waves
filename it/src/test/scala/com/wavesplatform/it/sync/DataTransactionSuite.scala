@@ -125,9 +125,9 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     sender.getData(secondAddress, "int") shouldBe item41
     sender.getData(secondAddress, "bool") shouldBe item42
-    sender.getData(secondAddress, "blob") shouldBe item43
+    sender.getData(secondAddress, "blob").equals(item43)
 
-    sender.getData(secondAddress) shouldBe List(item41, item42, item43)
+    sender.getData(secondAddress).equals(List(item41, item42, item43))
 
     notMiner.assertBalances(secondAddress, balance2 - fee, eff2 - fee)
   }
