@@ -4,6 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
+import com.wavesplatform.state2.{BooleanDataEntry, IntegerDataEntry}
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.{FreeSpec, Matchers}
 
@@ -81,5 +82,36 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
     } yield succeed
 
     Await.result(f, 1.minute)
+  }
+
+  "Data transaction rollback" in {
+    val node = nodes.head
+    val entry1 = IntegerDataEntry("1", 0)
+    val entry2 = BooleanDataEntry("2", true)
+    val entry3 = IntegerDataEntry("1", 1)
+
+    val f = for {
+      startHeight <- Future.traverse(nodes)(_.height).map(_.max)
+      tx1 <- node.putData(node.address, List(entry1), 100000).map(_.id)
+      _ <- Future.traverse(nodes)(_.waitForTransaction(tx1))
+      _ <- Future.traverse(nodes)(_.waitForHeight(startHeight + 1))
+      tx2 <- node.putData(node.address, List(entry2, entry3), 100000).map(_.id)
+      _ <- Future.traverse(nodes)(_.waitForTransaction(tx2))
+      _ <- Future.traverse(nodes)(_.waitForHeight(startHeight + 2))
+      data2 <- node.getData(node.address)
+      _ = assert(data2 == List(entry3, entry2))
+
+      _ <- Future.traverse(nodes)(_.rollback(startHeight + 1, returnToUTX = false))
+      _ <- Future.traverse(nodes)(_.waitForHeight(startHeight + 1))
+      data1 <- node.getData(node.address)
+      _ = assert(data1 == List(entry1))
+
+      _ <- Future.traverse(nodes)(_.rollback(startHeight, returnToUTX = false))
+      _ <- Future.traverse(nodes)(_.waitForHeight(startHeight))
+      data0 <- node.getData(node.address)
+      _ = assert(data0 == List.empty)
+    } yield succeed
+
+    Await.result(f, 3.minutes)
   }
 }
