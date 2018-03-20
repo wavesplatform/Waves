@@ -8,7 +8,8 @@ object BlockchainFeatures {
   val NG = BlockchainFeature(2)
   val MassTransfer = BlockchainFeature(3)
   val SmartAccounts = BlockchainFeature(4)
+  val FairPOS = BlockchainFeature(5)
 
-  val implemented: Set[Short] = Set(SmallerMinimalGeneratingBalance, NG, MassTransfer, SmartAccounts).map(_.id)
+  val implemented: Set[Short] = Set(SmallerMinimalGeneratingBalance, NG, MassTransfer, SmartAccounts, FairPOS).map(_.id)
 
 }
