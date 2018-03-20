@@ -3,7 +3,7 @@ package activation
 
 import com.typesafe.config.Config
 import com.wavesplatform.features.BlockchainFeatureStatus
-import com.wavesplatform.features.api.{ActivationStatusFeature, NodeFeatureStatus}
+import com.wavesplatform.features.api.{FeatureActivationStatus, NodeFeatureStatus}
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
@@ -39,8 +39,8 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with CancelAfte
     .withDefault(4)
     .buildNonConflicting()
 
-  private var activationStatusInfoBefore = Option.empty[ActivationStatusFeature]
-  private var activationStatusInfoAfter = Option.empty[ActivationStatusFeature]
+  private var activationStatusInfoBefore = Option.empty[FeatureActivationStatus]
+  private var activationStatusInfoAfter = Option.empty[FeatureActivationStatus]
 
   "get activation status info" in {
     activationStatusInfoBefore = Some(activationStatus(nodes, votingInterval - 1, votingFeatureNum, 4.minute))

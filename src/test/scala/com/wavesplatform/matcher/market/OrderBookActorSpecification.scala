@@ -3,7 +3,6 @@ package com.wavesplatform.matcher.market
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
@@ -13,9 +12,9 @@ import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, WalletSettings}
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{ByteStr, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
-import monix.eval.Coeval
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import scorex.account.PrivateKeyAccount
@@ -47,7 +46,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
   val pair = AssetPair(Some(ByteStr("BTC".getBytes)), Some(ByteStr("WAVES".getBytes)))
   val storedState: SnapshotStateReader = stub[SnapshotStateReader]
   val hugeAmount = Long.MaxValue / 2
-  (storedState.accountPortfolio _).when(*).returns(Portfolio(hugeAmount, LeaseInfo.empty, Map(
+  (storedState.portfolio _).when(*).returns(Portfolio(hugeAmount, LeaseBalance.empty, Map(
     ByteStr("BTC".getBytes) -> hugeAmount,
     ByteStr("WAVES".getBytes) -> hugeAmount
   )))
@@ -61,7 +60,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     100000L,
     10000L).right.get
 
-  (storedState.transactionInfo _).when(*).returns(Some((1, Some(issueTransaction))))
+  (storedState.transactionInfo _).when(*).returns(Some((1, issueTransaction)))
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
 
@@ -75,7 +74,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     }
   })
 
-  var actor: ActorRef = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, Coeval.now(storedState),
+  var actor: ActorRef = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, storedState,
     wallet, stub[UtxPool], stub[ChannelGroup], settings, stub[History], FunctionalitySettings.TESTNET) with RestartableActor))
 
   private def getOrders(actor: ActorRef) = {
@@ -95,9 +94,9 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     val functionalitySettings = TestFunctionalitySettings.Stub
 
     val utx = stub[UtxPool]
-    (utx.putIfNew _).when(*).onCall((tx: Transaction) => Right(true))
+    (utx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty)))
     val allChannels = stub[ChannelGroup]
-    actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, Coeval.now(storedState),
+    actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, storedState,
       wallet, utx, allChannels, settings, history, functionalitySettings) with RestartableActor))
 
     eventsProbe = TestProbe()
@@ -247,7 +246,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
     }
 
-    "place orders and restart without waiting for responce" in {
+    "place orders and restart without waiting for response" in {
       val ord1 = sell(pair, 100, 10 * Order.PriceConstant)
 
       (1 to 100).foreach({ i =>
@@ -279,11 +278,11 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       (pool.putIfNew _).when(*).onCall { (tx: Transaction) =>
         tx match {
           case om: ExchangeTransaction if om.buyOrder == ord2 => Left(ValidationError.GenericError("test"))
-          case _: Transaction => Right(true)
+          case _: Transaction => Right((true, Diff.empty))
         }
       }
       val allChannels = stub[ChannelGroup]
-      actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, Coeval.now(storedState),
+      actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, storedState,
         wallet, pool, allChannels, settings, history, functionalitySettings) with RestartableActor))
 
       actor ! ord1

@@ -1,7 +1,6 @@
 package com.wavesplatform.state2.diffs
 
 import cats.Monoid
-import cats.data.{NonEmptyList => NEL}
 import cats.implicits._
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics.Instrumented
@@ -10,26 +9,17 @@ import com.wavesplatform.state2._
 import com.wavesplatform.state2.patch.{CancelAllLeases, CancelLeaseOverflow}
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import monix.eval.Task
-import monix.execution.Scheduler
-import monix.execution.schedulers.SchedulerService
 import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.ValidationError.ActivationError
-import scorex.transaction.{History, Transaction, ValidationError}
+import scorex.transaction.{Transaction, ValidationError}
 import scorex.utils.ScorexLogging
-
-import scala.collection.SortedMap
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
 
 object BlockDiffer extends ScorexLogging with Instrumented {
 
-  private implicit val scheduler: SchedulerService = Scheduler.computation(name = "block-deser")
-
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
-  def fromBlock(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, maybePrevBlock: Option[Block], block: Block): Either[ValidationError, BlockDiff] = {
+  def fromBlock(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, maybePrevBlock: Option[Block], block: Block): Either[ValidationError, Diff] = {
     val blockSigner = block.signerData.generator.toAddress
     val stateHeight = s.height
 
@@ -56,73 +46,44 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     } yield r
   }
 
-  def fromMicroBlock(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, prevBlockTimestamp: Option[Long], micro: MicroBlock, timestamp: Long): Either[ValidationError, BlockDiff] = {
+  def fromMicroBlock(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, prevBlockTimestamp: Option[Long], micro: MicroBlock, timestamp: Long): Either[ValidationError, Diff] = {
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
-      _ <- Either.cond(fp.featureActivationHeight(BlockchainFeatures.NG.id).exists(s.height > _), (), ActivationError(s"MicroBlocks are not yet activated, current height=${s.height}"))
+      _ <- Either.cond(fp.activatedFeatures().contains(BlockchainFeatures.NG.id), (), ActivationError(s"MicroBlocks are not yet activated"))
       _ <- micro.signaturesValid()
       r <- apply(settings, s, fp, prevBlockTimestamp)(micro.sender, None, None, timestamp, micro.transactionData, 0)
     } yield r
   }
 
-  def unsafeDiffMany(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, prevBlock: Option[Block], maxTxsInChunk: Int)
-                    (blocks: Seq[Block]): NEL[BlockDiff] =
-    blocks.foldLeft((NEL.one(BlockDiff.empty), prevBlock)) { case ((diffs, prev), block) =>
-      val blockDiff = fromBlock(settings, fp, composite(diffs, s), prev, block).explicitGet()
-      (prependCompactBlockDiff(blockDiff, diffs, maxTxsInChunk), Some(block))
-    }._1
-
-  def unsafeDiffByRange(fs: FunctionalitySettings, fp: FeatureProvider, h: History, maxTransactionsPerChunk: Int)(state: SnapshotStateReader, upto: Int): NEL[BlockDiff] = {
-    val from = state.height + 1
-    val blocks = measureLog(s"Reading blocks from $from up upto $upto") {
-      Await.result(Task.wander(Range(from, upto).map(h.blockBytes))(b => Task(Block.parseBytes(b.get).get)).runAsyncLogErr, Duration.Inf)
-    }
-    measureLog(s"Building diff from $from up to $upto") {
-      BlockDiffer.unsafeDiffMany(fs, fp, state, h.blockAt(from - 1), maxTransactionsPerChunk)(blocks)
-    }
-  }
-
   private def apply(settings: FunctionalitySettings, s: SnapshotStateReader, fp: FeatureProvider, prevBlockTimestamp: Option[Long])
                    (blockGenerator: Address, prevBlockFeeDistr: Option[Diff], currentBlockFeeDistr: Option[Diff],
-                    timestamp: Long, txs: Seq[Transaction], heightDiff: Int): Either[ValidationError, BlockDiff] = {
+                    timestamp: Long, txs: Seq[Transaction], heightDiff: Int): Either[ValidationError, Diff] = {
     val currentBlockHeight = s.height + heightDiff
     val txDiffer = TransactionDiffer(settings, prevBlockTimestamp, timestamp, currentBlockHeight) _
 
     val txsDiffEi = currentBlockFeeDistr match {
       case Some(feedistr) =>
         txs.foldLeft(right(Monoid.combine(prevBlockFeeDistr.orEmpty, feedistr))) { case (ei, tx) => ei.flatMap(diff =>
-          txDiffer(composite(diff.asBlockDiff, s), fp, tx)
+          txDiffer(composite(s, diff), fp, tx)
             .map(newDiff => diff.combine(newDiff)))
         }
       case None =>
         txs.foldLeft(right(prevBlockFeeDistr.orEmpty)) { case (ei, tx) => ei.flatMap(diff =>
-          txDiffer(composite(diff.asBlockDiff, s), fp, tx)
+          txDiffer(composite(s, diff), fp, tx)
             .map(newDiff => diff.combine(newDiff.copy(portfolios = newDiff.portfolios.combine(Map(blockGenerator -> tx.feeDiff()).mapValues(_.multiply(Block.CurrentBlockFeePart)))))))
         }
     }
 
     txsDiffEi.map { d =>
       val diffWithCancelledLeases = if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
-        Monoid.combine(d, CancelAllLeases(composite(d.asBlockDiff, s)))
+        Monoid.combine(d, CancelAllLeases(composite(s, d)))
       else d
 
       val diffWithLeasePatches = if (currentBlockHeight == settings.blockVersion3AfterHeight)
-        Monoid.combine(diffWithCancelledLeases, CancelLeaseOverflow(composite(diffWithCancelledLeases.asBlockDiff, s)))
+        Monoid.combine(diffWithCancelledLeases, CancelLeaseOverflow(composite(s, diffWithCancelledLeases)))
       else diffWithCancelledLeases
 
-      val newSnapshots = diffWithLeasePatches.portfolios
-        .collect { case (acc, portfolioDiff) if portfolioDiff.balance != 0 || portfolioDiff.effectiveBalance != 0 =>
-          val oldPortfolio = s.partialPortfolio(acc, Set.empty[ByteStr])
-          if (s.lastUpdateHeight(acc).contains(currentBlockHeight)) {
-            throw new Exception(s"CRITICAL: attempting to build a circular reference in snapshot list. " +
-              s"acc=$acc, currentBlockHeight=$currentBlockHeight")
-          }
-          acc -> SortedMap(currentBlockHeight -> Snapshot(
-            prevHeight = s.lastUpdateHeight(acc).getOrElse(0),
-            balance = oldPortfolio.balance + portfolioDiff.balance,
-            effectiveBalance = oldPortfolio.effectiveBalance + portfolioDiff.effectiveBalance))
-        }
-      BlockDiff(diffWithLeasePatches, heightDiff, newSnapshots)
+      diffWithLeasePatches
     }
   }
 }

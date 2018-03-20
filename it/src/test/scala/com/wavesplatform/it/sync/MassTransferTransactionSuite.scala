@@ -1,20 +1,20 @@
-package com.wavesplatform.it.transactions
+package com.wavesplatform.it.sync
 
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json._
+import play.api.libs.json.{JsObject, Json}
 import scorex.account.AddressOrAlias
 import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.Proofs
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.MassTransferTransaction
-import scorex.transaction.assets.MassTransferTransaction.MaxTransferCount
-import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, Transfer}
+import scorex.transaction.assets.MassTransferTransaction.{MaxTransferCount, ParsedTransfer, Transfer}
+import scorex.transaction.assets.TransferTransaction.MaxAttachmentSize
 
 import scala.concurrent.duration._
-import scorex.transaction.assets.TransferTransaction.MaxAttachmentSize
 
 class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
@@ -69,7 +69,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
     val transfers = List(Transfer(secondAddress, balance1 / 2), Transfer(thirdAddress, balance1 / 2))
 
-    assertBadRequest2(sender.massTransfer(firstAddress, transfers, calcFee(transfers.size)))
+    assertBadRequest(sender.massTransfer(firstAddress, transfers, calcFee(transfers.size)))
 
     nodes.waitForHeightAraise()
     notMiner.assertBalances(firstAddress, balance1, eff1)
@@ -82,7 +82,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
     val transfers = List(Transfer(secondAddress, transferAmount))
 
-    assertBadRequest2(sender.massTransfer(firstAddress, transfers, transferFee))
+    assertBadRequest(sender.massTransfer(firstAddress, transfers, transferFee))
     nodes.waitForHeightAraise()
     notMiner.assertBalances(firstAddress, balance1, eff1)
     notMiner.assertBalances(secondAddress, balance2, eff2)
@@ -96,7 +96,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     val leaseTxId = sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee).id
     nodes.waitForHeightAraiseAndTxPresent(leaseTxId)
 
-    assertBadRequest2(sender.massTransfer(firstAddress, transfers, transferFee))
+    assertBadRequest(sender.massTransfer(firstAddress, transfers, transferFee))
     nodes.waitForHeightAraise()
     notMiner.assertBalances(firstAddress, balance1 - leasingFee, eff1 - leasingAmount - leasingFee)
     notMiner.assertBalances(secondAddress, balance2, eff2 + leasingAmount)
@@ -119,7 +119,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     for (tx <- invalidTransfers) {
       val id = tx.id()
       val req = createSignedMassTransferRequest(tx)
-      assertBadRequest2(sender.signedMassTransfer(req))
+      assertBadRequest(sender.signedMassTransfer(req))
       nodes.foreach(_.ensureTxDoesntExist(id.base58))
     }
   }
@@ -142,12 +142,13 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     notMiner.assertBalances(firstAddress, balance1 - fee, eff1 - fee)
   }
 
-  test("transaction requires either proofs or signature") {
+  test("transaction requires a proof") {
     val fee = calcFee(2)
     val transfers = Seq(Transfer(secondAddress, transferAmount), Transfer(thirdAddress, transferAmount))
     def signedMassTransfer(): JsObject = {
       val rs = sender.postJsonWithApiKey("/transactions/sign", Json.obj(
         "type" -> TransactionType.MassTransferTransaction.id,
+        "version" -> Proofs.Version,
         "sender" -> firstAddress,
         "transfers" -> transfers,
         "fee" -> fee))
@@ -155,26 +156,20 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     }
     def id(obj: JsObject) = obj.value("id").as[String]
 
-    val noProof = signedMassTransfer() - "proofs"
-    assertBadRequest2(sender.postJson("/transactions/broadcast", noProof))
-    nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
-
     val withProof = signedMassTransfer()
     assert((withProof \ "proofs").as[Seq[String]].lengthCompare(1) == 0)
     sender.postJson("/transactions/broadcast", withProof)
     nodes.waitForHeightAraiseAndTxPresent(id(withProof))
 
-    val signed = signedMassTransfer()
-    val proofs = (signed \ "proofs").as[Seq[String]]
-    assert(proofs.lengthCompare(1) == 0)
-    val withSignature = signed - "proofs" + ("signature" -> JsString(proofs.head))
-    sender.postJson("/transactions/broadcast", withSignature)
-    nodes.waitForHeightAraiseAndTxPresent(id(withSignature))
+    val noProof = signedMassTransfer() - "proofs"
+    assertBadRequest(sender.postJson("/transactions/broadcast", noProof))
+    nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
   }
 
   private def createSignedMassTransferRequest(tx: MassTransferTransaction): SignedMassTransferRequest = {
     import tx._
     SignedMassTransferRequest(
+      Proofs.Version,
       Base58.encode(tx.sender.publicKey),
       assetId.map(_.base58),
       transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) },

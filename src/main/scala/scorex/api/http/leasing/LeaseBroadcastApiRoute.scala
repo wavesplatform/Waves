@@ -3,8 +3,8 @@ package scorex.api.http.leasing
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute

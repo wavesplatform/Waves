@@ -1,10 +1,10 @@
 package com.wavesplatform.matcher.model
 
 import cats.implicits._
-import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.matcher.model.Events.OrderAdded
+import com.wavesplatform.utx.UtxPool
 import scorex.account.PublicKeyAccount
 import scorex.transaction.AssetAcc
 import scorex.transaction.ValidationError.GenericError
@@ -43,8 +43,6 @@ trait OrderValidator {
   }
 
   def validateNewOrder(order: Order): Either[GenericError, Order] = {
-    //(openOrdersCount.getOrElse(order.matcherPublicKey.address, 0) <= settings.maxOpenOrders) :|
-    //  s"Open orders count limit exceeded (Max = ${settings.maxOpenOrders})" &&
     val v =
     (order.matcherPublicKey == matcherPubKey) :| "Incorrect matcher public key" &&
       (order.expiration > NTP.correctedTime() + MinExpiration) :| "Order expiration should be > 1 min" &&

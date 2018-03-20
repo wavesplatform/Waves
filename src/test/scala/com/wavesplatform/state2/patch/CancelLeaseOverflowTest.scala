@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.patch
 
 import com.wavesplatform.state2.diffs._
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
@@ -12,7 +12,7 @@ import scorex.transaction.lease.LeaseTransaction
 
 
 class CancelLeaseOverflowTest extends PropSpec
-  with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
+  with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   private val settings = TestFunctionalitySettings.Enabled.copy(blockVersion3AfterHeight = 5)
 
@@ -33,15 +33,15 @@ class CancelLeaseOverflowTest extends PropSpec
     )
 
     forAll(leaseOverflowGen) { case (gt1, gt2, lease1, lease2, tx) =>
-      assertDiffAndState(db, Seq(
+      assertDiffAndState(Seq(
         TestBlock.create(Seq(gt1, gt2)),
         TestBlock.create(Seq(lease1)),
         TestBlock.create(Seq(lease2, tx)),
         TestBlock.create(Seq.empty)),
         TestBlock.create(Seq.empty),
         settings) { case (_, newState) =>
-        newState.isLeaseActive(lease2) shouldBe false
-        newState.isLeaseActive(lease1) shouldBe true
+        newState.leaseDetails(lease2.id()).forall(_.isActive) shouldBe false
+        newState.leaseDetails(lease1.id()).exists(_.isActive) shouldBe true
       }
     }
   }

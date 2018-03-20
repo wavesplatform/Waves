@@ -1,5 +1,7 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.BitVector

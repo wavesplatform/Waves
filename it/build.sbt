@@ -78,6 +78,8 @@ lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
         bootJars = Vector.empty[java.io.File],
         workingDirectory = Option(baseDirectory.value),
         runJVMOptions = Vector(
+          "-XX:+IgnoreUnrecognizedVMOptions",
+          "--add-modules=java.xml.bind",
           "-Dwaves.it.logging.appender=FILE",
           s"-Dwaves.it.logging.dir=${logDirectoryValue / suite.name.replaceAll("""(\w)\w*\.""", "$1.")}",
           s"-Dwaves.profiling.yourKitDir=$yourKitRedistDirValue"

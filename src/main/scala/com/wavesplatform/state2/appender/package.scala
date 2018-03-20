@@ -1,18 +1,18 @@
 package com.wavesplatform.state2
 
-import com.wavesplatform.UtxPool
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
 import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.PoSCalc._
-import scorex.transaction.ValidationError.{BlockFromFuture, GenericError}
+import scorex.transaction.ValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -54,22 +54,25 @@ package object appender extends ScorexLogging {
   private[appender] def appendBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
                                     stateReader: SnapshotStateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings,
                                     featureProvider: FeatureProvider)(block: Block): Either[ValidationError, Option[Int]] = for {
-    _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
-      GenericError(s"Block $block at height ${history.height() + 1} is not valid w.r.t. checkpoint"))
+    _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height + 1), (),
+      BlockAppendError(s"Block $block at height ${history.height + 1} is not valid w.r.t. checkpoint", block))
+    _ <- Either.cond(stateReader.accountScript(block.sender).isEmpty, (), BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block))
     _ <- blockConsensusValidation(history, featureProvider, settings, time.correctedTime(), block) { height =>
-      PoSCalc.generatingBalance(stateReader, settings.blockchainSettings.functionalitySettings, block.signerData.generator, height).toEither.left.map(_.toString)
-        .flatMap(validateEffectiveBalance(featureProvider, settings.blockchainSettings.functionalitySettings, block, height))
+      val balance = PoSCalc.generatingBalance(stateReader, settings.blockchainSettings.functionalitySettings, block.sender, height)
+      validateEffectiveBalance(featureProvider, settings.blockchainSettings.functionalitySettings, block, height)(balance)
     }
-    baseHeight = history.height()
+    baseHeight = history.height
     maybeDiscardedTxs <- blockchainUpdater.processBlock(block)
   } yield {
     utxStorage.removeAll(block.transactionData)
-    maybeDiscardedTxs.toSeq.flatten.foreach(utxStorage.putIfNew)
+    utxStorage.batched { ops =>
+      maybeDiscardedTxs.toSeq.flatten.foreach(ops.putIfNew)
+    }
     maybeDiscardedTxs.map(_ => baseHeight)
   }
 
   private def blockConsensusValidation(history: History, fp: FeatureProvider, settings: WavesSettings, currentTs: Long, block: Block)
-                                      (genBalance: Int => Either[String, Long]): Either[ValidationError, Unit] = history.read { _ =>
+                                      (genBalance: Int => Either[String, Long]): Either[ValidationError, Unit] = {
 
     val bcs = settings.blockchainSettings
     val fs = bcs.functionalitySettings
@@ -77,7 +80,7 @@ package object appender extends ScorexLogging {
     val generator = block.signerData.generator
 
     val r: Either[ValidationError, Unit] = for {
-      height <- history.heightOf(block.reference).toRight(GenericError(s"history does not contain parent ${block.reference}"))
+      height <- history.heightOf(block.reference).toRight(GenericError(s"height: history does not contain parent ${block.reference}"))
       _ <- Either.cond(height > fs.blockVersion3AfterHeight
         || block.version == Block.GenesisBlockVersion
         || block.version == Block.PlainBlockVersion,
@@ -91,10 +94,11 @@ package object appender extends ScorexLogging {
         || height > fs.dontRequireSortedTransactionsAfter
         || block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData,
         (), GenericError("transactions are not sorted"))
-      parent <- history.parent(block).toRight(GenericError(s"history does not contain parent ${block.reference}"))
+      parent <- history.parent(block).toRight(GenericError(s"parent: history does not contain parent ${block.reference}"))
       prevBlockData = parent.consensusData
       blockData = block.consensusData
-      cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay, height, parent.consensusData.baseTarget, parent.timestamp, history.parent(parent, 2).map(_.timestamp), blockTime)
+      ggp = history.parent(parent, 2)
+      cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay, height, parent.consensusData.baseTarget, parent.timestamp, ggp.map(_.timestamp), blockTime)
       bbt = blockData.baseTarget
       _ <- Either.cond(cbt == bbt, (), GenericError(s"declared baseTarget $bbt does not match calculated baseTarget $cbt"))
       calcGs = calcGeneratorSignature(prevBlockData, generator)
@@ -112,5 +116,4 @@ package object appender extends ScorexLogging {
       case x => x
     }
   }
-
 }

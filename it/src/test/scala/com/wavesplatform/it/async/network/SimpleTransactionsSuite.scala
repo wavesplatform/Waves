@@ -20,7 +20,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with ScalaFutures
-  with IntegrationPatience with RecoverMethods with RequestErrorAssert {
+  with IntegrationPatience with RecoverMethods {
 
   private val waitCompletion = 2.minutes
 

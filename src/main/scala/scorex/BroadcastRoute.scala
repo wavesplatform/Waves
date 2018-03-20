@@ -1,7 +1,7 @@
 package scorex
 
-import com.wavesplatform.UtxPool
 import com.wavesplatform.network._
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import scorex.api.http.ApiError
 import scorex.transaction.{Transaction, ValidationError}
@@ -18,8 +18,9 @@ trait BroadcastRoute {
   protected def doBroadcast(v: Either[ValidationError, Transaction]): Future[Either[ApiError, Transaction]] = Future {
     val r = for {
       tx <- v
-      added <- utx.putIfNew(tx)
+      r <- utx.putIfNew(tx)
     } yield {
+      val (added, _) = r
       if (added) allChannels.broadcastTx(tx, None)
       tx
     }
