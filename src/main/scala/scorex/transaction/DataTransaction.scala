@@ -22,12 +22,12 @@ case class DataTransaction private(version: Byte,
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
-    val dataBytes = Shorts.toByteArray(data.size.toShort) ++ data.flatMap(_.toBytes)
     Bytes.concat(
       Array(transactionType.id.toByte),
       Array(version),
       sender.publicKey,
-      dataBytes,
+      Shorts.toByteArray(data.size.toShort),
+      data.flatMap(_.toBytes).toArray,
       Longs.toByteArray(timestamp),
       Longs.toByteArray(fee))
   }

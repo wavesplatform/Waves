@@ -8,6 +8,8 @@ import play.api.libs.json._
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
 
+import scala.util.Success
+
 
 sealed abstract class DataEntry[T](val key: String, val value: T) {
   def valueBytes: Array[Byte]
@@ -37,10 +39,10 @@ object DataEntry {
   def parse(bytes: Array[Byte], p: Int): (DataEntry[_], Int) = {
     val keyLength = bytes(p)
     val key = new String(bytes, p + 1, keyLength, UTF8)
-    parse(key, bytes, p + 1 + keyLength)
+    parseValue(key, bytes, p + 1 + keyLength)
   }
 
-  def parse(key: String, bytes: Array[Byte], p: Int): (DataEntry[_], Int) = {
+  def parseValue(key: String, bytes: Array[Byte], p: Int): (DataEntry[_], Int) = {
     bytes(p) match {
       case t if t == Type.Integer.id => (IntegerDataEntry(key, Longs.fromByteArray(bytes.drop(p + 1))), p + 9)
       case t if t == Type.Boolean.id => (BooleanDataEntry(key, bytes(p + 1) != 0), p + 2)
@@ -65,9 +67,11 @@ object DataEntry {
               case _ => JsError("value is missing or not a boolean value")
             }
             case JsDefined(JsString("binary")) => jsv \ "value" match {
-              case JsDefined(JsString(base58)) => Base58.decode(base58).fold(
-                ex => JsError(ex.getMessage),
-                arr => JsSuccess(BinaryDataEntry(key, arr)))
+              case JsDefined(JsString(base58)) =>
+                val t = if (base58.isEmpty) Success(Array.emptyByteArray) else Base58.decode(base58) /// Base58 bug
+                t.fold(
+                  ex => JsError(ex.getMessage),
+                  arr => JsSuccess(BinaryDataEntry(key, arr)))
               case _ => JsError("value is missing or not a string")
             }
             case JsDefined(JsString(t)) => JsError(s"unknown type $t")

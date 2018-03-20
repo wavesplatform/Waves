@@ -300,12 +300,6 @@ object LevelDBWriter {
     def addressScript(height: Int, addressId: BigInt): Key[Option[Script]] =
       Key.opt(byteKeyWithH(28, height, addressId.toByteArray), Script.fromBytes(_).right.get, _.bytes().arr)
 
-    def dataKeyList(addressId: BigInt) = Key[Set[String]](addr(29, addressId), readStrings(_).toSet, keys => writeStrings(keys.toSeq))
-    def dataHistory(addressId: BigInt, key: String): Key[Seq[Int]] = historyKey(30, addressId.toByteArray ++ key.getBytes(UTF8))
-    def data(height: Int, addressId: BigInt, key: String): Key[Option[DataEntry[_]]] = Key.opt(
-      byteKeyWithH(31, height, addressId.toByteArray ++ key.getBytes(UTF8)),
-      DataEntry.parse(key, _, 0)._1, _.toBytes)
-
     private def readFeatureMap(data: Array[Byte]): Map[Short, Int] = Option(data).fold(Map.empty[Short, Int]) { _ =>
       val b = ByteBuffer.wrap(data)
       val features = Map.newBuilder[Short, Int]
@@ -326,6 +320,12 @@ object LevelDBWriter {
 
     def approvedFeatures: Key[Map[Short, Int]] = Key(Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
     def activatedFeatures: Key[Map[Short, Int]] = Key(Array[Byte](0, 30), readFeatureMap, writeFeatureMap)
+
+    def dataKeyList(addressId: BigInt) = Key[Set[String]](addr(31, addressId), readStrings(_).toSet, keys => writeStrings(keys.toSeq))
+    def dataHistory(addressId: BigInt, key: String): Key[Seq[Int]] = historyKey(32, addressId.toByteArray ++ key.getBytes(UTF8))
+    def data(height: Int, addressId: BigInt, key: String): Key[Option[DataEntry[_]]] = Key.opt(
+      byteKeyWithH(33, height, addressId.toByteArray ++ key.getBytes(UTF8)),
+      DataEntry.parseValue(key, _, 0)._1, _.valueBytes)
   }
 
   private def loadAssetInfo(db: ReadOnlyDB, assetId: ByteStr) = {
@@ -533,8 +533,9 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
 
     for ((addressId, addressData) <- data) {
       rw.put(k.dataKeyList(addressId), rw.get(k.dataKeyList(addressId)) ++ addressData.data.keySet)
-      addressData.data.foreach { case (key, value) =>
+      for ((key, value) <- addressData.data) {
         rw.put(k.data(height, addressId, key), Some(value))
+        expiredKeys ++= updateHistory(rw, k.dataHistory(addressId, key), threshold, k.data(_, addressId, key))
       }
     }
 
