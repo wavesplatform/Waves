@@ -1,12 +1,12 @@
 package com.wavesplatform.state2.diffs.smart.scenarios
 
-import com.wavesplatform.{NoShrink, TransactionGen}
 import com.wavesplatform.lang.Terms.Typed
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.smart.smartEnabledFS
-import com.wavesplatform.state2.diffs.{ENOUGH_AMT, assertDiffAndState, assertDiffEi, produce}
-import org.scalatest.{Matchers, PropSpec}
+import com.wavesplatform.state2.diffs.{ENOUGH_AMT, assertDiffEi, produce}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.VersionedTransferTransaction
