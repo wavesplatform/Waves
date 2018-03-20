@@ -51,7 +51,7 @@ abstract class WavesContextImpl { this: Crypto with Environment =>
       ))
 
   private val txByIdF = {
-    val returnType = OPTION(TYPEREF(transactionType.name))
+    val returnType = OPTION(transactionType.typeRef)
     PredefFunction("getTransactionById", returnType, List(("id", BYTEVECTOR))) {
       case (id: ByteVector) :: Nil =>
         val maybeDomainTx = transactionById(id.toArray).map(transactionObject)
@@ -64,7 +64,7 @@ abstract class WavesContextImpl { this: Crypto with Environment =>
     val txCoeval: Coeval[Either[String, Obj]]      = Coeval.evalOnce(Right(transactionObject(transaction)))
     val heightCoeval: Coeval[Either[String, Long]] = Coeval.evalOnce(Right(height))
     Context(
-      Map(transactionType.name -> transactionType),
+      Map(transactionType.name -> transactionType, addressType.name -> addressType),
       Map(
         ("None", none),
         ("H", LazyVal(LONG)(EitherT(heightCoeval))),
@@ -81,8 +81,7 @@ abstract class WavesContextImpl { this: Crypto with Environment =>
         blake2b256F.name -> blake2b256F,
         sha256F.name     -> sha256F,
         //dsl
-        publicKeyToAddressF.name -> publicKeyToAddressF
-
+        addressFromPublicKeyF.name -> addressFromPublicKeyF
       )
     )
   }
@@ -92,12 +91,12 @@ abstract class WavesContextImpl { this: Crypto with Environment =>
   private val AddressVersion             = 1: Byte
   private def secureHash(a: Array[Byte]) = keccack256(blake2b256(a))
 
-  val publicKeyToAddressF: PredefFunction = PredefFunction("publicKeyToAddress", BOOLEAN, List(("publicKey", BYTEVECTOR))) {
+  val addressFromPublicKeyF: PredefFunction = PredefFunction("addressFromPublicKey", addressType.typeRef, List(("publicKey", BYTEVECTOR))) {
     case (pk: ByteVector) :: Nil =>
       val publicKeyHash   = secureHash(pk.toArray).take(HashLength)
       val withoutChecksum = AddressVersion +: networkByte +: publicKeyHash
       val bytes           = withoutChecksum ++ secureHash(withoutChecksum).take(ChecksumLength)
-      Right(ByteVector(bytes))
+      Right(Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(bytes))))))
     case _ => ???
   }
 
@@ -137,6 +136,9 @@ object WavesContextImpl {
       "assetId"    -> optionByteVector
     )
   )
+
+  val addressType = PredefType("Address", List("bytes" -> BYTEVECTOR))
+
   val extract: PredefFunction = PredefFunction("extract", TYPEPARAM('T'), List(("opt", optionT))) {
     case Some(v) :: Nil => Right(v)
     case None :: Nil    => Left("Extract from empty option")
