@@ -632,7 +632,15 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
                 rw.put(kash, rw.get(kash).filter(_ != currentHeight))
               }
             case T.DataTransaction =>
-              ///
+              val dtx = tx.asInstanceOf[DataTransaction]
+              val address = dtx.sender.toAddress
+              addressIdCache.get(address).foreach { addressId =>
+                dtx.data.foreach { e =>
+                  rw.delete(k.data(currentHeight, addressId, e.key))
+                  val kdh = k.dataHistory(addressId, e.key)
+                  rw.put(kdh, rw.get(kdh).filter(_ != currentHeight))
+                }
+              }
             case T.CreateAliasTransaction =>
               rw.delete(k.addressIdOfAlias(tx.asInstanceOf[CreateAliasTransaction].alias))
             case T.ExchangeTransaction =>
