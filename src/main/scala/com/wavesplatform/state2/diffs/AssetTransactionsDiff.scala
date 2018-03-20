@@ -23,7 +23,6 @@ object AssetTransactionsDiff {
   }
 
   def smartIssue(height: Int)(tx: SmartIssueTransaction): Either[ValidationError, Diff] = {
-    println("SMARTISSUE")
     val info = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity, script = tx.script)
     Right(
       Diff(
@@ -36,7 +35,7 @@ object AssetTransactionsDiff {
 
   def reissue(state: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(
       tx: ReissueTransaction): Either[ValidationError, Diff] = {
-    findReferencedAsset(tx, state, tx.assetId).flatMap(itx => {
+    validateAsset(tx, state, tx.assetId).flatMap(_ => {
       val oldInfo = state.assetInfo(tx.assetId).get
       if (oldInfo.isReissuable || blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) {
         Right(
@@ -56,7 +55,7 @@ object AssetTransactionsDiff {
   }
 
   def burn(state: SnapshotStateReader, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] = {
-    findReferencedAsset(tx, state, tx.assetId).map(itx => {
+    validateAsset(tx, state, tx.assetId).map(_ => {
       Diff(
         height = height,
         tx = tx,
@@ -66,12 +65,12 @@ object AssetTransactionsDiff {
     })
   }
 
-  private def findReferencedAsset(tx: SignedTransaction, state: SnapshotStateReader, assetId: AssetId): Either[ValidationError, IssueTransaction] = {
-    state.findTransaction[IssueTransaction](assetId) match {
-      case None                                        => Left(GenericError("Referenced assetId not found"))
-      case Some(itx) if !(itx.sender equals tx.sender) => Left(GenericError("Asset was issued by other address"))
-      case Some(itx)                                   => Right(itx)
+  private def validateAsset(tx: SignedTransaction, state: SnapshotStateReader, assetId: AssetId): Either[ValidationError, Unit] = {
+    state.findTransaction[IssueTransaction](assetId).orElse(state.findTransaction[SmartIssueTransaction](assetId)) match {
+      case None                                                                       => Left(GenericError("Referenced assetId not found"))
+      case Some(SmartIssueTransaction(_, _, _, _, _, _, _, _, Some(script), _, _, _)) => Right({})
+      case Some(itx) if !(itx.sender equals tx.sender)                                => Left(GenericError("Asset was issued by other address"))
+      case Some(_)                                                                    => Right({})
     }
   }
-
 }

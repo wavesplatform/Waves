@@ -221,7 +221,7 @@ object TransactionsValueCodec extends Codec[(Int, Array[Byte])] {
 
 object AssetInfoCodec extends Codec[AssetInfo] {
   override def encode(value: AssetInfo): Array[Byte] = {
-    val result = new Array[Byte](1 + Longs.BYTES + value.script.map(s => s.bytes().arr.length).getOrElse(0))
+    val result = new Array[Byte](1 + Longs.BYTES + value.script.map(s => s.bytes().arr.length + 4).getOrElse(0))
     System.arraycopy(encodeBoolean(value.isReissuable), 0, result, 0, 1)
     System.arraycopy(Longs.toByteArray(value.volume), 0, result, 1, Longs.BYTES)
 

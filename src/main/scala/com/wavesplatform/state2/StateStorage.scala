@@ -8,44 +8,45 @@ import com.wavesplatform.utils._
 import org.iq80.leveldb.{DB, WriteBatch}
 import scorex.account.{Address, Alias}
 import scorex.serialization.Deser
+import scorex.transaction.GenesisTransaction
+import scorex.transaction.assets.SmartIssueTransaction
 import scorex.transaction.smart.Script
 import scorex.utils.{NTP, Time}
 
 import scala.util.Try
 
-class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") with PropertiesStorage with VersionedStorage {
+class StateStorage private (db: DB, time: Time) extends SubStorage(db, "state") with PropertiesStorage with VersionedStorage {
 
   import StateStorage._
 
   override protected val Version = 2
 
-  private val HeightPrefix = "state-height".getBytes(Charset)
-  private val TransactionsPrefix = "txs".getBytes(Charset)
+  private val HeightPrefix                     = "state-height".getBytes(Charset)
+  private val TransactionsPrefix               = "txs".getBytes(Charset)
   private val AccountTransactionsLengthsPrefix = "acc-txs-len".getBytes(Charset)
-  private val WavesBalancePrefix = "waves-bal".getBytes(Charset)
-  private val AddressesIndexPrefix = "add-idx".getBytes(Charset)
-  private val AssetBalancePrefix = "asset-bal".getBytes(Charset)
-  private val AddressAssetsPrefix = "address-assets".getBytes(Charset)
-  private val AssetsPrefix = "assets".getBytes(Charset)
-  private val OrderFillsPrefix = "ord-fls".getBytes(Charset)
-  private val AccountTransactionIdsPrefix = "acc-ids".getBytes(Charset)
-  private val BalanceSnapshotsPrefix = "bal-snap".getBytes(Charset)
-  private val LastBalanceHeightPrefix = "bal-h".getBytes(Charset)
-  private val AliasToAddressPrefix = "alias-address".getBytes(Charset)
-  private val AddressToAliasPrefix = "address-alias".getBytes(Charset)
-  private val LeaseStatePrefix = "lease-state".getBytes(Charset)
-  private val LeaseIndexPrefix = "lease-idx".getBytes(Charset)
-  private val MaxAddress = "max-address"
-  private val LeasesCount = "leases-count"
-  private val AddressScriptPrefix = "address-script".getBytes(Charset)
+  private val WavesBalancePrefix               = "waves-bal".getBytes(Charset)
+  private val AddressesIndexPrefix             = "add-idx".getBytes(Charset)
+  private val AssetBalancePrefix               = "asset-bal".getBytes(Charset)
+  private val AddressAssetsPrefix              = "address-assets".getBytes(Charset)
+  private val AssetsPrefix                     = "assets".getBytes(Charset)
+  private val OrderFillsPrefix                 = "ord-fls".getBytes(Charset)
+  private val AccountTransactionIdsPrefix      = "acc-ids".getBytes(Charset)
+  private val BalanceSnapshotsPrefix           = "bal-snap".getBytes(Charset)
+  private val LastBalanceHeightPrefix          = "bal-h".getBytes(Charset)
+  private val AliasToAddressPrefix             = "alias-address".getBytes(Charset)
+  private val AddressToAliasPrefix             = "address-alias".getBytes(Charset)
+  private val LeaseStatePrefix                 = "lease-state".getBytes(Charset)
+  private val LeaseIndexPrefix                 = "lease-idx".getBytes(Charset)
+  private val MaxAddress                       = "max-address"
+  private val LeasesCount                      = "leases-count"
+  private val AddressScriptPrefix              = "address-script".getBytes(Charset)
 
   def getScript(addr: Address): Option[Script] = {
     for {
-      bytes <- get(makeKey(AddressScriptPrefix, addr.bytes.arr))
+      bytes  <- get(makeKey(AddressScriptPrefix, addr.bytes.arr))
       script <- Deser.parseOption(bytes, 0)(x => Script.fromBytes(Deser.parseArraySize(x, 0)._1).explicitGet())._1
     } yield script
   }
-
 
   def getHeight: Int = get(makeKey(HeightPrefix, 0)).map(Ints.fromByteArray).getOrElse(0)
 
@@ -53,15 +54,16 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
     put(makeKey(HeightPrefix, 0), Ints.toByteArray(height), b)
   }
 
-  def getTransaction(id: ByteStr): Option[(Int, Array[Byte])] =
-    get(makeKey(TransactionsPrefix, id.arr)).map(TransactionsValueCodec.decode).map(_.explicitGet().value)
-
+  def getTransaction(id: ByteStr): Option[(Int, Array[Byte])] = {
+    get(makeKey(TransactionsPrefix, id.arr))
+      .map(TransactionsValueCodec.decode)
+      .map(x => x.explicitGet().value)
+  }
 
   def putTransactions(b: Option[WriteBatch], diff: Diff): Unit = {
-    diff.transactions.foreach { case (id, (h, tx, _)) =>
-      put(makeKey(TransactionsPrefix, id.arr), TransactionsValueCodec.encode((h, tx.bytes())), b)
+    diff.transactions.foreach {
+      case (id, (h, tx, _)) => put(makeKey(TransactionsPrefix, id.arr), TransactionsValueCodec.encode((h, tx.bytes())), b)
     }
-
     putOrderFills(b, diff.orderFills)
     putPortfolios(b, diff.portfolios)
     putIssuedAssets(b, diff.issuedAssets)
@@ -111,7 +113,7 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
   def getActiveLeases: Option[Seq[ByteStr]] = {
     val count = getIntProperty(LeasesCount).getOrElse(0)
     val result = (0 until count).foldLeft(Seq.empty[ByteStr]) { (r, i) =>
-      val maybeLease = get(makeKey(LeaseIndexPrefix, i))
+      val maybeLease      = get(makeKey(LeaseIndexPrefix, i))
       val maybeLeaseState = maybeLease.flatMap(l => get(makeKey(LeaseStatePrefix, l)).map(b => b.head == 1.toByte))
       if (maybeLeaseState.contains(true)) r :+ ByteStr(maybeLease.get) else r
     }
@@ -129,9 +131,15 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
     log.info(s"Accounts count: $maxAddressIndex")
     (0 until maxAddressIndex).flatMap({ i =>
       val maybeAddressBytes = get(makeKey(AddressesIndexPrefix, i))
-      val maybeAddress = maybeAddressBytes.flatMap { addressBytes => Address.fromBytes(addressBytes).toOption }
-      val maybeBalances = maybeAddress.flatMap { address => getWavesBalance(address) }
-      val maybeAssetsBalances = maybeAddress.flatMap { address => getAssetBalanceMap(address) }
+      val maybeAddress = maybeAddressBytes.flatMap { addressBytes =>
+        Address.fromBytes(addressBytes).toOption
+      }
+      val maybeBalances = maybeAddress.flatMap { address =>
+        getWavesBalance(address)
+      }
+      val maybeAssetsBalances = maybeAddress.flatMap { address =>
+        getAssetBalanceMap(address)
+      }
 
       (maybeAddress, maybeBalances, maybeAssetsBalances) match {
         case (Some(a), Some(b), Some(c)) =>
@@ -145,14 +153,13 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
     val assets = get(makeKey(AddressAssetsPrefix, address.bytes.arr)).map(Id32SeqCodec.decode).map(_.explicitGet().value)
     if (assets.isDefined) {
       val result = assets.get.foldLeft(Map.empty[ByteStr, Long]) { (m, a) =>
-        val key = makeKey(AssetBalancePrefix, Bytes.concat(address.bytes.arr, a.arr))
+        val key     = makeKey(AssetBalancePrefix, Bytes.concat(address.bytes.arr, a.arr))
         val balance = get(key).map(Longs.fromByteArray).getOrElse(0L)
         m.updated(a, balance)
       }
       Some(result)
     } else None
   }
-
 
   override def removeEverything(b: Option[WriteBatch]): Unit = {
     putIntProperty(MaxAddress, 0, b)
@@ -169,11 +176,12 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
   }
 
   private def putOrderFills(b: Option[WriteBatch], fills: Map[ByteStr, OrderFillInfo]): Unit =
-    fills.foreach { case (id, info) =>
-      val key = makeKey(OrderFillsPrefix, id.arr)
-      val existing = get(key).map(OrderFillInfoValueCodec.decode).map(_.explicitGet().value).getOrElse(Monoid[OrderFillInfo].empty)
-      val updated = existing.combine(info)
-      put(key, OrderFillInfoValueCodec.encode(updated), b)
+    fills.foreach {
+      case (id, info) =>
+        val key      = makeKey(OrderFillsPrefix, id.arr)
+        val existing = get(key).map(OrderFillInfoValueCodec.decode).map(_.explicitGet().value).getOrElse(Monoid[OrderFillInfo].empty)
+        val updated  = existing.combine(info)
+        put(key, OrderFillInfoValueCodec.encode(updated), b)
     }
 
   private def updateAddressesIndex(addresses: Iterable[Array[Byte]], b: Option[WriteBatch]): Unit = {
@@ -190,61 +198,66 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
 
   private def putPortfolios(b: Option[WriteBatch], portfolios: Map[Address, Portfolio]): Unit = {
     updateAddressesIndex(portfolios.keys.map(_.bytes.arr), b)
-    portfolios.foreach { case (a, d) =>
-      val addressBytes = a.bytes.arr
+    portfolios.foreach {
+      case (a, d) =>
+        val addressBytes = a.bytes.arr
 
-      val wavesKey = makeKey(WavesBalancePrefix, addressBytes)
-      val existingWavesBalance = get(wavesKey).map(WavesBalanceValueCodec.decode).map(_.explicitGet().value).getOrElse((0L, 0L, 0L))
-      val wavesBalanceValue = (
-        existingWavesBalance._1 + d.balance,
-        existingWavesBalance._2 + d.leaseInfo.leaseIn,
-        existingWavesBalance._3 + d.leaseInfo.leaseOut
-      )
-      put(wavesKey, WavesBalanceValueCodec.encode(wavesBalanceValue), b)
+        val wavesKey             = makeKey(WavesBalancePrefix, addressBytes)
+        val existingWavesBalance = get(wavesKey).map(WavesBalanceValueCodec.decode).map(_.explicitGet().value).getOrElse((0L, 0L, 0L))
+        val wavesBalanceValue = (
+          existingWavesBalance._1 + d.balance,
+          existingWavesBalance._2 + d.leaseInfo.leaseIn,
+          existingWavesBalance._3 + d.leaseInfo.leaseOut
+        )
+        put(wavesKey, WavesBalanceValueCodec.encode(wavesBalanceValue), b)
 
-      val addressKey = makeKey(AddressAssetsPrefix, addressBytes)
-      val existingAssets = get(addressKey).map(Id32SeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty[ByteStr])
-      val updatedAssets = existingAssets ++ d.assets.keySet
-      put(addressKey, Id32SeqCodec.encode(updatedAssets.distinct), b)
+        val addressKey     = makeKey(AddressAssetsPrefix, addressBytes)
+        val existingAssets = get(addressKey).map(Id32SeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty[ByteStr])
+        val updatedAssets  = existingAssets ++ d.assets.keySet
+        put(addressKey, Id32SeqCodec.encode(updatedAssets.distinct), b)
 
-      d.assets.foreach { case (as, df) =>
-        val addressAssetKey = makeKey(AssetBalancePrefix, Bytes.concat(addressBytes, as.arr))
-        val existingValue = get(addressAssetKey).map(Longs.fromByteArray).getOrElse(0L)
-        val updatedValue = existingValue + df
-        put(addressAssetKey, Longs.toByteArray(updatedValue), b)
-      }
+        d.assets.foreach {
+          case (as, df) =>
+            val addressAssetKey = makeKey(AssetBalancePrefix, Bytes.concat(addressBytes, as.arr))
+            val existingValue   = get(addressAssetKey).map(Longs.fromByteArray).getOrElse(0L)
+            val updatedValue    = existingValue + df
+            put(addressAssetKey, Longs.toByteArray(updatedValue), b)
+        }
     }
   }
 
   private def putIssuedAssets(b: Option[WriteBatch], issues: Map[ByteStr, AssetInfo]): Unit =
-    issues.foreach { case (id, info) =>
-      val key = makeKey(AssetsPrefix, id.arr)
-      val existing = get(key).map(AssetInfoCodec.decode).map(_.explicitGet().value).getOrElse(Monoid[AssetInfo].empty)
-      put(key, AssetInfoCodec.encode(existing.combine(info)), b)
+    issues.foreach {
+      case (id, info) =>
+        val key      = makeKey(AssetsPrefix, id.arr)
+        val existing = get(key).map(AssetInfoCodec.decode).map(_.explicitGet().value).getOrElse(Monoid[AssetInfo].empty)
+        put(key, AssetInfoCodec.encode(existing.combine(info)), b)
     }
 
   private def putAccountTransactionsIds(b: Option[WriteBatch], accountIds: Map[Address, List[ByteStr]]): Unit =
-    accountIds.foreach { case (a, ids) =>
-      val key = makeKey(AccountTransactionsLengthsPrefix, a.bytes.arr)
-      val start = get(key).map(Ints.fromByteArray).getOrElse(0)
-      val end = ids.reverse.foldLeft(start) { case (i, id) =>
-        put(makeKey(AccountTransactionIdsPrefix, accountIntKey(a, i)), id.arr, b)
-        i + 1
-      }
-      put(key, Ints.toByteArray(end), b)
+    accountIds.foreach {
+      case (a, ids) =>
+        val key   = makeKey(AccountTransactionsLengthsPrefix, a.bytes.arr)
+        val start = get(key).map(Ints.fromByteArray).getOrElse(0)
+        val end = ids.reverse.foldLeft(start) {
+          case (i, id) =>
+            put(makeKey(AccountTransactionIdsPrefix, accountIntKey(a, i)), id.arr, b)
+            i + 1
+        }
+        put(key, Ints.toByteArray(end), b)
     }
 
   private def putAliases(b: Option[WriteBatch], aliases: Map[Alias, Address]): Unit = {
     val map = aliases.foldLeft(Map.empty[Address, Seq[Alias]]) { (m, e) =>
       put(makeKey(AliasToAddressPrefix, e._1.bytes.arr), e._2.bytes.arr, b)
       val existingAliases = m.getOrElse(e._2, Seq.empty[Alias])
-      val aliases = existingAliases :+ e._1
+      val aliases         = existingAliases :+ e._1
       m.updated(e._2, aliases.distinct)
     }
     map.foreach { e =>
-      val key = makeKey(AddressToAliasPrefix, e._1.bytes.arr)
+      val key      = makeKey(AddressToAliasPrefix, e._1.bytes.arr)
       val existing = get(key).map(AliasSeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty[Alias])
-      val updated = existing ++ e._2
+      val updated  = existing ++ e._2
       put(key, AliasSeqCodec.encode(updated.distinct), b)
     }
   }

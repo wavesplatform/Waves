@@ -6,7 +6,6 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.TransactionParser.TransactionType
-import scorex.transaction.assets.SmartIssueTransaction
 import scorex.transaction.smart.SetScriptTransaction
 
 class SetScriptTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -27,10 +26,11 @@ class SetScriptTransactionSpecification extends PropSpec with PropertyChecks wit
   }
 
   property("SetScriptTransaction id doesn't depend on proof") {
-    forAll(accountGen, byteArrayGen(10), byteArrayGen(15), proofsGen, proofsGen, scriptGen) { case (acc: PrivateKeyAccount, p1, p2, proofs1, proofs2, script) =>
-      val tx1 = SetScriptTransaction.create(acc, Some(script), 1, 1, proofs1).explicitGet()
-      val tx2 = SetScriptTransaction.create(acc, Some(script), 1, 1, proofs2).explicitGet()
-      tx1.id() shouldBe tx2.id()
+    forAll(accountGen, byteArrayGen(10), byteArrayGen(15), proofsGen, proofsGen, scriptGen) {
+      case (acc: PrivateKeyAccount, p1, p2, proofs1, proofs2, script) =>
+        val tx1 = SetScriptTransaction.create(acc, Some(script), 1, 1, proofs1).explicitGet()
+        val tx2 = SetScriptTransaction.create(acc, Some(script), 1, 1, proofs2).explicitGet()
+        tx1.id() shouldBe tx2.id()
     }
   }
 

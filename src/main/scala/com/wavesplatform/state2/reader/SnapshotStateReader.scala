@@ -9,6 +9,7 @@ import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.Script
 import scorex.utils.{ScorexLogging, Synchronized}
+import shapeless.=:!=
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
@@ -59,19 +60,20 @@ object SnapshotStateReader {
         .mapValues(portfolio => portfolio.assets.get(assetId))
         .collect { case (acc, Some(amt)) => acc -> amt }
 
-    def findTransaction[T <: Transaction : ClassTag](signature: ByteStr): Option[T] =
+    def findTransaction[T <: Transaction](signature: ByteStr)(implicit ct: ClassTag[T], ev: T =:!= Nothing): Option[T] =
       s.transactionInfo(signature) match {
         case Some((_, Some(t: T))) => Some(t)
-        case _ => None
+        case _                     => None
       }
 
     def resolveAliasEi[T <: Transaction](aoa: AddressOrAlias): Either[ValidationError, Address] = {
       aoa match {
         case a: Address => Right(a)
-        case a: Alias => s.resolveAlias(a) match {
-          case None => Left(AliasNotExists(a))
-          case Some(acc) => Right(acc)
-        }
+        case a: Alias =>
+          s.resolveAlias(a) match {
+            case None      => Left(AliasNotExists(a))
+            case Some(acc) => Right(acc)
+          }
       }
     }
 
@@ -85,12 +87,12 @@ object SnapshotStateReader {
 
     def balance(account: Address): Long = s.wavesBalance(account)._1
 
-
     def getAccountBalance(account: Address): Map[AssetId, (Long, Boolean, Long, IssueTransaction)] = s.read { _ =>
-      s.accountPortfolio(account).assets.collect { case (id, amt) if amt > 0 =>
-        val assetInfo = s.assetInfo(id).get
-        val issueTransaction = findTransaction[IssueTransaction](id).get
-        id -> ((amt, assetInfo.isReissuable, assetInfo.volume, issueTransaction))
+      s.accountPortfolio(account).assets.collect {
+        case (id, amt) if amt > 0 =>
+          val assetInfo        = s.assetInfo(id).get
+          val issueTransaction = findTransaction[IssueTransaction](id).get
+          id -> ((amt, assetInfo.isReissuable, assetInfo.volume, issueTransaction))
       }
     }
 
@@ -104,7 +106,7 @@ object SnapshotStateReader {
       val accountPortfolio = s.partialPortfolio(assetAcc.account, assetAcc.assetId.toSet)
       assetAcc.assetId match {
         case Some(assetId) => accountPortfolio.assets.getOrElse(assetId, 0)
-        case None => accountPortfolio.spendableBalance
+        case None          => accountPortfolio.spendableBalance
       }
     }
 
@@ -180,17 +182,18 @@ object SnapshotStateReader {
     def balanceAtHeight(acc: Address, height: Int): Long = s.read { _ =>
       @tailrec
       def loop(lookupHeight: Int): Long = s.snapshotAtHeight(acc, lookupHeight) match {
-        case None if lookupHeight == 0 => 0
+        case None if lookupHeight == 0                => 0
         case Some(snapshot) if lookupHeight <= height => snapshot.balance
         case Some(snapshot) if snapshot.prevHeight == lookupHeight =>
-          throw new Exception(s"CRITICAL: Cannot lookup account $acc for height $height(current=${s.height}). Infinite loop detected. " +
-            s"This indicates snapshots processing error.")
+          throw new Exception(
+            s"CRITICAL: Cannot lookup account $acc for height $height(current=${s.height}). Infinite loop detected. " +
+              s"This indicates snapshots processing error.")
         case Some(snapshot) => loop(snapshot.prevHeight)
         case None =>
-          throw new Exception(s"CRITICAL: Cannot lookup account $acc for height $height(current=${s.height}). " +
-            s"No history found at requested lookupHeight=$lookupHeight")
+          throw new Exception(
+            s"CRITICAL: Cannot lookup account $acc for height $height(current=${s.height}). " +
+              s"No history found at requested lookupHeight=$lookupHeight")
       }
-
 
       loop(s.lastUpdateHeight(acc).getOrElse(0))
     }

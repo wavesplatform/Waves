@@ -107,6 +107,26 @@ object SmartIssueTransaction {
       _ <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
       _ <- IssueTransaction.create(sender, name, description, quantity, decimals, reissuable, fee, timestamp, ByteStr.empty)
     } yield SmartIssueTransaction(version, chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs)
+
+  def create(version: Byte,
+             chainId: Byte,
+             sender: PrivateKeyAccount,
+             name: Array[Byte],
+             description: Array[Byte],
+             quantity: Long,
+             decimals: Byte,
+             reissuable: Boolean,
+             script: Option[Script],
+             fee: Long,
+             timestamp: Long): Either[ValidationError, SmartIssueTransaction] =
+    for {
+      _ <- Either.cond(version == 1, (), GenericError(s"Unsupported SmartIssueTransaction version ${version.toInt}"))
+      _ <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
+      _ <- IssueTransaction.create(sender, name, description, quantity, decimals, reissuable, fee, timestamp, ByteStr.empty)
+      unverified = SmartIssueTransaction(version, chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty)
+      proofs <- Proofs.create(Seq(ByteStr(crypto.sign(sender, unverified.bodyBytes()))))
+
+    } yield unverified.copy(proofs = proofs)
 }
 
 case class IssueTransaction private (sender: PublicKeyAccount,

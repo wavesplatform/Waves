@@ -6,7 +6,7 @@ import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Coeval
 import scorex.transaction.ValidationError.{GenericError, TransactionNotAllowedByScript}
 import scorex.transaction._
-import scorex.transaction.assets.{MassTransferTransaction, ScriptTransferTransaction, TransferTransaction}
+import scorex.transaction.assets._
 import cats.syntax.all._
 
 object Verifier {
@@ -26,6 +26,8 @@ object Verifier {
           case t: TransferTransaction       => t.assetId
           case t: ScriptTransferTransaction => t.assetId
           case t: MassTransferTransaction   => t.assetId
+          case t: BurnTransaction           => Some(t.assetId)
+          case t: ReissueTransaction        => Some(t.assetId)
           case _                            => None
         }
         script <- s.assetInfo(assetId).flatMap(_.script)

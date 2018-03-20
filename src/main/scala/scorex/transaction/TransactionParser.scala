@@ -76,6 +76,9 @@ object TransactionParser {
       case txType: Byte if txType == TransactionType.ScriptTransferTransaction.id =>
         ScriptTransferTransaction.parseTail(data.tail)
 
+      case txType: Byte if txType == TransactionType.SmartIssueTransaction.id =>
+        SmartIssueTransaction.parseTail(data.tail)
+
       case txType => Failure(new Exception(s"Invalid transaction type: $txType"))
     }
 }

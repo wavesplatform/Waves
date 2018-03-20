@@ -100,24 +100,18 @@ trait TransactionGen extends ScriptGen {
     script                    <- Gen.option(scriptGen)
   } yield SetScriptTransaction.create(sender, script, fee, timestamp, proofs).explicitGet()
 
-  val smartIssueTransactionGen: Gen[SmartIssueTransaction] = for {
-    proofs                                                                           <- proofsGen
-    script                                                                           <- Gen.option(scriptGen)
-    (sender, assetName, description, quantity, decimals, reissuable, fee, timestamp) <- issueParamGen
+  def smartIssueTransactionGen(senderGen: Gen[PrivateKeyAccount] = accountGen,
+                               sGen: Gen[Option[Script]] = Gen.option(scriptGen)): Gen[SmartIssueTransaction] =
+    for {
 
-  } yield
-    SmartIssueTransaction.create(1,
-                                 AddressScheme.current.chainId,
-                                 sender,
-                                 assetName,
-                                 description,
-                                 quantity,
-                                 decimals,
-                                 reissuable,
-                                 script,
-                                 fee,
-                                 timestamp,
-                                 proofs).explicitGet()
+      script                                                                      <- sGen
+      (_, assetName, description, quantity, decimals, reissuable, fee, timestamp) <- issueParamGen
+      sender                                                                      <- senderGen
+
+    } yield
+      SmartIssueTransaction
+        .create(1, AddressScheme.current.chainId, sender, assetName, description, quantity, decimals, reissuable, script, fee, timestamp)
+        .explicitGet()
 
   def selfSignedSetScriptTransactionGenP(sender: PrivateKeyAccount, s: Script): Gen[SetScriptTransaction] =
     for {
