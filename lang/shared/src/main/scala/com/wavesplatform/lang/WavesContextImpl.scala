@@ -3,11 +3,11 @@ package com.wavesplatform.lang
 import cats.data.EitherT
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.ctx._
-import com.wavesplatform.lang.traits.{Crypto, Emulator, Transaction}
+import com.wavesplatform.lang.traits.{Crypto, Environment, Transaction}
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 
-abstract class WavesContextImpl { this: Crypto with Emulator =>
+abstract class WavesContextImpl { this: Crypto with Environment =>
 
   import WavesContextImpl._
 
@@ -79,16 +79,34 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
         //hashing
         keccack256F.name -> keccack256F,
         blake2b256F.name -> blake2b256F,
-        sha256F.name     -> sha256F
+        sha256F.name     -> sha256F,
+        //dsl
+        publicKeyToAddressF.name -> publicKeyToAddressF
+
       )
     )
   }
+
+  private val ChecksumLength             = 4
+  private val HashLength                 = 20
+  private val AddressVersion             = 1: Byte
+  private def secureHash(a: Array[Byte]) = keccack256(blake2b256(a))
+
+  val publicKeyToAddressF: PredefFunction = PredefFunction("publicKeyToAddress", BOOLEAN, List(("publicKey", BYTEVECTOR))) {
+    case (pk: ByteVector) :: Nil =>
+      val publicKeyHash   = secureHash(pk.toArray).take(HashLength)
+      val withoutChecksum = AddressVersion +: networkByte +: publicKeyHash
+      val bytes           = withoutChecksum ++ secureHash(withoutChecksum).take(ChecksumLength)
+      Right(ByteVector(bytes))
+    case _ => ???
+  }
+
 }
 object WavesContextImpl {
 
   private val noneCoeval: Coeval[Either[String, Option[Nothing]]] = Coeval.evalOnce(Right(None))
   val none: LazyVal                                               = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval))
-  private val optionByteVector: OPTION = OPTION(BYTEVECTOR)
+  private val optionByteVector: OPTION                            = OPTION(BYTEVECTOR)
   private val optionT                                             = OPTIONTYPEPARAM(TYPEPARAM('T'))
 
   private def hashFunction(name: String)(h: Array[Byte] => Array[Byte]) = PredefFunction(name, BYTEVECTOR, List(("bytes", BYTEVECTOR))) {
@@ -97,10 +115,10 @@ object WavesContextImpl {
   }
 
   val blockType = PredefType("Block",
-    List(
-      "height" -> LONG,
-      "timestamp" -> LONG
-    ))
+                             List(
+                               "height"    -> LONG,
+                               "timestamp" -> LONG
+                             ))
 
   val transactionType = PredefType(
     "Transaction",

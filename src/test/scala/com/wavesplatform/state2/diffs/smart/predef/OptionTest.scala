@@ -11,7 +11,7 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
 import scodec.bits.ByteVector
 import scorex.transaction.Transaction
-import scorex.transaction.smart.ConsensusContext
+import scorex.transaction.smart.BlockchainContext
 
 class OptionTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -32,7 +32,7 @@ class OptionTest extends PropSpec with PropertyChecks with Matchers with Transac
   private def runScript[T](script: String, tx: Transaction = null): Either[String, T] = {
     val Success(expr, _) = com.wavesplatform.lang.Parser(script)
     val Right(typedExpr) = com.wavesplatform.lang.TypeChecker(dummyTypeCheckerContext, expr)
-    Evaluator[T](new ConsensusContext(Coeval(tx), Coeval(???), null).build(), typedExpr)
+    Evaluator[T](new BlockchainContext(Coeval(tx), Coeval(???), null).build(), typedExpr)
   }
 
   property("should extract transaction assetId if exists") {

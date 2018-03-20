@@ -8,7 +8,7 @@ import monix.eval.Coeval
 import monix.execution.UncaughtExceptionReporter
 import org.joda.time.Duration
 import org.joda.time.format.PeriodFormat
-import scorex.transaction.smart.ConsensusContext
+import scorex.transaction.smart.BlockchainContext
 import scorex.utils.ScorexLogging
 
 import scala.util.Try
@@ -76,6 +76,6 @@ package object utils extends ScorexLogging {
     }
   }
 
-  private val dummyContext: Context                           = new ConsensusContext(Coeval(???), Coeval(???), null).build()
+  private val dummyContext: Context                           = new BlockchainContext(Coeval(???), Coeval(???), null).build()
   val dummyTypeCheckerContext: TypeChecker.TypeCheckerContext = TypeChecker.TypeCheckerContext.fromContext(dummyContext)
 }

@@ -20,7 +20,7 @@ object Verifier {
   }
 
   def verify[T <: ProvenTransaction](s: SnapshotStateReader, script: Script, height: Int, transaction: T): Either[ValidationError, T] = {
-    val context = new ConsensusContext(Coeval.evalOnce(transaction), Coeval.evalOnce(height), s).build()
+    val context = new BlockchainContext(Coeval.evalOnce(transaction), Coeval.evalOnce(height), s).build()
     Evaluator[Boolean](context, script.script) match {
       case Left(execError) => Left(GenericError(s"Script execution error: $execError"))
       case Right(false) => Left(TransactionNotAllowedByScript(transaction))

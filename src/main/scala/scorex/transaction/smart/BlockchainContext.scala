@@ -6,17 +6,18 @@ import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Coeval
 import scodec.bits.ByteVector
+import scorex.account.AddressScheme
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
-class ConsensusContext(tx: Coeval[Transaction], h: Coeval[Int], state: SnapshotStateReader) extends WavesContext {
+class BlockchainContext(tx: Coeval[Transaction], h: Coeval[Int], state: SnapshotStateReader) extends WavesContext {
 
-  import ConsensusContext._
+  import BlockchainContext._
 
-  override def height: Int = h()
-
+  override def networkByte: Byte                = AddressScheme.current.chainId
+  override def height: Int                      = h()
   override def transaction: ContractTransaction = convert(tx())
 
   override def transactionById(id: Array[Byte]): Option[ContractTransaction] =
@@ -26,7 +27,7 @@ class ConsensusContext(tx: Coeval[Transaction], h: Coeval[Int], state: SnapshotS
       .map(convert)
 }
 
-object ConsensusContext {
+object BlockchainContext {
 
   def convert(tx: Transaction): ContractTransaction = new ContractTransaction {
 
