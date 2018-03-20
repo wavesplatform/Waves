@@ -53,10 +53,15 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
 
   override def resolveAlias(a: Alias): Option[Address] = diff.aliases.get(a).orElse(inner.resolveAlias(a))
 
-  override def allActiveLeases = diff.leaseState
-    .collect { case (id, true) => diff.transactions(id)._2 }
-    .collect { case lt: LeaseTransaction => lt }
-    .toSet ++ inner.allActiveLeases
+  override def allActiveLeases = {
+    val (active, canceled) = diff.leaseState.partition(_._2)
+    val fromDiff = active.keys
+      .map { id => diff.transactions(id)._2 }
+      .collect { case lt: LeaseTransaction => lt }
+      .toSet
+    val fromInner = inner.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
+    fromDiff ++ fromInner
+  }
 
   override def collectPortfolios(filter: Portfolio => Boolean) = {
     inner.collectPortfolios(filter) ++
