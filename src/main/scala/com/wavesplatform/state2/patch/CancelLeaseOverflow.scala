@@ -19,12 +19,8 @@ object CancelLeaseOverflow extends ScorexLogging {
 
     log.info(s"Finished cancelling all lease overflows for sender. Transactions: ${leasesToCancel.mkString(", ")}\n${addressesWithLeaseOverflow.mkString("\n")}")
 
-    Diff(transactions = Map.empty,
+    Diff.empty.copy(
       portfolios = addressesWithLeaseOverflow.mapValues(p => Portfolio(0, LeaseBalance(0, -p.lease.out), Map.empty)),
-      issuedAssets = Map.empty,
-      aliases = Map.empty,
-      orderFills = Map.empty,
-      leaseState = leasesToCancel.map(_ -> false).toMap,
-      scripts = Map.empty)
+      leaseState = leasesToCancel.map(_ -> false).toMap)
   }
 }

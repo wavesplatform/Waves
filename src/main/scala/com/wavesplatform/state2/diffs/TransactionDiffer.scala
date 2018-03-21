@@ -37,6 +37,7 @@ object TransactionDiffer {
         case ltx: LeaseCancelTransaction => LeaseTransactionsDiff.leaseCancel(s, settings, currentBlockTimestamp, currentBlockHeight)(ltx)
         case etx: ExchangeTransaction => ExchangeTransactionDiff(s, currentBlockHeight)(etx)
         case atx: CreateAliasTransaction => CreateAliasTransactionDiff(currentBlockHeight)(atx)
+        case dtx: DataTransaction => DataTransactionDiff(s, currentBlockHeight)(dtx)
         case sstx: SetScriptTransaction => SetScriptTransactionDiff(currentBlockHeight)(sstx)
         case sttx: VersionedTransferTransaction => ScriptTransferTransactionDiff(s, currentBlockHeight)(sttx)
         case _ => Left(UnsupportedTransactionType)

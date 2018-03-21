@@ -47,6 +47,10 @@ trait SnapshotStateReader {
   def allActiveLeases: Set[LeaseTransaction]
 
   def collectPortfolios(filter: Portfolio => Boolean): Map[Address, Portfolio]
+
+  def accountData(acc: Address): AccountDataInfo
+
+  def accountData(acc: Address, key: String): Option[DataEntry[_]]
 }
 
 object SnapshotStateReader {

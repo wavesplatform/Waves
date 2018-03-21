@@ -65,6 +65,7 @@ case class MassTransferTransaction private(version: Byte,
 }
 
 object MassTransferTransaction {
+  val Version: Byte = 1
   val MaxTransferCount = 100
 
   case class Transfer(recipient: String, amount: Long)

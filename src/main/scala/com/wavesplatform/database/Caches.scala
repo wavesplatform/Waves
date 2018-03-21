@@ -5,7 +5,7 @@ import java.util
 import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{AssetDescription, AssetInfo, ByteStr, Diff, LeaseBalance, Portfolio, StateWriter, VolumeAndFee}
+import com.wavesplatform.state2.{AccountDataInfo, AssetDescription, AssetInfo, ByteStr, Diff, LeaseBalance, Portfolio, StateWriter, VolumeAndFee}
 import scorex.account.{Address, Alias}
 import scorex.block.Block
 import scorex.transaction.assets.IssueTransaction
@@ -81,6 +81,7 @@ trait Caches extends SnapshotStateReader with History with StateWriter {
                          reissuedAssets: Map[ByteStr, AssetInfo],
                          filledQuantity: Map[ByteStr, VolumeAndFee],
                          scripts: Map[BigInt, Option[Script]],
+                         data: Map[BigInt, AccountDataInfo],
                          aliases: Map[Alias, BigInt]): Unit
 
   override def append(diff: Diff, block: Block): Unit = {
@@ -158,6 +159,7 @@ trait Caches extends SnapshotStateReader with History with StateWriter {
     doAppend(block, newAddressIds, wavesBalances.result(), assetBalances.result(), leaseBalances.result(), diff.leaseState,
       newTransactions.result(), diff.issuedAssets, newFills.result(),
       diff.scripts.map { case (address, s) => addressIdCache.get(address).get -> s },
+      diff.accountData.map { case (address, data) => addressIdCache.get(address).get -> data },
       diff.aliases.map { case (a, address) => a -> addressIdCache.get(address).get })
   }
 

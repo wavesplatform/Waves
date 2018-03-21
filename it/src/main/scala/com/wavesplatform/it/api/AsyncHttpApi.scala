@@ -11,7 +11,7 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.state2.{ByteStr, Portfolio}
+import com.wavesplatform.state2.{ByteStr, DataEntry, Portfolio}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
@@ -19,12 +19,12 @@ import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json._
-import scorex.api.http.ApiErrorResponse
 import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
-import scorex.transaction.Proofs
+import scorex.api.http.{ApiErrorResponse, DataRequest}
+import scorex.transaction.assets.MassTransferTransaction
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 import scorex.transaction.assets.exchange.Order
 import scorex.waves.http.DebugApiRoute._
@@ -213,9 +213,6 @@ object AsyncHttpApi extends Assertions {
     def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None, feeAssetId: Option[String] = None): Future[Transaction] =
       postJson("/assets/transfer", TransferRequest(assetId, feeAssetId, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
-    def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Future[Transaction] =
-      postJson("/assets/masstransfer", MassTransferRequest(Proofs.Version, assetId, sourceAddress, transfers, fee, None)).as[Transaction]
-
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson("/waves/payment", PaymentRequest(amount, fee, sourceAddress, recipient)).as[Transaction]
 
@@ -245,6 +242,21 @@ object AsyncHttpApi extends Assertions {
     def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
+    def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Future[Transaction] = {
+      implicit val w = Json.writes[MassTransferRequest]
+      postJson("/assets/masstransfer",
+        MassTransferRequest(MassTransferTransaction.Version, assetId, sourceAddress, transfers, fee, None)).as[Transaction]
+    }
+
+    def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Future[Transaction] = {
+      implicit val w = Json.writes[DataRequest]
+      postJson("/addresses/data", DataRequest(1, sourceAddress, data, fee)).as[Transaction]
+    }
+
+    def getData(address: String): Future[List[DataEntry[_]]] = get(s"/addresses/data/$address").as[List[DataEntry[_]]]
+
+    def getData(address: String, key: String): Future[DataEntry[_]] = get(s"/addresses/data/$address/$key").as[DataEntry[_]]
+
     def signedTransfer(transfer: SignedTransferRequest): Future[Transaction] =
       postJson("/assets/broadcast/transfer", transfer).as[Transaction]
 
@@ -254,8 +266,7 @@ object AsyncHttpApi extends Assertions {
     def signedLeaseCancel(leaseCancel: SignedLeaseCancelRequest): Future[Transaction] =
       postJson("/leasing/broadcast/cancel", leaseCancel).as[Transaction]
 
-    def signedMassTransfer(req: SignedMassTransferRequest): Future[Transaction] =
-      postJson("/transactions/broadcast", req).as[Transaction]
+    def broadcastRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
 
     def signedBroadcast(jsobj: JsObject): Future[Transaction] =
       post("/transactions/broadcast", stringify(jsobj)).as[Transaction]
