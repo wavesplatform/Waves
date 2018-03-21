@@ -14,6 +14,7 @@ import scorex.transaction.assets._
 import scorex.transaction.smart.Script
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import com.wavesplatform.state2._
+import com.wavesplatform.state2.diffs.smart.smartEnabledFS
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
@@ -140,7 +141,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       issueGen   <- smartIssueTransactionGen(acc)
     } yield (genesisGen, issueGen)) {
       case (gen, issue) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(issue))) {
+        assertDiffAndState(Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(issue)), smartEnabledFS) {
           case (blockDiff, newState) =>
             newState.assetDescription(issue.id()) shouldBe Some(
               AssetDescription(issue.sender, issue.name, issue.decimals, issue.reissuable, BigInt(issue.quantity), issue.script))
@@ -154,7 +155,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   property("Can transfer when script evaluates to TRUE") {
     forAll(genesisIssueTransferReissue("true")) {
       case (gen, issue, transfer, _) =>
-        assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, transfer))) {
+        assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, transfer)), smartEnabledFS) {
           case (blockDiff, newState) =>
             val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
             totalPortfolioDiff.assets(issue.id()) shouldEqual issue.quantity
@@ -166,21 +167,23 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   property("Cannot transfer when script evaluates to FALSE") {
     forAll(genesisIssueTransferReissue("false")) {
       case (gen, issue, transfer, _) =>
-        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, transfer)))(ei => ei should produce("TransactionNotAllowedByScript"))
+        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, transfer)), smartEnabledFS)(ei =>
+          ei should produce("TransactionNotAllowedByScript"))
     }
   }
 
   property("Cannot reissue when script evaluates to FALSE") {
     forAll(genesisIssueTransferReissue("false")) {
       case (gen, issue, _, reissue) =>
-        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, reissue)))(ei => ei should produce("TransactionNotAllowedByScript"))
+        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, reissue)), smartEnabledFS)(ei =>
+          ei should produce("TransactionNotAllowedByScript"))
     }
   }
 
   property("Can reissue when script evaluates to TRUE even if sender is not original issuer") {
     forAll(genesisIssueTransferReissue("true")) {
       case (gen, issue, _, reissue) =>
-        assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, reissue))) {
+        assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, reissue)), smartEnabledFS) {
           case (blockDiff, newState) =>
             val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
             totalPortfolioDiff.assets(issue.id()) shouldEqual (issue.quantity + reissue.quantity)
