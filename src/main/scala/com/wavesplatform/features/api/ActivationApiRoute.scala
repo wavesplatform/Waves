@@ -43,6 +43,7 @@ case class ActivationApiRoute(settings: RestAPISettings,
           BlockchainFeatures.implemented).toSeq.sorted.map(id => {
           val status = featureProvider.featureStatus(id, height)
           FeatureActivationStatus(id,
+            BlockchainFeatures.feature(id).description,
             status,
             (BlockchainFeatures.implemented.contains(id), featuresSettings.supported.contains(id)) match {
               case (false, _) => NodeFeatureStatus.NotImplemented
