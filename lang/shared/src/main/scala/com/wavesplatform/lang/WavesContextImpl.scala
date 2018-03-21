@@ -76,6 +76,7 @@ abstract class WavesContextImpl { this: Crypto with Environment =>
         extract.name    -> extract,
         isDefined.name  -> isDefined,
         some.name       -> some,
+        size.name       -> size,
         //hashing
         keccack256F.name -> keccack256F,
         blake2b256F.name -> blake2b256F,
@@ -172,6 +173,11 @@ object WavesContextImpl {
   val isDefined: PredefFunction = PredefFunction("isDefined", BOOLEAN, List(("opt", optionT))) {
     case Some(_) :: Nil => Right(true)
     case None :: Nil    => Right(false)
+    case _              => ???
+  }
+
+  val size: PredefFunction = PredefFunction("size", LONG, List(("byteVector", BYTEVECTOR))) {
+    case (bv: ByteVector) :: Nil => Right(bv.size)
     case _              => ???
   }
 

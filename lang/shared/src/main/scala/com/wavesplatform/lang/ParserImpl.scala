@@ -17,7 +17,7 @@ abstract class ParserImpl { this: Base58 =>
   import fastparse.noApi._
   private val Base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
   private val StringChars = """1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-"""
-  private val keywords = Set("let", "base58", "true", "false", "if", "then", "else")
+  private val keywords    = Set("let", "base58", "true", "false", "if", "then", "else")
 
   private val lowerChar = CharIn('a' to 'z')
   private val upperChar = CharIn('A' to 'Z')
@@ -43,10 +43,11 @@ abstract class ParserImpl { this: Base58 =>
   private def getterP: P[GETTER] = P(refP ~ "." ~ varName).map { case ((b, f)) => GETTER(b, f) }
 
   private def byteVectorP: P[CONST_BYTEVECTOR] =
-    P("base58'" ~ CharsWhileIn(Base58Chars).! ~ "'").map(x => CONST_BYTEVECTOR(ByteVector(base58Decode(x).get)))
+    P("base58'" ~ CharsWhileIn(Base58Chars, 0).! ~ "'").map(x =>
+      CONST_BYTEVECTOR(if (x.isEmpty) ByteVector.empty else ByteVector(base58Decode(x).get)))
 
   private def stringP: P[CONST_STRING] =
-    P("\"" ~ CharsWhileIn(StringChars).! ~ "\"").map(x => CONST_STRING(x))
+    P("\"" ~ CharsWhileIn(StringChars, 0).! ~ "\"").map(x => CONST_STRING(x))
 
   private def block: P[EXPR] = P("\n".rep ~ letP.rep ~ expr ~ ";".rep).map {
     case ((Nil, y)) => y
@@ -75,7 +76,7 @@ abstract class ParserImpl { this: Base58 =>
   private def expr = P(binaryOp(opsByPriority) | atom)
 
   private def atom =
-    P(ifP | functionCallP | byteVectorP | stringP |numberP | trueP | falseP | bracesP | curlyBracesP | getterP | refP)
+    P(ifP | functionCallP | byteVectorP | stringP | numberP | trueP | falseP | bracesP | curlyBracesP | getterP | refP)
 
   def apply(str: String): core.Parsed[EXPR, Char, String] = P(block ~ End).parse(str)
 }

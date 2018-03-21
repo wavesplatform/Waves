@@ -7,9 +7,9 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 
-class OptionTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
-  property("should extract transaction assetId if exists") {
+  property("extract should transaction assetId if exists") {
     forAll(transferGen) {
       case (transfer) =>
         val result = runScript[ByteVector]("extract(tx.assetId)", transfer)
@@ -35,6 +35,11 @@ class OptionTest extends PropSpec with PropertyChecks with Matchers with Transac
     runScript("isDefined(None)".stripMargin) shouldBe Right(false)
     runScript("extract(Some(3))".stripMargin) shouldBe Right(3)
     runScript("extract(None)".stripMargin) should produce("Extract from empty option")
+  }
 
+  property("size") {
+    runScript("size(base58'')".stripMargin) shouldBe Right(0L)
+    val arr = Array(1: Byte, 2: Byte, 3: Byte)
+    runScript(s"size(base58'${ByteStr(arr).base58}')".stripMargin) shouldBe Right(3L)
   }
 }
