@@ -1,6 +1,7 @@
 package com.wavesplatform.database
 
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.primitives.{Ints, Longs}
@@ -58,6 +59,8 @@ object LevelDBWriter {
   }
 
   object k {
+    val UTF8 = StandardCharsets.UTF_8
+
     private def h(prefix: Int, height: Int): Array[Byte] = {
       val ndo = newDataOutput(6)
       ndo.writeShort(prefix)
@@ -101,6 +104,27 @@ object LevelDBWriter {
     private def readIntSeq(data: Array[Byte]): Seq[Int] = Option(data).fold(Seq.empty[Int]) { d =>
       val ndi = newDataInput(d)
       (1 to d.length / 4).map(_ => ndi.readInt())
+    }
+
+    private def readStrings(data: Array[Byte]): Seq[String] = Option(data).fold(Seq.empty[String]) { d =>
+      val b = ByteBuffer.wrap(d)
+      val s = Seq.newBuilder[String]
+
+      while (b.remaining() > 0) {
+        val len = b.get()
+        val buffer = new Array[Byte](len)
+        b.get(buffer)
+        s += new String(buffer, UTF8)
+      }
+      s.result()
+    }
+
+    private def writeStrings(strings: Seq[String]): Array[Byte] = {
+      val b = ByteBuffer.allocate(strings.map(_.length + 1).sum)
+      for (s <- strings) {
+        b.put(s.length.toByte).put(s.getBytes(UTF8))
+      }
+      b.array()
     }
 
     private def readTxIds(data: Array[Byte]): Seq[ByteStr] = Option(data).fold(Seq.empty[ByteStr]) { d =>
@@ -164,7 +188,7 @@ object LevelDBWriter {
     def blockAt(height: Int)               = Key.opt[Block](blockAtHeight(height), Block.parseBytes(_).get, _.bytes())
     def blockBytes(height: Int)            = Key.opt[Array[Byte]](blockAtHeight(height), identity, identity)
     def blockHeader(height: Int) =
-      Key.opt[(BlockHeader, Int)](blockAtHeight(height), b => (BlockHeader.parseBytes(b).get._1, b.length), _ => Array.empty) // this dummy encoder is never used: we omnly store blocks, not block headers
+      Key.opt[(BlockHeader, Int)](blockAtHeight(height), b => (BlockHeader.parseBytes(b).get._1, b.length), _ => Array.empty) // this dummy encoder is never used: we only store blocks, not block headers
 
     def heightOf(blockId: ByteStr) = Key.opt[Int](hash(4, blockId), Ints.fromByteArray, Ints.toByteArray)
 
@@ -303,6 +327,12 @@ object LevelDBWriter {
 
     def approvedFeatures: Key[Map[Short, Int]]  = Key(Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
     def activatedFeatures: Key[Map[Short, Int]] = Key(Array[Byte](0, 30), readFeatureMap, writeFeatureMap)
+
+    def dataKeyList(addressId: BigInt) = Key[Set[String]](addr(31, addressId), readStrings(_).toSet, keys => writeStrings(keys.toSeq))
+    def dataHistory(addressId: BigInt, key: String): Key[Seq[Int]] = historyKey(32, addressId.toByteArray ++ key.getBytes(UTF8))
+    def data(height: Int, addressId: BigInt, key: String): Key[Option[DataEntry[_]]] = Key.opt(
+      byteKeyWithH(33, height, addressId.toByteArray ++ key.getBytes(UTF8)),
+      DataEntry.parseValue(key, _, 0)._1, _.valueBytes)
   }
 
   private def loadAssetInfo(db: ReadOnlyDB, assetId: ByteStr) = {
@@ -389,6 +419,21 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
     }
   }
 
+  override def accountData(address: Address): AccountDataInfo = readOnly { db =>
+    val data = for {
+      addressId <- addressIdCache.get(address).toSeq
+      key <- db.get(k.dataKeyList(addressId))
+      value <- accountData(address, key)
+    } yield key -> value
+    AccountDataInfo(data.toMap)
+  }
+
+  override def accountData(address: Address, key: String): Option[DataEntry[_]] = readOnly { db =>
+    addressIdCache.get(address).fold[Option[DataEntry[_]]](None) { addressId =>
+      loadFromHistory[Option[DataEntry[_]]](db, addressId, k.dataHistory(_, key), k.data(_, _, key)).flatten
+    }
+  }
+
   private def loadFromHistory[A](db: ReadOnlyDB, addressId: BigInt, key: BigInt => Key[Seq[Int]], v: (Int, BigInt) => Key[A]) =
     for {
       lastChange <- db.get(key(addressId)).headOption
@@ -446,6 +491,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
                                   reissuedAssets: Map[ByteStr, AssetInfo],
                                   filledQuantity: Map[ByteStr, VolumeAndFee],
                                   scripts: Map[BigInt, Option[Script]],
+                                  data: Map[BigInt, AccountDataInfo],
                                   aliases: Map[Alias, BigInt]): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
@@ -498,6 +544,14 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
     for ((addressId, script) <- scripts) {
       expiredKeys ++= updateHistory(rw, k.addressScriptHistory(addressId), threshold, k.addressScript(_, addressId))
       script.foreach(s => rw.put(k.addressScript(height, addressId), Some(s)))
+    }
+
+    for ((addressId, addressData) <- data) {
+      rw.put(k.dataKeyList(addressId), rw.get(k.dataKeyList(addressId)) ++ addressData.data.keySet)
+      for ((key, value) <- addressData.data) {
+        rw.put(k.data(height, addressId, key), Some(value))
+        expiredKeys ++= updateHistory(rw, k.dataHistory(addressId, key), threshold, k.data(_, addressId, key))
+      }
     }
 
     val accountTransactions = (for {
@@ -591,7 +645,16 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
                 rw.delete(k.addressScript(currentHeight, addressId))
                 val kash = k.addressScriptHistory(addressId)
                 rw.put(kash, rw.get(kash).filter(_ != currentHeight))
-
+              }
+            case T.DataTransaction =>
+              val dtx = tx.asInstanceOf[DataTransaction]
+              val address = dtx.sender.toAddress
+              addressIdCache.get(address).foreach { addressId =>
+                dtx.data.foreach { e =>
+                  rw.delete(k.data(currentHeight, addressId, e.key))
+                  val kdh = k.dataHistory(addressId, e.key)
+                  rw.put(kdh, rw.get(kdh).filter(_ != currentHeight))
+                }
               }
             case T.CreateAliasTransaction =>
               rw.delete(k.addressIdOfAlias(tx.asInstanceOf[CreateAliasTransaction].alias))

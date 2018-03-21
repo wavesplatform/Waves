@@ -143,16 +143,19 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
         |  mass-transfer {
         |    WAVES = 10000,
         |  }
-        |  set-script {
+        |  data {
         |    WAVES = 200000
         |  }
-        |  versioned-transfer {
+        |  set-script {
         |    WAVES = 300000
+        |  }
+        |  versioned-transfer {
+        |    WAVES = 400000
         |  }
         |}
       """.stripMargin).withFallback(defaultConfig).resolve()
     val settings = FeesSettings.fromConfig(config)
-    settings.fees.size should be(11)
+    settings.fees.size should be(12)
     settings.fees(3).toSet should equal(Set(FeeSettings("WAVES", 200000000)))
     settings.fees(4).toSet should equal(Set(FeeSettings("WAVES", 300000), FeeSettings("6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL", 1)))
     settings.fees(5).toSet should equal(Set(FeeSettings("WAVES", 400000)))
@@ -164,5 +167,6 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
     settings.fees(11).toSet should equal(Set(FeeSettings("WAVES", 10000)))
     settings.fees(12).toSet should equal(Set(FeeSettings("WAVES", 200000)))
     settings.fees(13).toSet should equal(Set(FeeSettings("WAVES", 300000)))
+    settings.fees(14).toSet should equal(Set(FeeSettings("WAVES", 400000)))
   }
 }

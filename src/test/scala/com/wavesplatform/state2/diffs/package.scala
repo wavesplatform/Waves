@@ -1,5 +1,6 @@
 package com.wavesplatform.state2
 
+import cats.Monoid
 import com.wavesplatform.db.WithState
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
@@ -35,6 +36,13 @@ package object diffs extends WithState with Matchers {
     val totalDiff1 = differ(state, block).explicitGet()
     state.append(totalDiff1, block)
     assertion(totalDiff1, state)
+  }
+
+  def assertBalanceInvariant(diff: Diff): Unit = {
+    val portfolioDiff = Monoid.combineAll(diff.portfolios.values)
+    portfolioDiff.balance shouldBe 0
+    portfolioDiff.effectiveBalance shouldBe 0
+    portfolioDiff.assets.values.foreach(_ shouldBe 0)
   }
 
   def assertLeft(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)
