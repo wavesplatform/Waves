@@ -8,8 +8,6 @@ import com.wavesplatform.utils._
 import org.iq80.leveldb.{DB, WriteBatch}
 import scorex.account.{Address, Alias}
 import scorex.serialization.Deser
-import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.SmartIssueTransaction
 import scorex.transaction.smart.Script
 import scorex.utils.{NTP, Time}
 
