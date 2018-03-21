@@ -34,19 +34,6 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
       )) shouldBe Right(3)
   }
 
-  property("successful on some expr") {
-    ev(expr = SOME(CONST_LONG(4), OPTION(LONG))) shouldBe Right(Some(4))
-  }
-
-  property("successful on some block") {
-    ev(
-      expr = BLOCK(
-        None,
-        SOME(CONST_LONG(3), OPTION(LONG)),
-        OPTION(LONG)
-      )) shouldBe Right(Some(3))
-  }
-
   property("successful on x = y") {
     ev(
       expr = BLOCK(Some(LET("x", CONST_LONG(3))),
@@ -174,7 +161,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
     val f = PredefFunction("F", LONG, List(("_", LONG))) { _ =>
       functionEvaluated = functionEvaluated + 1
-      Right(1)
+      Right(1L)
     }
 
     val context = Context(
@@ -185,7 +172,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(
       context = context,
       expr = BLOCK(Some(LET("X", FUNCTION_CALL("F", List(CONST_LONG(1000)), LONG))), BINARY_OP(REF("X", LONG), SUM_OP, REF("X", LONG), LONG), LONG)
-    ) shouldBe Right(2)
+    ) shouldBe Right(2L)
 
     functionEvaluated shouldBe 1
 

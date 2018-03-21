@@ -9,10 +9,7 @@ import scodec.bits.ByteVector
 
 abstract class WavesContextImpl { this: Crypto with Emulator =>
 
-  private def hashFunction(name: String)(h: Array[Byte] => Array[Byte]) = PredefFunction(name, BYTEVECTOR, List(("bytes", BYTEVECTOR))) {
-    case (m: ByteVector) :: Nil => Right(ByteVector(h(m.toArray)))
-    case _                      => ???
-  }
+  import WavesContextImpl._
 
   val keccack256F: PredefFunction = hashFunction("keccack256")(this.keccack256)
   val blake2b256F: PredefFunction = hashFunction("blake2b256")(this.blake2b256)
@@ -23,33 +20,6 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
       Right(this.curve25519verify(m.toArray, s.toArray, p.toArray))
     case _ => ???
   }
-
-  val extract: PredefFunction = PredefFunction("extract", TYPEREF("T"), List(("opt", OPTION(TYPEREF("T"))))) {
-    case Some(v) :: Nil => Right(v)
-    case _              => Left("Extract from empty option")
-  }
-
-  val isDefined: PredefFunction = PredefFunction("isDefined", BOOLEAN, List(("opt", OPTION(TYPEREF("T"))))) {
-    case Some(_) :: Nil => Right(true)
-    case None :: Nil    => Right(false)
-    case x              => Left(s"Invalid function call, params: $x")
-  }
-
-  val optionByteVector = OPTION(BYTEVECTOR)
-
-  val transactionType = PredefType(
-    "Transaction",
-    List(
-      "TYPE"      -> LONG,
-      "ID"        -> BYTEVECTOR,
-      "BODYBYTES" -> BYTEVECTOR,
-      "SENDERPK"  -> BYTEVECTOR,
-      "PROOFA"    -> BYTEVECTOR,
-      "PROOFB"    -> BYTEVECTOR,
-      "PROOFC"    -> BYTEVECTOR,
-      "ASSETID"   -> optionByteVector
-    )
-  )
 
   private def proofBinding(tx: Transaction, x: Int): LazyVal =
     LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.proofs map { pfs =>
@@ -73,7 +43,7 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
 
   private val txByIdF = {
     val returnType = OPTION(TYPEREF(transactionType.name))
-    PredefFunction("GETTRANSACTIONBYID", returnType, List(("id", BYTEVECTOR))) {
+    PredefFunction("getTransactionById", returnType, List(("id", BYTEVECTOR))) {
       case (id: ByteVector) :: Nil =>
         val maybeDomainTx = transactionById(id.toArray).map(transactionObject)
         Right(maybeDomainTx).map(_.asInstanceOf[returnType.Underlying])
@@ -82,11 +52,12 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
   }
 
   def build(): Context = {
-    val txCoeval : Coeval[Either[String,Obj]] = Coeval.evalOnce(Right(transactionObject(transaction)))
-    val heightCoeval : Coeval[Either[String,Long]] = Coeval.evalOnce(Right(height))
+    val txCoeval: Coeval[Either[String, Obj]]               = Coeval.evalOnce(Right(transactionObject(transaction)))
+    val heightCoeval: Coeval[Either[String, Long]]          = Coeval.evalOnce(Right(height))
     Context(
       Map(transactionType.name -> transactionType),
       Map(
+        ("None", none),
         ("H", LazyVal(LONG)(EitherT(heightCoeval))),
         ("TX", LazyVal(TYPEREF(transactionType.name))(EitherT(txCoeval)))
       ),
@@ -94,13 +65,56 @@ abstract class WavesContextImpl { this: Crypto with Emulator =>
         sigVerifyF.name -> sigVerifyF,
         txByIdF.name    -> txByIdF,
         extract.name    -> extract,
-        isDefined.name    -> isDefined,
+        isDefined.name  -> isDefined,
+        some.name       -> some,
         //hashing
         keccack256F.name -> keccack256F,
         blake2b256F.name -> blake2b256F,
         sha256F.name     -> sha256F
       )
     )
+  }
+}
+object WavesContextImpl {
+
+  private val noneCoeval: Coeval[Either[String, Option[Nothing]]] = Coeval.evalOnce(Right(None))
+  val none: LazyVal = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval))
+  private val optionByteVector = OPTION(BYTEVECTOR)
+  private val optionT          = OPTIONTYPEPARAM(TYPEPARAM('T'))
+
+  private def hashFunction(name: String)(h: Array[Byte] => Array[Byte]) = PredefFunction(name, BYTEVECTOR, List(("bytes", BYTEVECTOR))) {
+    case (m: ByteVector) :: Nil => Right(ByteVector(h(m.toArray)))
+    case _                      => ???
+  }
+
+  val transactionType = PredefType(
+    "Transaction",
+    List(
+      "TYPE"      -> LONG,
+      "ID"        -> BYTEVECTOR,
+      "BODYBYTES" -> BYTEVECTOR,
+      "SENDERPK"  -> BYTEVECTOR,
+      "PROOFA"    -> BYTEVECTOR,
+      "PROOFB"    -> BYTEVECTOR,
+      "PROOFC"    -> BYTEVECTOR,
+      "ASSETID"   -> optionByteVector
+    )
+  )
+  val extract: PredefFunction = PredefFunction("extract", TYPEPARAM('T'), List(("opt", optionT))) {
+    case Some(v) :: Nil => Right(v)
+    case None :: Nil    => Left("Extract from empty option")
+    case _              => ???
+  }
+
+  val some: PredefFunction = PredefFunction("Some", optionT, List(("obj", TYPEPARAM('T')))) {
+    case v :: Nil => Right(Some(v))
+    case _        => ???
+  }
+
+  val isDefined: PredefFunction = PredefFunction("isDefined", BOOLEAN, List(("opt", optionT))) {
+    case Some(_) :: Nil => Right(true)
+    case None :: Nil    => Right(false)
+    case _              => ???
   }
 
 }

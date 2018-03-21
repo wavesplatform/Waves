@@ -3,12 +3,15 @@ package com.wavesplatform.matcher.market
 import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence.{PersistentActor, RecoveryCompleted}
-import com.wavesplatform.UtxPool
+import akka.routing.FromConfig
+import com.google.common.base.Charsets
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
-import com.wavesplatform.matcher.market.OrderBookActor.{DeleteOrderBookRequest, GetOrderBookResponse, OrderBookRequest}
+import com.wavesplatform.matcher.market.OrderBookActor._
+import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.account.Address
@@ -22,7 +25,7 @@ import scorex.wallet.Wallet
 import scala.collection.{immutable, mutable}
 import scala.language.reflectiveCalls
 
-class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup,
+class MatcherActor(orderHistory: ActorRef, storedState: SnapshotStateReader, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup,
                    settings: MatcherSettings, history: History, functionalitySettings: FunctionalitySettings)
   extends PersistentActor with ScorexLogging {
 
@@ -31,15 +34,15 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   val tradedPairs = mutable.Map.empty[AssetPair, MarketData]
 
   def getAssetName(asset: Option[AssetId]): String =
-    asset.map(storedState().getAssetName).getOrElse(AssetPair.WavesName)
+    asset.fold(AssetPair.WavesName) { aid =>
+      // fixme: the following line will throw an exception when asset name bytes are not a valid UTF-8
+      storedState.assetDescription(aid).fold("Unknown")(d => new String(d.name, Charsets.UTF_8))
+    }
 
   def createOrderBook(pair: AssetPair): ActorRef = {
-    val s = storedState()
-    def getAssetName(asset: Option[AssetId]): String = asset.map(s.getAssetName).getOrElse(AssetPair.WavesName)
-
     val md = MarketData(pair, getAssetName(pair.amountAsset), getAssetName(pair.priceAsset), NTP.correctedTime(),
-      pair.amountAsset.flatMap(s.getIssueTransaction).map(t => AssetInfo(t.decimals)),
-      pair.priceAsset.flatMap(s.getIssueTransaction).map(t => AssetInfo(t.decimals)))
+      pair.amountAsset.flatMap(storedState.assetDescription).map(t => AssetInfo(t.decimals)),
+      pair.priceAsset.flatMap(storedState.assetDescription).map(t => AssetInfo(t.decimals)))
     tradedPairs += pair -> md
 
     context.actorOf(OrderBookActor.props(pair, orderHistory, storedState, settings, wallet, utx, allChannels, history, functionalitySettings),
@@ -47,11 +50,11 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   }
 
   def basicValidation(msg: {def assetPair: AssetPair}): Validation = {
-    val s = storedState()
+    val s = storedState
     def isAssetsExist: Validation = {
-      msg.assetPair.priceAsset.forall(s.assetExists(_)) :|
+      msg.assetPair.priceAsset.forall(s.assetDescription(_).isDefined) :|
         s"Unknown Asset ID: ${msg.assetPair.priceAssetStr}" &&
-        msg.assetPair.amountAsset.forall(s.assetExists(_)) :|
+        msg.assetPair.amountAsset.forall(s.assetDescription(_).isDefined) :|
           s"Unknown Asset ID: ${msg.assetPair.amountAssetStr}"
     }
 
@@ -101,7 +104,7 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   }
 
   def returnEmptyOrderBook(pair: AssetPair): Unit = {
-    sender() ! GetOrderBookResponse(pair, Seq(), Seq())
+    sender() ! GetOrderBookResponse.empty(pair)
   }
 
   def forwardReq(req: Any)(orderBook: ActorRef): Unit = orderBook forward req
@@ -127,6 +130,7 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   def forwardToOrderBook: Receive = {
     case GetMarkets =>
       sender() ! GetMarketsResponse(getMatcherPublicKey, tradedPairs.values.toSeq)
+
     case order: Order =>
       checkAssetPair(order) {
         checkBlacklistedAddress(order.senderPublicKey) {
@@ -134,12 +138,28 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
             .fold(createAndForward(order))(forwardReq(order))
         }
       }
+
     case ob: DeleteOrderBookRequest =>
       checkAssetPair(ob) {
         context.child(OrderBookActor.name(ob.assetPair))
           .fold(returnEmptyOrderBook(ob.assetPair))(forwardReq(ob))
         removeOrderBook(ob.assetPair)
       }
+
+    case x: CancelOrder =>
+      checkAssetPair(x) {
+        context.child(OrderBookActor.name(x.assetPair)).fold {
+          sender() ! OrderCancelRejected(s"Order '${x.orderId}' is already cancelled or never existed in '${x.assetPair.key}' pair")
+        }(forwardReq(x))
+      }
+
+    case x: ForceCancelOrder =>
+      checkAssetPair(x) {
+        context.child(OrderBookActor.name(x.assetPair)).fold {
+          sender() ! OrderCancelRejected(s"Order '${x.orderId}' is already cancelled or never existed in '${x.assetPair.key}' pair")
+        }(forwardReq(x))
+      }
+
     case ob: OrderBookRequest =>
       checkAssetPair(ob) {
         context.child(OrderBookActor.name(ob.assetPair))
@@ -168,17 +188,23 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
     case RecoveryCompleted =>
       log.info("MatcherActor - Recovery completed!")
       initPredefinedPairs()
+      createBalanceWatcher()
   }
 
   override def receiveCommand: Receive = forwardToOrderBook
 
   override def persistenceId: String = "matcher"
+
+  private def createBalanceWatcher(): Unit = if (settings.balanceWatching.enable) {
+    val balanceWatcherMaster = context.actorOf(FromConfig.props(BalanceWatcherWorkerActor.props(settings.balanceWatching, self, orderHistory)), "order-watcher-router")
+    context.system.eventStream.subscribe(balanceWatcherMaster, classOf[BalanceChanged])
+  }
 }
 
 object MatcherActor {
   def name = "matcher"
 
-  def props(orderHistoryActor: ActorRef, storedState: StateReader, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup,
+  def props(orderHistoryActor: ActorRef, storedState: SnapshotStateReader, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup,
             settings: MatcherSettings, history: History, functionalitySettings: FunctionalitySettings): Props =
     Props(new MatcherActor(orderHistoryActor, storedState, wallet, utx, allChannels,settings, history, functionalitySettings))
 

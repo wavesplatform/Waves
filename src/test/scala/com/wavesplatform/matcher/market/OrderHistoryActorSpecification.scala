@@ -6,7 +6,8 @@ import com.wavesplatform.matcher.market.OrderHistoryActor.GetOrderHistory
 import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state2.ByteStr
-import com.wavesplatform.{UtxPool, WithDB}
+import com.wavesplatform.WithDB
+import com.wavesplatform.utx.UtxPool
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import scorex.transaction.assets.exchange.AssetPair

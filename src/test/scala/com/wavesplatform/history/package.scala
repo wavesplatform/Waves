@@ -4,7 +4,6 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state2._
-import org.iq80.leveldb.DB
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -33,14 +32,6 @@ package object history {
   val MicroblocksActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = MicroblocksActivatedAt0BlockchainSettings)
 
   val DefaultWavesSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings)
-
-  def domain(db: DB, settings: WavesSettings): Domain = {
-    import DBExtensions._
-    db.clear()
-    val (storage, _) = StorageFactory(db, settings).get
-    val (history, _, stateReader, blockchainUpdater, _) = storage()
-    Domain(history, stateReader, blockchainUpdater)
-  }
 
   val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
   val generationSignature = ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))

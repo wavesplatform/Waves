@@ -23,14 +23,15 @@ object Verifier {
     }).flatMap(tx => {
       for {
         assetId <- tx match {
-          case t: TransferTransaction       => t.assetId
-          case t: ScriptTransferTransaction => t.assetId
-          case t: MassTransferTransaction   => t.assetId
-          case t: BurnTransaction           => Some(t.assetId)
-          case t: ReissueTransaction        => Some(t.assetId)
-          case _                            => None
+          case t: TransferTransaction          => t.assetId
+          case t: VersionedTransferTransaction => t.assetId
+          case t: MassTransferTransaction      => t.assetId
+          case t: BurnTransaction              => Some(t.assetId)
+          case t: ReissueTransaction           => Some(t.assetId)
+          case _                               => None
         }
-        script <- s.assetInfo(assetId).flatMap(_.script)
+
+        script <- s.assetDescription(assetId).flatMap(_.script)
       } yield verify(s, script, currentBlockHeight, tx)
     }.getOrElse(Either.right(tx)))
 

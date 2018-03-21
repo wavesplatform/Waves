@@ -29,11 +29,11 @@ object Transaction {
       case (Some(asset), fee) =>
         Portfolio(
           balance = 0,
-          leaseInfo = LeaseInfo.empty,
+          lease = LeaseBalance.empty,
           assets = Map(asset -> fee))
       case (None, fee) => Portfolio(
         balance = fee,
-        leaseInfo = LeaseInfo.empty,
+        lease = LeaseBalance.empty,
         assets = Map.empty)
     }
   }

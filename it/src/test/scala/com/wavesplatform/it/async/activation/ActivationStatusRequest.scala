@@ -1,7 +1,7 @@
 package com.wavesplatform.it.activation
 
 import com.wavesplatform.features.BlockchainFeatureStatus
-import com.wavesplatform.features.api.{ActivationStatus, ActivationStatusFeature, NodeFeatureStatus}
+import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus, NodeFeatureStatus}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi._
 import org.scalatest.Matchers
@@ -11,13 +11,13 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 
 trait ActivationStatusRequest extends Matchers {
   def activationStatus(node: Node, height: Int, featureNum: Short, timeout: Duration)
-                      (implicit ec: ExecutionContext): ActivationStatusFeature = Await.result(
+                      (implicit ec: ExecutionContext): FeatureActivationStatus = Await.result(
     activationStatusInternal(node, height).map(_.features.find(_.id == featureNum).get),
     timeout
   )
 
   def activationStatus(nodes: Seq[Node], height: Int, featureNum: Short, timeout: Duration)
-                      (implicit ec: ExecutionContext): ActivationStatusFeature = {
+                      (implicit ec: ExecutionContext): FeatureActivationStatus = {
     Await.result(
       Future
         .traverse(nodes)(activationStatusInternal(_, height))
@@ -37,12 +37,12 @@ trait ActivationStatusRequest extends Matchers {
     node.waitFor[ActivationStatus](s"activationStatusInternal: height should be >= $height")(_.activationStatus, _.height >= height, 1.second)
   }
 
-  def assertVotingStatus(activationStatusFeature: ActivationStatusFeature,
+  def assertVotingStatus(activationStatusFeature: FeatureActivationStatus,
                          supportedBlocks: Int,
                          blockchainFeatureStatus: BlockchainFeatureStatus,
                          nodeFeatureStatus: NodeFeatureStatus): Unit = {
     withClue("supportedBlocks") {
-      activationStatusFeature.supportedBlocks.get shouldBe supportedBlocks
+      activationStatusFeature.supportingBlocks.get shouldBe supportedBlocks
     }
     withClue("blockchainStatus") {
       activationStatusFeature.blockchainStatus shouldBe blockchainFeatureStatus
@@ -52,7 +52,7 @@ trait ActivationStatusRequest extends Matchers {
     }
   }
 
-  def assertApprovedStatus(activationStatusFeature: ActivationStatusFeature,
+  def assertApprovedStatus(activationStatusFeature: FeatureActivationStatus,
                            height: Int,
                            nodeFeatureStatus: NodeFeatureStatus): Unit = {
     withClue("activationHeight") {
@@ -66,7 +66,7 @@ trait ActivationStatusRequest extends Matchers {
     }
   }
 
-  def assertActivatedStatus(activationStatusFeature: ActivationStatusFeature,
+  def assertActivatedStatus(activationStatusFeature: FeatureActivationStatus,
                             height: Int,
                             nodeFeatureStatus: NodeFeatureStatus): Unit = {
     withClue("activationHeight") {

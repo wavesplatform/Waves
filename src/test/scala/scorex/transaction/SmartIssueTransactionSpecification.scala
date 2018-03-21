@@ -25,5 +25,5 @@ class SmartIssueTransactionSpecification extends PropSpec with PropertyChecks wi
       tx.chainId shouldEqual recovered.chainId
       tx.bytes() shouldEqual recovered.bytes()
     }
-  }`
+  }
 }

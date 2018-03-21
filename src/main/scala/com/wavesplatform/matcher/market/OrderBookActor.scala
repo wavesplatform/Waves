@@ -4,7 +4,6 @@ import akka.actor.{ActorRef, Cancellable, Props, Stash}
 import akka.http.scaladsl.model.StatusCodes
 import akka.persistence._
 import com.google.common.cache.CacheBuilder
-import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{CancelOrderRequest, MatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
@@ -14,7 +13,8 @@ import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
@@ -30,7 +30,7 @@ import scala.concurrent.duration._
 
 class OrderBookActor(assetPair: AssetPair,
                      val orderHistory: ActorRef,
-                     val storedState: StateReader,
+                     val storedState: SnapshotStateReader,
                      val wallet: Wallet,
                      val utx: UtxPool,
                      val allChannels: ChannelGroup,
@@ -203,7 +203,7 @@ class OrderBookActor(assetPair: AssetPair,
         log.debug(s"Order rejected: $err.err")
         apiSender.foreach(_ ! OrderRejected(err.err))
       case Right(o) =>
-        log.debug(s"Order accepted: ${o.idStr()}, trying to match ...")
+        log.debug(s"Order accepted: '${o.idStr()}' in '${o.assetPair.key}', trying to match ...")
         apiSender.foreach(_ ! OrderAccepted(o))
         matchOrder(LimitOrder(o))
     }
@@ -323,7 +323,7 @@ class OrderBookActor(assetPair: AssetPair,
 }
 
 object OrderBookActor {
-  def props(assetPair: AssetPair, orderHistory: ActorRef, storedState: StateReader, settings: MatcherSettings,
+  def props(assetPair: AssetPair, orderHistory: ActorRef, storedState: SnapshotStateReader, settings: MatcherSettings,
             wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, history: History,
             functionalitySettings: FunctionalitySettings): Props =
     Props(new OrderBookActor(assetPair, orderHistory, storedState, wallet, utx, allChannels, settings, history, functionalitySettings))
@@ -380,6 +380,10 @@ object OrderBookActor {
   case class GetOrderBookResponse(pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends MatcherResponse {
     val json: JsValue = Json.toJson(OrderBookResult(NTP.correctedTime(), pair, bids, asks))
     val code = StatusCodes.OK
+  }
+
+  object GetOrderBookResponse {
+    def empty(pair: AssetPair): GetOrderBookResponse = GetOrderBookResponse(pair, Seq(), Seq())
   }
 
   // Direct requests

@@ -3,10 +3,10 @@ package scorex.api.http.assets
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.UtxPool
 import com.wavesplatform.network._
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
@@ -113,12 +113,13 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings,
   def batchTransfer: Route = (path("batch-transfer") & post) {
     json[List[SignedTransferRequest]] { reqs =>
       val r = Future
-        .traverse(reqs) { x =>
-          Future {
-            for {
-              tx <- x.toTx
-              added <- utx.putIfNew(tx)
-            } yield (tx, added)
+        .traverse(reqs) { x => Future(x.toTx) }
+        .map { xs =>
+          utx.batched { ops =>
+            xs.map {
+              case Left(e) => Left(e)
+              case Right(tx) => ops.putIfNew(tx).map { case (isNew, _) => (tx, isNew) }
+            }
           }
         }
         .map { xs =>

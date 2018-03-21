@@ -139,7 +139,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   }
   
   private def randomAlias(): String = {
-    s"testalias.${Random.alphanumeric take 9 mkString}".toLowerCase
+    s"testalias.${Random.alphanumeric.take(9).mkString}".toLowerCase
   }
 
 }

@@ -42,7 +42,7 @@ object Address extends ScorexLogging {
     val network = addressBytes.tail.head
     (for {
       _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
-      _ <- Either.cond(network == scheme.chainId, (), s"Data from other network: expected: ${scheme.chainId}(${scheme.chainId.toChar}, actual: $network(${network.toChar}")
+      _ <- Either.cond(network == scheme.chainId, (), s"Data from other network: expected: ${scheme.chainId}(${scheme.chainId.toChar}), actual: $network(${network.toChar})")
       _ <- Either.cond(addressBytes.length == Address.AddressLength, (), s"Wrong addressBytes length: expected: ${Address.AddressLength}, actual: ${addressBytes.length}")
       checkSum = addressBytes.takeRight(ChecksumLength)
       checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
