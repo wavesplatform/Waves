@@ -61,7 +61,11 @@ object SnapshotStateReader {
     def effectiveBalance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
       val balances = s.balanceSnapshots(address, bottomLimit, atHeight)
-      if (balances.isEmpty) 0L else balances.view.map(_.effectiveBalance).min
+      if (balances.isEmpty) 0L else {
+        val (activeSnapshots, outdatedSnapshots) = balances.view.partition(_.height >= bottomLimit)
+        if (activeSnapshots.nonEmpty) activeSnapshots.map(_.effectiveBalance).min
+        else outdatedSnapshots.headOption.fold(0L)(_.effectiveBalance)
+      }
     }
 
     def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
