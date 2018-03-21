@@ -150,11 +150,16 @@ class DataTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAraiseAndTxPresent(noDataTx)
     sender.getData(thirdAddress) shouldBe List.empty
 
-    val key = "intKey"
+    val key = "myKey"
     val multiKey = List.tabulate(5)(IntegerDataEntry(key, _))
-    val twinKeyTx = sender.putData(thirdAddress, multiKey, fee).id
-    nodes.waitForHeightAraiseAndTxPresent(twinKeyTx)
-    sender.getData(thirdAddress, key) shouldBe IntegerDataEntry(key, multiKey.size - 1)
+    val multiKeyTx = sender.putData(thirdAddress, multiKey, fee).id
+    nodes.waitForHeightAraiseAndTxPresent(multiKeyTx)
+    sender.getData(thirdAddress, key) shouldBe multiKey.last
+
+    val typeChange = List(BooleanDataEntry(key, true))
+    val typeChangeTx = sender.putData(thirdAddress, typeChange, fee).id
+    nodes.waitForHeightAraiseAndTxPresent(typeChangeTx)
+    sender.getData(thirdAddress, key) shouldBe typeChange.head
   }
 
   test("malformed JSON") {
