@@ -8,7 +8,7 @@ import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{AccountDataInfo, AssetDescription, AssetInfo, ByteStr, Diff, LeaseBalance, Portfolio, StateWriter, VolumeAndFee}
 import scorex.account.{Address, Alias}
 import scorex.block.Block
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
 import scorex.transaction.smart.Script
 import scorex.transaction.{History, Transaction}
 
@@ -149,7 +149,9 @@ trait Caches extends SnapshotStateReader with History with StateWriter {
       assetInfoCache.put(id, Some(ai))
       diff.transactions.get(id) match {
         case Some((_, it: IssueTransaction, _)) =>
-          assetDescriptionCache.put(id, Some(AssetDescription(it.sender, it.name, it.decimals, ai.isReissuable, ai.volume)))
+          assetDescriptionCache.put(id, Some(AssetDescription(it.sender, it.name, it.decimals, ai.isReissuable, ai.volume, None)))
+        case Some((_, it: SmartIssueTransaction, _)) =>
+          assetDescriptionCache.put(id, Some(AssetDescription(it.sender, it.name, it.decimals, ai.isReissuable, ai.volume, it.script)))
         case _ =>
       }
     }

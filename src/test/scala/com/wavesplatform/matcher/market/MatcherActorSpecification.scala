@@ -29,9 +29,16 @@ import scorex.wallet.Wallet
 
 import scala.concurrent.duration.DurationInt
 
-class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"))
-  with WordSpecLike with Matchers with BeforeAndAfterAll with ImplicitSender with MatcherTestData
-  with BeforeAndAfterEach with ScorexLogging with PathMockFactory {
+class MatcherActorSpecification
+    extends TestKit(ActorSystem.apply("MatcherTest2"))
+    with WordSpecLike
+    with Matchers
+    with BeforeAndAfterAll
+    with ImplicitSender
+    with MatcherTestData
+    with BeforeAndAfterEach
+    with ScorexLogging
+    with PathMockFactory {
 
   val storedState: SnapshotStateReader = stub[SnapshotStateReader]
 
@@ -39,24 +46,34 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     account = MatcherAccount.address,
     balanceWatching = BalanceWatcherWorkerActor.Settings(enable = false, oneAddressProcessingTimeout = 1.second)
   )
-  val history = stub[History]
+  val history               = stub[History]
   val functionalitySettings = TestFunctionalitySettings.Stub
-  val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
+  val wallet                = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
   wallet.generateNewAccount()
 
   val orderHistoryRef = TestActorRef(new Actor {
     def receive: Receive = {
       case ValidateOrder(o, _) => sender() ! ValidateOrderResult(Right(o))
-      case _ =>
+      case _                   =>
     }
   })
-  var actor: ActorRef = system.actorOf(Props(new MatcherActor(orderHistoryRef, storedState, wallet,
-    mock[UtxPool], mock[ChannelGroup], settings, history, functionalitySettings) with RestartableActor))
+  var actor: ActorRef = system.actorOf(
+    Props(
+      new MatcherActor(orderHistoryRef, storedState, wallet, mock[UtxPool], mock[ChannelGroup], settings, history, functionalitySettings)
+      with RestartableActor))
 
-  val i1 = IssueTransaction.create(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
-  val i2 = IssueTransaction.create(PrivateKeyAccount(Array.empty), "ForbiddenName".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
-  (storedState.assetDescription _).when(i2.id()).returns(Some(AssetDescription(i2.sender, "ForbiddenName".getBytes, 8, false, i2.quantity)))
-  (storedState.assetDescription _).when(*).returns(Some(AssetDescription(PublicKeyAccount(Array(0: Byte)), "Unknown".getBytes, 8, false, i1.quantity)))
+  val i1 = IssueTransaction
+    .create(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
+    .right
+    .get
+  val i2 = IssueTransaction
+    .create(PrivateKeyAccount(Array.empty), "ForbiddenName".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
+    .right
+    .get
+  (storedState.assetDescription _).when(i2.id()).returns(Some(AssetDescription(i2.sender, "ForbiddenName".getBytes, 8, false, i2.quantity, None)))
+  (storedState.assetDescription _)
+    .when(*)
+    .returns(Some(AssetDescription(PublicKeyAccount(Array(0: Byte)), "Unknown".getBytes, 8, false, i1.quantity, None)))
   (storedState.portfolio _).when(*).returns(Portfolio(Long.MaxValue, LeaseBalance.empty, Map(ByteStr("123".getBytes) -> Long.MaxValue)))
 
   override protected def beforeEach() = {
@@ -65,16 +82,27 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     tp.expectMsg(akka.actor.Status.Success(""))
     super.beforeEach()
 
-    actor = system.actorOf(Props(new MatcherActor(orderHistoryRef, storedState, wallet, mock[UtxPool], mock[ChannelGroup],
-      settings, history, functionalitySettings) with RestartableActor))
+    actor = system.actorOf(
+      Props(
+        new MatcherActor(orderHistoryRef, storedState, wallet, mock[UtxPool], mock[ChannelGroup], settings, history, functionalitySettings)
+        with RestartableActor))
   }
 
   "MatcherActor" should {
 
     "AssetPair with same assets" in {
-      def sameAssetsOrder(): Order = Order.apply(PrivateKeyAccount("123".getBytes()), MatcherAccount,
-        AssetPair(strToSomeAssetId("asset1"), strToSomeAssetId("asset1")), OrderType.BUY,
-        100000000L, 100L, 1L, 1000L, 100000L)
+      def sameAssetsOrder(): Order =
+        Order.apply(
+          PrivateKeyAccount("123".getBytes()),
+          MatcherAccount,
+          AssetPair(strToSomeAssetId("asset1"), strToSomeAssetId("asset1")),
+          OrderType.BUY,
+          100000000L,
+          100L,
+          1L,
+          1000L,
+          100000L
+        )
 
       val invalidOrder = sameAssetsOrder()
       actor ! invalidOrder
@@ -130,9 +158,18 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     }
 
     "accept orders with AssetPair with same assets" in {
-      def sameAssetsOrder(): Order = Order.apply(PrivateKeyAccount("123".getBytes()), MatcherAccount,
-        AssetPair(strToSomeAssetId("asset1"), strToSomeAssetId("asset1")), OrderType.BUY,
-        100000000L, 100L, 1L, 1000L, 100000L)
+      def sameAssetsOrder(): Order =
+        Order.apply(
+          PrivateKeyAccount("123".getBytes()),
+          MatcherAccount,
+          AssetPair(strToSomeAssetId("asset1"), strToSomeAssetId("asset1")),
+          OrderType.BUY,
+          100000000L,
+          100L,
+          1L,
+          1000L,
+          100000L
+        )
 
       val invalidOrder = sameAssetsOrder()
       actor ! invalidOrder
@@ -140,7 +177,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     }
 
     "restore OrderBook after restart" in {
-      val pair = AssetPair(strToSomeAssetId("123"), None)
+      val pair  = AssetPair(strToSomeAssetId("123"), None)
       val order = buy(pair, 1, 2000)
 
       actor ! order
@@ -155,7 +192,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
       val a1 = strToSomeAssetId("123")
       val a2 = strToSomeAssetId("234")
 
-      val pair = AssetPair(a2, a1)
+      val pair  = AssetPair(a2, a1)
       val order = buy(pair, 1, 2000)
 
       actor ! order
@@ -166,9 +203,8 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
       val Predefined = AssetPair(ByteStr.decodeBase58("BASE2").toOption, ByteStr.decodeBase58("BASE1").toOption)
 
       expectMsgPF() {
-        case GetMarketsResponse(publicKey, Seq(
-        MarketData(`Predefined`, "Unknown", "Unknown", _, _, _),
-        MarketData(_, "Unknown", "Unknown", _, _, _))) =>
+        case GetMarketsResponse(publicKey,
+                                Seq(MarketData(`Predefined`, "Unknown", "Unknown", _, _, _), MarketData(_, "Unknown", "Unknown", _, _, _))) =>
           publicKey shouldBe MatcherAccount.publicKey
       }
     }
@@ -188,27 +224,27 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
 
   "GetMarketsResponse" should {
     "serialize to json" in {
-      val waves = "WAVES"
+      val waves  = "WAVES"
       val a1Name = "BITCOIN"
-      val a1 = strToSomeAssetId(a1Name)
+      val a1     = strToSomeAssetId(a1Name)
 
       val a2Name = "US DOLLAR"
-      val a2 = strToSomeAssetId(a2Name)
+      val a2     = strToSomeAssetId(a2Name)
 
       val pair1 = AssetPair(a1, None)
       val pair2 = AssetPair(a1, a2)
 
       val now = NTP.correctedTime()
-      val json = GetMarketsResponse(Array(), Seq(MarketData(pair1, a1Name, waves, now, None, None),
-        MarketData(pair2, a1Name, a2Name, now, None, None))).json
+      val json =
+        GetMarketsResponse(Array(), Seq(MarketData(pair1, a1Name, waves, now, None, None), MarketData(pair2, a1Name, a2Name, now, None, None))).json
 
-      ((json \ "markets") (0) \ "priceAsset").as[String] shouldBe AssetPair.WavesName
-      ((json \ "markets") (0) \ "priceAssetName").as[String] shouldBe waves
-      ((json \ "markets") (0) \ "amountAsset").as[String] shouldBe a1.get.base58
-      ((json \ "markets") (0) \ "amountAssetName").as[String] shouldBe a1Name
-      ((json \ "markets") (0) \ "created").as[Long] shouldBe now
+      ((json \ "markets")(0) \ "priceAsset").as[String] shouldBe AssetPair.WavesName
+      ((json \ "markets")(0) \ "priceAssetName").as[String] shouldBe waves
+      ((json \ "markets")(0) \ "amountAsset").as[String] shouldBe a1.get.base58
+      ((json \ "markets")(0) \ "amountAssetName").as[String] shouldBe a1Name
+      ((json \ "markets")(0) \ "created").as[Long] shouldBe now
 
-      ((json \ "markets") (1) \ "amountAssetName").as[String] shouldBe a1Name
+      ((json \ "markets")(1) \ "amountAssetName").as[String] shouldBe a1Name
     }
   }
 

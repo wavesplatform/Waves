@@ -25,6 +25,7 @@ object TransactionParser {
     val DataTransaction = Value(12)
     val SetScriptTransaction = Value(13)
     val VersionedTransferTransaction = Value(14)
+    val SmartIssueTransaction = Value(15)
   }
 
   val TimestampLength = 8
@@ -75,6 +76,9 @@ object TransactionParser {
 
       case txType: Byte if txType == TransactionType.VersionedTransferTransaction.id =>
         VersionedTransferTransaction.parseTail(data.tail)
+
+      case txType: Byte if txType == TransactionType.SmartIssueTransaction.id =>
+        SmartIssueTransaction.parseTail(data.tail)
 
       case txType: Byte if txType == TransactionType.DataTransaction.id =>
         DataTransaction.parseTail(data.tail)
