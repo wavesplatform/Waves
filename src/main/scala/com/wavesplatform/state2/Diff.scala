@@ -49,13 +49,24 @@ object AssetInfo {
   }
 }
 
+case class AccountDataInfo(data: Map[String, DataEntry[_]])
+
+object AccountDataInfo {
+  implicit val accountDataInfoMonoid = new Monoid[AccountDataInfo] {
+    override def empty: AccountDataInfo = AccountDataInfo(Map.empty)
+
+    override def combine(x: AccountDataInfo, y: AccountDataInfo): AccountDataInfo = AccountDataInfo(x.data ++ y.data)
+  }
+}
+
 case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 portfolios: Map[Address, Portfolio],
                 issuedAssets: Map[ByteStr, AssetInfo],
                 aliases: Map[Alias, Address],
                 orderFills: Map[ByteStr, VolumeAndFee],
                 leaseState: Map[ByteStr, Boolean],
-                scripts: Map[Address, Option[Script]])
+                scripts: Map[Address, Option[Script]],
+                accountData: Map[Address, AccountDataInfo])
 
 object Diff {
   def apply(height: Int, tx: Transaction,
@@ -64,16 +75,18 @@ object Diff {
             aliases: Map[Alias, Address] = Map.empty,
             orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
             leaseState: Map[ByteStr, Boolean] = Map.empty,
-            scripts : Map[Address, Option[Script]] = Map.empty): Diff = Diff(
+            scripts: Map[Address, Option[Script]] = Map.empty,
+            accountData: Map[Address, AccountDataInfo] = Map.empty): Diff = Diff(
     transactions = Map((tx.id(), (height, tx, portfolios.keys.toSet))),
     portfolios = portfolios,
     issuedAssets = assetInfos,
     aliases = aliases,
     orderFills = orderFills,
     leaseState = leaseState,
-    scripts = scripts)
+    scripts = scripts,
+    accountData = accountData)
 
-  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
+  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
 
   implicit val diffMonoid = new Monoid[Diff] {
     override def empty: Diff = Diff.empty
@@ -85,7 +98,7 @@ object Diff {
       aliases = older.aliases ++ newer.aliases,
       orderFills = older.orderFills.combine(newer.orderFills),
       leaseState = older.leaseState ++ newer.leaseState,
-      scripts = older.scripts ++ newer.scripts
-    )
+      scripts = older.scripts ++ newer.scripts,
+      accountData = older.accountData.combine(newer.accountData))
   }
 }

@@ -13,12 +13,8 @@ object CancelAllLeases extends ScorexLogging {
     val portfolios = s.collectPortfolios(_.lease != LeaseBalance.empty).mapValues(invertLeaseInfo)
     log.info(s"Done collecting all active leases;\n${portfolios.mkString("\n")}")
 
-    Diff(transactions = Map.empty,
+    Diff.empty.copy(
       portfolios = portfolios,
-      issuedAssets = Map.empty,
-      aliases = Map.empty,
-      orderFills = Map.empty,
-      leaseState = leasesToCancel,
-      scripts = Map.empty)
+      leaseState = leasesToCancel)
   }
 }

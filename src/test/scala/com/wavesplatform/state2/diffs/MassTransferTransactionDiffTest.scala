@@ -1,6 +1,5 @@
 package com.wavesplatform.state2.diffs
 
-import cats._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state2.{LeaseBalance, Portfolio}
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -41,10 +40,7 @@ class MassTransferTransactionDiffTest extends PropSpec
 
       forAll(setup) { case (genesis, issue, transfer) =>
         assertDiffAndState(Seq(block(Seq(genesis, issue))), block(Seq(transfer)), fs) { case (totalDiff, newState) =>
-          val totalPortfolioDiff = Monoid.combineAll(totalDiff.portfolios.values)
-          totalPortfolioDiff.balance shouldBe 0
-          totalPortfolioDiff.effectiveBalance shouldBe 0
-          totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
+          assertBalanceInvariant(totalDiff)
 
           val totalAmount = transfer.transfers.map(_.amount).sum
           val fees = issue.fee + transfer.fee

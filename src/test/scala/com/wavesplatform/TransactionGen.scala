@@ -19,8 +19,10 @@ import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.{Script, SetScriptTransaction}
 import scorex.utils.TimeImpl
+import scala.util.Random
 
-trait TransactionGen extends BeforeAndAfterAll with ScriptGen { _: Suite =>
+trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
+  _: Suite =>
 
   def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.containerOfN[Array, Byte](length, Arbitrary.arbitrary[Byte])
 
@@ -239,7 +241,7 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen { _: Suite =>
         amount <- Gen.choose(1L, Long.MaxValue / MaxTransferCount)
       } yield ParsedTransfer(recipient, amount)
       recipients <- Gen.listOfN(transferCount, transferGen)
-    } yield MassTransferTransaction.selfSigned(Proofs.Version, assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
+    } yield MassTransferTransaction.selfSigned(MassTransferTransaction.Version, assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
   }.label("massTransferTransaction")
 
   val MinIssueFee = 100000000
@@ -377,20 +379,52 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen { _: Suite =>
     ts <- positiveIntGen
   } yield GenesisTransaction.create(recipient, amt, ts).right.get
 
+  val dataTransactionGen = {
+    import DataTransaction.MaxEntryCount
+    import DataEntry.{MaxKeySize, MaxValueSize}
+
+    val keyGen = for {
+      size <- Gen.choose[Byte](0, MaxKeySize)
+    } yield Random.alphanumeric.take(size).mkString
+
+    val integerEntryGen = for {
+      key <- keyGen
+      value <- Gen.choose[Long](Long.MinValue, Long.MaxValue)
+    } yield IntegerDataEntry(key, value)
+
+    val booleanEntryGen = for {
+      key <- keyGen
+      value <- Gen.oneOf(true, false)
+    } yield BooleanDataEntry(key, value)
+
+    val binaryEntryGen = for {
+      key <- keyGen
+      size <- Gen.choose(0, MaxValueSize)
+      value <- byteArrayGen(size)
+    } yield BinaryDataEntry(key, value)
+
+    (for {
+      (_, sender, _, _, timestamp, _, _, _) <- transferParamGen
+      size <- Gen.choose(0, MaxEntryCount)
+      data <- Gen.listOfN(size, Gen.oneOf(integerEntryGen, booleanEntryGen, binaryEntryGen))
+    } yield DataTransaction.selfSigned(DataTransaction.Version, sender, data, 15000000, timestamp).right.get)
+      .label("DataTransaction")
+  }
+
   def preconditionsTransferAndLease(code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = {
     val untyped = Parser(code).get.value
-    val typed   = TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
+    val typed = TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
     preconditionsTransferAndLease(typed)
   }
 
   def preconditionsTransferAndLease(typed: Typed.EXPR): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] =
     for {
-      master    <- accountGen
+      master <- accountGen
       recipient <- accountGen
-      ts        <- positiveIntGen
+      ts <- positiveIntGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
       setScript <- selfSignedSetScriptTransactionGenP(master, Script(typed))
-      transfer  <- transferGeneratorP(master, recipient.toAddress, None, None)
-      lease     <- leaseAndCancelGeneratorP(master, recipient.toAddress, master)
+      transfer <- transferGeneratorP(master, recipient.toAddress, None, None)
+      lease <- leaseAndCancelGeneratorP(master, recipient.toAddress, master)
     } yield (genesis, setScript, lease._1, transfer)
 }

@@ -90,6 +90,17 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
     }
   }
 
+  override def accountData(acc: Address): AccountDataInfo = {
+    val fromInner = inner.accountData(acc)
+    val fromDiff = diff.accountData.get(acc).orEmpty
+    fromInner.combine(fromDiff)
+  }
+
+  override def accountData(acc: Address, key: String): Option[DataEntry[_]] = {
+    val diffData = diff.accountData.get(acc).orEmpty
+    diffData.data.get(key).orElse(inner.accountData(acc, key))
+  }
+
   private def changedBalances(pred: Portfolio => Boolean, f: Address => Long): Map[Address, Long] = for {
     (address, p) <- diff.portfolios
     if pred(p)

@@ -1,6 +1,6 @@
 package scorex.api.http.assets
 
-import play.api.libs.json.{Format, Json}
+import play.api.libs.json.Json
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 
 case class MassTransferRequest(version: Byte,
@@ -12,5 +12,5 @@ case class MassTransferRequest(version: Byte,
                                timestamp: Option[Long] = None)
 
 object MassTransferRequest {
-  implicit val jsonFormat: Format[MassTransferRequest] = Json.format
+  implicit val reads = Json.reads[MassTransferRequest]
 }
