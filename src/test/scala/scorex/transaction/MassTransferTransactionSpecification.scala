@@ -40,7 +40,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
   property("property validation") {
     import MassTransferTransaction.create
 
-    val badVersionGen = Gen.choose(Proofs.Version + 1, Byte.MaxValue).map(_.toByte)
+    val badVersionGen = Gen.choose(MassTransferTransaction.Version + 1, Byte.MaxValue).map(_.toByte)
     forAll(massTransferGen, badVersionGen) {
       case (MassTransferTransaction(version, assetId, sender, transfers, timestamp, fee, attachment, proofs), badVersion) =>
         val badVersionEi = create(badVersion, assetId, sender, transfers, timestamp, fee, attachment, proofs)

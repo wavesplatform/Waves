@@ -41,6 +41,9 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
       |    create-alias {
       |      WAVES = 600000
       |    }
+      |    data {
+      |      WAVES = 100000
+      |    }
       |  }
       |}""".stripMargin
 
@@ -134,4 +137,10 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
     }
   }
 
+  property("Data transaction") {
+    val feeCalc = new FeeCalculator(mySettings)
+    forAll(dataTransactionGen) { tx =>
+      feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= Math.ceil(tx.bytes().length / 1024.0) * 100000)
+    }
+  }
 }

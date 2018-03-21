@@ -174,6 +174,14 @@ object StringCodec extends Codec[String] {
   }
 }
 
+object StringSeqCodec extends Codec[Seq[String]] {
+  val itemsCodec = SeqCodec(StringCodec)
+
+  override def encode(value: Seq[String]): Array[Byte] = itemsCodec.encode(value)
+
+  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Seq[String]]] = itemsCodec.decode(bytes)
+}
+
 object OrderToTxIdsCodec extends Codec[Set[String]] {
   private val itemsCodec = SeqCodec(StringCodec)
 

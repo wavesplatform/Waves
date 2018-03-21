@@ -10,7 +10,7 @@ import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 import scorex.transaction.{AssetIdStringLength, Proofs, ValidationError}
 
 object SignedMassTransferRequest {
-  implicit val jsonFormat: Format[SignedMassTransferRequest] = Json.format
+  implicit val reads = Json.reads[SignedMassTransferRequest]
 }
 
 @ApiModel(value = "Signed Asset transfer transaction")
@@ -37,6 +37,6 @@ case class SignedMassTransferRequest(@ApiModelProperty(required = true)
     _proofs <- Proofs.create(_proofBytes)
     _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
     _transfers <- MassTransferTransaction.parseTransfersList(transfers)
-    t <- MassTransferTransaction.create(Proofs.Version, _assetId, _sender, _transfers, timestamp, fee, _attachment.arr, _proofs)
+    t <- MassTransferTransaction.create(MassTransferTransaction.Version, _assetId, _sender, _transfers, timestamp, fee, _attachment.arr, _proofs)
   } yield t
 }

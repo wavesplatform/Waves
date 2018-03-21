@@ -19,21 +19,26 @@ import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.{Script, SetScriptTransaction}
 import scorex.utils.TimeImpl
+import scala.util.Random
 
-trait TransactionGen extends BeforeAndAfterAll with ScriptGen { _: Suite =>
+trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
+  _: Suite =>
 
   def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.containerOfN[Array, Byte](length, Arbitrary.arbitrary[Byte])
 
   val bytes32gen: Gen[Array[Byte]] = byteArrayGen(32)
   val bytes64gen: Gen[Array[Byte]] = byteArrayGen(64)
 
-  def genBoundedBytes(minSize: Int, maxSize: Int): Gen[Array[Byte]] = for {
-    length <- Gen.chooseNum(minSize, maxSize)
-    bytes <- byteArrayGen(length)
-  } yield bytes
+  def genBoundedBytes(minSize: Int, maxSize: Int): Gen[Array[Byte]] =
+    for {
+      length <- Gen.chooseNum(minSize, maxSize)
+      bytes  <- byteArrayGen(length)
+    } yield bytes
 
   def genBoundedString(minSize: Int, maxSize: Int): Gen[Array[Byte]] = {
-    Gen.choose(minSize, maxSize) flatMap { sz => Gen.listOfN(sz, Gen.choose(0, 0x7f).map(_.toByte)).map(_.toArray) }
+    Gen.choose(minSize, maxSize) flatMap { sz =>
+      Gen.listOfN(sz, Gen.choose(0, 0x7f).map(_.toByte)).map(_.toArray)
+    }
   }
 
   private val time = new TimeImpl
@@ -56,7 +61,7 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen { _: Suite =>
   val invalidAliasAlphabetGen: Gen[Char] = frequency((1, numChar), (3, invalidAliasSymbolChar), (9, alphaUpperChar))
 
   val validAliasStringGen: Gen[String] = for {
-    length <- Gen.chooseNum(Alias.MinLength, Alias.MaxLength)
+    length     <- Gen.chooseNum(Alias.MinLength, Alias.MaxLength)
     aliasChars <- Gen.listOfN(length, aliasAlphabetGen)
   } yield aliasChars.mkString
 
@@ -65,7 +70,7 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen { _: Suite =>
   } yield Alias.buildWithCurrentNetworkByte(str.mkString).explicitGet()
 
   val invalidAliasStringGen: Gen[String] = for {
-    length <- Gen.chooseNum(Alias.MinLength, Alias.MaxLength)
+    length     <- Gen.chooseNum(Alias.MinLength, Alias.MaxLength)
     aliasChars <- Gen.listOfN(length, invalidAliasAlphabetGen)
   } yield aliasChars.mkString
 
@@ -74,25 +79,25 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen { _: Suite =>
   def otherAccountGen(candidate: PrivateKeyAccount): Gen[PrivateKeyAccount] = accountGen.flatMap(Gen.oneOf(candidate, _))
 
   val positiveLongGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L / 100)
-  val positiveIntGen: Gen[Int] = Gen.choose(1, Int.MaxValue / 100)
-  val smallFeeGen: Gen[Long] = Gen.choose(1, 100000000)
+  val positiveIntGen: Gen[Int]   = Gen.choose(1, Int.MaxValue / 100)
+  val smallFeeGen: Gen[Long]     = Gen.choose(1, 100000000)
 
   val maxOrderTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + time.correctedTime())
-  val timestampGen: Gen[Long] = Gen.choose(1, Long.MaxValue - 100)
+  val timestampGen: Gen[Long]    = Gen.choose(1, Long.MaxValue - 100)
 
   val wavesAssetGen: Gen[Option[ByteStr]] = Gen.const(None)
-  val assetIdGen: Gen[Option[ByteStr]] = Gen.frequency((1, wavesAssetGen), (10, Gen.option(bytes32gen.map(ByteStr(_)))))
+  val assetIdGen: Gen[Option[ByteStr]]    = Gen.frequency((1, wavesAssetGen), (10, Gen.option(bytes32gen.map(ByteStr(_)))))
 
   val assetPairGen = assetIdGen.flatMap {
     case None => bytes32gen.map(b => AssetPair(None, Some(ByteStr(b))))
-    case a1@Some(a1bytes) =>
+    case a1 @ Some(a1bytes) =>
       val a2bytesGen = byteArrayGen(31).map(a2bytes => Option((~a1bytes.arr(0)).toByte +: a2bytes))
       Gen.oneOf(Gen.const(None), a2bytesGen).map(a2 => AssetPair(a1, a2.map(ByteStr(_))))
   }
 
   val proofsGen: Gen[Proofs] = for {
     proofsAmount <- Gen.chooseNum(0, 7)
-    proofs <- Gen.listOfN(proofsAmount, genBoundedBytes(0, 50))
+    proofs       <- Gen.listOfN(proofsAmount, genBoundedBytes(0, 50))
   } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
 
   val scriptGen = BOOLgen(1000).map { expr =>
@@ -102,22 +107,22 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen { _: Suite =>
 
   val setScriptTransactionGen: Gen[SetScriptTransaction] = for {
     sender: PrivateKeyAccount <- accountGen
-    fee <- smallFeeGen
-    timestamp <- timestampGen
-    proofs <- proofsGen
-    script <- Gen.option(scriptGen)
+    fee                       <- smallFeeGen
+    timestamp                 <- timestampGen
+    proofs                    <- proofsGen
+    script                    <- Gen.option(scriptGen)
   } yield SetScriptTransaction.create(sender, script, fee, timestamp, proofs).explicitGet()
 
-  def selfSignedSetScriptTransactionGenP(sender: PrivateKeyAccount, s: Script): Gen[SetScriptTransaction] = for {
-    fee <- smallFeeGen
-    timestamp <- timestampGen
-  } yield SetScriptTransaction.selfSigned(sender, Some(s), fee, timestamp).explicitGet()
-
+  def selfSignedSetScriptTransactionGenP(sender: PrivateKeyAccount, s: Script): Gen[SetScriptTransaction] =
+    for {
+      fee       <- smallFeeGen
+      timestamp <- timestampGen
+    } yield SetScriptTransaction.selfSigned(sender, Some(s), fee, timestamp).explicitGet()
 
   val paymentGen: Gen[PaymentTransaction] = for {
-    sender: PrivateKeyAccount <- accountGen
+    sender: PrivateKeyAccount    <- accountGen
     recipient: PrivateKeyAccount <- accountGen
-    tx <- paymentGeneratorP(sender, recipient)
+    tx                           <- paymentGeneratorP(sender, recipient)
   } yield tx
 
   val selfPaymentGen: Gen[PaymentTransaction] = accountGen.flatMap(acc => paymentGeneratorP(acc, acc))
@@ -125,16 +130,16 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen { _: Suite =>
   def paymentGeneratorP(sender: PrivateKeyAccount, recipient: PrivateKeyAccount): Gen[PaymentTransaction] =
     timestampGen.flatMap(ts => paymentGeneratorP(ts, sender, recipient))
 
-  def paymentGeneratorP(timestamp: Long, sender: PrivateKeyAccount, recipient: PrivateKeyAccount): Gen[PaymentTransaction] = for {
-    amount: Long <- positiveLongGen
-    fee: Long <- smallFeeGen
-  } yield PaymentTransaction.create(sender, recipient, amount, fee, timestamp).right.get
-
+  def paymentGeneratorP(timestamp: Long, sender: PrivateKeyAccount, recipient: PrivateKeyAccount): Gen[PaymentTransaction] =
+    for {
+      amount: Long <- positiveLongGen
+      fee: Long    <- smallFeeGen
+    } yield PaymentTransaction.create(sender, recipient, amount, fee, timestamp).right.get
 
   private val leaseParamGen = for {
-    sender <- accountGen
-    amount <- positiveLongGen
-    fee <- smallFeeGen
+    sender    <- accountGen
+    amount    <- positiveLongGen
+    fee       <- smallFeeGen
     timestamp <- timestampGen
     recipient <- accountGen
   } yield (sender, amount, fee, timestamp, recipient)
@@ -145,52 +150,63 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen { _: Suite =>
     cancelFee <- smallFeeGen
   } yield (lease, LeaseCancelTransaction.create(sender, lease.id(), cancelFee, timestamp + 1).right.get)
 
-  def leaseAndCancelGeneratorP(leaseSender: PrivateKeyAccount, recipient: AddressOrAlias, unleaseSender: PrivateKeyAccount): Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
-    (_, amount, fee, timestamp, _) <- leaseParamGen
-    lease = LeaseTransaction.create(leaseSender, amount, fee, timestamp, recipient).right.get
-    fee2 <- smallFeeGen
-    unlease = LeaseCancelTransaction.create(unleaseSender, lease.id(), fee2, timestamp + 1).right.get
-  } yield (lease, unlease)
+  def leaseAndCancelGeneratorP(leaseSender: PrivateKeyAccount,
+                               recipient: AddressOrAlias,
+                               unleaseSender: PrivateKeyAccount): Gen[(LeaseTransaction, LeaseCancelTransaction)] =
+    for {
+      (_, amount, fee, timestamp, _) <- leaseParamGen
+      lease = LeaseTransaction.create(leaseSender, amount, fee, timestamp, recipient).right.get
+      fee2 <- smallFeeGen
+      unlease = LeaseCancelTransaction.create(unleaseSender, lease.id(), fee2, timestamp + 1).right.get
+    } yield (lease, unlease)
 
   val twoLeasesGen: Gen[(LeaseTransaction, LeaseTransaction)] = for {
     (sender, amount, fee, timestamp, recipient) <- leaseParamGen
-    amount2 <- positiveLongGen
-    recipient2: PrivateKeyAccount <- accountGen
-    fee2 <- smallFeeGen
-  } yield (LeaseTransaction.create(sender, amount, fee, timestamp, recipient).right.get,
-    LeaseTransaction.create(sender, amount2, fee2, timestamp + 1, recipient2).right.get)
+    amount2                                     <- positiveLongGen
+    recipient2: PrivateKeyAccount               <- accountGen
+    fee2                                        <- smallFeeGen
+  } yield
+    (LeaseTransaction.create(sender, amount, fee, timestamp, recipient).right.get,
+     LeaseTransaction.create(sender, amount2, fee2, timestamp + 1, recipient2).right.get)
 
   val leaseAndCancelWithOtherSenderGen: Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
     (sender, amount, fee, timestamp, recipient) <- leaseParamGen
-    otherSender: PrivateKeyAccount <- accountGen
+    otherSender: PrivateKeyAccount              <- accountGen
     lease = LeaseTransaction.create(sender, amount, fee, timestamp, recipient).right.get
-    fee2 <- smallFeeGen
+    fee2       <- smallFeeGen
     timestamp2 <- positiveLongGen
   } yield (lease, LeaseCancelTransaction.create(otherSender, lease.id(), fee2, timestamp2).right.get)
 
-  val leaseGen: Gen[LeaseTransaction] = leaseAndCancelGen.map(_._1)
+  val leaseGen: Gen[LeaseTransaction]             = leaseAndCancelGen.map(_._1)
   val leaseCancelGen: Gen[LeaseCancelTransaction] = leaseAndCancelGen.map(_._2)
 
   val transferParamGen = for {
-    amount <- positiveLongGen
-    feeAmount <- smallFeeGen
-    assetId <- Gen.option(bytes32gen)
+    amount     <- positiveLongGen
+    feeAmount  <- smallFeeGen
+    assetId    <- Gen.option(bytes32gen)
     feeAssetId <- Gen.option(bytes32gen)
-    timestamp <- timestampGen
-    sender <- accountGen
+    timestamp  <- timestampGen
+    sender     <- accountGen
     attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
-    recipient <- accountOrAliasGen
+    recipient  <- accountOrAliasGen
   } yield (assetId.map(ByteStr(_)), sender, recipient, amount, timestamp, feeAssetId.map(ByteStr(_)), feeAmount, attachment)
 
-  def transferGeneratorP(sender: PrivateKeyAccount, recipient: AddressOrAlias,
-                         assetId: Option[AssetId], feeAssetId: Option[AssetId]): Gen[TransferTransaction] = for {
-    (_, _, _, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
-  } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
+  def transferGeneratorP(sender: PrivateKeyAccount,
+                         recipient: AddressOrAlias,
+                         assetId: Option[AssetId],
+                         feeAssetId: Option[AssetId]): Gen[TransferTransaction] =
+    for {
+      (_, _, _, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
+    } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
 
-  def transferGeneratorP(timestamp: Long, sender: PrivateKeyAccount, recipient: AddressOrAlias,
-                         assetId: Option[AssetId], feeAssetId: Option[AssetId]): Gen[TransferTransaction] = for {
-    (_, _, _, amount, _, _, feeAmount, attachment) <- transferParamGen
-  } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
+  def transferGeneratorP(timestamp: Long,
+                         sender: PrivateKeyAccount,
+                         recipient: AddressOrAlias,
+                         assetId: Option[AssetId],
+                         feeAssetId: Option[AssetId]): Gen[TransferTransaction] =
+    for {
+      (_, _, _, amount, _, _, feeAmount, attachment) <- transferParamGen
+    } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
 
   def wavesTransferGeneratorP(sender: PrivateKeyAccount, recipient: AddressOrAlias): Gen[TransferTransaction] =
     transferGeneratorP(sender, recipient, None, None)
@@ -198,12 +214,16 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen { _: Suite =>
   def wavesTransferGeneratorP(timestamp: Long, sender: PrivateKeyAccount, recipient: AddressOrAlias): Gen[TransferTransaction] =
     transferGeneratorP(timestamp, sender, recipient, None, None)
 
-  def massTransferGeneratorP(sender: PrivateKeyAccount, transfers: List[ParsedTransfer], assetId: Option[AssetId]): Gen[MassTransferTransaction] = for {
-    (_, _, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
-  } yield MassTransferTransaction.selfSigned(Proofs.Version, assetId, sender, transfers, timestamp, feeAmount, attachment).right.get
+  def massTransferGeneratorP(sender: PrivateKeyAccount, transfers: List[ParsedTransfer], assetId: Option[AssetId]): Gen[MassTransferTransaction] =
+    for {
+      (_, _, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
+    } yield MassTransferTransaction.selfSigned(Proofs.Version, assetId, sender, transfers, timestamp, feeAmount, attachment).right.get
 
-  def createWavesTransfer(sender: PrivateKeyAccount, recipient: Address,
-                          amount: Long, fee: Long, timestamp: Long): Either[ValidationError, TransferTransaction] =
+  def createWavesTransfer(sender: PrivateKeyAccount,
+                          recipient: Address,
+                          amount: Long,
+                          fee: Long,
+                          timestamp: Long): Either[ValidationError, TransferTransaction] =
     TransferTransaction.create(None, sender, recipient, amount, timestamp, None, fee, Array())
 
   val transferGen = (for {
@@ -213,7 +233,7 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen { _: Suite =>
 
   val scriptTransferGen = (for {
     (assetId, sender, recipient, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
-    proofs <- proofsGen
+    proofs                                                                    <- proofsGen
   } yield VersionedTransferTransaction.create(2, assetId, sender, recipient, amount, timestamp, feeAmount, attachment, proofs).explicitGet())
     .label("scriptTransferTransaction")
 
@@ -233,89 +253,97 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen { _: Suite =>
     import MassTransferTransaction.MaxTransferCount
     for {
       (assetId, sender, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
-      transferCount <- Gen.choose(0, MaxTransferCount)
+      transferCount                                                <- Gen.choose(0, MaxTransferCount)
       transferGen = for {
         recipient <- accountOrAliasGen
-        amount <- Gen.choose(1L, Long.MaxValue / MaxTransferCount)
+        amount    <- Gen.choose(1L, Long.MaxValue / MaxTransferCount)
       } yield ParsedTransfer(recipient, amount)
       recipients <- Gen.listOfN(transferCount, transferGen)
-    } yield MassTransferTransaction.selfSigned(Proofs.Version, assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
+    } yield MassTransferTransaction.selfSigned(MassTransferTransaction.Version, assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
   }.label("massTransferTransaction")
 
   val MinIssueFee = 100000000
 
   val createAliasGen: Gen[CreateAliasTransaction] = for {
-    timestamp: Long <- positiveLongGen
+    timestamp: Long           <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
-    alias: Alias <- aliasGen
+    alias: Alias              <- aliasGen
   } yield CreateAliasTransaction.create(sender, alias, MinIssueFee, timestamp).right.get
 
   val issueParamGen = for {
     sender: PrivateKeyAccount <- accountGen
-    assetName <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
-    description <- genBoundedString(0, IssueTransaction.MaxDescriptionLength)
-    quantity <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
-    decimals <- Gen.choose(0: Byte, 8: Byte)
-    reissuable <- Arbitrary.arbitrary[Boolean]
-    fee <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
-    timestamp <- positiveLongGen
+    assetName                 <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+    description               <- genBoundedString(0, IssueTransaction.MaxDescriptionLength)
+    quantity                  <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
+    decimals                  <- Gen.choose(0: Byte, 8: Byte)
+    reissuable                <- Arbitrary.arbitrary[Boolean]
+    fee                       <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
+    timestamp                 <- positiveLongGen
   } yield (sender, assetName, description, quantity, decimals, reissuable, fee, timestamp)
 
   val issueReissueBurnGen: Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
-    amount <- positiveLongGen
+    amount                    <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
-    r <- issueReissueBurnGeneratorP(amount, amount, amount, sender)
+    r                         <- issueReissueBurnGeneratorP(amount, amount, amount, sender)
   } yield r
 
   def issueReissueBurnGeneratorP(issueQuantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] =
     issueReissueBurnGeneratorP(issueQuantity, issueQuantity, issueQuantity, sender)
 
-  def issueReissueBurnGeneratorP(issueQuantity: Long, reissueQuantity: Long, burnQuantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
-    (_, assetName, description, _, decimals, reissuable, iFee, timestamp) <- issueParamGen
-    burnAmount <- Gen.choose(0L, burnQuantity)
-    reissuable2 <- Arbitrary.arbitrary[Boolean]
-    fee <- smallFeeGen
-  } yield {
-    val issue = IssueTransaction.create(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp).right.get
-    val reissue = ReissueTransaction.create(sender, issue.assetId(), reissueQuantity, reissuable2, fee, timestamp).right.get
-    val burn = BurnTransaction.create(sender, issue.assetId(), burnAmount, fee, timestamp).right.get
-    (issue, reissue, burn)
-  }
+  def issueReissueBurnGeneratorP(issueQuantity: Long,
+                                 reissueQuantity: Long,
+                                 burnQuantity: Long,
+                                 sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] =
+    for {
+      (_, assetName, description, _, decimals, reissuable, iFee, timestamp) <- issueParamGen
+      burnAmount                                                            <- Gen.choose(0L, burnQuantity)
+      reissuable2                                                           <- Arbitrary.arbitrary[Boolean]
+      fee                                                                   <- smallFeeGen
+    } yield {
+      val issue   = IssueTransaction.create(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp).right.get
+      val reissue = ReissueTransaction.create(sender, issue.assetId(), reissueQuantity, reissuable2, fee, timestamp).right.get
+      val burn    = BurnTransaction.create(sender, issue.assetId(), burnAmount, fee, timestamp).right.get
+      (issue, reissue, burn)
+    }
 
   val issueWithInvalidReissuesGen: Gen[(IssueTransaction, ReissueTransaction, ReissueTransaction)] = for {
     (sender, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
-    fee <- smallFeeGen
+    fee                                                                      <- smallFeeGen
   } yield {
-    val issue = IssueTransaction.create(sender, assetName, description, quantity, decimals, reissuable = true, iFee, timestamp).right.get
+    val issue    = IssueTransaction.create(sender, assetName, description, quantity, decimals, reissuable = true, iFee, timestamp).right.get
     val reissue1 = ReissueTransaction.create(sender, issue.assetId(), quantity, reissuable = false, fee, timestamp).right.get
     val reissue2 = ReissueTransaction.create(sender, issue.assetId(), quantity, reissuable = true, fee, timestamp + 1).right.get
     (issue, reissue1, reissue2)
   }
 
-  def issueGen(sender: PrivateKeyAccount, fixedQuantity: Option[Long] = None): Gen[IssueTransaction] = for {
-    (_, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
-  } yield {
-    IssueTransaction.create(sender, assetName, description, fixedQuantity.getOrElse(quantity), decimals, reissuable = false, 1 * Constants.UnitsInWave, timestamp).right.get
-  }
+  def issueGen(sender: PrivateKeyAccount, fixedQuantity: Option[Long] = None): Gen[IssueTransaction] =
+    for {
+      (_, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
+    } yield {
+      IssueTransaction
+        .create(sender, assetName, description, fixedQuantity.getOrElse(quantity), decimals, reissuable = false, 1 * Constants.UnitsInWave, timestamp)
+        .right
+        .get
+    }
 
-  val issueGen: Gen[IssueTransaction] = issueReissueBurnGen.map(_._1)
+  val issueGen: Gen[IssueTransaction]     = issueReissueBurnGen.map(_._1)
   val reissueGen: Gen[ReissueTransaction] = issueReissueBurnGen.map(_._2)
-  val burnGen: Gen[BurnTransaction] = issueReissueBurnGen.map(_._3)
+  val burnGen: Gen[BurnTransaction]       = issueReissueBurnGen.map(_._3)
 
-  val priceGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)
-  val matcherAmountGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)
+  val priceGen: Gen[Long]            = Gen.choose(1, 3 * 100000L * 100000000L)
+  val matcherAmountGen: Gen[Long]    = Gen.choose(1, 3 * 100000L * 100000000L)
   val matcherFeeAmountGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)
 
   val orderTypeGen: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
 
   val orderParamGen = for {
-    sender <- accountGen
-    matcher <- accountGen
-    pair <- assetPairGen
-    orderType <- orderTypeGen
-    price <- priceGen
-    amount <- matcherAmountGen
-    timestamp <- timestampGen
+    sender     <- accountGen
+    matcher    <- accountGen
+    pair       <- assetPairGen
+    orderType  <- orderTypeGen
+    price      <- priceGen
+    amount     <- matcherAmountGen
+    timestamp  <- timestampGen
     expiration <- maxOrderTimeGen
     matcherFee <- matcherFeeAmountGen
   } yield (sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee)
@@ -326,71 +354,122 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen { _: Suite =>
 
   val arbitraryOrderGen: Gen[Order] = for {
     (sender, matcher, pair, orderType, _, _, _, _, _) <- orderParamGen
-    price <- Arbitrary.arbitrary[Long]
-    amount <- Arbitrary.arbitrary[Long]
-    timestamp <- Arbitrary.arbitrary[Long]
-    expiration <- Arbitrary.arbitrary[Long]
-    matcherFee <- Arbitrary.arbitrary[Long]
+    price                                             <- Arbitrary.arbitrary[Long]
+    amount                                            <- Arbitrary.arbitrary[Long]
+    timestamp                                         <- Arbitrary.arbitrary[Long]
+    expiration                                        <- Arbitrary.arbitrary[Long]
+    matcherFee                                        <- Arbitrary.arbitrary[Long]
   } yield Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee)
 
   val exchangeTransactionGen: Gen[ExchangeTransaction] = for {
     sender1: PrivateKeyAccount <- accountGen
     sender2: PrivateKeyAccount <- accountGen
-    assetPair <- assetPairGen
-    r <- exchangeGeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset)
+    assetPair                  <- assetPairGen
+    r                          <- exchangeGeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset)
   } yield r
 
-  def exchangeGeneratorP(buyer: PrivateKeyAccount, seller: PrivateKeyAccount, amountAssetId: Option[ByteStr],
-                         priceAssetId: Option[ByteStr], fixedMatcherFee: Option[Long] = None): Gen[ExchangeTransaction] = for {
-    (_, matcher, _, _, price, amount1, timestamp, expiration, genMatcherFee) <- orderParamGen
-    amount2: Long <- matcherAmountGen
-    matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2) / 2000, Math.min(amount1, amount2) / 1000)
-    assetPair = AssetPair(amountAssetId, priceAssetId)
-  } yield {
-    val matcherFee = fixedMatcherFee.getOrElse(genMatcherFee)
-    val o1 = Order.buy(buyer, matcher, assetPair, price, amount1, timestamp, expiration, matcherFee)
-    val o2 = Order.sell(seller, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee)
-    val buyFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
-    val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
-    val trans = ExchangeTransaction.create(matcher, o1, o2, price, matchedAmount,
-      buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100).explicitGet()
+  def exchangeGeneratorP(buyer: PrivateKeyAccount,
+                         seller: PrivateKeyAccount,
+                         amountAssetId: Option[ByteStr],
+                         priceAssetId: Option[ByteStr],
+                         fixedMatcherFee: Option[Long] = None): Gen[ExchangeTransaction] =
+    for {
+      (_, matcher, _, _, price, amount1, timestamp, expiration, genMatcherFee) <- orderParamGen
+      amount2: Long                                                            <- matcherAmountGen
+      matchedAmount: Long                                                      <- Gen.choose(Math.min(amount1, amount2) / 2000, Math.min(amount1, amount2) / 1000)
+      assetPair = AssetPair(amountAssetId, priceAssetId)
+    } yield {
+      val matcherFee = fixedMatcherFee.getOrElse(genMatcherFee)
+      val o1         = Order.buy(buyer, matcher, assetPair, price, amount1, timestamp, expiration, matcherFee)
+      val o2         = Order.sell(seller, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee)
+      val buyFee     = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
+      val sellFee    = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
+      val trans =
+        ExchangeTransaction.create(matcher, o1, o2, price, matchedAmount, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100).explicitGet()
 
-    trans
-  }
+      trans
+    }
 
   val randomTransactionGen: Gen[SignedTransaction] = (for {
-    tr <- transferGen
+    tr           <- transferGen
     (is, ri, bu) <- issueReissueBurnGen
-    ca <- createAliasGen
-    xt <- exchangeTransactionGen
-    tx <- Gen.oneOf(tr, is, ri, ca, bu, xt)
+    ca           <- createAliasGen
+    xt           <- exchangeTransactionGen
+    tx           <- Gen.oneOf(tr, is, ri, ca, bu, xt)
   } yield tx).label("random transaction")
 
-  def randomTransactionsGen(count: Int): Gen[Seq[SignedTransaction]] = for {
-    transactions <- Gen.listOfN(count, randomTransactionGen)
-  } yield transactions
+  def randomTransactionsGen(count: Int): Gen[Seq[SignedTransaction]] =
+    for {
+      transactions <- Gen.listOfN(count, randomTransactionGen)
+    } yield transactions
 
   val genesisGen: Gen[GenesisTransaction] = accountGen.flatMap(genesisGeneratorP)
 
-  def genesisGeneratorP(recipient: PrivateKeyAccount): Gen[GenesisTransaction] = for {
-    amt <- Gen.choose(1, 100000000L * 100000000L)
-    ts <- positiveIntGen
-  } yield GenesisTransaction.create(recipient, amt, ts).right.get
+  def genesisGeneratorP(recipient: PrivateKeyAccount): Gen[GenesisTransaction] =
+    for {
+      amt <- Gen.choose(1, 100000000L * 100000000L)
+      ts  <- positiveIntGen
+    } yield GenesisTransaction.create(recipient, amt, ts).right.get
+
+  val dataTransactionGen = {
+    import DataTransaction.MaxEntryCount
+    import DataEntry.{MaxKeySize, MaxValueSize}
+
+    val keyGen = for {
+      size <- Gen.choose[Byte](0, MaxKeySize)
+    } yield Random.alphanumeric.take(size).mkString
+
+    val integerEntryGen = for {
+      key <- keyGen
+      value <- Gen.choose[Long](Long.MinValue, Long.MaxValue)
+    } yield IntegerDataEntry(key, value)
+
+    val booleanEntryGen = for {
+      key <- keyGen
+      value <- Gen.oneOf(true, false)
+    } yield BooleanDataEntry(key, value)
+
+    val binaryEntryGen = for {
+      key <- keyGen
+      size <- Gen.choose(0, MaxValueSize)
+      value <- byteArrayGen(size)
+    } yield BinaryDataEntry(key, value)
+
+    (for {
+      (_, sender, _, _, timestamp, _, _, _) <- transferParamGen
+      size <- Gen.choose(0, MaxEntryCount)
+      data <- Gen.listOfN(size, Gen.oneOf(integerEntryGen, booleanEntryGen, binaryEntryGen))
+    } yield DataTransaction.selfSigned(DataTransaction.Version, sender, data, 15000000, timestamp).right.get)
+      .label("DataTransaction")
+  }
 
   def preconditionsTransferAndLease(code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = {
     val untyped = Parser(code).get.value
-    val typed   = TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
+    val typed = TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
     preconditionsTransferAndLease(typed)
   }
 
   def preconditionsTransferAndLease(typed: Typed.EXPR): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] =
     for {
-      master    <- accountGen
+      master <- accountGen
       recipient <- accountGen
-      ts        <- positiveIntGen
+      ts <- positiveIntGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
       setScript <- selfSignedSetScriptTransactionGenP(master, Script(typed))
-      transfer  <- transferGeneratorP(master, recipient.toAddress, None, None)
-      lease     <- leaseAndCancelGeneratorP(master, recipient.toAddress, master)
+      transfer <- transferGeneratorP(master, recipient.toAddress, None, None)
+      lease <- leaseAndCancelGeneratorP(master, recipient.toAddress, master)
     } yield (genesis, setScript, lease._1, transfer)
+
+  def smartIssueTransactionGen(senderGen: Gen[PrivateKeyAccount] = accountGen,
+                               sGen: Gen[Option[Script]] = Gen.option(scriptGen)): Gen[SmartIssueTransaction] =
+    for {
+
+      script                                                                      <- sGen
+      (_, assetName, description, quantity, decimals, reissuable, fee, timestamp) <- issueParamGen
+      sender                                                                      <- senderGen
+
+    } yield
+      SmartIssueTransaction
+        .selfSigned(1, AddressScheme.current.chainId, sender, assetName, description, quantity, decimals, reissuable, script, fee, timestamp)
+        .explicitGet()
 }
