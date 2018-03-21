@@ -24,8 +24,8 @@ class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure 
     val status = getStatus(createdLeaseTxId)
     status shouldBe Active
 
-    val cancelLesingTxId = sender.cancelLease(firstAddress, createdLeaseTxId, fee = transferFee).id
-    notMiner.waitForTransaction(cancelLesingTxId)
+    val cancelLeaseTxId = sender.cancelLease(firstAddress, createdLeaseTxId, fee = transferFee).id
+    notMiner.waitForTransaction(cancelLeaseTxId)
     val status1 = getStatus(createdLeaseTxId)
     status1 shouldBe Canceled
     val sizeActiveLeases = sender.activeLeases(firstAddress).size
