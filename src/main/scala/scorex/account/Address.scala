@@ -30,9 +30,9 @@ object Address extends ScorexLogging {
 
   private class AddressImpl(val bytes: ByteStr) extends Address
 
-  def fromPublicKey(publicKey: Array[Byte]): Address = {
+  def fromPublicKey(publicKey: Array[Byte], chainId: Byte = scheme.chainId): Address = {
     val publicKeyHash = crypto.secureHash(publicKey).take(HashLength)
-    val withoutChecksum = AddressVersion +: scheme.chainId +: publicKeyHash
+    val withoutChecksum = AddressVersion +: chainId +: publicKeyHash
     val bytes = withoutChecksum ++ calcCheckSum(withoutChecksum)
     new AddressImpl(ByteStr(bytes))
   }

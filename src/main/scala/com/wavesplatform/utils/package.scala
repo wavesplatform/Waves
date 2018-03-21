@@ -76,6 +76,6 @@ package object utils extends ScorexLogging {
     }
   }
 
-  private val dummyContext: Context                           = new BlockchainContext(Coeval(???), Coeval(???), null).build()
+  private val dummyContext: Context                           = new BlockchainContext(0, Coeval(???), Coeval(???), null).build()
   val dummyTypeCheckerContext: TypeChecker.TypeCheckerContext = TypeChecker.TypeCheckerContext.fromContext(dummyContext)
 }
