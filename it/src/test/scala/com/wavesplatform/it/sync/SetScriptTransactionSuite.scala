@@ -40,8 +40,8 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
         let A = base58'${ByteStr(acc1.publicKey)}'
         let B = base58'${ByteStr(acc2.publicKey)}'
 
-        let AC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOFA,A)) then 1 else 0
-        let BC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOFB,B)) then 1 else 0
+        let AC = if(sigVerify(tx.bodyBytes,tx.proof0,A)) then 1 else 0
+        let BC = if(sigVerify(tx.bodyBytes,tx.proof1,B)) then 1 else 0
 
          AC + BC == 2
 

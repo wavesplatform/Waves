@@ -61,6 +61,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     treeTypeErasureTests(
       "CONST_LONG"       -> CONST_LONG(0),
       "CONST_BYTEVECTOR" -> CONST_BYTEVECTOR(ByteVector(1, 2, 3)),
+      "CONST_STRING" -> CONST_STRING("abc"),
       "TRUE"             -> TRUE,
       "FALSE"            -> FALSE,
       "SUM"              -> BINARY_OP(CONST_LONG(0), SUM_OP, CONST_LONG(1), LONG),
@@ -221,6 +222,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       Coeval.defer(root match {
         case x: Typed.CONST_LONG       => Coeval(Untyped.CONST_LONG(x.t))
         case x: Typed.CONST_BYTEVECTOR => Coeval(Untyped.CONST_BYTEVECTOR(x.bs))
+        case x: Typed.CONST_STRING => Coeval(Untyped.CONST_STRING(x.s))
         case Typed.TRUE                => Coeval(Untyped.TRUE)
         case Typed.FALSE               => Coeval(Untyped.FALSE)
         case getter: Typed.GETTER      => aux(getter.ref).map(Untyped.GETTER(_, getter.field))
