@@ -1,6 +1,6 @@
 package com.wavesplatform.state2.diffs.smart.predef
 
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
@@ -8,7 +8,7 @@ import scodec.bits.ByteVector
 import scorex.account.Address
 
 class AddressTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
-  property("should calculate correct address from public key") {
+  property("should calculate address from public key") {
     forAll(accountGen) { acc =>
       val script =
         s"""
@@ -17,6 +17,20 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
            | address.bytes
         """.stripMargin
       runScript[ByteVector](script) shouldBe Right(ByteVector(Address.fromPublicKey(acc.publicKey, networkByte).bytes.arr))
+    }
+  }
+
+  property("should calculate address from bytes") {
+    forAll(accountGen) { acc =>
+      val addressBytes = Address.fromPublicKey(acc.publicKey, networkByte).bytes
+      val script =
+        s"""
+           | let addressBytes = base58'${addressBytes.base58}'
+           | let maybeAddress = addressFromBytes(addressBytes)
+           | let address = extract(maybeAddress)
+           | address.bytes
+        """.stripMargin
+      runScript[ByteVector](script) shouldBe Right(ByteVector(Address.fromBytes(addressBytes.arr, networkByte).explicitGet().bytes.arr))
     }
   }
 }
