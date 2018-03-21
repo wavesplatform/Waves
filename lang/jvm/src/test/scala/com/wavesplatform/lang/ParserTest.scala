@@ -131,6 +131,14 @@ X > Y
       """.stripMargin) shouldBe GETTER(REF("X"), "Y")
   }
 
+  property("string literal") {
+    parse("""
+            |
+            | "asdf"
+            |
+      """.stripMargin) shouldBe CONST_STRING("asdf")
+  }
+
   property("reserved keywords are invalid variable names") {
     def script(keyword: String): String =
       s"""

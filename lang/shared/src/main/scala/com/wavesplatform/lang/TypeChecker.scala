@@ -26,8 +26,9 @@ object TypeChecker {
   private type SetTypeResult[T] = EitherT[Coeval, String, T]
 
   private def setType(ctx: TypeCheckerContext, t: SetTypeResult[Untyped.EXPR]): SetTypeResult[Typed.EXPR] = t.flatMap {
-    case x: Untyped.CONST_LONG       => EitherT.pure(Typed.CONST_LONG(x.t))
-    case x: Untyped.CONST_BYTEVECTOR => EitherT.pure(Typed.CONST_BYTEVECTOR(x.bs))
+    case x: Untyped.CONST_LONG       => EitherT.pure(Typed.CONST_LONG(x.value))
+    case x: Untyped.CONST_BYTEVECTOR => EitherT.pure(Typed.CONST_BYTEVECTOR(x.value))
+    case x: Untyped.CONST_STRING     => EitherT.pure(Typed.CONST_STRING(x.value))
     case Untyped.TRUE                => EitherT.pure(Typed.TRUE)
     case Untyped.FALSE               => EitherT.pure(Typed.FALSE)
 
