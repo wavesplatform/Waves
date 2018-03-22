@@ -270,9 +270,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           NxtConsensusApiRoute(settings.restAPISettings, state, history, settings.blockchainSettings.functionalitySettings),
           WalletApiRoute(settings.restAPISettings, wallet),
           PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
-          UtilsApiRoute(settings.restAPISettings),
+          UtilsApiRoute(time, settings.restAPISettings),
           PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
-          AddressApiRoute(settings.restAPISettings, wallet, state, settings.blockchainSettings.functionalitySettings),
+          AddressApiRoute(settings.restAPISettings, wallet, state, utxStorage, allChannels, time, settings.blockchainSettings.functionalitySettings),
           DebugApiRoute(
             settings.restAPISettings,
             wallet,

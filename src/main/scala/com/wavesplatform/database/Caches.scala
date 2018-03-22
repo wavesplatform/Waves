@@ -5,10 +5,10 @@ import java.util
 import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{AssetDescription, AssetInfo, ByteStr, Diff, LeaseBalance, Portfolio, StateWriter, VolumeAndFee}
+import com.wavesplatform.state2.{AccountDataInfo, AssetDescription, AssetInfo, ByteStr, Diff, LeaseBalance, Portfolio, StateWriter, VolumeAndFee}
 import scorex.account.{Address, Alias}
 import scorex.block.Block
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
 import scorex.transaction.smart.Script
 import scorex.transaction.{History, Transaction}
 
@@ -32,8 +32,8 @@ trait Caches extends SnapshotStateReader with History with StateWriter {
   protected def loadLastBlock(): Option[Block]
   override def lastBlock: Option[Block] = lastBlockCache
 
-  private val transactionIds = new util.HashMap[ByteStr, Long]()
-  protected def forgetTransaction(id: ByteStr): Unit = transactionIds.remove(id)
+  private val transactionIds                             = new util.HashMap[ByteStr, Long]()
+  protected def forgetTransaction(id: ByteStr): Unit     = transactionIds.remove(id)
   override def containsTransaction(id: ByteStr): Boolean = transactionIds.containsKey(id)
 
   protected val portfolioCache: LoadingCache[Address, Portfolio] = cache(100000, loadPortfolio)
@@ -81,6 +81,7 @@ trait Caches extends SnapshotStateReader with History with StateWriter {
                          reissuedAssets: Map[ByteStr, AssetInfo],
                          filledQuantity: Map[ByteStr, VolumeAndFee],
                          scripts: Map[BigInt, Option[Script]],
+                         data: Map[BigInt, AccountDataInfo],
                          aliases: Map[Alias, BigInt]): Unit
 
   override def append(diff: Diff, block: Block): Unit = {
@@ -148,17 +149,29 @@ trait Caches extends SnapshotStateReader with History with StateWriter {
       assetInfoCache.put(id, Some(ai))
       diff.transactions.get(id) match {
         case Some((_, it: IssueTransaction, _)) =>
-          assetDescriptionCache.put(id, Some(AssetDescription(it.sender, it.name, it.decimals, ai.isReissuable, ai.volume)))
+          assetDescriptionCache.put(id, Some(AssetDescription(it.sender, it.name, it.decimals, ai.isReissuable, ai.volume, None)))
+        case Some((_, it: SmartIssueTransaction, _)) =>
+          assetDescriptionCache.put(id, Some(AssetDescription(it.sender, it.name, it.decimals, ai.isReissuable, ai.volume, it.script)))
         case _ =>
       }
     }
 
     scriptCache.putAll(diff.scripts.asJava)
 
-    doAppend(block, newAddressIds, wavesBalances.result(), assetBalances.result(), leaseBalances.result(), diff.leaseState,
-      newTransactions.result(), diff.issuedAssets, newFills.result(),
-      diff.scripts.map { case (address, s) => addressIdCache.get(address).get -> s },
-      diff.aliases.map { case (a, address) => a -> addressIdCache.get(address).get })
+    doAppend(
+      block,
+      newAddressIds,
+      wavesBalances.result(),
+      assetBalances.result(),
+      leaseBalances.result(),
+      diff.leaseState,
+      newTransactions.result(),
+      diff.issuedAssets,
+      newFills.result(),
+      diff.scripts.map { case (address, s)        => addressIdCache.get(address).get -> s },
+      diff.accountData.map { case (address, data) => addressIdCache.get(address).get -> data },
+      diff.aliases.map { case (a, address)        => a                               -> addressIdCache.get(address).get }
+    )
   }
 
   protected def doRollback(targetBlockId: ByteStr): Seq[Block]
@@ -179,7 +192,11 @@ trait Caches extends SnapshotStateReader with History with StateWriter {
 
 object Caches {
   def cache[K <: AnyRef, V <: AnyRef](maximumSize: Int, loader: K => V): LoadingCache[K, V] =
-    CacheBuilder.newBuilder().maximumSize(maximumSize).recordStats().build(new CacheLoader[K, V] {
-      override def load(key: K) = loader(key)
-    })
+    CacheBuilder
+      .newBuilder()
+      .maximumSize(maximumSize)
+      .recordStats()
+      .build(new CacheLoader[K, V] {
+        override def load(key: K) = loader(key)
+      })
 }

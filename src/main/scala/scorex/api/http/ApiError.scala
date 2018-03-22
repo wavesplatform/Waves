@@ -211,3 +211,9 @@ case class Mistiming(errorMessage: String) extends ApiError {
 object Mistiming {
   val Id = 303
 }
+
+case object DataKeyNotExists extends ApiError {
+  override val id: Int = 304
+  override val code = StatusCodes.NotFound
+  override val message: String = "no data for this key"
+}

@@ -40,11 +40,11 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("bytestr expressions") {
-    parse("false || SIGVERIFY(base58'333', base58'222', base58'111')") shouldBe BINARY_OP(
+    parse("false || sigVerify(base58'333', base58'222', base58'111')") shouldBe BINARY_OP(
       FALSE,
       OR_OP,
       FUNCTION_CALL(
-        "SIGVERIFY",
+        "sigVerify",
         List(
           CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("333").get)),
           CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("222").get)),
@@ -131,6 +131,14 @@ X > Y
       """.stripMargin) shouldBe GETTER(REF("X"), "Y")
   }
 
+  property("string literal") {
+    parse("""
+            |
+            | "asdf"
+            |
+      """.stripMargin) shouldBe CONST_STRING("asdf")
+  }
+
   property("reserved keywords are invalid variable names") {
     def script(keyword: String): String =
       s"""
@@ -151,13 +159,13 @@ X > Y
         |let B = base58'PK2PK2PK2PK2PK2'
         |let C = base58'PK3PK3PK3PK3PK3'
         |
-        |let W = TX.BODYBYTES
-        |let P = TX.PROOF
-        |let V = SIGVERIFY(W,P,A)
+        |let W = tx.bodyBytes
+        |let P = tx.PROOF
+        |let V = sigVerify(W,P,A)
         |
         |let AC = if(V) then 1 else 0
-        |let BC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOF,B)) then 1 else 0
-        |let CC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOF,C)) then 1 else 0
+        |let BC = if(sigVerify(tx.bodyBytes,tx.PROOF,B)) then 1 else 0
+        |let CC = if(sigVerify(tx.bodyBytes,tx.PROOF,C)) then 1 else 0
         |
         | AC + BC+ CC >= 2
         |

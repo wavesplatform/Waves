@@ -17,6 +17,7 @@ object Global extends js.Object {
   def sha256(message: Array[Byte]): js.Array[Byte]                                        = js.native
 
   def height: Int                                           = js.native
+  def networkByte: Byte                                     = js.native
   def transaction: Transaction                              = js.native
   def transactionById(id: Array[Byte]): Option[Transaction] = js.native
 }

@@ -10,14 +10,15 @@ object Terms {
   case class TYPEPARAM(char: Char)               extends TYPEPLACEHOLDER
   case class OPTIONTYPEPARAM(t: TYPEPLACEHOLDER) extends TYPEPLACEHOLDER
 
-  sealed trait TYPE                extends TYPEPLACEHOLDER { type Underlying }
-  case object NOTHING              extends TYPE            { type Underlying = Nothing }
-  case object UNIT                 extends TYPE            { type Underlying = Unit }
-  case object LONG                 extends TYPE            { type Underlying = Long }
-  case object BYTEVECTOR           extends TYPE            { type Underlying = ByteVector }
-  case object BOOLEAN              extends TYPE            { type Underlying = Boolean }
-  case class OPTION(t: TYPE)       extends TYPE            { type Underlying = Option[t.Underlying] }
-  case class TYPEREF(name: String) extends TYPE            { type Underlying = Obj }
+  sealed trait TYPE                  extends TYPEPLACEHOLDER { type Underlying }
+  case object NOTHING                extends TYPE            { type Underlying = Nothing }
+  case object UNIT                   extends TYPE            { type Underlying = Unit }
+  case object LONG                   extends TYPE            { type Underlying = Long }
+  case object BYTEVECTOR             extends TYPE            { type Underlying = ByteVector }
+  case object BOOLEAN                extends TYPE            { type Underlying = Boolean }
+  case object STRING                 extends TYPE            { type Underlying = String }
+  case class OPTION(innerType: TYPE) extends TYPE            { type Underlying = Option[innerType.Underlying] }
+  case class TYPEREF(name: String)   extends TYPE            { type Underlying = Obj }
 
   sealed trait BINARY_OP_KIND
   case object SUM_OP extends BINARY_OP_KIND
@@ -30,9 +31,10 @@ object Terms {
   object Untyped {
     case class LET(name: String, value: EXPR)
     sealed trait EXPR
-    case class CONST_LONG(t: Long)                                   extends EXPR
+    case class CONST_LONG(value: Long)                                   extends EXPR
     case class GETTER(ref: EXPR, field: String)                      extends EXPR
-    case class CONST_BYTEVECTOR(bs: ByteVector)                      extends EXPR
+    case class CONST_BYTEVECTOR(value: ByteVector)                      extends EXPR
+    case class CONST_STRING(value: String)                               extends EXPR
     case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR)     extends EXPR
     case class BLOCK(let: Option[LET], body: EXPR)                   extends EXPR
     case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)           extends EXPR
@@ -48,6 +50,7 @@ object Terms {
     case class CONST_LONG(t: Long)                                                           extends EXPR(LONG)
     case class GETTER(ref: EXPR, field: String, override val tpe: TYPE)                      extends EXPR(tpe)
     case class CONST_BYTEVECTOR(bs: ByteVector)                                              extends EXPR(BYTEVECTOR)
+    case class CONST_STRING(s: String)                                                       extends EXPR(STRING)
     case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR, override val tpe: TYPE)     extends EXPR(tpe)
     case class BLOCK(let: Option[LET], body: EXPR, override val tpe: TYPE)                   extends EXPR(tpe)
     case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, override val tpe: TYPE)           extends EXPR(tpe)

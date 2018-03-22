@@ -36,6 +36,7 @@ object Evaluator {
 
         case Typed.CONST_LONG(v)       => EitherT.rightT[Coeval, String](v)
         case Typed.CONST_BYTEVECTOR(v) => EitherT.rightT[Coeval, String](v)
+        case Typed.CONST_STRING(v)     => EitherT.rightT[Coeval, String](v)
         case Typed.TRUE                => EitherT.rightT[Coeval, String](true)
         case Typed.FALSE               => EitherT.rightT[Coeval, String](false)
 

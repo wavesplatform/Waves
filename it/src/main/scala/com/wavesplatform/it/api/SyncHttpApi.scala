@@ -2,12 +2,13 @@ package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.it.Node
+import com.wavesplatform.state2.DataEntry
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
 import play.api.libs.json.{Format, JsObject, Json, Writes}
-import scorex.api.http.assets.{SignedIssueRequest, SignedMassTransferRequest}
+import scorex.api.http.assets.SignedIssueRequest
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 
 import scala.concurrent.duration._
@@ -21,8 +22,17 @@ object SyncHttpApi extends Assertions {
 
   def assertBadRequest[R](f: => R): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Assertions.assert(statusCode == StatusCodes.BadRequest.intValue)
-    case Failure(e)                                               => Assertions.fail(e)
-    case _                                                        => Assertions.fail(s"Expecting bad request")
+    case Failure(e) => Assertions.fail(e)
+    case _          => Assertions.fail("Expecting bad request")
+  }
+
+  def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
+    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+      Assertions.assert(
+        statusCode == StatusCodes.BadRequest.intValue &&
+        responseBody.replace("\n", "").matches(s".*$errorRegex.*"))
+    case Failure(e) => Assertions.fail(e)
+    case _          => Assertions.fail("Expecting bad request")
   }
 
   def assertBadRequestAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
@@ -88,14 +98,23 @@ object SyncHttpApi extends Assertions {
     def lease(sourceAddress: String, recipient: String, leasingAmount: Long, leasingFee: Long): Transaction =
       Await.result(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee), RequestAwaitTime)
 
+    def putData(sourceAddress:String, data: List[DataEntry[_]], fee: Long): Transaction =
+      Await.result(async(n).putData(sourceAddress, data, fee), RequestAwaitTime)
+
+    def getData(sourceAddress:String): List[DataEntry[_]] =
+      Await.result(async(n).getData(sourceAddress), RequestAwaitTime)
+
+    def getData(sourceAddress:String, key: String): DataEntry[_] =
+      Await.result(async(n).getData(sourceAddress, key), RequestAwaitTime)
+
+    def broadcastRequest[A: Writes](req: A): Transaction =
+      Await.result(async(n).broadcastRequest(req), RequestAwaitTime)
+
     def activeLeases(sourceAddress: String): Seq[Transaction] =
       Await.result(async(n).activeLeases(sourceAddress), RequestAwaitTime)
 
     def cancelLease(sourceAddress: String, leaseId: String, fee: Long): Transaction =
       Await.result(async(n).cancelLease(sourceAddress, leaseId, fee), RequestAwaitTime)
-
-    def signedMassTransfer(tx: SignedMassTransferRequest): Transaction =
-      Await.result(async(n).signedMassTransfer(tx), RequestAwaitTime)
 
     def signedBroadcast(tx: JsObject) : Transaction =
       Await.result(async(n).signedBroadcast(tx), RequestAwaitTime)
