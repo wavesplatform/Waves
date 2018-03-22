@@ -160,6 +160,7 @@ case class TransactionsApiRoute(
           case CreateAliasTransaction => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
           case DataTransaction => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
           case SetScriptTransaction => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
+          case SmartIssueTransaction => TransactionFactory.sma
           case VersionedTransferTransaction => TransactionFactory.versionedTransfer(jsv.as[VersionedTransferRequest], wallet, time)
           case t => Left(GenericError(s"Bad transaction type: $t"))
         }
