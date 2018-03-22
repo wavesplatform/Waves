@@ -23,7 +23,16 @@ case class UtilsApiRoute(settings: RestAPISettings) extends ApiRoute {
   }
 
   override val route = pathPrefix("utils") {
-    seedRoute ~ length ~ hashFast ~ hashSecure ~ sign
+    time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign
+  }
+
+  @Path("/time")
+  @ApiOperation(value = "Time", notes = "Current Node time (UTC)", httpMethod = "GET")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json with time or error")
+  ))
+  def time: Route = (path("time") & get) {
+    complete(System.currentTimeMillis())
   }
 
   @Path("/seed")
