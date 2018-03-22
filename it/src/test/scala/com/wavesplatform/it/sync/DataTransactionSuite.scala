@@ -128,7 +128,6 @@ class DataTransactionSuite extends BaseTransactionSuite {
     sender.getData(secondAddress, "int") shouldBe intEntry2
     sender.getData(secondAddress, "bool") shouldBe boolEntry2
     sender.getData(secondAddress, "blob").equals(blobEntry2)
-
     sender.getData(secondAddress).equals(dataAllTypes)
 
     notMiner.assertBalances(secondAddress, balance2 - fee, eff2 - fee)
