@@ -427,7 +427,7 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
 
   val longEntryGen = for {
     key <- dataTxKeyGen
-    value <- Gen.choose[Long](Long.MinValue, Long.MaxValue)
+    value <- Gen.choose[Long](1, Long.MaxValue)
   } yield LongDataEntry(key, value)
 
   val booleanEntryGen = for {
@@ -455,7 +455,6 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
 
   def dataTransactionGenP(sender: PrivateKeyAccount, data: List[DataEntry[_]]): Gen[DataTransaction] =
     (for {
-    sender <- accountGen
     timestamp <- timestampGen
     size <- Gen.choose(0, MaxEntryCount)
   } yield DataTransaction.selfSigned(DataTransaction.Version, sender, data, 15000000, timestamp).right.get)

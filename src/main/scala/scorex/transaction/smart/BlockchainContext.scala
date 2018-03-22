@@ -1,11 +1,12 @@
 package scorex.transaction.smart
 
 import com.wavesplatform.lang.WavesContext
-import com.wavesplatform.lang.traits.{Transaction => ContractTransaction}
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.lang.traits.{DataType, Transaction => ContractTransaction}
+import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Coeval
 import scodec.bits.ByteVector
+import scorex.account.Address
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -15,7 +16,8 @@ class BlockchainContext(override val networkByte: Byte, tx: Coeval[Transaction],
 
   import BlockchainContext._
 
-  override def height: Int                      = h()
+  override def height: Int = h()
+
   override def transaction: ContractTransaction = convert(tx())
 
   override def transactionById(id: Array[Byte]): Option[ContractTransaction] =
@@ -23,6 +25,16 @@ class BlockchainContext(override val networkByte: Byte, tx: Coeval[Transaction],
       .transactionInfo(ByteStr(id))
       .map(_._2)
       .map(convert)
+
+  override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any] = {
+    val data = state.accountData(Address.fromBytes(addressBytes).explicitGet(), key)
+    data.map((_, dataType)).flatMap {
+      case (LongDataEntry(_, value), DataType.Long)        => Some(value)
+      case (BinaryDataEntry(_, value), DataType.ByteArray) => Some(value)
+      case (BooleanDataEntry(_, value), DataType.Boolean)  => Some(value)
+      case _                                               => None
+    }
+  }
 }
 
 object BlockchainContext {

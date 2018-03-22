@@ -17,4 +17,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with Matchers with No
   property("function call") {
     eval("MULTIPLY(3,4)".stripMargin) shouldBe Right(12)
   }
+
+  property("equals on byte array") {
+    eval("base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8' == base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8'".stripMargin) shouldBe Right(true)
+  }
 }
