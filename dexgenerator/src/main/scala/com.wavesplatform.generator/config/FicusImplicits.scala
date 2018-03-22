@@ -8,6 +8,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.generator.utils.GenOrderType
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.{CollectionReaders, ValueReader}
+import scorex.transaction.TransactionParser.TransactionType
 
 trait FicusImplicits {
   implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = { (config: Config, path: String) =>
