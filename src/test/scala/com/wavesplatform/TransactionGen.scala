@@ -427,7 +427,7 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
 
   val longEntryGen = for {
     key <- dataTxKeyGen
-    value <- Gen.choose[Long](1, Long.MaxValue)
+    value <- Gen.choose[Long](Long.MinValue, Long.MaxValue)
   } yield LongDataEntry(key, value)
 
   val booleanEntryGen = for {
