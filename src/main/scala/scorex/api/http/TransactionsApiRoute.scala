@@ -29,14 +29,16 @@ import scala.util.control.Exception
 
 @Path("/transactions")
 @Api(value = "/transactions")
-case class TransactionsApiRoute(
-    settings: RestAPISettings,
-    wallet: Wallet,
-    state: SnapshotStateReader,
-    history: History,
-    utx: UtxPool,
-    allChannels: ChannelGroup,
-    time: Time) extends ApiRoute with BroadcastRoute with CommonApiFunctions {
+case class TransactionsApiRoute(settings: RestAPISettings,
+                                wallet: Wallet,
+                                state: SnapshotStateReader,
+                                history: History,
+                                utx: UtxPool,
+                                allChannels: ChannelGroup,
+                                time: Time)
+    extends ApiRoute
+    with BroadcastRoute
+    with CommonApiFunctions {
 
   import TransactionsApiRoute.MaxTransactionsPerRequest
 
@@ -50,10 +52,15 @@ case class TransactionsApiRoute(
   //TODO implement general pagination
   @Path("/address/{address}/limit/{limit}")
   @ApiOperation(value = "Address", notes = "Get list of transactions where specified address has been involved", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "string", paramType = "path"),
-    new ApiImplicitParam(name = "limit", value = "Specified number of records to be returned", required = true, dataType = "integer", paramType = "path")
-  ))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "limit",
+                           value = "Specified number of records to be returned",
+                           required = true,
+                           dataType = "integer",
+                           paramType = "path")
+    ))
   def addressLimit: Route = (pathPrefix("address") & get) {
     pathPrefix(Segment) { address =>
       Address.fromString(address) match {
@@ -66,10 +73,10 @@ case class TransactionsApiRoute(
               path(Segment) { limitStr =>
                 Exception.allCatch.opt(limitStr.toInt) match {
                   case Some(limit) if limit > 0 && limit <= MaxTransactionsPerRequest =>
-                    complete(Json.arr(JsArray(
-                      state.addressTransactions(a, Set.empty, 0, 1000).map { case (h, tx) =>
+                    complete(Json.arr(JsArray(state.addressTransactions(a, Set.empty, 0, 1000).map {
+                      case (h, tx) =>
                         txToCompactJson(a, tx) + ("height" -> JsNumber(h))
-                      })))
+                    })))
                   case Some(limit) if limit > MaxTransactionsPerRequest =>
                     complete(TooBigArrayAllocation)
                   case _ =>
@@ -83,23 +90,24 @@ case class TransactionsApiRoute(
 
   @Path("/info/{id}")
   @ApiOperation(value = "Info", notes = "Get transaction info", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "id", value = "transaction id ", required = true, dataType = "string", paramType = "path")
-  ))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "id", value = "transaction id ", required = true, dataType = "string", paramType = "path")
+    ))
   def info: Route = (pathPrefix("info") & get) {
     pathEndOrSingleSlash {
       complete(InvalidSignature)
     } ~
-    path(Segment) { encoded =>
-      ByteStr.decodeBase58(encoded) match {
-        case Success(id) =>
-          state.transactionInfo(id) match {
-            case Some((h, tx)) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
-            case None => complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
-          }
-        case _ => complete(InvalidSignature)
+      path(Segment) { encoded =>
+        ByteStr.decodeBase58(encoded) match {
+          case Success(id) =>
+            state.transactionInfo(id) match {
+              case Some((h, tx)) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
+              case None          => complete(StatusCodes.NotFound             -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
+            }
+          case _ => complete(InvalidSignature)
+        }
       }
-    }
   }
 
   @Path("/unconfirmed")
@@ -118,9 +126,10 @@ case class TransactionsApiRoute(
 
   @Path("/unconfirmed/info/{id}")
   @ApiOperation(value = "Transaction Info", notes = "Get transaction that is in the UTX", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "id", value = "Transaction id ", required = true, dataType = "string", paramType = "path")
-  ))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "id", value = "Transaction id ", required = true, dataType = "string", paramType = "path")
+    ))
   def utxTransactionInfo: Route = (pathPrefix("info") & get) {
     pathEndOrSingleSlash {
       complete(InvalidSignature)
@@ -141,28 +150,32 @@ case class TransactionsApiRoute(
 
   @Path("/sign")
   @ApiOperation(value = "Sign a transaction", notes = "Sign a transaction", httpMethod = "POST")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "json", required = true, dataType = "string", paramType = "body",
-                         value = "Transaction data including type and optional timestamp in milliseconds")
-  ))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "json",
+                           required = true,
+                           dataType = "string",
+                           paramType = "body",
+                           value = "Transaction data including type and optional timestamp in milliseconds")
+    ))
   def sign: Route = (pathPrefix("sign") & post & withAuth) {
     handleExceptions(jsonExceptionHandler) {
       json[JsObject] { jsv =>
         import TransactionType._
         val txEi = TransactionType((jsv \ "type").as[Int]) match {
-          case IssueTransaction => TransactionFactory.issueAsset(jsv.as[IssueRequest], wallet, time)
-          case TransferTransaction => TransactionFactory.transferAsset(jsv.as[TransferRequest], wallet, time)
-          case MassTransferTransaction => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
-          case ReissueTransaction => TransactionFactory.reissueAsset(jsv.as[ReissueRequest], wallet, time)
-          case BurnTransaction => TransactionFactory.burnAsset(jsv.as[BurnRequest], wallet, time)
-          case LeaseTransaction => TransactionFactory.lease(jsv.as[LeaseRequest], wallet, time)
-          case LeaseCancelTransaction => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
-          case CreateAliasTransaction => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
-          case DataTransaction => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
-          case SetScriptTransaction => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
-          case SmartIssueTransaction => TransactionFactory.sma
+          case IssueTransaction             => TransactionFactory.issueAsset(jsv.as[IssueRequest], wallet, time)
+          case TransferTransaction          => TransactionFactory.transferAsset(jsv.as[TransferRequest], wallet, time)
+          case MassTransferTransaction      => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
+          case ReissueTransaction           => TransactionFactory.reissueAsset(jsv.as[ReissueRequest], wallet, time)
+          case BurnTransaction              => TransactionFactory.burnAsset(jsv.as[BurnRequest], wallet, time)
+          case LeaseTransaction             => TransactionFactory.lease(jsv.as[LeaseRequest], wallet, time)
+          case LeaseCancelTransaction       => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
+          case CreateAliasTransaction       => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
+          case DataTransaction              => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
+          case SetScriptTransaction         => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
+          case SmartIssueTransaction        => TransactionFactory.smartIssue(jsv.as[SmartIssueRequest], wallet, time)
           case VersionedTransferTransaction => TransactionFactory.versionedTransfer(jsv.as[VersionedTransferRequest], wallet, time)
-          case t => Left(GenericError(s"Bad transaction type: $t"))
+          case t                            => Left(GenericError(s"Bad transaction type: $t"))
         }
         txEi match {
           case Right(tx) => tx.json()
@@ -174,26 +187,32 @@ case class TransactionsApiRoute(
 
   @Path("/broadcast")
   @ApiOperation(value = "Broadcasts a signed transaction", notes = "Broadcasts a signed transaction", httpMethod = "POST")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "json", value = "Transaction data including type and signature", required = true, dataType = "string", paramType = "body")
-  ))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "json",
+                           value = "Transaction data including type and signature",
+                           required = true,
+                           dataType = "string",
+                           paramType = "body")
+    ))
   def broadcast: Route = (pathPrefix("broadcast") & post) {
     handleExceptions(jsonExceptionHandler) {
       json[JsObject] { jsv =>
         import TransactionType._
         val req = TransactionType((jsv \ "type").as[Int]) match {
-          case IssueTransaction => jsv.as[SignedIssueRequest].toTx
-          case TransferTransaction => jsv.as[SignedTransferRequest].toTx
-          case MassTransferTransaction => jsv.as[SignedMassTransferRequest].toTx
-          case ReissueTransaction => jsv.as[SignedReissueRequest].toTx
-          case BurnTransaction => jsv.as[SignedBurnRequest].toTx
-          case LeaseTransaction => jsv.as[SignedLeaseRequest].toTx
-          case LeaseCancelTransaction => jsv.as[SignedLeaseCancelRequest].toTx
-          case CreateAliasTransaction => jsv.as[SignedCreateAliasRequest].toTx
-          case DataTransaction => jsv.as[SignedDataRequest].toTx
-          case SetScriptTransaction=> jsv.as[SignedSetScriptRequest].toTx
+          case IssueTransaction             => jsv.as[SignedIssueRequest].toTx
+          case TransferTransaction          => jsv.as[SignedTransferRequest].toTx
+          case MassTransferTransaction      => jsv.as[SignedMassTransferRequest].toTx
+          case ReissueTransaction           => jsv.as[SignedReissueRequest].toTx
+          case BurnTransaction              => jsv.as[SignedBurnRequest].toTx
+          case LeaseTransaction             => jsv.as[SignedLeaseRequest].toTx
+          case LeaseCancelTransaction       => jsv.as[SignedLeaseCancelRequest].toTx
+          case CreateAliasTransaction       => jsv.as[SignedCreateAliasRequest].toTx
+          case DataTransaction              => jsv.as[SignedDataRequest].toTx
+          case SetScriptTransaction         => jsv.as[SignedSetScriptRequest].toTx
+          case SmartIssueTransaction        => jsv.as[SignedSmartIssueRequest].toTx
           case VersionedTransferTransaction => jsv.as[SignedVersionedTransferRequest].toTx
-          case t => Left(GenericError(s"Bad transaction type: $t"))
+          case t                            => Left(GenericError(s"Bad transaction type: $t"))
         }
         doBroadcast(req)
       }
@@ -220,12 +239,12 @@ case class TransactionsApiRoute(
     import scorex.transaction.assets.MassTransferTransaction
     tx match {
       case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(address)
-      case _ => txToExtendedJson(tx)
+      case _                                                               => txToExtendedJson(tx)
     }
   }
 
   private val jsonExceptionHandler = ExceptionHandler {
-    case JsResultException(err) => complete(WrongJson(errors = err))
+    case JsResultException(err)    => complete(WrongJson(errors = err))
     case e: NoSuchElementException => complete(WrongJson(Some(e)))
   }
 }

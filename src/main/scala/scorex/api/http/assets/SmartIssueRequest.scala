@@ -5,14 +5,12 @@ import play.api.libs.json.{Format, Json}
 
 case class SmartIssueRequest(@ApiModelProperty(required = true)
                              version: Byte,
-                             @ApiModelProperty(required = true)
-                             chainId: Byte,
                              @ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
                              sender: String,
                              @ApiModelProperty(value = "Base58 encoded name of Asset", required = true)
-                             name: Array[Byte],
+                             name: String,
                              @ApiModelProperty(value = "Base58 encoded description of Asset", required = true)
-                             description: Array[Byte],
+                             description: String,
                              @ApiModelProperty(required = true, example = "1000000")
                              quantity: Long,
                              @ApiModelProperty(allowableValues = "range[0,8]", example = "8", dataType = "integer", required = true)
@@ -22,8 +20,7 @@ case class SmartIssueRequest(@ApiModelProperty(required = true)
                              script: Option[String],
                              @ApiModelProperty(required = true)
                              fee: Long,
-                             @ApiModelProperty(required = true)
-                             timestamp: Long)
+                             timestamp: Option[Long])
 
 object SmartIssueRequest {
   implicit val jsonFormat: Format[SmartIssueRequest] = Json.format
