@@ -123,13 +123,15 @@ abstract class WavesContextImpl { this: Crypto with Environment with Base58 =>
 
   val addressFromString: PredefFunction = PredefFunction("addressFromString", optionAddress, List(("string", STRING))) {
     case (addressString: String) :: Nil =>
-      base58Decode(addressString) match {
+      val Prefix: String = "address:"
+      val base58String = if (addressString.startsWith(Prefix)) addressString.drop(Prefix.length) else addressString
+      base58Decode(base58String) match {
         case Success(addressBytes) =>
           val version = addressBytes.head
           val network = addressBytes.tail.head
           lazy val checksumCorrect = {
             val checkSum          = addressBytes.takeRight(ChecksumLength)
-            val checkSumGenerated = secureHash(addressBytes.toArray.dropRight(ChecksumLength)).take(ChecksumLength)
+            val checkSumGenerated = secureHash(addressBytes.dropRight(ChecksumLength)).take(ChecksumLength)
             checkSum sameElements checkSumGenerated
           }
           if (version == AddressVersion && network == networkByte && addressBytes.length == AddressLength && checksumCorrect)
