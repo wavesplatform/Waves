@@ -5,7 +5,12 @@ import com.wavesplatform.generator.utils.GenOrderType
 import scorex.account.PrivateKeyAccount
 import settings.OrdersSettings.Settings
 
-class OrdersSettings(settings: Settings, val accounts: Seq[PrivateKeyAccount], val assets: Int) {}
+
+class OrdersSettings(settings: Settings,
+                     val accounts: Seq[PrivateKeyAccount],
+                     val assets: Int){
+
+}
 
 object OrdersSettings {
 

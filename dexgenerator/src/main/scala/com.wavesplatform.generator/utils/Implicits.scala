@@ -10,7 +10,7 @@ object Implicits {
       private val origSize = orig.size
 
       override val hasNext: Boolean = true
-      override def next(): A        = orig(random.nextInt(origSize))
+      override def next(): A = orig(random.nextInt(origSize))
     }
   }
 }
