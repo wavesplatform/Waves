@@ -29,7 +29,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       dataTransaction <- dataTransactionGenP(oracle, List(long, bool, bin))
       allFieldsRequiredScript        = s"""
                     |
-                    | let oracle = extract(addressFromBytes(base58'${oracle.address}'))
+                    | let oracle = extract(addressFromString("${oracle.address}"))
                     | let long = extract(getLong(oracle,"${long.key}")) == ${long.value}
                     | let bool = extract(getBoolean(oracle,"${bool.key}")) == ${bool.value}
                     | let bin = extract(getByteArray(oracle,"${bin.key}")) == base58'${ByteStr(bin.value).base58}'

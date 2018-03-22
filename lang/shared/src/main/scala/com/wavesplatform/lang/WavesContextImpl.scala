@@ -3,11 +3,13 @@ package com.wavesplatform.lang
 import cats.data.EitherT
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.ctx._
-import com.wavesplatform.lang.traits.{Crypto, DataType, Environment, Transaction}
+import com.wavesplatform.lang.traits._
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 
-abstract class WavesContextImpl { this: Crypto with Environment =>
+import scala.util.{Failure, Success}
+
+abstract class WavesContextImpl { this: Crypto with Environment with Base58 =>
 
   import WavesContextImpl._
 
@@ -24,7 +26,7 @@ abstract class WavesContextImpl { this: Crypto with Environment =>
   private def getdataF(name: String, dataType: DataType) =
     PredefFunction(name, OPTION(dataType.innerType), List(("address", addressType.typeRef), ("key", STRING))) {
       case (addr: Obj) :: (k: String) :: Nil =>
-        val addressBytes = addr.fields("bytes").value.value.apply().right.get.asInstanceOf[ByteVector].toArray
+        val addressBytes  = addr.fields("bytes").value.value.apply().right.get.asInstanceOf[ByteVector].toArray
         val retrievedData = data(addressBytes, k, dataType)
         Right(retrievedData)
       case _ => ???
@@ -94,7 +96,7 @@ abstract class WavesContextImpl { this: Crypto with Environment =>
         sha256F.name     -> sha256F,
         //dsl
         addressFromPublicKeyF.name -> addressFromPublicKeyF,
-        addressFromBytesF.name     -> addressFromBytesF,
+        addressFromString.name     -> addressFromString,
         //state
         txByIdF.name       -> txByIdF,
         getLongF.name      -> getLongF,
@@ -119,18 +121,23 @@ abstract class WavesContextImpl { this: Crypto with Environment =>
     case _ => ???
   }
 
-  val addressFromBytesF: PredefFunction = PredefFunction("addressFromBytes", optionAddress, List(("bytes", BYTEVECTOR))) {
-    case (addressBytes: ByteVector) :: Nil =>
-      val version = addressBytes.head
-      val network = addressBytes.tail.head
-      lazy val checksumCorrect = {
-        val checkSum          = addressBytes.takeRight(ChecksumLength)
-        val checkSumGenerated = secureHash(addressBytes.toArray.dropRight(ChecksumLength)).take(ChecksumLength)
-        checkSum == ByteVector(checkSumGenerated)
+  val addressFromString: PredefFunction = PredefFunction("addressFromString", optionAddress, List(("string", STRING))) {
+    case (addressString: String) :: Nil =>
+      base58Decode(addressString) match {
+        case Success(addressBytes) =>
+          val version = addressBytes.head
+          val network = addressBytes.tail.head
+          lazy val checksumCorrect = {
+            val checkSum          = addressBytes.takeRight(ChecksumLength)
+            val checkSumGenerated = secureHash(addressBytes.toArray.dropRight(ChecksumLength)).take(ChecksumLength)
+            checkSum sameElements checkSumGenerated
+          }
+          if (version == AddressVersion && network == networkByte && addressBytes.length == AddressLength && checksumCorrect)
+            Right(Some(Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(addressBytes)))))))
+          else Right(None)
+        case Failure(_) => Left(s"Can't decode $addressString as Base58")
       }
-      if (version == AddressVersion && network == networkByte && addressBytes.length == AddressLength && checksumCorrect)
-        Right(Some(Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(addressBytes))))))
-      else Right(None)
+
     case _ => ???
   }
 
