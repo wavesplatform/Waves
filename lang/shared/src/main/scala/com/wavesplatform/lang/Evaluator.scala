@@ -1,169 +1,122 @@
 package com.wavesplatform.lang
 
+import cats.data.EitherT
 import com.wavesplatform.lang.Terms._
-import scodec.bits.ByteVector
-import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
+import com.wavesplatform.lang.ctx._
+import monix.eval.Coeval
 
 import scala.util.{Failure, Success, Try}
 
 object Evaluator {
 
-  import scala.util.control.TailCalls.{TailRec, done, tailcall}
-
-  type Defs = Map[String, (TYPE, Any)]
-
-  case class Context(typeDefs: Map[String, CUSTOMTYPE], defs: Defs)
-  object Context {
-    val empty = Context(Map.empty, Map.empty)
-  }
-
-  type TypeResolutionError = String
-  type ExcecutionError = String
-  type ExecResult[T] = Either[ExcecutionError, T]
-
-  private def r[T](ctx: Context, t: Typed.EXPR): TailRec[ExecResult[T]] = {
-    (t match {
-      case Typed.BLOCK(mayBeLet, inner, blockTpe) => tailcall {
-        mayBeLet match {
-          case None =>
-            r[blockTpe.Underlying](ctx, inner)
-
-          case Some(Typed.LET(newVarName, newVarBlock)) =>
-            ctx.defs.get(newVarName) match {
-              case Some(_) => done(Left(s"Value '$newVarName' already defined in the scope"))
-              case None =>
-                val varBlockTpe = newVarBlock.tpe
-                  r[varBlockTpe.Underlying](ctx, newVarBlock).flatMap {
-                    case Left(e) => done(Left(e))
-                    case Right(newVarValue) =>
-                      val updatedCtx = ctx.copy(defs = ctx.defs.updated(newVarName, (varBlockTpe, newVarValue)))
-                      r[blockTpe.Underlying](updatedCtx, inner)
-                  }
-            }
-        }
-      }
-
-      case let: Typed.LET => tailcall(r[let.tpe.Underlying](ctx, let.value))
-
-      case Typed.REF(str, _) => done {
-        ctx.defs.get(str) match {
-          case Some((x, y)) => Right(y.asInstanceOf[x.Underlying])
-          case None => Left(s"A definition of '$str' is not found")
-        }
-      }
-
-      case Typed.CONST_INT(v) => done(Right(v))
-      case Typed.CONST_BYTEVECTOR(v) => done(Right(v))
-      case Typed.TRUE => done(Right(true))
-      case Typed.FALSE => done(Right(false))
-
-      case Typed.BINARY_OP(a, SUM_OP, b, INT) => tailcall {
-        for {
-          evaluatedA <- r[Int](ctx, a)
-          evaluatedB <- r[Int](ctx, b)
-        } yield evaluatedA.flatMap(v1 => evaluatedB.map { v2 => v1 + v2 })
-      }
-
-      case Typed.BINARY_OP(a, op@(GE_OP | GT_OP), b, BOOLEAN) => tailcall {
-        for {
-          evaluatedA <- r[Int](ctx, a)
-          evaluatedB <- r[Int](ctx, b)
-        } yield evaluatedA.flatMap(v1 => evaluatedB.map { v2 =>
-          op match {
-            case GE_OP => v1 >= v2
-            case GT_OP => v1 > v2
-            case x => throw new IllegalStateException(s"$x")
+  private def r[T](ctx: Context, t: TrampolinedExecResult[Typed.EXPR]): TrampolinedExecResult[T] =
+    t flatMap { (typedExpr: Typed.EXPR) =>
+      (typedExpr match {
+        case Typed.BLOCK(mayBeLet, inner, blockTpe) =>
+          mayBeLet match {
+            case None => r[blockTpe.Underlying](ctx, EitherT.pure(inner))
+            case Some(Typed.LET(newVarName, newVarBlock)) =>
+              (ctx.letDefs.get(newVarName), ctx.functions.get(newVarName)) match {
+                case (Some(_), _) => EitherT.leftT[Coeval, T](s"Value '$newVarName' already defined in the scope")
+                case (_, Some(_)) =>
+                  EitherT.leftT[Coeval, Typed.EXPR](s"Value '$newVarName' can't be defined because function with such name is predefined")
+                case (None, None) =>
+                  val varBlockTpe                                                  = newVarBlock.tpe
+                  val eitherTCoeval: TrampolinedExecResult[varBlockTpe.Underlying] = r[varBlockTpe.Underlying](ctx, EitherT.pure(newVarBlock))
+                  val lz: LazyVal                                                  = LazyVal(varBlockTpe)(eitherTCoeval)
+                  val updatedCtx: Context                                          = ctx.copy(letDefs = ctx.letDefs.updated(newVarName, lz))
+                  r[blockTpe.Underlying](updatedCtx, EitherT.pure(inner))
+              }
           }
-        })
-      }
-
-      case Typed.IF(cond, t1, t2, tpe) => tailcall {
-        r[Boolean](ctx, cond).flatMap {
-          case Right(true) => r[tpe.Underlying](ctx, t1)
-          case Right(false) => r[tpe.Underlying](ctx, t2)
-          case Left(err) => done(Left(err))
-        }
-      }
-      case Typed.BINARY_OP(t1, AND_OP, t2, BOOLEAN) => tailcall {
-        r[Boolean](ctx, t1) flatMap {
-          case Left(err) => done(Left(err))
-          case Right(false) => done(Right(false))
-          case Right(true) =>
-            r[Boolean](ctx, t2) map {
-              case Left(err) => Left(err)
-              case Right(v) => Right(v)
-            }
-        }
-      }
-
-      case o@Typed.BINARY_OP(t1, OR_OP, t2, BOOLEAN) => tailcall {
-        r[Boolean](ctx, t1).flatMap {
-          case Left(err) => done(Left(err))
-          case Right(true) => done(Right(true))
-          case Right(false) =>
-            r[Boolean](ctx, t2) map {
-              case Left(err) => Left(err)
-              case Right(v) => Right(v)
-            }
-        }
-      }
-
-      case eq@Typed.BINARY_OP(it1, EQ_OP, it2, tpe) => tailcall {
-        for {
-          i1 <- r[tpe.Underlying](ctx, it1)
-          i2 <- r[tpe.Underlying](ctx, it2)
-        } yield i1.flatMap(v1 => i2.map(v2 => v1 == v2))
-      }
-
-      case isDefined@Typed.IS_DEFINED(opt) =>
-        tailcall {
-          r[isDefined.tpe.Underlying](ctx, opt).map {
-            case Right(x: Option[_]) => Right(x.isDefined)
-            case Right(_) => Left("IS_DEFINED invoked on non-option type")
-            case _ => Left("IS_DEFINED expression error")
+        case Typed.REF(str, _) =>
+          ctx.letDefs.get(str) match {
+            case Some(lzy) => lzy.value
+            case None      => EitherT.leftT[Coeval, T](s"A definition of '$str' is not found")
           }
-        }
 
-      case Typed.GET(opt, tpe) =>
-        r[tpe.Underlying](ctx, opt).map {
-          case Right(Some(x)) => Right(x)
-          case Right(_) => Left("GET(NONE)")
-          case _ => Left("GET expression error")
-        }
+        case Typed.CONST_LONG(v)       => EitherT.rightT[Coeval, String](v)
+        case Typed.CONST_BYTEVECTOR(v) => EitherT.rightT[Coeval, String](v)
+        case Typed.CONST_STRING(v)     => EitherT.rightT[Coeval, String](v)
+        case Typed.TRUE                => EitherT.rightT[Coeval, String](true)
+        case Typed.FALSE               => EitherT.rightT[Coeval, String](false)
 
-      case Typed.NONE => done(Right(None))
+        case Typed.BINARY_OP(a, SUM_OP, b, LONG) =>
+          for {
+            evaluatedA <- r[Long](ctx, EitherT.pure(a))
+            evaluatedB <- r[Long](ctx, EitherT.pure(b))
+          } yield evaluatedA + evaluatedB
 
-      case Typed.SOME(b, tpe) =>
-        tailcall(r[tpe.Underlying](ctx, b).map(_.map(x => Some(x))))
+        case Typed.BINARY_OP(a, op @ (GE_OP | GT_OP), b, BOOLEAN) =>
+          for {
+            evaluatedA <- r[Long](ctx, EitherT.pure(a))
+            evaluatedB <- r[Long](ctx, EitherT.pure(b))
+          } yield
+            op match {
+              case GE_OP => evaluatedA >= evaluatedB
+              case GT_OP => evaluatedA > evaluatedB
+              case x     => throw new IllegalStateException(s"$x") // supress pattern match warning
+            }
 
-      case Typed.SIG_VERIFY(msg, sig, pk) => tailcall {
-        for {
-          s <- r[ByteVector](ctx, sig)
-          m <- r[ByteVector](ctx, msg)
-          p <- r[ByteVector](ctx, pk)
-        } yield s.flatMap(ss => m.flatMap(mm => p.map(pp => Curve25519.verify(Signature(ss.toArray), mm.toArray, PublicKey(pp.toArray)))))
-      }
-
-      case Typed.GETTER(expr, field, _) => tailcall {
-        r[OBJECT](ctx, expr).map {
-          case Right(obj) => obj.fields.find(_._1 == field) match {
-            case Some((_, lzy)) => Right(lzy.value())
-            case None => Left("field not found")
+        case Typed.IF(cond, t1, t2, tpe) =>
+          r[Boolean](ctx, EitherT.pure(cond)) flatMap {
+            case true  => r[tpe.Underlying](ctx, EitherT.pure(t1))
+            case false => r[tpe.Underlying](ctx, EitherT.pure(t2))
           }
-          case Left(err) => Left(err)
-        }
-      }
 
-      case Typed.BINARY_OP(_, SUM_OP, _, tpe) if tpe != INT => throw new IllegalArgumentException(s"Expected INT, but got $tpe: $t")
-      case Typed.BINARY_OP(_, GE_OP | GT_OP, _, tpe) if tpe != BOOLEAN => throw new IllegalArgumentException(s"Expected INT, but got $tpe: $t")
-      case Typed.BINARY_OP(_, AND_OP | OR_OP, _, tpe) if tpe != BOOLEAN => throw new IllegalArgumentException(s"Expected BOOLEAN, but got $tpe: $t")
-    }).map(x => x.map(_.asInstanceOf[T]))
-  }
+        case Typed.BINARY_OP(t1, AND_OP, t2, BOOLEAN) =>
+          r[Boolean](ctx, EitherT.pure(t1)) flatMap {
+            case false => EitherT.rightT[Coeval, String](false)
+            case true  => r[Boolean](ctx, EitherT.pure(t2))
+          }
+        case Typed.BINARY_OP(t1, OR_OP, t2, BOOLEAN) =>
+          r[Boolean](ctx, EitherT.pure(t1)).flatMap {
+            case true  => EitherT.rightT[Coeval, String](true)
+            case false => r[Boolean](ctx, EitherT.pure(t2))
+          }
 
-  def apply[A](c: Context, expr: Typed.EXPR): ExecResult[A] = {
-    def result = r[A](c, expr).result
+        case Typed.BINARY_OP(it1, EQ_OP, it2, tpe) =>
+          for {
+            i1 <- r[tpe.Underlying](ctx, EitherT.pure(it1))
+            i2 <- r[tpe.Underlying](ctx, EitherT.pure(it2))
+          } yield i1 == i2
+
+        case Typed.GETTER(expr, field, _) =>
+          r[Obj](ctx, EitherT.pure(expr)).flatMap { (obj: Obj) =>
+            val value: EitherT[Coeval, ExecutionError, Any] = obj.fields.find(_._1 == field) match {
+              case Some((_, lzy)) => lzy.value.map(_.asInstanceOf[Any])
+              case None           => EitherT.leftT[Coeval, Any](s"field '$field' not found")
+            }
+            value
+          }
+        case Typed.FUNCTION_CALL(name, args, tpe) =>
+          import cats.data._
+          import cats.instances.vector._
+          import cats.syntax.all._
+          ctx.functions.get(name) match {
+            case Some(func) =>
+              val argsVector = args
+                .map(a =>
+                  r[a.tpe.Underlying](ctx, EitherT.pure(a))
+                    .map(_.asInstanceOf[Any]))
+                .toVector
+              val argsSequenced = argsVector.sequence[TrampolinedExecResult, Any]
+              for {
+                actualArgs <- argsSequenced
+                r          <- func.eval(actualArgs.toList)
+              } yield r
+            case None => EitherT.leftT[Coeval, Any](s"function '$name' not found")
+          }
+        case Typed.BINARY_OP(_, SUM_OP, _, tpe) if tpe != LONG            => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
+        case Typed.BINARY_OP(_, GE_OP | GT_OP, _, tpe) if tpe != BOOLEAN  => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
+        case Typed.BINARY_OP(_, AND_OP | OR_OP, _, tpe) if tpe != BOOLEAN => EitherT.leftT[Coeval, Any](s"Expected BOOLEAN, but got $tpe: $t")
+
+      }).map(_.asInstanceOf[T])
+    }
+
+  def apply[A](c: Context, expr: Typed.EXPR): Either[ExecutionError, A] = {
+    def result = r[A](c, EitherT.pure(expr)).value.apply()
     Try(result) match {
-      case Failure(ex) => Left(ex.toString)
+      case Failure(ex)  => Left(ex.toString)
       case Success(res) => res
     }
   }

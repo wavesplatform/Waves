@@ -2,7 +2,7 @@ package scorex.api.http.assets
 
 import cats.implicits._
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
-import play.api.libs.json.{Format, Json}
+import play.api.libs.json._
 import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.assets.MassTransferTransaction.Transfer
@@ -10,11 +10,13 @@ import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 import scorex.transaction.{AssetIdStringLength, Proofs, ValidationError}
 
 object SignedMassTransferRequest {
-  implicit val jsonFormat: Format[SignedMassTransferRequest] = Json.format
+  implicit val reads = Json.reads[SignedMassTransferRequest]
 }
 
 @ApiModel(value = "Signed Asset transfer transaction")
-case class SignedMassTransferRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
+case class SignedMassTransferRequest(@ApiModelProperty(required = true)
+                                     version: Byte,
+                                     @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                                      senderPublicKey: String,
                                      @ApiModelProperty(value = "Base58 encoded Asset ID")
                                      assetId: Option[String],
@@ -31,10 +33,10 @@ case class SignedMassTransferRequest(@ApiModelProperty(value = "Base58 encoded s
   def toTx: Either[ValidationError, MassTransferTransaction] = for {
     _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
     _assetId <- parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
-    _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofSize))
+    _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
     _proofs <- Proofs.create(_proofBytes)
     _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
     _transfers <- MassTransferTransaction.parseTransfersList(transfers)
-    t <- MassTransferTransaction.create(Proofs.Version, _assetId, _sender, _transfers, timestamp, fee, _attachment.arr, _proofs)
+    t <- MassTransferTransaction.create(MassTransferTransaction.Version, _assetId, _sender, _transfers, timestamp, fee, _attachment.arr, _proofs)
   } yield t
 }

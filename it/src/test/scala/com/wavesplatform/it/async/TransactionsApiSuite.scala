@@ -4,6 +4,7 @@ import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry}
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 import scorex.api.http.assets.MassTransferRequest
@@ -138,6 +139,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
   test("/transactions/sign should produce mass transfer transaction that is good for /transactions/broadcast") {
     signAndBroadcast(Json.obj(
       "type" -> 11,
+      "version" -> 1,
       "sender" -> firstAddress,
       "transfers" -> Json.toJson(Seq(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))),
       "fee" -> 200000,
@@ -168,6 +170,19 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       "fee" -> 100000))
   }
 
+  test("/transactions/sign should produce data transaction that is good for /transactions/broadcast") {
+    signAndBroadcast(Json.obj(
+      "type" -> 12,
+      "version" -> 1,
+      "sender" -> firstAddress,
+      "data" -> List(
+        IntegerDataEntry("int", 923275292849183L),
+        BooleanDataEntry("bool", true),
+        BinaryDataEntry("blob", Array.tabulate(445)(_.toByte))),
+      "fee" -> 100000),
+      usesProofs = true)
+  }
+
   private def signAndBroadcast(json: JsObject, usesProofs: Boolean = false): String = {
     val f = for {
       rs <- sender.postJsonWithApiKey("/transactions/sign", json)
@@ -189,6 +204,8 @@ class TransactionsApiSuite extends BaseTransactionSuite {
   }
 
   test("reporting MassTransfer transactions") {
+    implicit val mtFormat = Json.format[MassTransferRequest]
+
     val transfers = List(Transfer(firstAddress, 5.waves), Transfer(secondAddress, 2.waves), Transfer(thirdAddress, 3.waves))
     val f = for {
       txId <- sender.massTransfer(firstAddress, transfers, 250000).map(_.id)

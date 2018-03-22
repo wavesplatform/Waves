@@ -162,8 +162,8 @@ case class Block private(override val timestamp: Long,
   }.toList.map {
     case (maybeAssetId, feeVolume) =>
       maybeAssetId match {
-        case None => Portfolio(feeVolume, LeaseInfo.empty, Map.empty)
-        case Some(assetId) => Portfolio(0L, LeaseInfo.empty, Map(assetId -> feeVolume))
+        case None => Portfolio(feeVolume, LeaseBalance.empty, Map.empty)
+        case Some(assetId) => Portfolio(0L, LeaseBalance.empty, Map(assetId -> feeVolume))
       }
   }))
 
@@ -210,14 +210,16 @@ object Block extends ScorexLogging {
         case _ => ???
       }
 
-      (1 to v._2).foldLeft((0: Int, Seq[Transaction]())) { case ((pos, txs), _) =>
+      val txs = Seq.newBuilder[Transaction]
+      (1 to v._2).foldLeft(0) { case (pos, _) =>
         val transactionLengthBytes = v._1.slice(pos, pos + TransactionSizeLength)
         val transactionLength = Ints.fromByteArray(transactionLengthBytes)
         val transactionBytes = v._1.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
-        val transaction = TransactionParser.parseBytes(transactionBytes).get
+        txs += TransactionParser.parseBytes(transactionBytes).get
+        pos + TransactionSizeLength + transactionLength
+      }
 
-        (pos + TransactionSizeLength + transactionLength, txs :+ transaction)
-      }._2
+      txs.result()
     }
   }
 

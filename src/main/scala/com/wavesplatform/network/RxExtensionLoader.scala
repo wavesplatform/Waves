@@ -3,17 +3,18 @@ package com.wavesplatform.network
 import com.wavesplatform.network.RxExtensionLoader.ApplierState.Buffer
 import com.wavesplatform.network.RxExtensionLoader.LoaderState.WithPeer
 import com.wavesplatform.network.RxScoreObserver.{ChannelClosedAndSyncWith, SyncWith}
+import com.wavesplatform.state2.ByteStr
 import io.netty.channel._
 import monix.eval.{Coeval, Task}
 import monix.execution.CancelableFuture
 import monix.execution.schedulers.SchedulerService
+import monix.reactive.subjects.{ConcurrentSubject, Subject}
 import monix.reactive.{Observable, Observer}
-import monix.reactive.subjects.ConcurrentSubject
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.transaction.History.BlockchainScore
+import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.{NgHistory, ValidationError}
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
@@ -22,17 +23,18 @@ object RxExtensionLoader extends ScorexLogging {
 
   type ApplyExtensionResult = Either[ValidationError, Option[BlockchainScore]]
 
-  def apply(maxRollback: Int, syncTimeOut: FiniteDuration,
-            history: NgHistory,
+  def apply(syncTimeOut: FiniteDuration,
+            lastBlockIds: Coeval[Seq[ByteStr]],
             peerDatabase: PeerDatabase,
             invalidBlocks: InvalidBlockStorage,
             blocks: Observable[(Channel, Block)],
             signatures: Observable[(Channel, Signatures)],
             syncWithChannelClosed: Observable[ChannelClosedAndSyncWith],
-            scheduler: SchedulerService)
+            scheduler: SchedulerService,
+            timeoutSubject: Subject[Channel, Channel])
            (extensionApplier: (Channel, ExtensionBlocks) => Task[ApplyExtensionResult]): (Observable[(Channel, Block)], Coeval[State], RxExtensionLoaderShutdownHook) = {
 
-    implicit val schdlr = scheduler
+    implicit val schdlr: SchedulerService = scheduler
 
     val extensions: ConcurrentSubject[(Channel, ExtensionBlocks), (Channel, ExtensionBlocks)] = ConcurrentSubject.publish[(Channel, ExtensionBlocks)]
     val simpleBlocks: ConcurrentSubject[(Channel, Block), (Channel, Block)] = ConcurrentSubject.publish[(Channel, Block)]
@@ -40,6 +42,7 @@ object RxExtensionLoader extends ScorexLogging {
     val lastSyncWith: Coeval[Option[SyncWith]] = lastObserved(syncWithChannelClosed.map(_.syncWith))
 
     def scheduleBlacklist(ch: Channel, reason: String): Task[Unit] = Task {
+      timeoutSubject.onNext(ch)
       peerDatabase.blacklistAndClose(ch, reason)
     }.delayExecution(syncTimeOut)
 
@@ -55,14 +58,14 @@ object RxExtensionLoader extends ScorexLogging {
               state
             case LoaderState.Idle =>
               val maybeKnownSigs = state.applierState match {
-                case ApplierState.Idle => Some((history.lastBlockIds(maxRollback), false))
-                case ApplierState.Applying(None, ext) => Some((ext.blocks.map(_.uniqueId), true))
+                case ApplierState.Idle => Some((lastBlockIds(), false))
+                case ApplierState.Applying(None, ext) => Some((ext.blocks.map(_.uniqueId).reverse, true))
                 case _ => None
               }
               maybeKnownSigs match {
                 case Some((knownSigs, optimistic)) =>
                   val ch = best.channel
-                  log.debug(s"${id(ch)} Requesting extension signatures ${if (optimistic) "optimistically" else ""}, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
+                  log.debug(s"${id(ch)} Requesting signatures${if (optimistic) " optimistically" else ""}, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
                   val blacklisting = scheduleBlacklist(ch, s"Timeout loading extension").runAsync
                   ch.writeAndFlush(GetSignatures(knownSigs))
                   state.withLoaderState(LoaderState.ExpectingSignatures(ch, knownSigs, blacklisting))

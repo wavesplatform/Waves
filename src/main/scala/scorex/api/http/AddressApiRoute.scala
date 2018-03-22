@@ -7,19 +7,24 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
-import com.wavesplatform.state2.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.utx.UtxPool
+import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import play.api.libs.json._
+import scorex.BroadcastRoute
 import scorex.account.{Address, PublicKeyAccount}
 import scorex.crypto.encode.Base58
-import scorex.transaction.PoSCalc
+import scorex.transaction.{PoSCalc, TransactionFactory}
+import scorex.utils.Time
 import scorex.wallet.Wallet
 
 import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
-@Api(value = "/addresses/", description = "Info about wallet's accounts and other calls about addresses")
-case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader, functionalitySettings: FunctionalitySettings) extends ApiRoute {
+@Api(value = "/addresses/")
+case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: SnapshotStateReader, utx: UtxPool, allChannels: ChannelGroup,
+                           time: Time, functionalitySettings: FunctionalitySettings) extends ApiRoute with BroadcastRoute {
 
   import AddressApiRoute._
 
@@ -28,7 +33,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   override lazy val route =
     pathPrefix("addresses") {
       validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
-        signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations
+        signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ getDataItem ~ postData
     } ~ root ~ create
 
   @Path("/{address}")
@@ -146,7 +151,6 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     }
   }
 
-
   @Path("/effectiveBalance/{address}")
   @ApiOperation(value = "Balance", notes = "Account's balance", httpMethod = "GET")
   @ApiImplicitParams(Array(
@@ -196,6 +200,41 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     complete(Validity(address, Address.fromString(address).isRight))
   }
 
+  @Path("/data")
+  @ApiOperation(value = "Post Data to Blockchain",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.api.http.DataRequest",
+      defaultValue = "{\n\t\"version\": 1,\n\t\"sender\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n\t\"fee\": 100000,\n\t\"data\": {}\n}"
+    )
+  ))
+  @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
+  def postData: Route = processRequest("data", (req: DataRequest) => doBroadcast(TransactionFactory.data(req, wallet, time)))
+
+  @Path("/data/{address}")
+  @ApiOperation(value = "Complete Data", notes = "Read all data posted by an account", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")))
+  def getData: Route = (path("data" / Segment) & get) { address =>
+    complete(accountData(address))
+  }
+
+  @Path("/data/{address}/{key}")
+  @ApiOperation(value = "Data by Key", notes = "Read data associated with an account and a key", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "key", value = "Data key", required = true, dataType = "string", paramType = "path")))
+  def getDataItem: Route = (path("data" / Segment / Segment) & get) { case (address, key) =>
+    complete(accountData(address, key))
+  }
+
   @Path("/")
   @ApiOperation(value = "Addresses", notes = "Get wallet accounts addresses", httpMethod = "GET")
   def root: Route = (path("addresses") & get) {
@@ -235,7 +274,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     Address.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
       confirmations,
-      state().balanceWithConfirmations(acc, confirmations)
+      state.balance(acc, state.height, confirmations)
     ))).getOrElse(InvalidAddress)
   }
 
@@ -243,32 +282,40 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     Address.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
       0,
-      state().balance(acc)
+      state.portfolio(acc).balance
     ))).getOrElse(InvalidAddress)
   }
 
   private def balancesDetailsJson(account: Address): BalanceDetails = {
-    val s = state()
-    s.read { _ =>
-      val portfolio = s.accountPortfolio(account)
+      val portfolio = state.portfolio(account)
       BalanceDetails(
         account.address,
         portfolio.balance,
-        PoSCalc.generatingBalance(s, functionalitySettings, account, s.height).get,
-        portfolio.balance - portfolio.leaseInfo.leaseOut,
-        s.effectiveBalance(account))
-    }
+        PoSCalc.generatingBalance(state, functionalitySettings, account, state.height),
+        portfolio.balance - portfolio.lease.out,
+        portfolio.effectiveBalance)
   }
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    val s = state()
-    s.read { _ =>
       Address.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
         acc.address,
         confirmations,
-        s.effectiveBalanceAtHeightWithConfirmations(acc, s.height, confirmations).get)))
+        state.effectiveBalance(acc, state.height, confirmations))))
         .getOrElse(InvalidAddress)
-    }
+  }
+
+  private def accountData(address: String): ToResponseMarshallable = {
+    Address.fromString(address).map { acc =>
+      ToResponseMarshallable(state.accountData(acc).data.values.toSeq.sortBy(_.key))
+    }.getOrElse(InvalidAddress)
+  }
+
+  private def accountData(address: String, key: String): ToResponseMarshallable = {
+    val result = for {
+      addr <- Address.fromString(address).left.map(_ => InvalidAddress)
+      value <- state.accountData(addr, key).toRight(DataKeyNotExists)
+    } yield value
+    ToResponseMarshallable(result)
   }
 
   private def signPath(address: String, encode: Boolean) = (post & entity(as[String])) { message =>

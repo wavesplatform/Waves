@@ -1,14 +1,17 @@
 package scorex.transaction
 
+import cats.implicits._
 import com.google.common.base.Charsets
 import com.wavesplatform.state2.ByteStr
 import scorex.account._
+import scorex.api.http.DataRequest
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.smart.{Script, SetScriptTransaction}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
@@ -29,12 +32,28 @@ object TransactionFactory {
           request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
     } yield tx
 
+  def versionedTransfer(request: VersionedTransferRequest, wallet: Wallet, time: Time): Either[ValidationError, VersionedTransferTransaction] =
+    for {
+      senderPrivateKey <- wallet.findWallet(request.sender)
+      recipientAcc <- AddressOrAlias.fromString(request.recipient)
+      tx <- VersionedTransferTransaction
+        .selfSigned(2,
+          request.assetId.map(s => ByteStr.decodeBase58(s).get),
+          senderPrivateKey,
+          recipientAcc,
+          request.amount,
+          request.timestamp.getOrElse(time.getTimestamp()),
+          request.fee,
+          request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
+    } yield tx
+
+
   def massTransferAsset(request: MassTransferRequest, wallet: Wallet, time: Time): Either[ValidationError, MassTransferTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       transfers <- MassTransferTransaction.parseTransfersList(request.transfers)
       tx <- MassTransferTransaction.selfSigned(
-        Proofs.Version,
+        request.version,
         request.assetId.map(s => ByteStr.decodeBase58(s).get),
         senderPrivateKey,
         transfers,
@@ -42,6 +61,23 @@ object TransactionFactory {
         request.fee,
         request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
     } yield tx
+
+
+  def setScript(request: SetScriptRequest, wallet: Wallet, time: Time): Either[ValidationError, SetScriptTransaction] =
+    for {
+      senderPrivateKey <- wallet.findWallet(request.sender)
+      script <- request.script match {
+        case None => Right(None)
+        case Some(s) => Script.fromBase58String(s).map(Some(_))
+      }
+      tx <- SetScriptTransaction.selfSigned(
+        sender = senderPrivateKey,
+        script = script,
+        fee = request.fee,
+        timestamp = request.timestamp.getOrElse(time.getTimestamp()),
+        )
+    } yield tx
+
 
   def issueAsset(request: IssueRequest, wallet: Wallet, time: Time): Either[ValidationError, IssueTransaction] =
     for {
@@ -86,5 +122,11 @@ object TransactionFactory {
     pk <- wallet.findWallet(request.sender)
     timestamp = request.timestamp.getOrElse(time.getTimestamp())
     tx <- BurnTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.fee, timestamp)
+  } yield tx
+
+  def data(request: DataRequest, wallet: Wallet, time: Time): Either[ValidationError, DataTransaction] = for {
+    pk <- wallet.findWallet(request.sender)
+    timestamp = request.timestamp.getOrElse(time.getTimestamp())
+    tx <- DataTransaction.selfSigned(request.version, pk, request.data, request.fee, timestamp)
   } yield tx
 }

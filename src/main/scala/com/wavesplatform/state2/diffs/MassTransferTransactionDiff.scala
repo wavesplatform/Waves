@@ -16,8 +16,8 @@ object MassTransferTransactionDiff {
       for {
         recipientAddr <- state.resolveAliasEi(xfer.address)
         portfolio = tx.assetId match {
-          case None => Map(recipientAddr -> Portfolio(xfer.amount, LeaseInfo.empty, Map.empty))
-          case Some(aid) => Map(recipientAddr -> Portfolio(0, LeaseInfo.empty, Map(aid -> xfer.amount)))
+          case None => Map(recipientAddr -> Portfolio(xfer.amount, LeaseBalance.empty, Map.empty))
+          case Some(aid) => Map(recipientAddr -> Portfolio(0, LeaseBalance.empty, Map(aid -> xfer.amount)))
         }
       } yield (portfolio, xfer.amount)
     }
@@ -25,18 +25,16 @@ object MassTransferTransactionDiff {
 
     portfoliosEi.flatMap { list: List[(Map[Address, Portfolio], Long)] =>
       val sender = Address.fromPublicKey(tx.sender.publicKey)
-      val foldInit = (Map(sender -> Portfolio(-tx.fee, LeaseInfo.empty, Map.empty)), 0L)
+      val foldInit = (Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)), 0L)
       val (recipientPortfolios, totalAmount) = list.fold(foldInit) { (u, v) => (u._1 combine v._1, u._2 + v._2) }
       val completePortfolio = recipientPortfolios.combine(
         tx.assetId match {
-          case None => Map(sender -> Portfolio(-totalAmount, LeaseInfo.empty, Map.empty))
-          case Some(aid) => Map(sender -> Portfolio(0, LeaseInfo.empty, Map(aid -> -totalAmount)))
+          case None => Map(sender -> Portfolio(-totalAmount, LeaseBalance.empty, Map.empty))
+          case Some(aid) => Map(sender -> Portfolio(0, LeaseBalance.empty, Map(aid -> -totalAmount)))
         })
 
-      val assetIssued = tx.assetId match {
-        case None => true
-        case Some(aid) => state.assetInfo(aid).isDefined
-      }
+      val assetIssued = tx.assetId.forall(state.assetDescription(_).isDefined)
+
       Either.cond(assetIssued,
         Diff(height, tx, completePortfolio),
         GenericError(s"Attempt to transfer a nonexistent asset"))

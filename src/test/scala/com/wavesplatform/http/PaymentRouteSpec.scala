@@ -1,7 +1,9 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.{NoShrink, TestWallet, TransactionGen, UtxPool}
+import com.wavesplatform.state2.Diff
+import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.{NoShrink, TestWallet, TransactionGen}
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
@@ -21,7 +23,7 @@ class PaymentRouteSpec
     with NoShrink {
 
   private val utx = stub[UtxPool]
-  (utx.putIfNew _).when(*).onCall((t: Transaction) => Right(true)).anyNumberOfTimes()
+  (utx.putIfNew _).when(*).onCall((t: Transaction) => Right((true, Diff.empty))).anyNumberOfTimes()
   private val allChannels = stub[ChannelGroup]
 
   "accepts payments" in {

@@ -16,6 +16,7 @@ import scorex.block.BlockHeader
 import scorex.transaction._
 
 import scala.concurrent._
+import scala.util.Try
 
 @Path("/blocks")
 @Api(value = "/blocks")
@@ -64,8 +65,12 @@ case class BlocksApiRoute(settings: RestAPISettings,
   ))
   def child: Route = (path("child" / Segment) & get) { encodedSignature =>
     withBlock(history, encodedSignature) { block =>
-      complete(history.child(block).map(_.json()).getOrElse[JsObject](
-        Json.obj("status" -> "error", "details" -> "No child blocks")))
+      val childJson = for {
+        h <- history.heightOf(block.uniqueId)
+        b <- history.blockAt(h + 1)
+      } yield b.json()
+
+      complete(childJson.getOrElse[JsObject](Json.obj("status" -> "error", "details" -> "No child blocks")))
     }
   }
 
@@ -78,7 +83,11 @@ case class BlocksApiRoute(settings: RestAPISettings,
   ))
   def delay: Route = (path("delay" / Segment / IntNumber) & get) { (encodedSignature, count) =>
     withBlock(history, encodedSignature) { block =>
-      complete(history.averageDelay(block, count).map(d => Json.obj("delay" -> d))
+      val averageDelay = Try {
+        (block.timestamp - history.parent(block, count).get.timestamp) / count
+      }
+
+      complete(averageDelay.map(d => Json.obj("delay" -> d))
         .getOrElse[JsObject](Json.obj("status" -> "error", "details" -> "Internal error")))
     }
   }
@@ -93,7 +102,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
       complete(InvalidSignature)
     else {
       ByteStr.decodeBase58(encodedSignature).toOption.toRight(InvalidSignature)
-        .flatMap(s => history.heightOf(s).toRight(BlockNotExists)) match {
+        .flatMap(s => history.heightOf(s).toRight(BlockDoesNotExist)) match {
         case Right(h) => complete(Json.obj("height" -> h))
         case Left(e) => complete(e)
       }
@@ -126,7 +135,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
       history.blockAt(height).map(_.json())
     }
     else {
-      history.blockHeaderAndSizeAt(height).map { case ((bh, s)) => BlockHeader.json(bh, s) }
+      history.blockHeaderAndSize(height).map { case ((bh, s)) => BlockHeader.json(bh, s) }
     }) match {
       case Some(json) => complete(json + ("height" -> JsNumber(height)))
       case None => complete(Json.obj("status" -> "error", "details" -> "No block for this height"))
@@ -156,7 +165,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
           (if (includeTransactions) {
             history.blockAt(height).map(_.json())
           } else {
-            history.blockHeaderAndSizeAt(height).map { case ((bh, s)) => BlockHeader.json(bh, s) }
+            history.blockHeaderAndSize(height).map { case ((bh, s)) => BlockHeader.json(bh, s) }
           }).map(_ + ("height" -> Json.toJson(height)))
         })
       complete(blocks)
@@ -173,13 +182,13 @@ case class BlocksApiRoute(settings: RestAPISettings,
 
   def last(includeTransactions: Boolean): StandardRoute = {
     complete(Future {
-      history.read { _ =>
-        val height = history.height()
+      {
+        val height = history.height
 
         (if (includeTransactions) {
           history.blockAt(height).get.json()
         } else {
-          val bhs = history.blockHeaderAndSizeAt(height).get
+          val bhs = history.blockHeaderAndSize(height).get
           BlockHeader.json(bhs._1, bhs._2)
         }) + ("height" -> Json.toJson(height))
       }
@@ -200,7 +209,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
   def signature: Route = (path("signature" / Segment) & get) { encodedSignature =>
     if (encodedSignature.length > TransactionParser.SignatureStringLength) complete(InvalidSignature) else {
       ByteStr.decodeBase58(encodedSignature).toOption.toRight(InvalidSignature)
-        .flatMap(s => history.blockById(s).toRight(BlockNotExists)) match {
+        .flatMap(s => history.blockById(s).toRight(BlockDoesNotExist)) match {
         case Right(block) => complete(block.json() + ("height" -> history.heightOf(block.uniqueId).map(Json.toJson(_)).getOrElse(JsNull)))
         case Left(e) => complete(e)
       }
@@ -219,7 +228,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
   def checkpoint: Route = (path("checkpoint") & post) {
     json[Checkpoint] { checkpoint =>
       checkpointProc(checkpoint).runAsync(rollbackExecutor).map {
-        _.map(score => allChannels.broadcast(LocalScoreChanged(score.getOrElse(history.score()))))
+        _.map(score => allChannels.broadcast(LocalScoreChanged(score.getOrElse(history.score))))
       }.map(_.fold(ApiError.fromValidationError,
         _ => Json.obj("" -> "")): ToResponseMarshallable)
     }

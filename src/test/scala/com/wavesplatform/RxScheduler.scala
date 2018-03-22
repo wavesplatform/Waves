@@ -3,7 +3,7 @@ package com.wavesplatform
 import com.wavesplatform.state2._
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{Ack, Scheduler}
-import monix.reactive.subjects.PublishSubject
+import monix.reactive.Observer
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock, SignerData}
@@ -23,7 +23,7 @@ trait RxScheduler extends BeforeAndAfterAll { _: Suite =>
 
   def test[A](f: => Future[A]): A = Await.result(f, 10.seconds)
 
-  def send[A](p: PublishSubject[A])(a: A): Future[Ack] = p.onNext(a).map(ack => {
+  def send[A](p: Observer[A])(a: A): Future[Ack] = p.onNext(a).map(ack => {
     Thread.sleep(500)
     ack
   })

@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.TransactionGen
+import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.TransactionParser.TransactionType
@@ -38,8 +39,13 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
 
   property("property validation") {
     import MassTransferTransaction.create
-    forAll(massTransferGen) {
-      case MassTransferTransaction(version, assetId, sender, transfers, timestamp, fee, attachment, proofs) =>
+
+    val badVersionGen = Gen.choose(MassTransferTransaction.Version + 1, Byte.MaxValue).map(_.toByte)
+    forAll(massTransferGen, badVersionGen) {
+      case (MassTransferTransaction(version, assetId, sender, transfers, timestamp, fee, attachment, proofs), badVersion) =>
+        val badVersionEi = create(badVersion, assetId, sender, transfers, timestamp, fee, attachment, proofs)
+        badVersionEi shouldBe Left(ValidationError.UnsupportedVersion(badVersion))
+
         val tooManyTransfers = List.fill(MaxTransferCount + 1)(ParsedTransfer(sender.toAddress, 1L))
         val tooManyTransfersEi = create(version, assetId, sender, tooManyTransfers, timestamp, fee, attachment, proofs)
         tooManyTransfersEi shouldBe Left(GenericError(s"Number of transfers is greater than $MaxTransferCount"))

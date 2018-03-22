@@ -1,5 +1,7 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.BitVector
@@ -18,7 +20,7 @@ class SerdeTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
 
   property("Script roundtrip") {
     forAll(BOOLgen(500)) { expr =>
-      val typed = TypeChecker(TypeChecker.Context.empty, expr)
+      val typed = TypeChecker(TypeChecker.TypeCheckerContext.empty, expr)
       typed shouldBe 'right
       roundtrip(Serde.codec, typed.right.get)
     }

@@ -9,7 +9,7 @@ object Dependencies {
 
   def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.0.9"
 
-  def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.13.Final"
+  def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.22.Final"
 
   def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "0.6.7"
 

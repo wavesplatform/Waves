@@ -2,6 +2,7 @@ package com.wavesplatform
 
 import org.scalacheck.Gen.{alphaNumChar, choose, listOfN, oneOf}
 import org.scalacheck.{Arbitrary, Gen => G}
+import org.scalatest.Suite
 import scorex.account.Alias
 import scorex.api.http.alias.SignedCreateAliasRequest
 import scorex.api.http.assets._
@@ -10,7 +11,7 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 
-trait RequestGen extends TransactionGen {
+trait RequestGen extends TransactionGen { _: Suite =>
   val nonPositiveLong: G[Long] = choose(Long.MinValue, 0).label("non-positive value")
   val invalidDecimals: G[Byte] = oneOf(
     choose[Byte](Byte.MinValue, -1),

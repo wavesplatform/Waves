@@ -1,10 +1,11 @@
 package com.wavesplatform.http
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.{RequestGen, UtxPool}
+import com.wavesplatform.RequestGen
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks

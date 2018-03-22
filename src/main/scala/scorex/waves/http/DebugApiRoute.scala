@@ -8,11 +8,13 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
+import com.wavesplatform.crypto
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio, StateReader}
-import com.wavesplatform.{UtxPool, crypto}
+import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state2.{ByteStr, LeaseBalance, Portfolio}
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
@@ -37,14 +39,13 @@ import scala.util.{Failure, Success}
 @Api(value = "/debug")
 case class DebugApiRoute(settings: RestAPISettings,
                          wallet: Wallet,
-                         stateReader: StateReader,
+                         stateReader: SnapshotStateReader,
                          history: History with DebugNgHistory,
                          peerDatabase: PeerDatabase,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo],
                          blockchainUpdater: BlockchainUpdater,
                          allChannels: ChannelGroup,
                          utxStorage: UtxPool,
-                         blockchainDebugInfo: BlockchainDebugInfo,
                          miner: Miner with MinerDebugInfo,
                          historyReplier: HistoryReplier,
                          extLoaderStateReporter: Coeval[RxExtensionLoader.State],
@@ -105,16 +106,6 @@ case class DebugApiRoute(settings: RestAPISettings,
   }
 
 
-  @Path("/state")
-  @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET")
-  @ApiResponses(Array(new ApiResponse(code = 200, message = "Json state")))
-  def state: Route = (path("state") & get & withAuth) {
-    complete(stateReader().accountPortfolios
-      .map { case (k, v) =>
-        k.address -> v.balance
-      }
-    )
-  }
 
   @Path("/portfolios/{address}")
   @ApiOperation(
@@ -145,10 +136,17 @@ case class DebugApiRoute(settings: RestAPISettings,
       Address.fromString(rawAddress) match {
         case Left(_) => complete(InvalidAddress)
         case Right(address) =>
-          val portfolio = if (considerUnspent) utxStorage.portfolio(address) else stateReader().accountPortfolio(address)
+          val portfolio = if (considerUnspent) utxStorage.portfolio(address) else stateReader.portfolio(address)
           complete(Json.toJson(portfolio))
       }
     }
+  }
+
+  @Path("/state")
+  @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET")
+  @ApiResponses(Array(new ApiResponse(code = 200, message = "Json state")))
+  def state: Route = (path("state") & get & withAuth) {
+    complete(stateReader.wavesDistribution(stateReader.height).map { case (a, b) => a.stringRepr -> b })
   }
 
   @Path("/stateWaves/{height}")
@@ -157,20 +155,17 @@ case class DebugApiRoute(settings: RestAPISettings,
     new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
   ))
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get & withAuth) { height =>
-    val s = stateReader()
-    val result = s.accountPortfolios.keys
-      .map(acc => acc.stringRepr -> s.balanceAtHeight(acc, height))
-      .filter(_._2 != 0)
-      .toMap
-    complete(result)
+    complete(stateReader.wavesDistribution(height).map { case (a, b) => a.stringRepr -> b })
   }
 
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] = Future {
     blockchainUpdater.removeAfter(blockId) match {
       case Right(blocks) =>
-        allChannels.broadcast(LocalScoreChanged(history.score()))
+        allChannels.broadcast(LocalScoreChanged(history.score))
         if (returnTransactionsToUtx) {
-          blocks.flatMap(_.transactionData).foreach(tx => utxStorage.putIfNew(tx))
+          utxStorage.batched { ops =>
+            blocks.flatMap(_.transactionData).foreach(ops.putIfNew)
+          }
         }
         miner.scheduleMining()
         Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
@@ -211,7 +206,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   ))
   def info: Route = (path("info") & get & withAuth) {
     complete(Json.obj(
-      "stateHeight" -> stateReader().height,
+      "stateHeight" -> stateReader.height,
       "extensionLoaderState" -> extLoaderStateReporter().toString,
       "historyReplierCacheSizes" -> Json.toJson(historyReplier.cacheSizes),
       "microBlockSynchronizerCacheSizes" -> Json.toJson(mbsCacheSizesReporter()),
@@ -227,13 +222,9 @@ case class DebugApiRoute(settings: RestAPISettings,
   ))
   def minerInfo: Route = (path("minerInfo") & get & withAuth) {
     complete(miner.collectNextBlockGenerationTimes.map { case (a, t) =>
-      val s = stateReader()
-      AccountMiningInfo(a.stringRepr,
-        s.effectiveBalanceAtHeightWithConfirmations(a, s.height, 1000).get,
-        t)
+      AccountMiningInfo(a.stringRepr, stateReader.effectiveBalance(a, stateReader.height, 1000), t)
     })
   }
-
 
   @Path("/historyInfo")
   @ApiOperation(value = "State", notes = "All history info you need to debug", httpMethod = "GET")
@@ -246,7 +237,6 @@ case class DebugApiRoute(settings: RestAPISettings,
     complete(HistoryInfo(a, b))
 
   }
-
 
   @Path("/configInfo")
   @ApiOperation(value = "Config", notes = "Currently running node config", httpMethod = "GET")
@@ -308,7 +298,6 @@ case class DebugApiRoute(settings: RestAPISettings,
       }
     } ~ complete(StatusCodes.BadRequest)
   }
-
 }
 
 object DebugApiRoute {
@@ -329,7 +318,7 @@ object DebugApiRoute {
     },
     m => Json.toJson(m.map { case (assetId, count) => assetId.base58 -> count })
   )
-  implicit val leaseInfoFormat: Format[LeaseInfo] = Json.format
+  implicit val leaseInfoFormat: Format[LeaseBalance] = Json.format
   implicit val portfolioFormat: Format[Portfolio] = Json.format
 
   case class AccountMiningInfo(address: String, miningBalance: Long, timestamp: Long)
@@ -351,18 +340,11 @@ object DebugApiRoute {
   implicit val BigIntWrite: Writes[BigInt] = (bigInt: BigInt) => JsNumber(BigDecimal(bigInt))
   implicit val scoreReporterStatsWrite: Writes[RxScoreObserver.Stats] = Json.writes[RxScoreObserver.Stats]
 
-  implicit object MinerStateWrites extends Writes[MinerDebugInfo.State] {
-
-    import MinerDebugInfo._
-
-    def writes(state: MinerDebugInfo.State) = Json.toJson(
-      state match {
-        case MiningBlocks => "mining blocks"
-        case MiningMicroblocks => "mining microblocks"
-        case Disabled => "disabled"
-        case Error(err) => s"error: $err"
-      }
-    )
-  }
-
+  import MinerDebugInfo._
+  implicit val minerStateWrites: Writes[MinerDebugInfo.State] = (s: MinerDebugInfo.State) => JsString(s match {
+    case MiningBlocks => "mining blocks"
+    case MiningMicroblocks => "mining microblocks"
+    case Disabled => "disabled"
+    case Error(err) => s"error: $err"
+  })
 }

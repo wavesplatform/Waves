@@ -11,6 +11,8 @@ import scorex.transaction.assets.MassTransferTransaction
   */
 class FeeCalculator(settings: FeesSettings) {
 
+  private val Kb = 1024
+
   private val map: Map[String, Long] = {
     settings.fees.flatMap { fs =>
       val transactionType = fs._1
@@ -26,6 +28,9 @@ class FeeCalculator(settings: FeesSettings) {
   def enoughFee[T <: Transaction](tx: T): Either[ValidationError, T] = {
     val feeSpec = map.get(TransactionAssetFee(tx.transactionType.id, tx.assetFee._1).key)
     val feeValue = tx match {
+      case dt: DataTransaction =>
+        val sizeInKb = 1 + (dt.bytes().length - 1) / Kb
+        feeSpec.map(_ * sizeInKb)
       case mtt: MassTransferTransaction =>
         val transferFeeSpec = map.get(TransactionAssetFee(TransactionType.TransferTransaction.id, tx.assetFee._1).key)
         feeSpec.flatMap(mfee => transferFeeSpec.map(tfee => tfee + mfee * mtt.transfers.size))

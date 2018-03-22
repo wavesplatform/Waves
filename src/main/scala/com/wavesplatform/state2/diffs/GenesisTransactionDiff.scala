@@ -1,6 +1,6 @@
 package com.wavesplatform.state2.diffs
 
-import com.wavesplatform.state2.{Diff, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{Diff, LeaseBalance, Portfolio}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{GenesisTransaction, ValidationError}
 
@@ -13,7 +13,7 @@ object GenesisTransactionDiff {
       Right(Diff(height = height, tx = tx,
         portfolios = Map(tx.recipient -> Portfolio(
           balance = tx.amount,
-          LeaseInfo.empty,
+          LeaseBalance.empty,
           assets = Map.empty))))
   }
 }

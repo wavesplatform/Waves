@@ -2,8 +2,8 @@ package com.wavesplatform.state2.diffs
 
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.{SnapshotStateReader}
-import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state2.{Diff, LeaseBalance, Portfolio}
 import scorex.account.Address
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{PaymentTransaction, ValidationError}
@@ -17,21 +17,19 @@ object PaymentTransactionDiff {
 
     if (height > settings.blockVersion3AfterHeight) {
       Left(GenericError(s"Payment transaction is deprecated after h=${settings.blockVersion3AfterHeight}"))
-    } else stateReader.paymentTransactionIdByHash(ByteStr(tx.hash())) match {
-      case Some(existing) if blockTime >= settings.requirePaymentUniqueIdAfter => Left(GenericError(s"PaymentTx is already registered: $existing"))
-      case _ => Right(Diff(height = height,
+    } else {
+      Right(Diff(height = height,
         tx = tx,
         portfolios = Map(
           tx.recipient -> Portfolio(
             balance = tx.amount,
-            LeaseInfo.empty,
+            LeaseBalance.empty,
             assets = Map.empty)) combine Map(
           Address.fromPublicKey(tx.sender.publicKey) -> Portfolio(
             balance = -tx.amount - tx.fee,
-            LeaseInfo.empty,
+            LeaseBalance.empty,
             assets = Map.empty
           )),
-        paymentTransactionIdsByHashes = Map(ByteStr(tx.hash()) -> tx.id())
       ))
     }
   }

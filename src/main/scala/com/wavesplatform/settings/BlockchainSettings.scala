@@ -11,24 +11,33 @@ import scala.concurrent.duration._
 case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
                                  blocksForFeatureActivation: Int,
                                  allowTemporaryNegativeUntil: Long,
-                                 allowInvalidPaymentTransactionsByTimestamp: Long,
                                  requireSortedTransactionsAfter: Long,
                                  generationBalanceDepthFrom50To1000AfterHeight: Int,
                                  minimalGeneratingBalanceAfter: Long,
                                  allowTransactionsFromFutureUntil: Long,
                                  allowUnissuedAssetsUntil: Long,
-                                 requirePaymentUniqueIdAfter: Long,
                                  allowInvalidReissueInSameBlockUntilTimestamp: Long,
                                  allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
                                  resetEffectiveBalancesAtHeight: Int,
                                  blockVersion3AfterHeight: Int,
                                  preActivatedFeatures: Map[Short, Int],
                                  doubleFeaturesPeriodsAfterHeight: Int) {
-  val dontRequireSortedTransactionsAfter = blockVersion3AfterHeight
-  val allowLeasedBalanceTransferUntilHeight = blockVersion3AfterHeight
+  val dontRequireSortedTransactionsAfter: Int = blockVersion3AfterHeight
+  val allowLeasedBalanceTransferUntilHeight: Int = blockVersion3AfterHeight
 
   require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
   require((blocksForFeatureActivation > 0) && (blocksForFeatureActivation <= featureCheckBlocksPeriod), s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod")
+
+  def activationWindowSize(height: Int): Int =
+    featureCheckBlocksPeriod * (if (height <= doubleFeaturesPeriodsAfterHeight) 1 else 2)
+
+  def activationWindow(height: Int): Range = if (height < 1) Range(0, 0) else {
+    val ws = activationWindowSize(height)
+    Range.inclusive((height - 1) / ws * ws + 1, ((height - 1) / ws + 1) * ws)
+  }
+
+  def blocksForFeatureActivation(height: Int): Int =
+    blocksForFeatureActivation * (if (height <= doubleFeaturesPeriodsAfterHeight) 1 else 2)
 }
 
 object FunctionalitySettings {
@@ -36,13 +45,11 @@ object FunctionalitySettings {
     featureCheckBlocksPeriod = 5000,
     blocksForFeatureActivation = 4000,
     allowTemporaryNegativeUntil = 1479168000000L,
-    allowInvalidPaymentTransactionsByTimestamp = 1479168000000L,
     requireSortedTransactionsAfter = 1479168000000L,
     generationBalanceDepthFrom50To1000AfterHeight = 232000,
     minimalGeneratingBalanceAfter = 1479168000000L,
     allowTransactionsFromFutureUntil = 1479168000000L,
     allowUnissuedAssetsUntil = 1479416400000L,
-    requirePaymentUniqueIdAfter = 1491192000000L,
     allowInvalidReissueInSameBlockUntilTimestamp = 1492768800000L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000,
@@ -54,13 +61,11 @@ object FunctionalitySettings {
     featureCheckBlocksPeriod = 3000,
     blocksForFeatureActivation = 2700,
     allowTemporaryNegativeUntil = 1477958400000L,
-    allowInvalidPaymentTransactionsByTimestamp = 1477958400000L,
     requireSortedTransactionsAfter = 1477958400000L,
     generationBalanceDepthFrom50To1000AfterHeight = 0,
     minimalGeneratingBalanceAfter = 0,
     allowTransactionsFromFutureUntil = 1478100000000L,
     allowUnissuedAssetsUntil = 1479416400000L,
-    requirePaymentUniqueIdAfter = 1485942685000L,
     allowInvalidReissueInSameBlockUntilTimestamp = 1492560000000L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
     resetEffectiveBalancesAtHeight = 51500,

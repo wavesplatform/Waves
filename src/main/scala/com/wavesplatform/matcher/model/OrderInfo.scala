@@ -9,7 +9,7 @@ import scala.util.Try
 
 
 case class OrderInfo(amount: Long, filled: Long, canceled: Boolean) {
-  def remaining: Long = if (!canceled) amount - filled else 0L
+  def remaining: Long = if (canceled) 0L else amount - filled
 
   def status: LimitOrder.OrderStatus = {
     if (amount == 0) LimitOrder.NotFound
