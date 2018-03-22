@@ -39,3 +39,8 @@ Dockerfile
 package
 !src/package
 native
+/dexgenerator/dexgenerator.iml
+out/
+project/project/
+waves.directory_IS_UNDEFINED/
+/dexgenerator/target/
