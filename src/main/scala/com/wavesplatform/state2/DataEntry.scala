@@ -44,7 +44,7 @@ object DataEntry {
 
   def parseValue(key: String, bytes: Array[Byte], p: Int): (DataEntry[_], Int) = {
     bytes(p) match {
-      case t if t == Type.Integer.id => (IntegerDataEntry(key, Longs.fromByteArray(bytes.drop(p + 1))), p + 9)
+      case t if t == Type.Integer.id => (LongDataEntry(key, Longs.fromByteArray(bytes.drop(p + 1))), p + 9)
       case t if t == Type.Boolean.id => (BooleanDataEntry(key, bytes(p + 1) != 0), p + 2)
       case t if t == Type.Binary.id =>
         val (blob, p1) = Deser.parseArraySize(bytes, p + 1)
@@ -59,7 +59,7 @@ object DataEntry {
         case JsDefined(JsString(key)) =>
           jsv \ "type" match {
             case JsDefined(JsString("integer")) => jsv \ "value" match {
-              case JsDefined(JsNumber(n)) => JsSuccess(IntegerDataEntry(key, n.toLong))
+              case JsDefined(JsNumber(n)) => JsSuccess(LongDataEntry(key, n.toLong))
               case _ => JsError("value is missing or not an integer")
             }
             case JsDefined(JsString("boolean")) => jsv \ "value" match {
@@ -85,7 +85,7 @@ object DataEntry {
   }
 }
 
-case class IntegerDataEntry(override val key: String, override val value: Long) extends DataEntry[Long](key, value) {
+case class LongDataEntry(override val key: String, override val value: Long) extends DataEntry[Long](key, value) {
   override def valueBytes: Array[Byte] = Type.Integer.id.toByte +: Longs.toByteArray(value)
 
   override def toJson: JsObject = super.toJson + ("type" -> JsString("integer")) + ("value" -> JsNumber(value))

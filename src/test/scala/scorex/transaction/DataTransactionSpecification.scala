@@ -3,7 +3,7 @@ package scorex.transaction
 import com.google.common.primitives.Shorts
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.DataEntry._
-import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry}
+import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, DataEntry, LongDataEntry}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -92,10 +92,10 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         }
 
         check(List.empty)  // no data
-        check(List.tabulate(MaxEntryCount)(n => IntegerDataEntry(n.toString, n)))  // maximal data
+        check(List.tabulate(MaxEntryCount)(n => LongDataEntry(n.toString, n)))  // maximal data
         check(List.fill[DataEntry[_]](keyRepeatCount)(data.head))  // repeating keys
         check(List(BooleanDataEntry("", false)))  // empty key
-        check(List(IntegerDataEntry("a" * Byte.MaxValue, 0xa)))  // max key size
+        check(List(LongDataEntry("a" * Byte.MaxValue, 0xa)))  // max key size
         check(List(BinaryDataEntry("bin", Array.empty)))  // empty binary
         check(List(BinaryDataEntry("bin", Array.fill(MaxValueSize)(1: Byte))))  // max binary value size
     }
@@ -108,7 +108,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         val badVersionEi = create(badVersion, sender, data, fee, timestamp, proofs)
         badVersionEi shouldBe Left(ValidationError.UnsupportedVersion(badVersion))
 
-        val dataTooBig = List.fill(MaxEntryCount + 1)(IntegerDataEntry("key", 4))
+        val dataTooBig = List.fill(MaxEntryCount + 1)(LongDataEntry("key", 4))
         val dataTooBigEi = create(version, sender, dataTooBig, fee, timestamp, proofs)
         dataTooBigEi shouldBe Left(ValidationError.TooBigArray)
 

@@ -3,7 +3,7 @@ package com.wavesplatform.it.transactions
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import com.wavesplatform.it.util._
-import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry}
+import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, DataEntry, LongDataEntry}
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
 import scorex.api.http.SignedDataRequest
@@ -19,7 +19,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
   test("sender's waves balance is decreased by fee.") {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
-    val entry = IntegerDataEntry("int", 0xcafebabe)
+    val entry = LongDataEntry("int", 0xcafebabe)
     val size = entry.valueBytes.size
     val data = List(entry)
     val transferFee = calcDataFee(size)
@@ -48,7 +48,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("invalid transaction should not be in UTX or blockchain") {
-    def data(entries: List[DataEntry[_]] = List(IntegerDataEntry("int", 177)),
+    def data(entries: List[DataEntry[_]] = List(LongDataEntry("int", 177)),
              fee: Long = 100000,
              timestamp: Long = System.currentTimeMillis,
              version: Byte = DataTransaction.Version): DataTransaction =
@@ -89,7 +89,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
   test("data definition and retrieval") {
     // define first data item
-    val item1 = IntegerDataEntry("int", 8)
+    val item1 = LongDataEntry("int", 8)
     val tx1 = sender.putData(secondAddress, List(item1), fee).id
     nodes.waitForHeightAraiseAndTxPresent(tx1)
 
@@ -106,7 +106,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     sender.getData(secondAddress) shouldBe List(item2, item1)
 
     // redefine item 1
-    val item11 = IntegerDataEntry("int", 10)
+    val item11 = LongDataEntry("int", 10)
     val tx3 = sender.putData(secondAddress, List(item11), fee).id
     nodes.waitForHeightAraiseAndTxPresent(tx3)
 
@@ -116,7 +116,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     
     // define tx with all types
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
-    val item41 = IntegerDataEntry("int", -127)
+    val item41 = LongDataEntry("int", -127)
     val item42 = BooleanDataEntry("bool", false)
     val item43 = BinaryDataEntry("blob", Array[Byte](127.toByte, 0, 1, 1))
     val data = List(item41, item42, item43)
@@ -151,7 +151,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     sender.getData(thirdAddress) shouldBe List.empty
 
     val key = "myKey"
-    val multiKey = List.tabulate(5)(IntegerDataEntry(key, _))
+    val multiKey = List.tabulate(5)(LongDataEntry(key, _))
     val multiKeyTx = sender.putData(thirdAddress, multiKey, fee).id
     nodes.waitForHeightAraiseAndTxPresent(multiKeyTx)
     sender.getData(thirdAddress, key) shouldBe multiKey.last
@@ -234,7 +234,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
         "version" -> 1,
         "type" -> TransactionType.DataTransaction.id,
         "sender" -> firstAddress,
-        "data" -> List(IntegerDataEntry("int", 333)),
+        "data" -> List(LongDataEntry("int", 333)),
         "fee" -> 100000))
       Json.parse(rs.getResponseBody).as[JsObject]
     }

@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry}
+import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, DataEntry, LongDataEntry}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
@@ -30,7 +30,7 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
 
       key1 <- validAliasStringGen
       value1 <- positiveLongGen
-      item1 = IntegerDataEntry(key1, value1)
+      item1 = LongDataEntry(key1, value1)
       fee1 <- smallFeeGen
       dataTx1 = data(master, List(item1), fee1, ts + 10000)
 
@@ -41,7 +41,7 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
       dataTx2 = data(master, List(item2), fee2, ts + 20000)
 
       value3 <- positiveLongGen
-      item3 = IntegerDataEntry(key1, value3)
+      item3 = LongDataEntry(key1, value3)
       fee3 <- smallFeeGen
       dataTx3 = data(master, List(item3), fee3, ts + 30000)
     } yield (genesis, Seq(item1, item2, item3), Seq(dataTx1, dataTx2, dataTx3))

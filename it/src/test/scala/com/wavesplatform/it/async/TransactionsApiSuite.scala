@@ -4,7 +4,7 @@ import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry}
+import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, LongDataEntry}
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 import scorex.api.http.assets.MassTransferRequest
@@ -176,7 +176,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       "version" -> 1,
       "sender" -> firstAddress,
       "data" -> List(
-        IntegerDataEntry("int", 923275292849183L),
+        LongDataEntry("int", 923275292849183L),
         BooleanDataEntry("bool", true),
         BinaryDataEntry("blob", Array.tabulate(445)(_.toByte))),
       "fee" -> 100000),
