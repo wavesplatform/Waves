@@ -1,22 +1,24 @@
 package com.wavesplatform.http
 
 import java.time.Instant
-import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.Shutdownable
 import com.wavesplatform.settings.{Constants, RestAPISettings}
-import com.wavesplatform.utils.HeightInfo
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import io.swagger.annotations._
-import monix.eval.Coeval
+import javax.ws.rs.Path
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
+import scorex.transaction.History
 import scorex.utils.ScorexLogging
 
 @Path("/node")
 @Api(value = "node")
-case class NodeApiRoute(settings: RestAPISettings, heights: Coeval[(HeightInfo, HeightInfo)], application: Shutdownable)
-  extends ApiRoute with CommonApiFunctions with ScorexLogging {
+case class NodeApiRoute(settings: RestAPISettings, history: History, state: SnapshotStateReader, application: Shutdownable)
+    extends ApiRoute
+    with CommonApiFunctions
+    with ScorexLogging {
 
   override lazy val route = pathPrefix("node") {
     stop ~ status ~ version
@@ -24,9 +26,10 @@ case class NodeApiRoute(settings: RestAPISettings, heights: Coeval[(HeightInfo, 
 
   @Path("/version")
   @ApiOperation(value = "Version", notes = "Get Waves node version", httpMethod = "GET")
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json Waves node version")
-  ))
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Json Waves node version")
+    ))
   def version: Route = (get & path("version")) {
     complete(Json.obj("version" -> Constants.AgentName))
   }
@@ -42,13 +45,13 @@ case class NodeApiRoute(settings: RestAPISettings, heights: Coeval[(HeightInfo, 
   @Path("/status")
   @ApiOperation(value = "Status", notes = "Get status of the running core", httpMethod = "GET")
   def status: Route = (get & path("status")) {
-    val ((bcHeight, bcTime), (stHeight, stTime)) = heights()
-    val lastUpdated = bcTime max stTime
-    complete(Json.obj(
-      "blockchainHeight" -> bcHeight,
-      "stateHeight" -> stHeight,
-      "updatedTimestamp" -> lastUpdated,
-      "updatedDate" -> Instant.ofEpochMilli(lastUpdated).toString
-    ))
+    val lastUpdated = history.lastBlock.get.timestamp
+    complete(
+      Json.obj(
+        "blockchainHeight" -> history.height,
+        "stateHeight"      -> state.height,
+        "updatedTimestamp" -> lastUpdated,
+        "updatedDate"      -> Instant.ofEpochMilli(lastUpdated).toString
+      ))
   }
 }
