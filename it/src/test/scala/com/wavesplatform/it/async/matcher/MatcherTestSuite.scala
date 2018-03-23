@@ -3,10 +3,10 @@ package com.wavesplatform.it.async.matcher
 import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.crypto
-import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.{Node, ReportingTestName}
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.state2.ByteStr
@@ -647,6 +647,8 @@ class MatcherTestSuite
 }
 
 object MatcherTestSuite {
+
+  import com.wavesplatform.it.NodeConfigs._
 
   val ForbiddenAssetId = "FdbnAsset"
 
