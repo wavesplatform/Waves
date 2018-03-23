@@ -21,9 +21,8 @@ class DataTransactionSuite extends BaseTransactionSuite {
   test("sender's waves balance is decreased by fee.") {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val entry            = IntegerDataEntry("int", 0xcafebabe)
-    val size             = entry.valueBytes.size
     val data             = List(entry)
-    val transferFee      = calcDataFee(size)
+    val transferFee      = calcDataFee(data)
     val txId             = sender.putData(firstAddress, data, transferFee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
@@ -79,56 +78,58 @@ class DataTransactionSuite extends BaseTransactionSuite {
     import DataEntry.{MaxKeySize, MaxValueSize}
     import DataTransaction.MaxEntryCount
 
-    val maxKey    = "a" * MaxKeySize
-    val data      = List.tabulate(MaxEntryCount)(n => BinaryDataEntry(maxKey, Array.fill(MaxValueSize)(n.toByte)))
-    val kilobytes = (MaxEntryCount * (MaxKeySize + MaxValueSize + 3) + 120) / 1024 + 1
-    val fee       = kilobytes * 100000
-    val txId      = sender.putData(firstAddress, data, fee).id
+    val maxKey = "a" * MaxKeySize
+    val data   = List.tabulate(MaxEntryCount)(n => BinaryDataEntry(maxKey, Array.fill(MaxValueSize)(n.toByte)))
+    val fee    = calcDataFee(data)
+    val txId   = sender.putData(firstAddress, data, fee).id
 
     nodes.waitForHeightAriseAndTxPresent(txId)
   }
 
   test("data definition and retrieval") {
-    // define first data item
-    val item1 = IntegerDataEntry("int", 8)
-    val tx1   = sender.putData(secondAddress, List(item1), fee).id
+    // define first int entry
+    val intEntry = IntegerDataEntry("int", 8)
+    val intList  = List(intEntry)
+    val tx1      = sender.putData(secondAddress, intList, calcDataFee(intList)).id
     nodes.waitForHeightAriseAndTxPresent(tx1)
 
-    sender.getData(secondAddress, "int") shouldBe item1
-    sender.getData(secondAddress) shouldBe List(item1)
+    sender.getData(secondAddress, "int") shouldBe intEntry
+    sender.getData(secondAddress) shouldBe intList
 
-    // define another one
-    val item2 = BooleanDataEntry("bool", true)
-    val tx2   = sender.putData(secondAddress, List(item2), fee).id
+    // define boolean entry
+    val boolEntry = BooleanDataEntry("bool", true)
+    val boolList  = List(boolEntry)
+    val tx2       = sender.putData(secondAddress, boolList, calcDataFee(boolList)).id
     nodes.waitForHeightAriseAndTxPresent(tx2)
 
-    sender.getData(secondAddress, "int") shouldBe item1
-    sender.getData(secondAddress, "bool") shouldBe item2
-    sender.getData(secondAddress) shouldBe List(item2, item1)
+    sender.getData(secondAddress, "int") shouldBe intEntry
+    sender.getData(secondAddress, "bool") shouldBe boolEntry
+    sender.getData(secondAddress) shouldBe boolList ++ intList
 
-    // redefine item 1
-    val item11 = IntegerDataEntry("int", 10)
-    val tx3    = sender.putData(secondAddress, List(item11), fee).id
+    // redefine int entry
+    val reIntEntry = IntegerDataEntry("int", 10)
+    val reIntList  = List(reIntEntry)
+    val tx3        = sender.putData(secondAddress, reIntList, calcDataFee(reIntList)).id
     nodes.waitForHeightAriseAndTxPresent(tx3)
 
-    sender.getData(secondAddress, "int") shouldBe item11
-    sender.getData(secondAddress, "bool") shouldBe item2
-    sender.getData(secondAddress) shouldBe List(item2, item11)
+    sender.getData(secondAddress, "int") shouldBe reIntEntry
+    sender.getData(secondAddress, "bool") shouldBe boolEntry
+    sender.getData(secondAddress) shouldBe boolList ++ reIntList
 
     // define tx with all types
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
-    val item41           = IntegerDataEntry("int", -127)
-    val item42           = BooleanDataEntry("bool", false)
-    val item43           = BinaryDataEntry("blob", Array[Byte](127.toByte, 0, 1, 1))
-    val data             = List(item41, item42, item43)
-    val txId             = sender.putData(secondAddress, data, fee).id
+    val intEntry2        = IntegerDataEntry("int", -127)
+    val boolEntry2       = BooleanDataEntry("bool", false)
+    val blobEntry2       = BinaryDataEntry("blob", Array[Byte](127.toByte, 0, 1, 1))
+    val dataAllTypes     = List(intEntry2, boolEntry2, blobEntry2)
+    val fee              = calcDataFee(dataAllTypes)
+    val txId             = sender.putData(secondAddress, dataAllTypes, fee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
-    sender.getData(secondAddress, "int") shouldBe item41
-    sender.getData(secondAddress, "bool") shouldBe item42
-    sender.getData(secondAddress, "blob").equals(item43)
-
-    sender.getData(secondAddress).equals(List(item41, item42, item43))
+    sender.getData(secondAddress, "int") shouldBe intEntry2
+    sender.getData(secondAddress, "bool") shouldBe boolEntry2
+    sender.getData(secondAddress, "blob").equals(blobEntry2)
+    sender.getData(secondAddress).equals(dataAllTypes)
 
     notMiner.assertBalances(secondAddress, balance2 - fee, eff2 - fee)
   }
@@ -147,18 +148,20 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("data definition corner cases") {
-    val noDataTx = sender.putData(thirdAddress, List.empty, fee).id
+    val noDataTx = sender.putData(thirdAddress, List.empty, calcDataFee(List.empty)).id
     nodes.waitForHeightAriseAndTxPresent(noDataTx)
     sender.getData(thirdAddress) shouldBe List.empty
 
-    val key        = "myKey"
-    val multiKey   = List.tabulate(5)(IntegerDataEntry(key, _))
-    val multiKeyTx = sender.putData(thirdAddress, multiKey, fee).id
+    val key         = "myKey"
+    val multiKey    = List.tabulate(5)(IntegerDataEntry(key, _))
+    val multiKeyFee = calcDataFee(multiKey)
+    val multiKeyTx  = sender.putData(thirdAddress, multiKey, multiKeyFee).id
     nodes.waitForHeightAriseAndTxPresent(multiKeyTx)
     sender.getData(thirdAddress, key) shouldBe multiKey.last
 
-    val typeChange   = List(BooleanDataEntry(key, true))
-    val typeChangeTx = sender.putData(thirdAddress, typeChange, fee).id
+    val typeChange    = List(BooleanDataEntry(key, true))
+    val typeChangeFee = calcDataFee(typeChange)
+    val typeChangeTx  = sender.putData(thirdAddress, typeChange, typeChangeFee).id
     nodes.waitForHeightAriseAndTxPresent(typeChangeTx)
     sender.getData(thirdAddress, key) shouldBe typeChange.head
   }
@@ -177,6 +180,8 @@ class DataTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem + ("type" -> JsString("falafel")))), "unknown type falafel")
 
     assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "value")), "value is missing")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
+                                "value is missing or not an integer")
 
     assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
                                 "value is missing or not an integer")
@@ -225,9 +230,31 @@ class DataTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(id(withProof))
   }
 
-  private def calcDataFee(dataSize: Int): Long = {
+  test("try to send tx above limits of key, value and size") {
+    import DataEntry.{MaxKeySize, MaxValueSize}
+    import DataTransaction.MaxEntryCount
+
+    val message  = "Too big sequences requested"
+    val extraKey = "a" * (MaxKeySize + 1)
+    val data     = List(BooleanDataEntry(extraKey, false))
+
+    assertBadRequestAndResponse(sender.putData(firstAddress, data, calcDataFee(data)), message)
+    nodes.waitForHeightAraise()
+
+    val extraValueData = List(BinaryDataEntry("key", Array.fill(MaxValueSize + 1)(1.toByte)))
+    assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, calcDataFee(extraValueData)), message)
+    nodes.waitForHeightAraise()
+
+    val extraSizedData = List.tabulate(MaxEntryCount + 1)(n => BinaryDataEntry(extraKey, Array.fill(MaxValueSize)(n.toByte)))
+    assertBadRequestAndResponse(sender.putData(firstAddress, extraSizedData, calcDataFee(extraSizedData)), message)
+    nodes.waitForHeightAraise()
+
+  }
+
+  private def calcDataFee(data: List[DataEntry[_]]): Long = {
+    val dataSize = data.map(_.toBytes.size).sum + 128
     if (dataSize > 1024) {
-      (fee * dataSize) / 1024
+      fee * (dataSize / 1024 + 1)
     } else fee
   }
 }
