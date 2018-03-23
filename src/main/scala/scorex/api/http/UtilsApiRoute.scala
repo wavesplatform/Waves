@@ -5,10 +5,13 @@ import java.security.SecureRandom
 import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.{Parser, TypeChecker}
 import com.wavesplatform.settings.RestAPISettings
+import fastparse.core.Parsed.{Failure, Success}
 import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.crypto.encode.Base58
+import scorex.transaction.smart.{BlockchainContext, Script}
 import scorex.utils.Time
 
 @Path("/utils")
@@ -24,7 +27,30 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   }
 
   override val route: Route = pathPrefix("utils") {
-    time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign
+    compile ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign
+  }
+
+  @Path("/script/compile")
+  @ApiOperation(value = "Compile", notes = "Compiles string code to base58 script representation", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "code", required = true, dataType = "string", paramType = "body", value = "Script code")
+    ))
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "base58 or error")
+    ))
+  def compile: Route = path("script" / "compile") {
+    (post & entity(as[String])) { code =>
+      complete((Parser(code) match {
+        case Success(value, index) =>
+          TypeChecker(BlockchainContext.typeCheckerContext, value) match {
+            case Left(err)   => Left[String, String](err.toString)
+            case Right(expr) => Right[String, String](Script(expr).bytes().base58)
+          }
+        case f @ Failure(_, _, _) => Left[String, String](f.toString)
+      }).fold(x => Json.obj("error" -> x), x => Json.obj("script" -> x)))
+    }
   }
 
   @Path("/time")
