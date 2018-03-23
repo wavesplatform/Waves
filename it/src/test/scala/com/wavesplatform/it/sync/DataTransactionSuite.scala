@@ -25,7 +25,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val transferFee = calcDataFee(size)
     val txId = sender.putData(firstAddress, data, transferFee).id
     nodes.waitForHeightAraiseAndTxPresent(txId)
-    
+
     notMiner.assertBalances(firstAddress, balance1 - transferFee, eff1 - transferFee)
   }
 
@@ -150,6 +150,11 @@ class DataTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAraiseAndTxPresent(noDataTx)
     sender.getData(thirdAddress) shouldBe List.empty
 
+    val emptyKey = List(IntegerDataEntry("", 7))
+    val emptyKeyTx = sender.putData(thirdAddress, emptyKey, fee).id
+    nodes.waitForHeightAraiseAndTxPresent(emptyKeyTx)
+    sender.getData(thirdAddress, "") shouldBe emptyKey.head
+
     val key = "myKey"
     val multiKey = List.tabulate(5)(IntegerDataEntry(key, _))
     val multiKeyTx = sender.putData(thirdAddress, multiKey, fee).id
@@ -172,9 +177,6 @@ class DataTransactionSuite extends BaseTransactionSuite {
       "key" -> "key",
       "type" -> "integer",
       "value" -> 8)
-
-    //    where is a bug?
-    sender.postJson("/addresses/data", request(validItem + ("key" -> JsString("")))).getStatusCode shouldBe 200
 
     assertBadRequestAndResponse(
       sender.postJson("/addresses/data", request(validItem - "key")),
@@ -226,6 +228,10 @@ class DataTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndResponse(
       sender.postJson("/addresses/data", request(notValidBlobValue)),
       "value is missing or not a string")
+
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("NOTaBase58")))),
+      "Wrong char in Base58 string")
   }
 
   test("transaction requires a valid proof") {

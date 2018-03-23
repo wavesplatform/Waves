@@ -231,8 +231,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sna
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "key", value = "Data key", required = true, dataType = "string", paramType = "path")))
-  def getDataItem: Route = (path("data" / Segment / Segment) & get) { case (address, key) =>
-    complete(accountData(address, key))
+  def getDataItem: Route = (path("data" / Segment / Segment.?) & get) { case (address, keyOpt) =>
+    complete(accountData(address, keyOpt.getOrElse("")))
   }
 
   @Path("/")
