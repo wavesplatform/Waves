@@ -3,7 +3,7 @@ package scorex.transaction
 import com.google.common.primitives.Shorts
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.DataEntry._
-import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, DataEntry, LongDataEntry}
+import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, LongDataEntry}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -96,8 +96,8 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         check(List.fill[DataEntry[_]](keyRepeatCount)(data.head))  // repeating keys
         check(List(BooleanDataEntry("", false)))  // empty key
         check(List(LongDataEntry("a" * Byte.MaxValue, 0xa)))  // max key size
-        check(List(BinaryDataEntry("bin", Array.empty)))  // empty binary
-        check(List(BinaryDataEntry("bin", Array.fill(MaxValueSize)(1: Byte))))  // max binary value size
+        check(List(BinaryDataEntry("bin", ByteStr.empty)))  // empty binary
+        check(List(BinaryDataEntry("bin", ByteStr(Array.fill(MaxValueSize)(1: Byte)))))  // max binary value size
     }
   }
 
@@ -112,11 +112,11 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         val dataTooBigEi = create(version, sender, dataTooBig, fee, timestamp, proofs)
         dataTooBigEi shouldBe Left(ValidationError.TooBigArray)
 
-        val keyTooLong = data :+ BinaryDataEntry("a" * (MaxKeySize + 1), Array(1, 2))
+        val keyTooLong = data :+ BinaryDataEntry("a" * (MaxKeySize + 1), ByteStr(Array(1, 2)))
         val keyTooLongEi = create(version, sender, keyTooLong, fee, timestamp, proofs)
         keyTooLongEi shouldBe Left(ValidationError.TooBigArray)
 
-        val valueTooLong = data :+ BinaryDataEntry("key", Array.fill(MaxValueSize + 1)(1: Byte))
+        val valueTooLong = data :+ BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1: Byte)))
         val valueTooLongEi = create(version, sender, valueTooLong, fee, timestamp, proofs)
         valueTooLongEi shouldBe Left(ValidationError.TooBigArray)
 

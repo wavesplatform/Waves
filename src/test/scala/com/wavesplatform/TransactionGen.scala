@@ -439,7 +439,7 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
     key <- dataTxKeyGen
     size <- Gen.choose(0, MaxValueSize)
     value <- byteArrayGen(size)
-  } yield BinaryDataEntry(key, value)
+  } yield BinaryDataEntry(key, ByteStr(value))
 
   val dataTransactionGen = {
     import DataTransaction.MaxEntryCount

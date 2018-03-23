@@ -27,7 +27,11 @@ class BlockchainContext(override val networkByte: Byte, tx: Coeval[Transaction],
       .map(convert)
 
   override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any] = {
-    val data = state.accountData(Address.fromBytes(addressBytes).explicitGet(), key)
+
+    val address = Address.fromBytes(addressBytes).explicitGet()
+    println("real address: " + address)
+    println("address data: " + state.accountData(address))
+    val data = state.accountData(address, key)
     data.map((_, dataType)).flatMap {
       case (LongDataEntry(_, value), DataType.Long)        => Some(value)
       case (BooleanDataEntry(_, value), DataType.Boolean)  => Some(value)

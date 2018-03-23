@@ -48,7 +48,7 @@ object DataEntry {
       case t if t == Type.Boolean.id => (BooleanDataEntry(key, bytes(p + 1) != 0), p + 2)
       case t if t == Type.Binary.id =>
         val (blob, p1) = Deser.parseArraySize(bytes, p + 1)
-        (BinaryDataEntry(key, blob), p1)
+        (BinaryDataEntry(key, ByteStr(blob)), p1)
       case t => throw new Exception(s"Unknown type $t")
     }
   }
@@ -71,7 +71,7 @@ object DataEntry {
                 val t = if (base58.isEmpty) Success(Array.emptyByteArray) else Base58.decode(base58) /// Base58 bug
                 t.fold(
                   ex => JsError(ex.getMessage),
-                  arr => JsSuccess(BinaryDataEntry(key, arr)))
+                  arr => JsSuccess(BinaryDataEntry(key, ByteStr(arr))))
               case _ => JsError("value is missing or not a string")
             }
             case JsDefined(JsString(t)) => JsError(s"unknown type $t")
@@ -97,10 +97,10 @@ case class BooleanDataEntry(override val key: String, override val value: Boolea
   override def toJson: JsObject = super.toJson + ("type" -> JsString("boolean")) + ("value" -> JsBoolean(value))
 }
 
-case class BinaryDataEntry(override val key: String, override val value: Array[Byte]) extends DataEntry[Array[Byte]](key, value) {
-  override def valueBytes: Array[Byte] = Type.Binary.id.toByte +: Deser.serializeArray(value)
+case class BinaryDataEntry(override val key: String, override val value: ByteStr) extends DataEntry[ByteStr](key, value) {
+  override def valueBytes: Array[Byte] = Type.Binary.id.toByte +: Deser.serializeArray(value.arr)
 
-  override def toJson: JsObject = super.toJson + ("type" -> JsString("binary")) + ("value" -> JsString(Base58.encode(value)))
+  override def toJson: JsObject = super.toJson + ("type" -> JsString("binary")) + ("value" -> JsString(value.base58))
 
-  override def valid: Boolean = super.valid && value.length <= MaxValueSize
+  override def valid: Boolean = super.valid && value.arr.length <= MaxValueSize
 }
