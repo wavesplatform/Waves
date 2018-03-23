@@ -27,15 +27,12 @@ class BlockchainContext(override val networkByte: Byte, tx: Coeval[Transaction],
       .map(convert)
 
   override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any] = {
-
     val address = Address.fromBytes(addressBytes).explicitGet()
-    println("real address: " + address)
-    println("address data: " + state.accountData(address))
     val data = state.accountData(address, key)
     data.map((_, dataType)).flatMap {
       case (LongDataEntry(_, value), DataType.Long)        => Some(value)
       case (BooleanDataEntry(_, value), DataType.Boolean)  => Some(value)
-      case (BinaryDataEntry(_, value), DataType.ByteArray) => Some(value)
+      case (BinaryDataEntry(_, value), DataType.ByteArray) => Some(ByteVector(value.arr))
       case _                                               => None
     }
   }

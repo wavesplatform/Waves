@@ -90,7 +90,7 @@ object Evaluator {
             }
             value
           }
-        case Typed.FUNCTION_CALL(name, args, tpe) =>
+        case Typed.FUNCTION_CALL(name, args, _) =>
           import cats.data._
           import cats.instances.vector._
           import cats.syntax.all._
@@ -116,7 +116,7 @@ object Evaluator {
         val tt = implicitly[TypeTag[T]]
         v match {
           case x if typedExpr.tpe.typetag.tpe <:< tt.tpe => x.asInstanceOf[T]
-          case _                                         => throw new Exception("Bad type")
+          case _                                         => throw new Exception(s"Bad type: expected: ${tt.tpe} actual: ${typedExpr.tpe.typetag.tpe}")
         }
       }
     }
@@ -127,6 +127,5 @@ object Evaluator {
       case Failure(ex)  => Left(ex.toString)
       case Success(res) => res
     }
-    result
   }
 }

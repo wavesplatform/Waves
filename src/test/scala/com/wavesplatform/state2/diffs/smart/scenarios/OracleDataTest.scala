@@ -26,19 +26,18 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       long                <- longEntryGen
       bool                <- booleanEntryGen
       bin                 <- binaryEntryGen
-      _ = println("oracle=" + oracle)
-      _ = println("bin=" + bin)
       dataTransaction <- dataTransactionGenP(oracle, List(long, bool, bin))
       allFieldsRequiredScript        = s"""
                     |
                     | let oracle = extract(addressFromString("${oracle.address}"))
+                    | let long = extract(getLong(oracle,"${long.key}")) == ${long.value}
+                    | let bool = extract(getBoolean(oracle,"${bool.key}")) == ${bool.value}
                     | let bin = extract(getByteArray(oracle,"${bin.key}")) == base58'${bin.value.base58}'
-                    | bin
+                    | long && bool && bin
                     |
                     |
                     |
         """.stripMargin
-      _ = println(allFieldsRequiredScript)
       untypedAllFieldsRequiredScript = Parser(allFieldsRequiredScript).get.value
       typedAllFieldsRequiredScript   = TypeChecker(dummyTypeCheckerContext, untypedAllFieldsRequiredScript).explicitGet()
       setScript            <- selfSignedSetScriptTransactionGenP(master, Script(typedAllFieldsRequiredScript))
