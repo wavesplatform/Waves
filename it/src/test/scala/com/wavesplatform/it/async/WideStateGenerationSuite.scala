@@ -1,8 +1,9 @@
-package com.wavesplatform.it
+package com.wavesplatform.it.async
 
 import java.util.concurrent.TimeoutException
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
@@ -13,8 +14,7 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
-  with Matchers with TransferSending with NodesFromDocker {
+class WideStateGenerationSuite extends FreeSpec with WaitForHeight2 with Matchers with TransferSending with NodesFromDocker {
 
   override protected def createDocker: Docker = new Docker(
     suiteConfig = ConfigFactory.parseString(
@@ -52,13 +52,14 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
   "Generate a lot of transactions and synchronise" in {
     val test = for {
       b <- dumpBalances()
-      uploadedTxs <- processRequests(generateTransfersToRandomAddresses(requestsCount / 2, nodeAddresses) ++
-        generateTransfersBetweenAccounts(requestsCount / 2, b))
+      uploadedTxs <- processRequests(
+        generateTransfersToRandomAddresses(requestsCount / 2, nodeAddresses) ++
+          generateTransfersBetweenAccounts(requestsCount / 2, b))
 
       _ <- Await.ready(traverse(nodes)(_.waitFor[Int]("UTX is empty")(_.utxSize, _ == 0, 5.seconds)), 7.minutes)
 
       height <- traverse(nodes)(_.height).map(_.max)
-      _ <- Await.ready(nodes.waitForSameBlocksAt(5.seconds, height + 1), 5.minutes)
+      _      <- Await.ready(nodes.waitForSameBlocksAt(5.seconds, height + 1), 5.minutes)
 
       _ <- Await.ready(traverse(nodes)(assertHasTxs(_, uploadedTxs.map(_.id).toSet)), 5.minutes)
     } yield ()
@@ -67,7 +68,7 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
     val testWithDumps = Future.firstCompletedOf(Seq(test, limit)).recoverWith {
       case e =>
         for {
-          _ <- dumpBalances()
+          _     <- dumpBalances()
           dumps <- traverse(nodes)(dumpBlockChain)
         } yield {
           log.debug(dumps.mkString("Dumps:\n", "\n\n", "\n"))
@@ -84,7 +85,7 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
       blocks <- node.blockSeq(1, height)
     } yield {
       val txsInBlockchain = blocks.flatMap(_.transactions.map(_.id))
-      val diff = txIds -- txsInBlockchain
+      val diff            = txIds -- txsInBlockchain
       withClue(s"all transactions in node") {
         diff shouldBe empty
       }
@@ -94,11 +95,9 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
   private def dumpBalances(): Future[Map[Config, Long]] = {
     traverse(nodeConfigs) { config =>
       nodes.head.balance(config.getString("address")).map(x => (config, x.balance))
-    }
-      .map(_.toMap)
+    }.map(_.toMap)
       .map { r =>
-        log.debug(
-          s"""Balances:
+        log.debug(s"""Balances:
              |${r.map { case (config, balance) => s"${config.getString("address")} -> $balance" }.mkString("\n")}""".stripMargin)
         r
       }
@@ -109,12 +108,13 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
 
     for {
       utxSize <- node.utxSize
-      height <- node.height
-      blockGroups <- traverse((2 to height).grouped(maxRequestSize).map { xs => (xs.head, xs.last) })(Function.tupled(node.blockSeq))
+      height  <- node.height
+      blockGroups <- traverse((2 to height).grouped(maxRequestSize).map { xs =>
+        (xs.head, xs.last)
+      })(Function.tupled(node.blockSeq))
     } yield {
       val blocks = blockGroups.flatten.toList
-      val blocksInfo = blocks
-        .zipWithIndex
+      val blocksInfo = blocks.zipWithIndex
         .map { case (x, i) => s"$i: id=${x.signature.trim}, txsSize=${x.transactions.size}, txs=${x.transactions.map(_.id.trim).mkString(", ")}" }
 
       s"""Dump of ${node.name}:

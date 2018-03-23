@@ -28,8 +28,8 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   private val acc2 = randomPk
   private val acc3 = randomPk
 
-  private val transferAmount: Long = 1.waves
-  private val fee: Long            = 0.001.waves
+  private val transferAmount: Long          = 1.waves
+  private val fee: Long                     = 0.001.waves
   private val senderPublicKeyString: String = ByteStr(sender.publicKey.publicKey).base58
 
   test("set 2of2 multisig") {
@@ -60,12 +60,11 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       proofs = List(setScriptTransaction.proofs.proofs.head.base58)
     )
 
-
     val setScriptId = sender
       .signedBroadcast(Json.toJsObject(request) + ("type" -> JsNumber(TransactionType.SetScriptTransaction.id)))
       .id
 
-    nodes.waitForHeightAraiseAndTxPresent(setScriptId)
+    nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
     // get script by account
   }
@@ -105,11 +104,10 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       proofs = List(sig1, sig2).map(_.base58)
     )
 
-    val versionedTransferId = sender.
-      signedBroadcast(Json.toJsObject(request) + ("type" -> JsNumber(TransactionType.VersionedTransferTransaction.id)))
-      .id
+    val versionedTransferId =
+      sender.signedBroadcast(Json.toJsObject(request) + ("type" -> JsNumber(TransactionType.VersionedTransferTransaction.id))).id
 
-    nodes.waitForHeightAraiseAndTxPresent(versionedTransferId)
+    nodes.waitForHeightAriseAndTxPresent(versionedTransferId)
   }
 
   test("can clear script") {
@@ -130,7 +128,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       .signedBroadcast(Json.toJsObject(request) + ("type" -> JsNumber(TransactionType.SetScriptTransaction.id)))
       .id
 
-    nodes.waitForHeightAraiseAndTxPresent(clearScriptId)
+    nodes.waitForHeightAriseAndTxPresent(clearScriptId)
 
   }
 
@@ -138,6 +136,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val transferId = sender
       .transfer(sourceAddress = sender.address, recipient = acc3.address, amount = transferAmount, fee = fee, assetId = None, feeAssetId = None)
       .id
-    nodes.waitForHeightAraiseAndTxPresent(transferId)
+    nodes.waitForHeightAriseAndTxPresent(transferId)
   }
 }
