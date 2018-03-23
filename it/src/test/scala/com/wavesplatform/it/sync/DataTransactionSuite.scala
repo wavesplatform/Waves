@@ -232,7 +232,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("transaction requires a valid proof") {
-    def request: JsObject = {
+    val request: JsObject = {
       val rs = sender.postJsonWithApiKey("/transactions/sign", Json.obj(
         "version" -> 1,
         "type" -> TransactionType.DataTransaction.id,
@@ -244,7 +244,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     def id(obj: JsObject) = obj.value("id").as[String]
 
     val noProof = request - "proofs"
-    assertBadRequestAndMessage(sender.postJson("/transactions/broadcast", noProof), "failed to parse json message")
+    assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", noProof), "failed to parse json message.*proofs.*missing")
     nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
 
     val badProof = request ++ Json.obj("proofs" -> Seq(Base58.encode(Array.fill(64)(Random.nextInt.toByte))))
