@@ -1,8 +1,8 @@
-package com.wavesplatform.it
+package com.wavesplatform.it.async
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.NetworkUniqueConnectionsTestSuite._
 import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.{DockerBased, NodeConfigs}
 import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -10,6 +10,8 @@ import scala.concurrent._
 import scala.concurrent.duration.DurationInt
 
 class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with DockerBased {
+
+  import com.wavesplatform.it.async.NetworkUniqueConnectionsTestSuite._
 
   "nodes should up and connect with each other" in {
     val firstNode = docker.startNode(FirstNodeConfig)
@@ -43,8 +45,8 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Dock
 
 private object NetworkUniqueConnectionsTestSuite {
 
-  private val configs = NodeConfigs.newBuilder.withDefault(0).withSpecial(2, _.nonMiner).build()
-  val FirstNodeConfig: Config = configs.head
+  private val configs          = NodeConfigs.newBuilder.withDefault(0).withSpecial(2, _.nonMiner).build()
+  val FirstNodeConfig: Config  = configs.head
   val SecondNodeConfig: Config = configs.last
 
 }

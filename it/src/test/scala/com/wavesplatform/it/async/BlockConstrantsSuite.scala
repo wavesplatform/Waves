@@ -1,8 +1,9 @@
-package com.wavesplatform.it
+package com.wavesplatform.it.async
 
 import com.typesafe.config.Config
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.{NodeConfigs, TransferSending}
 import org.scalatest._
 
 import scala.concurrent.Await.result
@@ -11,12 +12,13 @@ import scala.concurrent.duration._
 
 class BlockConstrantsSuite extends FreeSpec with Matchers with TransferSending with NodesFromDocker {
 
-  private val maxTxs = 5000 // More, than 1mb of block
+  private val maxTxs          = 5000 // More, than 1mb of block
   private val txsInMicroBlock = 500
 
   override protected val nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
-    .overrideBase(_.raw(
-      s"""akka.http.server {
+    .overrideBase(
+      _.raw(
+        s"""akka.http.server {
          |  parsing.max-content-length = 3737439
          |  request-timeout = 60s
          |}
@@ -48,7 +50,7 @@ class BlockConstrantsSuite extends FreeSpec with Matchers with TransferSending w
          |
          |  features.supported = [2, 3]
          |}""".stripMargin
-    ))
+      ))
     .withDefault(1)
     .build()
 
@@ -56,19 +58,22 @@ class BlockConstrantsSuite extends FreeSpec with Matchers with TransferSending w
 
   private def miner = nodes.head
 
-  s"Block is limited by size after activation" in result(for {
-    _ <- processRequests(generateTransfersToRandomAddresses(maxTxs, nodeAddresses), includeAttachment = true)
-    _ <- miner.waitForHeight(3)
-    _ <- processRequests(generateTransfersToRandomAddresses(maxTxs, nodeAddresses), includeAttachment = true)
-    _ <- miner.waitForHeight(4)
-    Seq(blockHeaderBefore, blockHeaderAfter) <- miner.blockHeadersSeq(2, 3)
-  } yield {
-    val maxSizeInBytesAfterActivation = (1.1d * 1024 * 1024).toInt // including headers
-    val blockSizeInBytesBefore = blockHeaderBefore.blocksize
-    blockSizeInBytesBefore should be > maxSizeInBytesAfterActivation
+  s"Block is limited by size after activation" in result(
+    for {
+      _                                        <- processRequests(generateTransfersToRandomAddresses(maxTxs, nodeAddresses), includeAttachment = true)
+      _                                        <- miner.waitForHeight(3)
+      _                                        <- processRequests(generateTransfersToRandomAddresses(maxTxs, nodeAddresses), includeAttachment = true)
+      _                                        <- miner.waitForHeight(4)
+      Seq(blockHeaderBefore, blockHeaderAfter) <- miner.blockHeadersSeq(2, 3)
+    } yield {
+      val maxSizeInBytesAfterActivation = (1.1d * 1024 * 1024).toInt // including headers
+      val blockSizeInBytesBefore        = blockHeaderBefore.blocksize
+      blockSizeInBytesBefore should be > maxSizeInBytesAfterActivation
 
-    val blockSizeInBytesAfter = blockHeaderAfter.blocksize
-    blockSizeInBytesAfter should be <= maxSizeInBytesAfterActivation
-  }, 6.minutes)
+      val blockSizeInBytesAfter = blockHeaderAfter.blocksize
+      blockSizeInBytesAfter should be <= maxSizeInBytesAfterActivation
+    },
+    6.minutes
+  )
 
 }

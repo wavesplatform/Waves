@@ -1,8 +1,9 @@
-package com.wavesplatform.it
+package com.wavesplatform.it.async
 
 import com.typesafe.config.Config
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.{NodeConfigs, TransferSending}
 import org.scalatest._
 
 import scala.concurrent.Await.result
@@ -12,11 +13,12 @@ import scala.concurrent.duration._
 class MicroblocksGenerationSuite extends FreeSpec with Matchers with TransferSending with NodesFromDocker {
 
   private val txsInMicroBlock = 200
-  private val maxTxs = 2000
+  private val maxTxs          = 2000
 
   override protected val nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
-    .overrideBase(_.raw(
-      s"""waves {
+    .overrideBase(
+      _.raw(
+        s"""waves {
          |  network.enable-peers-exchange = no
          |
          |  miner {
@@ -37,7 +39,7 @@ class MicroblocksGenerationSuite extends FreeSpec with Matchers with TransferSen
          |
          |  features.supported = [2]
          |}""".stripMargin
-    ))
+      ))
     .withDefault(1)
     .build()
 
@@ -45,16 +47,19 @@ class MicroblocksGenerationSuite extends FreeSpec with Matchers with TransferSen
 
   private def miner = nodes.head
 
-  s"Generate transactions and wait for one block with $maxTxs txs" in result(for {
-    uploadedTxs <- processRequests(generateTransfersToRandomAddresses(maxTxs, nodeAddresses))
-    _ <- miner.waitForHeight(3)
-    block <- miner.blockAt(2)
-  } yield {
-    block.transactions.size shouldBe maxTxs
+  s"Generate transactions and wait for one block with $maxTxs txs" in result(
+    for {
+      uploadedTxs <- processRequests(generateTransfersToRandomAddresses(maxTxs, nodeAddresses))
+      _           <- miner.waitForHeight(3)
+      block       <- miner.blockAt(2)
+    } yield {
+      block.transactions.size shouldBe maxTxs
 
-    val blockTxs = block.transactions.map(_.id)
-    val diff = uploadedTxs.map(_.id).toSet -- blockTxs
-    diff shouldBe empty
-  }, 3.minutes)
+      val blockTxs = block.transactions.map(_.id)
+      val diff     = uploadedTxs.map(_.id).toSet -- blockTxs
+      diff shouldBe empty
+    },
+    3.minutes
+  )
 
 }
