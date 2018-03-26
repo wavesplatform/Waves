@@ -134,8 +134,8 @@ abstract class WavesContextImpl { this: Crypto with Environment =>
 
       case _ => ???
     }
-
 }
+
 object WavesContextImpl {
 
   val addressType        = PredefType("Address", List("bytes"        -> BYTEVECTOR))
@@ -172,6 +172,11 @@ object WavesContextImpl {
       "proof0"     -> BYTEVECTOR,
       "proof1"     -> BYTEVECTOR,
       "proof2"     -> BYTEVECTOR,
+      "proof3"     -> BYTEVECTOR,
+      "proof4"     -> BYTEVECTOR,
+      "proof5"     -> BYTEVECTOR,
+      "proof6"     -> BYTEVECTOR,
+      "proof7"     -> BYTEVECTOR,
       "assetId"    -> optionByteVector,
       "recipient"  -> addressOrAliasType.typeRef
     )
