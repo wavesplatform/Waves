@@ -68,7 +68,7 @@ abstract class WavesContextImpl { this: Crypto with Environment =>
     val txCoeval: Coeval[Either[String, Obj]]      = Coeval.evalOnce(Right(transactionObject(transaction)))
     val heightCoeval: Coeval[Either[String, Long]] = Coeval.evalOnce(Right(height))
     Context(
-      Map(transactionType.name -> transactionType, addressType.name -> addressType),
+      Map(transactionType.name -> transactionType, addressType.name -> addressType, addressOrAliasType.name -> addressOrAliasType),
       Map(
         ("None", none),
         ("H", LazyVal(LONG)(EitherT(heightCoeval))),
