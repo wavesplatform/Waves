@@ -411,8 +411,7 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
       ts  <- positiveIntGen
     } yield GenesisTransaction.create(recipient, amt, ts).right.get
 
-  val dataTransactionGen = {
-    import DataTransaction.MaxEntryCount
+  val dataEntryGen = {
     import DataEntry.{MaxKeySize, MaxValueSize}
 
     val keyGen = for {
@@ -435,10 +434,16 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
       value <- byteArrayGen(size)
     } yield BinaryDataEntry(key, value)
 
+    Gen.oneOf(integerEntryGen, booleanEntryGen, binaryEntryGen)
+  }
+
+  val dataTransactionGen = {
+    import DataTransaction.MaxEntryCount
+
     (for {
       (_, sender, _, _, timestamp, _, _, _) <- transferParamGen
       size <- Gen.choose(0, MaxEntryCount)
-      data <- Gen.listOfN(size, Gen.oneOf(integerEntryGen, booleanEntryGen, binaryEntryGen))
+      data <- Gen.listOfN(size, dataEntryGen)
     } yield DataTransaction.selfSigned(DataTransaction.Version, sender, data, 15000000, timestamp).right.get)
       .label("DataTransaction")
   }

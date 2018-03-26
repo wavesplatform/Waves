@@ -1,10 +1,11 @@
-package com.wavesplatform.it
+package com.wavesplatform.it.async
 
 import com.typesafe.config.Config
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
+import com.wavesplatform.it.{Node, NodeConfigs, ReportingTestName}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.utils.ScorexLogging
 
@@ -14,14 +15,21 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
-  with NodesFromDocker with ReportingTestName with ScorexLogging {
+class BlockHeadersTestSuite
+    extends FreeSpec
+    with Matchers
+    with BeforeAndAfterAll
+    with CancelAfterFailure
+    with NodesFromDocker
+    with ReportingTestName
+    with ScorexLogging {
 
-  override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
-    .overrideBase(_.quorum(2))
-    .withDefault(2)
-    .withSpecial(_.nonMiner)
-    .buildNonConflicting()
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(2))
+      .withDefault(2)
+      .withSpecial(_.nonMiner)
+      .buildNonConflicting()
 
   private def notMiner: Node = nodes.last
 
@@ -35,17 +43,22 @@ class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAl
   private def txRequestsGen(n: Int, fee: Long): Future[Unit] = {
     val parallelRequests = 1
 
-    def requests(n: Int): Future[Unit] = Future
-      .sequence {
-        (1 to n).map { _ => notMiner.transfer(notMiner.address, firstAddress, (1 + Random.nextInt(10)).waves, fee) }
-      }
-      .map(_ => ())
+    def requests(n: Int): Future[Unit] =
+      Future
+        .sequence {
+          (1 to n).map { _ =>
+            notMiner.transfer(notMiner.address, firstAddress, (1 + Random.nextInt(10)).waves, fee)
+          }
+        }
+        .map(_ => ())
 
     val steps = (1 to n)
       .sliding(parallelRequests, parallelRequests)
       .map(_.size)
 
-    steps.foldLeft(Future.successful(())) { (r, numRequests) => r.flatMap(_ => requests(numRequests)) }
+    steps.foldLeft(Future.successful(())) { (r, numRequests) =>
+      r.flatMap(_ => requests(numRequests))
+    }
   }
 
   def assertBlockInfo(blocks: Seq[Block], blockHeaders: Seq[BlockHeaders]): Unit = {
@@ -57,10 +70,10 @@ class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAl
 
   "blockAt content should be equal to blockHeaderAt, except transactions info" in {
     val f = for {
-      baseHeight <- traverse(nodes)(_.height).map(_.max)
-      _ <- txRequestsGen(30, 2.waves)
-      _ <- traverse(nodes)(_.waitForHeight(baseHeight + 3))
-      blocks <- traverse(nodes)(_.blockAt(baseHeight + 1))
+      baseHeight    <- traverse(nodes)(_.height).map(_.max)
+      _             <- txRequestsGen(30, 2.waves)
+      _             <- traverse(nodes)(_.waitForHeight(baseHeight + 3))
+      blocks        <- traverse(nodes)(_.blockAt(baseHeight + 1))
       blocksHeaders <- traverse(nodes)(_.blockHeadersAt(baseHeight + 1))
     } yield {
       assertBlockInfo(blocks, blocksHeaders)
@@ -70,10 +83,10 @@ class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAl
 
   "lastBlock content should be equal to lastBlockHeader, except transactions info" in {
     val f = for {
-      baseHeight <- traverse(nodes)(_.height).map(_.max)
-      _ <- txRequestsGen(30, 2.waves)
-      _ <- traverse(nodes)(_.waitForHeight(baseHeight + 1))
-      blocks <- traverse(nodes)(_.lastBlock)
+      baseHeight    <- traverse(nodes)(_.height).map(_.max)
+      _             <- txRequestsGen(30, 2.waves)
+      _             <- traverse(nodes)(_.waitForHeight(baseHeight + 1))
+      blocks        <- traverse(nodes)(_.lastBlock)
       blocksHeaders <- traverse(nodes)(_.lastBlockHeaders)
     } yield {
       assertBlockInfo(blocks, blocksHeaders)
@@ -84,17 +97,18 @@ class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAl
 
   "blockSeq content should be equal to blockHeaderSeq, except transactions info" in {
     val f = for {
-      baseHeight <- traverse(nodes)(_.height).map(_.max)
-      _ <- txRequestsGen(30, 2.waves)
-      _ <- nodes.waitForSameBlocksAt(3.seconds, baseHeight + 3)
-      blocks <- nodes.head.blockSeq(baseHeight + 1, baseHeight + 3)
+      baseHeight   <- traverse(nodes)(_.height).map(_.max)
+      _            <- txRequestsGen(30, 2.waves)
+      _            <- nodes.waitForSameBlocksAt(3.seconds, baseHeight + 3)
+      blocks       <- nodes.head.blockSeq(baseHeight + 1, baseHeight + 3)
       blockHeaders <- nodes.head.blockHeadersSeq(baseHeight + 1, baseHeight + 3)
     } yield {
-      blocks.zip(blockHeaders).foreach { case (block, header) =>
-        header.generator shouldBe block.generator
-        header.timestamp shouldBe block.timestamp
-        header.signature shouldBe block.signature
-        header.transactionCount shouldBe block.transactions.size
+      blocks.zip(blockHeaders).foreach {
+        case (block, header) =>
+          header.generator shouldBe block.generator
+          header.timestamp shouldBe block.timestamp
+          header.signature shouldBe block.signature
+          header.transactionCount shouldBe block.transactions.size
       }
     }
 

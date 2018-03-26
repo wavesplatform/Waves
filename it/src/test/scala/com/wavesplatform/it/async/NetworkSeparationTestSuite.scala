@@ -1,8 +1,9 @@
-package com.wavesplatform.it
+package com.wavesplatform.it.async
 
 import com.typesafe.config.Config
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.{NodeConfigs, ReportingTestName, WaitForHeight2}
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.Await
@@ -10,14 +11,20 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
-class NetworkSeparationTestSuite extends FreeSpec with Matchers with WaitForHeight2
-  with CancelAfterFailure with ReportingTestName with NodesFromDocker {
+class NetworkSeparationTestSuite
+    extends FreeSpec
+    with Matchers
+    with WaitForHeight2
+    with CancelAfterFailure
+    with ReportingTestName
+    with NodesFromDocker {
 
-  override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
-    .overrideBase(_.quorum(3))
-    .withDefault(3)
-    .withSpecial(_.quorum(0))
-    .buildNonConflicting()
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(3))
+      .withDefault(3)
+      .withSpecial(_.quorum(0))
+      .buildNonConflicting()
 
   "node should grow up to 10 blocks together and sync" in Await.result(
     Await.ready(nodes.waitForSameBlocksAt(5.seconds, 10), 3.minutes),

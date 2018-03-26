@@ -1,7 +1,8 @@
-package com.wavesplatform.it.transactions
+package com.wavesplatform.it.async.transactions
 
 import com.wavesplatform.it.TransferSending
 import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
 import scorex.account.AddressOrAlias
@@ -14,27 +15,30 @@ import scala.concurrent.duration._
 
 class TransferTransactionSuite extends BaseTransactionSuite with TransferSending with CancelAfterFailure {
 
-  private val waitCompletion = 2.minutes
+  private val waitCompletion       = 2.minutes
   private val defaultAssetQuantity = 100000
-  private val transferAmount = 5.waves
-  private val leasingAmount = 5.waves
-  private val leasingFee = 0.003.waves
-  private val transferFee = 0.002.waves
-  private val issueFee = 5.waves
+  private val transferAmount       = 5.waves
+  private val leasingAmount        = 5.waves
+  private val leasingFee           = 0.003.waves
+  private val transferFee          = 0.002.waves
+  private val issueFee             = 5.waves
 
   test("asset transfer changes sender's and recipient's asset balance; issuer's.waves balance is decreased by fee") {
     val f = for {
-      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner.accountBalances(firstAddress)
+      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner
+        .accountBalances(firstAddress)
         .zip(notMiner.accountBalances(secondAddress))
 
       issuedAssetId <- sender.issue(firstAddress, "name", "description", defaultAssetQuantity, 2, reissuable = false, issueFee).map(_.id)
-      _ <- nodes.waitForHeightAraiseAndTxPresent(issuedAssetId)
-      _ <- notMiner.assertBalances(firstAddress, firstBalance - issueFee, firstEffBalance - issueFee)
+      _             <- nodes.waitForHeightAraiseAndTxPresent(issuedAssetId)
+      _ <- notMiner
+        .assertBalances(firstAddress, firstBalance - issueFee, firstEffBalance - issueFee)
         .zip(notMiner.assertAssetBalance(firstAddress, issuedAssetId, defaultAssetQuantity))
 
       transferTransactionId <- sender.transfer(firstAddress, secondAddress, defaultAssetQuantity, transferFee, Some(issuedAssetId)).map(_.id)
-      _ <- nodes.waitForHeightAraiseAndTxPresent(transferTransactionId)
-      _ <- notMiner.assertBalances(firstAddress, firstBalance - transferFee - issueFee, firstEffBalance - transferFee - issueFee)
+      _                     <- nodes.waitForHeightAraiseAndTxPresent(transferTransactionId)
+      _ <- notMiner
+        .assertBalances(firstAddress, firstBalance - transferFee - issueFee, firstEffBalance - transferFee - issueFee)
         .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance))
         .zip(notMiner.assertAssetBalance(firstAddress, issuedAssetId, 0))
         .zip(notMiner.assertAssetBalance(secondAddress, issuedAssetId, defaultAssetQuantity))
@@ -45,12 +49,14 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
 
   test("waves transfer changes waves balances and eff.b.") {
     val f = for {
-      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner.accountBalances(firstAddress)
+      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner
+        .accountBalances(firstAddress)
         .zip(notMiner.accountBalances(secondAddress))
 
       transferId <- sender.transfer(firstAddress, secondAddress, transferAmount, transferFee).map(_.id)
-      _ <- nodes.waitForHeightAraiseAndTxPresent(transferId)
-      _ <- notMiner.assertBalances(firstAddress, firstBalance - transferAmount - transferFee, firstEffBalance - transferAmount - transferFee)
+      _          <- nodes.waitForHeightAraiseAndTxPresent(transferId)
+      _ <- notMiner
+        .assertBalances(firstAddress, firstBalance - transferAmount - transferFee, firstEffBalance - transferAmount - transferFee)
         .zip(notMiner.assertBalances(secondAddress, secondBalance + transferAmount, secondEffBalance + transferAmount))
     } yield succeed
 
@@ -58,15 +64,11 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
   }
 
   test("invalid signed waves transfer should not be in UTX or blockchain") {
-    def invalidByTsTx(ts: Long) = TransferTransaction.create(None,
-      sender.privateKey,
-      AddressOrAlias.fromString(sender.address).right.get,
-      1,
-      ts,
-      None,
-      1.waves,
-      Array.emptyByteArray
-    ).right.get
+    def invalidByTsTx(ts: Long) =
+      TransferTransaction
+        .create(None, sender.privateKey, AddressOrAlias.fromString(sender.address).right.get, 1, ts, None, 1.waves, Array.emptyByteArray)
+        .right
+        .get
 
     val invalidTimestamps: Seq[Long] = Seq(
       System.currentTimeMillis() + 1.day.toMillis,
@@ -74,8 +76,8 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
     )
 
     for (timestamp <- invalidTimestamps) {
-      val tx = invalidByTsTx(timestamp)
-      val id = tx.id()
+      val tx  = invalidByTsTx(timestamp)
+      val id  = tx.id()
       val req = createSignedTransferRequest(tx)
       val f = for {
         _ <- expectErrorResponse(sender.signedTransfer(req)) { x =>
@@ -92,33 +94,36 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
     val f = for {
       fb <- traverse(nodes)(_.height).map(_.min)
 
-      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner.accountBalances(firstAddress)
+      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner
+        .accountBalances(firstAddress)
         .zip(notMiner.accountBalances(secondAddress))
 
       transferFailureAssertion <- assertBadRequest(sender.transfer(secondAddress, firstAddress, secondEffBalance, transferFee))
 
       _ <- traverse(nodes)(_.waitForHeight(fb + 2))
 
-      _ <- notMiner.assertBalances(firstAddress, firstBalance, firstEffBalance)
+      _ <- notMiner
+        .assertBalances(firstAddress, firstBalance, firstEffBalance)
         .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance))
     } yield transferFailureAssertion
 
     Await.result(f, waitCompletion)
   }
 
-
   test("can not make transfer without having enough of waves") {
     val f = for {
       fb <- traverse(nodes)(_.height).map(_.min)
 
-      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner.accountBalances(firstAddress)
+      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner
+        .accountBalances(firstAddress)
         .zip(notMiner.accountBalances(secondAddress))
 
       transferFailureAssertion <- assertBadRequest(sender.transfer(secondAddress, firstAddress, secondBalance + 1.waves, transferFee))
 
       _ <- traverse(nodes)(_.waitForHeight(fb + 2))
 
-      _ <- notMiner.assertBalances(firstAddress, firstBalance, firstEffBalance)
+      _ <- notMiner
+        .assertBalances(firstAddress, firstBalance, firstEffBalance)
         .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance))
     } yield transferFailureAssertion
 
@@ -129,20 +134,24 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
     val f = for {
       fb <- traverse(nodes)(_.height).map(_.min)
 
-      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner.accountBalances(firstAddress)
+      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner
+        .accountBalances(firstAddress)
         .zip(notMiner.accountBalances(secondAddress))
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee).map(_.id)
-      _ <- nodes.waitForHeightAraiseAndTxPresent(createdLeaseTxId)
+      _                <- nodes.waitForHeightAraiseAndTxPresent(createdLeaseTxId)
 
-      _ <- notMiner.assertBalances(firstAddress, firstBalance - leasingFee, firstEffBalance - leasingAmount - leasingFee)
+      _ <- notMiner
+        .assertBalances(firstAddress, firstBalance - leasingFee, firstEffBalance - leasingAmount - leasingFee)
         .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
 
-      transferFailureAssertion <- assertBadRequest(sender.transfer(firstAddress, secondAddress, firstBalance - leasingFee - transferFee, fee = transferFee))
+      transferFailureAssertion <- assertBadRequest(
+        sender.transfer(firstAddress, secondAddress, firstBalance - leasingFee - transferFee, fee = transferFee))
 
       _ <- traverse(nodes)(_.waitForHeight(fb + 2))
 
-      _ <- notMiner.assertBalances(firstAddress, firstBalance - leasingFee, firstEffBalance - leasingAmount - leasingFee)
+      _ <- notMiner
+        .assertBalances(firstAddress, firstBalance - leasingFee, firstEffBalance - leasingAmount - leasingFee)
         .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
     } yield transferFailureAssertion
 
@@ -153,24 +162,26 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
     val f = for {
       fb <- traverse(nodes)(_.height).map(_.min)
 
-      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner.accountBalances(firstAddress)
+      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner
+        .accountBalances(firstAddress)
         .zip(notMiner.accountBalances(secondAddress))
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, leasingAmount, fee = leasingFee).map(_.id)
 
       _ <- nodes.waitForHeightAraiseAndTxPresent(createdLeaseTxId)
 
-      _ <- notMiner.assertBalances(firstAddress, firstBalance - leasingFee, firstEffBalance - leasingAmount - leasingFee)
+      _ <- notMiner
+        .assertBalances(firstAddress, firstBalance - leasingFee, firstEffBalance - leasingAmount - leasingFee)
         .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
 
       //effecdtive balance is greater than own balance
-      transferFailureAssertion <- assertBadRequest(sender.transfer(secondAddress, firstAddress
-        , secondBalance + (secondEffBalance - secondBalance) / 2
-        , transferFee))
+      transferFailureAssertion <- assertBadRequest(
+        sender.transfer(secondAddress, firstAddress, secondBalance + (secondEffBalance - secondBalance) / 2, transferFee))
 
       _ <- traverse(nodes)(_.waitForHeight(fb + 2))
 
-      _ <- notMiner.assertBalances(firstAddress, firstBalance - leasingFee, firstEffBalance - leasingAmount - leasingFee)
+      _ <- notMiner
+        .assertBalances(firstAddress, firstBalance - leasingFee, firstEffBalance - leasingAmount - leasingFee)
         .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
     } yield transferFailureAssertion
 
@@ -179,27 +190,30 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
 
   test("can forge block with sending majority of some asset to self and to other account") {
     val f = for {
-      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner.accountBalances(firstAddress)
+      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner
+        .accountBalances(firstAddress)
         .zip(notMiner.accountBalances(secondAddress))
 
       assetId <- sender.issue(firstAddress, "second asset", "description", defaultAssetQuantity, 0, reissuable = false, fee = issueFee).map(_.id)
 
       _ <- nodes.waitForHeightAraiseAndTxPresent(assetId)
 
-      _ <- notMiner.assertBalances(firstAddress, firstBalance - issueFee, firstEffBalance - issueFee)
+      _ <- notMiner
+        .assertBalances(firstAddress, firstBalance - issueFee, firstEffBalance - issueFee)
         .zip(notMiner.assertAssetBalance(firstAddress, assetId, defaultAssetQuantity))
 
       tx1 <- sender.transfer(firstAddress, firstAddress, defaultAssetQuantity, fee = transferFee, Some(assetId)).map(_.id)
       tx2 <- sender.transfer(firstAddress, secondAddress, defaultAssetQuantity / 2, fee = transferFee, Some(assetId)).map(_.id)
 
       height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 1))
+      _      <- traverse(nodes)(_.waitForHeight(height + 1))
       _ <- traverse(nodes)(_.waitForTransaction(tx1))
         .zip(traverse(nodes)(_.waitForTransaction(tx2)))
 
       _ <- traverse(nodes)(_.waitForHeight(height + 5))
 
-      _ <- notMiner.assertBalances(firstAddress, firstBalance - issueFee - 2 * transferFee, firstEffBalance - issueFee - 2 * transferFee)
+      _ <- notMiner
+        .assertBalances(firstAddress, firstBalance - issueFee - 2 * transferFee, firstEffBalance - issueFee - 2 * transferFee)
         .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance))
     } yield succeed
 
