@@ -7,7 +7,7 @@ import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Coeval
 import scodec.bits.ByteVector
-import scorex.account.AddressScheme
+import scorex.account.{AddressOrAlias, AddressScheme}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -25,6 +25,13 @@ class BlockchainContext(override val networkByte: Byte, tx: Coeval[Transaction],
       .transactionInfo(ByteStr(id))
       .map(_._2)
       .map(convert)
+
+  override def resolveAddress(addressOrAlias: Array[Byte]): Either[String, Array[Byte]] = {
+    (for {
+      aoa     <- AddressOrAlias.fromBytes(addressOrAlias, 0)
+      address <- state.resolveAliasEi(aoa._1)
+    } yield address.bytes.arr).left.map(_.toString)
+  }
 }
 
 object BlockchainContext {
@@ -35,7 +42,6 @@ object BlockchainContext {
     TypeCheckerContext.fromContext(new BlockchainContext(networkByte, Coeval(???), Coeval(???), null).build())
 
   def convert(tx: Transaction): ContractTransaction = new ContractTransaction {
-
     override def bodyBytes: Either[String, ByteVector] = tx match {
       case pt: ProvenTransaction => Right(ByteVector(pt.bodyBytes()))
       case _                     => Left("Transaction is not Proven, doesn't contain bodyBytes")
@@ -49,8 +55,16 @@ object BlockchainContext {
     }
 
     override def assetId: Either[String, Option[ByteVector]] = tx match {
-      case tt: TransferTransaction => Right(tt.assetId.map(x => ByteVector(x.arr)))
-      case _                       => Left("Transaction doesn't contain asset id")
+      case tt: TransferTransaction           => Right(tt.assetId.map(x => ByteVector(x.arr)))
+      case vtt: VersionedTransferTransaction => Right(vtt.assetId.map(x => ByteVector(x.arr)))
+      case mtt: MassTransferTransaction      => Right(mtt.assetId.map(x => ByteVector(x.arr)))
+      case _                                 => Left("Transaction doesn't contain asset id")
+    }
+
+    override def recipient: Either[String, ByteVector] = tx match {
+      case tt: TransferTransaction           => Right(ByteVector(tt.recipient.bytes.arr))
+      case vtt: VersionedTransferTransaction => Right(ByteVector(vtt.recipient.bytes.arr))
+      case _                                 => Left("Transaction doesn't contain recipient")
     }
 
     override def proofs: Either[String, IndexedSeq[ByteVector]] = tx match {

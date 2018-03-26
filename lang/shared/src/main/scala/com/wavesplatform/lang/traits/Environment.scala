@@ -5,4 +5,5 @@ trait Environment {
   def networkByte : Byte
   def transaction: Transaction
   def transactionById(id: Array[Byte]): Option[Transaction]
+  def resolveAddress(addressOrAlias: Array[Byte]): Either[String, Array[Byte]]
 }
