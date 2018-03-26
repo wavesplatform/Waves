@@ -1,7 +1,8 @@
 package com.wavesplatform.generator
 
 import cats.Show
-import com.wavesplatform.generator.OrdersGenerator.Settings
+import com.wavesplatform.generator.AccountsDistribution.Settings
+
 
 
 class AccountsDistribution(settings: Settings,

@@ -7,25 +7,28 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.generator.cli.ScoptImplicits
 import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.generator.utils.{ApiRequests, GenOrderType}
-import com.wavesplatform.generator.workers.{FakeOrdersWorker, OrdersWorker}
+import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.it.util.GlobalTimer
+import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.network.client.NetworkSender
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
 import org.asynchttpclient.AsyncHttpClient
 import org.asynchttpclient.Dsl.{config => clientConfig, _}
-import org.asynchttpclient._
 import org.slf4j.LoggerFactory
 import scopt.OptionParser
-import scorex.account.AddressScheme
+import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount, PublicKeyAccount}
+import scorex.api.http.assets.SignedIssueRequest
+import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
+import scorex.transaction.assets.{IssueTransaction, MassTransferTransaction}
+import scorex.transaction.{AssetId, Proofs}
 import scorex.utils.LoggerFacade
 import settings.GeneratorSettings
-
-import scala.collection.immutable
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 import scala.concurrent.duration._
-import scala.util.{Failure, Random, Success}
+import scala.util.Random
 
 object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplicits with EnumerationReader {
 
@@ -57,6 +60,93 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
   }
 
   val defaultConfig = ConfigFactory.load().as[GeneratorSettings]("generator")
+
+  def issueAssets(endpoint: String, richAddressSeed: String, n: Int): Seq[AssetId] = {
+    val client: AsyncHttpClient = asyncHttpClient(clientConfig().setKeepAlive(false).setNettyTimer(timer))
+    val api: ApiRequests = new ApiRequests(client)
+
+    val node = api.to(endpoint)
+
+    val assetsTx: Seq[IssueTransaction] = (1 to n).map(_ =>
+      IssueTransaction.create(PrivateKeyAccount.fromSeed(richAddressSeed).right.get,
+        name = "asset$n".getBytes(),
+        description = "asset description".getBytes(),
+        quantity = 9000000,
+        decimals = 8,
+        reissuable = false,
+        fee = 100000000,
+        timestamp = System.currentTimeMillis()).right.get)
+
+
+    val tradingAssets: Seq[AssetId] = assetsTx.map(tx => tx.id())
+    val signedIssueRequests: Seq[SignedIssueRequest] = assetsTx.map(tx => api.createSignedIssueRequest(tx))
+
+    val issued: Seq[Future[Transaction]] = signedIssueRequests
+      .map { txReq =>
+        node.signedIssue(txReq).flatMap { tx =>
+          node.waitForTransaction(tx.id)
+        }
+      }
+
+    val allIssued: Future[Seq[Transaction]] = Future.sequence(issued)
+    Await.result(allIssued, 30.seconds)
+    tradingAssets
+  }
+
+  def parsedTransfersList(endpoint: String, asset: Option[String], pk: PrivateKeyAccount, accounts: Seq[PrivateKeyAccount]): List[ParsedTransfer] = {
+    val client: AsyncHttpClient = asyncHttpClient(clientConfig().setKeepAlive(false).setNettyTimer(GlobalTimer.instance))
+    val api: ApiRequests = new ApiRequests(client)
+
+    val node = api.to(endpoint)
+    var richAccountBalance = Await.result(asset match {
+      case None => node.balance(PublicKeyAccount(pk.publicKey).address).map(_.balance)
+      case Some(assetId) =>
+        node.assetBalance(PublicKeyAccount(pk.publicKey).address, assetId).map(_.balance)
+    }, 30.seconds)
+
+    val transferAmount: Long = (richAccountBalance / accounts.size) / 1000
+    val assetsTransfers =
+      accounts.map { accountPk =>
+        ParsedTransfer(AddressOrAlias.fromString(PublicKeyAccount(accountPk.publicKey).address).right.get, transferAmount)
+      }
+    assetsTransfers.toList
+  }
+
+  def massTransferAssets(endpoint: String, richAccountSeed: String, validAccounts: Seq[PrivateKeyAccount], tradingAssets: Seq[AssetId]) = {
+    val client: AsyncHttpClient = asyncHttpClient(clientConfig().setKeepAlive(false).setNettyTimer(GlobalTimer.instance))
+    val api: ApiRequests = new ApiRequests(client)
+
+    val node = api.to(endpoint)
+    val pk = PrivateKeyAccount.fromSeed(richAccountSeed).right.get
+
+    val wavesTransfers = parsedTransfersList(endpoint, None, pk, validAccounts)
+    val assetsTransfers = parsedTransfersList(endpoint, Some(tradingAssets.seq.head.base58), pk, validAccounts)
+
+    val tradingAssetsAndWaves: Seq[Option[AssetId]] = tradingAssets.map(Some(_)) :+ None
+
+    val signedAssetsMassReqSeq: Seq[MassTransferTransaction] = tradingAssetsAndWaves.map(asset =>
+      MassTransferTransaction.selfSigned(
+        Proofs.Version,
+        asset,
+        PrivateKeyAccount.fromSeed(richAccountSeed).right.get,
+        wavesTransfers,
+        System.currentTimeMillis(),
+        100000 + 50000 * assetsTransfers.size,
+        "".toArray[Byte]).right.get
+    )
+
+    val transferred: Seq[Future[Transaction]] = signedAssetsMassReqSeq
+      .map { txReq =>
+        node.broadcastRequest(txReq).flatMap { tx =>
+          node.waitForTransaction(tx.id)
+        }
+      }
+
+    val allIssued: Future[Seq[Transaction]] = Future.sequence(transferred)
+    Await.result(allIssued, 30.seconds)
+
+  }
+
   parser.parse(args, defaultConfig) match {
     case None => parser.failure("Failed to parse command line parameters")
     case Some(finalConfig) =>
@@ -66,11 +156,10 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         override val chainId: Byte = finalConfig.addressScheme.toByte
       }
 
-      val generator: OrdersGenerator = finalConfig.mode match {
-        case Mode.DEX => new OrdersGenerator(finalConfig.dex, finalConfig.richPrivateKeyAccounts)
+      val ordersDistr: Map[GenOrderType.Value, Double] = finalConfig.dex.probabilities.map {
+        case (k, v) =>
+          (k, v * finalConfig.dex.orders)
       }
-
-      val ordersDistr: Map[GenOrderType.Value, Double] = finalConfig.dex.probabilities.mapValues(v => v * finalConfig.dex.orders)
 
       val threadPool = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(threadPool)
@@ -78,21 +167,23 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       val sender = new NetworkSender(finalConfig.addressScheme, "generator", nonce = Random.nextLong())
       sys.addShutdownHook(sender.close())
 
-
       val client: AsyncHttpClient = asyncHttpClient(clientConfig().setKeepAlive(false).setNettyTimer(GlobalTimer.instance))
 
-      val t = new ApiRequests(client)
-
+      val endpoint = finalConfig.sendTo.head.getHostString
+        //val node = api.to(endpoint)
 
       val test: GeneratorSettings = finalConfig
-
 
       val defaultPrice = 1000
 
 
+      val tradingAssets = issueAssets(endpoint, finalConfig.richAccounts.head, finalConfig.assetPairsNum)
+//
+//      massTransferAssets(endpoint, finalConfig.richAccounts.head, finalConfig.validAccounts, tradingAssets)
+
 
       val workers: Seq[Worker] = ordersDistr.foreach(p =>
-        new Worker(finalConfig.worker, finalConfig, finalConfig.matcherConfig.endpoint, tradingAssets, p._1, p._2, client))
+        new Worker(finalConfig.worker, finalConfig, finalConfig.matcherConfig, tradingAssets, p._1, p._2, client))
 
 
       def close(status: Int): Unit = {
@@ -101,17 +192,18 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         System.exit(status)
       }
 
-      Future
-        .sequence(workers.map(_.run()))
-        .onComplete {
-          case Success(_) =>
-            log.info("Done")
-            close(0)
-
-          case Failure(e) =>
-            log.error("Failed", e)
-            close(1)
-        }
+//      Future
+//        .sequence(workers.map(_.run()))
+//        .onComplete {
+//          case Success(_) =>
+//            log.info("Done")
+//            close(0)
+//
+//          case Failure(e) =>
+//            log.error("Failed", e)
+//            close(1)
+//        }
   }
+
 
 }
