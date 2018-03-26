@@ -33,14 +33,14 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
     transferViaAlias   <- transferGeneratorP(master, AddressOrAlias.fromBytes(alias.bytes.arr, 0).right.get._1, None, None)
   } yield (Seq(genesis1, genesis2), aliasTx, transferViaAddress, transferViaAlias)
 
-  def evalScript[T](code: String, tx: Transaction, state: SnapshotStateReader): Either[com.wavesplatform.lang.ExecutionError, T] = {
+  def evalScript(tx: Transaction, state: SnapshotStateReader): Either[com.wavesplatform.lang.ExecutionError, Obj] = {
     val context =
       new BlockchainContext(AddressScheme.current.chainId, Coeval.evalOnce(tx), Coeval.evalOnce(state.height), state)
         .build()
 
     val Parsed.Success(expr, _) = Parser("addressFromRecipient(tx.recipient)")
     val Right(typedExpr)        = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(context), expr)
-    Evaluator[T](context, typedExpr)
+    Evaluator[Obj](context, typedExpr)
   }
 
   property("Script can resolve AddressOrAlias") {
@@ -49,12 +49,12 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
         assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(aliasTx))) {
           case (_, state) =>
             val Right(addressBytes: ByteVector) =
-              evalScript[Obj]("addressFromRecipient(tx.recipient)", transferViaAddress, state).explicitGet().fields("bytes").value.value()
+              evalScript(transferViaAddress, state).explicitGet().fields("bytes").value.value()
 
             addressBytes.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
 
             val Right(resolvedAddressBytes: ByteVector) =
-              evalScript[Obj]("addressFromRecipient(tx.recipient)", transferViaAlias, state).explicitGet().fields("bytes").value.value()
+              evalScript(transferViaAlias, state).explicitGet().fields("bytes").value.value()
 
             resolvedAddressBytes.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
         }
@@ -63,10 +63,10 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
 
   property("Script can't resolve alias that doesn't exist") {
     forAll(preconditionsAndAliasCreations) {
-      case (gen, _, transferViaAddress, transferViaAlias) =>
+      case (gen, _, _, transferViaAlias) =>
         assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq())) {
           case (_, state) =>
-            evalScript[Obj]("addressFromRecipient(tx.recipient)", transferViaAlias, state) should produce("AliasNotExists")
+            evalScript(transferViaAlias, state) should produce("AliasNotExists")
         }
     }
   }

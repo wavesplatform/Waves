@@ -25,8 +25,8 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
       val addressBytes = Address.fromPublicKey(acc.publicKey, networkByte).bytes
       val script =
         s"""
-           | let addressBytes = base58'${addressBytes.base58}'
-           | let maybeAddress = addressFromBytes(addressBytes)
+           | let addressString = "${addressBytes.base58}"
+           | let maybeAddress = addressFromString(addressString)
            | let address = extract(maybeAddress)
            | address.bytes
         """.stripMargin

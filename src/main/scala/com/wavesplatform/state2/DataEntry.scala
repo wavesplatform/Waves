@@ -44,11 +44,11 @@ object DataEntry {
 
   def parseValue(key: String, bytes: Array[Byte], p: Int): (DataEntry[_], Int) = {
     bytes(p) match {
-      case t if t == Type.Integer.id => (IntegerDataEntry(key, Longs.fromByteArray(bytes.drop(p + 1))), p + 9)
+      case t if t == Type.Integer.id => (LongDataEntry(key, Longs.fromByteArray(bytes.drop(p + 1))), p + 9)
       case t if t == Type.Boolean.id => (BooleanDataEntry(key, bytes(p + 1) != 0), p + 2)
       case t if t == Type.Binary.id =>
         val (blob, p1) = Deser.parseArraySize(bytes, p + 1)
-        (BinaryDataEntry(key, blob), p1)
+        (BinaryDataEntry(key, ByteStr(blob)), p1)
       case t => throw new Exception(s"Unknown type $t")
     }
   }
@@ -59,7 +59,7 @@ object DataEntry {
         case JsDefined(JsString(key)) =>
           jsv \ "type" match {
             case JsDefined(JsString("integer")) => jsv \ "value" match {
-              case JsDefined(JsNumber(n)) => JsSuccess(IntegerDataEntry(key, n.toLong))
+              case JsDefined(JsNumber(n)) => JsSuccess(LongDataEntry(key, n.toLong))
               case _ => JsError("value is missing or not an integer")
             }
             case JsDefined(JsString("boolean")) => jsv \ "value" match {
@@ -71,7 +71,7 @@ object DataEntry {
                 val t = if (base58.isEmpty) Success(Array.emptyByteArray) else Base58.decode(base58) /// Base58 bug
                 t.fold(
                   ex => JsError(ex.getMessage),
-                  arr => JsSuccess(BinaryDataEntry(key, arr)))
+                  arr => JsSuccess(BinaryDataEntry(key, ByteStr(arr))))
               case _ => JsError("value is missing or not a string")
             }
             case JsDefined(JsString(t)) => JsError(s"unknown type $t")
@@ -85,7 +85,7 @@ object DataEntry {
   }
 }
 
-case class IntegerDataEntry(override val key: String, override val value: Long) extends DataEntry[Long](key, value) {
+case class LongDataEntry(override val key: String, override val value: Long) extends DataEntry[Long](key, value) {
   override def valueBytes: Array[Byte] = Type.Integer.id.toByte +: Longs.toByteArray(value)
 
   override def toJson: JsObject = super.toJson + ("type" -> JsString("integer")) + ("value" -> JsNumber(value))
@@ -97,10 +97,10 @@ case class BooleanDataEntry(override val key: String, override val value: Boolea
   override def toJson: JsObject = super.toJson + ("type" -> JsString("boolean")) + ("value" -> JsBoolean(value))
 }
 
-case class BinaryDataEntry(override val key: String, override val value: Array[Byte]) extends DataEntry[Array[Byte]](key, value) {
-  override def valueBytes: Array[Byte] = Type.Binary.id.toByte +: Deser.serializeArray(value)
+case class BinaryDataEntry(override val key: String, override val value: ByteStr) extends DataEntry[ByteStr](key, value) {
+  override def valueBytes: Array[Byte] = Type.Binary.id.toByte +: Deser.serializeArray(value.arr)
 
-  override def toJson: JsObject = super.toJson + ("type" -> JsString("binary")) + ("value" -> JsString(Base58.encode(value)))
+  override def toJson: JsObject = super.toJson + ("type" -> JsString("binary")) + ("value" -> JsString(value.base58))
 
-  override def valid: Boolean = super.valid && value.length <= MaxValueSize
+  override def valid: Boolean = super.valid && value.arr.length <= MaxValueSize
 }

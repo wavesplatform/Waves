@@ -4,8 +4,8 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
+import com.wavesplatform.state2.{BooleanDataEntry, LongDataEntry}
 import com.wavesplatform.it.{NodeConfigs, TransferSending, WaitForHeight2}
-import com.wavesplatform.state2.{BooleanDataEntry, IntegerDataEntry}
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.{FreeSpec, Matchers}
 
@@ -99,9 +99,9 @@ class RollbackSpecSuite
 
   "Data transaction rollback" in {
     val node   = nodes.head
-    val entry1 = IntegerDataEntry("1", 0)
+    val entry1 = LongDataEntry("1", 0)
     val entry2 = BooleanDataEntry("2", true)
-    val entry3 = IntegerDataEntry("1", 1)
+    val entry3 = LongDataEntry("1", 1)
 
     val f = for {
       startHeight <- Future.traverse(nodes)(_.height).map(_.max)
