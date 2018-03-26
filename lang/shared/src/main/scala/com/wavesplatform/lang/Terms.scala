@@ -12,24 +12,24 @@ object Terms {
   case class TYPEPARAM(char: Char)               extends TYPEPLACEHOLDER
   case class OPTIONTYPEPARAM(t: TYPEPLACEHOLDER) extends TYPEPLACEHOLDER
 
-  sealed abstract class TYPE_HELPER[T](implicit override val typetag: TypeTag[T]) extends TYPE {
-    override type Underlying = T
-  }
   sealed trait TYPE extends TYPEPLACEHOLDER {
     type Underlying
     def typetag: TypeTag[Underlying]
   }
-  case object NOTHING extends TYPE_HELPER[Nothing]
-  case object UNIT                   extends TYPE_HELPER[Unit] //TYPE            { type Underlying = Unit }
-  case object LONG                   extends TYPE_HELPER[Long]
-  case object BYTEVECTOR             extends TYPE_HELPER[ByteVector]
-  case object BOOLEAN                extends TYPE_HELPER[Boolean]
-  case object STRING                 extends TYPE_HELPER[String]
+  sealed abstract class AUTO_TAGGED_TYPE[T](implicit override val typetag: TypeTag[T]) extends TYPE {
+    override type Underlying = T
+  }
+  case object NOTHING    extends AUTO_TAGGED_TYPE[Nothing]
+  case object UNIT       extends AUTO_TAGGED_TYPE[Unit]
+  case object LONG       extends AUTO_TAGGED_TYPE[Long]
+  case object BYTEVECTOR extends AUTO_TAGGED_TYPE[ByteVector]
+  case object BOOLEAN    extends AUTO_TAGGED_TYPE[Boolean]
+  case object STRING     extends AUTO_TAGGED_TYPE[String]
   case class OPTION(innerType: TYPE) extends TYPE {
     type Underlying = Option[innerType.Underlying]
     override def typetag: TypeTag[Option[innerType.Underlying]] = typeTag[Underlying]
   }
-  case class TYPEREF(name: String)   extends TYPE_HELPER[Obj]
+  case class TYPEREF(name: String) extends AUTO_TAGGED_TYPE[Obj]
 
   sealed trait BINARY_OP_KIND
   case object SUM_OP extends BINARY_OP_KIND
