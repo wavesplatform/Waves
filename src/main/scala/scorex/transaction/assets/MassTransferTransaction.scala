@@ -49,10 +49,13 @@ case class MassTransferTransaction private (override val version: Byte,
   }
 
   override def jsonBase(): JsObject =
-    super.jsonBase() ++ Json.obj("assetId"       -> assetId.map(_.base58),
-                                 "attachment"    -> Base58.encode(attachment),
-                                 "transferCount" -> transfers.size,
-                                 "totalAmount"   -> transfers.map(_.amount).sum)
+    super.jsonBase() ++ Json.obj(
+      "version"       -> version,
+      "assetId"       -> assetId.map(_.base58),
+      "attachment"    -> Base58.encode(attachment),
+      "transferCount" -> transfers.size,
+      "totalAmount"   -> transfers.map(_.amount).sum
+    )
 
   override val json: Coeval[JsObject] = Coeval.evalOnce {
     jsonBase() ++ Json.obj("transfers" -> toJson(transfers))

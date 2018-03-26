@@ -18,7 +18,7 @@ trait FicusImplicits {
 
   implicit val distributionsReader: ValueReader[Map[TransactionParser, Double]] = {
     val converter = CaseFormat.LOWER_HYPHEN.converterTo(CaseFormat.UPPER_CAMEL)
-    def toTxType(key: String): TransactionParser = TransactionParsers.builderBy(s"${converter.convert(key)}Transaction").get
+    def toTxType(key: String): TransactionParser = TransactionParsers.by(s"${converter.convert(key)}Transaction").get
 
     CollectionReaders.mapValueReader[Double].map { xs =>
       xs.map { case (k, v) => toTxType(k) -> v }

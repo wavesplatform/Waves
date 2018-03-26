@@ -76,7 +76,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
                 Exception.allCatch.opt(limitStr.toInt) match {
                   case Some(limit) if limit > 0 && limit <= MaxTransactionsPerRequest =>
                     complete(Json.arr(JsArray(
-                      state.addressTransactions(a, 0, limit, Set.empty).map { case (h, tx) =>
+                      state.addressTransactions(a, Set.empty, limit, 0).map { case (h, tx) =>
                         txToCompactJson(a, tx) + ("height" -> JsNumber(h))
                     })))
                   case Some(limit) if limit > MaxTransactionsPerRequest =>
@@ -166,7 +166,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
         val typeId = (jsv \ "type").as[Byte]
         val version = (jsv \ "version").asOpt[Byte].getOrElse(1.toByte)
 
-        val r = TransactionParsers.builderBy(typeId, version) match {
+        val r = TransactionParsers.by(typeId, version) match {
           case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
           case Some(x) => x match {
             case IssueTransaction => TransactionFactory.issueAsset(jsv.as[IssueRequest], wallet, time)
@@ -206,7 +206,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
         val typeId = (jsv \ "type").as[Byte]
         val version = (jsv \ "version").asOpt[Byte].getOrElse(1.toByte)
 
-        val r = TransactionParsers.builderBy(typeId, version) match {
+        val r = TransactionParsers.by(typeId, version) match {
           case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
           case Some(x) => x match {
             case IssueTransaction => jsv.as[SignedIssueRequest].toTx

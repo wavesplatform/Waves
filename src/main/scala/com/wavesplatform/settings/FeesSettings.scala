@@ -22,6 +22,6 @@ object FeesSettings {
 
   private def toTxType(key: String): Int = {
     val name = s"${converter.convert(key)}Transaction"
-    TransactionParsers.builderBy(name).getOrElse(throw new NoSuchElementException(s"Can't find '$name' transaction")).typeId
+    TransactionParsers.by(name).getOrElse(throw new NoSuchElementException(s"Can't find '$name' transaction")).typeId
   }
 }

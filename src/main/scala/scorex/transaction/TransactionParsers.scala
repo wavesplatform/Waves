@@ -56,8 +56,8 @@ object TransactionParsers {
     case (_, builder) => builder.classTag.runtimeClass.getSimpleName -> builder
   }
 
-  def builderBy(name: String): Option[TransactionParser] = byName.get(name)
-  def builderBy(typeId: Byte, version: Byte): Option[TransactionParser] = all.get((typeId, version))
+  def by(name: String): Option[TransactionParser] = byName.get(name)
+  def by(typeId: Byte, version: Byte): Option[TransactionParser] = all.get((typeId, version))
 
   def parseBytes(data: Array[Byte]): Try[Transaction] =
     data.headOption

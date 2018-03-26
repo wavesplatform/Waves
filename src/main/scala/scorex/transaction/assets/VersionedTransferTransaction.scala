@@ -25,7 +25,7 @@ case class VersionedTransferTransaction private (override val version: Byte,
     extends ProvenTransaction
     with FastHashId {
 
-  override val builder: TransactionParser       = VersionedTransferTransaction
+  override val builder: TransactionParser        = VersionedTransferTransaction
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
@@ -48,6 +48,7 @@ case class VersionedTransferTransaction private (override val version: Byte,
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
+      "version"    -> version,
       "recipient"  -> recipient.stringRepr,
       "assetId"    -> assetId.map(_.base58),
       "amount"     -> amount,
@@ -76,7 +77,15 @@ object VersionedTransferTransaction extends TransactionParserFor[VersionedTransf
         (recipient, recipientEnd) = recRes
         (attachment, attachEnd)   = Deser.parseArraySize(bytes, recipientEnd)
         proofs <- Proofs.fromBytes(bytes.drop(attachEnd))
-        tt     <- VersionedTransferTransaction.create(version, assetIdOpt.map(ByteStr(_)), sender, recipient, amount, timestamp, feeAmount, attachment, proofs)
+        tt <- VersionedTransferTransaction.create(version,
+                                                  assetIdOpt.map(ByteStr(_)),
+                                                  sender,
+                                                  recipient,
+                                                  amount,
+                                                  timestamp,
+                                                  feeAmount,
+                                                  attachment,
+                                                  proofs)
       } yield tt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 

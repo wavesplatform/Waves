@@ -4,6 +4,7 @@ import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Address, Alias}
 import scorex.transaction.Transaction
+import scorex.transaction.Transaction.Type
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.Script
@@ -40,18 +41,15 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
 
   override def height: Int = inner.height + (if (maybeDiff.isDefined) 1 else 0)
 
-  override def addressTransactions(address: Address,
-                                   from: Int,
-                                   count: Int,
-                                   filter: Set[Transaction.Type]): Seq[(Int, Transaction)] = {
+  override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = {
     val transactionsFromDiff = diff.transactions.values.view.collect {
-      case (height, tx, addresses) if addresses(address) && (filter.isEmpty || filter.contains(tx.builder.typeId)) => (height, tx)
+      case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder.typeId)) => (height, tx)
     }.slice(from, from + count).toSeq
 
     val actualTxCount = transactionsFromDiff.length
 
     if (actualTxCount == count) transactionsFromDiff else {
-      transactionsFromDiff ++ inner.addressTransactions(address, 0, count - actualTxCount, filter)
+      transactionsFromDiff ++ inner.addressTransactions(address, types, count - actualTxCount, 0)
     }
   }
 

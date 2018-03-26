@@ -12,6 +12,7 @@ import com.wavesplatform.state2.reader.LeaseDetails
 import org.iq80.leveldb.{DB, ReadOptions}
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}
+import scorex.transaction.Transaction.Type
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -630,13 +631,14 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
 
           rw.delete(ktxId)
           tx match {
-            case _: GenesisTransaction => // genesis transaction can not be rolled back
+            case _: GenesisTransaction                                                                                         => // genesis transaction can not be rolled back
             case _: PaymentTransaction | _: TransferTransaction | _: VersionedTransferTransaction | _: MassTransferTransaction => // balances already restored
-            case _: IssueTransaction         => rollbackAssetInfo(rw, tx.id(), currentHeight)
-            case tx: ReissueTransaction      => rollbackAssetInfo(rw, tx.assetId, currentHeight)
-            case tx: BurnTransaction         => rollbackAssetInfo(rw, tx.assetId, currentHeight)
-            case _: LeaseTransaction         => rw.delete(k.leaseStatus(currentHeight, tx.id()))
-            case tx: LeaseCancelTransaction  => rw.delete(k.leaseStatus(currentHeight, tx.leaseId))
+
+            case _: IssueTransaction        => rollbackAssetInfo(rw, tx.id(), currentHeight)
+            case tx: ReissueTransaction     => rollbackAssetInfo(rw, tx.assetId, currentHeight)
+            case tx: BurnTransaction        => rollbackAssetInfo(rw, tx.assetId, currentHeight)
+            case _: LeaseTransaction        => rw.delete(k.leaseStatus(currentHeight, tx.id()))
+            case tx: LeaseCancelTransaction => rw.delete(k.leaseStatus(currentHeight, tx.leaseId))
 
             case tx: SetScriptTransaction =>
               val address = tx.sender.toAddress
@@ -646,6 +648,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
                 val kash = k.addressScriptHistory(addressId)
                 rw.put(kash, rw.get(kash).filter(_ != currentHeight))
               }
+
             case tx: DataTransaction =>
               val address = tx.sender.toAddress
               addressIdCache.get(address).foreach { addressId =>
@@ -685,12 +688,12 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(db => db.get(k.transactionInfo(id)))
 
-  override def addressTransactions(address: Address, from: Int, count: Int, filter: Set[Transaction.Type]): Seq[(Int, Transaction)] = readOnly { db =>
+  override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = readOnly { db =>
     db.get(k.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { addressId =>
       val txs = for {
         h              <- (db.get(k.height) to 1 by -1).view
         (txType, txId) <- db.get(k.addressTransactionIds(h, addressId))
-        if filter.isEmpty || filter.contains(txType.toByte)
+        if types.isEmpty || types.contains(txType.toByte)
         (_, tx) <- db.get(k.transactionInfo(txId))
       } yield (h, tx)
 

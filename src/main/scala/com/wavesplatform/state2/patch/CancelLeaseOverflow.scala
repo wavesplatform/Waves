@@ -11,7 +11,7 @@ object CancelLeaseOverflow extends ScorexLogging {
 
     val addressesWithLeaseOverflow = s.collectPortfolios { p => p.balance < p.lease.out }
     val leasesToCancel = addressesWithLeaseOverflow.keys.flatMap { a =>
-      s.addressTransactions(a, 0, Int.MaxValue, Set(LeaseTransaction.typeId)).collect {
+      s.addressTransactions(a, Set(LeaseTransaction.typeId), Int.MaxValue, 0).collect {
         case (_, lt: LeaseTransaction) if lt.sender.toAddress == a => lt.id()
       }
     }

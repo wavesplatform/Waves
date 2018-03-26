@@ -19,7 +19,7 @@ case class DataTransaction private (override val version: Byte,
     extends ProvenTransaction
     with FastHashId {
 
-  override val builder: TransactionParser       = DataTransaction
+  override val builder: TransactionParser        = DataTransaction
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
@@ -36,7 +36,10 @@ case class DataTransaction private (override val version: Byte,
   implicit val dataItemFormat: Format[DataEntry[_]] = DataEntry.Format
 
   override val json: Coeval[JsObject] = Coeval.evalOnce {
-    jsonBase() ++ Json.obj("data" -> Json.toJson(data))
+    jsonBase() ++ Json.obj(
+      "version" -> version,
+      "data"    -> Json.toJson(data)
+    )
   }
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), proofs.bytes()))

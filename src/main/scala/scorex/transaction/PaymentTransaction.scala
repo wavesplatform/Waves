@@ -14,7 +14,7 @@ import scala.util.{Failure, Success, Try}
 
 case class PaymentTransaction private (sender: PublicKeyAccount, recipient: Address, amount: Long, fee: Long, timestamp: Long, signature: ByteStr)
     extends SignedTransaction {
-  override val builder: TransactionParser       = PaymentTransaction
+  override val builder: TransactionParser        = PaymentTransaction
   override def version: Byte                     = builder.supportedVersions.head
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val id: Coeval[AssetId]               = Coeval.evalOnce(signature)

@@ -12,59 +12,76 @@ import scorex.transaction.{ValidationError, _}
 
 import scala.util.{Failure, Success, Try}
 
-case class ExchangeTransaction private(buyOrder: Order,
-                                       sellOrder: Order,
-                                       price: Long,
-                                       amount: Long,
-                                       buyMatcherFee: Long,
-                                       sellMatcherFee: Long,
-                                       fee: Long,
-                                       timestamp: Long,
-                                       signature: ByteStr)
-  extends SignedTransaction with FastHashId {
+case class ExchangeTransaction private (buyOrder: Order,
+                                        sellOrder: Order,
+                                        price: Long,
+                                        amount: Long,
+                                        buyMatcherFee: Long,
+                                        sellMatcherFee: Long,
+                                        fee: Long,
+                                        timestamp: Long,
+                                        signature: ByteStr)
+    extends SignedTransaction
+    with FastHashId {
 
   override val builder: ExchangeTransaction.type = ExchangeTransaction
-  override def version: Byte = builder.version
+  override def version: Byte                     = builder.version
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
   @ApiModelProperty(hidden = true)
   override val sender: PublicKeyAccount = buyOrder.matcherPublicKey
 
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Array(builder.typeId) ++
-    Ints.toByteArray(buyOrder.bytes().length) ++ Ints.toByteArray(sellOrder.bytes().length) ++
-    buyOrder.bytes() ++ sellOrder.bytes() ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
-    Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
-    Longs.toByteArray(timestamp))
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
+    Array(builder.typeId) ++
+      Ints.toByteArray(buyOrder.bytes().length) ++ Ints.toByteArray(sellOrder.bytes().length) ++
+      buyOrder.bytes() ++ sellOrder.bytes() ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
+      Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
+      Longs.toByteArray(timestamp))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature.arr)
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
-    "order1" -> buyOrder.json(),
-    "order2" -> sellOrder.json(),
-    "price" -> price,
-    "amount" -> amount,
-    "buyMatcherFee" -> buyMatcherFee,
-    "sellMatcherFee" -> sellMatcherFee
-  ))
+  override val json: Coeval[JsObject] = Coeval.evalOnce(
+    jsonBase() ++ Json.obj(
+      "order1"         -> buyOrder.json(),
+      "order2"         -> sellOrder.json(),
+      "price"          -> price,
+      "amount"         -> amount,
+      "buyMatcherFee"  -> buyMatcherFee,
+      "sellMatcherFee" -> sellMatcherFee
+    ))
 
   override val signedDescendants: Coeval[Seq[Order]] = Coeval.evalOnce(Seq(buyOrder, sellOrder))
 }
 
 object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] with TransactionParser.HardcodedVersion {
 
-  override val typeId: Byte = 7
+  override val typeId: Byte  = 7
   override val version: Byte = 1
 
-  def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+  def create(matcher: PrivateKeyAccount,
+             buyOrder: Order,
+             sellOrder: Order,
+             price: Long,
+             amount: Long,
+             buyMatcherFee: Long,
+             sellMatcherFee: Long,
+             fee: Long,
+             timestamp: Long): Either[ValidationError, TransactionT] = {
     create(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).right.map { unverified =>
       unverified.copy(signature = ByteStr(crypto.sign(matcher.privateKey, unverified.bodyBytes())))
     }
   }
 
-  def create(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, TransactionT] = {
+  def create(buyOrder: Order,
+             sellOrder: Order,
+             price: Long,
+             amount: Long,
+             buyMatcherFee: Long,
+             sellMatcherFee: Long,
+             fee: Long,
+             timestamp: Long,
+             signature: ByteStr): Either[ValidationError, TransactionT] = {
     lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
 
     if (fee <= 0) {
@@ -102,33 +119,34 @@ object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] wit
     }
   }
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] = Try {
-    var from = 0
-    val o1Size = Ints.fromByteArray(bytes.slice(from, from + 4))
-    from += 4
-    val o2Size = Ints.fromByteArray(bytes.slice(from, from + 4))
-    from += 4
-    val o1 = Order.parseBytes(bytes.slice(from, from + o1Size)).get
-    from += o1Size
-    val o2 = Order.parseBytes(bytes.slice(from, from + o2Size)).get
-    from += o2Size
-    val price = Longs.fromByteArray(bytes.slice(from, from + 8))
-    from += 8
-    val amount = Longs.fromByteArray(bytes.slice(from, from + 8))
-    from += 8
-    val buyMatcherFee = Longs.fromByteArray(bytes.slice(from, from + 8))
-    from += 8
-    val sellMatcherFee = Longs.fromByteArray(bytes.slice(from, from + 8))
-    from += 8
-    val fee = Longs.fromByteArray(bytes.slice(from, from + 8))
-    from += 8
-    val timestamp = Longs.fromByteArray(bytes.slice(from, from + 8))
-    from += 8
-    val signature = ByteStr(bytes.slice(from, from + TransactionParsers.SignatureLength))
-    from += TransactionParsers.SignatureLength
+  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+    Try {
+      var from   = 0
+      val o1Size = Ints.fromByteArray(bytes.slice(from, from + 4))
+      from += 4
+      val o2Size = Ints.fromByteArray(bytes.slice(from, from + 4))
+      from += 4
+      val o1 = Order.parseBytes(bytes.slice(from, from + o1Size)).get
+      from += o1Size
+      val o2 = Order.parseBytes(bytes.slice(from, from + o2Size)).get
+      from += o2Size
+      val price = Longs.fromByteArray(bytes.slice(from, from + 8))
+      from += 8
+      val amount = Longs.fromByteArray(bytes.slice(from, from + 8))
+      from += 8
+      val buyMatcherFee = Longs.fromByteArray(bytes.slice(from, from + 8))
+      from += 8
+      val sellMatcherFee = Longs.fromByteArray(bytes.slice(from, from + 8))
+      from += 8
+      val fee = Longs.fromByteArray(bytes.slice(from, from + 8))
+      from += 8
+      val timestamp = Longs.fromByteArray(bytes.slice(from, from + 8))
+      from += 8
+      val signature = ByteStr(bytes.slice(from, from + TransactionParsers.SignatureLength))
+      from += TransactionParsers.SignatureLength
 
-    create(o1, o2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
-      .fold(left => Failure(new Exception(left.toString)), right => Success(right))
-  }.flatten
+      create(o1, o2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
+        .fold(left => Failure(new Exception(left.toString)), right => Success(right))
+    }.flatten
 
 }

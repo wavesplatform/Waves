@@ -50,25 +50,27 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
 
   private val networkByte = AddressScheme.current.chainId
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] = Try {
-    val chainId = bytes(0)
-    val sender = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
-    val (scriptOptEi: Option[Either[ValidationError.ScriptParseError, Script]], scriptEnd) = Deser.parseOption(bytes, KeyLength + 1)(str => Script.fromBytes(Deser.parseArraySize(str, 0)._1))
-    val scriptEiOpt = scriptOptEi match {
-      case None => Right(None)
-      case Some(Right(sc)) => Right(Some(sc))
-      case Some(Left(err)) => Left(err)
-    }
+  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+    Try {
+      val chainId = bytes(0)
+      val sender  = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
+      val (scriptOptEi: Option[Either[ValidationError.ScriptParseError, Script]], scriptEnd) =
+        Deser.parseOption(bytes, KeyLength + 1)(str => Script.fromBytes(Deser.parseArraySize(str, 0)._1))
+      val scriptEiOpt = scriptOptEi match {
+        case None            => Right(None)
+        case Some(Right(sc)) => Right(Some(sc))
+        case Some(Left(err)) => Left(err)
+      }
 
-    val fee = Longs.fromByteArray(bytes.slice(scriptEnd, scriptEnd + 8))
-    val timestamp = Longs.fromByteArray(bytes.slice(scriptEnd + 8, scriptEnd + 16))
-    (for {
-      scriptOpt <- scriptEiOpt
-      _ <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
-      proofs <- Proofs.fromBytes(bytes.drop(scriptEnd + 16))
-      tx <- create(version, sender, scriptOpt, fee, timestamp, proofs)
-    } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
-  }.flatten
+      val fee       = Longs.fromByteArray(bytes.slice(scriptEnd, scriptEnd + 8))
+      val timestamp = Longs.fromByteArray(bytes.slice(scriptEnd + 8, scriptEnd + 16))
+      (for {
+        scriptOpt <- scriptEiOpt
+        _         <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
+        proofs    <- Proofs.fromBytes(bytes.drop(scriptEnd + 16))
+        tx        <- create(version, sender, scriptOpt, fee, timestamp, proofs)
+      } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
+    }.flatten
 
   def create(version: Byte,
              sender: PublicKeyAccount,
@@ -81,7 +83,11 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
       _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee)
     } yield new SetScriptTransaction(version, networkByte, sender, script, fee, timestamp, proofs)
 
-  def selfSigned(version: Byte, sender: PrivateKeyAccount, script: Option[Script], fee: Long, timestamp: Long): Either[ValidationError, TransactionT] =
+  def selfSigned(version: Byte,
+                 sender: PrivateKeyAccount,
+                 script: Option[Script],
+                 fee: Long,
+                 timestamp: Long): Either[ValidationError, TransactionT] =
     create(version, sender, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes())))).explicitGet())
     }

@@ -45,8 +45,13 @@ case class SmartIssueTransaction private (override val version: Byte,
       Longs.toByteArray(timestamp)
     ))
 
-  override val assetFee                   = (None, fee)
-  override val json                       = Coeval.evalOnce(jsonBase() ++ Json.obj("script" -> script.map(_.text)))
+  override val assetFee = (None, fee)
+  override val json = Coeval.evalOnce(
+    jsonBase() ++ Json.obj(
+      "version" -> version,
+      "script"  -> script.map(_.text)
+    ))
+
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), proofs.bytes()))
 }
 
@@ -98,7 +103,7 @@ object SmartIssueTransaction extends TransactionParserFor[SmartIssueTransaction]
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] =
     for {
-     _<- Either.cond(supportedVersions.contains(version), (), UnsupportedVersion(version))
+      _ <- Either.cond(supportedVersions.contains(version), (), UnsupportedVersion(version))
       _ <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
       _ <- IssueTransaction.validateIssueParams(name, description, quantity, decimals, reissuable, fee)
     } yield SmartIssueTransaction(version, chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs)
