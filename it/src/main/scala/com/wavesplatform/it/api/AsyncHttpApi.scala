@@ -192,7 +192,8 @@ object AsyncHttpApi extends Assertions {
       case Failure(ex) => Failure(ex)
     }
 
-    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[Transaction] = waitFor[Option[Transaction]](s"transaction $txId")(_.transactionInfo(txId).transform {
+    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[Transaction] =
+      waitFor[Option[Transaction]](s"transaction $txId")(_.transactionInfo(txId).transform {
       case Success(tx) => Success(Some(tx))
       case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
       case Failure(ex) => Failure(ex)
