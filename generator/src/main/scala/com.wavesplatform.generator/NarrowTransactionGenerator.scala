@@ -80,7 +80,7 @@ class NarrowTransactionGenerator(settings: Settings,
                 val pk = accounts.find(_ == issue.sender).get
                 (pk, Some(issue.id()))
               })
-            } else Some(randomFrom(accounts).get, None)
+            } else Some((randomFrom(accounts).get, None))
             senderAndAssetOpt.flatMap { case (sender, asset) =>
               logOption(TransferTransaction.create(asset, sender, recipient, r.nextInt(500000), ts, None, moreThatStandartFee,
                 Array.fill(r.nextInt(100))(r.nextInt().toByte)))
@@ -134,9 +134,9 @@ class NarrowTransactionGenerator(settings: Settings,
                 val pk = accounts.find(_ == issue.sender).get
                 (pk, Some(issue.id()))
               })
-            } else Some(randomFrom(accounts).get, None)
+            } else Some((randomFrom(accounts).get, None))
             senderAndAssetOpt.flatMap { case (sender, asset) =>
-              logOption(MassTransferTransaction.selfSigned(asset, sender, transfers.toList, ts, moreThatStandartFee,
+              logOption(MassTransferTransaction.selfSigned(MassTransferTransaction.version, asset, sender, transfers.toList, ts, moreThatStandartFee,
                 Array.fill(r.nextInt(100))(r.nextInt().toByte)))
             }
         }
