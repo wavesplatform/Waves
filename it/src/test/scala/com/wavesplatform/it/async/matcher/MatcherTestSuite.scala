@@ -3,9 +3,11 @@ package com.wavesplatform.it.async.matcher
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.{LevelResponse, MatcherStatusResponse}
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{Node, ReportingTestName}
 import com.wavesplatform.matcher.api.CancelOrderRequest
+import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.api.http.assets.SignedTransferRequest
@@ -97,15 +99,14 @@ class MatcherTestSuite
   }
 
   "frozen amount should be listed via matcherBalance REST endpoint" in {
-    getReservedBalance(matcherNode, aliceNode.privateKey
-    ) shouldBe Map(aliceAsset -> aliceSellAmount)
+    getReservedBalance(matcherNode, aliceNode.privateKey) shouldBe Map(aliceAsset -> aliceSellAmount)
 
     getReservedBalance(matcherNode, bobNode.privateKey) shouldBe Map()
   }
 
   "and should be listed by trader's publiс key via REST" in {
 
-    val orderIds = getAllOrder(matcherNode,aliceNode.privateKey)
+    val orderIds = getAllOrder(matcherNode, aliceNode.privateKey)
 
     orderIds should contain(aliceSell1)
   }
@@ -311,7 +312,8 @@ class MatcherTestSuite
     waitForAssetBalance(aliceNode, bobAsset, 0)
 
     // Bob wants to sell all own assets for 1 Wave
-    def bobOrder    = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.SELL, 1 * Waves * Order.PriceConstant, bobAssetQuantity)
+    def bobOrder = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.SELL, 1 * Waves * Order.PriceConstant, bobAssetQuantity)
+
     val (sellId, _) = matcherPlaceOrder(matcherNode, bobOrder)
     waitForOrderStatus(matcherNode, bobAsset, sellId, "Accepted")
 

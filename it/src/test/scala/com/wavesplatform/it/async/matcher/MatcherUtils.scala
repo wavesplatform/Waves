@@ -6,6 +6,9 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.{AssetBalance, MatcherStatusResponse, OrderBookResponse}
 import com.wavesplatform.it.util._
+import com.wavesplatform.state2.ByteStr
+import scorex.account.PrivateKeyAccount
+import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -95,21 +98,23 @@ trait MatcherUtils {
   }
 
   def getAllOrder(node: Node, pk: PrivateKeyAccount): Seq[String] = {
-    val ts = System.currentTimeMillis()
+    val ts        = System.currentTimeMillis()
     val signature = ByteStr(crypto.sign(pk, pk.publicKey ++ Longs.toByteArray(ts)))
-    Await.result(node.getOrderbookByPublicKey(Base58.encode(pk.publicKey), ts, signature), 1.minute)
+    Await
+      .result(node.getOrderbookByPublicKey(Base58.encode(pk.publicKey), ts, signature), 1.minute)
       .map(_.id)
   }
 
   def getAllActiveOrder(node: Node, pk: PrivateKeyAccount): Seq[String] = {
-    val ts = System.currentTimeMillis()
+    val ts        = System.currentTimeMillis()
     val signature = ByteStr(crypto.sign(pk, pk.publicKey ++ Longs.toByteArray(ts)))
-    Await.result(node.getOrderbookByPublicKeyActive(Base58.encode(pk.publicKey), ts, signature), 1.minute)
+    Await
+      .result(node.getOrderbookByPublicKeyActive(Base58.encode(pk.publicKey), ts, signature), 1.minute)
       .map(_.id)
   }
 
   def getReservedBalance(node: Node, pk: PrivateKeyAccount): Map[String, Long] = {
-    val ts = System.currentTimeMillis()
+    val ts        = System.currentTimeMillis()
     val signature = ByteStr(crypto.sign(pk, pk.publicKey ++ Longs.toByteArray(ts)))
     Await.result(node.getReservedBalance(Base58.encode(pk.publicKey), ts, signature), 1.minute)
   }
