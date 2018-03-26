@@ -12,8 +12,8 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
     forAll(accountGen) { acc =>
       val script =
         s"""
-           | let pk = "${ByteStr(acc.publicKey).base58}"
-           | let address = addressFromString(pk)
+           | let pk = base58'${ByteStr(acc.publicKey).base58}'
+           | let address = addressFromPublicKey(pk)
            | address.bytes
         """.stripMargin
       runScript[ByteVector](script) shouldBe Right(ByteVector(Address.fromPublicKey(acc.publicKey, networkByte).bytes.arr))
@@ -25,8 +25,8 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
       val addressBytes = Address.fromPublicKey(acc.publicKey, networkByte).bytes
       val script =
         s"""
-           | let addressBytes = base58'${addressBytes.base58}'
-           | let maybeAddress = addressFromBytes(addressBytes)
+           | let addressString = "${addressBytes.base58}"
+           | let maybeAddress = addressFromString(addressString)
            | let address = extract(maybeAddress)
            | address.bytes
         """.stripMargin

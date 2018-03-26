@@ -4,7 +4,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, DataEntry, LongDataEntry}
+import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, LongDataEntry}
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
 import scorex.api.http.SignedDataRequest
@@ -78,7 +78,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     import DataTransaction.MaxEntryCount
 
     val maxKey = "a" * MaxKeySize
-    val data   = List.tabulate(MaxEntryCount)(n => BinaryDataEntry(maxKey, Array.fill(MaxValueSize)(n.toByte)))
+    val data   = List.tabulate(MaxEntryCount)(n => BinaryDataEntry(maxKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
     val fee    = calcDataFee(data)
     val txId   = sender.putData(firstAddress, data, fee).id
 
@@ -119,7 +119,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
     val intEntry2        = LongDataEntry("int", -127)
     val boolEntry2       = BooleanDataEntry("bool", false)
-    val blobEntry2       = BinaryDataEntry("blob", Array[Byte](127.toByte, 0, 1, 1))
+    val blobEntry2       = BinaryDataEntry("blob", ByteStr(Array[Byte](127.toByte, 0, 1, 1)))
     val dataAllTypes     = List(intEntry2, boolEntry2, blobEntry2)
     val fee              = calcDataFee(dataAllTypes)
     val txId             = sender.putData(secondAddress, dataAllTypes, fee).id
@@ -238,11 +238,11 @@ class DataTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndResponse(sender.putData(firstAddress, data, calcDataFee(data)), message)
     nodes.waitForHeightAraise()
 
-    val extraValueData = List(BinaryDataEntry("key", Array.fill(MaxValueSize + 1)(1.toByte)))
+    val extraValueData = List(BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1.toByte))))
     assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, calcDataFee(extraValueData)), message)
     nodes.waitForHeightAraise()
 
-    val extraSizedData = List.tabulate(MaxEntryCount + 1)(n => BinaryDataEntry(extraKey, Array.fill(MaxValueSize)(n.toByte)))
+    val extraSizedData = List.tabulate(MaxEntryCount + 1)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
     assertBadRequestAndResponse(sender.putData(firstAddress, extraSizedData, calcDataFee(extraSizedData)), message)
     nodes.waitForHeightAraise()
 
