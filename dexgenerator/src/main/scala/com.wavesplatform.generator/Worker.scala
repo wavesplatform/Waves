@@ -24,9 +24,7 @@ import scala.util.Failure
 
 class Worker(workerSettings: Settings,
              generatorSettings: GeneratorSettings,
-             sender: NetworkSender,
-             matcher: MatcherNodeSettings,
-             val accounts: Seq[PrivateKeyAccount],
+             matcher: MatcherNodeSettings.Settings,
              val tradingAssets: Seq[AssetId],
              orderType: Int,
              ordersCount: Int,
@@ -56,7 +54,7 @@ class Worker(workerSettings: Settings,
     val pair = AssetPair(randomFrom(tradingAssets), None)
     val buyer = randomFrom(accounts).get
     val order = Order.buy(buyer, matcherPublickKey, pair, price, 0.0001.waves, ts, ts + 1.day.toMillis, fee)
-    placeOrder(matcher.endpoint, order)
+    to(matcher.endpoint).placeOrder(order)
   }
 
 
@@ -64,7 +62,7 @@ class Worker(workerSettings: Settings,
     val pair = AssetPair(randomFrom(tradingAssets), None)
     val seller = randomFrom(accounts).get
     val order = Order.sell(seller, matcherPublickKey, pair, price, 0.0001.waves, ts, ts + 1.day.toMillis, fee)
-    placeOrder(matcher.endpoint, order)
+    to(matcher.endpoint).placeOrder( order)
   }
 
   private def placeOrders(startStep: Int): Result[Unit] = {
