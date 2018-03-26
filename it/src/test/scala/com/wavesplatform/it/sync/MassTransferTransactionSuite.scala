@@ -107,7 +107,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   test("invalid transfer should not be in UTX or blockchain") {
     import scorex.transaction.assets.TransferTransaction.MaxAttachmentSize
 
-    def request(version: Byte = MassTransferTransaction.Version,
+    def request(version: Byte = MassTransferTransaction.version,
                 transfers: List[Transfer] = List(Transfer(secondAddress, transferAmount)),
                 fee: Long = calcFee(1),
                 timestamp: Long = System.currentTimeMillis,
