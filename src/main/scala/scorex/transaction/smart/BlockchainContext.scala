@@ -1,11 +1,13 @@
 package scorex.transaction.smart
 
+import com.wavesplatform.lang.TypeChecker.TypeCheckerContext
 import com.wavesplatform.lang.WavesContext
 import com.wavesplatform.lang.traits.{Transaction => ContractTransaction}
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Coeval
 import scodec.bits.ByteVector
+import scorex.account.AddressScheme
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -26,6 +28,11 @@ class BlockchainContext(override val networkByte: Byte, tx: Coeval[Transaction],
 }
 
 object BlockchainContext {
+
+  private val networkByte = AddressScheme.current.chainId
+
+  lazy val typeCheckerContext: TypeCheckerContext =
+    TypeCheckerContext.fromContext(new BlockchainContext(networkByte, Coeval(???), Coeval(???), null).build())
 
   def convert(tx: Transaction): ContractTransaction = new ContractTransaction {
 

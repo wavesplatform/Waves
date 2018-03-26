@@ -1,6 +1,7 @@
-package com.wavesplatform.it
+package com.wavesplatform.it.async
 
 import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.{DockerBased, NodeConfigs}
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.utils.ScorexLogging
 

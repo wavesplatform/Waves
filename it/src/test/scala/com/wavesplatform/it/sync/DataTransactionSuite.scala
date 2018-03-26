@@ -1,7 +1,8 @@
-package com.wavesplatform.it.transactions
+package com.wavesplatform.it.sync
 
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.UnexpectedStatusCodeException
+import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry}
 import org.scalatest.{Assertion, Assertions}
@@ -19,13 +20,12 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
   test("sender's waves balance is decreased by fee.") {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
-    val entry = IntegerDataEntry("int", 0xcafebabe)
-    val size = entry.valueBytes.size
-    val data = List(entry)
-    val transferFee = calcDataFee(size)
-    val txId = sender.putData(firstAddress, data, transferFee).id
-    nodes.waitForHeightAraiseAndTxPresent(txId)
-    
+    val entry            = IntegerDataEntry("int", 0xcafebabe)
+    val data             = List(entry)
+    val transferFee      = calcDataFee(data)
+    val txId             = sender.putData(firstAddress, data, transferFee).id
+    nodes.waitForHeightAriseAndTxPresent(txId)
+
     notMiner.assertBalances(firstAddress, balance1 - transferFee, eff1 - transferFee)
   }
 
@@ -38,9 +38,9 @@ class DataTransactionSuite extends BaseTransactionSuite {
     notMiner.assertBalances(firstAddress, balance1, eff1)
 
     val leaseAmount = 1.waves
-    val leaseFee = 100000
-    val leaseId = sender.lease(firstAddress, secondAddress, leaseAmount, leaseFee).id
-    nodes.waitForHeightAraiseAndTxPresent(leaseId)
+    val leaseFee    = 100000
+    val leaseId     = sender.lease(firstAddress, secondAddress, leaseAmount, leaseFee).id
+    nodes.waitForHeightAriseAndTxPresent(leaseId)
 
     assertBadRequestAndResponse(sender.putData(firstAddress, data, balance1 - leaseAmount), "negative effective balance")
     nodes.waitForHeightAraise()
@@ -57,13 +57,13 @@ class DataTransactionSuite extends BaseTransactionSuite {
     def request(tx: DataTransaction): SignedDataRequest =
       SignedDataRequest(DataTransaction.Version, Base58.encode(tx.sender.publicKey), tx.data, tx.fee, tx.timestamp, tx.proofs.base58().toList)
 
-    implicit val w = Json.writes[SignedDataRequest].transform((jsobj: JsObject) =>
-      jsobj + ("type" -> JsNumber(TransactionType.DataTransaction.id)))
+    implicit val w = Json.writes[SignedDataRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(TransactionType.DataTransaction.id)))
 
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val invalidTxs = Seq(
       (data(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction .* is from far future"),
-      (data(fee = 99999), "Fee .* does not exceed minimal value"))
+      (data(fee = 99999), "Fee .* does not exceed minimal value")
+    )
 
     for ((tx, diag) <- invalidTxs) {
       assertBadRequestAndResponse(sender.broadcastRequest(request(tx)), diag)
@@ -75,59 +75,61 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("max transaction size") {
-    import DataTransaction.MaxEntryCount
     import DataEntry.{MaxKeySize, MaxValueSize}
+    import DataTransaction.MaxEntryCount
 
     val maxKey = "a" * MaxKeySize
-    val data = List.tabulate(MaxEntryCount)(n => BinaryDataEntry(maxKey, Array.fill(MaxValueSize)(n.toByte)))
-    val kilobytes = (MaxEntryCount * (MaxKeySize + MaxValueSize + 3) + 120) / 1024 + 1
-    val fee = kilobytes * 100000
-    val txId = sender.putData(firstAddress, data, fee).id
+    val data   = List.tabulate(MaxEntryCount)(n => BinaryDataEntry(maxKey, Array.fill(MaxValueSize)(n.toByte)))
+    val fee    = calcDataFee(data)
+    val txId   = sender.putData(firstAddress, data, fee).id
 
-    nodes.waitForHeightAraiseAndTxPresent(txId)
+    nodes.waitForHeightAriseAndTxPresent(txId)
   }
 
   test("data definition and retrieval") {
-    // define first data item
-    val item1 = IntegerDataEntry("int", 8)
-    val tx1 = sender.putData(secondAddress, List(item1), fee).id
-    nodes.waitForHeightAraiseAndTxPresent(tx1)
+    // define first int entry
+    val intEntry = IntegerDataEntry("int", 8)
+    val intList  = List(intEntry)
+    val tx1      = sender.putData(secondAddress, intList, calcDataFee(intList)).id
+    nodes.waitForHeightAriseAndTxPresent(tx1)
 
-    sender.getData(secondAddress, "int") shouldBe item1
-    sender.getData(secondAddress) shouldBe List(item1)
+    sender.getData(secondAddress, "int") shouldBe intEntry
+    sender.getData(secondAddress) shouldBe intList
 
-    // define another one
-    val item2 = BooleanDataEntry("bool", true)
-    val tx2 = sender.putData(secondAddress, List(item2), fee).id
-    nodes.waitForHeightAraiseAndTxPresent(tx2)
+    // define boolean entry
+    val boolEntry = BooleanDataEntry("bool", true)
+    val boolList  = List(boolEntry)
+    val tx2       = sender.putData(secondAddress, boolList, calcDataFee(boolList)).id
+    nodes.waitForHeightAriseAndTxPresent(tx2)
 
-    sender.getData(secondAddress, "int") shouldBe item1
-    sender.getData(secondAddress, "bool") shouldBe item2
-    sender.getData(secondAddress) shouldBe List(item2, item1)
+    sender.getData(secondAddress, "int") shouldBe intEntry
+    sender.getData(secondAddress, "bool") shouldBe boolEntry
+    sender.getData(secondAddress) shouldBe boolList ++ intList
 
-    // redefine item 1
-    val item11 = IntegerDataEntry("int", 10)
-    val tx3 = sender.putData(secondAddress, List(item11), fee).id
-    nodes.waitForHeightAraiseAndTxPresent(tx3)
+    // redefine int entry
+    val reIntEntry = IntegerDataEntry("int", 10)
+    val reIntList  = List(reIntEntry)
+    val tx3        = sender.putData(secondAddress, reIntList, calcDataFee(reIntList)).id
+    nodes.waitForHeightAriseAndTxPresent(tx3)
 
-    sender.getData(secondAddress, "int") shouldBe item11
-    sender.getData(secondAddress, "bool") shouldBe item2
-    sender.getData(secondAddress) shouldBe List(item2, item11)
-    
+    sender.getData(secondAddress, "int") shouldBe reIntEntry
+    sender.getData(secondAddress, "bool") shouldBe boolEntry
+    sender.getData(secondAddress) shouldBe boolList ++ reIntList
+
     // define tx with all types
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
-    val item41 = IntegerDataEntry("int", -127)
-    val item42 = BooleanDataEntry("bool", false)
-    val item43 = BinaryDataEntry("blob", Array[Byte](127.toByte, 0, 1, 1))
-    val data = List(item41, item42, item43)
-    val txId = sender.putData(secondAddress, data, fee).id
-    nodes.waitForHeightAraiseAndTxPresent(txId)
+    val intEntry2        = IntegerDataEntry("int", -127)
+    val boolEntry2       = BooleanDataEntry("bool", false)
+    val blobEntry2       = BinaryDataEntry("blob", Array[Byte](127.toByte, 0, 1, 1))
+    val dataAllTypes     = List(intEntry2, boolEntry2, blobEntry2)
+    val fee              = calcDataFee(dataAllTypes)
+    val txId             = sender.putData(secondAddress, dataAllTypes, fee).id
+    nodes.waitForHeightAriseAndTxPresent(txId)
 
-    sender.getData(secondAddress, "int") shouldBe item41
-    sender.getData(secondAddress, "bool") shouldBe item42
-    sender.getData(secondAddress, "blob").equals(item43)
-
-    sender.getData(secondAddress).equals(List(item41, item42, item43))
+    sender.getData(secondAddress, "int") shouldBe intEntry2
+    sender.getData(secondAddress, "bool") shouldBe boolEntry2
+    sender.getData(secondAddress, "blob").equals(blobEntry2)
+    sender.getData(secondAddress).equals(dataAllTypes)
 
     notMiner.assertBalances(secondAddress, balance2 - fee, eff2 - fee)
   }
@@ -146,96 +148,70 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("data definition corner cases") {
-    val noDataTx = sender.putData(thirdAddress, List.empty, fee).id
-    nodes.waitForHeightAraiseAndTxPresent(noDataTx)
+    val noDataTx = sender.putData(thirdAddress, List.empty, calcDataFee(List.empty)).id
+    nodes.waitForHeightAriseAndTxPresent(noDataTx)
     sender.getData(thirdAddress) shouldBe List.empty
 
-    val key = "myKey"
-    val multiKey = List.tabulate(5)(IntegerDataEntry(key, _))
-    val multiKeyTx = sender.putData(thirdAddress, multiKey, fee).id
-    nodes.waitForHeightAraiseAndTxPresent(multiKeyTx)
+    val key         = "myKey"
+    val multiKey    = List.tabulate(5)(IntegerDataEntry(key, _))
+    val multiKeyFee = calcDataFee(multiKey)
+    val multiKeyTx  = sender.putData(thirdAddress, multiKey, multiKeyFee).id
+    nodes.waitForHeightAriseAndTxPresent(multiKeyTx)
     sender.getData(thirdAddress, key) shouldBe multiKey.last
 
-    val typeChange = List(BooleanDataEntry(key, true))
-    val typeChangeTx = sender.putData(thirdAddress, typeChange, fee).id
-    nodes.waitForHeightAraiseAndTxPresent(typeChangeTx)
+    val typeChange    = List(BooleanDataEntry(key, true))
+    val typeChangeFee = calcDataFee(typeChange)
+    val typeChangeTx  = sender.putData(thirdAddress, typeChange, typeChangeFee).id
+    nodes.waitForHeightAriseAndTxPresent(typeChangeTx)
     sender.getData(thirdAddress, key) shouldBe typeChange.head
   }
 
   test("malformed JSON") {
-    def request(item: JsObject) = Json.obj(
-      "version" -> 1,
-      "sender" -> secondAddress,
-      "fee" -> fee,
-      "data" -> Seq(item))
-    val validItem = Json.obj(
-      "key" -> "key",
-      "type" -> "integer",
-      "value" -> 8)
+    def request(item: JsObject) = Json.obj("version" -> 1, "sender"   -> secondAddress, "fee" -> fee, "data" -> Seq(item))
+    val validItem               = Json.obj("key"     -> "key", "type" -> "integer", "value"   -> 8)
 
     //    where is a bug?
     sender.postJson("/addresses/data", request(validItem + ("key" -> JsString("")))).getStatusCode shouldBe 200
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(validItem - "key")),
-      "key is missing")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "key")), "key is missing")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(validItem - "type")),
-      "type is missing")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "type")), "type is missing")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(validItem + ("type" -> JsString("falafel")))),
-      "unknown type falafel")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem + ("type" -> JsString("falafel")))), "unknown type falafel")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(validItem - "value")),
-      "value is missing")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "value")), "value is missing")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
+                                "value is missing or not an integer")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
-      "value is missing or not an integer")
-    
-    val notValidIntValue = Json.obj(
-      "key" -> "key",
-      "type" -> "integer",
-      "value" -> JsNull)
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
+                                "value is missing or not an integer")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(notValidIntValue)),
-      "value is missing or not an integer")
+    val notValidIntValue = Json.obj("key" -> "key", "type" -> "integer", "value" -> JsNull)
 
-    val notValidBoolValue = Json.obj(
-      "key" -> "bool",
-      "type" -> "boolean",
-      "value" -> JsNull)
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidIntValue)), "value is missing or not an integer")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(notValidBoolValue)),
-      "value is missing or not a boolean")
+    val notValidBoolValue = Json.obj("key" -> "bool", "type" -> "boolean", "value" -> JsNull)
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(notValidBoolValue + ("value" -> JsString("true")))),
-      "value is missing or not a boolean")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBoolValue)), "value is missing or not a boolean")
 
-    val notValidBlobValue = Json.obj(
-      "key" -> "blob",
-      "type" -> "binary",
-      "value" -> JsNull)
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBoolValue + ("value" -> JsString("true")))),
+                                "value is missing or not a boolean")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(notValidBlobValue)),
-      "value is missing or not a string")
+    val notValidBlobValue = Json.obj("key" -> "blob", "type" -> "binary", "value" -> JsNull)
+
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue)), "value is missing or not a string")
   }
 
   test("transaction requires a valid proof") {
     def request: JsObject = {
-      val rs = sender.postJsonWithApiKey("/transactions/sign", Json.obj(
-        "version" -> 1,
-        "type" -> TransactionType.DataTransaction.id,
-        "sender" -> firstAddress,
-        "data" -> List(IntegerDataEntry("int", 333)),
-        "fee" -> 100000))
+      val rs = sender.postJsonWithApiKey(
+        "/transactions/sign",
+        Json.obj("version" -> 1,
+                 "type"    -> TransactionType.DataTransaction.id,
+                 "sender"  -> firstAddress,
+                 "data"    -> List(IntegerDataEntry("int", 333)),
+                 "fee"     -> 100000)
+      )
       Json.parse(rs.getResponseBody).as[JsObject]
     }
     def id(obj: JsObject) = obj.value("id").as[String]
@@ -251,12 +227,34 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val withProof = request
     assert((withProof \ "proofs").as[Seq[String]].lengthCompare(1) == 0)
     sender.postJson("/transactions/broadcast", withProof)
-    nodes.waitForHeightAraiseAndTxPresent(id(withProof))
+    nodes.waitForHeightAriseAndTxPresent(id(withProof))
   }
-  
-  private def calcDataFee(dataSize: Int): Long = {
+
+  test("try to send tx above limits of key, value and size") {
+    import DataEntry.{MaxKeySize, MaxValueSize}
+    import DataTransaction.MaxEntryCount
+
+    val message  = "Too big sequences requested"
+    val extraKey = "a" * (MaxKeySize + 1)
+    val data     = List(BooleanDataEntry(extraKey, false))
+
+    assertBadRequestAndResponse(sender.putData(firstAddress, data, calcDataFee(data)), message)
+    nodes.waitForHeightAraise()
+
+    val extraValueData = List(BinaryDataEntry("key", Array.fill(MaxValueSize + 1)(1.toByte)))
+    assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, calcDataFee(extraValueData)), message)
+    nodes.waitForHeightAraise()
+
+    val extraSizedData = List.tabulate(MaxEntryCount + 1)(n => BinaryDataEntry(extraKey, Array.fill(MaxValueSize)(n.toByte)))
+    assertBadRequestAndResponse(sender.putData(firstAddress, extraSizedData, calcDataFee(extraSizedData)), message)
+    nodes.waitForHeightAraise()
+
+  }
+
+  private def calcDataFee(data: List[DataEntry[_]]): Long = {
+    val dataSize = data.map(_.toBytes.size).sum + 128
     if (dataSize > 1024) {
-      (fee * dataSize) / 1024
+      fee * (dataSize / 1024 + 1)
     } else fee
   }
 }
