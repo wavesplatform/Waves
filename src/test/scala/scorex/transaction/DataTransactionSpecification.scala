@@ -83,8 +83,8 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
 
   property("positive validation cases") {
     val keyRepeatCountGen = Gen.choose(2, MaxEntryCount)
-    forAll(dataTransactionGen, keyRepeatCountGen) {
-      case (DataTransaction(version, sender, data, fee, timestamp, proofs), keyRepeatCount) =>
+    forAll(dataTransactionGen, dataEntryGen, keyRepeatCountGen) {
+      case (DataTransaction(version, sender, data, fee, timestamp, proofs), entry, keyRepeatCount) =>
         def check(data: List[DataEntry[_]]): Assertion = {
           val txEi = create(version, sender, data, fee, timestamp, proofs)
           txEi shouldBe Right(DataTransaction(version, sender, data, fee, timestamp, proofs))
@@ -93,7 +93,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
 
         check(List.empty)  // no data
         check(List.tabulate(MaxEntryCount)(n => IntegerDataEntry(n.toString, n)))  // maximal data
-        check(List.fill[DataEntry[_]](keyRepeatCount)(data.head))  // repeating keys
+        check(List.fill[DataEntry[_]](keyRepeatCount)(entry))  // repeating keys
         check(List(BooleanDataEntry("", false)))  // empty key
         check(List(IntegerDataEntry("a" * Byte.MaxValue, 0xa)))  // max key size
         check(List(BinaryDataEntry("bin", Array.empty)))  // empty binary
