@@ -17,6 +17,7 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.smart.BlockchainContext
+import scala.reflect.runtime.universe._
 
 class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -33,7 +34,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
     transferViaAlias   <- transferGeneratorP(master, AddressOrAlias.fromBytes(alias.bytes.arr, 0).right.get._1, None, None)
   } yield (Seq(genesis1, genesis2), aliasTx, transferViaAddress, transferViaAlias)
 
-  def evalScript[T](code: String, tx: Transaction, state: SnapshotStateReader): Either[com.wavesplatform.lang.ExecutionError, T] = {
+  def evalScript[T: TypeTag](code: String, tx: Transaction, state: SnapshotStateReader): Either[com.wavesplatform.lang.ExecutionError, T] = {
     val context =
       new BlockchainContext(AddressScheme.current.chainId, Coeval.evalOnce(tx), Coeval.evalOnce(state.height), state)
         .build()
