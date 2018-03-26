@@ -29,17 +29,17 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
   }
 
   property("Some/None/extract/isDefined") {
-    runScript("Some(3)".stripMargin) shouldBe Right(Some(3))
-    runScript("None".stripMargin) shouldBe Right(None)
-    runScript("isDefined(Some(3))".stripMargin) shouldBe Right(true)
-    runScript("isDefined(None)".stripMargin) shouldBe Right(false)
-    runScript("extract(Some(3))".stripMargin) shouldBe Right(3)
-    runScript("extract(None)".stripMargin) should produce("Extract from empty option")
+    runScript[Option[Long]]("Some(3)".stripMargin) shouldBe Right(Some(3L))
+    runScript[None.type]("None".stripMargin) shouldBe Right(None)
+    runScript[Boolean]("isDefined(Some(3))".stripMargin) shouldBe Right(true)
+    runScript[Boolean]("isDefined(None)".stripMargin) shouldBe Right(false)
+    runScript[Long]("extract(Some(3))".stripMargin) shouldBe Right(3L)
+    runScript[Long]("extract(None)".stripMargin) should produce("Extract from empty option")
   }
 
   property("size") {
-    runScript("size(base58'')".stripMargin) shouldBe Right(0L)
     val arr = Array(1: Byte, 2: Byte, 3: Byte)
-    runScript(s"size(base58'${ByteStr(arr).base58}')".stripMargin) shouldBe Right(3L)
+    runScript[Long]("size(base58'')".stripMargin) shouldBe Right(0L)
+    runScript[Long](s"size(base58'${ByteStr(arr).base58}')".stripMargin) shouldBe Right(3L)
   }
 }

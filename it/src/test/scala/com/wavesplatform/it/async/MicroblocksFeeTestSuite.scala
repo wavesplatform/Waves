@@ -1,4 +1,4 @@
-package com.wavesplatform.it
+package com.wavesplatform.it.async
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.NodeConfigs.Default
@@ -14,8 +14,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class MicroblocksFeeTestSuite extends FreeSpec with Matchers with CancelAfterFailure
-  with NodesFromDocker with ScorexLogging {
+class MicroblocksFeeTestSuite extends FreeSpec with Matchers with CancelAfterFailure with NodesFromDocker with ScorexLogging {
 
   private def notMiner = nodes.head
 
@@ -24,19 +23,24 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with CancelAfterFai
   private def txRequestsGen(n: Int, fee: Long): Future[Unit] = {
     val parallelRequests = 1
 
-    def requests(n: Int): Future[Unit] = Future
-      .sequence {
-        //Not mining node sends transfer transactions to another not mining node
-        //Mining nodes collect fee
-        (1 to n).map { _ => notMiner.transfer(notMiner.address, firstAddress, (1 + Random.nextInt(10)).waves, fee) }
-      }
-      .map(_ => ())
+    def requests(n: Int): Future[Unit] =
+      Future
+        .sequence {
+          //Not mining node sends transfer transactions to another not mining node
+          //Mining nodes collect fee
+          (1 to n).map { _ =>
+            notMiner.transfer(notMiner.address, firstAddress, (1 + Random.nextInt(10)).waves, fee)
+          }
+        }
+        .map(_ => ())
 
     val steps = (1 to n)
       .sliding(parallelRequests, parallelRequests)
       .map(_.size)
 
-    steps.foldLeft(Future.successful(())) { (r, numRequests) => r.flatMap(_ => requests(numRequests)) }
+    steps.foldLeft(Future.successful(())) { (r, numRequests) =>
+      r.flatMap(_ => requests(numRequests))
+    }
   }
 
   "fee distribution when NG activates" in {
@@ -50,13 +54,13 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with CancelAfterFai
       initialBalances <- notMiner.debugStateAt(microblockActivationHeight - 1) //100%
 
       balancesBeforeActivation <- notMiner.debugStateAt(microblockActivationHeight) // 100%
-      blockBeforeActivation <- notMiner.blockAt(microblockActivationHeight)
+      blockBeforeActivation    <- notMiner.blockAt(microblockActivationHeight)
 
       balancesOnActivation <- notMiner.debugStateAt(microblockActivationHeight + 1) // 40%
-      blockOnActivation <- notMiner.blockAt(microblockActivationHeight + 1)
+      blockOnActivation    <- notMiner.blockAt(microblockActivationHeight + 1)
 
       balancesAfterActivation <- notMiner.debugStateAt(microblockActivationHeight + 2) // 60% of previous + 40% of current
-      blockAfterActivation <- notMiner.blockAt(microblockActivationHeight + 2)
+      blockAfterActivation    <- notMiner.blockAt(microblockActivationHeight + 2)
     } yield {
 
       balancesBeforeActivation(blockBeforeActivation.generator) shouldBe {
