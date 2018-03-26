@@ -13,4 +13,5 @@ trait Transaction {
   def senderPk: Either[String, ByteVector]
   def assetId: Either[String, Option[ByteVector]]
   def proofs: Either[String, IndexedSeq[ByteVector]]
+  def recipient: Either[String, ByteVector]
 }

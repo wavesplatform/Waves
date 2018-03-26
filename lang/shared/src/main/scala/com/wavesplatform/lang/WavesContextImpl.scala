@@ -42,7 +42,8 @@ abstract class WavesContextImpl { this: Crypto with Environment with Base58 =>
       else pfs(x)
     }))
 
-  private def transactionObject(tx: Transaction): Obj =
+  private def transactionObject(tx: Transaction): Obj = {
+
     Obj(
       Map(
         "type"       -> LazyVal(LONG)(EitherT.pure(tx.transactionType)),
@@ -54,15 +55,18 @@ abstract class WavesContextImpl { this: Crypto with Environment with Base58 =>
         "bodyBytes"  -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.bodyBytes)),
         "senderPk"   -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.senderPk)),
         "assetId"    -> LazyVal(optionByteVector)(EitherT.fromEither(tx.assetId.map(_.asInstanceOf[optionByteVector.Underlying]))),
-        "proof0"     -> proofBinding(tx, 0),
-        "proof1"     -> proofBinding(tx, 1),
-        "proof2"     -> proofBinding(tx, 2),
-        "proof3"     -> proofBinding(tx, 3),
-        "proof4"     -> proofBinding(tx, 4),
-        "proof5"     -> proofBinding(tx, 5),
-        "proof6"     -> proofBinding(tx, 6),
-        "proof7"     -> proofBinding(tx, 7),
+        "recipient" -> LazyVal(addressOrAliasType.typeRef)(EitherT.fromEither(tx.recipient.map(bv =>
+          Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(bv))))))),
+        "proof0" -> proofBinding(tx, 0),
+        "proof1" -> proofBinding(tx, 1),
+        "proof2" -> proofBinding(tx, 2),
+        "proof3" -> proofBinding(tx, 3),
+        "proof4" -> proofBinding(tx, 4),
+        "proof5" -> proofBinding(tx, 5),
+        "proof6" -> proofBinding(tx, 6),
+        "proof7" -> proofBinding(tx, 7)
       ))
+  }
 
   private val txByIdF = {
     val returnType = OPTION(transactionType.typeRef)
@@ -78,7 +82,7 @@ abstract class WavesContextImpl { this: Crypto with Environment with Base58 =>
     val txCoeval: Coeval[Either[String, Obj]]      = Coeval.evalOnce(Right(transactionObject(transaction)))
     val heightCoeval: Coeval[Either[String, Long]] = Coeval.evalOnce(Right(height))
     Context(
-      Map(transactionType.name -> transactionType, addressType.name -> addressType),
+      Map(transactionType.name -> transactionType, addressType.name -> addressType, addressOrAliasType.name -> addressOrAliasType),
       Map(
         ("None", none),
         ("height", LazyVal(LONG)(EitherT(heightCoeval))),
@@ -101,7 +105,8 @@ abstract class WavesContextImpl { this: Crypto with Environment with Base58 =>
         txByIdF.name       -> txByIdF,
         getLongF.name      -> getLongF,
         getBooleanF.name   -> getBooleanF,
-        getByteArrayF.name -> getByteArrayF
+        getByteArrayF.name -> getByteArrayF,
+        addressFromRecipientF.name -> addressFromRecipientF
       )
     )
   }
@@ -143,16 +148,29 @@ abstract class WavesContextImpl { this: Crypto with Environment with Base58 =>
     case _ => ???
   }
 
+  val addressFromRecipientF: PredefFunction =
+    PredefFunction("addressFromRecipient", optionAddress, List(("AddressOrAlias", TYPEREF(addressOrAliasType.name)))) {
+      case Obj(fields) :: Nil =>
+        val bytes = fields("bytes").value.map(_.asInstanceOf[ByteVector]).value()
+
+        bytes
+          .flatMap(bv => resolveAddress(bv.toArray))
+          .map(resolved => Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(resolved))))))
+
+      case _ => ???
+    }
 }
+
 object WavesContextImpl {
 
-  val addressType = PredefType("Address", List("bytes" -> BYTEVECTOR))
+  val addressType        = PredefType("Address", List("bytes"        -> BYTEVECTOR))
+  val addressOrAliasType = PredefType("AddressOrAlias", List("bytes" -> BYTEVECTOR))
 
   private val noneCoeval: Coeval[Either[String, Option[Nothing]]] = Coeval.evalOnce(Right(None))
   val none: LazyVal                                               = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval))
   private val optionByteVector: OPTION                            = OPTION(BYTEVECTOR)
   private val optionT                                             = OPTIONTYPEPARAM(TYPEPARAM('T'))
-  private val optionAddress                                       = OPTIONTYPEPARAM(addressType.typeRef)
+  private val optionAddress                                       = OPTION(addressType.typeRef)
 
   private def hashFunction(name: String)(h: Array[Byte] => Array[Byte]) = PredefFunction(name, BYTEVECTOR, List(("bytes", BYTEVECTOR))) {
     case (m: ByteVector) :: Nil => Right(ByteVector(h(m.toArray)))
@@ -179,7 +197,13 @@ object WavesContextImpl {
       "proof0"     -> BYTEVECTOR,
       "proof1"     -> BYTEVECTOR,
       "proof2"     -> BYTEVECTOR,
-      "assetId"    -> optionByteVector
+      "proof3"     -> BYTEVECTOR,
+      "proof4"     -> BYTEVECTOR,
+      "proof5"     -> BYTEVECTOR,
+      "proof6"     -> BYTEVECTOR,
+      "proof7"     -> BYTEVECTOR,
+      "assetId"    -> optionByteVector,
+      "recipient"  -> addressOrAliasType.typeRef
     )
   )
 
