@@ -41,7 +41,7 @@ class BlockchainContext(override val networkByte: Byte, tx: Coeval[Transaction],
 
   override def resolveAddress(addressOrAlias: Array[Byte]): Either[String, Array[Byte]] = {
     (for {
-      aoa     <- AddressOrAlias.fromBytes(addressOrAlias, 0)
+      aoa     <- AddressOrAlias.fromBytes(bytes = addressOrAlias, position = 0)
       address <- state.resolveAliasEi(aoa._1)
     } yield address.bytes.arr).left.map(_.toString)
   }

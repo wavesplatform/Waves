@@ -149,7 +149,7 @@ abstract class WavesContextImpl { this: Crypto with Environment with Base58 =>
   }
 
   val addressFromRecipientF: PredefFunction =
-    PredefFunction("addressFromRecipient", optionAddress, List(("AddressOrAlias", TYPEREF(addressOrAliasType.name)))) {
+    PredefFunction("addressFromRecipient", addressType.typeRef, List(("AddressOrAlias", TYPEREF(addressOrAliasType.name)))) {
       case Obj(fields) :: Nil =>
         val bytes = fields("bytes").value.map(_.asInstanceOf[ByteVector]).value()
 
