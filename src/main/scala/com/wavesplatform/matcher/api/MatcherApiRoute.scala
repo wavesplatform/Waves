@@ -44,13 +44,6 @@ case class MatcherApiRoute(wallet: Wallet,
         historyDelete ~ cancel ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder
     }
 
-  def withAssetPair(a1: String, a2: String): Directive1[AssetPair] = {
-    AssetPair.createAssetPair(a1, a2) match {
-      case Success(p) => provide(p)
-      case Failure(_) => complete(StatusCodes.BadRequest -> Json.obj("message" -> "Invalid asset pair"))
-    }
-  }
-
   @Path("/")
   @ApiOperation(value = "Matcher Public Key", notes = "Get matcher public key", httpMethod = "GET")
   def matcherPublicKey: Route = (pathEndOrSingleSlash & get) {
@@ -165,14 +158,10 @@ case class MatcherApiRoute(wallet: Wallet,
     }
   }
 
-  def checkGetSignature(publicKey: String, timestamp: String, signature: String): Try[String] = {
-    Try {
-      val pk = Base58.decode(publicKey).get
-      val sig = Base58.decode(signature).get
-      val ts = timestamp.toLong
-      require(math.abs(ts - NTP.correctedTime()).millis < matcherSettings.maxTimestampDiff, "Incorrect timestamp")
-      require(crypto.verify(sig, pk ++ Longs.toByteArray(ts), pk), "Incorrect signature")
-      PublicKeyAccount(pk).address
+  def withAssetPair(a1: String, a2: String): Directive1[AssetPair] = {
+    AssetPair.createAssetPair(a1, a2) match {
+      case Success(p) => provide(p)
+      case Failure(_) => complete(StatusCodes.BadRequest -> Json.obj("message" -> "Invalid asset pair"))
     }
   }
 
@@ -221,6 +210,17 @@ case class MatcherApiRoute(wallet: Wallet,
         case Failure(ex) =>
           complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
       }
+    }
+  }
+
+  def checkGetSignature(publicKey: String, timestamp: String, signature: String): Try[String] = {
+    Try {
+      val pk = Base58.decode(publicKey).get
+      val sig = Base58.decode(signature).get
+      val ts = timestamp.toLong
+      require(math.abs(ts - NTP.correctedTime()).millis < matcherSettings.maxTimestampDiff, "Incorrect timestamp")
+      require(crypto.verify(sig, pk ++ Longs.toByteArray(ts), pk), "Incorrect signature")
+      PublicKeyAccount(pk).address
     }
   }
 
