@@ -151,6 +151,11 @@ class DataTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(noDataTx)
     sender.getData(thirdAddress) shouldBe List.empty
 
+    val emptyKey = List(LongDataEntry("", 7))
+    val emptyKeyTx = sender.putData(thirdAddress, emptyKey, fee).id
+    nodes.waitForHeightAriseAndTxPresent(emptyKeyTx)
+    sender.getData(thirdAddress, "") shouldBe emptyKey.head
+
     val key         = "myKey"
     val multiKey    = List.tabulate(5)(LongDataEntry(key, _))
     val multiKeyFee = calcDataFee(multiKey)
@@ -169,36 +174,60 @@ class DataTransactionSuite extends BaseTransactionSuite {
     def request(item: JsObject) = Json.obj("version" -> 1, "sender"   -> secondAddress, "fee" -> fee, "data" -> Seq(item))
     val validItem               = Json.obj("key"     -> "key", "type" -> "integer", "value"   -> 8)
 
-    //    where is a bug?
-    sender.postJson("/addresses/data", request(validItem + ("key" -> JsString("")))).getStatusCode shouldBe 200
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(validItem - "key")),
+      "key is missing")
 
-    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "key")), "key is missing")
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(validItem - "type")),
+      "type is missing")
 
-    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "type")), "type is missing")
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(validItem + ("type" -> JsString("falafel")))),
+      "unknown type falafel")
 
-    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem + ("type" -> JsString("falafel")))), "unknown type falafel")
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(validItem - "value")),
+      "value is missing")
 
-    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "value")), "value is missing")
-    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
-                                "value is missing or not an integer")
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
+      "value is missing or not an integer")
+    
+    val notValidIntValue = Json.obj(
+      "key" -> "key",
+      "type" -> "integer",
+      "value" -> JsNull)
 
-    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
-                                "value is missing or not an integer")
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(notValidIntValue)),
+      "value is missing or not an integer")
 
-    val notValidIntValue = Json.obj("key" -> "key", "type" -> "integer", "value" -> JsNull)
+    val notValidBoolValue = Json.obj(
+      "key" -> "bool",
+      "type" -> "boolean",
+      "value" -> JsNull)
 
-    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidIntValue)), "value is missing or not an integer")
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(notValidBoolValue)),
+      "value is missing or not a boolean")
 
-    val notValidBoolValue = Json.obj("key" -> "bool", "type" -> "boolean", "value" -> JsNull)
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(notValidBoolValue + ("value" -> JsString("true")))),
+      "value is missing or not a boolean")
 
-    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBoolValue)), "value is missing or not a boolean")
+    val notValidBlobValue = Json.obj(
+      "key" -> "blob",
+      "type" -> "binary",
+      "value" -> JsNull)
 
-    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBoolValue + ("value" -> JsString("true")))),
-                                "value is missing or not a boolean")
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(notValidBlobValue)),
+      "value is missing or not a string")
 
-    val notValidBlobValue = Json.obj("key" -> "blob", "type" -> "binary", "value" -> JsNull)
-
-    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue)), "value is missing or not a string")
+    assertBadRequestAndResponse(
+      sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("NOTaBase58")))),
+      "Wrong char in Base58 string")
   }
 
   test("transaction requires a valid proof") {
