@@ -1,19 +1,18 @@
 package settings
 
 import cats.Show
-import scorex.account.PublicKeyAccount
 import settings.MatcherNodeSettings.Settings
 
 case class MatcherNodeSettings(setting: Settings,
                                endpoint: String,
-                               matcherKey: PublicKeyAccount) {
+                               matcherKey: String) {
 
 }
 
 object MatcherNodeSettings {
 
   case class Settings(endpoint: String,
-                      matcherKey: PublicKeyAccount)
+                      matcherKey: String)
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>
