@@ -1,18 +1,13 @@
 package com.wavesplatform.it.async.matcher
 
-import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{Node, ReportingTestName}
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
-import play.api.libs.json.JsNumber
-import play.api.libs.json.Json.parse
 import scorex.api.http.assets.SignedTransferRequest
 import scorex.api.http.leasing.{SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.crypto.encode.Base58
@@ -102,28 +97,15 @@ class MatcherTestSuite
   }
 
   "frozen amount should be listed via matcherBalance REST endpoint" in {
-    val ts         = System.currentTimeMillis()
-    val privateKey = aliceNode.privateKey
-    val signature  = Base58.encode(crypto.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts)))
+    getReservedBalance(matcherNode, aliceNode.privateKey
+    ) shouldBe Map(aliceAsset -> aliceSellAmount)
 
-    val json = parse(
-      Await
-        .result(matcherNode.matcherGet(s"/matcher/matcherBalance/${aliceNode.publicKeyStr}",
-                                       _.addHeader("Timestamp", ts)
-                                         .addHeader("Signature", signature)),
-                1.minute)
-        .getResponseBody)
-
-    (json \ aliceAsset).get shouldBe JsNumber(aliceSellAmount)
+    getReservedBalance(matcherNode, bobNode.privateKey) shouldBe Map()
   }
 
   "and should be listed by trader's publiс key via REST" in {
-    val ts         = System.currentTimeMillis()
-    val privateKey = aliceNode.privateKey
-    val signature  = ByteStr(crypto.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts)))
-    val orderIds = Await
-      .result(matcherNode.getOrderbookByPublicKey(aliceNode.publicKeyStr, ts, signature), 1.minute)
-      .map(_.id)
+
+    val orderIds = getAllOrder(matcherNode,aliceNode.privateKey)
 
     orderIds should contain(aliceSell1)
   }
@@ -165,6 +147,13 @@ class MatcherTestSuite
     val updatedMatcherBalance = getBalance(matcherNode)
     updatedMatcherBalance._1 shouldBe (matcherBalance._1 + MatcherFee + (MatcherFee * 200.0 / 500.0).toLong - TransactionFee)
     matcherBalance = updatedMatcherBalance
+  }
+
+  "request activeOnly orders" in {
+    val aliceOrders = getAllActiveOrder(matcherNode, aliceNode.privateKey)
+    aliceOrders shouldBe Seq(aliceSell1)
+    val bobOrders = getAllActiveOrder(matcherNode, bobNode.privateKey)
+    bobOrders shouldBe Seq()
   }
 
   "submitting sell orders should check availability of asset" in {

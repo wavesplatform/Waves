@@ -1,5 +1,7 @@
 package com.wavesplatform.it.async.matcher
 
+import com.google.common.primitives.Longs
+import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.{AssetBalance, MatcherStatusResponse, OrderBookResponse}
@@ -92,4 +94,23 @@ trait MatcherUtils {
     (balance, height)
   }
 
+  def getAllOrder(node: Node, pk: PrivateKeyAccount): Seq[String] = {
+    val ts = System.currentTimeMillis()
+    val signature = ByteStr(crypto.sign(pk, pk.publicKey ++ Longs.toByteArray(ts)))
+    Await.result(node.getOrderbookByPublicKey(Base58.encode(pk.publicKey), ts, signature), 1.minute)
+      .map(_.id)
+  }
+
+  def getAllActiveOrder(node: Node, pk: PrivateKeyAccount): Seq[String] = {
+    val ts = System.currentTimeMillis()
+    val signature = ByteStr(crypto.sign(pk, pk.publicKey ++ Longs.toByteArray(ts)))
+    Await.result(node.getOrderbookByPublicKeyActive(Base58.encode(pk.publicKey), ts, signature), 1.minute)
+      .map(_.id)
+  }
+
+  def getReservedBalance(node: Node, pk: PrivateKeyAccount): Map[String, Long] = {
+    val ts = System.currentTimeMillis()
+    val signature = ByteStr(crypto.sign(pk, pk.publicKey ++ Longs.toByteArray(ts)))
+    Await.result(node.getReservedBalance(Base58.encode(pk.publicKey), ts, signature), 1.minute)
+  }
 }

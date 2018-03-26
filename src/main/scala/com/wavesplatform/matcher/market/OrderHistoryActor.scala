@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{CancelOrder, GetOrderStatusResponse}
-import com.wavesplatform.matcher.market.OrderHistoryActor._
+import com.wavesplatform.matcher.market.OrderHistoryActor.{ExpirableOrderHistoryRequest, _}
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.Filled
 import com.wavesplatform.matcher.model._
@@ -48,8 +48,6 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       sender() ! GetOrderStatusResponse(orderHistory.orderStatus(id))
     case GetTradableBalance(assetPair, addr, _) =>
       sender() ! getPairTradableBalance(assetPair, addr)
-    case GetMatcherBalance(addr, _) =>
-      sender() ! getMatcherBalance(addr)
     case GetActiveOrdersByAddress(requestId, addr, assets, _) =>
       // Because all orders spend waves for fee
       val wasAssetChanged: Option[AssetId] => Boolean = if (assets.contains(None)) { _ => true } else assets.contains
@@ -62,6 +60,8 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       }(collection.breakOut)
 
       sender().forward(GetActiveOrdersByAddressResponse(requestId, addr, active))
+    case GetOpenPortfolio(addr, _) =>
+      sender() ! GetOpenPortfolioResponse(OpenPortfolio(orderHistory.openPortfolio(addr).orders.filter(_._2 > 0)))
   }
 
   override def receive: Receive = {
@@ -86,7 +86,12 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   }
 
   def fetchAllOrderHistory(req: GetAllOrderHistory): Unit = {
-    sender() ! GetOrderHistoryResponse(orderHistory.fetchAllOrderHistory(req.address))
+    req.activeOnly match {
+      case true =>
+        sender() ! GetOrderHistoryResponse(orderHistory.fetchAllActiveOrderHistory(req.address))
+      case false =>
+        sender() ! GetOrderHistoryResponse(orderHistory.fetchAllOrderHistory(req.address))
+    }
   }
 
   def forceCancelOrder(id: String): Unit = {
@@ -116,8 +121,6 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       assetPair.priceAssetStr -> bal._2
     ))
   }
-
-  def getMatcherBalance(addr: String): GetMatcherBalanceResponse = GetMatcherBalanceResponse(orderHistory.openVolumes(addr))
 
   def deleteFromOrderHistory(req: DeleteOrderFromHistory): Unit = {
     orderHistory.orderStatus(req.id) match {
@@ -157,7 +160,7 @@ object OrderHistoryActor {
 
   case class GetOrderHistory(assetPair: AssetPair, address: String, ts: Long) extends ExpirableOrderHistoryRequest
 
-  case class GetAllOrderHistory(address: String, ts: Long) extends ExpirableOrderHistoryRequest
+  case class GetAllOrderHistory(address: String, activeOnly: Boolean,ts: Long) extends ExpirableOrderHistoryRequest
 
   case class GetOrderStatus(assetPair: AssetPair, id: String, ts: Long) extends ExpirableOrderHistoryRequest
 
@@ -209,11 +212,11 @@ object OrderHistoryActor {
     val code: StatusCode = StatusCodes.OK
   }
 
-  case class GetMatcherBalance(address: String, ts: Long) extends ExpirableOrderHistoryRequest
+  case class GetOpenPortfolio(address: String, ts: Long) extends ExpirableOrderHistoryRequest
 
-  case class GetMatcherBalanceResponse(balances: Option[Map[String, Long]]) extends MatcherResponse {
-    val json: JsObject = JsObject(balances.getOrElse(Map.empty).mapValues(JsNumber(_)))
-    val code: StatusCode = balances.map(_ => StatusCodes.OK).getOrElse(StatusCodes.NotFound)
+  case class GetOpenPortfolioResponse(portfolio: OpenPortfolio) extends MatcherResponse {
+    override def json: JsValue = JsObject(portfolio.orders.map(o => (o._1, JsNumber(o._2))).toSeq)
+
+    override def code: StatusCode = StatusCodes.OK
   }
-
 }

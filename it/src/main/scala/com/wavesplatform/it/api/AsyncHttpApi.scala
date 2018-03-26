@@ -96,6 +96,12 @@ object AsyncHttpApi extends Assertions {
     def getOrderbookByPublicKey(publicKey: String, timestamp: Long, signature: ByteStr): Future[Seq[OrderbookHistory]] =
       matcherGetWithSignature(s"/matcher/orderbook/$publicKey", timestamp, signature).as[Seq[OrderbookHistory]]
 
+    def getOrderbookByPublicKeyActive(publicKey: String, timestamp: Long, signature: ByteStr): Future[Seq[OrderbookHistory]] =
+      matcherGetWithSignature(s"/matcher/orderbook/$publicKey?activeOnly=true", timestamp, signature).as[Seq[OrderbookHistory]]
+
+    def getReservedBalance(publicKey: String, timestamp: Long, signature: ByteStr): Future[Map[String, Long]] =
+      matcherGetWithSignature(s"/matcher/balance/reserved/$publicKey", timestamp, signature).as[Map[String, Long]]
+
     def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
       retrying(f(_get(s"${n.nodeApiEndpoint}$path")).build())
 

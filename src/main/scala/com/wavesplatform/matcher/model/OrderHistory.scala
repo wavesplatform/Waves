@@ -28,11 +28,15 @@ trait OrderHistory {
 
   def openVolumes(address: String): Option[Map[String, Long]]
 
-  def orderIdsByAddress(address: String): Set[String]
+  def allOrderIdsByAddress(address: String): Set[String]
+
+  def finalOrderIdsByAddress(address: String): Set[String]
 
   def activeOrderIdsByAddress(address: String): Set[(Option[AssetId], String)]
 
   def fetchOrderHistoryByPair(assetPair: AssetPair, address: String): Seq[(String, OrderInfo, Option[Order])]
+
+  def fetchAllActiveOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])]
 
   def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])]
 
@@ -65,7 +69,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
   private val AddressToActiveOrdersPrefix = "a-addr-orders".getBytes(Charset)
   private val AddressPortfolioPrefix = "portfolios".getBytes(Charset)
 
-  def savePairAddress(address: String, orderId: String): Unit = {
+  def addToFinal(address: String, orderId: String): Unit = {
     get(OrderIdsCodec)(makeKey(AddressToOrdersPrefix, address)) match {
       case Some(prev) =>
         val r = if (prev.length >= settings.maxOrdersPerRequest) {
@@ -120,25 +124,28 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     saveOrder(lo.order)
     val updatedInfo = saveOrderInfo(event)
     saveOpenPortfolio(event)
-    savePairAddress(lo.order.senderPublicKey.address, lo.order.idStr())
 
     updatedInfo.foreach { case (orderId, (o, oi)) =>
       if (!oi.status.isFinal) {
         val assetId = if (o.orderType == OrderType.BUY) o.assetPair.priceAsset else o.assetPair.amountAsset
         addToActive(o.senderPublicKey.address, assetId, orderId)
+      } else {
+        addToFinal(o.senderPublicKey.address, orderId)
       }
     }
   }
 
   override def orderExecuted(event: OrderExecuted): Unit = {
     saveOrder(event.submitted.order)
-    savePairAddress(event.submitted.order.senderPublicKey.address, event.submitted.order.idStr())
     val updatedInfo = saveOrderInfo(event)
     saveOpenPortfolio(OrderAdded(event.submittedExecuted))
     saveOpenPortfolio(event)
 
     updatedInfo.foreach { case (orderId, (o, oi)) =>
-      if (oi.status.isFinal) deleteFromActive(o.senderPublicKey.address, orderId)
+      if (oi.status.isFinal) {
+        deleteFromActive(o.senderPublicKey.address, orderId)
+        addToFinal(o.senderPublicKey.address, orderId)
+      }
     }
   }
 
@@ -147,7 +154,10 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     saveOpenPortfolio(event)
 
     updatedInfo.foreach { case (orderId, (o, oi)) =>
-      if (oi.status.isFinal) deleteFromActive(o.senderPublicKey.address, orderId)
+      if (oi.status.isFinal) {
+        deleteFromActive(o.senderPublicKey.address, orderId)
+        addToFinal(o.senderPublicKey.address, orderId)
+      }
     }
   }
 
@@ -165,15 +175,19 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
 
   override def openVolume(assetAcc: AssetAcc): Long = {
     val asset = assetAcc.assetId.map(_.base58).getOrElse(AssetPair.WavesName)
-    get(PortfolioCodec)(makeKey(AddressPortfolioPrefix, assetAcc.account.address))
-      .flatMap(_.get(asset)).map(math.max(0L, _)).getOrElse(0L)
+    openPortfolio(assetAcc.account.address).orders.getOrElse(asset, 0L)
   }
 
   override def openVolumes(address: String): Option[Map[String, Long]] = {
     get(PortfolioCodec)(makeKey(AddressPortfolioPrefix, address))
   }
 
-  override def orderIdsByAddress(address: String): Set[String] = {
+  override def allOrderIdsByAddress(address: String): Set[String] = {
+    get(AssetIdOrderIdSetCodec)(makeKey(AddressToActiveOrdersPrefix, address)).getOrElse(Set.empty).map(_._2) ++
+      get(OrderIdsCodec)(makeKey(AddressToOrdersPrefix, address)).map(_.toSet).getOrElse(Set.empty)
+  }
+
+  override def finalOrderIdsByAddress(address: String): Set[String] = {
     get(OrderIdsCodec)(makeKey(AddressToOrdersPrefix, address)).map(_.toSet).getOrElse(Set.empty)
   }
 
@@ -195,7 +209,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
   }
 
   override def fetchOrderHistoryByPair(assetPair: AssetPair, address: String): Seq[(String, OrderInfo, Option[Order])] = {
-    orderIdsByAddress(address)
+    allOrderIdsByAddress(address)
       .toSeq
       .map(id => (id, orderInfo(id), order(id)))
       .filter(_._3.exists(_.assetPair == assetPair))
@@ -203,9 +217,20 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
       .take(settings.maxOrdersPerRequest)
   }
 
+  override def fetchAllActiveOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])] = {
+    import OrderInfo.orderStatusOrdering
+    activeOrderIdsByAddress(address)
+      .toSeq
+      .map(o => (o._2, orderInfo(o._2)))
+      .sortBy(_._2.status)
+      .take(settings.maxOrdersPerRequest)
+      .map(p => (p._1, p._2, order(p._1)))
+      .sorted(OrderHistoryOrdering)
+  }
+
   override def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])] = {
     import OrderInfo.orderStatusOrdering
-    orderIdsByAddress(address)
+    allOrderIdsByAddress(address)
       .toSeq
       .map(id => (id, orderInfo(id)))
       .sortBy(_._2.status)
