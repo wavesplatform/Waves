@@ -275,7 +275,6 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val extraSizedData = List.tabulate(MaxEntryCount + 1)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
     assertBadRequestAndResponse(sender.putData(firstAddress, extraSizedData, calcDataFee(extraSizedData)), message)
     nodes.waitForHeightAraise()
-
   }
 
   private def calcDataFee(data: List[DataEntry[_]]): Long = {
