@@ -48,7 +48,7 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
   override val typeId: Byte                 = 13
   override val supportedVersions: Set[Byte] = Set(1)
 
-  private val networkByte = AddressScheme.current.chainId
+  private def networkByte = AddressScheme.current.chainId
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
