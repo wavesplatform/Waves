@@ -7,9 +7,13 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue}
 import scorex.api.http.{TooBigArrayAllocation, UtilsApiRoute}
 import scorex.crypto.encode.Base58
+import scorex.utils.Time
 
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks {
-  private val route = UtilsApiRoute(restAPISettings).route
+  private val route = UtilsApiRoute(new Time {
+    def correctedTime(): Long = System.currentTimeMillis()
+    def getTimestamp(): Long  = System.currentTimeMillis()
+  }, restAPISettings).route
 
   routePath("/seed") in {
     Get(routePath("/seed")) ~> route ~> check {
@@ -21,7 +25,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
   routePath("/seed/{length}") in forAll(Gen.posNum[Int]) { l =>
     if (l > UtilsApiRoute.MaxSeedSize) {
-      Get(routePath(s"/seed/$l")) ~> route should produce (TooBigArrayAllocation)
+      Get(routePath(s"/seed/$l")) ~> route should produce(TooBigArrayAllocation)
     } else {
       Get(routePath(s"/seed/$l")) ~> route ~> check {
         val seed = Base58.decode((responseAs[JsValue] \ "seed").as[String])
@@ -32,9 +36,9 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   for ((hash, f) <- Seq[(String, String => Array[Byte])](
-    "secure" -> crypto.secureHash,
-    "fast" -> crypto.fastHash
-  )) {
+         "secure" -> crypto.secureHash,
+         "fast"   -> crypto.fastHash
+       )) {
     val uri = routePath(s"/hash/$hash")
     uri in {
       forAll(Gen.alphaNumStr) { s =>
