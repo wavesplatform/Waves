@@ -27,7 +27,6 @@ case class IssueTransaction private (sender: PublicKeyAccount,
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val builder: IssueTransaction.type    = IssueTransaction
-  override def version: Byte                     = builder.version
 
   val assetId = id
 

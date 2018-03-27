@@ -15,8 +15,7 @@ case class CreateAliasTransaction private (sender: PublicKeyAccount, alias: Alia
     extends SignedTransaction {
 
   override val builder: TransactionParser = CreateAliasTransaction
-  override def version: Byte               = builder.supportedVersions.head
-  override val id: Coeval[AssetId]         = Coeval.evalOnce(ByteStr(crypto.fastHash(builder.typeId +: alias.bytes.arr)))
+  override val id: Coeval[AssetId]        = Coeval.evalOnce(ByteStr(crypto.fastHash(builder.typeId +: alias.bytes.arr)))
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes

@@ -22,7 +22,6 @@ case class ReissueTransaction private (sender: PublicKeyAccount,
     with FastHashId {
 
   override val builder: ReissueTransaction.type = ReissueTransaction
-  override def version: Byte                    = builder.version
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(

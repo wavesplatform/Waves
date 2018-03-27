@@ -27,7 +27,6 @@ case class TransferTransaction private (assetId: Option[AssetId],
     with FastHashId {
 
   override val builder: TransactionParser = TransferTransaction
-  override def version: Byte              = builder.supportedVersions.head
 
   override val assetFee: (Option[AssetId], Long) = (feeAssetId, fee)
 

@@ -13,7 +13,7 @@ import scorex.transaction._
 
 import scala.util.Try
 
-case class SmartIssueTransaction private (override val version: Byte,
+case class SmartIssueTransaction private (version: Byte,
                                           chainId: Byte,
                                           sender: PublicKeyAccount,
                                           name: Array[Byte],

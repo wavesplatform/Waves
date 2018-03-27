@@ -13,7 +13,7 @@ import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
-case class SetScriptTransaction private (override val version: Byte,
+case class SetScriptTransaction private (version: Byte,
                                          chainId: Byte,
                                          sender: PublicKeyAccount,
                                          script: Option[Script],

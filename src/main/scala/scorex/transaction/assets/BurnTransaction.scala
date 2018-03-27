@@ -16,8 +16,6 @@ case class BurnTransaction private (sender: PublicKeyAccount, assetId: ByteStr, 
     with FastHashId {
 
   override val builder: BurnTransaction.type = BurnTransaction
-  override def version: Byte                 = builder.version
-
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes
       .concat(Array(builder.typeId), sender.publicKey, assetId.arr, Longs.toByteArray(amount), Longs.toByteArray(fee), Longs.toByteArray(timestamp)))

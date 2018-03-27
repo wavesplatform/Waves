@@ -13,7 +13,7 @@ import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
-case class VersionedTransferTransaction private (override val version: Byte,
+case class VersionedTransferTransaction private (version: Byte,
                                                  sender: PublicKeyAccount,
                                                  recipient: AddressOrAlias,
                                                  assetId: Option[AssetId],

@@ -16,7 +16,7 @@ import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, toJson
 
 import scala.util.{Either, Failure, Success, Try}
 
-case class MassTransferTransaction private (override val version: Byte,
+case class MassTransferTransaction private (version: Byte,
                                             assetId: Option[AssetId],
                                             sender: PublicKeyAccount,
                                             transfers: List[ParsedTransfer],

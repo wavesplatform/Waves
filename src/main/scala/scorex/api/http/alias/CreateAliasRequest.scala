@@ -3,9 +3,7 @@ package scorex.api.http.alias
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
 
-case class CreateAliasRequest(@ApiModelProperty(value = "Version")
-                              version: Option[Byte],
-                              @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
+case class CreateAliasRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                               sender: String,
                               @ApiModelProperty(value = "Alias", required = true)
                               alias: String,

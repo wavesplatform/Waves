@@ -304,7 +304,7 @@ object AsyncHttpApi extends Assertions {
     }
 
     def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
-      postJson("/alias/create", CreateAliasRequest(None, targetAddress, alias, fee)).as[Transaction]
+      postJson("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
 
     def aliasByAddress(targetAddress: String): Future[Seq[String]] =
       get(s"/alias/by-address/$targetAddress").as[Seq[String]]

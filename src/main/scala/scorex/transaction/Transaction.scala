@@ -8,7 +8,6 @@ trait Transaction extends BytesSerializable with JsonSerializable {
   val id: Coeval[ByteStr]
 
   def builder: TransactionParser
-  def version: Byte
   def assetFee: (Option[AssetId], Long)
   def timestamp: Long
 

@@ -16,7 +16,6 @@ case class LeaseCancelTransaction private (sender: PublicKeyAccount, leaseId: By
     with FastHashId {
 
   override val builder: TransactionParser = LeaseCancelTransaction
-  override def version: Byte               = builder.supportedVersions.head
 
   val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(Bytes.concat(Array(builder.typeId), sender.publicKey, Longs.toByteArray(fee), Longs.toByteArray(timestamp), leaseId.arr))
