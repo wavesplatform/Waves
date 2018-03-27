@@ -460,7 +460,7 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
       size      <- Gen.choose(0, MaxEntryCount)
       data      <- Gen.listOfN(size, dataEntryGen)
       version   <- Gen.oneOf(DataTransaction.supportedVersions.toSeq)
-    } yield DataTransaction.selfSigned(DataTransaction.Version, sender, data, 15000000, timestamp).right.get)
+    } yield DataTransaction.selfSigned(version, sender, data, 15000000, timestamp).right.get)
       .label("DataTransaction")
   }
 

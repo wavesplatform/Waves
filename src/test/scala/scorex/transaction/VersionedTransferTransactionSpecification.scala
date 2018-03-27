@@ -11,21 +11,21 @@ class VersionedTransferTransactionSpecification extends PropSpec with PropertyCh
 
   private val versionGen: Gen[Byte] = Gen.oneOf(VersionedTransferTransaction.supportedVersions.toSeq)
 
-  property("ScriptTransferTransaction serialization roundtrip") {
+  property("VersionedTransferTransactionSpecification serialization roundtrip") {
     forAll(versionedTransferGen) { tx: VersionedTransferTransaction =>
-      val recovered = VersionedTransferTransaction.parseBytes(tx.bytes().tail).get
+      val recovered = VersionedTransferTransaction.parseBytes(tx.bytes()).get
       assertTxs(recovered, tx)
     }
   }
 
-  property("ScriptTransferTransaction serialization from TypedTransaction") {
+  property("VersionedTransferTransactionSpecification serialization from TypedTransaction") {
     forAll(versionedTransferGen) { tx: VersionedTransferTransaction =>
       val recovered = TransactionParsers.parseBytes(tx.bytes()).get
       assertTxs(recovered.asInstanceOf[VersionedTransferTransaction], tx)
     }
   }
 
-  property("VersionedTransferTransaction id doesn't depend on proof") {
+  property("VersionedTransferTransactionSpecification id doesn't depend on proof") {
     forAll(versionGen, accountGen, accountGen, proofsGen, proofsGen, bytes32gen) {
       case (version, acc1, acc2, proofs1, proofs2, attachment) =>
         val tx1 = VersionedTransferTransaction.create(version, None, acc2, acc2.toAddress, 1, 1, 1, attachment, proofs1).explicitGet()
