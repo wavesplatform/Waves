@@ -1,7 +1,5 @@
 package scorex.api.http.assets
 
-import javax.ws.rs.Path
-
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.ByteStr
@@ -9,10 +7,11 @@ import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
+import javax.ws.rs.Path
 import play.api.libs.json._
 import scorex.BroadcastRoute
 import scorex.account.Address
-import scorex.api.http.{ApiError, ApiRoute, InvalidAddress}
+import scorex.api.http.{ApiError, ApiRoute, InvalidAddress, WrongJson}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
@@ -20,6 +19,7 @@ import scorex.transaction.{AssetIdStringLength, TransactionFactory}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 @Path("/assets")
@@ -86,8 +86,15 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       defaultValue = "{\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500,\"feeAssetId\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\",\"fee\":1579331567487095949,\"timestamp\":4231642878298810008}"
     )
   ))
-  def transfer: Route =
-    processRequest("transfer", (t: TransferRequest) => doBroadcast(TransactionFactory.transferAsset(t, wallet, time)))
+  def transfer: Route = processRequest[TransferRequests]("transfer", { req =>
+    req.eliminate(
+      x => doBroadcast(TransactionFactory.transferAsset(x, wallet, time)),
+      _.eliminate(
+        x => doBroadcast(TransactionFactory.versionedTransfer(x, wallet, time)),
+        _ => Future.successful(WrongJson(Some(new IllegalArgumentException("Doesn't know how to process request"))))
+      )
+    )
+  })
 
   @Path("/masstransfer")
   @ApiOperation(value = "Mass Transfer",

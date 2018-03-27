@@ -189,6 +189,7 @@ lazy val node = project.in(file("."))
       Dependencies.matcher ++
       Dependencies.metrics ++
       Dependencies.fp ++
+      Dependencies.meta ++
       Dependencies.ficus ++
       Dependencies.scorex ++
       Dependencies.commons_net ++

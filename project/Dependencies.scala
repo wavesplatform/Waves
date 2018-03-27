@@ -75,6 +75,7 @@ object Dependencies {
     "org.typelevel" %% "cats-core" % "1.0.1",
     "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
   )
+  lazy val meta = Seq("com.chuusai" %% "shapeless" % "2.3.3")
   lazy val monix = Def.setting(Seq("io.monix" %%% "monix" % "3.0.0-M3"))
   lazy val scodec = Def.setting(Seq("org.scodec" %%% "scodec-core" % "1.10.3"))
   lazy val fastparse = Def.setting(Seq("com.lihaoyi" %%% "fastparse" % "1.0.0"))
