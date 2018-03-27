@@ -102,10 +102,10 @@ abstract class WavesContextImpl { this: Crypto with Environment with Base58 =>
         addressFromPublicKeyF.name -> addressFromPublicKeyF,
         addressFromString.name     -> addressFromString,
         //state
-        txByIdF.name       -> txByIdF,
-        getLongF.name      -> getLongF,
-        getBooleanF.name   -> getBooleanF,
-        getByteArrayF.name -> getByteArrayF,
+        txByIdF.name               -> txByIdF,
+        getLongF.name              -> getLongF,
+        getBooleanF.name           -> getBooleanF,
+        getByteArrayF.name         -> getByteArrayF,
         addressFromRecipientF.name -> addressFromRecipientF
       )
     )
@@ -129,7 +129,7 @@ abstract class WavesContextImpl { this: Crypto with Environment with Base58 =>
   val addressFromString: PredefFunction = PredefFunction("addressFromString", optionAddress, List(("string", STRING))) {
     case (addressString: String) :: Nil =>
       val Prefix: String = "address:"
-      val base58String = if (addressString.startsWith(Prefix)) addressString.drop(Prefix.length) else addressString
+      val base58String   = if (addressString.startsWith(Prefix)) addressString.drop(Prefix.length) else addressString
       base58Decode(base58String) match {
         case Success(addressBytes) =>
           val version = addressBytes.head
