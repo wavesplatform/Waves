@@ -24,7 +24,7 @@ case class DataTransaction private (version: Byte,
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     Bytes.concat(
-      Array(0, builder.typeId, version),
+      Array(builder.typeId, version),
       sender.publicKey,
       Shorts.toByteArray(data.size.toShort),
       data.flatMap(_.toBytes).toArray,
@@ -42,7 +42,7 @@ case class DataTransaction private (version: Byte,
     )
   }
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), proofs.bytes()))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 }
 
 object DataTransaction extends TransactionParserFor[DataTransaction] with TransactionParser.MultipleVersions {

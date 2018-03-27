@@ -33,7 +33,7 @@ case class SmartIssueTransaction private (version: Byte,
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(
-      Array(0, builder.typeId, version, chainId),
+      Array(builder.typeId, version, chainId),
       sender.publicKey,
       Deser.serializeArray(name),
       Deser.serializeArray(description),
@@ -52,7 +52,7 @@ case class SmartIssueTransaction private (version: Byte,
       "script"  -> script.map(_.text)
     ))
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), proofs.bytes()))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 }
 
 object SmartIssueTransaction extends TransactionParserFor[SmartIssueTransaction] with TransactionParser.MultipleVersions {

@@ -27,7 +27,7 @@ case class SetScriptTransaction private (version: Byte,
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(
-      Array(0, builder.typeId, version, chainId),
+      Array(builder.typeId, version, chainId),
       sender.publicKey,
       Deser.serializeOption(script)(s => Deser.serializeArray(s.bytes().arr)),
       Longs.toByteArray(fee),
@@ -40,7 +40,7 @@ case class SetScriptTransaction private (version: Byte,
     "script"  -> script.map(_.bytes()))
   )
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), proofs.bytes()))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 }
 
 object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] with TransactionParser.MultipleVersions {

@@ -35,7 +35,7 @@ case class VersionedTransferTransaction private (version: Byte,
     val feeBytes       = Longs.toByteArray(fee)
 
     Bytes.concat(
-      Array(0, builder.typeId, version),
+      Array(builder.typeId, version),
       sender.publicKey,
       assetIdBytes,
       timestampBytes,
@@ -55,7 +55,7 @@ case class VersionedTransferTransaction private (version: Byte,
       "attachment" -> Base58.encode(attachment)
     ))
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), proofs.bytes()))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
 }
 
