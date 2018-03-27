@@ -5,6 +5,7 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 import sbtassembly.MergeStrategy
 
 enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
+scalafmtOnCompile in ThisBuild := true
 
 val versionSource = Def.task {
   // WARNING!!!
