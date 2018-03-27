@@ -18,6 +18,7 @@ import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.{Script, SetScriptTransaction}
 
+import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -353,34 +354,37 @@ object LevelDBWriter {
     * ([10, 7], 5, 11) => [10, 7, 1]
     * }}}
     */
-  private def sliceWaves(v: Seq[Int], from: Int, to: Int): Seq[Int] = {
+  private def slice(v: Seq[Int], from: Int, to: Int): Seq[Int] = {
     val (c1, c2) = v.dropWhile(_ > to).partition(_ > from)
     c1 :+ c2.headOption.getOrElse(1)
   }
 
-  private def sliceLease(v: Seq[Int], from: Int, to: Int): Seq[Int] = {
-    val (c1, c2) = v.dropWhile(_ > to).partition(_ > from)
-    c1 ++ c2.headOption
-  }
-
-  /** {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 12), (3, 5), (3, 0)]}}} */
+  /** {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 12), (3, 5), (3, 1)]}}}
+    * @param wbh WAVES balance history
+    * @param lbh Lease balance history
+    */
   private def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
-    val wi     = wbh.iterator.buffered
-    val li     = lbh.iterator.buffered
-    val result = Seq.newBuilder[(Int, Int)]
-
-    while (wi.hasNext || li.hasNext) {
-      val nextW = wi.headOption.getOrElse(0)
-      val nextL = li.headOption.getOrElse(0)
-
-      result += {
-        if (nextW > nextL) (wi.next(), nextL)
-        else if (nextW < nextL) (nextW, li.next())
-        else (wi.next(), li.next())
+    @tailrec
+    def recMerge(wh: Int, wt: Seq[Int], lh: Int, lt: Seq[Int], buf: ArrayBuffer[(Int, Int)]): ArrayBuffer[(Int, Int)] = {
+      buf += wh -> lh
+      if (wt.isEmpty && lt.isEmpty) {
+        buf
+      } else if (wt.isEmpty) {
+        recMerge(wh, wt, lt.head, lt.tail, buf)
+      } else if (lt.isEmpty) {
+        recMerge(wt.head, wt.tail, lh, lt, buf)
+      } else {
+        if (wh > lh) {
+          recMerge(wt.head, wt.tail, lh, lt, buf)
+        } else if (wh < lh) {
+          recMerge(wh, wt, lt.head, lt.tail, buf)
+        } else {
+          recMerge(wt.head, wt.tail, lt.head, lt.tail, buf)
+        }
       }
     }
 
-    result.result()
+    recMerge(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 }
 
@@ -720,8 +724,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
 
   override def balanceSnapshots(address: Address, from: Int, to: Int): Seq[BalanceSnapshot] = readOnly { db =>
     db.get(k.addressId(address)).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
-      val wbh = sliceWaves(db.get(k.wavesBalanceHistory(addressId)), from, to)
-      val lbh = sliceLease(db.get(k.leaseBalanceHistory(addressId)), from, to)
+      val wbh = slice(db.get(k.wavesBalanceHistory(addressId)), from, to)
+      val lbh = slice(db.get(k.leaseBalanceHistory(addressId)), from, to)
       for {
         (wh, lh) <- merge(wbh, lbh)
         wb = db.get(k.wavesBalance(wh, addressId))

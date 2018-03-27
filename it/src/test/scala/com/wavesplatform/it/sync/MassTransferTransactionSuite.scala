@@ -9,7 +9,7 @@ import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.MassTransferTransaction
-import scorex.transaction.assets.MassTransferTransaction.{MaxTransferCount, ParsedTransfer, Transfer}
+import scorex.transaction.assets.MassTransferTransaction.{MaxTransferCount, Transfer}
 
 import scala.concurrent.duration._
 import scala.util.Random

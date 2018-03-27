@@ -10,7 +10,7 @@ import scorex.transaction.assets.VersionedTransferTransaction
 class VersionedTransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("ScriptTransferTransaction serialization roundtrip") {
-    forAll(scriptTransferGen) { tx: VersionedTransferTransaction =>
+    forAll(versionedTransferGen) { tx: VersionedTransferTransaction =>
       tx.bytes().head shouldBe TransactionType.VersionedTransferTransaction.id
       val recovered = VersionedTransferTransaction.parseTail(tx.bytes().tail).get
       assertTxs(recovered, tx)
@@ -18,7 +18,7 @@ class VersionedTransferTransactionSpecification extends PropSpec with PropertyCh
   }
 
   property("ScriptTransferTransaction serialization from TypedTransaction") {
-    forAll(scriptTransferGen) { tx: VersionedTransferTransaction =>
+    forAll(versionedTransferGen) { tx: VersionedTransferTransaction =>
       val recovered = TransactionParser.parseBytes(tx.bytes()).get
       assertTxs(recovered.asInstanceOf[VersionedTransferTransaction], tx)
     }

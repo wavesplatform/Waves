@@ -4,7 +4,7 @@ import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry}
+import com.wavesplatform.state2._
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 import scorex.api.http.assets.MassTransferRequest
@@ -123,17 +123,14 @@ class TransactionsApiSuite extends BaseTransactionSuite {
   }
 
   test("/transactions/sign should produce mass transfer transaction that is good for /transactions/broadcast") {
-    signAndBroadcast(
-      Json.obj(
-        "type"       -> 11,
-        "version"    -> 1,
-        "sender"     -> firstAddress,
-        "transfers"  -> Json.toJson(Seq(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))),
-        "fee"        -> 200000,
-        "attachment" -> Base58.encode("masspay".getBytes)
-      ),
-      usesProofs = true
-    )
+    signAndBroadcast(Json.obj(
+      "type" -> 11,
+      "version" -> 1,
+      "sender" -> firstAddress,
+      "transfers" -> Json.toJson(Seq(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))),
+      "fee" -> 200000,
+      "attachment" -> Base58.encode("masspay".getBytes)
+    ),usesProofs = true)
   }
 
   test("/transactions/sign should produce lease/cancel transactions that are good for /transactions/broadcast") {
@@ -148,18 +145,16 @@ class TransactionsApiSuite extends BaseTransactionSuite {
   }
 
   test("/transactions/sign should produce data transaction that is good for /transactions/broadcast") {
-    signAndBroadcast(
-      Json.obj(
-        "type"    -> 12,
-        "version" -> 1,
-        "sender"  -> firstAddress,
-        "data" -> List(IntegerDataEntry("int", 923275292849183L),
-                       BooleanDataEntry("bool", true),
-                       BinaryDataEntry("blob", Array.tabulate(445)(_.toByte))),
-        "fee" -> 100000
-      ),
-      usesProofs = true
-    )
+    signAndBroadcast(Json.obj(
+      "type" -> 12,
+      "version" -> 1,
+      "sender" -> firstAddress,
+      "data" -> List(
+        LongDataEntry("int", 923275292849183L),
+        BooleanDataEntry("bool", true),
+        BinaryDataEntry("blob", ByteStr(Array.tabulate(445)(_.toByte)))),
+      "fee" -> 100000),
+      usesProofs = true)
   }
 
   private def signAndBroadcast(json: JsObject, usesProofs: Boolean = false): String = {
