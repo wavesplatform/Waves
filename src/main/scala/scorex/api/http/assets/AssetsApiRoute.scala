@@ -11,7 +11,7 @@ import javax.ws.rs.Path
 import play.api.libs.json._
 import scorex.BroadcastRoute
 import scorex.account.Address
-import scorex.api.http.{ApiError, ApiRoute, InvalidAddress}
+import scorex.api.http._
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.Order
@@ -234,28 +234,30 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       )
     }).left.map(ApiError.fromValidationError)
 
-  private def assetDetails(assetId: String): Either[ApiError, JsObject] = {
-    for {
-      id <- ByteStr.decodeBase58(assetId).toEither
-      txInfo <- state().findTransaction[IssueTransaction](id)
-      (h, tx) <- txInfo
-      info <- state().assetInfo(id)
+  private def assetDetails(assetId: String): Either[ApiError, JsObject] =
+    (for {
+      id <- ByteStr.decodeBase58(assetId).toOption.toRight("Incorrect asset ID")
+      tt <- state().transactionInfo(id).toRight("Failed to find issue transaction by ID")
+      (h, mtx) = tt
+      tx <- (mtx match {
+        case Some(t: IssueTransaction) => Some(t)
+        case _                         => None
+      }).toRight("No issue transaction found with given asset ID")
+      info <- state().assetInfo(id).toRight("Failed to get information about the asset")
     } yield {
       JsObject(
         Seq(
-          "assetId" -> JsString(id.base58),
-          "issueHeight" -> JsNumber(h),
-          "issuer" -> JsString(txInfo.sender.toString),
-          "name" -> JsString(new String(txInfo.name, Charsets.UTF_8)),
-          "description" -> JsString(new String(txInfo.description, Charsets.UTF_8)),
-          "decimals" -> JsNumber(txInfo.decimals),
-          "reissualbe" -> JsBoolean(info.isReissuable),
-          "quantity" -> JsNumber(info.volume)
+          "assetId"        -> JsString(id.base58),
+          "issueHeight"    -> JsNumber(h),
+          "issueTimestamp" -> JsNumber(tx.timestamp),
+          "issuer"         -> JsString(tx.sender.toString),
+          "name"           -> JsString(new String(tx.name, Charsets.UTF_8)),
+          "description"    -> JsString(new String(tx.description, Charsets.UTF_8)),
+          "decimals"       -> JsNumber(tx.decimals.toInt),
+          "reissuable"     -> JsBoolean(info.isReissuable),
+          "quantity"       -> JsNumber(info.volume)
         )
       )
-
-    }
-
-  }
+    }).left.map(m => CustomValidationError(m))
 
 }
