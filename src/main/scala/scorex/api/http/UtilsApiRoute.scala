@@ -43,7 +43,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   def compile: Route = path("script" / "compile") {
     (post & entity(as[String])) { code =>
       complete((Parser(code) match {
-        case Success(value, index) =>
+        case Success(value, _) =>
           TypeChecker(BlockchainContext.typeCheckerContext, value) match {
             case Left(err)   => Left[String, String](err.toString)
             case Right(expr) => Right[String, String](Script(expr).bytes().base58)
