@@ -43,10 +43,9 @@ case class LeaseTransaction private (sender: PublicKeyAccount,
 
 }
 
-object LeaseTransaction extends TransactionParserFor[LeaseTransaction] with TransactionParser.HardcodedVersion {
+object LeaseTransaction extends TransactionParserFor[LeaseTransaction] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte  = 8
-  override val version: Byte = 1
+  override val typeId: Byte = 8
 
   object Status {
     val Active   = "active"

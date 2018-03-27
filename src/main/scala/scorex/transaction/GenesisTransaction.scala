@@ -41,10 +41,9 @@ case class GenesisTransaction private (recipient: Address, amount: Long, timesta
   }
 }
 
-object GenesisTransaction extends TransactionParserFor[GenesisTransaction] with TransactionParser.HardcodedVersion {
+object GenesisTransaction extends TransactionParserFor[GenesisTransaction] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte  = 1
-  override val version: Byte = 1
+  override val typeId: Byte = 1
 
   private val RECIPIENT_LENGTH = Address.AddressLength
   private val BASE_LENGTH      = TimestampLength + RECIPIENT_LENGTH + AmountLength

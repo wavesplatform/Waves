@@ -63,10 +63,9 @@ case class TransferTransaction private (assetId: Option[AssetId],
 
 }
 
-object TransferTransaction extends TransactionParserFor[TransferTransaction] with TransactionParser.HardcodedVersion {
+object TransferTransaction extends TransactionParserFor[TransferTransaction] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte  = 4
-  override val version: Byte = 1
+  override val typeId: Byte = 4
 
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)

@@ -57,10 +57,9 @@ case class IssueTransaction private (sender: PublicKeyAccount,
 
 }
 
-object IssueTransaction extends TransactionParserFor[IssueTransaction] with TransactionParser.HardcodedVersion {
+object IssueTransaction extends TransactionParserFor[IssueTransaction] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte  = 3
-  override val version: Byte = 1
+  override val typeId: Byte = 3
 
   val MaxDescriptionLength = 1000
   val MaxAssetNameLength   = 16

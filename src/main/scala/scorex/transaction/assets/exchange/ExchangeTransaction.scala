@@ -52,10 +52,9 @@ case class ExchangeTransaction private (buyOrder: Order,
   override val signedDescendants: Coeval[Seq[Order]] = Coeval.evalOnce(Seq(buyOrder, sellOrder))
 }
 
-object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] with TransactionParser.HardcodedVersion {
+object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte  = 7
-  override val version: Byte = 1
+  override val typeId: Byte = 7
 
   def create(matcher: PrivateKeyAccount,
              buyOrder: Order,

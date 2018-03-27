@@ -33,10 +33,9 @@ case class CreateAliasTransaction private (sender: PublicKeyAccount, alias: Alia
 
 }
 
-object CreateAliasTransaction extends TransactionParserFor[CreateAliasTransaction] with TransactionParser.HardcodedVersion {
+object CreateAliasTransaction extends TransactionParserFor[CreateAliasTransaction] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte  = 10
-  override val version: Byte = 1
+  override val typeId: Byte = 10
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {

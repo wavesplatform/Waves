@@ -22,16 +22,15 @@ trait TransactionParser {
 }
 
 object TransactionParser {
-  trait HardcodedVersion extends TransactionParser {
-    def version: Byte
-    override def supportedVersions: Set[Byte] = Set(version)
+  trait HardcodedVersion1 extends TransactionParser {
+    override val supportedVersions: Set[Byte] = Set(1)
 
     override protected def parseHeader(bytes: Array[Byte]): Try[(Byte, Int)] = Try {
       if (bytes.length < 1) throw new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements")
 
       val parsedTypeId = bytes.head
       if (parsedTypeId != typeId) throw new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'")
-      (version, 1)
+      (1, 1)
     }
   }
 

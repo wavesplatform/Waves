@@ -32,10 +32,9 @@ case class LeaseCancelTransaction private (sender: PublicKeyAccount, leaseId: By
 
 }
 
-object LeaseCancelTransaction extends TransactionParserFor[LeaseCancelTransaction] with TransactionParser.HardcodedVersion {
+object LeaseCancelTransaction extends TransactionParserFor[LeaseCancelTransaction] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte  = 9
-  override val version: Byte = 1
+  override val typeId: Byte = 9
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {

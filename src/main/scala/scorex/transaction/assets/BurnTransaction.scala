@@ -34,10 +34,9 @@ case class BurnTransaction private (sender: PublicKeyAccount, assetId: ByteStr, 
 
 }
 
-object BurnTransaction extends TransactionParserFor[BurnTransaction] with TransactionParser.HardcodedVersion {
+object BurnTransaction extends TransactionParserFor[BurnTransaction] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte  = 6
-  override val version: Byte = 1
+  override val typeId: Byte = 6
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
