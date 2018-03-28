@@ -1,10 +1,9 @@
 package scorex.transaction
 
 import com.wavesplatform.TransactionGen
-import org.scalacheck.Gen
+import org.scalacheck.Arbitrary
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
@@ -13,8 +12,8 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
 
   property("serialization roundtrip") {
     forAll(massTransferGen) { tx: MassTransferTransaction =>
-      require(tx.bytes().head == TransactionType.MassTransferTransaction.id)
-      val recovered = MassTransferTransaction.parseTail(tx.bytes().tail).get
+      require(tx.bytes().head == MassTransferTransaction.typeId)
+      val recovered = MassTransferTransaction.parseBytes(tx.bytes()).get
 
       recovered.sender.address shouldEqual tx.sender.address
       recovered.assetId.map(_ == tx.assetId.get).getOrElse(tx.assetId.isEmpty) shouldBe true
@@ -32,7 +31,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
 
   property("serialization from TypedTransaction") {
     forAll(massTransferGen) { tx: MassTransferTransaction =>
-      val recovered = TransactionParser.parseBytes(tx.bytes()).get
+      val recovered = TransactionParsers.parseBytes(tx.bytes()).get
       recovered.bytes() shouldEqual tx.bytes()
     }
   }
@@ -40,7 +39,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
   property("property validation") {
     import MassTransferTransaction.create
 
-    val badVersionGen = Gen.choose(MassTransferTransaction.Version + 1, Byte.MaxValue).map(_.toByte)
+    val badVersionGen = Arbitrary.arbByte.arbitrary.filter(x => !MassTransferTransaction.supportedVersions.contains(x))
     forAll(massTransferGen, badVersionGen) {
       case (MassTransferTransaction(version, assetId, sender, transfers, timestamp, fee, attachment, proofs), badVersion) =>
         val badVersionEi = create(badVersion, assetId, sender, transfers, timestamp, fee, attachment, proofs)

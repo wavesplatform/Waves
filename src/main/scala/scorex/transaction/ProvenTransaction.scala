@@ -11,7 +11,7 @@ trait ProvenTransaction extends Transaction with Proven {
   val bodyBytes: Coeval[Array[Byte]]
 
   protected def jsonBase(): JsObject = Json.obj(
-    "type" -> transactionType.id,
+    "type" -> builder.typeId,
     "id" -> id().base58,
     "sender" -> sender.address,
     "senderPublicKey" -> Base58.encode(sender.publicKey),

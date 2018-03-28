@@ -66,7 +66,7 @@ object AssetTransactionsDiff {
   private def validateAsset(tx: SignedTransaction, state: SnapshotStateReader, assetId: AssetId): Either[ValidationError, Unit] = {
     state.transactionInfo(assetId) match {
       case Some((_, itx: IssueTransaction)) if !(itx.sender equals tx.sender) => Left(GenericError("Asset was issued by other address"))
-      case Some((_, sitx @ SmartIssueTransaction(_, _, _, _, _, _, _, _, None, _, _, _))) if !(sitx.sender equals tx.sender) =>
+      case Some((_, sitx: SmartIssueTransaction)) if sitx.script.isEmpty && !sitx.sender.equals(tx.sender) =>
         Left(GenericError("Asset was issued by other address"))
       case None    => Left(GenericError("Referenced assetId not found"))
       case Some(_) => Right({})

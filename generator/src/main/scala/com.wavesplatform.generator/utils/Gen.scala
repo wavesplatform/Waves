@@ -6,7 +6,7 @@ import com.wavesplatform.generator.utils.Implicits._
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
-import scorex.transaction.{Proofs, Transaction, TransactionParser}
+import scorex.transaction.{Proofs, Transaction, TransactionParsers}
 
 object Gen {
   private def random = ThreadLocalRandom.current
@@ -45,7 +45,7 @@ object Gen {
   }
 
   val address: Iterator[Address] = Iterator.continually {
-    val pk = Array.fill[Byte](TransactionParser.KeyLength)(random.nextInt(Byte.MaxValue).toByte)
+    val pk = Array.fill[Byte](TransactionParsers.KeyLength)(random.nextInt(Byte.MaxValue).toByte)
     Address.fromPublicKey(pk)
   }
 

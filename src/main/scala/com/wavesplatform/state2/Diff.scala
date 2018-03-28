@@ -33,7 +33,7 @@ object VolumeAndFee {
   }
 }
 
-case class AssetInfo(isReissuable: Boolean, volume: Long, script: Option[Script])
+case class AssetInfo(isReissuable: Boolean, volume: BigInt, script: Option[Script])
 object AssetInfo {
   implicit val assetInfoMonoid: Monoid[AssetInfo]  = new Monoid[AssetInfo] {
     override def empty: AssetInfo = AssetInfo(isReissuable = true, 0, None)

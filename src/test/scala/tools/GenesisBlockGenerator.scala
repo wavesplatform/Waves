@@ -12,7 +12,7 @@ import scorex.account.{Address, AddressScheme, PrivateKeyAccount}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.TransactionParser.SignatureLength
+import scorex.transaction.TransactionParsers.SignatureLength
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._

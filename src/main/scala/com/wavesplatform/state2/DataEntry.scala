@@ -25,7 +25,7 @@ sealed abstract class DataEntry[T](val key: String, val value: T) {
 
 
 object DataEntry {
-  val MaxKeySize = 100
+  val MaxKeySize: Byte = 100
   val MaxValueSize = 1024
 
   private val UTF8 = StandardCharsets.UTF_8

@@ -29,9 +29,10 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
 
   private def scriptedSendGen(from: PrivateKeyAccount, to: PublicKeyAccount, ts: Long): Gen[VersionedTransferTransaction] =
     for {
-      amt <- smallFeeGen
-      fee <- smallFeeGen
-    } yield VersionedTransferTransaction.selfSigned(1, None, from, to.toAddress, amt, ts, fee, Array.emptyByteArray).explicitGet()
+      version <- Gen.oneOf(VersionedTransferTransaction.supportedVersions.toSeq)
+      amt     <- smallFeeGen
+      fee     <- smallFeeGen
+    } yield VersionedTransferTransaction.selfSigned(version, None, from, to.toAddress, amt, ts, fee, Array.emptyByteArray).explicitGet()
 
   private def differentTransfers(typed: Typed.EXPR) =
     for {
@@ -56,9 +57,10 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
     forAll(differentTransfers(typedScript)) {
       case (gen, setScript, transfers, scriptTransfers) =>
         def simpleCheck(): Unit = assertDiffAndState(Seq(TestBlock.create(Seq(gen))), TestBlock.create(transfers), smartEnabledFS) { case _ => }
-        def scriptedCheck(): Unit = assertDiffAndState(Seq(TestBlock.create(Seq(gen, setScript))), TestBlock.create(scriptTransfers), smartEnabledFS) {
-          case _ =>
-        }
+        def scriptedCheck(): Unit =
+          assertDiffAndState(Seq(TestBlock.create(Seq(gen, setScript))), TestBlock.create(scriptTransfers), smartEnabledFS) {
+            case _ =>
+          }
 
         val simeplCheckTime   = Instrumented.withTime(simpleCheck())._2
         val scriptedCheckTime = Instrumented.withTime(scriptedCheck())._2

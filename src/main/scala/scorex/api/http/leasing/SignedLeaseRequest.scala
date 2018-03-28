@@ -4,7 +4,7 @@ import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
 import scorex.account.{AddressOrAlias, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
-import scorex.transaction.TransactionParser.SignatureStringLength
+import scorex.transaction.TransactionParsers.SignatureStringLength
 import scorex.transaction.ValidationError
 import scorex.transaction.lease.LeaseTransaction
 

@@ -4,7 +4,7 @@ import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util._
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
-import scorex.transaction.TransactionParser.TransactionType
+import scorex.transaction.assets.TransferTransaction
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -55,7 +55,7 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
     }
 
     def makeTransfers(accounts: Seq[String]): Future[Seq[String]] = traverse(accounts) { acc =>
-      sender.transfer(sender.address, acc, defaultBalance, sender.fee(TransactionType.TransferTransaction)).map(_.id)
+      sender.transfer(sender.address, acc, defaultBalance, sender.fee(TransferTransaction.typeId)).map(_.id)
     }
 
     val correctStartBalancesFuture = for {

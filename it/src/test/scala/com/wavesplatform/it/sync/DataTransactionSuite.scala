@@ -10,7 +10,6 @@ import play.api.libs.json._
 import scorex.api.http.SignedDataRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.DataTransaction
-import scorex.transaction.TransactionParser.TransactionType
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Try}
@@ -50,13 +49,13 @@ class DataTransactionSuite extends BaseTransactionSuite {
     def data(entries: List[DataEntry[_]] = List(LongDataEntry("int", 177)),
              fee: Long = 100000,
              timestamp: Long = System.currentTimeMillis,
-             version: Byte = DataTransaction.Version): DataTransaction =
+             version: Byte = DataTransaction.supportedVersions.head): DataTransaction =
       DataTransaction.selfSigned(version, sender.privateKey, entries, fee, timestamp).right.get
 
     def request(tx: DataTransaction): SignedDataRequest =
-      SignedDataRequest(DataTransaction.Version, Base58.encode(tx.sender.publicKey), tx.data, tx.fee, tx.timestamp, tx.proofs.base58().toList)
+      SignedDataRequest(DataTransaction.supportedVersions.head, Base58.encode(tx.sender.publicKey), tx.data, tx.fee, tx.timestamp, tx.proofs.base58().toList)
 
-    implicit val w = Json.writes[SignedDataRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(TransactionType.DataTransaction.id)))
+    implicit val w = Json.writes[SignedDataRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(DataTransaction.typeId)))
 
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val invalidTxs = Seq(
@@ -233,13 +232,15 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("transaction requires a valid proof") {
-    val request: JsObject = {
-      val rs = sender.postJsonWithApiKey("/transactions/sign", Json.obj(
-        "version" -> 1,
-        "type" -> TransactionType.DataTransaction.id,
-        "sender" -> firstAddress,
-        "data" -> List(LongDataEntry("int", 333)),
-        "fee" -> 100000))
+    def request: JsObject = {
+      val rs = sender.postJsonWithApiKey(
+        "/transactions/sign",
+        Json.obj("version" -> 1,
+                 "type"    -> DataTransaction.typeId,
+                 "sender"  -> firstAddress,
+                 "data"    -> List(LongDataEntry("int", 333)),
+                 "fee"     -> 100000)
+      )
       Json.parse(rs.getResponseBody).as[JsObject]
     }
     def id(obj: JsObject) = obj.value("id").as[String]
@@ -276,7 +277,6 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val extraSizedData = List.tabulate(MaxEntryCount + 1)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
     assertBadRequestAndResponse(sender.putData(firstAddress, extraSizedData, calcDataFee(extraSizedData)), message)
     nodes.waitForHeightAraise()
-
   }
 
   private def calcDataFee(data: List[DataEntry[_]]): Long = {

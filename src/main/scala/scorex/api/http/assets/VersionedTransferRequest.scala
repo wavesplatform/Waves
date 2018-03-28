@@ -2,7 +2,8 @@ package scorex.api.http.assets
 
 import play.api.libs.json.{Format, Json}
 
-case class VersionedTransferRequest(assetId: Option[String],
+case class VersionedTransferRequest(version: Byte,
+                                    assetId: Option[String],
                                     amount: Long,
                                     fee: Long,
                                     sender: String,
@@ -11,5 +12,5 @@ case class VersionedTransferRequest(assetId: Option[String],
                                     timestamp: Option[Long] = None)
 
 object VersionedTransferRequest {
-  implicit val versionedTransferFormat: Format[VersionedTransferRequest] = Json.format
+  implicit val format: Format[VersionedTransferRequest] = Json.format
 }

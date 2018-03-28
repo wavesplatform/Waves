@@ -5,13 +5,13 @@ import com.wavesplatform.state2._
 import scorex.account.PrivateKeyAccount
 import scorex.block._
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.transaction.TransactionParser._
-import scorex.transaction.{Transaction, TransactionParser}
+import scorex.transaction.TransactionParsers._
+import scorex.transaction.{Transaction, TransactionParsers}
 
 import scala.util.{Random, Try}
 
 object TestBlock {
-  val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
+  val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParsers.KeyLength)(0))
 
   val random: Random = new Random()
 

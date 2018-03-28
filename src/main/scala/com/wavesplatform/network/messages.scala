@@ -7,7 +7,7 @@ import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, MicroBlock}
-import scorex.transaction.{History, Signed}
+import scorex.transaction.{History, Signed, Transaction}
 
 sealed trait Message
 
@@ -28,6 +28,10 @@ case class GetBlock(signature: ByteStr) extends Message
 case class LocalScoreChanged(newLocalScore: History.BlockchainScore) extends Message
 
 case class RawBytes(code: Byte, data: Array[Byte]) extends Message
+
+object RawBytes {
+  def from(tx: Transaction): RawBytes = RawBytes(TransactionSpec.messageCode, tx.bytes())
+}
 
 case class BlockForged(block: Block) extends Message
 

@@ -18,9 +18,11 @@ import scorex.api.http.DataRequest._
 import scorex.api.http.alias.{CreateAliasRequest, SignedCreateAliasRequest}
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
-import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.{History, Transaction, TransactionFactory}
+import scorex.transaction.assets._
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction._
+import scorex.transaction.smart.SetScriptTransaction
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
@@ -73,8 +75,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               path(Segment) { limitStr =>
                 Exception.allCatch.opt(limitStr.toInt) match {
                   case Some(limit) if limit > 0 && limit <= MaxTransactionsPerRequest =>
-                    complete(Json.arr(JsArray(state.addressTransactions(a, Set.empty, 0, limit).map {
-                      case (h, tx) =>
+                    complete(Json.arr(JsArray(
+                      state.addressTransactions(a, Set.empty, limit, 0).map { case (h, tx) =>
                         txToCompactJson(a, tx) + ("height" -> JsNumber(h))
                     })))
                   case Some(limit) if limit > MaxTransactionsPerRequest =>
@@ -161,22 +163,26 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   def sign: Route = (pathPrefix("sign") & post & withAuth) {
     handleExceptions(jsonExceptionHandler) {
       json[JsObject] { jsv =>
-        import TransactionType._
-        val txEi = TransactionType((jsv \ "type").as[Int]) match {
-          case IssueTransaction             => TransactionFactory.issueAsset(jsv.as[IssueRequest], wallet, time)
-          case TransferTransaction          => TransactionFactory.transferAsset(jsv.as[TransferRequest], wallet, time)
-          case MassTransferTransaction      => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
-          case ReissueTransaction           => TransactionFactory.reissueAsset(jsv.as[ReissueRequest], wallet, time)
-          case BurnTransaction              => TransactionFactory.burnAsset(jsv.as[BurnRequest], wallet, time)
-          case LeaseTransaction             => TransactionFactory.lease(jsv.as[LeaseRequest], wallet, time)
-          case LeaseCancelTransaction       => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
-          case CreateAliasTransaction       => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
-          case DataTransaction              => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
-          case SetScriptTransaction         => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
-          case VersionedTransferTransaction => TransactionFactory.versionedTransfer(jsv.as[VersionedTransferRequest], wallet, time)
-          case t                            => Left(GenericError(s"Bad transaction type: $t"))
+        val typeId = (jsv \ "type").as[Byte]
+        val version = (jsv \ "version").asOpt[Byte].getOrElse(1.toByte)
+
+        val r = TransactionParsers.by(typeId, version) match {
+          case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
+          case Some(x) => x match {
+            case IssueTransaction => TransactionFactory.issueAsset(jsv.as[IssueRequest], wallet, time)
+            case TransferTransaction => TransactionFactory.transferAsset(jsv.as[TransferRequest], wallet, time)
+            case VersionedTransferTransaction => TransactionFactory.versionedTransfer(jsv.as[VersionedTransferRequest], wallet, time)
+            case MassTransferTransaction => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
+            case ReissueTransaction => TransactionFactory.reissueAsset(jsv.as[ReissueRequest], wallet, time)
+            case BurnTransaction => TransactionFactory.burnAsset(jsv.as[BurnRequest], wallet, time)
+            case LeaseTransaction => TransactionFactory.lease(jsv.as[LeaseRequest], wallet, time)
+            case LeaseCancelTransaction => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
+            case CreateAliasTransaction => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
+            case DataTransaction => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
+            case SetScriptTransaction => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
+          }
         }
-        txEi match {
+        r match {
           case Right(tx) => tx.json()
           case Left(err) => ApiError.fromValidationError(err)
         }
@@ -197,22 +203,26 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   def broadcast: Route = (pathPrefix("broadcast") & post) {
     handleExceptions(jsonExceptionHandler) {
       json[JsObject] { jsv =>
-        import TransactionType._
-        val req = TransactionType((jsv \ "type").as[Int]) match {
-          case IssueTransaction             => jsv.as[SignedIssueRequest].toTx
-          case TransferTransaction          => jsv.as[SignedTransferRequest].toTx
-          case MassTransferTransaction      => jsv.as[SignedMassTransferRequest].toTx
-          case ReissueTransaction           => jsv.as[SignedReissueRequest].toTx
-          case BurnTransaction              => jsv.as[SignedBurnRequest].toTx
-          case LeaseTransaction             => jsv.as[SignedLeaseRequest].toTx
-          case LeaseCancelTransaction       => jsv.as[SignedLeaseCancelRequest].toTx
-          case CreateAliasTransaction       => jsv.as[SignedCreateAliasRequest].toTx
-          case DataTransaction              => jsv.as[SignedDataRequest].toTx
-          case SetScriptTransaction         => jsv.as[SignedSetScriptRequest].toTx
-          case VersionedTransferTransaction => jsv.as[SignedVersionedTransferRequest].toTx
-          case t                            => Left(GenericError(s"Bad transaction type: $t"))
+        val typeId = (jsv \ "type").as[Byte]
+        val version = (jsv \ "version").asOpt[Byte].getOrElse(1.toByte)
+
+        val r = TransactionParsers.by(typeId, version) match {
+          case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
+          case Some(x) => x match {
+            case IssueTransaction => jsv.as[SignedIssueRequest].toTx
+            case TransferTransaction => jsv.as[SignedTransferRequest].toTx
+            case VersionedTransferTransaction => jsv.as[SignedVersionedTransferRequest].toTx
+            case MassTransferTransaction => jsv.as[SignedMassTransferRequest].toTx
+            case ReissueTransaction => jsv.as[SignedReissueRequest].toTx
+            case BurnTransaction => jsv.as[SignedBurnRequest].toTx
+            case LeaseTransaction => jsv.as[SignedLeaseRequest].toTx
+            case LeaseCancelTransaction => jsv.as[SignedLeaseCancelRequest].toTx
+            case CreateAliasTransaction => jsv.as[SignedCreateAliasRequest].toTx
+            case DataTransaction => jsv.as[SignedDataRequest].toTx
+            case SetScriptTransaction => jsv.as[SignedSetScriptRequest].toTx
+          }
         }
-        doBroadcast(req)
+        doBroadcast(r)
       }
     }
   }
