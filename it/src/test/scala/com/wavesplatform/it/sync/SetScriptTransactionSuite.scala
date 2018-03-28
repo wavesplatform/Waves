@@ -8,10 +8,8 @@ import com.wavesplatform.lang.{Parser, TypeChecker}
 import com.wavesplatform.state2._
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json.{JsNumber, Json}
+import play.api.libs.json.JsNumber
 import scorex.account.PrivateKeyAccount
-import scorex.api.http.assets.SignedVersionedTransferRequest
-import scorex.api.http.assets.SignedVersionedTransferRequest.jsonFormat
 import scorex.transaction.Proofs
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.VersionedTransferTransaction
@@ -83,20 +81,10 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val sig1 = ByteStr(crypto.sign(acc1, unsigned.bodyBytes()))
     val sig2 = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
 
-    val request = SignedVersionedTransferRequest(
-      senderPublicKey = senderPublicKeyString,
-      assetId = None,
-      recipient = unsigned.recipient.toString,
-      amount = unsigned.amount,
-      fee = unsigned.fee,
-      timestamp = unsigned.timestamp,
-      version = unsigned.version,
-      attachment = None,
-      proofs = List(sig1, sig2).map(_.base58)
-    )
+    val signed = unsigned.copy(proofs = Proofs(Seq(sig1, sig2)))
 
     val versionedTransferId =
-      sender.signedBroadcast(Json.toJsObject(request) + ("type" -> JsNumber(TransactionType.VersionedTransferTransaction.id))).id
+      sender.signedBroadcast(signed.json() + ("type" -> JsNumber(TransactionType.VersionedTransferTransaction.id))).id
 
     nodes.waitForHeightAriseAndTxPresent(versionedTransferId)
   }
