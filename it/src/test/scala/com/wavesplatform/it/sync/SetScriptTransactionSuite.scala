@@ -9,7 +9,7 @@ import com.wavesplatform.state2._
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.JsNumber
-import scorex.account.{AddressScheme, PrivateKeyAccount}
+import scorex.account.PrivateKeyAccount
 import scorex.transaction.Proofs
 import scorex.transaction.assets.VersionedTransferTransaction
 import scorex.transaction.smart.{Script, SetScriptTransaction}
@@ -19,10 +19,6 @@ import scala.util.Random
 class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   private def randomPk = PrivateKeyAccount(Array.fill[Byte](32)(Random.nextInt(Byte.MaxValue).toByte))
-
-  AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = 'H'
-  }
 
   private val acc0 = randomPk
   private val acc1 = randomPk
