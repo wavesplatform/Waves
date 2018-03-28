@@ -71,4 +71,5 @@ object ValidationError {
 
   case class ActivationError(err: String) extends ValidationError
 
+  case class UnsupportedVersion(version: Int) extends ValidationError
 }

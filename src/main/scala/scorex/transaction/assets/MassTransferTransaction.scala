@@ -65,6 +65,7 @@ case class MassTransferTransaction private(version: Byte,
 }
 
 object MassTransferTransaction {
+  val Version: Byte = 1
   val MaxTransferCount = 100
 
   case class Transfer(recipient: String, amount: Long)
@@ -116,7 +117,9 @@ object MassTransferTransaction {
     }.fold(
       ex => Left(ValidationError.OverflowError),
       totalAmount =>
-        if (transfers.lengthCompare(MaxTransferCount) > 0) {
+        if (version != 1) {
+          Left(ValidationError.UnsupportedVersion(version))
+        } else if (transfers.lengthCompare(MaxTransferCount) > 0) {
           Left(ValidationError.GenericError(s"Number of transfers is greater than $MaxTransferCount"))
         } else if (transfers.exists(_.amount < 0)) {
           Left(ValidationError.GenericError("One of the transfers has negative amount"))

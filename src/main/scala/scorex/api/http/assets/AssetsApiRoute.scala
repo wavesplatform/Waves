@@ -61,6 +61,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         }
       }
     }
+
+
   @Path("/balance/{address}")
   @ApiOperation(value = "Account's balance", notes = "Account's balances for all assets", httpMethod = "GET")
   @ApiImplicitParams(
@@ -106,22 +108,20 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
 
   @Path("/masstransfer")
   @ApiOperation(value = "Mass Transfer",
-                notes = "Mass transfer of assets",
-                httpMethod = "POST",
-                produces = "application/json",
-                consumes = "application/json")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(
-        name = "body",
-        value = "Json with data",
-        required = true,
-        paramType = "body",
-        dataType = "scorex.api.http.assets.MassTransferRequest",
-        defaultValue =
-          "{\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"transfers\":(\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",100000000),\"fee\":100000,\"timestamp\":1517315595291}"
-      )
-    ))
+    notes = "Mass transfer of assets",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.api.http.assets.MassTransferRequest",
+      defaultValue = "{\"version\": 1, \"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"transfers\":(\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",100000000),\"fee\":100000,\"timestamp\":1517315595291}"
+    )
+  ))
   def massTransfer: Route =
     processRequest("masstransfer", (t: MassTransferRequest) => doBroadcast(TransactionFactory.massTransferAsset(t, wallet, time)))
 
