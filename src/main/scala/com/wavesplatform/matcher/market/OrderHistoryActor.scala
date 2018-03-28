@@ -145,7 +145,7 @@ object OrderHistoryActor {
 
   case class GetOrderHistory(assetPair: AssetPair, address: String, ts: Long) extends ExpirableOrderHistoryRequest
 
-  case class GetAllOrderHistory(address: String, ts: Long) extends ExpirableOrderHistoryRequest
+  case class GetAllOrderHistory(address: String, activeOnly: Boolean,ts: Long) extends ExpirableOrderHistoryRequest
 
   case class GetOrderStatus(assetPair: AssetPair, id: String, ts: Long) extends ExpirableOrderHistoryRequest
 
@@ -200,4 +200,11 @@ object OrderHistoryActor {
     val code: StatusCode = balances.map(_ => StatusCodes.OK).getOrElse(StatusCodes.NotFound)
   }
 
+  case class GetOpenPortfolio(address: String, ts: Long) extends ExpirableOrderHistoryRequest
+
+  case class GetOpenPortfolioResponse(portfolio: OpenPortfolio) extends MatcherResponse {
+    override def json: JsValue = JsObject(portfolio.orders.map(o => (o._1, JsNumber(o._2))).toSeq)
+
+    override def code: StatusCode = StatusCodes.OK
+  }
 }
