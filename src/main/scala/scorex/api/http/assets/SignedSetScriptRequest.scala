@@ -24,9 +24,7 @@ case class SignedSetScriptRequest(@ApiModelProperty(required = true)
                                   @ApiModelProperty(required = true)
                                   timestamp: Long,
                                   @ApiModelProperty(required = true)
-                                  proofs: List[String],
-                                  @ApiModelProperty(required = true)
-                                  version: Int)
+                                  proofs: List[String])
     extends BroadcastRequest {
   def toTx: Either[ValidationError, SetScriptTransaction] =
     for {
