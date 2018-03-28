@@ -4,7 +4,7 @@ import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
 import scorex.account.{Alias, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
-import scorex.transaction.TransactionParser.SignatureStringLength
+import scorex.transaction.TransactionParsers.SignatureStringLength
 import scorex.transaction.{CreateAliasTransaction, ValidationError}
 
 case class SignedCreateAliasRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)

@@ -13,14 +13,14 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{GenesisTransaction, TransactionParser, ValidationError}
+import scorex.transaction.{GenesisTransaction, TransactionParsers, ValidationError}
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with WithState {
 
   private val TransactionFee = 10
 
   def randomPrivateKeyAccount(): PrivateKeyAccount = {
-    val seed = Array.ofDim[Byte](TransactionParser.KeyLength)
+    val seed = Array.ofDim[Byte](TransactionParsers.KeyLength)
     ThreadLocalRandom.current().nextBytes(seed)
     PrivateKeyAccount(seed)
   }

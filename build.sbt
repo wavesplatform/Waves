@@ -189,12 +189,12 @@ lazy val node = project.in(file("."))
       Dependencies.matcher ++
       Dependencies.metrics ++
       Dependencies.fp ++
+      Dependencies.meta ++
       Dependencies.ficus ++
       Dependencies.scorex ++
       Dependencies.commons_net ++
       Dependencies.monix.value
   )
-  .aggregate(langJVM)
   .dependsOn(langJVM)
 
 lazy val discovery = project

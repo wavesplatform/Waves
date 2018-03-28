@@ -1,23 +1,20 @@
 package scorex.transaction
 
-import com.google.common.primitives.Shorts
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.DataEntry._
 import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, LongDataEntry}
-import org.scalacheck.Gen
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import play.api.libs.json.Json
+import play.api.libs.json.{Format, Json}
 import scorex.api.http.SignedDataRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.DataTransaction._
-import scorex.transaction.TransactionParser.TransactionType
 
 class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   private def checkSerialization(tx: DataTransaction): Assertion = {
-    require(tx.bytes().head == TransactionType.DataTransaction.id)
-    val parsed = DataTransaction.parseTail(tx.bytes().tail).get
+    val parsed = DataTransaction.parseBytes(tx.bytes()).get
 
     parsed.sender.address shouldEqual tx.sender.address
     parsed.timestamp shouldEqual tx.timestamp
@@ -37,7 +34,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
 
   property("serialization from TypedTransaction") {
     forAll(dataTransactionGen) { tx: DataTransaction =>
-      val recovered = TransactionParser.parseBytes(tx.bytes()).get
+      val recovered = TransactionParsers.parseBytes(tx.bytes()).get
       recovered.bytes() shouldEqual tx.bytes()
     }
   }
@@ -45,19 +42,17 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   property("unknown type handing") {
     val badTypeIdGen = Gen.choose[Byte](3, Byte.MaxValue)
     forAll(dataTransactionGen, badTypeIdGen) { case (tx, badTypeId) =>
-      val bytes = tx.bytes()
-      val entryCount = Shorts.fromByteArray(bytes.drop(34))
-      if (entryCount > 0) {
-        val p = 36 + bytes(36) // bytes(36) is key#1 length
-        val parsed = DataTransaction.parseTail((bytes.tail.take(p) :+ badTypeId) ++ bytes.drop(p + 2))
-        parsed.isFailure shouldBe true
-        parsed.failed.get.getMessage shouldBe s"Unknown type $badTypeId"
-      }
+      val bytesWithBadType = tx.bytes()
+      bytesWithBadType(1) = badTypeId
+
+      val parsed = DataTransaction.parseBytes(bytesWithBadType)
+      parsed.isFailure shouldBe true
+      parsed.failed.get.getMessage shouldBe s"Expected type of transaction '12', but got '$badTypeId'"
     }
   }
 
   property("JSON roundtrip") {
-    implicit val signedFormat = Json.format[SignedDataRequest]
+    implicit val signedFormat: Format[SignedDataRequest] = Json.format[SignedDataRequest]
 
     forAll(dataTransactionGen) { tx =>
       val json = tx.json()
@@ -86,7 +81,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     forAll(dataTransactionGen, dataEntryGen, keyRepeatCountGen) {
       case (DataTransaction(version, sender, data, fee, timestamp, proofs), entry, keyRepeatCount) =>
         def check(data: List[DataEntry[_]]): Assertion = {
-          val txEi = create(version, sender, data, fee, timestamp, proofs)
+          val txEi = DataTransaction.create(version, sender, data, fee, timestamp, proofs)
           txEi shouldBe Right(DataTransaction(version, sender, data, fee, timestamp, proofs))
           checkSerialization(txEi.right.get)
         }
@@ -102,10 +97,10 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   }
 
   property("negative validation cases") {
-    val badVersionGen = Gen.choose(DataTransaction.Version + 1, Byte.MaxValue).map(_.toByte)
+    val badVersionGen = Arbitrary.arbByte.arbitrary.filter(v => !DataTransaction.supportedVersions.contains(v))
     forAll(dataTransactionGen, badVersionGen) {
       case (DataTransaction(version, sender, data, fee, timestamp, proofs), badVersion) =>
-        val badVersionEi = create(badVersion, sender, data, fee, timestamp, proofs)
+        val badVersionEi = DataTransaction.create(badVersion, sender, data, fee, timestamp, proofs)
         badVersionEi shouldBe Left(ValidationError.UnsupportedVersion(badVersion))
 
         val dataTooBig = List.fill(MaxEntryCount + 1)(LongDataEntry("key", 4))
@@ -120,10 +115,10 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         val valueTooLongEi = create(version, sender, valueTooLong, fee, timestamp, proofs)
         valueTooLongEi shouldBe Left(ValidationError.TooBigArray)
 
-        val noFeeEi = create(version, sender, data, 0, timestamp, proofs)
+        val noFeeEi = DataTransaction.create(version, sender, data, 0, timestamp, proofs)
         noFeeEi shouldBe Left(ValidationError.InsufficientFee)
 
-        val negativeFeeEi = create(version, sender, data, -100, timestamp, proofs)
+        val negativeFeeEi = DataTransaction.create(version, sender, data, -100, timestamp, proofs)
         negativeFeeEi shouldBe Left(ValidationError.InsufficientFee)
     }
   }

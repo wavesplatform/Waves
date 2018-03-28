@@ -12,7 +12,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.fields.FeaturesBlockField
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
-import scorex.transaction.TransactionParser._
+import scorex.transaction.TransactionParsers._
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.utils.ScorexLogging
@@ -215,7 +215,7 @@ object Block extends ScorexLogging {
         val transactionLengthBytes = v._1.slice(pos, pos + TransactionSizeLength)
         val transactionLength = Ints.fromByteArray(transactionLengthBytes)
         val transactionBytes = v._1.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
-        txs += TransactionParser.parseBytes(transactionBytes).get
+        txs += TransactionParsers.parseBytes(transactionBytes).get
         pos + TransactionSizeLength + transactionLength
       }
 

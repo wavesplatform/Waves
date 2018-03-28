@@ -8,7 +8,7 @@ import scorex.api.http.alias.SignedCreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.crypto.encode.Base58
-import scorex.transaction.TransactionParser
+import scorex.transaction.TransactionParsers
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 
 trait RequestGen extends TransactionGen { _: Suite =>
@@ -39,7 +39,7 @@ trait RequestGen extends TransactionGen { _: Suite =>
       .map(Base58.encode)
 
   val addressGen: G[String] = listOfN(32, Arbitrary.arbByte.arbitrary).map(b => Base58.encode(b.toArray))
-  val signatureGen: G[String] = listOfN(TransactionParser.SignatureLength, Arbitrary.arbByte.arbitrary)
+  val signatureGen: G[String] = listOfN(TransactionParsers.SignatureLength, Arbitrary.arbByte.arbitrary)
     .map(b => Base58.encode(b.toArray))
   private val assetIdStringGen = assetIdGen.map(_.map(_.base58))
 

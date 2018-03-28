@@ -251,7 +251,7 @@ object AsyncHttpApi extends Assertions {
     def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Future[Transaction] = {
       implicit val w = Json.writes[MassTransferRequest]
       postJson("/assets/masstransfer",
-        MassTransferRequest(MassTransferTransaction.Version, assetId, sourceAddress, transfers, fee, None)).as[Transaction]
+        MassTransferRequest(MassTransferTransaction.version, assetId, sourceAddress, transfers, fee, None)).as[Transaction]
     }
 
     def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Future[Transaction] = {

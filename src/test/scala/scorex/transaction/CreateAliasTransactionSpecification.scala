@@ -4,21 +4,19 @@ import com.wavesplatform.TransactionGen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{Alias, PrivateKeyAccount}
-import scorex.transaction.TransactionParser.TransactionType
 
 class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("CreateAliasTransaction serialization roundtrip") {
     forAll(createAliasGen) { tx: CreateAliasTransaction =>
-      require(tx.bytes().head == TransactionType.CreateAliasTransaction.id)
-      val recovered = CreateAliasTransaction.parseTail(tx.bytes().tail).get
+      val recovered = CreateAliasTransaction.parseBytes(tx.bytes()).get
       assertTxs(recovered, tx)
     }
   }
 
   property("CreateAliasTransaction serialization from TypedTransaction") {
     forAll(createAliasGen) { tx: CreateAliasTransaction =>
-      val recovered = TransactionParser.parseBytes(tx.bytes()).get
+      val recovered = TransactionParsers.parseBytes(tx.bytes()).get
       assertTxs(recovered.asInstanceOf[CreateAliasTransaction], tx)
     }
   }

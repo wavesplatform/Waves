@@ -8,7 +8,7 @@ import org.scalatest.{BeforeAndAfterAll, Suite}
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock, SignerData}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.TransactionParser
+import scorex.transaction.TransactionParsers
 import scorex.transaction.assets.TransferTransaction
 
 import scala.concurrent.duration._
@@ -28,7 +28,7 @@ trait RxScheduler extends BeforeAndAfterAll { _: Suite =>
     ack
   })
 
-  def byteStr(id: Int): ByteStr = ByteStr(Array.concat(Array.fill(TransactionParser.SignatureLength - 1)(0), Array(id.toByte)))
+  def byteStr(id: Int): ByteStr = ByteStr(Array.concat(Array.fill(TransactionParsers.SignatureLength - 1)(0), Array(id.toByte)))
 
   val signer: PrivateKeyAccount = TestBlock.defaultSigner
 

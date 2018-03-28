@@ -5,7 +5,6 @@ import java.net.InetSocketAddress
 import cats.Show
 import cats.implicits.showInterpolator
 import scorex.account.PrivateKeyAccount
-import scorex.crypto.encode.Base58
 
 case class GeneratorSettings(chainId: String,
                              accounts: Seq[String],

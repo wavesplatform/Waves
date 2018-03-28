@@ -19,7 +19,7 @@ object LevelDBFactory extends ScorexLogging {
 
     val f = pairs.flatMap { case (name, loader) =>
       try {
-        val c = loader.loadClass(name).newInstance().asInstanceOf[DBFactory]
+        val c = loader.loadClass(name).getConstructor().newInstance().asInstanceOf[DBFactory]
         log.trace(s"Loaded ${c.getClass.getName} with $loader")
         Some(c)
       } catch {

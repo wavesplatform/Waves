@@ -7,7 +7,6 @@ import monix.eval.Coeval
 import play.api.libs.json.Json
 import scorex.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import scorex.serialization.Deser
-import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.ValidationError.{GenericError, UnsupportedVersion}
 import scorex.transaction.smart.Script
 import scorex.transaction._
@@ -30,10 +29,11 @@ case class SmartIssueTransaction private (version: Byte,
     with FastHashId
     with ChainSpecific {
 
+  override val builder: TransactionParser = SmartIssueTransaction
+
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(
-      Array(version),
-      Array(chainId),
+      Array(builder.typeId, version, chainId),
       sender.publicKey,
       Deser.serializeArray(name),
       Deser.serializeArray(description),
@@ -45,27 +45,28 @@ case class SmartIssueTransaction private (version: Byte,
       Longs.toByteArray(timestamp)
     ))
 
-  override val transactionType            = TransactionType.SmartIssueTransaction
-  override val assetFee                   = (None, fee)
-  override val json                       = Coeval.evalOnce(jsonBase() ++ Json.obj("version" -> version, "script" -> script.map(_.text)))
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), bodyBytes(), proofs.bytes()))
+  override val assetFee = (None, fee)
+  override val json = Coeval.evalOnce(
+    jsonBase() ++ Json.obj(
+      "version" -> version,
+      "script"  -> script.map(_.text)
+    ))
+
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 }
 
-object SmartIssueTransaction {
+object SmartIssueTransaction extends TransactionParserFor[SmartIssueTransaction] with TransactionParser.MultipleVersions {
+
+  override val typeId: Byte                 = 3
+  override val supportedVersions: Set[Byte] = Set(2)
 
   private val networkByte = AddressScheme.current.chainId
 
-  def parseBytes(bytes: Array[Byte]): Try[SmartIssueTransaction] = Try {
-    require(bytes.head == TransactionType.SmartIssueTransaction.id)
-    parseTail(bytes.tail).get
-  }
-
-  def parseTail(bytes: Array[Byte]): Try[SmartIssueTransaction] =
+  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
-      val version                       = bytes(0)
-      val chainId                       = bytes(1)
-      val sender                        = PublicKeyAccount(bytes.slice(2, TransactionParser.KeyLength + 2))
-      val (assetName, descriptionStart) = Deser.parseArraySize(bytes, TransactionParser.KeyLength + 2)
+      val chainId                       = bytes(0)
+      val sender                        = PublicKeyAccount(bytes.slice(1, TransactionParsers.KeyLength + 1))
+      val (assetName, descriptionStart) = Deser.parseArraySize(bytes, TransactionParsers.KeyLength + 1)
       val (description, quantityStart)  = Deser.parseArraySize(bytes, descriptionStart)
       val quantity                      = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
       val decimals                      = bytes.slice(quantityStart + 8, quantityStart + 9).head
@@ -100,9 +101,9 @@ object SmartIssueTransaction {
              script: Option[Script],
              fee: Long,
              timestamp: Long,
-             proofs: Proofs): Either[ValidationError, SmartIssueTransaction] =
+             proofs: Proofs): Either[ValidationError, TransactionT] =
     for {
-      _ <- Either.cond(version == 1, (), UnsupportedVersion(version))
+      _ <- Either.cond(supportedVersions.contains(version), (), UnsupportedVersion(version))
       _ <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
       _ <- IssueTransaction.validateIssueParams(name, description, quantity, decimals, reissuable, fee)
     } yield SmartIssueTransaction(version, chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs)
@@ -117,7 +118,7 @@ object SmartIssueTransaction {
                  reissuable: Boolean,
                  script: Option[Script],
                  fee: Long,
-                 timestamp: Long): Either[ValidationError, SmartIssueTransaction] =
+                 timestamp: Long): Either[ValidationError, TransactionT] =
     for {
       unverified <- create(version, chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty)
       proofs     <- Proofs.create(Seq(ByteStr(crypto.sign(sender, unverified.bodyBytes()))))

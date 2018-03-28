@@ -10,8 +10,8 @@ import scorex.account.PublicKeyAccount
 import scorex.block.{Block, MicroBlock}
 import scorex.network.message.Message._
 import scorex.network.message._
-import scorex.transaction.TransactionParser._
-import scorex.transaction.{History, Transaction, TransactionParser}
+import scorex.transaction.TransactionParsers._
+import scorex.transaction.{History, Transaction, TransactionParsers}
 
 import scala.util.Try
 
@@ -71,7 +71,7 @@ object PeersSpec extends MessageSpec[KnownPeers] {
 
 trait SignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
 
-  import scorex.transaction.TransactionParser.SignatureLength
+  import scorex.transaction.TransactionParsers.SignatureLength
 
   private val DataLength = 4
 
@@ -122,7 +122,7 @@ object SignaturesSpec extends SignaturesSeqSpec[Signatures] {
 object GetBlockSpec extends MessageSpec[GetBlock] {
   override val messageCode: MessageCode = 22: Byte
 
-  override val maxLength: Int = TransactionParser.SignatureLength
+  override val maxLength: Int = TransactionParsers.SignatureLength
 
   override def serializeData(signature: GetBlock): Array[Byte] = signature.signature.arr
 
@@ -196,7 +196,7 @@ object TransactionSpec extends MessageSpec[Transaction] {
   override val maxLength: Int = 150000
 
   override def deserializeData(bytes: Array[Byte]): Try[Transaction] =
-    TransactionParser.parseBytes(bytes)
+    TransactionParsers.parseBytes(bytes)
 
   override def serializeData(tx: Transaction): Array[Byte] = tx.bytes()
 }

@@ -2,7 +2,8 @@ package scorex.api.http.assets
 
 import play.api.libs.json.{Format, Json}
 
-case class SetScriptRequest(sender: String,
+case class SetScriptRequest(version: Byte,
+                            sender: String,
                             script: Option[String],
                             fee: Long,
                             timestamp: Option[Long] = None)

@@ -9,7 +9,7 @@ import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.assets.TransferTransaction
-import scorex.transaction.{GenesisTransaction, TransactionParser}
+import scorex.transaction.{GenesisTransaction, TransactionParsers}
 
 class BlockchainUpdaterMicroblockBadSignaturesTest extends PropSpec with PropertyChecks
   with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
@@ -47,7 +47,7 @@ class BlockchainUpdaterMicroblockBadSignaturesTest extends PropSpec with Propert
 
   property("other sender") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment, payment2)) =>
-      val otherSigner = PrivateKeyAccount(TestBlock.randomOfLength(TransactionParser.KeyLength).arr)
+      val otherSigner = PrivateKeyAccount(TestBlock.randomOfLength(TransactionParsers.KeyLength).arr)
       val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
       val block1 = buildBlockOfTxs(block0.uniqueId, Seq(payment))
       val badSigMicro = buildMicroBlockOfTxs(block0.uniqueId, block1, Seq(payment2), otherSigner)._2

@@ -10,7 +10,6 @@ import org.asynchttpclient._
 import org.slf4j.LoggerFactory
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
-import scorex.transaction.TransactionParser.TransactionType
 import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration.FiniteDuration
@@ -20,12 +19,14 @@ abstract class Node(config: Config) extends AutoCloseable {
     LoggerFacade(LoggerFactory.getLogger(s"${getClass.getCanonicalName}.${this.name}"))
 
   val settings: WavesSettings = WavesSettings.fromConfig(config)
-  val client: AsyncHttpClient = asyncHttpClient(clientConfig()
-      .setKeepAlive(false).setNettyTimer(GlobalTimer.instance))
+  val client: AsyncHttpClient = asyncHttpClient(
+    clientConfig()
+      .setKeepAlive(false)
+      .setNettyTimer(GlobalTimer.instance))
 
   val privateKey: PrivateKeyAccount = PrivateKeyAccount.fromSeed(config.getString("account-seed")).right.get
-  val publicKey: PublicKeyAccount = PublicKeyAccount.fromBase58String(config.getString("public-key")).right.get
-  val address: String = config.getString("address")
+  val publicKey: PublicKeyAccount   = PublicKeyAccount.fromBase58String(config.getString("public-key")).right.get
+  val address: String               = config.getString("address")
 
   def nodeApiEndpoint: URL
   def matcherApiEndpoint: URL
@@ -43,8 +44,7 @@ object Node {
 
     def publicKeyStr = Base58.encode(n.publicKey.publicKey)
 
-    def fee(txValue: TransactionType.Value, asset: String = "WAVES"): Long
-     = n.settings.feesSettings.fees(txValue.id).find(_.asset == asset).get.fee
+    def fee(txTypeId: Byte, asset: String = "WAVES"): Long = n.settings.feesSettings.fees(txTypeId).find(_.asset == asset).get.fee
 
     def blockDelay: FiniteDuration = n.settings.blockchainSettings.genesisSettings.averageBlockDelay
   }

@@ -98,7 +98,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
     new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "string", paramType = "path")
   ))
   def heightEncoded: Route = (path("height" / Segment) & get) { encodedSignature =>
-    if (encodedSignature.length > TransactionParser.SignatureStringLength)
+    if (encodedSignature.length > TransactionParsers.SignatureStringLength)
       complete(InvalidSignature)
     else {
       ByteStr.decodeBase58(encodedSignature).toOption.toRight(InvalidSignature)
@@ -207,7 +207,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
     new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "string", paramType = "path")
   ))
   def signature: Route = (path("signature" / Segment) & get) { encodedSignature =>
-    if (encodedSignature.length > TransactionParser.SignatureStringLength) complete(InvalidSignature) else {
+    if (encodedSignature.length > TransactionParsers.SignatureStringLength) complete(InvalidSignature) else {
       ByteStr.decodeBase58(encodedSignature).toOption.toRight(InvalidSignature)
         .flatMap(s => history.blockById(s).toRight(BlockDoesNotExist)) match {
         case Right(block) => complete(block.json() + ("height" -> history.heightOf(block.uniqueId).map(Json.toJson(_)).getOrElse(JsNull)))

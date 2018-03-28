@@ -81,11 +81,9 @@ package object network extends ScorexLogging {
       allChannels.flush(channelMatcher)
     }
 
-    def broadcastTx(tx: Transaction, except: Option[Channel] = None): Unit =
-      allChannels.broadcast(RawBytes(TransactionSpec.messageCode, tx.bytes()), except)
+    def broadcastTx(tx: Transaction, except: Option[Channel] = None): Unit = allChannels.broadcast(RawBytes.from(tx), except)
 
-    def broadcastTx(txs: Seq[Transaction]): Unit =
-      allChannels.broadcastMany(txs.map(tx => RawBytes(TransactionSpec.messageCode, tx.bytes())))
+    def broadcastTx(txs: Seq[Transaction]): Unit = allChannels.broadcastMany(txs.map(RawBytes.from))
 
     private def logBroadcast(message: AnyRef, except: Set[Channel]): Unit = message match {
       case RawBytes(TransactionSpec.messageCode, _) =>

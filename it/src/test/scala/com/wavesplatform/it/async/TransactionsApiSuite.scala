@@ -6,7 +6,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state2._
 import org.asynchttpclient.util.HttpConstants
-import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
+import play.api.libs.json._
 import scorex.api.http.assets.MassTransferRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.MassTransferTransaction.Transfer
@@ -36,14 +36,14 @@ class TransactionsApiSuite extends BaseTransactionSuite {
   }
 
   test("/transactions/sign should handle erroneous input") {
-    def assertSignBadJson(json: JsObject) =
-      assertBadRequestAndMessage(sender.postJsonWithApiKey("/transactions/sign", json), "failed to parse json message")
+    def assertSignBadJson(json: JsObject, expectedMessage: String) =
+      assertBadRequestAndMessage(sender.postJsonWithApiKey("/transactions/sign", json), expectedMessage)
 
     val json = Json.obj("type" -> 10, "sender" -> firstAddress, "alias" -> "alias", "fee" -> 100000)
     val f = for {
-      _ <- assertSignBadJson(json - "type")
-      _ <- assertSignBadJson(json + ("type" -> Json.toJson(-100)))
-      _ <- assertSignBadJson(json - "alias")
+      _ <- assertSignBadJson(json - "type", "failed to parse json message")
+      _ <- assertSignBadJson(json + ("type" -> Json.toJson(-100)), "Bad transaction type")
+      _ <- assertSignBadJson(json - "alias", "failed to parse json message")
     } yield succeed
 
     Await.result(f, timeout)
@@ -76,7 +76,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
     )
     val f = for {
       _ <- assertBroadcastBadJson(json - "type", "failed to parse json message")
-      _ <- assertBroadcastBadJson(json - "type" + ("type" -> Json.toJson(88)), "failed to parse json message")
+      _ <- assertBroadcastBadJson(json - "type" + ("type" -> Json.toJson(88)), "Bad transaction type")
       _ <- assertBroadcastBadJson(json - "alias", "failed to parse json message")
       _ <- assertBroadcastBadJson(json, "invalid signature")
     } yield succeed
@@ -181,7 +181,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
     json.validate[Seq[JsObject]].getOrElse(Seq.empty[JsValue]).filter(_("type").as[Int] == t)
 
   test("reporting MassTransfer transactions") {
-    implicit val mtFormat = Json.format[MassTransferRequest]
+    implicit val mtFormat: Format[MassTransferRequest] = Json.format[MassTransferRequest]
 
     val transfers = List(Transfer(firstAddress, 5.waves), Transfer(secondAddress, 2.waves), Transfer(thirdAddress, 3.waves))
     val f = for {
@@ -199,7 +199,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       _                   = assert((txSender \ "totalAmount").as[Long] == 10.waves)
       transfersAfterTrans = txSender.as[MassTransferRequest].transfers
 
-      _ = assert((transfers.equals(transfersAfterTrans)))
+      _ = assert(transfers.equals(transfersAfterTrans))
 
       // ...and compact list for recipients
       txRecipient <- sender.get(s"/transactions/address/$secondAddress/limit/10").as[JsArray].map(js => extractTransactionByType(js.apply(0), 11).head)

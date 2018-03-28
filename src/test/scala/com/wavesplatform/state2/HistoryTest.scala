@@ -3,7 +3,7 @@ package com.wavesplatform.state2
 import scorex.block.Block
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.History
-import scorex.transaction.TransactionParser.SignatureLength
+import scorex.transaction.TransactionParsers.SignatureLength
 
 trait HistoryTest {
   val genesisBlock: Block = TestBlock.withReference(ByteStr(Array.fill(SignatureLength)(0: Byte)))

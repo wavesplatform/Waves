@@ -12,6 +12,7 @@ import com.wavesplatform.state2.reader.LeaseDetails
 import org.iq80.leveldb.{DB, ReadOptions}
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}
+import scorex.transaction.Transaction.Type
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -259,7 +260,7 @@ object LevelDBWriter {
       Key(byteKeyWithH(17, height, orderId.arr), readVolumeAndFee, writeVolumeAndFee)
 
     private def readTransactionInfo(data: Array[Byte]) =
-      (Ints.fromByteArray(data), TransactionParser.parseBytes(data.drop(4)).get)
+      (Ints.fromByteArray(data), TransactionParsers.parseBytes(data.drop(4)).get)
 
     private def writeTransactionInfo(txInfo: (Int, Transaction)) = {
       val (h, tx) = txInfo
@@ -563,7 +564,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
     val accountTransactions = (for {
       (id, (tx, addresses)) <- transactions.toSeq
       addressId             <- addresses
-    } yield (addressId, (tx.transactionType.id, id))).groupBy(_._1).mapValues(_.map(_._2))
+    } yield (addressId, (tx.builder.typeId.toInt, id))).groupBy(_._1).mapValues(_.map(_._2))
 
     for ((addressId, txs) <- accountTransactions) {
       rw.put(k.addressTransactionIds(height, addressId), txs)
@@ -628,46 +629,40 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
           val ktxId         = k.transactionInfo(txId)
           val Some((_, tx)) = rw.get(ktxId)
 
-          import scorex.transaction.TransactionParser.{TransactionType => T}
-
           rw.delete(ktxId)
-          tx.transactionType match {
-            case T.GenesisTransaction                                                                                      => // genesis transaction can not be rolled back
-            case T.PaymentTransaction | T.TransferTransaction | T.VersionedTransferTransaction | T.MassTransferTransaction => // balances already restored
-            case T.IssueTransaction =>
-              rollbackAssetInfo(rw, tx.id(), currentHeight)
-            case T.ReissueTransaction =>
-              rollbackAssetInfo(rw, tx.asInstanceOf[ReissueTransaction].assetId, currentHeight)
-            case T.BurnTransaction =>
-              rollbackAssetInfo(rw, tx.asInstanceOf[BurnTransaction].assetId, currentHeight)
-            case T.LeaseTransaction =>
-              rw.delete(k.leaseStatus(currentHeight, tx.id()))
-            case T.LeaseCancelTransaction =>
-              rw.delete(k.leaseStatus(currentHeight, tx.asInstanceOf[LeaseCancelTransaction].leaseId))
-            case T.SetScriptTransaction =>
-              val address = tx.asInstanceOf[SetScriptTransaction].sender.toAddress
+          tx match {
+            case _: GenesisTransaction                                                                                         => // genesis transaction can not be rolled back
+            case _: PaymentTransaction | _: TransferTransaction | _: VersionedTransferTransaction | _: MassTransferTransaction => // balances already restored
+
+            case _: IssueTransaction        => rollbackAssetInfo(rw, tx.id(), currentHeight)
+            case tx: ReissueTransaction     => rollbackAssetInfo(rw, tx.assetId, currentHeight)
+            case tx: BurnTransaction        => rollbackAssetInfo(rw, tx.assetId, currentHeight)
+            case _: LeaseTransaction        => rw.delete(k.leaseStatus(currentHeight, tx.id()))
+            case tx: LeaseCancelTransaction => rw.delete(k.leaseStatus(currentHeight, tx.leaseId))
+
+            case tx: SetScriptTransaction =>
+              val address = tx.sender.toAddress
               scriptCache.invalidate(address)
               addressIdCache.get(address).foreach { addressId =>
                 rw.delete(k.addressScript(currentHeight, addressId))
                 val kash = k.addressScriptHistory(addressId)
                 rw.put(kash, rw.get(kash).filter(_ != currentHeight))
               }
-            case T.DataTransaction =>
-              val dtx     = tx.asInstanceOf[DataTransaction]
-              val address = dtx.sender.toAddress
+
+            case tx: DataTransaction =>
+              val address = tx.sender.toAddress
               addressIdCache.get(address).foreach { addressId =>
-                dtx.data.foreach { e =>
+                tx.data.foreach { e =>
                   rw.delete(k.data(currentHeight, addressId, e.key))
                   val kdh = k.dataHistory(addressId, e.key)
                   rw.put(kdh, rw.get(kdh).filter(_ != currentHeight))
                 }
               }
-            case T.CreateAliasTransaction =>
-              rw.delete(k.addressIdOfAlias(tx.asInstanceOf[CreateAliasTransaction].alias))
-            case T.ExchangeTransaction =>
-              val et = tx.asInstanceOf[ExchangeTransaction]
-              rollbackOrderFill(rw, ByteStr(et.buyOrder.id()), currentHeight)
-              rollbackOrderFill(rw, ByteStr(et.sellOrder.id()), currentHeight)
+
+            case tx: CreateAliasTransaction => rw.delete(k.addressIdOfAlias(tx.alias))
+            case tx: ExchangeTransaction =>
+              rollbackOrderFill(rw, ByteStr(tx.buyOrder.id()), currentHeight)
+              rollbackOrderFill(rw, ByteStr(tx.sellOrder.id()), currentHeight)
           }
         }
 
@@ -693,16 +688,12 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(db => db.get(k.transactionInfo(id)))
 
-  override def addressTransactions(address: Address,
-                                   types: Set[TransactionParser.TransactionType.Value],
-                                   from: Int,
-                                   count: Int): Seq[(Int, Transaction)] = readOnly { db =>
-    val filter = types.map(_.id)
+  override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = readOnly { db =>
     db.get(k.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { addressId =>
       val txs = for {
         h              <- (db.get(k.height) to 1 by -1).view
         (txType, txId) <- db.get(k.addressTransactionIds(h, addressId))
-        if filter.isEmpty || filter(txType)
+        if types.isEmpty || types.contains(txType.toByte)
         (_, tx) <- db.get(k.transactionInfo(txId))
       } yield (h, tx)
 

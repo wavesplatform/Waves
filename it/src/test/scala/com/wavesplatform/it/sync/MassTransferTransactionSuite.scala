@@ -7,9 +7,8 @@ import org.scalatest.CancelAfterFailure
 import play.api.libs.json.{JsNumber, JsObject, Json}
 import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.crypto.encode.Base58
-import scorex.transaction.TransactionParser.TransactionType
-import scorex.transaction.assets.MassTransferTransaction
 import scorex.transaction.assets.MassTransferTransaction.{MaxTransferCount, Transfer}
+import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -20,9 +19,9 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   private val transferAmount             = 5.waves
   private val leasingAmount              = 5.waves
   private val leasingFee                 = 0.003.waves
-  private val transferFee                = notMiner.settings.feesSettings.fees(TransactionType.TransferTransaction.id)(0).fee
+  private val transferFee                = notMiner.settings.feesSettings.fees(TransferTransaction.typeId)(0).fee
   private val issueFee                   = 1.waves
-  private val massTransferFeePerTransfer = notMiner.settings.feesSettings.fees(TransactionType.MassTransferTransaction.id)(0).fee
+  private val massTransferFeePerTransfer = notMiner.settings.feesSettings.fees(MassTransferTransaction.typeId)(0).fee
 
   private def calcFee(numberOfRecipients: Int): Long = {
     transferFee + numberOfRecipients * massTransferFeePerTransfer
@@ -108,7 +107,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   test("invalid transfer should not be in UTX or blockchain") {
     import scorex.transaction.assets.TransferTransaction.MaxAttachmentSize
 
-    def request(version: Byte = MassTransferTransaction.Version,
+    def request(version: Byte = MassTransferTransaction.version,
                 transfers: List[Transfer] = List(Transfer(secondAddress, transferAmount)),
                 fee: Long = calcFee(1),
                 timestamp: Long = System.currentTimeMillis,
@@ -132,7 +131,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     }
 
     implicit val w =
-      Json.writes[SignedMassTransferRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(TransactionType.MassTransferTransaction.id)))
+      Json.writes[SignedMassTransferRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt)))
 
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val invalidTransfers = Seq(
@@ -175,11 +174,11 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     val transfers = Seq(Transfer(secondAddress, transferAmount), Transfer(thirdAddress, transferAmount))
     val signedMassTransfer: JsObject = {
       val rs = sender.postJsonWithApiKey("/transactions/sign", Json.obj(
-        "type" -> TransactionType.MassTransferTransaction.id,
-        "version" -> MassTransferTransaction.Version,
-        "sender" -> firstAddress,
+        "type"      -> MassTransferTransaction.typeId,
+        "version"   -> MassTransferTransaction.version,
+        "sender"    -> firstAddress,
         "transfers" -> transfers,
-        "fee" -> fee))
+        "fee"       -> fee))
       Json.parse(rs.getResponseBody).as[JsObject]
     }
     def id(obj: JsObject) = obj.value("id").as[String]
