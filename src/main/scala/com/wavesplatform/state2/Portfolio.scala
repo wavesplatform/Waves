@@ -14,16 +14,17 @@ case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[ByteStr, Lo
   def balanceOf(assetId: Option[AssetId]): Long = assetId.flatMap(assets.get).getOrElse(balance)
   def remove(assetId: Option[AssetId], amount: Long): Option[Portfolio] = {
     val origAmount = assetId match {
-      case None => balance
+      case None    => balance
       case Some(x) => assets.getOrElse(x, 0L)
     }
 
     val updatedAmount = origAmount - amount
     if (updatedAmount < 0) None
-    else Some(assetId match {
-      case None => copy(balance = updatedAmount)
-      case Some(x) => copy(assets = this.assets.updated(x, updatedAmount))
-    })
+    else
+      Some(assetId match {
+        case None    => copy(balance = updatedAmount)
+        case Some(x) => copy(assets = this.assets.updated(x, updatedAmount))
+      })
   }
 }
 
@@ -35,11 +36,10 @@ object Portfolio {
   implicit val monoid: Monoid[Portfolio] = new Monoid[Portfolio] {
     override val empty: Portfolio = Portfolio.empty
 
-    override def combine(older: Portfolio, newer: Portfolio): Portfolio
-    = Portfolio(
-      balance = safeSum(older.balance, newer.balance),
-      lease = Monoid.combine(older.lease, newer.lease),
-      assets = Monoid.combine(older.assets, newer.assets))
+    override def combine(older: Portfolio, newer: Portfolio): Portfolio =
+      Portfolio(balance = safeSum(older.balance, newer.balance),
+                lease = Monoid.combine(older.lease, newer.lease),
+                assets = Monoid.combine(older.assets, newer.assets))
   }
 
   implicit class PortfolioExt(self: Portfolio) {
@@ -57,8 +57,7 @@ object Portfolio {
       Portfolio(f(self.balance), LeaseBalance.empty, self.assets.mapValues(f.apply))
 
     def minus(other: Portfolio): Portfolio =
-      Portfolio(self.balance - other.balance, LeaseBalance.empty,
-        Monoid.combine(self.assets, other.assets.mapValues(-_)))
+      Portfolio(self.balance - other.balance, LeaseBalance.empty, Monoid.combine(self.assets, other.assets.mapValues(-_)))
   }
 
 }

@@ -114,18 +114,19 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
                 attachment: Array[Byte] = Array.emptyByteArray) = {
       val txEi = for {
         parsedTransfers <- MassTransferTransaction.parseTransfersList(transfers)
-        tx <- MassTransferTransaction.selfSigned(version, None, sender.privateKey, parsedTransfers, timestamp, fee, attachment)
+        tx              <- MassTransferTransaction.selfSigned(version, None, sender.privateKey, parsedTransfers, timestamp, fee, attachment)
       } yield tx
 
-      val (signature, idOpt) = txEi.fold(
-        _ => (List(fakeSignature), None),
-        tx => (tx.proofs.base58().toList, Some(tx.id())))
+      val (signature, idOpt) = txEi.fold(_ => (List(fakeSignature), None), tx => (tx.proofs.base58().toList, Some(tx.id())))
 
       val req = SignedMassTransferRequest(version,
-        Base58.encode(sender.publicKey.publicKey),
-        None, transfers, fee, timestamp,
-        attachment.headOption.map(_ => Base58.encode(attachment)),
-        signature)
+                                          Base58.encode(sender.publicKey.publicKey),
+                                          None,
+                                          transfers,
+                                          fee,
+                                          timestamp,
+                                          attachment.headOption.map(_ => Base58.encode(attachment)),
+                                          signature)
 
       (req, idOpt)
     }
@@ -135,18 +136,14 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val invalidTransfers = Seq(
-      (request(timestamp = System.currentTimeMillis + 1.day.toMillis),
-        "Transaction .* is from far future"),
+      (request(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction .* is from far future"),
       (request(transfers = List.fill(MaxTransferCount + 1)(Transfer(secondAddress, 1)), fee = calcFee(MaxTransferCount + 1)),
-        "Number of transfers is greater than 100"),
-      (request(transfers = List(Transfer(secondAddress, -1))),
-        "One of the transfers has negative amount"),
-      (request(fee = 0),
-        "insufficient fee"),
-      (request(fee = 99999),
-        "Fee .* does not exceed minimal value"),
-      (request(attachment = ("a" * (MaxAttachmentSize + 1)).getBytes),
-        "invalid.attachment"))
+       "Number of transfers is greater than 100"),
+      (request(transfers = List(Transfer(secondAddress, -1))), "One of the transfers has negative amount"),
+      (request(fee = 0), "insufficient fee"),
+      (request(fee = 99999), "Fee .* does not exceed minimal value"),
+      (request(attachment = ("a" * (MaxAttachmentSize + 1)).getBytes), "invalid.attachment")
+    )
 
     for (((req, idOpt), diag) <- invalidTransfers) {
       assertBadRequestAndResponse(sender.broadcastRequest(req), diag)
@@ -173,12 +170,14 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     val fee       = calcFee(2)
     val transfers = Seq(Transfer(secondAddress, transferAmount), Transfer(thirdAddress, transferAmount))
     val signedMassTransfer: JsObject = {
-      val rs = sender.postJsonWithApiKey("/transactions/sign", Json.obj(
-        "type"      -> MassTransferTransaction.typeId,
-        "version"   -> MassTransferTransaction.version,
-        "sender"    -> firstAddress,
-        "transfers" -> transfers,
-        "fee"       -> fee))
+      val rs = sender.postJsonWithApiKey(
+        "/transactions/sign",
+        Json.obj("type"      -> MassTransferTransaction.typeId,
+                 "version"   -> MassTransferTransaction.version,
+                 "sender"    -> firstAddress,
+                 "transfers" -> transfers,
+                 "fee"       -> fee)
+      )
       Json.parse(rs.getResponseBody).as[JsObject]
     }
     def id(obj: JsObject) = obj.value("id").as[String]

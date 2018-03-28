@@ -25,11 +25,13 @@ case class SignedReissueRequest(@ApiModelProperty(value = "Base58 encoded Issuer
                                 @ApiModelProperty(required = true)
                                 timestamp: Long,
                                 @ApiModelProperty(required = true)
-                                signature: String) extends BroadcastRequest {
-  def toTx: Either[ValidationError, ReissueTransaction] = for {
-    _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
-    _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-    _assetId <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
-    _t <- ReissueTransaction.create(_sender, _assetId, quantity, reissuable, fee, timestamp, _signature)
-  } yield _t
+                                signature: String)
+    extends BroadcastRequest {
+  def toTx: Either[ValidationError, ReissueTransaction] =
+    for {
+      _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
+      _assetId   <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
+      _t         <- ReissueTransaction.create(_sender, _assetId, quantity, reissuable, fee, timestamp, _signature)
+    } yield _t
 }

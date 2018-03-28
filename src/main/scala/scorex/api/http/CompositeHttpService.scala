@@ -19,10 +19,16 @@ case class CompositeHttpService(system: ActorSystem, apiTypes: Seq[Type], routes
 
   val swaggerService = new SwaggerDocService(system, ActorMaterializer()(system), apiTypes, settings)
 
-  def withCors: Directive0 = if (settings.cors)
-    respondWithHeader(`Access-Control-Allow-Origin`.*) else pass
+  def withCors: Directive0 =
+    if (settings.cors)
+      respondWithHeader(`Access-Control-Allow-Origin`.*)
+    else pass
 
-  private val headers: scala.collection.immutable.Seq[String] = scala.collection.immutable.Seq("Authorization", "Content-Type", "X-Requested-With", "Timestamp", "Signature") ++
+  private val headers: scala.collection.immutable.Seq[String] = scala.collection.immutable.Seq("Authorization",
+                                                                                               "Content-Type",
+                                                                                               "X-Requested-With",
+                                                                                               "Timestamp",
+                                                                                               "Signature") ++
     (if (settings.apiKeyDifferentHost) Seq("api_key", "X-API-Key") else Seq.empty[String])
 
   val compositeRoute: Route =
@@ -37,11 +43,10 @@ case class CompositeHttpService(system: ActorSystem, apiTypes: Seq[Type], routes
         } ~
           getFromResourceDirectory("swagger-ui")
       } ~ options {
-        respondWithDefaultHeaders(
-          `Access-Control-Allow-Credentials`(true),
-          `Access-Control-Allow-Headers`(headers),
-          `Access-Control-Allow-Methods`(OPTIONS, POST, PUT, GET, DELETE))(withCors(complete(StatusCodes.OK)))
-      } ~ complete(StatusCodes.NotFound)
+      respondWithDefaultHeaders(`Access-Control-Allow-Credentials`(true),
+                                `Access-Control-Allow-Headers`(headers),
+                                `Access-Control-Allow-Methods`(OPTIONS, POST, PUT, GET, DELETE))(withCors(complete(StatusCodes.OK)))
+    } ~ complete(StatusCodes.NotFound)
 
   def logRequestResponse(req: HttpRequest)(res: RouteResult): Unit = res match {
     case Complete(resp) =>

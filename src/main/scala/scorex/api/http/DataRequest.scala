@@ -9,14 +9,10 @@ import scorex.transaction.{DataTransaction, Proofs, ValidationError}
 
 object DataRequest {
   implicit val unsignedReads = Json.reads[DataRequest]
-  implicit val signedReads = Json.reads[SignedDataRequest]
+  implicit val signedReads   = Json.reads[SignedDataRequest]
 }
 
-case class DataRequest(version: Byte,
-                       sender: String,
-                       data: List[DataEntry[_]],
-                       fee: Long,
-                       timestamp: Option[Long] = None)
+case class DataRequest(version: Byte, sender: String, data: List[DataEntry[_]], fee: Long, timestamp: Option[Long] = None)
 
 @ApiModel(value = "Signed Data transaction")
 case class SignedDataRequest(@ApiModelProperty(required = true)
@@ -30,11 +26,13 @@ case class SignedDataRequest(@ApiModelProperty(required = true)
                              @ApiModelProperty(required = true)
                              timestamp: Long,
                              @ApiModelProperty(required = true)
-                             proofs: List[String]) extends BroadcastRequest {
-  def toTx: Either[ValidationError, DataTransaction] = for {
-    _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
-    _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
-    _proofs <- Proofs.create(_proofBytes)
-    t <- DataTransaction.create(version, _sender, data, fee, timestamp, _proofs)
-  } yield t
+                             proofs: List[String])
+    extends BroadcastRequest {
+  def toTx: Either[ValidationError, DataTransaction] =
+    for {
+      _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
+      _proofs     <- Proofs.create(_proofBytes)
+      t           <- DataTransaction.create(version, _sender, data, fee, timestamp, _proofs)
+    } yield t
 }

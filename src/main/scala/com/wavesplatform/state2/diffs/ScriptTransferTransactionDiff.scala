@@ -24,7 +24,7 @@ object ScriptTransferTransactionDiff {
           )
       }).combine(Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)))
       assetIssued = tx.assetId match {
-        case None => true
+        case None      => true
         case Some(aid) => state.assetDescription(aid).isDefined
       }
       _ <- Either.cond(assetIssued, (), GenericError(s"Unissued assets are not allowed"))

@@ -16,15 +16,15 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.util.control.NonFatal
 
-class Worker(settings: Settings,
-             sender: NetworkSender,
-             node: InetSocketAddress,
-             generator: TransactionGenerator)
-            (implicit ec: ExecutionContext) extends ScorexLogging {
+class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress, generator: TransactionGenerator)(implicit ec: ExecutionContext)
+    extends ScorexLogging {
 
   private type Result[T] = EitherT[Future, (Int, Throwable), T]
 
-  def run(): Future[Unit] = guardedSend(1).leftMap { _ => () }.merge
+  def run(): Future[Unit] =
+    guardedSend(1).leftMap { _ =>
+      ()
+    }.merge
 
   private def guardedSend(startStep: Int): Result[Unit] = {
     tryConnect
@@ -46,7 +46,9 @@ class Worker(settings: Settings,
   private def tryConnect: Result[Channel] = EitherT {
     sender
       .connect(node)
-      .map { x => Right(x) }
+      .map { x =>
+        Right(x)
+      }
       .recover {
         case NonFatal(e) => Left(0 -> e)
       }
@@ -60,7 +62,9 @@ class Worker(settings: Settings,
       def trySend: Result[Unit] = EitherT {
         sender
           .send(channel, messages: _*)
-          .map { _ => Right(()) }
+          .map { _ =>
+            Right(())
+          }
           .recover {
             case NonFatal(e) => Left(step -> e)
           }
@@ -89,10 +93,7 @@ class Worker(settings: Settings,
 }
 
 object Worker {
-  case class Settings(autoReconnect: Boolean,
-                      iterations: Int,
-                      delay: FiniteDuration,
-                      reconnectDelay: FiniteDuration)
+  case class Settings(autoReconnect: Boolean, iterations: Int, delay: FiniteDuration, reconnectDelay: FiniteDuration)
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>

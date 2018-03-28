@@ -10,16 +10,21 @@ import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
-abstract class BaseTransactionSuite extends FunSuite with WaitForHeight2
-  with IntegrationSuiteWithThreeAddresses with BeforeAndAfterAll with NodesFromDocker {
+abstract class BaseTransactionSuite
+    extends FunSuite
+    with WaitForHeight2
+    with IntegrationSuiteWithThreeAddresses
+    with BeforeAndAfterAll
+    with NodesFromDocker {
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
-  protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
-    .overrideBase(_.quorum(3))
-    .withDefault(3)
-    .withSpecial(_.nonMiner)
-    .buildNonConflicting()
+  protected def nodeConfigs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(3))
+      .withDefault(3)
+      .withSpecial(_.nonMiner)
+      .buildNonConflicting()
 
   override def notMiner: Node = nodes.last
 

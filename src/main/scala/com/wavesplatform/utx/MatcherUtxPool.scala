@@ -85,7 +85,7 @@ class MatcherUtxPool(underlying: UtxPool, matcherSettings: MatcherSettings, even
       txDiff.portfolios.foreach {
         case (addr, txPortfolio) =>
           if (addr.stringRepr != matcherSettings.account) {
-            val prevPortfolio = accountInfos.getOrElse(addr, Monoid[Portfolio].empty)
+            val prevPortfolio       = accountInfos.getOrElse(addr, Monoid[Portfolio].empty)
             val overriddenPortfolio = Monoid.combine(prevPortfolio, txPortfolio.pessimistic)
             accountInfos.update(addr, overriddenPortfolio)
           }
@@ -105,7 +105,7 @@ class MatcherUtxPool(underlying: UtxPool, matcherSettings: MatcherSettings, even
           if (changedAssets.isEmpty) List.empty
           else {
             val accPortfolio = accountPortfolio(addr)
-            val combined = Monoid.combine(portfolio, accPortfolio)
+            val combined     = Monoid.combine(portfolio, accPortfolio)
 
             log.debug(s"\n=== $addr ====\naccPortfolio: $accPortfolio\nportfolio: $portfolio\ncombined: $combined")
             List(addr -> BalanceChanged.Changes(combined, changedAssets))

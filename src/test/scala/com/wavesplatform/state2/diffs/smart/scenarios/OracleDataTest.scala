@@ -21,11 +21,11 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       oracle <- accountGen
       alice  <- accountGen
       ts     <- positiveIntGen
-      genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       genesis2 = GenesisTransaction.create(oracle, ENOUGH_AMT, ts).explicitGet()
-      long                <- longEntryGen
-      bool                <- booleanEntryGen
-      bin                 <- binaryEntryGen
+      long            <- longEntryGen
+      bool            <- booleanEntryGen
+      bin             <- binaryEntryGen
       dataTransaction <- dataTransactionGenP(oracle, List(long, bool, bin))
       allFieldsRequiredScript        = s"""
                     |
@@ -49,10 +49,10 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
     forAll(preconditions) {
       case ((genesis, genesis2, setScript, dataTransaction, transferFromScripted)) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, genesis2, setScript, dataTransaction))),
-          TestBlock.create(Seq(transferFromScripted)),
-          smartEnabledFS) { case _ => () }
+                           TestBlock.create(Seq(transferFromScripted)),
+                           smartEnabledFS) { case _ => () }
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, genesis2, setScript))), TestBlock.create(Seq(transferFromScripted)), smartEnabledFS)(
-            totalDiffEi => totalDiffEi should produce("Script execution error"))
+          totalDiffEi => totalDiffEi should produce("Script execution error"))
     }
   }
 }

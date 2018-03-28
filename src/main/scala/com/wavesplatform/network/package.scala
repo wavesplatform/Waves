@@ -36,10 +36,10 @@ package object network extends ScorexLogging {
   }
 
   private def formatAddress(sa: SocketAddress) = sa match {
-    case null => ""
-    case l: LocalAddress => s" $l"
+    case null                   => ""
+    case l: LocalAddress        => s" $l"
     case isa: InetSocketAddress => s" ${toSocketAddressString(isa)}"
-    case x => s" $x" // For EmbeddedSocketAddress
+    case x                      => s" $x" // For EmbeddedSocketAddress
   }
 
   def id(ctx: ChannelHandlerContext): String = id(ctx.channel())
@@ -48,9 +48,10 @@ package object network extends ScorexLogging {
 
   def formatBlocks(blocks: Seq[Block]): String = formatSignatures(blocks.view.map(_.uniqueId))
 
-  def formatSignatures(signatures: Seq[ByteStr]): String = if (signatures.isEmpty) "[Empty]"
-  else if (signatures.size == 1) s"[${signatures.head.trim}]"
-  else s"(total=${signatures.size}) [${signatures.head.trim} -- ${signatures.last.trim}]"
+  def formatSignatures(signatures: Seq[ByteStr]): String =
+    if (signatures.isEmpty) "[Empty]"
+    else if (signatures.size == 1) s"[${signatures.head.trim}]"
+    else s"(total=${signatures.size}) [${signatures.head.trim} -- ${signatures.last.trim}]"
 
   implicit val channelEq: Eq[Channel] = Eq.fromUniversalEquals
 
@@ -68,11 +69,15 @@ package object network extends ScorexLogging {
 
     def broadcast(message: AnyRef, except: Set[Channel]): ChannelGroupFuture = {
       logBroadcast(message, except)
-      allChannels.writeAndFlush(message, { (channel: Channel) => !except.contains(channel) })
+      allChannels.writeAndFlush(message, { (channel: Channel) =>
+        !except.contains(channel)
+      })
     }
 
     def broadcastMany(messages: Seq[AnyRef], except: Set[Channel] = Set.empty): Unit = {
-      val channelMatcher: ChannelMatcher = { (channel: Channel) => !except.contains(channel) }
+      val channelMatcher: ChannelMatcher = { (channel: Channel) =>
+        !except.contains(channel)
+      }
       messages.foreach { message =>
         logBroadcast(message, except)
         allChannels.write(message, channelMatcher)

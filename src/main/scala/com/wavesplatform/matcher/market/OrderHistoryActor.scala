@@ -22,8 +22,7 @@ import scorex.wallet.Wallet
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxPool, val wallet: Wallet)
-  extends Actor with OrderValidator {
+class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxPool, val wallet: Wallet) extends Actor with OrderValidator {
 
   val orderHistory = OrderHistoryImpl(db, settings)
 
@@ -50,13 +49,18 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       sender() ! getPairTradableBalance(assetPair, addr)
     case GetActiveOrdersByAddress(requestId, addr, assets, _) =>
       // Because all orders spend waves for fee
-      val wasAssetChanged: Option[AssetId] => Boolean = if (assets.contains(None)) { _ => true } else assets.contains
+      val wasAssetChanged: Option[AssetId] => Boolean = if (assets.contains(None)) { _ =>
+        true
+      } else assets.contains
 
-      val allActiveOrders = orderHistory.activeOrderIdsByAddress(addr.stringRepr)
+      val allActiveOrders      = orderHistory.activeOrderIdsByAddress(addr.stringRepr)
       val activeOrdersByAssets = allActiveOrders.collect { case (assetId, id) if wasAssetChanged(assetId) => id -> orderHistory.orderInfo(id) }
 
-      val active: Seq[LimitOrder] = activeOrdersByAssets.flatMap { case (id, info) =>
-        orderHistory.order(id).map { order => LimitOrder(order).partial(info.remaining) }
+      val active: Seq[LimitOrder] = activeOrdersByAssets.flatMap {
+        case (id, info) =>
+          orderHistory.order(id).map { order =>
+            LimitOrder(order).partial(info.remaining)
+          }
       }(collection.breakOut)
 
       sender().forward(GetActiveOrdersByAddressResponse(requestId, addr, active))
@@ -106,20 +110,21 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
 
   def getPairTradableBalance(assetPair: AssetPair, address: String): GetTradableBalanceResponse = {
     val bal = (for {
-      acc <- Address.fromString(address)
+      acc       <- Address.fromString(address)
       amountAcc <- Right(AssetAcc(acc, assetPair.amountAsset))
-      priceAcc <- Right(AssetAcc(acc, assetPair.priceAsset))
+      priceAcc  <- Right(AssetAcc(acc, assetPair.priceAsset))
       amountBal <- Right(getTradableBalance(amountAcc))
-      priceBal <- Right(getTradableBalance(priceAcc))
+      priceBal  <- Right(getTradableBalance(priceAcc))
     } yield (amountBal, priceBal)) match {
-      case Left(_) => (0L, 0L)
+      case Left(_)  => (0L, 0L)
       case Right(b) => b
     }
 
-    GetTradableBalanceResponse(Map(
-      assetPair.amountAssetStr -> bal._1,
-      assetPair.priceAssetStr -> bal._2
-    ))
+    GetTradableBalanceResponse(
+      Map(
+        assetPair.amountAssetStr -> bal._1,
+        assetPair.priceAssetStr  -> bal._2
+      ))
   }
 
   def deleteFromOrderHistory(req: DeleteOrderFromHistory): Unit = {
@@ -133,18 +138,20 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   }
 
   def recoverFromOrderBook(ob: OrderBook): Unit = {
-    ob.asks.foreach { case (_, orders) =>
-      orders.foreach(o => orderHistory.orderAccepted(OrderAdded(o)))
+    ob.asks.foreach {
+      case (_, orders) =>
+        orders.foreach(o => orderHistory.orderAccepted(OrderAdded(o)))
     }
-    ob.bids.foreach { case (_, orders) =>
-      orders.foreach(o => orderHistory.orderAccepted(OrderAdded(o)))
+    ob.bids.foreach {
+      case (_, orders) =>
+        orders.foreach(o => orderHistory.orderAccepted(OrderAdded(o)))
     }
   }
 
 }
 
 object OrderHistoryActor {
-  val RequestTTL: Int = 5 * 1000
+  val RequestTTL: Int                          = 5 * 1000
   val UpdateOpenPortfolioDelay: FiniteDuration = 30 seconds
 
   def name: String = "OrderHistory"
@@ -160,7 +167,7 @@ object OrderHistoryActor {
 
   case class GetOrderHistory(assetPair: AssetPair, address: String, ts: Long) extends ExpirableOrderHistoryRequest
 
-  case class GetAllOrderHistory(address: String, activeOnly: Boolean,ts: Long) extends ExpirableOrderHistoryRequest
+  case class GetAllOrderHistory(address: String, activeOnly: Boolean, ts: Long) extends ExpirableOrderHistoryRequest
 
   case class GetOrderStatus(assetPair: AssetPair, id: String, ts: Long) extends ExpirableOrderHistoryRequest
 
@@ -187,28 +194,30 @@ object OrderHistoryActor {
   case object DbCommit
 
   case class OrderDeleted(orderId: String) extends MatcherResponse {
-    val json: JsObject = Json.obj("status" -> "OrderDeleted", "orderId" -> orderId)
+    val json: JsObject            = Json.obj("status" -> "OrderDeleted", "orderId" -> orderId)
     val code: StatusCodes.Success = StatusCodes.OK
   }
 
   case class GetOrderHistoryResponse(history: Seq[(String, OrderInfo, Option[Order])]) extends MatcherResponse {
-    val json = JsArray(history.map(h => Json.obj(
-      "id" -> h._1,
-      "type" -> h._3.map(_.orderType.toString),
-      "amount" -> h._2.amount,
-      "price" -> h._3.map(_.price),
-      "timestamp" -> h._3.map(_.timestamp),
-      "filled" -> h._2.filled,
-      "status" -> h._2.status.name,
-      "assetPair" -> h._3.map(_.assetPair.json)
-    )))
+    val json = JsArray(
+      history.map(h =>
+        Json.obj(
+          "id"        -> h._1,
+          "type"      -> h._3.map(_.orderType.toString),
+          "amount"    -> h._2.amount,
+          "price"     -> h._3.map(_.price),
+          "timestamp" -> h._3.map(_.timestamp),
+          "filled"    -> h._2.filled,
+          "status"    -> h._2.status.name,
+          "assetPair" -> h._3.map(_.assetPair.json)
+      )))
     val code: StatusCode = StatusCodes.OK
   }
 
   case class GetTradableBalance(assetPair: AssetPair, address: String, ts: Long) extends ExpirableOrderHistoryRequest
 
   case class GetTradableBalanceResponse(balances: Map[String, Long]) extends MatcherResponse {
-    val json: JsObject = JsObject(balances.map { case (k, v) => (k, JsNumber(v)) })
+    val json: JsObject   = JsObject(balances.map { case (k, v) => (k, JsNumber(v)) })
     val code: StatusCode = StatusCodes.OK
   }
 

@@ -23,29 +23,49 @@ import scala.util.Right
 
 object BlockAppender extends ScorexLogging with Instrumented {
 
-  def apply(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
-            stateReader: SnapshotStateReader, utxStorage: UtxPool, settings: WavesSettings,
-            featureProvider: FeatureProvider, scheduler: Scheduler)(newBlock: Block): Task[Either[ValidationError, Option[BlockchainScore]]] = Task {
-    measureSuccessful(blockProcessingTimeStats, {
-      if (history.contains(newBlock)) Right(None)
-      else for {
-        _ <- Either.cond(history.heightOf(newBlock.reference).exists(_ >= history.height - 1), (), BlockAppendError("Irrelevant block", newBlock))
-        maybeBaseHeight <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings, featureProvider)(newBlock)
-      } yield maybeBaseHeight map (_ => history.score)
-    })
-  }.executeOn(scheduler)
+  def apply(checkpoint: CheckpointService,
+            history: History,
+            blockchainUpdater: BlockchainUpdater,
+            time: Time,
+            stateReader: SnapshotStateReader,
+            utxStorage: UtxPool,
+            settings: WavesSettings,
+            featureProvider: FeatureProvider,
+            scheduler: Scheduler)(newBlock: Block): Task[Either[ValidationError, Option[BlockchainScore]]] =
+    Task {
+      measureSuccessful(
+        blockProcessingTimeStats, {
+          if (history.contains(newBlock)) Right(None)
+          else
+            for {
+              _ <- Either.cond(history.heightOf(newBlock.reference).exists(_ >= history.height - 1),
+                               (),
+                               BlockAppendError("Irrelevant block", newBlock))
+              maybeBaseHeight <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings, featureProvider)(
+                newBlock)
+            } yield maybeBaseHeight map (_ => history.score)
+        }
+      )
+    }.executeOn(scheduler)
 
-  def apply(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
-            stateReader: SnapshotStateReader, utxStorage: UtxPool, settings: WavesSettings,
-            featureProvider: FeatureProvider, allChannels: ChannelGroup, peerDatabase: PeerDatabase, miner: Miner,
-            scheduler: Scheduler)
-           (ch: Channel, newBlock: Block): Task[Unit] = {
+  def apply(checkpoint: CheckpointService,
+            history: History,
+            blockchainUpdater: BlockchainUpdater,
+            time: Time,
+            stateReader: SnapshotStateReader,
+            utxStorage: UtxPool,
+            settings: WavesSettings,
+            featureProvider: FeatureProvider,
+            allChannels: ChannelGroup,
+            peerDatabase: PeerDatabase,
+            miner: Miner,
+            scheduler: Scheduler)(ch: Channel, newBlock: Block): Task[Unit] = {
     BlockStats.received(newBlock, BlockStats.Source.Broadcast, ch)
     blockReceivingLag.safeRecord(System.currentTimeMillis() - newBlock.timestamp)
     (for {
       _ <- EitherT(Task.now(newBlock.signaturesValid()))
-      validApplication <- EitherT(apply(checkpoint, history, blockchainUpdater, time, stateReader, utxStorage, settings,
-        featureProvider, scheduler)(newBlock))
+      validApplication <- EitherT(
+        apply(checkpoint, history, blockchainUpdater, time, stateReader, utxStorage, settings, featureProvider, scheduler)(newBlock))
     } yield validApplication).value.map {
       case Right(None) =>
         log.trace(s"${id(ch)} $newBlock already appended")
@@ -63,7 +83,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
     }
   }
 
-  private val blockReceivingLag = Kamon.metrics.histogram("block-receiving-lag")
+  private val blockReceivingLag        = Kamon.metrics.histogram("block-receiving-lag")
   private val blockProcessingTimeStats = Kamon.metrics.histogram("single-block-processing-time")
 
 }

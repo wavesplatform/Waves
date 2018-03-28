@@ -6,66 +6,64 @@ import play.api.libs.json.JsError
 //WALLET
 
 case object WalletNotExist extends ApiError {
-  override val id: Int = 201
-  override val message: String = "wallet does not exist"
+  override val id: Int          = 201
+  override val message: String  = "wallet does not exist"
   override val code: StatusCode = StatusCodes.NotFound
 }
 
 case object WalletAddressNotExists extends ApiError {
-  override val id: Int = 202
-  override val message: String = "private key for the public key does not exist in wallet"
+  override val id: Int          = 202
+  override val message: String  = "private key for the public key does not exist in wallet"
   override val code: StatusCode = StatusCodes.NotFound
 }
 
 case object WalletLocked extends ApiError {
-  override val id: Int = 203
-  override val message: String = "wallet is locked"
+  override val id: Int          = 203
+  override val message: String  = "wallet is locked"
   override val code: StatusCode = StatusCodes.UnprocessableEntity
 }
 
 case object WalletAlreadyExists extends ApiError {
-  override val id: Int = 204
-  override val message: String = "wallet already exists"
+  override val id: Int          = 204
+  override val message: String  = "wallet already exists"
   override val code: StatusCode = StatusCodes.Conflict
 }
 
 case object WalletSeedExportFailed extends ApiError {
-  override val id: Int = 205
-  override val message: String = "seed exporting failed"
+  override val id: Int          = 205
+  override val message: String  = "seed exporting failed"
   override val code: StatusCode = StatusCodes.InternalServerError
 }
 
-
 //TRANSACTIONS
 case object TransactionNotExists extends ApiError {
-  override val id: Int = 311
-  override val message: String = "transactions does not exist"
+  override val id: Int          = 311
+  override val message: String  = "transactions does not exist"
   override val code: StatusCode = StatusCodes.NotFound
 }
 
-
 case object NoBalance extends ApiError {
-  override val id: Int = 2
-  override val message: String = "not enough balance"
+  override val id: Int          = 2
+  override val message: String  = "not enough balance"
   override val code: StatusCode = StatusCodes.BadRequest
 }
 
 case class NegativeAmount(msg: String) extends ApiError {
-  override val id: Int = 111
-  override val message: String = s"negative amount: $msg"
+  override val id: Int          = 111
+  override val message: String  = s"negative amount: $msg"
   override val code: StatusCode = StatusCodes.BadRequest
 }
 
 @Deprecated //"Use InsufficientFee instead"
 case object NegativeFee extends ApiError {
-  override val id: Int = 112
-  override val message: String = "negative fee"
+  override val id: Int          = 112
+  override val message: String  = "negative fee"
   override val code: StatusCode = StatusCodes.BadRequest
 }
 
 case object InsufficientFee extends ApiError {
-  override val id: Int = 112
-  override val message: String = "insufficient fee"
+  override val id: Int          = 112
+  override val message: String  = "insufficient fee"
   override val code: StatusCode = StatusCodes.BadRequest
 }
 

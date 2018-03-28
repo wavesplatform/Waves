@@ -7,8 +7,7 @@ import scorex.serialization.BytesSerializable
 
 import scala.util.{Success, Try}
 
-case class Message[Content <: AnyRef](spec: MessageSpec[Content],
-                            input: Either[Array[Byte], Content]) extends BytesSerializable {
+case class Message[Content <: AnyRef](spec: MessageSpec[Content], input: Either[Array[Byte], Content]) extends BytesSerializable {
 
   import Message.{ChecksumLength, MAGIC}
 
@@ -34,7 +33,6 @@ case class Message[Content <: AnyRef](spec: MessageSpec[Content],
   }
 }
 
-
 object Message {
   type MessageCode = Byte
 
@@ -42,7 +40,7 @@ object Message {
 
   val MagicLength = MAGIC.length
 
-  val ChecksumLength = 4
+  val ChecksumLength    = 4
   val LengthFieldLength = 4
   val MessageCodeLength = 1
 }

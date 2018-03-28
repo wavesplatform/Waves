@@ -11,15 +11,17 @@ import play.api.libs.json._
 import scorex.api.http.ApiError
 import scorex.transaction.{Transaction, ValidationError}
 
-case class PlayJsonException(
-    cause: Option[Throwable] = None,
-    errors: Seq[(JsPath, Seq[JsonValidationError])] = Seq.empty) extends IllegalArgumentException with NoStackTrace
+case class PlayJsonException(cause: Option[Throwable] = None, errors: Seq[(JsPath, Seq[JsonValidationError])] = Seq.empty)
+    extends IllegalArgumentException
+    with NoStackTrace
 
 trait ApiMarshallers {
   type TRM[A] = ToResponseMarshaller[A]
 
   import akka.http.scaladsl.marshalling.PredefinedToResponseMarshallers._
-  implicit val aem: TRM[ApiError] = fromStatusCodeAndValue[StatusCode, JsValue].compose { ae => ae.code -> ae.json }
+  implicit val aem: TRM[ApiError] = fromStatusCodeAndValue[StatusCode, JsValue].compose { ae =>
+    ae.code -> ae.json
+  }
   implicit val vem: TRM[ValidationError] = aem.compose(ve => ApiError.fromValidationError(ve))
 
   implicit val tw: Writes[Transaction] = Writes(_.json())
@@ -41,17 +43,15 @@ trait ApiMarshallers {
 
       json.validate[A] match {
         case JsSuccess(value, _) => value
-        case JsError(errors) => throw PlayJsonException(errors = errors)
+        case JsError(errors)     => throw PlayJsonException(errors = errors)
       }
     }
 
   // preserve support for extracting plain strings from requests
   implicit val stringUnmarshaller: FromEntityUnmarshaller[String] = PredefinedFromEntityUnmarshallers.stringUnmarshaller
-  implicit val intUnmarshaller: FromEntityUnmarshaller[Int] = stringUnmarshaller.map(_.toInt)
+  implicit val intUnmarshaller: FromEntityUnmarshaller[Int]       = stringUnmarshaller.map(_.toInt)
 
-  implicit def playJsonMarshaller[A](
-      implicit writes: Writes[A],
-      printer: JsValue => String = Json.prettyPrint): ToEntityMarshaller[A] =
+  implicit def playJsonMarshaller[A](implicit writes: Writes[A], printer: JsValue => String = Json.prettyPrint): ToEntityMarshaller[A] =
     jsonStringMarshaller.compose(printer).compose(writes.writes)
 
   // preserve support for using plain strings as request entities
