@@ -145,7 +145,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     }
   }
 
-  "/batch-transfer" - {
+  "compatibility" - {
     val alwaysApproveUtx = stub[UtxPool]
     val utxOps = new UtxBatchOps {
       override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = alwaysApproveUtx.putIfNew(tx)
@@ -157,8 +157,6 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     (alwaysSendAllChannels.writeAndFlush(_: Any)).when(*).onCall((_: Any) => null).anyNumberOfTimes()
 
     val route = AssetsBroadcastApiRoute(settings, alwaysApproveUtx, alwaysSendAllChannels).route
-
-    def posting[A: Writes](v: A): RouteTestResult = Post(routePath("batch-transfer"), v).addHeader(ApiKeyHeader) ~> route
 
     val seed               = "seed".getBytes()
     val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)
@@ -196,38 +194,61 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
         .right
         .get)
 
-    "accepts TransferRequest" in posting(List(transferRequest)) ~> check {
-      status shouldBe StatusCodes.OK
-      val xs = responseAs[Seq[TransferTransactions]]
-      xs.size shouldBe 1
-      xs.head.select[TransferTransaction] shouldBe defined
-    }
+    "/transfer" - {
+      def posting[A: Writes](v: A): RouteTestResult = Post(routePath("transfer"), v).addHeader(ApiKeyHeader) ~> route
 
-    "accepts VersionedTransferRequest" in posting(List(versionedTransferRequest)) ~> check {
-      status shouldBe StatusCodes.OK
-      val xs = responseAs[Seq[TransferTransactions]]
-      xs.size shouldBe 1
-      xs.head.select[VersionedTransferTransaction] shouldBe defined
-    }
-
-    "accepts both TransferRequest and VersionedTransferRequest" in {
-      val reqs = List(
-        Coproduct[SignedTransferRequests](transferRequest),
-        Coproduct[SignedTransferRequests](versionedTransferRequest)
-      )
-
-      posting(reqs) ~> check {
+      "accepts TransferRequest" in posting(transferRequest) ~> check {
         status shouldBe StatusCodes.OK
-        val xs = responseAs[Seq[TransferTransactions]]
-        xs.size shouldBe 2
-        xs.flatMap(_.select[TransferTransaction]) shouldNot be(empty)
-        xs.flatMap(_.select[VersionedTransferTransaction]) shouldNot be(empty)
+        responseAs[TransferTransactions].select[TransferTransaction] shouldBe defined
+      }
+
+      "accepts VersionedTransferRequest" in posting(versionedTransferRequest) ~> check {
+        status shouldBe StatusCodes.OK
+        responseAs[TransferTransactions].select[VersionedTransferTransaction] shouldBe defined
+      }
+
+      "returns a error if it is not a transfer request" in posting(issueReq.sample.get) ~> check {
+        status shouldNot be(StatusCodes.OK)
       }
     }
 
-    "returns a error if it is not a transfer request" in posting(List(issueReq.sample.get)) ~> check {
-      status shouldNot be(StatusCodes.OK)
+    "/batch-transfer" - {
+      def posting[A: Writes](v: A): RouteTestResult = Post(routePath("batch-transfer"), v).addHeader(ApiKeyHeader) ~> route
+
+      "accepts TransferRequest" in posting(List(transferRequest)) ~> check {
+        status shouldBe StatusCodes.OK
+        val xs = responseAs[Seq[TransferTransactions]]
+        xs.size shouldBe 1
+        xs.head.select[TransferTransaction] shouldBe defined
+      }
+
+      "accepts VersionedTransferRequest" in posting(List(versionedTransferRequest)) ~> check {
+        status shouldBe StatusCodes.OK
+        val xs = responseAs[Seq[TransferTransactions]]
+        xs.size shouldBe 1
+        xs.head.select[VersionedTransferTransaction] shouldBe defined
+      }
+
+      "accepts both TransferRequest and VersionedTransferRequest" in {
+        val reqs = List(
+          Coproduct[SignedTransferRequests](transferRequest),
+          Coproduct[SignedTransferRequests](versionedTransferRequest)
+        )
+
+        posting(reqs) ~> check {
+          status shouldBe StatusCodes.OK
+          val xs = responseAs[Seq[TransferTransactions]]
+          xs.size shouldBe 2
+          xs.flatMap(_.select[TransferTransaction]) shouldNot be(empty)
+          xs.flatMap(_.select[VersionedTransferTransaction]) shouldNot be(empty)
+        }
+      }
+
+      "returns a error if it is not a transfer request" in posting(List(issueReq.sample.get)) ~> check {
+        status shouldNot be(StatusCodes.OK)
+      }
     }
+
   }
 
   protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {

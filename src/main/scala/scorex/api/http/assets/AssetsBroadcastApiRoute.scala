@@ -170,8 +170,16 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings,
     new ApiResponse(code = 200, message = "Json with signed Asset transfer transaction"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
   def transfer: Route = (path("transfer") & post) {
-    json[SignedTransferRequest] { transferReq =>
-      doBroadcast(transferReq.toTx)
+    json[SignedTransferRequests] { transferReq =>
+      doBroadcast(
+        transferReq.eliminate(
+          _.toTx,
+          _.eliminate(
+            _.toTx,
+            _ => Left(ValidationError.UnsupportedTransactionType)
+          )
+        )
+      )
     }
   }
 
