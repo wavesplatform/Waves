@@ -3,30 +3,42 @@ package com.wavesplatform.it.api
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.it.Node
 import org.asynchttpclient.Response
+import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
-import play.api.libs.json.Writes
-import scorex.api.http.assets.SignedMassTransferRequest
+import play.api.libs.json.{Format, JsObject, Json, Writes}
+import scorex.api.http.assets.SignedIssueRequest
 import scorex.transaction.assets.MassTransferTransaction.Transfer
-import com.wavesplatform.it.RequestErrorAssert.ErrorMessage
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Try}
 
-object SyncHttpApi extends Assertions{
+object SyncHttpApi extends Assertions {
+  case class ErrorMessage(error: Int, message: String)
 
-  def assertBadRequest2[R](f: => R): Assertion = Try(f) match {
+  implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
+
+  def assertBadRequest[R](f: => R): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Assertions.assert(statusCode == StatusCodes.BadRequest.intValue)
-    case Failure(e) => Assertions.fail(e)
-    case _ => Assertions.fail(s"Expecting bad request")
+    case Failure(e)                                               => Assertions.fail(e)
+    case _                                                        => Assertions.fail("Expecting bad request")
   }
 
-  def assertBadRequestAndMessage2[R](f: => R, errorMessage: String): Assertion = Try(f) match {
+  def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
+    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+      Assertions.assert(
+        statusCode == StatusCodes.BadRequest.intValue &&
+          responseBody.replace("\n", "").matches(s".*$errorRegex.*"))
+    case Failure(e) => Assertions.fail(e)
+    case _          => Assertions.fail("Expecting bad request")
+  }
+
+  def assertBadRequestAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
       Assertions.assert(statusCode == StatusCodes.BadRequest.intValue && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
-    case _ => Assertions.fail(s"Expecting bad request")
+    case _          => Assertions.fail(s"Expecting bad request")
   }
 
   implicit class NodeExtSync(n: Node) extends Assertions with Matchers {
@@ -34,6 +46,9 @@ object SyncHttpApi extends Assertions{
     import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
 
     private val RequestAwaitTime = 15.seconds
+
+    def get(path: String): Response =
+      Await.result(async(n).get(path), RequestAwaitTime)
 
     def postJson[A: Writes](path: String, body: A): Response =
       Await.result(async(n).postJson(path, body), RequestAwaitTime)
@@ -44,10 +59,10 @@ object SyncHttpApi extends Assertions{
     def accountBalances(acc: String): (Long, Long) =
       Await.result(async(n).accountBalances(acc), RequestAwaitTime)
 
-    def assertBalances(acc: String, balance: Long, effectiveBalance: Long): Unit =
+    def assertBalances(acc: String, balance: Long, effectiveBalance: Long)(implicit pos: Position): Unit =
       Await.result(async(n).assertBalances(acc, balance, effectiveBalance), RequestAwaitTime)
 
-    def assertAssetBalance(acc: String, assetIdString: String, balance: Long): Unit =
+    def assertAssetBalance(acc: String, assetIdString: String, balance: Long)(implicit pos: Position): Unit =
       Await.result(async(n).assertAssetBalance(acc, assetIdString, balance), RequestAwaitTime)
 
     def assetBalance(address: String, asset: String): AssetBalance =
@@ -68,43 +83,65 @@ object SyncHttpApi extends Assertions{
     def aliasByAddress(targetAddress: String): Seq[String] =
       Await.result(async(n).aliasByAddress(targetAddress), RequestAwaitTime)
 
-    def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None): Transaction =
-      Await.result(async(n).transfer(sourceAddress, recipient, amount, fee, assetId), RequestAwaitTime)
+    def transfer(sourceAddress: String,
+                 recipient: String,
+                 amount: Long,
+                 fee: Long,
+                 assetId: Option[String] = None,
+                 feeAssetId: Option[String] = None): Transaction =
+      Await.result(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId), RequestAwaitTime)
 
     def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Transaction =
       Await.result(async(n).massTransfer(sourceAddress, transfers, fee, assetId), RequestAwaitTime)
 
-    def lease(sourceAddress:String, recipient: String, leasingAmount: Long, leasingFee: Long): Transaction =
+    def lease(sourceAddress: String, recipient: String, leasingAmount: Long, leasingFee: Long): Transaction =
       Await.result(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee), RequestAwaitTime)
 
-    def signedMassTransfer(tx: SignedMassTransferRequest): Transaction =
-      Await.result(async(n).signedMassTransfer(tx), RequestAwaitTime)
+    def broadcastRequest[A: Writes](req: A): Transaction =
+      Await.result(async(n).broadcastRequest(req), RequestAwaitTime)
+
+    def activeLeases(sourceAddress: String): Seq[Transaction] =
+      Await.result(async(n).activeLeases(sourceAddress), RequestAwaitTime)
+
+    def cancelLease(sourceAddress: String, leaseId: String, fee: Long): Transaction =
+      Await.result(async(n).cancelLease(sourceAddress, leaseId, fee), RequestAwaitTime)
+
+    def signedBroadcast(tx: JsObject): Transaction =
+      Await.result(async(n).signedBroadcast(tx), RequestAwaitTime)
+
+    def signedIssue(tx: SignedIssueRequest): Transaction =
+      Await.result(async(n).signedIssue(tx), RequestAwaitTime)
 
     def ensureTxDoesntExist(txId: String): Unit =
       Await.result(async(n).ensureTxDoesntExist(txId), RequestAwaitTime)
+
+    def createAddress(): String =
+      Await.result(async(n).createAddress, RequestAwaitTime)
+
+    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Transaction =
+      Await.result(async(n).waitForTransaction(txId), RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
 
     import com.wavesplatform.it.api.AsyncHttpApi.{NodesAsyncHttpApi => async}
 
+    private val TxInBlockchainAwaitTime = 6 * nodes.head.blockDelay
+    private val ConditionAwaitTime      = 5.minutes
 
-    private val TxInBlockchainAwaitTime = 3 * nodes.head.blockDelay
-    private val ConditionAwaitTime = 5.minutes
-
-
-
-    def waitForHeightAraiseAndTxPresent(transactionId: String): Unit =
+    def waitForHeightAriseAndTxPresent(transactionId: String): Unit =
       Await.result(async(nodes).waitForHeightAraiseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
 
-    def waitForHeightAraise(): Unit =
+    def waitForHeightArise(): Unit =
       Await.result(async(nodes).waitForHeightAraise(), TxInBlockchainAwaitTime)
 
     def waitForSameBlocksAt(retryInterval: FiniteDuration, height: Int): Boolean =
       Await.result(async(nodes).waitForSameBlocksAt(retryInterval, height), ConditionAwaitTime)
 
     def waitFor[A](desc: String)(retryInterval: FiniteDuration)(request: Node => A, cond: Iterable[A] => Boolean): Boolean =
-      Await.result(async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(scala.concurrent.ExecutionContext.Implicits.global), cond), ConditionAwaitTime)
+      Await.result(
+        async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(scala.concurrent.ExecutionContext.Implicits.global), cond),
+        ConditionAwaitTime)
   }
 
 }

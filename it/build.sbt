@@ -38,13 +38,6 @@ inTask(docker)(Seq(
 
 libraryDependencies ++= Dependencies.testKit ++ Dependencies.itKit
 
-concurrentRestrictions in Global := Seq(
-  Tags.limit(Tags.CPU, 5),
-  Tags.limit(Tags.Network, 5),
-  Tags.limit(Tags.Test, 5),
-  Tags.limitAll(5)
-)
-
 val logDirectory = Def.task {
   val runId = Option(System.getenv("RUN_ID")).getOrElse {
     val formatter = DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss")
