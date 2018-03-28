@@ -37,12 +37,12 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
   (utx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty))).anyNumberOfTimes()
   (allChannels.writeAndFlush(_: Any)).when(*).onCall((_: Any) => null).anyNumberOfTimes()
 
-  "/transfer accepts TransferRequest and VersionedTransferRequest" - {
+  "/transfer" - {
     val route = AssetsApiRoute(settings, wallet, utx, allChannels, state, new TestTime()).route
 
     def posting[A: Writes](v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(apiKeyHeader) ~> route
 
-    "TransferRequest" in {
+    "accepts TransferRequest" in {
       val req = TransferRequest(
         assetId = None,
         feeAssetId = None,
@@ -62,7 +62,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
       }
     }
 
-    "VersionedTransferRequest" in {
+    "accepts VersionedTransferRequest" in {
       val req = VersionedTransferRequest(
         version = 2,
         assetId = None,
@@ -79,6 +79,13 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
         val r = responseAs[String]
         r should include(""""type" : 4""")
         r should include(""""version" : 2""")
+      }
+    }
+
+    "returns a error if it is not a transfer request" in {
+      val req = issueReq.sample.get
+      posting(req) ~> check {
+        status shouldNot be(StatusCodes.OK)
       }
     }
   }
