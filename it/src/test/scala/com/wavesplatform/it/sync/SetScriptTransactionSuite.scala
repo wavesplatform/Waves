@@ -10,9 +10,8 @@ import com.wavesplatform.utils.dummyTypeCheckerContext
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.{JsNumber, Json}
 import scorex.account.PrivateKeyAccount
-import scorex.api.http.assets.SignedSetScriptRequest.jsonFormat
+import scorex.api.http.assets.SignedVersionedTransferRequest
 import scorex.api.http.assets.SignedVersionedTransferRequest.jsonFormat
-import scorex.api.http.assets.{SignedSetScriptRequest, SignedVersionedTransferRequest}
 import scorex.transaction.Proofs
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.VersionedTransferTransaction
@@ -109,15 +108,9 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val sig1 = ByteStr(crypto.sign(acc1, unsigned.bodyBytes()))
     val sig2 = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
 
-    val request = SignedSetScriptRequest(
-      senderPublicKey = senderPublicKeyString,
-      script = None,
-      fee = unsigned.fee,
-      timestamp = unsigned.timestamp,
-      proofs = List(sig1, sig2) map (_.base58)
-    )
+    val signed = unsigned.copy(proofs = Proofs(Seq(sig1, sig2)))
     val clearScriptId = sender
-      .signedBroadcast(Json.toJsObject(request) + ("type" -> JsNumber(TransactionType.SetScriptTransaction.id)))
+      .signedBroadcast(signed.json() + ("type" -> JsNumber(TransactionType.SetScriptTransaction.id)))
       .id
 
     nodes.waitForHeightAriseAndTxPresent(clearScriptId)
