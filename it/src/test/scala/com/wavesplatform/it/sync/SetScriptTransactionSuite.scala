@@ -20,6 +20,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
   private def randomPk = PrivateKeyAccount(Array.fill[Byte](32)(Random.nextInt(Byte.MaxValue).toByte))
 
+  private val acc0 = randomPk
   private val acc1 = randomPk
   private val acc2 = randomPk
   private val acc3 = randomPk
@@ -27,8 +28,16 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   private val transferAmount: Long          = 1.waves
   private val fee: Long                     = 0.001.waves
   private val senderPublicKeyString: String = ByteStr(sender.publicKey.publicKey).base58
+  private val acc0PublicKeyString: String = ByteStr(acc0.publicKey).base58
 
-  test("set 2of2 multisig") {
+  test("setup acc0 with 1 waves") {
+    val transferId = sender
+      .transfer(sourceAddress = sender.address, recipient = acc0.address, amount = transferAmount, fee = fee, assetId = None, feeAssetId = None)
+      .id
+    nodes.waitForHeightAriseAndTxPresent(transferId)
+  }
+
+  test("set acc0 as 2of2 multisig") {
     val scriptText = {
       val untyped = Parser(s"""
 
@@ -46,11 +55,11 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
     val script = Script(scriptText)
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(SetScriptTransaction.supportedVersions.head, sender.privateKey, Some(script), fee, System.currentTimeMillis())
+      .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), fee, System.currentTimeMillis())
       .explicitGet()
 
     val setScriptId = sender
-      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId)))
+      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
       .id
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
@@ -58,18 +67,31 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     // get script by account
   }
 
-  test("can't send using old pk ") {
-    assertBadRequest(sender.transfer(senderPublicKeyString, acc3.address, transferAmount, fee, None, None))
+  test("can't send from acc0 using old pk") {
+
+    val tx =
+      VersionedTransferTransaction
+        .selfSigned(
+          version = 2,
+          assetId = None,
+          sender = acc0,
+          recipient = acc3,
+          amount = transferAmount,
+          timestamp = System.currentTimeMillis(),
+          feeAmount = fee,
+          attachment = Array.emptyByteArray)
+        .explicitGet()
+    assertBadRequest(sender.signedBroadcast(tx.json() + ("type" -> JsNumber(VersionedTransferTransaction.typeId.toInt))))
   }
 
-  test("can send using multisig") {
+  test("can send from acc0 using multisig of acc1 and acc2") {
 
     val unsigned =
       VersionedTransferTransaction
         .create(
           version = 2,
           assetId = None,
-          sender = sender.publicKey,
+          sender = acc0,
           recipient = acc3,
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
@@ -89,11 +111,11 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     nodes.waitForHeightAriseAndTxPresent(versionedTransferId)
   }
 
-  test("can clear script") {
+  test("can clear script at acc0") {
     val unsigned = SetScriptTransaction
       .create(
         version = SetScriptTransaction.supportedVersions.head,
-        sender = sender.privateKey,
+        sender = acc0,
         script = None,
         fee = fee,
         timestamp = System.currentTimeMillis(),
@@ -112,10 +134,20 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
   }
 
-  test("can send using old pk again") {
-    val transferId = sender
-      .transfer(sourceAddress = sender.address, recipient = acc3.address, amount = transferAmount, fee = fee, assetId = None, feeAssetId = None)
-      .id
-    nodes.waitForHeightAriseAndTxPresent(transferId)
+  test("can send using old pk of acc0") {
+    val tx =
+      VersionedTransferTransaction
+        .selfSigned(
+          version = 2,
+          assetId = None,
+          sender = acc0,
+          recipient = acc3,
+          amount = transferAmount,
+          timestamp = System.currentTimeMillis(),
+          feeAmount = fee,
+          attachment = Array.emptyByteArray)
+        .explicitGet()
+    val txId = sender.signedBroadcast(tx.json() + ("type" -> JsNumber(VersionedTransferTransaction.typeId.toInt))).id
+    nodes.waitForHeightAriseAndTxPresent(txId)
   }
 }
