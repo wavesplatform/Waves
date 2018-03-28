@@ -16,8 +16,8 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
 
   private val ApprovalPeriod = 100
 
-  private val WavesSettings = DefaultWavesSettings.copy(blockchainSettings =
-    DefaultWavesSettings.blockchainSettings.copy(
+  private val WavesSettings = DefaultWavesSettings.copy(
+    blockchainSettings = DefaultWavesSettings.blockchainSettings.copy(
       functionalitySettings = DefaultWavesSettings.blockchainSettings.functionalitySettings.copy(
         featureCheckBlocksPeriod = ApprovalPeriod,
         blocksForFeatureActivation = (ApprovalPeriod * 0.9).toInt
@@ -26,18 +26,19 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     featuresSettings = DefaultWavesSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = true)
   )
 
-  private val WavesSettingsWithDoubling = WavesSettings.copy(blockchainSettings = WavesSettings.blockchainSettings.copy(
-    functionalitySettings = WavesSettings.blockchainSettings.functionalitySettings.copy(
-      doubleFeaturesPeriodsAfterHeight = 300
-    )
-  ))
+  private val WavesSettingsWithDoubling = WavesSettings.copy(
+    blockchainSettings = WavesSettings.blockchainSettings.copy(
+      functionalitySettings = WavesSettings.blockchainSettings.functionalitySettings.copy(
+        doubleFeaturesPeriodsAfterHeight = 300
+      )
+    ))
 
   def appendBlock(block: Block, blockchainUpdater: BlockchainUpdater): Unit = {
     blockchainUpdater.processBlock(block)
   }
 
   "features approved and accepted as height grows" in withDomain(WavesSettings) { domain =>
-    val h = domain.history
+    val h  = domain.history
     val bu = domain.blockchainUpdater
 
     bu.processBlock(genesisBlock)
@@ -75,7 +76,7 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
   }
 
   "features rollback with block rollback" in withDomain(WavesSettings) { domain =>
-    val h = domain.history
+    val h  = domain.history
     val bu = domain.blockchainUpdater
     bu.processBlock(genesisBlock)
 
@@ -129,8 +130,8 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     h.featureStatus(2, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
   }
 
-  "feature activation height is not overriden with further periods"in withDomain(WavesSettings) { domain =>
-    val h = domain.history
+  "feature activation height is not overriden with further periods" in withDomain(WavesSettings) { domain =>
+    val h  = domain.history
     val bu = domain.blockchainUpdater
 
     bu.processBlock(genesisBlock)
@@ -152,8 +153,8 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     h.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
   }
 
-  "feature activated only by 90% of blocks"in withDomain(WavesSettings) { domain =>
-    val h = domain.history
+  "feature activated only by 90% of blocks" in withDomain(WavesSettings) { domain =>
+    val h  = domain.history
     val bu = domain.blockchainUpdater
 
     bu.processBlock(genesisBlock)
@@ -177,7 +178,7 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
   }
 
   "features votes resets when voting window changes" in withDomain(WavesSettings) { domain =>
-    val h = domain.history
+    val h  = domain.history
     val bu = domain.blockchainUpdater
 
     bu.processBlock(genesisBlock)
@@ -199,10 +200,10 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     h.featureStatus(1, h.height) shouldBe BlockchainFeatureStatus.Approved
   }
 
-  "block processing should fail if unimplemented feature was activated on blockchain when autoShutdownOnUnsupportedFeature = yes and exit with code 38" in withDomain(WavesSettings) { domain =>
-
-    val h = domain.history
-    val bu = domain.blockchainUpdater
+  "block processing should fail if unimplemented feature was activated on blockchain when autoShutdownOnUnsupportedFeature = yes and exit with code 38" in withDomain(
+    WavesSettings) { domain =>
+    val h      = domain.history
+    val bu     = domain.blockchainUpdater
     val signal = new Semaphore(1)
     signal.acquire()
 
@@ -233,7 +234,7 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
   }
 
   "sunny day test when known feature activated" in withDomain(WavesSettings) { domain =>
-    val h = domain.history
+    val h  = domain.history
     val bu = domain.blockchainUpdater
     bu.processBlock(genesisBlock)
 
@@ -247,7 +248,7 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
   }
 
   "empty blocks should not disable activation" in withDomain(WavesSettings) { domain =>
-    val h = domain.history
+    val h  = domain.history
     val bu = domain.blockchainUpdater
 
     bu.processBlock(genesisBlock)
@@ -287,9 +288,8 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     h.featureStatus(2, h.height) should be(BlockchainFeatureStatus.Activated)
   }
 
-
   "doubling of feature periods works in the middle of activation period" in withDomain(WavesSettingsWithDoubling) { domain =>
-    val h = domain.history
+    val h  = domain.history
     val bu = domain.blockchainUpdater
 
     bu.processBlock(genesisBlock)
@@ -320,7 +320,7 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
   }
 
   "doubling of feature periods should work after defined height" in withDomain(WavesSettingsWithDoubling) { domain =>
-    val h = domain.history
+    val h  = domain.history
     val bu = domain.blockchainUpdater
 
     bu.processBlock(genesisBlock)

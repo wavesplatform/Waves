@@ -20,7 +20,7 @@ import scala.concurrent.duration._
 object GenesisBlockGenerator extends App {
 
   private type SeedText = String
-  private type Share = Long
+  private type Share    = Long
 
   case class Settings(networkType: String,
                       initialBalance: Long,
@@ -47,7 +47,7 @@ object GenesisBlockGenerator extends App {
 
   private def toFullAddressInfo(seedText: SeedText): FullAddressInfo = {
     val seedHash = seedText.getBytes
-    val acc = Wallet.generateNewAccount(seedHash, 0)
+    val acc      = Wallet.generateNewAccount(seedHash, 0)
 
     FullAddressInfo(
       seedText = seedText,
@@ -78,45 +78,52 @@ object GenesisBlockGenerator extends App {
     settings.distributions.map { case (seedText, part) => toFullAddressInfo(seedText) -> part }
   }
 
-  val genesisTxs: Seq[GenesisTransaction] = shares
-    .map { case (addrInfo, part) =>
+  val genesisTxs: Seq[GenesisTransaction] = shares.map {
+    case (addrInfo, part) =>
       GenesisTransaction(addrInfo.accountAddress, part, settings.timestamp, ByteStr.empty)
-    }
-    .toSeq
+  }.toSeq
 
   val genesisBlock: Block = {
-    val reference = ByteStr(Array.fill(SignatureLength)(-1: Byte))
+    val reference     = ByteStr(Array.fill(SignatureLength)(-1: Byte))
     val genesisSigner = PrivateKeyAccount(Array.empty)
 
-    Block.buildAndSign(
-      version = 1,
-      timestamp = settings.timestamp,
-      reference = reference,
-      consensusData = NxtLikeConsensusBlockData(settings.baseTarget, ByteStr(Array.fill(crypto.DigestSize)(0: Byte))),
-      transactionData = genesisTxs,
-      signer = genesisSigner,
-      featureVotes = Set.empty
-    ).explicitGet()
+    Block
+      .buildAndSign(
+        version = 1,
+        timestamp = settings.timestamp,
+        reference = reference,
+        consensusData = NxtLikeConsensusBlockData(settings.baseTarget, ByteStr(Array.fill(crypto.DigestSize)(0: Byte))),
+        transactionData = genesisTxs,
+        signer = genesisSigner,
+        featureVotes = Set.empty
+      )
+      .explicitGet()
   }
 
   val signature = genesisBlock.signerData.signature
 
   report(
     addrInfos = shares.keysIterator,
-    settings = GenesisSettings(settings.timestamp, genesisBlock.timestamp, settings.initialBalance, Some(signature),
-      genesisTxs.map { tx => GenesisTransactionSettings(tx.recipient.stringRepr, tx.amount) }, settings.baseTarget,
+    settings = GenesisSettings(
+      settings.timestamp,
+      genesisBlock.timestamp,
+      settings.initialBalance,
+      Some(signature),
+      genesisTxs.map { tx =>
+        GenesisTransactionSettings(tx.recipient.stringRepr, tx.amount)
+      },
+      settings.baseTarget,
       settings.averageBlockDelay
     )
   )
 
-  private def report(addrInfos: Iterator[FullAddressInfo],
-                     settings: GenesisSettings): Unit = {
+  private def report(addrInfos: Iterator[FullAddressInfo], settings: GenesisSettings): Unit = {
 
     val output = new StringBuilder
     output.append("Addresses:\n")
-    addrInfos.zipWithIndex.foreach { case (acc, n) =>
-      output.append(
-        s"""($n):
+    addrInfos.zipWithIndex.foreach {
+      case (acc, n) =>
+        output.append(s"""($n):
            | Seed text:           ${acc.seedText}
            | Seed:                ${acc.seed}
            | Account seed:        ${acc.accountSeed}
@@ -137,7 +144,11 @@ object GenesisBlockGenerator extends App {
          |  signature: "${settings.signature.get}"
          |  initial-balance: ${settings.initialBalance}
          |  transactions = [
-         |    ${settings.transactions.map { x => s"""{recipient: "${x.recipient}", amount: ${x.amount}}""" }.mkString(",\n    ")}
+         |    ${settings.transactions
+           .map { x =>
+             s"""{recipient: "${x.recipient}", amount: ${x.amount}}"""
+           }
+           .mkString(",\n    ")}
          |  ]
          |}
          |""".stripMargin

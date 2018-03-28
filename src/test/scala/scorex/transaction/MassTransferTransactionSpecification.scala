@@ -20,7 +20,8 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
       recovered.timestamp shouldEqual tx.timestamp
       recovered.fee shouldEqual tx.fee
 
-      recovered.transfers.zip(tx.transfers).foreach { case (ParsedTransfer(rr, ra), ParsedTransfer(tr, ta)) =>
+      recovered.transfers.zip(tx.transfers).foreach {
+        case (ParsedTransfer(rr, ra), ParsedTransfer(tr, ta)) =>
           rr shouldEqual tr
           ra shouldEqual ta
       }
@@ -45,24 +46,24 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
         val badVersionEi = create(badVersion, assetId, sender, transfers, timestamp, fee, attachment, proofs)
         badVersionEi shouldBe Left(ValidationError.UnsupportedVersion(badVersion))
 
-        val tooManyTransfers = List.fill(MaxTransferCount + 1)(ParsedTransfer(sender.toAddress, 1L))
+        val tooManyTransfers   = List.fill(MaxTransferCount + 1)(ParsedTransfer(sender.toAddress, 1L))
         val tooManyTransfersEi = create(version, assetId, sender, tooManyTransfers, timestamp, fee, attachment, proofs)
         tooManyTransfersEi shouldBe Left(GenericError(s"Number of transfers is greater than $MaxTransferCount"))
 
-        val negativeTransfer = List(ParsedTransfer(sender.toAddress, -1L))
+        val negativeTransfer   = List(ParsedTransfer(sender.toAddress, -1L))
         val negativeTransferEi = create(version, assetId, sender, negativeTransfer, timestamp, fee, attachment, proofs)
         negativeTransferEi shouldBe Left(GenericError("One of the transfers has negative amount"))
 
-        val oneHalf = Long.MaxValue / 2 + 1
-        val overflow = List.fill(2)(ParsedTransfer(sender.toAddress, oneHalf))
+        val oneHalf    = Long.MaxValue / 2 + 1
+        val overflow   = List.fill(2)(ParsedTransfer(sender.toAddress, oneHalf))
         val overflowEi = create(version, assetId, sender, overflow, timestamp, fee, attachment, proofs)
         overflowEi shouldBe Left(ValidationError.OverflowError)
 
-        val feeOverflow = List(ParsedTransfer(sender.toAddress, oneHalf))
+        val feeOverflow   = List(ParsedTransfer(sender.toAddress, oneHalf))
         val feeOverflowEi = create(version, assetId, sender, feeOverflow, timestamp, oneHalf, attachment, proofs)
         feeOverflowEi shouldBe Left(ValidationError.OverflowError)
 
-        val longAttachment = Array.fill(TransferTransaction.MaxAttachmentSize + 1)(1: Byte)
+        val longAttachment   = Array.fill(TransferTransaction.MaxAttachmentSize + 1)(1: Byte)
         val longAttachmentEi = create(version, assetId, sender, transfers, timestamp, fee, longAttachment, proofs)
         longAttachmentEi shouldBe Left(ValidationError.TooBigArray)
 

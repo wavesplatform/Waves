@@ -16,13 +16,15 @@ case class SignedCreateAliasRequest(@ApiModelProperty(value = "Base58 encoded se
                                     @ApiModelProperty(required = true)
                                     timestamp: Long,
                                     @ApiModelProperty(required = true)
-                                    signature: String) extends BroadcastRequest {
-  def toTx: Either[ValidationError, CreateAliasTransaction] = for {
-    _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
-    _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-    _alias <- Alias.buildWithCurrentNetworkByte(alias)
-    _t <- CreateAliasTransaction.create(_sender, _alias, fee, timestamp, _signature)
-  } yield _t
+                                    signature: String)
+    extends BroadcastRequest {
+  def toTx: Either[ValidationError, CreateAliasTransaction] =
+    for {
+      _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
+      _alias     <- Alias.buildWithCurrentNetworkByte(alias)
+      _t         <- CreateAliasTransaction.create(_sender, _alias, fee, timestamp, _signature)
+    } yield _t
 }
 
 object SignedCreateAliasRequest {

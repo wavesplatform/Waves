@@ -26,7 +26,6 @@ class InvalidBlockStorageImpl(settings: InvalidBlockStorageSettings) extends Inv
 
 object InvalidBlockStorageImpl {
 
-  case class InvalidBlockStorageSettings(maxSize: Int,
-                                         timeout: FiniteDuration)
+  case class InvalidBlockStorageSettings(maxSize: Int, timeout: FiniteDuration)
 
 }

@@ -12,9 +12,13 @@ import scorex.transaction.{BlockchainUpdater, CheckpointService, History, Valida
 import scorex.utils.ScorexLogging
 
 object CheckpointAppender extends ScorexLogging {
-  def apply(checkpointService: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
-            peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup, scheduler: Scheduler
-           )(maybeChannel: Option[Channel], c: Checkpoint): Task[Either[ValidationError, Option[BigInt]]] = {
+  def apply(checkpointService: CheckpointService,
+            history: History,
+            blockchainUpdater: BlockchainUpdater,
+            peerDatabase: PeerDatabase,
+            miner: Miner,
+            allChannels: ChannelGroup,
+            scheduler: Scheduler)(maybeChannel: Option[Channel], c: Checkpoint): Task[Either[ValidationError, Option[BigInt]]] = {
     val t = Task(checkpointService.set(c).map { _ =>
       log.info(s"Processing checkpoint $c")
       makeBlockchainCompliantWith(history, blockchainUpdater)(c)
@@ -22,16 +26,22 @@ object CheckpointAppender extends ScorexLogging {
     }).executeOn(scheduler).map(_.map(Some(_)))
     maybeChannel match {
       case None => t
-      case Some(ch) => processAndBlacklistOnFailure(ch, peerDatabase, miner, allChannels,
-        s"${id(ch)} Attempting to process checkpoint",
-        s"${id(ch)} Successfully processed checkpoint",
-        s"${id(ch)} Error processing checkpoint")(t)
+      case Some(ch) =>
+        processAndBlacklistOnFailure(
+          ch,
+          peerDatabase,
+          miner,
+          allChannels,
+          s"${id(ch)} Attempting to process checkpoint",
+          s"${id(ch)} Successfully processed checkpoint",
+          s"${id(ch)} Error processing checkpoint"
+        )(t)
     }
   }
 
   private def makeBlockchainCompliantWith(history: History, blockchainUpdater: BlockchainUpdater)(checkpoint: Checkpoint): Unit = {
-    val existingItems = checkpoint.items.filter {
-      checkpoint => history.blockAt(checkpoint.height).isDefined
+    val existingItems = checkpoint.items.filter { checkpoint =>
+      history.blockAt(checkpoint.height).isDefined
     }
 
     val fork = existingItems.takeWhile {
@@ -42,17 +52,16 @@ object CheckpointAppender extends ScorexLogging {
 
     if (fork.nonEmpty) {
       val genesisBlockHeight = 1
-      val hh = existingItems.map(_.height) :+ genesisBlockHeight
-      history.blockAt(hh(fork.size)).foreach {
-        lastValidBlock =>
-          log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block $lastValidBlock]")
-          blockBlockForkStats.increment()
-          blockForkHeightStats.record(fork.size)
-          blockchainUpdater.removeAfter(lastValidBlock.uniqueId)
+      val hh                 = existingItems.map(_.height) :+ genesisBlockHeight
+      history.blockAt(hh(fork.size)).foreach { lastValidBlock =>
+        log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block $lastValidBlock]")
+        blockBlockForkStats.increment()
+        blockForkHeightStats.record(fork.size)
+        blockchainUpdater.removeAfter(lastValidBlock.uniqueId)
       }
     }
   }
 
-  private val blockBlockForkStats = Kamon.metrics.counter("block-fork")
+  private val blockBlockForkStats  = Kamon.metrics.counter("block-fork")
   private val blockForkHeightStats = Kamon.metrics.histogram("block-fork-height")
 }

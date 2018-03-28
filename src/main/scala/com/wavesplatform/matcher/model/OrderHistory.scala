@@ -63,11 +63,11 @@ object OrderHistory {
 
 case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorage(db: DB, "matcher") with OrderHistory with ScorexLogging {
 
-  private val OrdersPrefix = "orders".getBytes(Charset)
-  private val OrdersInfoPrefix = "infos".getBytes(Charset)
-  private val AddressToOrdersPrefix = "addr-orders".getBytes(Charset)
+  private val OrdersPrefix                = "orders".getBytes(Charset)
+  private val OrdersInfoPrefix            = "infos".getBytes(Charset)
+  private val AddressToOrdersPrefix       = "addr-orders".getBytes(Charset)
   private val AddressToActiveOrdersPrefix = "a-addr-orders".getBytes(Charset)
-  private val AddressPortfolioPrefix = "portfolios".getBytes(Charset)
+  private val AddressPortfolioPrefix      = "portfolios".getBytes(Charset)
 
   def addToFinal(address: String, orderId: String): Unit = {
     get(OrderIdsCodec)(makeKey(AddressToOrdersPrefix, address)) match {
@@ -87,9 +87,10 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
       case (orderId, (o, oi)) => (orderId, (o, orderInfo(orderId).combine(oi)))
     }
 
-    updatedInfo.foreach { case (orderId, (_, oi)) =>
-      put(makeKey(OrdersInfoPrefix, orderId), oi.jsonStr.getBytes(Charset), None)
-      log.debug(s"Changed OrderInfo for: $orderId -> $oi")
+    updatedInfo.foreach {
+      case (orderId, (_, oi)) =>
+        put(makeKey(OrdersInfoPrefix, orderId), oi.jsonStr.getBytes(Charset), None)
+        log.debug(s"Changed OrderInfo for: $orderId -> $oi")
     }
 
     updatedInfo
@@ -100,12 +101,13 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
   }
 
   def saveOpenPortfolio(event: Event): Unit = {
-    Events.createOpenPortfolio(event).foreach { case (address, op) =>
-      val key = makeKey(AddressPortfolioPrefix, address)
-      val prev = get(PortfolioCodec)(key).map(OpenPortfolio.apply).getOrElse(OpenPortfolio.empty)
-      val updatedPortfolios = prev.combine(op)
-      put(key, PortfolioCodec.encode(updatedPortfolios.orders), None)
-      log.debug(s"Changed OpenPortfolio for: $address -> " + updatedPortfolios.toString)
+    Events.createOpenPortfolio(event).foreach {
+      case (address, op) =>
+        val key               = makeKey(AddressPortfolioPrefix, address)
+        val prev              = get(PortfolioCodec)(key).map(OpenPortfolio.apply).getOrElse(OpenPortfolio.empty)
+        val updatedPortfolios = prev.combine(op)
+        put(key, PortfolioCodec.encode(updatedPortfolios.orders), None)
+        log.debug(s"Changed OpenPortfolio for: $address -> " + updatedPortfolios.toString)
     }
   }
 
@@ -125,13 +127,14 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     val updatedInfo = saveOrderInfo(event)
     saveOpenPortfolio(event)
 
-    updatedInfo.foreach { case (orderId, (o, oi)) =>
-      if (!oi.status.isFinal) {
-        val assetId = if (o.orderType == OrderType.BUY) o.assetPair.priceAsset else o.assetPair.amountAsset
-        addToActive(o.senderPublicKey.address, assetId, orderId)
-      } else {
-        addToFinal(o.senderPublicKey.address, orderId)
-      }
+    updatedInfo.foreach {
+      case (orderId, (o, oi)) =>
+        if (!oi.status.isFinal) {
+          val assetId = if (o.orderType == OrderType.BUY) o.assetPair.priceAsset else o.assetPair.amountAsset
+          addToActive(o.senderPublicKey.address, assetId, orderId)
+        } else {
+          addToFinal(o.senderPublicKey.address, orderId)
+        }
     }
   }
 
@@ -141,11 +144,12 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     saveOpenPortfolio(OrderAdded(event.submittedExecuted))
     saveOpenPortfolio(event)
 
-    updatedInfo.foreach { case (orderId, (o, oi)) =>
-      if (oi.status.isFinal) {
-        deleteFromActive(o.senderPublicKey.address, orderId)
-        addToFinal(o.senderPublicKey.address, orderId)
-      }
+    updatedInfo.foreach {
+      case (orderId, (o, oi)) =>
+        if (oi.status.isFinal) {
+          deleteFromActive(o.senderPublicKey.address, orderId)
+          addToFinal(o.senderPublicKey.address, orderId)
+        }
     }
   }
 
@@ -153,11 +157,12 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     val updatedInfo = saveOrderInfo(event)
     saveOpenPortfolio(event)
 
-    updatedInfo.foreach { case (orderId, (o, oi)) =>
-      if (oi.status.isFinal) {
-        deleteFromActive(o.senderPublicKey.address, orderId)
-        addToFinal(o.senderPublicKey.address, orderId)
-      }
+    updatedInfo.foreach {
+      case (orderId, (o, oi)) =>
+        if (oi.status.isFinal) {
+          deleteFromActive(o.senderPublicKey.address, orderId)
+          addToFinal(o.senderPublicKey.address, orderId)
+        }
     }
   }
 
@@ -209,8 +214,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
   }
 
   override def fetchOrderHistoryByPair(assetPair: AssetPair, address: String): Seq[(String, OrderInfo, Option[Order])] = {
-    allOrderIdsByAddress(address)
-      .toSeq
+    allOrderIdsByAddress(address).toSeq
       .map(id => (id, orderInfo(id), order(id)))
       .filter(_._3.exists(_.assetPair == assetPair))
       .sorted(OrderHistoryOrdering)
@@ -219,8 +223,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
 
   override def fetchAllActiveOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])] = {
     import OrderInfo.orderStatusOrdering
-    activeOrderIdsByAddress(address)
-      .toSeq
+    activeOrderIdsByAddress(address).toSeq
       .map(o => (o._2, orderInfo(o._2)))
       .sortBy(_._2.status)
       .take(settings.maxOrdersPerRequest)
@@ -230,8 +233,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
 
   override def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])] = {
     import OrderInfo.orderStatusOrdering
-    allOrderIdsByAddress(address)
-      .toSeq
+    allOrderIdsByAddress(address).toSeq
       .map(id => (id, orderInfo(id)))
       .sortBy(_._2.status)
       .take(settings.maxOrdersPerRequest)
@@ -245,8 +247,8 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     deleteOrderFromAddress(AddressToOrdersPrefix, address, orderId)
   }
 
-  private def addToActive(address: String, assetId: Option[AssetId], orderId: String): Unit =  {
-    val key = makeKey(AddressToActiveOrdersPrefix, address)
+  private def addToActive(address: String, assetId: Option[AssetId], orderId: String): Unit = {
+    val key  = makeKey(AddressToActiveOrdersPrefix, address)
     val orig = get(AssetIdOrderIdSetCodec)(key).getOrElse(Set.empty)
     put(key, AssetIdOrderIdSetCodec.encode(orig + (assetId -> orderId)), None)
   }
@@ -265,10 +267,14 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
   }
 
   private def update[Content](codec: Codec[Content])(key: Array[Byte])(f: Content => Content): Unit = {
-    get(codec)(key).foreach { orig => put(key, codec.encode(f(orig)), None) }
+    get(codec)(key).foreach { orig =>
+      put(key, codec.encode(f(orig)), None)
+    }
   }
 
   private def get[Content](codec: Codec[Content])(key: Array[Byte]): Option[Content] = {
-    get(key).map { x => codec.decode(x).explicitGet().value }
+    get(key).map { x =>
+      codec.decode(x).explicitGet().value
+    }
   }
 }

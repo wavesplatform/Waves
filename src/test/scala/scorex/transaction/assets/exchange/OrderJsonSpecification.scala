@@ -12,11 +12,10 @@ import scorex.transaction.assets.exchange.OrderJson._
 class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Read Order from json") {
-    val pk = PrivateKeyAccount("123".getBytes)
+    val pk        = PrivateKeyAccount("123".getBytes)
     val pubKeyStr = Base58.encode(pk.publicKey)
 
-    val json = Json.parse(
-      s"""
+    val json = Json.parse(s"""
         {
           "senderPublicKey": "$pubKeyStr",
           "matcherPublicKey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
@@ -53,8 +52,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
   }
 
   property("Read Order without sender and matcher PublicKey") {
-    val json = Json.parse(
-      """
+    val json = Json.parse("""
         {
           "senderPublicKey": " ",
           "spendAssetId": "string",
@@ -70,15 +68,14 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
     json.validate[Order] match {
       case e: JsError =>
         val paths = e.errors.map(_._1)
-        paths should contain allOf(JsPath \ "matcherPublicKey", JsPath \ "senderPublicKey")
+        paths should contain allOf (JsPath \ "matcherPublicKey", JsPath \ "senderPublicKey")
       case _ =>
         fail("Should be JsError")
     }
   }
 
-  val base58Str = "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ"
-  val json: JsValue = Json.parse(
-    s"""
+  val base58Str     = "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ"
+  val json: JsValue = Json.parse(s"""
     {
       "sender": "$base58Str",
       "wrong_sender": "0abcd",
@@ -121,11 +118,10 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
   }
 
   property("Read Order with empty assetId") {
-    val pk = PrivateKeyAccount("123".getBytes)
+    val pk        = PrivateKeyAccount("123".getBytes)
     val pubKeyStr = Base58.encode(pk.publicKey)
 
-    val json = Json.parse(
-      s"""
+    val json = Json.parse(s"""
         {
           "senderPublicKey": "$pubKeyStr",
           "matcherPublicKey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",

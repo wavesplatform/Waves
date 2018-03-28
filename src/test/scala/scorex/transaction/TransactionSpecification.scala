@@ -11,8 +11,7 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
   property("transaction fields should be constructed in a right way") {
     forAll(bytes32gen, bytes32gen, timestampGen, positiveLongGen, positiveLongGen) {
       (senderSeed: Array[Byte], recipientSeed: Array[Byte], time: Long, amount: Long, fee: Long) =>
-
-        val sender = PrivateKeyAccount(senderSeed)
+        val sender    = PrivateKeyAccount(senderSeed)
         val recipient = PrivateKeyAccount(recipientSeed)
 
         val tx = createWavesTransfer(sender, recipient, amount, fee, time).right.get
@@ -28,11 +27,10 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
   property("bytes()/parse() roundtrip should preserve a transaction") {
     forAll(bytes32gen, bytes32gen, timestampGen, positiveLongGen, positiveLongGen) {
       (senderSeed: Array[Byte], recipientSeed: Array[Byte], time: Long, amount: Long, fee: Long) =>
-
-        val sender = PrivateKeyAccount(senderSeed)
+        val sender    = PrivateKeyAccount(senderSeed)
         val recipient = PrivateKeyAccount(recipientSeed)
-        val tx = createWavesTransfer(sender, recipient, amount, fee, time).right.get
-        val txAfter = TransferTransaction.parseBytes(tx.bytes()).get
+        val tx        = createWavesTransfer(sender, recipient, amount, fee, time).right.get
+        val txAfter   = TransferTransaction.parseBytes(tx.bytes()).get
 
         txAfter.getClass.shouldBe(tx.getClass)
 
@@ -48,11 +46,10 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
   property("TransferTransaction should deserialize to LagonakiTransaction") {
     forAll(bytes32gen, bytes32gen, timestampGen, positiveLongGen, positiveLongGen) {
       (senderSeed: Array[Byte], recipientSeed: Array[Byte], time: Long, amount: Long, fee: Long) =>
-
-        val sender = PrivateKeyAccount(senderSeed)
+        val sender    = PrivateKeyAccount(senderSeed)
         val recipient = PrivateKeyAccount(recipientSeed)
-        val tx = createWavesTransfer(sender, recipient, amount, fee, time).right.get
-        val txAfter = TransactionParsers.parseBytes(tx.bytes()).get.asInstanceOf[TransferTransaction]
+        val tx        = createWavesTransfer(sender, recipient, amount, fee, time).right.get
+        val txAfter   = TransactionParsers.parseBytes(tx.bytes()).get.asInstanceOf[TransferTransaction]
 
         txAfter.getClass.shouldBe(tx.getClass)
 

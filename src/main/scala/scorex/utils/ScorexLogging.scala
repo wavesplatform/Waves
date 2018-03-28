@@ -77,13 +77,12 @@ trait ScorexLogging {
           case gex: UncheckedExecutionException =>
             Option(gex.getCause) match {
               case Some(nseex: NoSuchElementException) =>
-              case _ => log.error(s"Error executing task", ex)
+              case _                                   => log.error(s"Error executing task", ex)
             }
           case _ => log.error(s"Error executing task", ex)
         }
         Task.raiseError[A](ex)
-      }
-      )
+      })
     }
   }
 

@@ -65,7 +65,9 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev[Boolean](
       expr = BLOCK(
         Some(LET("x", CONST_LONG(3))),
-        BLOCK(Some(LET("y", BINARY_OP(CONST_LONG(3), SUM_OP, CONST_LONG(0), LONG))), BINARY_OP(REF("x", LONG), EQ_OP, REF("y", LONG), BOOLEAN), BOOLEAN),
+        BLOCK(Some(LET("y", BINARY_OP(CONST_LONG(3), SUM_OP, CONST_LONG(0), LONG))),
+              BINARY_OP(REF("x", LONG), EQ_OP, REF("y", LONG), BOOLEAN),
+              BOOLEAN),
         BOOLEAN
       )) shouldBe Right(true)
   }
@@ -76,7 +78,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("successful on same value names in different branches") {
     val expr = IF(BINARY_OP(CONST_LONG(1), EQ_OP, CONST_LONG(2), BOOLEAN), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4), LONG)
-    ev[Long](expr=expr) shouldBe Right(4)
+    ev[Long](expr = expr) shouldBe Right(4)
   }
 
   property("fails if override") {

@@ -12,28 +12,29 @@ import scorex.transaction.assets.TransferTransaction
 import scala.util.Right
 
 object TransferTransactionDiff {
-  def apply(state: SnapshotStateReader, s: FunctionalitySettings, blockTime: Long, height: Int)(tx: TransferTransaction): Either[ValidationError, Diff] = {
+  def apply(state: SnapshotStateReader, s: FunctionalitySettings, blockTime: Long, height: Int)(
+      tx: TransferTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender.publicKey)
 
     val isInvalidEi = for {
       recipient <- state.resolveAliasEi(tx.recipient)
-      portfolios = (
-        tx.assetId match {
-          case None => Map(sender -> Portfolio(-tx.amount, LeaseBalance.empty, Map.empty)).combine(
+      portfolios = (tx.assetId match {
+        case None =>
+          Map(sender -> Portfolio(-tx.amount, LeaseBalance.empty, Map.empty)).combine(
             Map(recipient -> Portfolio(tx.amount, LeaseBalance.empty, Map.empty))
           )
-          case Some(aid) =>
-            Map(sender -> Portfolio(0, LeaseBalance.empty, Map(aid -> -tx.amount))).combine(
-              Map(recipient -> Portfolio(0, LeaseBalance.empty, Map(aid -> tx.amount)))
-            )
-        }).combine(
+        case Some(aid) =>
+          Map(sender -> Portfolio(0, LeaseBalance.empty, Map(aid -> -tx.amount))).combine(
+            Map(recipient -> Portfolio(0, LeaseBalance.empty, Map(aid -> tx.amount)))
+          )
+      }).combine(
         tx.feeAssetId match {
           case None => Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))
           case Some(aid) =>
             Map(sender -> Portfolio(0, LeaseBalance.empty, Map(aid -> -tx.fee)))
         }
       )
-      assetIssued = tx.assetId.forall(state.assetDescription(_).isDefined)
+      assetIssued    = tx.assetId.forall(state.assetDescription(_).isDefined)
       feeAssetIssued = tx.feeAssetId.forall(state.assetDescription(_).isDefined)
     } yield (portfolios, blockTime > s.allowUnissuedAssetsUntil && !(assetIssued && feeAssetIssued))
 

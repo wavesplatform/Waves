@@ -20,11 +20,11 @@ object BlockStats {
   private sealed abstract class Event extends Named
 
   private object Event {
-    case object Inv extends Event
+    case object Inv      extends Event
     case object Received extends Event
-    case object Applied extends Event
+    case object Applied  extends Event
     case object Declined extends Event
-    case object Mined extends Event
+    case object Mined    extends Event
   }
 
   private sealed abstract class Type extends Named
@@ -38,7 +38,7 @@ object BlockStats {
 
   object Source {
     case object Broadcast extends Source
-    case object Ext extends Source
+    case object Ext       extends Source
   }
 
   def received(b: Block, source: Source, ch: Channel): Unit = write(
@@ -73,7 +73,6 @@ object BlockStats {
     Event.Mined,
     Seq.empty
   )
-
 
   def inv(m: MicroBlockInv, ch: Channel): Unit = write(
     measurement(Type.Micro)
@@ -113,12 +112,14 @@ object BlockStats {
     Seq.empty
   )
 
-  private def block(b: Block, source: Source): Point.Builder = measurement(Type.Block)
-    .tag("id", id(b.uniqueId))
-    .tag("source", source.name)
+  private def block(b: Block, source: Source): Point.Builder =
+    measurement(Type.Block)
+      .tag("id", id(b.uniqueId))
+      .tag("source", source.name)
 
-  private def micro(m: MicroBlock): Point.Builder = measurement(Type.Micro)
-    .tag("id", id(m.totalResBlockSig))
+  private def micro(m: MicroBlock): Point.Builder =
+    measurement(Type.Micro)
+      .tag("id", id(m.totalResBlockSig))
 
   private def measurement(t: Type): Point.Builder = Point.measurement("block").tag("type", t.toString)
 

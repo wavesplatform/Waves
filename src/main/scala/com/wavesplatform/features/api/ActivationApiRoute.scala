@@ -18,7 +18,9 @@ case class ActivationApiRoute(settings: RestAPISettings,
                               featuresSettings: FeaturesSettings,
                               history: History,
                               featureProvider: FeatureProvider)
-  extends ApiRoute with CommonApiFunctions with ScorexLogging {
+    extends ApiRoute
+    with CommonApiFunctions
+    with ScorexLogging {
 
   override lazy val route: Route = pathPrefix("activation") {
     status
@@ -26,15 +28,17 @@ case class ActivationApiRoute(settings: RestAPISettings,
 
   @Path("/status")
   @ApiOperation(value = "Status", notes = "Get activation status", httpMethod = "GET")
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json activation status")
-  ))
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Json activation status")
+    ))
   def status: Route = (get & path("status")) {
 
     val height = history.height
 
-    complete(Json.toJson(
-      ActivationStatus(height,
+    complete(
+      Json.toJson(ActivationStatus(
+        height,
         functionalitySettings.activationWindowSize(height),
         functionalitySettings.blocksForFeatureActivation(height),
         functionalitySettings.activationWindow(height).last,
@@ -42,17 +46,19 @@ case class ActivationApiRoute(settings: RestAPISettings,
           featureProvider.approvedFeatures().keySet ++
           BlockchainFeatures.implemented).toSeq.sorted.map(id => {
           val status = featureProvider.featureStatus(id, height)
-          FeatureActivationStatus(id,
+          FeatureActivationStatus(
+            id,
             BlockchainFeatures.feature(id).description,
             status,
             (BlockchainFeatures.implemented.contains(id), featuresSettings.supported.contains(id)) match {
               case (false, _) => NodeFeatureStatus.NotImplemented
-              case (_, true) => NodeFeatureStatus.Voted
-              case _ => NodeFeatureStatus.Implemented
+              case (_, true)  => NodeFeatureStatus.Voted
+              case _          => NodeFeatureStatus.Implemented
             },
             featureProvider.featureActivationHeight(id),
             if (status == BlockchainFeatureStatus.Undefined) featureProvider.featureVotes(height).get(id).orElse(Some(0)) else None
           )
-        }))))
+        })
+      )))
   }
 }

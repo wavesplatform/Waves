@@ -273,8 +273,7 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
         amount    <- Gen.choose(1L, Long.MaxValue / MaxTransferCount)
       } yield ParsedTransfer(recipient, amount)
       recipients <- Gen.listOfN(transferCount, transferGen)
-    } yield
-      MassTransferTransaction.selfSigned(version, assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
+    } yield MassTransferTransaction.selfSigned(version, assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
   }.label("massTransferTransaction")
 
   val MinIssueFee = 100000000

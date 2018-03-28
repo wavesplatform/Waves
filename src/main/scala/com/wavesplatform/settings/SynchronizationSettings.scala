@@ -24,28 +24,33 @@ object SynchronizationSettings {
                                             processedMicroBlocksCacheTimeout: FiniteDuration,
                                             invCacheTimeout: FiniteDuration)
 
-  case class HistoryReplierSettings(maxMicroBlockCacheSize: Int,
-                                    maxBlockCacheSize: Int)
+  case class HistoryReplierSettings(maxMicroBlockCacheSize: Int, maxBlockCacheSize: Int)
 
-  case class UtxSynchronizerSettings(networkTxCacheSize: Int,
-                                     networkTxCacheTime: FiniteDuration,
-                                     maxBufferSize: Int,
-                                     maxBufferTime: FiniteDuration)
+  case class UtxSynchronizerSettings(networkTxCacheSize: Int, networkTxCacheTime: FiniteDuration, maxBufferSize: Int, maxBufferTime: FiniteDuration)
 
   val configPath: String = "waves.synchronization"
 
   def fromConfig(config: Config): SynchronizationSettings = {
-    val maxRollback = config.as[Int](s"$configPath.max-rollback")
-    val maxChainLength = config.as[Int](s"$configPath.max-chain-length")
-    val synchronizationTimeout = config.as[FiniteDuration](s"$configPath.synchronization-timeout")
-    val scoreTTL = config.as[FiniteDuration](s"$configPath.score-ttl")
-    val remoteScoreDebounce = config.as[FiniteDuration](s"$configPath.remote-score-debounce")
-    val invalidBlocksStorage = config.as[InvalidBlockStorageSettings](s"$configPath.invalid-blocks-storage")
-    val microBlockSynchronizer = config.as[MicroblockSynchronizerSettings](s"$configPath.micro-block-synchronizer")
-    val historyReplierSettings = config.as[HistoryReplierSettings](s"$configPath.history-replier")
+    val maxRollback             = config.as[Int](s"$configPath.max-rollback")
+    val maxChainLength          = config.as[Int](s"$configPath.max-chain-length")
+    val synchronizationTimeout  = config.as[FiniteDuration](s"$configPath.synchronization-timeout")
+    val scoreTTL                = config.as[FiniteDuration](s"$configPath.score-ttl")
+    val remoteScoreDebounce     = config.as[FiniteDuration](s"$configPath.remote-score-debounce")
+    val invalidBlocksStorage    = config.as[InvalidBlockStorageSettings](s"$configPath.invalid-blocks-storage")
+    val microBlockSynchronizer  = config.as[MicroblockSynchronizerSettings](s"$configPath.micro-block-synchronizer")
+    val historyReplierSettings  = config.as[HistoryReplierSettings](s"$configPath.history-replier")
     val utxSynchronizerSettings = config.as[UtxSynchronizerSettings](s"$configPath.utx-synchronizer")
 
-    SynchronizationSettings(maxRollback, maxChainLength, synchronizationTimeout, scoreTTL, remoteScoreDebounce,
-      invalidBlocksStorage, microBlockSynchronizer, historyReplierSettings, utxSynchronizerSettings)
+    SynchronizationSettings(
+      maxRollback,
+      maxChainLength,
+      synchronizationTimeout,
+      scoreTTL,
+      remoteScoreDebounce,
+      invalidBlocksStorage,
+      microBlockSynchronizer,
+      historyReplierSettings,
+      utxSynchronizerSettings
+    )
   }
 }

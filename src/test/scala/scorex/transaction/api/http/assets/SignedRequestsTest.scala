@@ -5,7 +5,6 @@ import play.api.libs.json.Json
 import scorex.api.http.assets._
 import scorex.crypto.encode.Base58
 
-
 class SignedRequestsTest extends FunSuite with Matchers {
 
   test("AssetIssueRequest json parsing works") {

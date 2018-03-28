@@ -13,25 +13,25 @@ sealed trait Caching[K, V] {
   def size: Long
 }
 
-class Cache[K, V](val cache: GuavaCache[K,V]) extends Caching[K, V] with Serializable {
+class Cache[K, V](val cache: GuavaCache[K, V]) extends Caching[K, V] with Serializable {
 
   /**
-   * Get an optional value from the cache
-   *
-   * cache.set("foo", "bar")
-   * cache.get("foo") => Some("bar")
-   *
-   * @param k Cache key
-   */
+    * Get an optional value from the cache
+    *
+    * cache.set("foo", "bar")
+    * cache.get("foo") => Some("bar")
+    *
+    * @param k Cache key
+    */
   def get(k: K): Option[V] =
     Option(cache.getIfPresent(k))
 
   /**
-   * Get a value from the cache or else return a default value
-   *
-   * @param k cache key
-   * @param orElse the default value to return if k is not found in the cache
-   */
+    * Get a value from the cache or else return a default value
+    *
+    * @param k cache key
+    * @param orElse the default value to return if k is not found in the cache
+    */
   def getOrElse(k: K, orElse: V): V =
     get(k) match {
       case Some(v) => v
@@ -39,14 +39,14 @@ class Cache[K, V](val cache: GuavaCache[K,V]) extends Caching[K, V] with Seriali
     }
 
   /**
-   * Get a value from the cache or call a function to set the cache value
-   *
-   * This can be used to make TTL caching easy to understand
-   *
-   * @param k the cache key
-   * @param f a function to call if the cache value is not present
-   * @return
-   */
+    * Get a value from the cache or call a function to set the cache value
+    *
+    * This can be used to make TTL caching easy to understand
+    *
+    * @param k the cache key
+    * @param f a function to call if the cache value is not present
+    * @return
+    */
   def getOrElseUpdate(k: K, f: () => V): V = {
     cache.get(k, new Callable[V] {
       def call(): V = f()
@@ -54,13 +54,13 @@ class Cache[K, V](val cache: GuavaCache[K,V]) extends Caching[K, V] with Seriali
   }
 
   /**
-   * Insert an item into the cache
-   *
-   * e.g cache.set("foo", "bar")
-   *
-   * @param k key
-   * @param v value
-   */
+    * Insert an item into the cache
+    *
+    * e.g cache.set("foo", "bar")
+    *
+    * @param k key
+    * @param v value
+    */
   def set(k: K, v: V) = cache.put(k, v)
 
   def remove(k: K): Unit = cache.invalidate(k)
