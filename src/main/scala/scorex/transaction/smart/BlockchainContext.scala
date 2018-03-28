@@ -30,7 +30,7 @@ class BlockchainContext(override val networkByte: Byte, tx: Coeval[Transaction],
 
   override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any] = {
     val address = Address.fromBytes(addressBytes).explicitGet()
-    val data = state.accountData(address, key)
+    val data    = state.accountData(address, key)
     data.map((_, dataType)).flatMap {
       case (LongDataEntry(_, value), DataType.Long)        => Some(value)
       case (BooleanDataEntry(_, value), DataType.Boolean)  => Some(value)
@@ -76,6 +76,7 @@ object BlockchainContext {
 
     override def recipient: Either[String, ByteVector] = tx match {
       case tt: TransferTransaction           => Right(ByteVector(tt.recipient.bytes.arr))
+      case lt: LeaseTransaction              => Right(ByteVector(lt.recipient.bytes.arr))
       case vtt: VersionedTransferTransaction => Right(ByteVector(vtt.recipient.bytes.arr))
       case _                                 => Left("Transaction doesn't contain recipient")
     }

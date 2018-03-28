@@ -193,7 +193,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       _ = assert(txInfo.transfers.size == 3)
 
       // /transactions/address should return complete transfers list for the sender...
-      txSender <- sender.get(s"/transactions/address/$firstAddress/limit/1").as[JsArray].map(js => extractTransactionByType(js.apply(0), 11).head)
+      txSender <- sender.get(s"/transactions/address/$firstAddress/limit/10").as[JsArray].map(js => extractTransactionByType(js.apply(0), 11).head)
       _                   = assert(txSender.as[MassTransferRequest].transfers.size == 3)
       _                   = assert((txSender \ "transferCount").as[Int] == 3)
       _                   = assert((txSender \ "totalAmount").as[Long] == 10.waves)
@@ -202,7 +202,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       _ = assert((transfers.equals(transfersAfterTrans)))
 
       // ...and compact list for recipients
-      txRecipient <- sender.get(s"/transactions/address/$secondAddress/limit/1").as[JsArray].map(js => extractTransactionByType(js.apply(0), 11).head)
+      txRecipient <- sender.get(s"/transactions/address/$secondAddress/limit/10").as[JsArray].map(js => extractTransactionByType(js.apply(0), 11).head)
       _                = assert(txRecipient.as[MassTransferRequest].transfers.size == 1)
       _                = assert((txRecipient \ "transferCount").as[Int] == 3)
       _                = assert((txRecipient \ "totalAmount").as[Long] == 10.waves)

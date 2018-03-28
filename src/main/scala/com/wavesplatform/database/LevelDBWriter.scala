@@ -350,20 +350,20 @@ object LevelDBWriter {
   }
 
   /** {{{
-    * ([10, 7, 4], 5, 11) => [10, 7]
+    * ([10, 7, 4], 5, 11) => [10, 7, 4]
     * ([10, 7], 5, 11) => [10, 7, 1]
     * }}}
     */
-  private def slice(v: Seq[Int], from: Int, to: Int): Seq[Int] = {
+  private[database] def slice(v: Seq[Int], from: Int, to: Int): Seq[Int] = {
     val (c1, c2) = v.dropWhile(_ > to).partition(_ > from)
     c1 :+ c2.headOption.getOrElse(1)
   }
 
-  /** {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 12), (3, 5), (3, 1)]}}}
+  /** {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 12), (3, 5)]}}}
     * @param wbh WAVES balance history
     * @param lbh Lease balance history
     */
-  private def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
+  private[database] def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
     @tailrec
     def recMerge(wh: Int, wt: Seq[Int], lh: Int, lt: Seq[Int], buf: ArrayBuffer[(Int, Int)]): ArrayBuffer[(Int, Int)] = {
       buf += wh -> lh
@@ -374,12 +374,10 @@ object LevelDBWriter {
       } else if (lt.isEmpty) {
         recMerge(wt.head, wt.tail, lh, lt, buf)
       } else {
-        if (wh > lh) {
+        if (wh >= lh) {
           recMerge(wt.head, wt.tail, lh, lt, buf)
-        } else if (wh < lh) {
-          recMerge(wh, wt, lt.head, lt.tail, buf)
         } else {
-          recMerge(wt.head, wt.tail, lt.head, lt.tail, buf)
+          recMerge(wh, wt, lt.head, lt.tail, buf)
         }
       }
     }
