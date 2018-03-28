@@ -48,7 +48,8 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
       val bytes = tx.bytes()
       val entryCount = Shorts.fromByteArray(bytes.drop(34))
       if (entryCount > 0) {
-        val p = 36 + bytes(36) // bytes(36) is key#1 length
+        val key1Length = Shorts.fromByteArray(bytes.drop(36))
+        val p = 37 + key1Length
         val parsed = DataTransaction.parseTail((bytes.tail.take(p) :+ badTypeId) ++ bytes.drop(p + 2))
         parsed.isFailure shouldBe true
         parsed.failed.get.getMessage shouldBe s"Unknown type $badTypeId"
@@ -95,7 +96,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         check(List.tabulate(MaxEntryCount)(n => LongDataEntry(n.toString, n)))  // maximal data
         check(List.fill[DataEntry[_]](keyRepeatCount)(entry))  // repeating keys
         check(List(BooleanDataEntry("", false)))  // empty key
-        check(List(LongDataEntry("a" * Byte.MaxValue, 0xa)))  // max key size
+        check(List(LongDataEntry("a" * MaxKeySize, 0xa)))  // max key size
         check(List(BinaryDataEntry("bin", ByteStr.empty)))  // empty binary
         check(List(BinaryDataEntry("bin", ByteStr(Array.fill(MaxValueSize)(1: Byte)))))  // max binary value size
     }

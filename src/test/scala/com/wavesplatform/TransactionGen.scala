@@ -424,7 +424,7 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
   import DataTransaction.MaxEntryCount
 
   val dataTxKeyGen = for {
-    size <- Gen.choose[Byte](0, MaxKeySize)
+    size <- Gen.choose[Byte](0, MaxKeySize.toByte)
   } yield Random.alphanumeric.take(size).mkString
 
   val longEntryGen = for {

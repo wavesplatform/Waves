@@ -45,7 +45,7 @@ case class DataTransaction private(version: Byte,
 
 object DataTransaction {
   val Version: Byte = 1
-  val MaxEntryCount: Byte = Byte.MaxValue
+  val MaxEntryCount: Byte = 100
 
   def parseTail(bytes: Array[Byte]): Try[DataTransaction] = Try {
     val version = bytes(0)

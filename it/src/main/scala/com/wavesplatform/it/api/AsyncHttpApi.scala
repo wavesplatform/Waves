@@ -114,7 +114,7 @@ object AsyncHttpApi extends Assertions {
     def postJsonWithApiKey[A: Writes](path: String, body: A): Future[Response] = retrying {
       _post(s"${n.nodeApiEndpoint}$path")
         .withApiKey(n.apiKey)
-        .setHeader("Content-type", "application/json").setBody(stringify(toJson(body)))
+        .setHeader("Content-type", "application/json;charset=utf-8").setBody(stringify(toJson(body)))
         .build()
     }
 
@@ -126,7 +126,7 @@ object AsyncHttpApi extends Assertions {
 
     def post(path: String, body: String): Future[Response] =
       post(s"${n.nodeApiEndpoint}$path",
-        (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(body))
+        (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json;charset=utf-8").setBody(body))
 
     def blacklist(address: InetSocketAddress): Future[Unit] =
       post("/debug/blacklist", s"${address.getHostString}:${address.getPort}").map(_ => ())

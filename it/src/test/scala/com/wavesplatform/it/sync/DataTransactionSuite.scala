@@ -77,12 +77,13 @@ class DataTransactionSuite extends BaseTransactionSuite {
     import DataEntry.{MaxKeySize, MaxValueSize}
     import DataTransaction.MaxEntryCount
 
-    val maxKey = "a" * MaxKeySize
+    val maxKey = "\u6fae" * MaxKeySize
     val data   = List.tabulate(MaxEntryCount)(n => BinaryDataEntry(maxKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
     val fee    = calcDataFee(data)
     val txId   = sender.putData(firstAddress, data, fee).id
 
     nodes.waitForHeightAriseAndTxPresent(txId)
+    sender.getData(firstAddress, maxKey) shouldBe data.last
   }
 
   test("data definition and retrieval") {
@@ -156,18 +157,19 @@ class DataTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(emptyKeyTx)
     sender.getData(thirdAddress, "") shouldBe emptyKey.head
 
-    val key         = "myKey"
-    val multiKey    = List.tabulate(5)(LongDataEntry(key, _))
+    val latinKey = "C,u!"
+    val multiKey    = List.tabulate(5)(LongDataEntry(latinKey, _))
     val multiKeyFee = calcDataFee(multiKey)
     val multiKeyTx  = sender.putData(thirdAddress, multiKey, multiKeyFee).id
     nodes.waitForHeightAriseAndTxPresent(multiKeyTx)
-    sender.getData(thirdAddress, key) shouldBe multiKey.last
+    sender.getData(thirdAddress, latinKey) shouldBe multiKey.last
 
-    val typeChange    = List(BooleanDataEntry(key, true))
+    val nonLatinKey = "\u05EA\u05E8\u05D1\u05D5\u05EA, \u05E1\u05E4\u05D5\u05E8\u05D8 \u05D5\u05EA\u05D9\u05D9\u05E8\u05D5\u05EA"
+    val typeChange    = List(BooleanDataEntry(nonLatinKey, true))
     val typeChangeFee = calcDataFee(typeChange)
     val typeChangeTx  = sender.putData(thirdAddress, typeChange, typeChangeFee).id
     nodes.waitForHeightAriseAndTxPresent(typeChangeTx)
-    sender.getData(thirdAddress, key) shouldBe typeChange.head
+    sender.getData(thirdAddress, nonLatinKey) shouldBe typeChange.head
   }
 
   test("malformed JSON") {
@@ -193,7 +195,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndResponse(
       sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
       "value is missing or not an integer")
-    
+
     val notValidIntValue = Json.obj(
       "key" -> "key",
       "type" -> "integer",
@@ -278,7 +280,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   private def calcDataFee(data: List[DataEntry[_]]): Long = {
-    val dataSize = data.map(_.toBytes.size).sum + 128
+    val dataSize = data.map(_.toBytes.length).sum + 128
     if (dataSize > 1024) {
       fee * (dataSize / 1024 + 1)
     } else fee
