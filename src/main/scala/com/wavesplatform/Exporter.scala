@@ -21,20 +21,20 @@ object Exporter extends ScorexLogging {
     SLF4JBridgeHandler.removeHandlersForRootLogger()
     SLF4JBridgeHandler.install()
 
-    val configFilename = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
+    val configFilename       = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
     val outputFilenamePrefix = Try(args(1)).toOption.getOrElse("blockchain")
-    val exportHeight = Try(args(2)).toOption.flatMap(s => Try(s.toInt).toOption)
-    val format = Try(args(3)).toOption.filter(s => s.toUpperCase == "JSON").getOrElse("BINARY").toUpperCase
+    val exportHeight         = Try(args(2)).toOption.flatMap(s => Try(s.toInt).toOption)
+    val format               = Try(args(3)).toOption.filter(s => s.toUpperCase == "JSON").getOrElse("BINARY").toUpperCase
 
     val settings = WavesSettings.fromConfig(loadConfig(ConfigFactory.parseFile(new File(configFilename))))
     AddressScheme.current = new AddressScheme {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
-    val db = openDB(settings.dataDirectory, settings.levelDbCacheSize)
-    val (history, _, _) = StorageFactory(settings, db, NTP)
+    val db               = openDB(settings.dataDirectory, settings.levelDbCacheSize)
+    val (history, _, _)  = StorageFactory(settings, db, NTP)
     val blockchainHeight = history.height
-    val height = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
+    val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
     log.info(s"Blockchain height is $blockchainHeight exporting to $height")
     val outputFilename = s"$outputFilenamePrefix-$height"
     log.info(s"Output file: $outputFilename")
@@ -42,8 +42,8 @@ object Exporter extends ScorexLogging {
     createOutputStream(outputFilename) match {
       case Success(output) =>
         var exportedBytes = 0L
-        val bos = new BufferedOutputStream(output)
-        val start = System.currentTimeMillis()
+        val bos           = new BufferedOutputStream(output)
+        val start         = System.currentTimeMillis()
         exportedBytes += writeHeader(bos, format)
         (2 to height).foreach { h =>
           exportedBytes += (if (format == "JSON") exportBlockToJson(bos, history, h) else exportBlockToBinary(bos, history, h))
@@ -66,27 +66,30 @@ object Exporter extends ScorexLogging {
 
   private def exportBlockToBinary(stream: OutputStream, history: History, height: Int): Int = {
     val maybeBlockBytes = history.blockBytes(height)
-    maybeBlockBytes.map {
-      bytes =>
+    maybeBlockBytes
+      .map { bytes =>
         val len = bytes.length
         stream.write(Ints.toByteArray(len))
         stream.write(bytes)
         len + Ints.BYTES
-    }.getOrElse(0)
+      }
+      .getOrElse(0)
   }
 
   private def exportBlockToJson(stream: OutputStream, history: History, height: Int): Int = {
     val maybeBlock = history.blockAt(height)
-    maybeBlock.map { block =>
-      val len = if (height != 2) {
-        val bytes = ",\n".getBytes(StandardCharsets.UTF_8)
+    maybeBlock
+      .map { block =>
+        val len = if (height != 2) {
+          val bytes = ",\n".getBytes(StandardCharsets.UTF_8)
+          stream.write(bytes)
+          bytes.length
+        } else 0
+        val bytes = block.json().toString().getBytes(StandardCharsets.UTF_8)
         stream.write(bytes)
-        bytes.length
-      } else 0
-      val bytes = block.json().toString().getBytes(StandardCharsets.UTF_8)
-      stream.write(bytes)
-      len + bytes.length
-    }.getOrElse(0)
+        len + bytes.length
+      }
+      .getOrElse(0)
   }
 
   private def writeHeader(stream: OutputStream, format: String): Int =

@@ -10,8 +10,7 @@ import org.scalatest.{FeatureSpec, GivenWhenThen, ParallelTestExecution}
 
 class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with ParallelTestExecution {
 
-  private val config = loadConfig(ConfigFactory.parseString(
-    """waves.network {
+  private val config = loadConfig(ConfigFactory.parseString("""waves.network {
       |  known-peers = []
       |  file = null
       |  black-list-residence-time: 1s
@@ -27,9 +26,9 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
 
     val peerDatabase = new PeerDatabaseImpl(networkSettings)
 
-    val host1 = InetAddress.getByName("1.1.1.1")
-    val host2 = InetAddress.getByName("2.2.2.2")
-    val host3 = InetAddress.getByName("3.3.3.3")
+    val host1    = InetAddress.getByName("1.1.1.1")
+    val host2    = InetAddress.getByName("2.2.2.2")
+    val host3    = InetAddress.getByName("3.3.3.3")
     val address1 = new InetSocketAddress(host1, 1)
     val address2 = new InetSocketAddress(host2, 2)
     val address3 = new InetSocketAddress(host3, 2)

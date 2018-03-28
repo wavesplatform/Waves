@@ -31,11 +31,20 @@ case class SignedIssueRequest(@ApiModelProperty(value = "Base58 encoded Issuer p
                               @ApiModelProperty(required = true)
                               timestamp: Long,
                               @ApiModelProperty(required = true)
-                              signature: String) extends BroadcastRequest {
-  def toTx: Either[ValidationError, IssueTransaction] = for {
-    _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
-    _signature <- parseBase58(signature, "invalid signature", SignatureStringLength)
-    _t <- IssueTransaction.create(_sender, name.getBytes(Charsets.UTF_8), description.getBytes(Charsets.UTF_8),
-      quantity, decimals, reissuable, fee, timestamp, _signature)
-  } yield _t
+                              signature: String)
+    extends BroadcastRequest {
+  def toTx: Either[ValidationError, IssueTransaction] =
+    for {
+      _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _signature <- parseBase58(signature, "invalid signature", SignatureStringLength)
+      _t <- IssueTransaction.create(_sender,
+                                    name.getBytes(Charsets.UTF_8),
+                                    description.getBytes(Charsets.UTF_8),
+                                    quantity,
+                                    decimals,
+                                    reissuable,
+                                    fee,
+                                    timestamp,
+                                    _signature)
+    } yield _t
 }

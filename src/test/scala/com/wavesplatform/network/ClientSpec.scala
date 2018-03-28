@@ -13,10 +13,7 @@ import org.scalatest.{FreeSpec, Matchers}
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
-class ClientSpec extends FreeSpec
-  with Matchers
-  with MockFactory
-  with TransactionGen {
+class ClientSpec extends FreeSpec with Matchers with MockFactory with TransactionGen {
 
   private val clientHandshake = new Handshake(
     applicationName = "wavesI",
@@ -38,7 +35,7 @@ class ClientSpec extends FreeSpec
 
   "should add a server's channel to all channels after the handshake only" in {
     var channelWasAdded = false
-    val allChannels = mock[ChannelGroup]
+    val allChannels     = mock[ChannelGroup]
     (allChannels.add _).expects(*).onCall { _: Channel =>
       channelWasAdded = true
       true

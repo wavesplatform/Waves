@@ -20,7 +20,8 @@ object SystemInformationReporter extends ScorexLogging {
       ).foldLeft(orig)(_.withoutPath(_))
     }
 
-    val renderOptions = ConfigRenderOptions.defaults()
+    val renderOptions = ConfigRenderOptions
+      .defaults()
       .setOriginComments(false)
       .setComments(false)
       .setFormatted(false)
@@ -41,7 +42,9 @@ object SystemInformationReporter extends ScorexLogging {
       "sun.net.inetaddr.negative.ttl",
       "networkaddress.cache.ttl",
       "networkaddress.cache.negative.ttl"
-    ).map { x => x -> System.getProperty(x) } ++ Seq(
+    ).map { x =>
+      x -> System.getProperty(x)
+    } ++ Seq(
       "Configuration" -> configForLogs.root.render(renderOptions)
     )
 

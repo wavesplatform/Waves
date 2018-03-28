@@ -11,10 +11,12 @@ import io.swagger.models.{Scheme, Swagger}
 import scala.reflect.runtime.universe.Type
 
 class SwaggerDocService(val actorSystem: ActorSystem, val materializer: ActorMaterializer, val apiTypes: Seq[Type], settings: RestAPISettings)
-  extends SwaggerHttpService with HasActorSystem {
+    extends SwaggerHttpService
+    with HasActorSystem {
 
   override val host: String = settings.bindAddress + ":" + settings.port
-  override val info: Info = Info("The Web Interface to the Waves Full Node API",
+  override val info: Info = Info(
+    "The Web Interface to the Waves Full Node API",
     Version.VersionString,
     "Waves Full Node",
     "License: Apache License, Version 2.0",

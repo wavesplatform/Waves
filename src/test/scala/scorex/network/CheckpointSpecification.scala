@@ -5,10 +5,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers, OneInstancePerTest}
 import scorex.transaction.TransactionParsers._
 
-class CheckpointSpecification extends FreeSpec
-  with Matchers
-  with MockFactory
-  with OneInstancePerTest {
+class CheckpointSpecification extends FreeSpec with Matchers with MockFactory with OneInstancePerTest {
 
   private val maxRollback = 10
 
@@ -22,7 +19,6 @@ class CheckpointSpecification extends FreeSpec
     Checkpoint.historyPoints(1000, maxRollback, 3) shouldBe Seq(990, 980, 960)
 
     Checkpoint.historyPoints(h, maxRollback, 2) shouldBe Seq(h - 10, h - 20)
-
 
   }
 

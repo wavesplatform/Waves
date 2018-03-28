@@ -23,13 +23,15 @@ trait ExchangeTransactionCreator extends ScorexLogging {
   }
 
   def createTransaction(submitted: LimitOrder, counter: LimitOrder): Either[ValidationError, ExchangeTransaction] = {
-    wallet.privateKeyAccount(submitted.order.matcherPublicKey).flatMap(matcherPrivateKey => {
-      val price = counter.price
-      val amount = math.min(submitted.amount, counter.amount)
-      val (buy, sell) = Order.splitByType(submitted.order, counter.order)
-      val (buyFee, sellFee) = calculateMatcherFee(buy, sell, amount: Long)
-      ExchangeTransaction.create(matcherPrivateKey, buy, sell, price, amount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
-    })
+    wallet
+      .privateKeyAccount(submitted.order.matcherPublicKey)
+      .flatMap(matcherPrivateKey => {
+        val price             = counter.price
+        val amount            = math.min(submitted.amount, counter.amount)
+        val (buy, sell)       = Order.splitByType(submitted.order, counter.order)
+        val (buyFee, sellFee) = calculateMatcherFee(buy, sell, amount: Long)
+        ExchangeTransaction.create(matcherPrivateKey, buy, sell, price, amount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
+      })
   }
 
   def calculateMatcherFee(buy: Order, sell: Order, amount: Long): (Long, Long) = {

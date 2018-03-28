@@ -12,12 +12,19 @@ import scorex.api.http.BlockDoesNotExist
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.transaction.History
 
-class ConsensusRouteSpec extends RouteSpec("/consensus")
-  with RestAPISettingsHelper with PropertyChecks with BlockGen with HistoryTest with WithState {
+class ConsensusRouteSpec
+    extends RouteSpec("/consensus")
+    with RestAPISettingsHelper
+    with PropertyChecks
+    with BlockGen
+    with HistoryTest
+    with WithState {
 
   def routeTest(f: (History, Route) => Any) = withDomain() { d =>
     d.blockchainUpdater.processBlock(genesisBlock)
-    1 to 10 foreach { _ => d.blockchainUpdater.processBlock(getNextTestBlock(d.history)) }
+    1 to 10 foreach { _ =>
+      d.blockchainUpdater.processBlock(getNextTestBlock(d.history))
+    }
     f(d.history, NxtConsensusApiRoute(restAPISettings, d.stateReader, d.history, FunctionalitySettings.TESTNET).route)
   }
 

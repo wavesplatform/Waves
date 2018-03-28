@@ -6,7 +6,7 @@ abstract class AddressScheme {
 }
 
 object AddressScheme {
-  @volatile var current : AddressScheme = DefaultAddressScheme
+  @volatile var current: AddressScheme = DefaultAddressScheme
 }
 
 object DefaultAddressScheme extends AddressScheme {

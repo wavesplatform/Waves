@@ -2,7 +2,6 @@ package scorex.waves.http
 
 import play.api.libs.json.{Format, Json}
 
-
 case class DebugMessage(message: String)
 
 object DebugMessage {

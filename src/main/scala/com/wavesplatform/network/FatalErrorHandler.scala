@@ -8,8 +8,6 @@ import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.utils.ScorexLogging
 
 import scala.util.control.NonFatal
-
-
 @Sharable
 class FatalErrorHandler extends ChannelInboundHandlerAdapter with ScorexLogging {
   override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable): Unit = cause match {

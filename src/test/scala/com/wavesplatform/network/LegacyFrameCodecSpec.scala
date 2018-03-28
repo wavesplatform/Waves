@@ -11,11 +11,7 @@ import org.scalatest.{FreeSpec, Matchers}
 import scorex.network.message.{Message => ScorexMessage}
 import scorex.transaction.Transaction
 
-class LegacyFrameCodecSpec extends FreeSpec
-  with Matchers
-  with MockFactory
-  with PropertyChecks
-  with TransactionGen {
+class LegacyFrameCodecSpec extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen {
 
   "should handle one message" in forAll(issueGen) { origTx =>
     val codec = new LegacyFrameCodec(PeerDatabase.NoOp)
@@ -53,7 +49,7 @@ class LegacyFrameCodecSpec extends FreeSpec
   }
 
   private def write(buff: ByteBuf, tx: Transaction): Unit = {
-    val txBytes = tx.bytes()
+    val txBytes  = tx.bytes()
     val checkSum = wrappedBuffer(crypto.fastHash(txBytes), 0, ScorexMessage.ChecksumLength)
 
     buff.writeInt(LegacyFrameCodec.Magic)

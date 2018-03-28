@@ -9,11 +9,13 @@ object RestAPISettings {
   val configPath: String = "waves.rest-api"
 
   def fromConfig(config: Config): RestAPISettings = {
-    RestAPISettings(enable = config.as[Boolean](s"$configPath.enable"),
+    RestAPISettings(
+      enable = config.as[Boolean](s"$configPath.enable"),
       bindAddress = config.as[String](s"$configPath.bind-address"),
       port = config.as[Int](s"$configPath.port"),
       apiKeyHash = config.as[String](s"$configPath.api-key-hash"),
       cors = config.as[Boolean](s"$configPath.cors"),
-      apiKeyDifferentHost = config.as[Boolean](s"$configPath.api-key-different-host"))
+      apiKeyDifferentHost = config.as[Boolean](s"$configPath.api-key-different-host")
+    )
   }
 }

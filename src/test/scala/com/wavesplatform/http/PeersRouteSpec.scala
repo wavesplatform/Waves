@@ -12,17 +12,16 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{Format, JsObject, JsValue, Json}
 import scorex.api.http.{ApiKeyNotValid, PeersApiRoute}
 
-
 class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with PropertyChecks with MockFactory {
 
   import PeersRouteSpec._
 
-  private val peerDatabase = mock[PeerDatabase]
-  private val connectToPeer = mockFunction[InetSocketAddress, Unit]
+  private val peerDatabase   = mock[PeerDatabase]
+  private val connectToPeer  = mockFunction[InetSocketAddress, Unit]
   private val inetAddressGen = Gen.listOfN(4, Arbitrary.arbitrary[Byte]).map(_.toArray).map(InetAddress.getByAddress)
   private val inetSocketAddressGen = for {
     address <- inetAddressGen
-    port <- Gen.chooseNum(0, 0xFFFF)
+    port    <- Gen.chooseNum(0, 0xFFFF)
   } yield new InetSocketAddress(address, port)
 
   private val versionGen = for {
@@ -35,26 +34,31 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
 
   routePath("/connected") in {
     val gen = for {
-      remoteAddress <- inetSocketAddressGen
-      declaredAddress <- Gen.option(inetSocketAddressGen)
-      nodeName <- Gen.alphaNumStr
-      nodeNonce <- Arbitrary.arbitrary[Int]
-      applicationName <- Gen.alphaNumStr
+      remoteAddress      <- inetSocketAddressGen
+      declaredAddress    <- Gen.option(inetSocketAddressGen)
+      nodeName           <- Gen.alphaNumStr
+      nodeNonce          <- Arbitrary.arbitrary[Int]
+      applicationName    <- Gen.alphaNumStr
       applicationVersion <- versionGen
     } yield PeerInfo(remoteAddress, declaredAddress, applicationName, applicationVersion, nodeName, nodeNonce)
 
     forAll(genListOf(TestsCount, gen)) { l: List[PeerInfo] =>
       val connections = new ConcurrentHashMap[Channel, PeerInfo]()
-      val route = PeersApiRoute(restAPISettings, connectToPeer, peerDatabase, connections).route
+      val route       = PeersApiRoute(restAPISettings, connectToPeer, peerDatabase, connections).route
       l.foreach(i => connections.put(mock[Channel], i))
 
       val result = Get(routePath("/connected")) ~> route ~> runRoute
 
       check {
         responseAs[Connected].peers should contain theSameElementsAs l.map { pi =>
-          ConnectedPeer(pi.remoteAddress.toString, pi.declaredAddress.fold("N/A")(_.toString),
-            pi.nodeName, pi.nodeNonce, pi.applicationName,
-            s"${pi.applicationVersion._1}.${pi.applicationVersion._2}.${pi.applicationVersion._3}")
+          ConnectedPeer(
+            pi.remoteAddress.toString,
+            pi.declaredAddress.fold("N/A")(_.toString),
+            pi.nodeName,
+            pi.nodeNonce,
+            pi.applicationName,
+            s"${pi.applicationVersion._1}.${pi.applicationVersion._2}.${pi.applicationVersion._3}"
+          )
         }
       }(result)
     }
@@ -63,13 +67,12 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
   routePath("/all") in {
     val gen = for {
       inetAddress <- inetSocketAddressGen
-      ts <- Gen.posNum[Long]
+      ts          <- Gen.posNum[Long]
     } yield inetAddress -> ts
-
 
     forAll(genListOf(TestsCount, gen)) { m =>
       (peerDatabase.knownPeers _).expects().returning(m.toMap[InetSocketAddress, Long])
-      val route = PeersApiRoute(restAPISettings, connectToPeer, peerDatabase, new ConcurrentHashMap[Channel, PeerInfo]()).route
+      val route  = PeersApiRoute(restAPISettings, connectToPeer, peerDatabase, new ConcurrentHashMap[Channel, PeerInfo]()).route
       val result = Get(routePath("/all")) ~> route ~> runRoute
 
       check {
@@ -81,7 +84,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
   }
 
   routePath("/connect") in {
-    val route = PeersApiRoute(restAPISettings, connectToPeer, peerDatabase, new ConcurrentHashMap[Channel, PeerInfo]()).route
+    val route      = PeersApiRoute(restAPISettings, connectToPeer, peerDatabase, new ConcurrentHashMap[Channel, PeerInfo]()).route
     val connectUri = routePath("/connect")
     Post(connectUri, ConnectReq("example.com", 1)) ~> route should produce(ApiKeyNotValid)
     Post(connectUri, "") ~> api_key(apiKey) ~> route ~> check(handled shouldEqual false)
@@ -110,8 +113,12 @@ object PeersRouteSpec {
 
   implicit val connectRespFormat: Format[ConnectResp] = Json.format
 
-  case class ConnectedPeer(address: String, declaredAddress: String, peerName: String, peerNonce: Long,
-                           applicationName: String, applicationVersion: String)
+  case class ConnectedPeer(address: String,
+                           declaredAddress: String,
+                           peerName: String,
+                           peerNonce: Long,
+                           applicationName: String,
+                           applicationVersion: String)
 
   implicit val connectedPeerFormat: Format[ConnectedPeer] = Json.format
 

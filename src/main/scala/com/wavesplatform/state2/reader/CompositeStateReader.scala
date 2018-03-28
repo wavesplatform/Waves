@@ -42,13 +42,17 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
   override def height: Int = inner.height + (if (maybeDiff.isDefined) 1 else 0)
 
   override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = {
-    val transactionsFromDiff = diff.transactions.values.view.collect {
-      case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder.typeId)) => (height, tx)
-    }.slice(from, from + count).toSeq
+    val transactionsFromDiff = diff.transactions.values.view
+      .collect {
+        case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder.typeId)) => (height, tx)
+      }
+      .slice(from, from + count)
+      .toSeq
 
     val actualTxCount = transactionsFromDiff.length
 
-    if (actualTxCount == count) transactionsFromDiff else {
+    if (actualTxCount == count) transactionsFromDiff
+    else {
       transactionsFromDiff ++ inner.addressTransactions(address, types, count - actualTxCount, 0)
     }
   }
@@ -96,7 +100,7 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
 
   override def accountData(acc: Address): AccountDataInfo = {
     val fromInner = inner.accountData(acc)
-    val fromDiff = diff.accountData.get(acc).orEmpty
+    val fromDiff  = diff.accountData.get(acc).orEmpty
     fromInner.combine(fromDiff)
   }
 

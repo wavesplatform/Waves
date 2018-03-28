@@ -15,7 +15,7 @@ trait Transaction extends BytesSerializable with JsonSerializable {
 
   override def equals(other: Any): Boolean = other match {
     case tx: Transaction => id() == tx.id()
-    case _ => false
+    case _               => false
   }
 
   override def hashCode(): Int = id().hashCode()
@@ -28,14 +28,8 @@ object Transaction {
   implicit class TransactionExt(tx: Transaction) {
     def feeDiff(): Portfolio = tx.assetFee match {
       case (Some(asset), fee) =>
-        Portfolio(
-          balance = 0,
-          lease = LeaseBalance.empty,
-          assets = Map(asset -> fee))
-      case (None, fee) => Portfolio(
-        balance = fee,
-        lease = LeaseBalance.empty,
-        assets = Map.empty)
+        Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> fee))
+      case (None, fee) => Portfolio(balance = fee, lease = LeaseBalance.empty, assets = Map.empty)
     }
   }
 

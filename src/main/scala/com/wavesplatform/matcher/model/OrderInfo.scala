@@ -7,7 +7,6 @@ import play.api.libs.json.{Format, Json}
 
 import scala.util.Try
 
-
 case class OrderInfo(amount: Long, filled: Long, canceled: Boolean) {
   def remaining: Long = if (canceled) 0L else amount - filled
 
@@ -25,7 +24,7 @@ case class OrderInfo(amount: Long, filled: Long, canceled: Boolean) {
 }
 
 object OrderInfo {
-  def safeSum(x: Long, y: Long): Long =  Try(Math.addExact(x, y)).getOrElse(Long.MaxValue)
+  def safeSum(x: Long, y: Long): Long         = Try(Math.addExact(x, y)).getOrElse(Long.MaxValue)
   implicit val longSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
 
   val empty = OrderInfo(0L, 0L, false)

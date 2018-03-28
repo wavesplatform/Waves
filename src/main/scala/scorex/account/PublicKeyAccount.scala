@@ -9,7 +9,7 @@ trait PublicKeyAccount {
 
   override def equals(b: Any): Boolean = b match {
     case a: PublicKeyAccount => publicKey.sameElements(a.publicKey)
-    case _ => false
+    case _                   => false
   }
 
   override def hashCode(): Int = publicKey.hashCode()
@@ -31,7 +31,7 @@ object PublicKeyAccount {
 
   def fromBase58String(s: String): Either[InvalidAddress, PublicKeyAccount] =
     (for {
-      _ <- Either.cond(s.length <= TransactionParsers.KeyStringLength, (), "Bad public key string length")
+      _     <- Either.cond(s.length <= TransactionParsers.KeyStringLength, (), "Bad public key string length")
       bytes <- Base58.decode(s).toEither.left.map(ex => s"Unable to decode base58: ${ex.getMessage}")
     } yield PublicKeyAccount(bytes)).left.map(err => InvalidAddress(s"Invalid sender: $err"))
 }

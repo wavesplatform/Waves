@@ -19,8 +19,8 @@ case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") s
   def isSignatureValid: Boolean = crypto.verify(signature, toSign, senderPublicKey.publicKey)
 
   def json: JsObject = Json.obj(
-    "sender" -> Base58.encode(senderPublicKey.publicKey),
-    "orderId" -> Base58.encode(orderId),
+    "sender"    -> Base58.encode(senderPublicKey.publicKey),
+    "orderId"   -> Base58.encode(orderId),
     "signature" -> Base58.encode(signature)
   )
 }
