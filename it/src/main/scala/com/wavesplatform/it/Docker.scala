@@ -452,7 +452,6 @@ object Docker {
   }
 
   private def renderProperties(p: Properties) = p.asScala
-    //.map { case (k, v) => k -> v.replaceAll("""([\*#:=])""", """\\$1""") }
     .map {
       case (k, v) if v.contains(" ") => k -> s""""$v""""
       case x => x

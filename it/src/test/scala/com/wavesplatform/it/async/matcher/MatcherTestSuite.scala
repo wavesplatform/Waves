@@ -643,44 +643,17 @@ object MatcherTestSuite {
 
   val ForbiddenAssetId = "FdbnAsset"
 
-  private val matcherConfig = ConfigFactory.parseString(
-    s"""waves {
-       |  matcher {
-       |    enable = yes
-       |    account = "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC"
-       |    bind-address = "0.0.0.0"
-       |    order-match-tx-fee = 300000
-       |    blacklisted-assets = [$ForbiddenAssetId]
-       |    balance-watching.enable = yes
-       |  }
-       |
-       |  miner.enable = no
+  private val matcherConfig = ConfigFactory.parseString(s"""
+       |waves.matcher {
+       |  enable = yes
+       |  account = "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC"
+       |  bind-address = "0.0.0.0"
+       |  order-match-tx-fee = 300000
+       |  blacklisted-assets = ["$ForbiddenAssetId"]
+       |  balance-watching.enable = yes
        |}
-       |
-       |kamon {
-       |  metric {
-       |    tick-interval = 1s
-       |
-       |    filters {
-       |      akka-actor {
-       |        includes = [
-       |          "wavesplatform/user/matcher",
-       |          "wavesplatform/user/matcher/*", // order books
-       |          "wavesplatform/user/OrderHistory",
-       |          "wavesplatform/user/MatcherTransactionWriter"
-       |        ]
-       |      }
-       |
-       |      akka-dispatcher {
-       |        includes = ["**"]
-       |      }
-       |
-       |      akka-router {
-       |        includes = ["**"]
-       |      }
-       |    }
-       |  }
-       |}""".stripMargin)
+       |waves.miner.enable = no
+      """.stripMargin)
 
   private val nonGeneratingPeersConfig = ConfigFactory.parseString("waves.miner.enable=no")
 
