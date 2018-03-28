@@ -12,7 +12,6 @@ import com.wavesplatform.state2.reader.LeaseDetails
 import org.iq80.leveldb.{DB, ReadOptions}
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}
-import scorex.serialization.Deser
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -164,9 +163,7 @@ object LevelDBWriter {
       val ndo = newDataOutput()
       ndo.writeInt(values.size)
       for (v <- values) {
-        val bytes = v.toByteArray
-        ndo.writeByte(bytes.length)
-        ndo.write(bytes)
+        ndo.writeBigInt(v)
       }
       ndo.toByteArray
     }
@@ -174,12 +171,7 @@ object LevelDBWriter {
     private def readBigIntSeq(data: Array[Byte]) = Option(data).fold(Seq.empty[BigInt]) { d =>
       val ndi    = newDataInput(d)
       val length = ndi.readInt()
-      for (_ <- 0 until length) yield {
-        val size  = ndi.readByte()
-        val bytes = new Array[Byte](size)
-        ndi.readFully(bytes)
-        BigInt(bytes)
-      }
+      for (_ <- 0 until length) yield ndi.readBigInt()
     }
 
     private def historyKey(prefix: Int, bytes: Array[Byte]) = Key(byteKey(prefix, bytes), readIntSeq, writeIntSeq)
@@ -212,18 +204,17 @@ object LevelDBWriter {
       Key[Long](byteKeyWithH(9, height, addressId.toByteArray ++ assetId.arr), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
     private def readAssetInfo(data: Array[Byte]) = {
-      val b      = ByteBuffer.wrap(data)
-      val script = Deser.parseOption(data, 1 + 8)(x => Script.fromBytes(Deser.parseArraySize(x, 0)._1).explicitGet())._1
-      AssetInfo(b.get() == 1, b.getLong, script)
+      val ndi = newDataInput(data)
+      AssetInfo(ndi.readBoolean(), ndi.readBigInt(), ndi.readScriptOption())
     }
 
-    private def writeAssetInfo(ai: AssetInfo) =
-      ByteBuffer
-        .allocate(1 + 8 + 1 + ai.script.map(_.bytes().arr.length + 4).getOrElse(0))
-        .put((if (ai.isReissuable) 1 else 0): Byte)
-        .putLong(ai.volume.longValue())
-        .put(Deser.serializeOption(ai.script.map(s => s.bytes()))(x => Deser.serializeArray(x.arr)))
-        .array()
+    private def writeAssetInfo(ai: AssetInfo): Array[Byte] = {
+      val ndo = newDataOutput()
+      ndo.writeBoolean(ai.isReissuable)
+      ndo.writeBigInt(ai.volume)
+      ndo.writeScriptOption(ai.script)
+      ndo.toByteArray
+    }
 
     def assetInfoHistory(assetId: ByteStr): Key[Seq[Int]]        = historyKey(10, assetId.arr)
     def assetInfo(height: Int, assetId: ByteStr): Key[AssetInfo] = Key(byteKeyWithH(11, height, assetId.arr), readAssetInfo, writeAssetInfo)
@@ -359,20 +350,20 @@ object LevelDBWriter {
   }
 
   /** {{{
-    * ([10, 7, 4], 5, 11) => [10, 7]
+    * ([10, 7, 4], 5, 11) => [10, 7, 4]
     * ([10, 7], 5, 11) => [10, 7, 1]
     * }}}
     */
-  private def slice(v: Seq[Int], from: Int, to: Int): Seq[Int] = {
+  private[database] def slice(v: Seq[Int], from: Int, to: Int): Seq[Int] = {
     val (c1, c2) = v.dropWhile(_ > to).partition(_ > from)
     c1 :+ c2.headOption.getOrElse(1)
   }
 
-  /** {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 12), (3, 5), (3, 1)]}}}
+  /** {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 12), (3, 5)]}}}
     * @param wbh WAVES balance history
     * @param lbh Lease balance history
     */
-  private def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
+  private[database] def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
     @tailrec
     def recMerge(wh: Int, wt: Seq[Int], lh: Int, lt: Seq[Int], buf: ArrayBuffer[(Int, Int)]): ArrayBuffer[(Int, Int)] = {
       buf += wh -> lh
@@ -383,12 +374,10 @@ object LevelDBWriter {
       } else if (lt.isEmpty) {
         recMerge(wt.head, wt.tail, lh, lt, buf)
       } else {
-        if (wh > lh) {
+        if (wh >= lh) {
           recMerge(wt.head, wt.tail, lh, lt, buf)
-        } else if (wh < lh) {
-          recMerge(wh, wt, lt.head, lt.tail, buf)
         } else {
-          recMerge(wt.head, wt.tail, lt.head, lt.tail, buf)
+          recMerge(wh, wt, lt.head, lt.tail, buf)
         }
       }
     }

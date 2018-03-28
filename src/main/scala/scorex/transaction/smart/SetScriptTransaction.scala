@@ -33,7 +33,7 @@ case class SetScriptTransaction private(version: Byte,
   override val assetFee = (None, fee)
   override val json = Coeval.evalOnce(jsonBase() ++ Json.obj(
     "version" -> version,
-    "script" -> script.map(_.text))
+    "script" -> script.map(_.bytes()))
   )
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), bodyBytes(), proofs.bytes()))
