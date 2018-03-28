@@ -1,7 +1,6 @@
 package scorex.api.http.assets
 
 import javax.ws.rs.Path
-
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.network._
 import com.wavesplatform.settings.RestAPISettings
@@ -11,7 +10,7 @@ import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
 import scorex.api.http._
-import scorex.transaction.ValidationError
+import scorex.transaction.{Transaction, ValidationError}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -111,10 +110,20 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings,
     )
   ))
   def batchTransfer: Route = (path("batch-transfer") & post) {
-    json[List[SignedTransferRequest]] { reqs =>
+    json[List[SignedTransferRequests]] { reqs =>
       val r = Future
-        .traverse(reqs) { x => Future(x.toTx) }
-        .map { xs =>
+        .traverse(reqs) { req =>
+          Future {
+            req.eliminate(
+              _.toTx,
+              _.eliminate(
+                _.toTx,
+                _ => Left(ValidationError.UnsupportedTransactionType)
+              )
+            )
+          }
+        }
+        .map { xs: List[Either[ValidationError, Transaction]] =>
           utx.batched { ops =>
             xs.map {
               case Left(e) => Left(e)

@@ -1,18 +1,42 @@
 package scorex.api.http
 
-import play.api.libs.json.Reads
-import scorex.api.http.assets.TransferRequest.transferFormat
-import scorex.api.http.assets.VersionedTransferRequest.versionedTransferFormat
+import play.api.libs.json._
 import shapeless.{:+:, CNil, Coproduct}
 
 package object assets {
 
   type TransferRequests = TransferRequest :+: VersionedTransferRequest :+: CNil
-  implicit val autoVersionTransferRequestsReads: Reads[TransferRequests] = Reads { json =>
+  implicit val autoTransferRequestsReads: Reads[TransferRequests] = Reads { json =>
     (json \ "version").asOpt[Byte] match {
-      case None => transferFormat.reads(json).map(Coproduct[TransferRequests](_))
-      case _    => versionedTransferFormat.reads(json).map(Coproduct[TransferRequests](_))
+      case None => TransferRequest.format.reads(json).map(Coproduct[TransferRequests](_))
+      case _    => VersionedTransferRequest.format.reads(json).map(Coproduct[TransferRequests](_))
     }
+  }
+  implicit val autoTransferRequestsWrites: Writes[TransferRequests] = Writes {
+    _.eliminate(
+      TransferRequest.format.writes,
+      _.eliminate(
+        VersionedTransferRequest.format.writes,
+        _ => JsNull
+      )
+    )
+  }
+
+  type SignedTransferRequests = SignedTransferRequest :+: SignedVersionedTransferRequest :+: CNil
+  implicit val autoSignedTransferRequestsReads: Reads[SignedTransferRequests] = Reads { json =>
+    (json \ "version").asOpt[Byte] match {
+      case None => SignedTransferRequest.reads.reads(json).map(Coproduct[SignedTransferRequests](_))
+      case _    => SignedVersionedTransferRequest.format.reads(json).map(Coproduct[SignedTransferRequests](_))
+    }
+  }
+  implicit val autoSignedTransferRequestsWrites: Writes[SignedTransferRequests] = Writes {
+    _.eliminate(
+      SignedTransferRequest.writes.writes,
+      _.eliminate(
+        SignedVersionedTransferRequest.format.writes,
+        _ => JsNull
+      )
+    )
   }
 
 }

@@ -15,11 +15,10 @@ import play.api.libs.json.Writes
 import scorex.account.Address
 import scorex.api.http.assets.{AssetsApiRoute, TransferRequest, VersionedTransferRequest}
 import scorex.transaction.Transaction
+import scorex.transaction.assets.TransferTransaction
 import scorex.wallet.Wallet
 
 class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMockFactory with Eventually {
-
-  private val Waves: Long = 100000000L
 
   private val settings    = RestAPISettings.fromConfig(ConfigFactory.load())
   private val wallet      = stub[Wallet]
@@ -31,8 +30,6 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
   private val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)
   private val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
 
-  private val apiKeyHeader = api_key("ridethewaves!")
-
   (wallet.privateKeyAccount _).when(senderPrivateKey.toAddress).onCall((_: Address) => Right(senderPrivateKey)).anyNumberOfTimes()
   (utx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty))).anyNumberOfTimes()
   (allChannels.writeAndFlush(_: Any)).when(*).onCall((_: Any) => null).anyNumberOfTimes()
@@ -40,7 +37,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
   "/transfer" - {
     val route = AssetsApiRoute(settings, wallet, utx, allChannels, state, new TestTime()).route
 
-    def posting[A: Writes](v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(apiKeyHeader) ~> route
+    def posting[A: Writes](v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(ApiKeyHeader) ~> route
 
     "accepts TransferRequest" in {
       val req = TransferRequest(
@@ -49,16 +46,14 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
         amount = 1 * Waves,
         fee = Waves / 3,
         sender = senderPrivateKey.address,
-        attachment = None,
+        attachment = Some("attachment"),
         recipient = receiverPrivateKey.address,
         timestamp = Some(System.currentTimeMillis())
       )
 
       posting(req) ~> check {
         status shouldBe StatusCodes.OK
-        val r = responseAs[String]
-        r should include(""""type" : 4""")
-        r shouldNot include("version")
+        responseAs[TransferTransaction]
       }
     }
 
@@ -76,9 +71,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
 
       posting(req) ~> check {
         status shouldBe StatusCodes.OK
-        val r = responseAs[String]
-        r should include(""""type" : 4""")
-        r should include(""""version" : 2""")
+        responseAs[VersionedTransferRequest]
       }
     }
 

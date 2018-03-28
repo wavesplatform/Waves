@@ -9,7 +9,7 @@ import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransact
 import scorex.transaction.{AssetIdStringLength, Proofs, ValidationError}
 
 object SignedVersionedTransferRequest {
-   implicit val jsonFormat: OFormat[SignedVersionedTransferRequest] = Json.format
+   implicit val format: OFormat[SignedVersionedTransferRequest] = Json.format
 }
 
 @ApiModel(value = "Signed Asset transfer transaction")

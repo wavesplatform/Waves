@@ -12,5 +12,5 @@ case class VersionedTransferRequest(version: Byte,
                                     timestamp: Option[Long] = None)
 
 object VersionedTransferRequest {
-  implicit val versionedTransferFormat: Format[VersionedTransferRequest] = Json.format
+  implicit val format: Format[VersionedTransferRequest] = Json.format
 }
