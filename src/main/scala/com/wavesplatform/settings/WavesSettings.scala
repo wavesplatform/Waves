@@ -33,7 +33,7 @@ object WavesSettings {
     val dataDirectory = config.as[String](s"$configPath.data-directory")
     val levelDbCacheSize = config.getBytes(s"$configPath.leveldb-cache-size")
     val networkSettings = config.as[NetworkSettings]("waves.network")
-    val walletSettings = config.as[WalletSettings]("waves.wallet")
+    val walletSettings = WalletSettings.fromConfig(config)
     val blockchainSettings = BlockchainSettings.fromConfig(config)
     val checkpointsSettings = CheckpointsSettings.fromConfig(config)
     val feesSettings = FeesSettings.fromConfig(config)
