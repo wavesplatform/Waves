@@ -212,17 +212,19 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     val ip = ipForNode(nodeNumber)
 
     val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
-    val configOverrides = {
-      val common = s"$javaOptions ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))} " +
-        s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dwaves.network.declared-address=$ip:$networkPort " +
-        s"-javaagent:$ContainerRoot/aspectjweaver-1.8.13.jar "
+    val configOverrides: String = {
+      val withAspectJ = Option(System.getenv("WITH_ASPECTJ")).fold(false)(_.toBoolean)
 
-      val additional = profilerController().fold("") { _ =>
-        s"-agentpath:$ContainerRoot/libyjpagent.so=listen=0.0.0.0:$ProfilerPort," +
-          s"sampling,monitors,sessionname=WavesNode,dir=$ContainerRoot/profiler,logdir=$ContainerRoot"
+      var config = s"$javaOptions ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))} " +
+        s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dwaves.network.declared-address=$ip:$networkPort "
+
+      if (profilerController().isDefined) {
+        config += s"-agentpath:$ContainerRoot/libyjpagent.so=listen=0.0.0.0:$ProfilerPort," +
+          s"sampling,monitors,sessionname=WavesNode,dir=$ContainerRoot/profiler,logdir=$ContainerRoot "
       }
 
-      s"$common $additional"
+      if (withAspectJ) config += s"-javaagent:$ContainerRoot/aspectjweaver.jar "
+      config
     }
 
     val containerConfig = ContainerConfig.builder()

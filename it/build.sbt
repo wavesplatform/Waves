@@ -21,13 +21,16 @@ inTask(docker)(Seq(
   dockerfile := {
     val configTemplate = (Compile / resourceDirectory).value / "template.conf"
     val startWaves = sourceDirectory.value / "container" / "start-waves.sh"
-    val aspectjAgent = aspectjRedistDir.value / "aspectjweaver-1.8.13.jar"
     val profilerAgent = yourKitRedistDir.value / "libyjpagent.so"
+
+    val withAspectJ = Option(System.getenv("WITH_ASPECTJ")).fold(false)(_.toBoolean)
+    val aspectjAgentUrl = "http://search.maven.org/remotecontent?filepath=org/aspectj/aspectjweaver/1.8.13/aspectjweaver-1.8.13.jar"
 
     new Dockerfile {
       from("anapsix/alpine-java:8_server-jre")
       add((assembly in LocalProject("node")).value, "/opt/waves/waves.jar")
-      add(Seq(configTemplate, startWaves, profilerAgent, aspectjAgent), "/opt/waves/")
+      add(Seq(configTemplate, startWaves, profilerAgent), "/opt/waves/")
+      if (withAspectJ) run("wget", "--quiet", aspectjAgentUrl, "-O", "/opt/waves/aspectjweaver.jar")
       add(profilerAgent, "/opt/waves/")
       run("chmod", "+x", "/opt/waves/start-waves.sh")
       entryPoint("/opt/waves/start-waves.sh")
