@@ -163,4 +163,26 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
     }
   }
 
+  property("exactly 1 proof required for non-scripted accounts") {
+
+    val s = for {
+      master    <- accountGen
+      recipient <- accountGen
+      amt       <- positiveLongGen
+      fee       <- smallFeeGen
+      ts        <- positiveIntGen
+      genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      setScript <- selfSignedSetScriptTransactionGenP(master, Script(Typed.TRUE))
+      transfer = ScriptTransferTransaction.selfSigned(1, None, master, recipient, amt, ts, fee, Array.emptyByteArray).explicitGet()
+    } yield (genesis, setScript, transfer)
+
+    forAll(s) {
+      case ((genesis, script, transfer)) =>
+        val transferWithExtraProof = transfer.copy(proofs = Proofs(Seq(ByteStr.empty, ByteStr(Array(1: Byte)))))
+        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transferWithExtraProof)), fs) { case _ => () }
+        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transferWithExtraProof)), fs)(totalDiffEi =>
+          totalDiffEi should produce("must have exactly 1 proof"))
+    }
+  }
+
 }
