@@ -22,7 +22,9 @@ case class SignedSetScriptRequest(@ApiModelProperty(value = "Base58 encoded send
                                   @ApiModelProperty(required = true)
                                   timestamp: Long,
                                   @ApiModelProperty(required = true)
-                                  proofs: List[String])
+                                  proofs: List[String],
+                                  @ApiModelProperty(required = true)
+                                  version: Int)
     extends BroadcastRequest {
   def toTx: Either[ValidationError, SetScriptTransaction] =
     for {
