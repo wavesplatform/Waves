@@ -52,16 +52,8 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val script               = Script(scriptText)
     val setScriptTransaction = SetScriptTransaction.selfSigned(sender.privateKey, Some(script), fee, System.currentTimeMillis()).explicitGet()
 
-    val request = SignedSetScriptRequest(
-      senderPublicKey = senderPublicKeyString,
-      script = Some(script.bytes().base58),
-      fee = setScriptTransaction.fee,
-      timestamp = setScriptTransaction.timestamp,
-      proofs = List(setScriptTransaction.proofs.proofs.head.base58)
-    )
-
     val setScriptId = sender
-      .signedBroadcast(Json.toJsObject(request) + ("type" -> JsNumber(TransactionType.SetScriptTransaction.id)))
+      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(TransactionType.SetScriptTransaction.id)))
       .id
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
