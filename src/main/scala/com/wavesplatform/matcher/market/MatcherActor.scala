@@ -196,7 +196,7 @@ class MatcherActor(orderHistory: ActorRef, storedState: SnapshotStateReader, wal
   override def persistenceId: String = "matcher"
 
   private def createBalanceWatcher(): Unit = if (settings.balanceWatching.enable) {
-    val balanceWatcherMaster = context.actorOf(FromConfig.props(BalanceWatcherWorkerActor.props(settings.balanceWatching, self, orderHistory)), "order-watcher-router")
+    val balanceWatcherMaster = context.actorOf(FromConfig.props(BalanceWatcherWorkerActor.props(settings.balanceWatching, self, orderHistory)), "balance-watcher-router")
     context.system.eventStream.subscribe(balanceWatcherMaster, classOf[BalanceChanged])
   }
 }

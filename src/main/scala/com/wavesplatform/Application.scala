@@ -11,6 +11,7 @@ import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import cats.instances.all._
 import com.typesafe.config._
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.db.openDB
 import com.wavesplatform.features.api.ActivationApiRoute
@@ -431,6 +432,10 @@ object Application extends ScorexLogging {
     System.setProperty("sun.net.inetaddr.negative.ttl", "0")
     Security.setProperty("networkaddress.cache.ttl", "0")
     Security.setProperty("networkaddress.cache.negative.ttl", "0")
+
+    // specify aspectj to use it's build-in infrastructure
+    // http://www.eclipse.org/aspectj/doc/released/pdguide/trace.html
+    System.setProperty("org.aspectj.tracing.factory", "default")
 
     // j.u.l should log messages using the projects' conventions
     SLF4JBridgeHandler.removeHandlersForRootLogger()
