@@ -15,9 +15,7 @@ object NodeConfigs {
 
   def newBuilder: Builder = Builder(Default, Default.size, Seq.empty)
 
-  case class Builder(baseConfigs: Seq[Config],
-                     defaultEntities: Int,
-                     specialsConfigs: Seq[Config]) {
+  case class Builder(baseConfigs: Seq[Config], defaultEntities: Int, specialsConfigs: Seq[Config]) {
     def overrideBase(f: Templates.type => String): Builder = {
       val priorityConfig = ConfigFactory.parseString(f(Templates))
       copy(baseConfigs = this.baseConfigs.map(priorityConfig.withFallback))
@@ -41,7 +39,8 @@ object NodeConfigs {
         .take(totalEntities)
         .splitAt(defaultEntities)
 
-      specialNodes.zip(specialsConfigs)
+      specialNodes
+        .zip(specialsConfigs)
         .foldLeft(defaultNodes) { case (r, (base, special)) => r :+ special.withFallback(base) }
     }
 
@@ -50,12 +49,12 @@ object NodeConfigs {
       val totalEntities = defaultEntities + specialsConfigs.size
       require(totalEntities <= NonConflictingNodes.size)
 
-      val (defaultNodes: Seq[Config], specialNodes: Seq[Config]) = baseConfigs
-        .zipWithIndex
+      val (defaultNodes: Seq[Config], specialNodes: Seq[Config]) = baseConfigs.zipWithIndex
         .collect { case (x, i) if NonConflictingNodes.contains(i + 1) => x }
         .splitAt(defaultEntities)
 
-      specialNodes.zip(specialsConfigs)
+      specialNodes
+        .zip(specialsConfigs)
         .foldLeft(defaultNodes) { case (r, (base, special)) => r :+ special.withFallback(base) }
     }
   }

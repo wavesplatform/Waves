@@ -1,18 +1,15 @@
-package com.wavesplatform.it
-package matcher
+package com.wavesplatform.it.async.matcher
 
-import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.api._
+import com.wavesplatform.it.api.{LevelResponse, MatcherStatusResponse}
 import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.{Node, ReportingTestName}
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
-import play.api.libs.json.JsNumber
-import play.api.libs.json.Json.parse
 import scorex.api.http.assets.SignedTransferRequest
 import scorex.api.http.leasing.{SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.crypto.encode.Base58
@@ -24,8 +21,14 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Random
 
-class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with NodesFromDocker
-  with ReportingTestName with MatcherUtils {
+class MatcherTestSuite
+    extends FreeSpec
+    with Matchers
+    with BeforeAndAfterAll
+    with CancelAfterFailure
+    with NodesFromDocker
+    with ReportingTestName
+    with MatcherUtils {
 
   import MatcherTestSuite._
 
@@ -38,15 +41,15 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   private def bobNode = nodes(2)
 
   private var matcherBalance = (0L, 0L)
-  private var aliceBalance = (0L, 0L)
-  private var bobBalance = (0L, 0L)
+  private var aliceBalance   = (0L, 0L)
+  private var bobBalance     = (0L, 0L)
 
   private val aliceSellAmount = 500
-  private var aliceSell1 = ""
-  private var bobBuy1 = ""
+  private var aliceSell1      = ""
+  private var bobBuy1         = ""
 
-  private var aliceAsset: String = ""
-  private var aliceAssetId: ByteStr = ByteStr.empty
+  private var aliceAsset: String        = ""
+  private var aliceAssetId: ByteStr     = ByteStr.empty
   private var aliceWavesPair: AssetPair = AssetPair(None, None)
 
   override protected def beforeAll(): Unit = {
@@ -76,14 +79,14 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   }
 
   "matcher should respond with Public key" in {
-    Await.result(matcherNode.matcherGet("/matcher"), 1.minute)
-      .getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe matcherNode.publicKeyStr
+    Await.result(matcherNode.matcherGet("/matcher"), 1.minute).getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe matcherNode.publicKeyStr
   }
 
   "sell order could be placed" in {
     // Alice places sell order
-    val (id, status) = matcherPlaceOrder(matcherNode,
-      prepareOrder(aliceNode, matcherNode, aliceWavesPair, OrderType.SELL, 2 * Waves * Order.PriceConstant, aliceSellAmount))
+    val (id, status) =
+      matcherPlaceOrder(matcherNode,
+                        prepareOrder(aliceNode, matcherNode, aliceWavesPair, OrderType.SELL, 2 * Waves * Order.PriceConstant, aliceSellAmount))
     status shouldBe "OrderAccepted"
     aliceSell1 = id
     // Alice checks that the order in order book
@@ -96,31 +99,22 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   }
 
   "frozen amount should be listed via matcherBalance REST endpoint" in {
-    val ts = System.currentTimeMillis()
-    val privateKey = aliceNode.privateKey
-    val signature = Base58.encode(crypto.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts)))
+    getReservedBalance(matcherNode, aliceNode.privateKey) shouldBe Map(aliceAsset -> aliceSellAmount)
 
-    val json = parse(Await.result(matcherNode.matcherGet(s"/matcher/matcherBalance/${aliceNode.publicKeyStr}", _
-      .addHeader("Timestamp", ts)
-      .addHeader("Signature", signature)), 1.minute).getResponseBody)
-
-    (json \ aliceAsset).get shouldBe JsNumber(aliceSellAmount)
+    getReservedBalance(matcherNode, bobNode.privateKey) shouldBe Map()
   }
 
   "and should be listed by trader's publiс key via REST" in {
-    val ts = System.currentTimeMillis()
-    val privateKey = aliceNode.privateKey
-    val signature = ByteStr(crypto.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts)))
-    val orderIds = Await.result(matcherNode.getOrderbookByPublicKey(aliceNode.publicKeyStr, ts, signature), 1.minute)
-      .map(_.id)
+
+    val orderIds = getAllOrder(matcherNode, aliceNode.privateKey)
 
     orderIds should contain(aliceSell1)
   }
 
   "and should match with buy order" in {
     // Bob places a buy order
-    val (id, status) = matcherPlaceOrder(matcherNode,
-      prepareOrder(bobNode, matcherNode, aliceWavesPair, OrderType.BUY, 2 * Waves * Order.PriceConstant, 200))
+    val (id, status) =
+      matcherPlaceOrder(matcherNode, prepareOrder(bobNode, matcherNode, aliceWavesPair, OrderType.BUY, 2 * Waves * Order.PriceConstant, 200))
     bobBuy1 = id
     status shouldBe "OrderAccepted"
 
@@ -156,14 +150,21 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     matcherBalance = updatedMatcherBalance
   }
 
+  "request activeOnly orders" in {
+    val aliceOrders = getAllActiveOrder(matcherNode, aliceNode.privateKey)
+    aliceOrders shouldBe Seq(aliceSell1)
+    val bobOrders = getAllActiveOrder(matcherNode, bobNode.privateKey)
+    bobOrders shouldBe Seq()
+  }
+
   "submitting sell orders should check availability of asset" in {
     // Bob trying to place order on more assets than he has - order rejected
     val badOrder = prepareOrder(bobNode, matcherNode, aliceWavesPair, OrderType.SELL, (19.0 * Waves / 10.0 * Order.PriceConstant).toLong, 300)
-    val error = matcherExpectOrderPlacementRejected(badOrder, 400, "OrderRejected")
+    val error    = matcherExpectOrderPlacementRejected(badOrder, 400, "OrderRejected")
     error should be(true)
 
     // Bob places order on available amount of assets - order accepted
-    val goodOrder = prepareOrder(bobNode, matcherNode, aliceWavesPair, OrderType.SELL, (19.0 * Waves / 10.0 * Order.PriceConstant).toLong, 150)
+    val goodOrder   = prepareOrder(bobNode, matcherNode, aliceWavesPair, OrderType.SELL, (19.0 * Waves / 10.0 * Order.PriceConstant).toLong, 150)
     val (_, status) = matcherPlaceOrder(matcherNode, goodOrder)
     status should be("OrderAccepted")
 
@@ -174,7 +175,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   "buy order should match on few price levels" in {
     // Alice places a buy order
-    val order = prepareOrder(aliceNode, matcherNode, aliceWavesPair, OrderType.BUY, (21.0 * Waves / 10.0 * Order.PriceConstant).toLong, 350)
+    val order        = prepareOrder(aliceNode, matcherNode, aliceWavesPair, OrderType.BUY, (21.0 * Waves / 10.0 * Order.PriceConstant).toLong, 350)
     val (id, status) = matcherPlaceOrder(matcherNode, order)
     status should be("OrderAccepted")
 
@@ -186,7 +187,8 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     waitForAssetBalance(bobNode, aliceAsset, 50)
 
     val updatedMatcherBalance = getBalance(matcherNode)
-    updatedMatcherBalance._1 should be(matcherBalance._1 - 2 * TransactionFee + MatcherFee + (MatcherFee * 150.0 / 350.0).toLong + (MatcherFee * 200.0 / 350.0).toLong + (MatcherFee * 200.0 / 500.0).toLong)
+    updatedMatcherBalance._1 should be(
+      matcherBalance._1 - 2 * TransactionFee + MatcherFee + (MatcherFee * 150.0 / 350.0).toLong + (MatcherFee * 200.0 / 350.0).toLong + (MatcherFee * 200.0 / 500.0).toLong)
     matcherBalance = updatedMatcherBalance
 
     val updatedBobBalance = getBalance(bobNode)
@@ -194,7 +196,8 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     bobBalance = updatedBobBalance
 
     val updatedAliceBalance = getBalance(aliceNode)
-    updatedAliceBalance._1 should be(aliceBalance._1 - (MatcherFee * 200.0 / 350.0).toLong - (MatcherFee * 150.0 / 350.0).toLong - (MatcherFee * 200.0 / 500.0).toLong - (19.0 * Waves / 10.0).toLong * 150)
+    updatedAliceBalance._1 should be(
+      aliceBalance._1 - (MatcherFee * 200.0 / 350.0).toLong - (MatcherFee * 150.0 / 350.0).toLong - (MatcherFee * 200.0 / 500.0).toLong - (19.0 * Waves / 10.0).toLong * 150)
     aliceBalance = updatedAliceBalance
   }
 
@@ -209,7 +212,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     orders1.bids.size should be(0)
 
     // Alice places a new sell order on 100
-    val order = prepareOrder(aliceNode, matcherNode, aliceWavesPair, OrderType.SELL, 2 * Waves * Order.PriceConstant, 100)
+    val order         = prepareOrder(aliceNode, matcherNode, aliceWavesPair, OrderType.SELL, 2 * Waves * Order.PriceConstant, 100)
     val (id, status2) = matcherPlaceOrder(matcherNode, order)
     status2 should be("OrderAccepted")
 
@@ -220,7 +223,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   "buy order should execute all open orders and put remaining in order book" in {
     // Bob places buy order on amount bigger then left in sell orders
-    val order = prepareOrder(bobNode, matcherNode, aliceWavesPair, OrderType.BUY, 2 * Waves * Order.PriceConstant, 130)
+    val order        = prepareOrder(bobNode, matcherNode, aliceWavesPair, OrderType.BUY, 2 * Waves * Order.PriceConstant, 130)
     val (id, status) = matcherPlaceOrder(matcherNode, order)
     status should be("OrderAccepted")
 
@@ -258,9 +261,9 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   "should consider UTX pool when checking the balance" in {
     // Bob issues new asset
     val bobAssetQuantity = 10000
-    val bobAssetName = "BobCoin"
-    val bobAsset = issueAsset(bobNode, bobAssetName, bobAssetQuantity)
-    val bobAssetId = ByteStr.decodeBase58(bobAsset).get
+    val bobAssetName     = "BobCoin"
+    val bobAsset         = issueAsset(bobNode, bobAssetName, bobAssetQuantity)
+    val bobAssetId       = ByteStr.decodeBase58(bobAsset).get
 
     Await.result(matcherNode.waitForHeightArise, 1.minute)
     waitForAssetBalance(bobNode, bobAsset, bobAssetQuantity)
@@ -279,7 +282,9 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     waitForOrderStatus(matcherNode, aliceAsset, sellId, "Accepted")
 
     // Alice wants to buy all Bob's assets for 1 Wave
-    val (buyId, _) = matcherPlaceOrder(matcherNode, prepareOrder(aliceNode, matcherNode, bobWavesPair, OrderType.BUY, 1 * Waves * Order.PriceConstant, bobAssetQuantity))
+    val (buyId, _) =
+      matcherPlaceOrder(matcherNode,
+                        prepareOrder(aliceNode, matcherNode, bobWavesPair, OrderType.BUY, 1 * Waves * Order.PriceConstant, bobAssetQuantity))
     waitForOrderStatus(matcherNode, aliceAsset, buyId, "Filled")
 
     // Bob tries to do the same operation, but at now he have no assets
@@ -293,9 +298,9 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   "trader should be able to place a buy waves for asset order without having waves" in {
     // Bob issues new asset
     val bobAssetQuantity = 10000
-    val bobAssetName = "BobCoin2"
-    val bobAsset = issueAsset(bobNode, bobAssetName, bobAssetQuantity)
-    val bobAssetId = ByteStr.decodeBase58(bobAsset).get
+    val bobAssetName     = "BobCoin2"
+    val bobAsset         = issueAsset(bobNode, bobAssetName, bobAssetQuantity)
+    val bobAssetId       = ByteStr.decodeBase58(bobAsset).get
     val bobWavesPair = AssetPair(
       amountAsset = Some(bobAssetId),
       priceAsset = None
@@ -308,11 +313,12 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
     // Bob wants to sell all own assets for 1 Wave
     def bobOrder = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.SELL, 1 * Waves * Order.PriceConstant, bobAssetQuantity)
+
     val (sellId, _) = matcherPlaceOrder(matcherNode, bobOrder)
     waitForOrderStatus(matcherNode, bobAsset, sellId, "Accepted")
 
     // Bob moves all waves to Alice
-    val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
+    val bobBalance     = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
     val transferAmount = bobBalance - TransactionFee
     transfer(bobNode, aliceNode, None, transferAmount, wait = true)
 
@@ -330,10 +336,10 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   }
 
   "owner moves assets/waves to another account and order become an invalid" - {
-    val bobAssetName = "BobCoin3"
-    var bobAssetIdRaw: String = ""
-    var bobAssetId: ByteStr = ByteStr.empty
-    var bobWavesPair: AssetPair = AssetPair(None, None)
+    val bobAssetName             = "BobCoin3"
+    var bobAssetIdRaw: String    = ""
+    var bobAssetId: ByteStr      = ByteStr.empty
+    var bobWavesPair: AssetPair  = AssetPair(None, None)
     var twoAssetsPair: AssetPair = AssetPair(None, None)
 
     "prepare" in {
@@ -346,13 +352,17 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         priceAsset = None
       )
 
-      twoAssetsPair = if (MatcherActor.compare(Some(bobAssetId.arr), Some(aliceAssetId.arr)) < 0) AssetPair(
-          amountAsset = Some(aliceAssetId),
-          priceAsset = Some(bobAssetId)
-      ) else AssetPair(
-        amountAsset = Some(bobAssetId),
-        priceAsset = Some(aliceAssetId)
-      )
+      twoAssetsPair =
+        if (MatcherActor.compare(Some(bobAssetId.arr), Some(aliceAssetId.arr)) < 0)
+          AssetPair(
+            amountAsset = Some(aliceAssetId),
+            priceAsset = Some(bobAssetId)
+          )
+        else
+          AssetPair(
+            amountAsset = Some(bobAssetId),
+            priceAsset = Some(aliceAssetId)
+          )
 
       Await.result(matcherNode.waitForHeightArise, 1.minute)
       waitForAssetBalance(bobNode, bobAssetIdRaw, bobAssetQuantity)
@@ -381,13 +391,13 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       }
 
       "leased waves, insufficient fee" in {
-        val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
+        val bobBalance    = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
         val oldestOrderId = bobPlacesAssetOrder(1000)
         val newestOrderId = bobPlacesAssetOrder(1000)
 
         // TransactionFee for leasing, MatcherFee for one order
         val leaseAmount = bobBalance - TransactionFee - MatcherFee
-        val leaseId = lease(bobNode, aliceNode, leaseAmount)
+        val leaseId     = lease(bobNode, aliceNode, leaseAmount)
 
         withClue(s"The oldest order '$oldestOrderId' was cancelled") {
           waitOrderCancelled(oldestOrderId)
@@ -404,7 +414,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       }
 
       "moved waves, insufficient fee" in {
-        val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
+        val bobBalance    = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
         val oldestOrderId = bobPlacesAssetOrder(1000)
         val newestOrderId = bobPlacesAssetOrder(1000)
 
@@ -432,11 +442,11 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         // Amount of waves in order is smaller than fee
         val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
 
-        val price = TransactionFee / 2
+        val price   = TransactionFee / 2
         val orderId = bobPlacesWavesOrder(price * Order.PriceConstant, 1)
 
         val leaseAmount = bobBalance - TransactionFee - price
-        val leaseId = lease(bobNode, aliceNode, leaseAmount)
+        val leaseId     = lease(bobNode, aliceNode, leaseAmount)
 
         withClue(s"The order '$orderId' was cancelled") {
           waitOrderCancelled(orderId)
@@ -451,11 +461,11 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       "leased waves, insufficient waves" in {
         val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
 
-        val price = 1 * Waves
+        val price   = 1 * Waves
         val orderId = bobPlacesWavesOrder(price * Order.PriceConstant, 1)
 
         val leaseAmount = bobBalance - TransactionFee - price / 2
-        val leaseId = lease(bobNode, aliceNode, leaseAmount)
+        val leaseId     = lease(bobNode, aliceNode, leaseAmount)
 
         withClue(s"The order '$orderId' was cancelled") {
           waitOrderCancelled(orderId)
@@ -471,7 +481,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         // Amount of waves in order is smaller than fee
         val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
 
-        val price = TransactionFee / 2
+        val price   = TransactionFee / 2
         val orderId = bobPlacesWavesOrder(price * Order.PriceConstant, 1)
 
         val transferAmount = bobBalance - TransactionFee - price
@@ -490,7 +500,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
     def bobPlacesWavesOrder(price: Long, amount: Int): String = {
       val bobOrder = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.BUY, price, amount)
-      val (id, _) = matcherPlaceOrder(matcherNode, bobOrder)
+      val (id, _)  = matcherPlaceOrder(matcherNode, bobOrder)
       waitForOrderStatus(matcherNode, bobAssetIdRaw, id, "Accepted")
       id
     }
@@ -507,8 +517,9 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     }
 
     def waitOrderCancelled(orderId: String): Unit = {
-      val task = matcherNode.waitFor[MatcherStatusResponse](s"Order '$orderId' is cancelled")(
-        _.getOrderStatus(bobAssetIdRaw, orderId), _.status == "Cancelled", 1.second)
+      val task = matcherNode.waitFor[MatcherStatusResponse](s"Order '$orderId' is cancelled")(_.getOrderStatus(bobAssetIdRaw, orderId),
+                                                                                              _.status == "Cancelled",
+                                                                                              1.second)
       Await.result(task, 1.minute)
     }
 
@@ -525,12 +536,12 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   }
 
   private def matcherCancelOrder(node: Node, pair: AssetPair, orderId: String): String = {
-    val privateKey = node.privateKey
-    val publicKey = node.publicKey
-    val request = CancelOrderRequest(publicKey, Base58.decode(orderId).get, Array.emptyByteArray)
-    val sig = crypto.sign(privateKey, request.toSign)
+    val privateKey    = node.privateKey
+    val publicKey     = node.publicKey
+    val request       = CancelOrderRequest(publicKey, Base58.decode(orderId).get, Array.emptyByteArray)
+    val sig           = crypto.sign(privateKey, request.toSign)
     val signedRequest = request.copy(signature = sig)
-    val futureResult = matcherNode.cancelOrder(pair.amountAssetStr, pair.priceAssetStr, signedRequest)
+    val futureResult  = matcherNode.cancelOrder(pair.amountAssetStr, pair.priceAssetStr, signedRequest)
 
     val result = Await.result(futureResult, 1.minute)
 
@@ -576,40 +587,49 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   }
 
   private def transfer(from: Node, to: Node, assetId: Option[ByteStr], amount: Long, wait: Boolean = false): Unit = {
-    val transferTx = TransferTransaction.create(
-      assetId = assetId,
-      sender = from.privateKey,
-      recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).right.get,
-      amount = amount,
-      timestamp = System.currentTimeMillis(),
-      feeAssetId = None,
-      feeAmount = TransactionFee,
-      attachment = Array.emptyByteArray
-    ).right.get
+    val transferTx = TransferTransaction
+      .create(
+        assetId = assetId,
+        sender = from.privateKey,
+        recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).right.get,
+        amount = amount,
+        timestamp = System.currentTimeMillis(),
+        feeAssetId = None,
+        feeAmount = TransactionFee,
+        attachment = Array.emptyByteArray
+      )
+      .right
+      .get
     val tx = Await.result(matcherNode.signedTransfer(createSignedTransferRequest(transferTx)), 1.minute)
     if (wait) Await.result(matcherNode.waitForTransaction(tx.id), 1.minute)
   }
 
   private def lease(from: Node, to: Node, amount: Long): ByteStr = {
-    val leaseTx = LeaseTransaction.create(
-      sender = from.privateKey,
-      recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).right.get,
-      amount = amount,
-      timestamp = System.currentTimeMillis(),
-      fee = TransactionFee
-    ).right.get
+    val leaseTx = LeaseTransaction
+      .create(
+        sender = from.privateKey,
+        recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).right.get,
+        amount = amount,
+        timestamp = System.currentTimeMillis(),
+        fee = TransactionFee
+      )
+      .right
+      .get
     val tx = Await.result(matcherNode.signedLease(createSignedLeaseRequest(leaseTx)), 1.minute)
     Await.result(matcherNode.waitForTransaction(tx.id), 1.minute)
     ByteStr(Base58.decode(tx.id).get)
   }
 
   private def cancelLease(sender: Node, leaseId: ByteStr, amount: Long): Unit = {
-    val cancelLeaseTx = LeaseCancelTransaction.create(
-      sender = sender.privateKey,
-      leaseId = leaseId,
-      fee = TransactionFee,
-      timestamp = System.currentTimeMillis()
-    ).right.get
+    val cancelLeaseTx = LeaseCancelTransaction
+      .create(
+        sender = sender.privateKey,
+        leaseId = leaseId,
+        fee = TransactionFee,
+        timestamp = System.currentTimeMillis()
+      )
+      .right
+      .get
 
     val tx = Await.result(matcherNode.signedLeaseCancel(createSignedLeaseCancelRequest(cancelLeaseTx)), 1.minute)
     Await.result(matcherNode.waitForTransaction(tx.id), 1.minute)
@@ -619,12 +639,11 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
 object MatcherTestSuite {
 
-  import NodeConfigs.Default
+  import com.wavesplatform.it.NodeConfigs._
 
   val ForbiddenAssetId = "FdbnAsset"
 
-  private val matcherConfig = ConfigFactory.parseString(
-    s"""
+  private val matcherConfig = ConfigFactory.parseString(s"""
        |waves.matcher {
        |  enable = yes
        |  account = "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC"
@@ -640,7 +659,7 @@ object MatcherTestSuite {
 
   val AssetQuantity: Long = 1000
 
-  val MatcherFee: Long = 300000
+  val MatcherFee: Long     = 300000
   val TransactionFee: Long = 300000
 
   val Waves: Long = 100000000L

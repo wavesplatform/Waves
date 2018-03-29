@@ -17,12 +17,12 @@ object SignedSmartIssueRequest {
 
 @ApiModel(value = "Signed Smart issue transaction")
 case class SignedSmartIssueRequest(@ApiModelProperty(required = true)
-                                   version: Int,
+                                   version: Byte,
                                    @ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
-                                   sender: String,
-                                   @ApiModelProperty(value = "Base58 encoded name of Asset", required = true)
+                                   senderPublicKey: String,
+                                   @ApiModelProperty(required = true)
                                    name: String,
-                                   @ApiModelProperty(value = "Base58 encoded description of Asset", required = true)
+                                   @ApiModelProperty(required = true)
                                    description: String,
                                    @ApiModelProperty(required = true, example = "1000000")
                                    quantity: Long,
@@ -40,7 +40,7 @@ case class SignedSmartIssueRequest(@ApiModelProperty(required = true)
     extends BroadcastRequest {
   def toTx: Either[ValidationError, SmartIssueTransaction] =
     for {
-      _sender     <- PublicKeyAccount.fromBase58String(sender)
+      _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       _script <- script match {
@@ -48,7 +48,7 @@ case class SignedSmartIssueRequest(@ApiModelProperty(required = true)
         case Some(s) => Script.fromBase58String(s).map(Some(_))
       }
       t <- SmartIssueTransaction.create(
-        version.toByte,
+        version,
         AddressScheme.current.chainId,
         _sender,
         name.getBytes(Charsets.UTF_8),

@@ -12,7 +12,7 @@ object StorageFactory {
 
   def apply(settings: WavesSettings, db: DB, time: Time): (NgHistory with DebugNgHistory, SnapshotStateReader, BlockchainUpdaterImpl) = {
     val stateWriter = new LevelDBWriter(db, settings.blockchainSettings.functionalitySettings)
-    val bcu = new BlockchainUpdaterImpl(stateWriter, settings, time, stateWriter)
+    val bcu         = new BlockchainUpdaterImpl(stateWriter, settings, time, stateWriter)
     (bcu.historyReader, bcu.stateReader, bcu)
   }
 }

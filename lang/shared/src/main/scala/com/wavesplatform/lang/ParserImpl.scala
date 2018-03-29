@@ -25,7 +25,7 @@ abstract class ParserImpl { this: Base58 =>
   private val digit     = CharIn('0' to '9')
   private val varName   = (char.repX(min = 1, max = 1) ~~ (digit | char).repX()).!.filter(!keywords.contains(_))
 
-  private def numberP: P[CONST_LONG] = P(digit.rep(min = 1).!.map(t => CONST_LONG(t.toInt)))
+  private def numberP: P[CONST_LONG] = P((CharIn(Seq('+', '-')).rep(max=1) ~ digit.rep(min = 1)).!.map(t => CONST_LONG(t.toLong)))
   private def trueP: P[TRUE.type]    = P("true").map(_ => TRUE)
   private def falseP: P[FALSE.type]  = P("false").map(_ => FALSE)
   private def bracesP: P[EXPR]       = P("(" ~ block ~ ")")

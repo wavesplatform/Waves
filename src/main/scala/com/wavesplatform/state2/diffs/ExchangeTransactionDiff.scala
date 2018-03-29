@@ -21,9 +21,15 @@ object ExchangeTransactionDiff {
                      tx.sellOrder.assetPair.amountAsset,
                      tx.sellOrder.assetPair.priceAsset).flatten
     for {
-      _ <- Either.cond(!assets.exists(s.assetDescription(_).flatMap(_.script).isDefined), (), GenericError(s"Smart assets can't participate in ExchangeTransactions"))
-      _ <- Either.cond(s.accountScript(buyer).isEmpty, (), GenericError(s"Buyer $buyer can't participate in ExchangeTransaction because it has assigned Script"))
-      _ <- Either.cond(s.accountScript(seller).isEmpty, (), GenericError(s"Seller $seller can't participate in ExchangeTransaction because it has assigned Script"))
+      _ <- Either.cond(!assets.exists(s.assetDescription(_).flatMap(_.script).isDefined),
+                       (),
+                       GenericError(s"Smart assets can't participate in ExchangeTransactions"))
+      _ <- Either.cond(s.accountScript(buyer).isEmpty,
+                       (),
+                       GenericError(s"Buyer $buyer can't participate in ExchangeTransaction because it has assigned Script"))
+      _ <- Either.cond(s.accountScript(seller).isEmpty,
+                       (),
+                       GenericError(s"Seller $seller can't participate in ExchangeTransaction because it has assigned Script"))
       t                     <- enoughVolume(tx, s)
       buyPriceAssetChange   <- t.buyOrder.getSpendAmount(t.price, t.amount).liftValidationError(tx).map(-_)
       buyAmountAssetChange  <- t.buyOrder.getReceiveAmount(t.price, t.amount).liftValidationError(tx)

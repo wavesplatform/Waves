@@ -2,33 +2,35 @@ package scorex.transaction
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2._
+import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.VersionedTransferTransaction
 
 class VersionedTransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
-  property("ScriptTransferTransaction serialization roundtrip") {
-    forAll(scriptTransferGen) { tx: VersionedTransferTransaction =>
-      tx.bytes().head shouldBe TransactionType.VersionedTransferTransaction.id
-      val recovered = VersionedTransferTransaction.parseTail(tx.bytes().tail).get
+  private val versionGen: Gen[Byte] = Gen.oneOf(VersionedTransferTransaction.supportedVersions.toSeq)
+
+  property("VersionedTransferTransactionSpecification serialization roundtrip") {
+    forAll(versionedTransferGen) { tx: VersionedTransferTransaction =>
+      val recovered = VersionedTransferTransaction.parseBytes(tx.bytes()).get
       assertTxs(recovered, tx)
     }
   }
 
-  property("ScriptTransferTransaction serialization from TypedTransaction") {
-    forAll(scriptTransferGen) { tx: VersionedTransferTransaction =>
-      val recovered = TransactionParser.parseBytes(tx.bytes()).get
+  property("VersionedTransferTransactionSpecification serialization from TypedTransaction") {
+    forAll(versionedTransferGen) { tx: VersionedTransferTransaction =>
+      val recovered = TransactionParsers.parseBytes(tx.bytes()).get
       assertTxs(recovered.asInstanceOf[VersionedTransferTransaction], tx)
     }
   }
 
-  property("ScriptTransferTransaction id doesn't depend on proof") {
-    forAll(accountGen, accountGen, proofsGen, proofsGen, bytes32gen) { case (acc1, acc2, proofs1, proofs2, attachment) =>
-      val tx1 = VersionedTransferTransaction.create(2, None, acc2, acc2.toAddress, 1, 1, 1, attachment, proofs1).explicitGet()
-      val tx2 = VersionedTransferTransaction.create(2, None, acc2, acc2.toAddress, 1, 1, 1, attachment, proofs2).explicitGet()
-      tx1.id() shouldBe tx2.id()
+  property("VersionedTransferTransactionSpecification id doesn't depend on proof") {
+    forAll(versionGen, accountGen, accountGen, proofsGen, proofsGen, bytes32gen) {
+      case (version, acc1, acc2, proofs1, proofs2, attachment) =>
+        val tx1 = VersionedTransferTransaction.create(version, None, acc2, acc2.toAddress, 1, 1, 1, attachment, proofs1).explicitGet()
+        val tx2 = VersionedTransferTransaction.create(version, None, acc2, acc2.toAddress, 1, 1, 1, attachment, proofs2).explicitGet()
+        tx1.id() shouldBe tx2.id()
     }
   }
 

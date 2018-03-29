@@ -6,8 +6,7 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class FeesSettingsSpecification extends FlatSpec with Matchers {
   "FeesSettings" should "read values" in {
-    val config = ConfigFactory.parseString(
-      """waves {
+    val config = ConfigFactory.parseString("""waves {
         |  network.file = "xxx"
         |  fees {
         |    payment.WAVES = 100000
@@ -33,8 +32,7 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
   }
 
   it should "combine read few fees for one transaction type" in {
-    val config = ConfigFactory.parseString(
-      """waves.fees {
+    val config = ConfigFactory.parseString("""waves.fees {
         |  payment {
         |    WAVES0 = 0
         |  }
@@ -64,14 +62,14 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
   }
 
   it should "override values" in {
-    val config = ConfigFactory.parseString(
-      """waves.fees {
+    val config = ConfigFactory
+      .parseString("""waves.fees {
         |  payment.WAVES1 = 1111
         |  reissue.WAVES5 = 0
         |}
-      """.stripMargin).withFallback(
-      ConfigFactory.parseString(
-        """waves.fees {
+      """.stripMargin)
+      .withFallback(
+        ConfigFactory.parseString("""waves.fees {
           |  payment.WAVES = 100000
           |  issue.WAVES = 100000000
           |  transfer.WAVES = 100000
@@ -80,7 +78,8 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
           |  exchange.WAVES = 100000
           |}
         """.stripMargin)
-    ).resolve()
+      )
+      .resolve()
 
     val settings = FeesSettings.fromConfig(config)
     settings.fees.size should be(6)
@@ -97,7 +96,7 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
   }
 
   it should "not fail on long values as strings" in {
-    val config = ConfigFactory.parseString("waves.fees.transfer.WAVES=\"1000\"").resolve()
+    val config   = ConfigFactory.parseString("waves.fees.transfer.WAVES=\"1000\"").resolve()
     val settings = FeesSettings.fromConfig(config)
     settings.fees(4).toSet should equal(Set(FeeSettings("WAVES", 1000)))
   }
@@ -112,8 +111,7 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
 
   it should "override values from default config" in {
     val defaultConfig = ConfigFactory.load()
-    val config = ConfigFactory.parseString(
-      """
+    val config        = ConfigFactory.parseString("""
         |waves.fees {
         |  issue {
         |    WAVES = 200000000
@@ -149,13 +147,10 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
         |  set-script {
         |    WAVES = 300000
         |  }
-        |  versioned-transfer {
-        |    WAVES = 400000
-        |  }
         |}
       """.stripMargin).withFallback(defaultConfig).resolve()
-    val settings = FeesSettings.fromConfig(config)
-    settings.fees.size should be(12)
+    val settings      = FeesSettings.fromConfig(config)
+    settings.fees.size should be(11)
     settings.fees(3).toSet should equal(Set(FeeSettings("WAVES", 200000000)))
     settings.fees(4).toSet should equal(Set(FeeSettings("WAVES", 300000), FeeSettings("6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL", 1)))
     settings.fees(5).toSet should equal(Set(FeeSettings("WAVES", 400000)))
@@ -167,6 +162,5 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
     settings.fees(11).toSet should equal(Set(FeeSettings("WAVES", 10000)))
     settings.fees(12).toSet should equal(Set(FeeSettings("WAVES", 200000)))
     settings.fees(13).toSet should equal(Set(FeeSettings("WAVES", 300000)))
-    settings.fees(14).toSet should equal(Set(FeeSettings("WAVES", 400000)))
   }
 }

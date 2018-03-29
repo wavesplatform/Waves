@@ -15,8 +15,6 @@ import scala.util.Try
 
 package object utils extends ScorexLogging {
 
-  type HeightInfo = (Int, Long)
-
   private val BytesMaxValue  = 256
   private val Base58MaxValue = 58
 
@@ -76,6 +74,7 @@ package object utils extends ScorexLogging {
     }
   }
 
-  private val dummyContext: Context                           = new BlockchainContext(0, Coeval(???), Coeval(???), null).build()
+  val dummyNetworkByte: Byte                                  = 0
+  private val dummyContext: Context                           = new BlockchainContext(dummyNetworkByte, Coeval(???), Coeval(???), null).build()
   val dummyTypeCheckerContext: TypeChecker.TypeCheckerContext = TypeChecker.TypeCheckerContext.fromContext(dummyContext)
 }

@@ -33,9 +33,9 @@ object VolumeAndFee {
   }
 }
 
-case class AssetInfo(isReissuable: Boolean, volume: Long, script: Option[Script])
+case class AssetInfo(isReissuable: Boolean, volume: BigInt, script: Option[Script])
 object AssetInfo {
-  implicit val assetInfoMonoid: Monoid[AssetInfo]  = new Monoid[AssetInfo] {
+  implicit val assetInfoMonoid: Monoid[AssetInfo] = new Monoid[AssetInfo] {
     override def empty: AssetInfo = AssetInfo(isReissuable = true, 0, None)
     override def combine(x: AssetInfo, y: AssetInfo): AssetInfo =
       AssetInfo(x.isReissuable && y.isReissuable, x.volume + y.volume, y.script.orElse(x.script))
@@ -92,28 +92,31 @@ object Diff {
             scripts: Map[Address, Option[Script]] = Map.empty,
             accountData: Map[Address, AccountDataInfo] = Map.empty): Diff =
     Diff(
-    transactions = Map((tx.id(), (height, tx, portfolios.keys.toSet))),
-    portfolios = portfolios,
-    issuedAssets = assetInfos,
-    aliases = aliases,
-    orderFills = orderFills,
-    leaseState = leaseState,
-    scripts = scripts,
-    accountData = accountData)
+      transactions = Map((tx.id(), (height, tx, portfolios.keys.toSet))),
+      portfolios = portfolios,
+      issuedAssets = assetInfos,
+      aliases = aliases,
+      orderFills = orderFills,
+      leaseState = leaseState,
+      scripts = scripts,
+      accountData = accountData
+    )
 
   val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
 
   implicit val diffMonoid = new Monoid[Diff] {
     override def empty: Diff = Diff.empty
 
-    override def combine(older: Diff, newer: Diff): Diff = Diff(
-      transactions = older.transactions ++ newer.transactions,
-      portfolios = older.portfolios.combine(newer.portfolios),
-      issuedAssets = older.issuedAssets.combine(newer.issuedAssets),
-      aliases = older.aliases ++ newer.aliases,
-      orderFills = older.orderFills.combine(newer.orderFills),
-      leaseState = older.leaseState ++ newer.leaseState,
-      scripts = older.scripts ++ newer.scripts,
-      accountData = older.accountData.combine(newer.accountData))
+    override def combine(older: Diff, newer: Diff): Diff =
+      Diff(
+        transactions = older.transactions ++ newer.transactions,
+        portfolios = older.portfolios.combine(newer.portfolios),
+        issuedAssets = older.issuedAssets.combine(newer.issuedAssets),
+        aliases = older.aliases ++ newer.aliases,
+        orderFills = older.orderFills.combine(newer.orderFills),
+        leaseState = older.leaseState ++ newer.leaseState,
+        scripts = older.scripts ++ newer.scripts,
+        accountData = older.accountData.combine(newer.accountData)
+      )
   }
 }

@@ -29,14 +29,16 @@ case class SignedMassTransferRequest(@ApiModelProperty(required = true)
                                      @ApiModelProperty(value = "Base58 encoded attachment")
                                      attachment: Option[String],
                                      @ApiModelProperty(required = true)
-                                     proofs: List[String]) extends BroadcastRequest {
-  def toTx: Either[ValidationError, MassTransferTransaction] = for {
-    _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
-    _assetId <- parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
-    _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
-    _proofs <- Proofs.create(_proofBytes)
-    _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
-    _transfers <- MassTransferTransaction.parseTransfersList(transfers)
-    t <- MassTransferTransaction.create(MassTransferTransaction.Version, _assetId, _sender, _transfers, timestamp, fee, _attachment.arr, _proofs)
-  } yield t
+                                     proofs: List[String])
+    extends BroadcastRequest {
+  def toTx: Either[ValidationError, MassTransferTransaction] =
+    for {
+      _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _assetId    <- parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
+      _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
+      _proofs     <- Proofs.create(_proofBytes)
+      _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
+      _transfers  <- MassTransferTransaction.parseTransfersList(transfers)
+      t           <- MassTransferTransaction.create(version, _assetId, _sender, _transfers, timestamp, fee, _attachment.arr, _proofs)
+    } yield t
 }

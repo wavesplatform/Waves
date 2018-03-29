@@ -29,6 +29,6 @@ object Common {
 
   val multiplierFunction: PredefFunction = PredefFunction("MULTIPLY", Terms.LONG, List(("x1", Terms.LONG), ("x2", Terms.LONG))) {
     case (x1: Long) :: (x2: Long) :: Nil => Try(x1 * x2).toEither.left.map(_.toString)
-    case _                             => ??? // suppress pattern match warning
+    case _                               => ??? // suppress pattern match warning
   }
 }

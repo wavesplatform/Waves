@@ -9,8 +9,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
-trait WaitForHeight2 extends BeforeAndAfterAll with ScorexLogging
-  with ReportingTestName with Nodes {
+trait WaitForHeight2 extends BeforeAndAfterAll with ScorexLogging with ReportingTestName with Nodes {
   this: Suite =>
 
   abstract protected override def beforeAll(): Unit = {

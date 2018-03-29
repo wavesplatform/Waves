@@ -39,7 +39,7 @@ object TransactionFactory {
       recipientAcc     <- AddressOrAlias.fromString(request.recipient)
       tx <- VersionedTransferTransaction
         .selfSigned(
-          2,
+          request.version,
           request.assetId.map(s => ByteStr.decodeBase58(s).get),
           senderPrivateKey,
           recipientAcc,
@@ -73,6 +73,7 @@ object TransactionFactory {
         case Some(s) => Script.fromBase58String(s).map(Some(_))
       }
       tx <- SetScriptTransaction.selfSigned(
+        version = request.version,
         sender = senderPrivateKey,
         script = script,
         fee = request.fee,
@@ -83,16 +84,16 @@ object TransactionFactory {
   def smartIssue(request: SmartIssueRequest, wallet: Wallet, time: Time): Either[ValidationError, SmartIssueTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
-      script <- request.script match {
+      s <- request.script match {
         case None    => Right(None)
         case Some(s) => Script.fromBase58String(s).map(Some(_))
       }
       tx <- SmartIssueTransaction.selfSigned(
         sender = senderPrivateKey,
-        script = script,
+        script = s,
         fee = request.fee,
         timestamp = request.timestamp.getOrElse(time.getTimestamp()),
-        version = 1,
+        version = request.version,
         chainId = AddressScheme.current.chainId,
         name = request.name.getBytes(Charsets.UTF_8),
         description = request.description.getBytes(Charsets.UTF_8),

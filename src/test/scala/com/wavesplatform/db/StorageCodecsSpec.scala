@@ -14,9 +14,9 @@ class StorageCodecsSpec extends FreeSpec with Matchers with PropertyChecks {
 
   "Empty Checkpoint round trip" in {
     Random.nextBytes(signature)
-    val c1 = Checkpoint(Seq.empty, signature)
+    val c1    = Checkpoint(Seq.empty, signature)
     val bytes = CheckpointCodec.encode(c1)
-    val r = CheckpointCodec.decode(bytes)
+    val r     = CheckpointCodec.decode(bytes)
     r.isRight shouldBe true
     val c2 = r.right.get.value
     c2.signature.sameElements(c1.signature) shouldBe true
@@ -25,9 +25,9 @@ class StorageCodecsSpec extends FreeSpec with Matchers with PropertyChecks {
 
   "Non-empty Checkpoint round trip" in {
     Random.nextBytes(signature)
-    val c1 = Checkpoint(Seq(BlockCheckpoint(10, signature), BlockCheckpoint(20, signature)), signature)
+    val c1    = Checkpoint(Seq(BlockCheckpoint(10, signature), BlockCheckpoint(20, signature)), signature)
     val bytes = CheckpointCodec.encode(c1)
-    val r = CheckpointCodec.decode(bytes)
+    val r     = CheckpointCodec.decode(bytes)
     r.isRight shouldBe true
     val c2 = r.right.get.value
     c2.signature.sameElements(c1.signature) shouldBe true
@@ -40,7 +40,7 @@ class StorageCodecsSpec extends FreeSpec with Matchers with PropertyChecks {
 
   "Broken bytes should return left" in {
     Random.nextBytes(signature)
-    val c1 = Checkpoint(Seq(BlockCheckpoint(1, signature), BlockCheckpoint(2, signature), BlockCheckpoint(3, signature)), signature)
+    val c1    = Checkpoint(Seq(BlockCheckpoint(1, signature), BlockCheckpoint(2, signature), BlockCheckpoint(3, signature)), signature)
     val bytes = CheckpointCodec.encode(c1)
 
     val r1 = CheckpointCodec.decode(bytes.take(bytes.length - 2))
@@ -52,7 +52,7 @@ class StorageCodecsSpec extends FreeSpec with Matchers with PropertyChecks {
 
   "TupleCodec" in {
     val codec = Tuple2Codec[String, Short](StringCodec, ShortCodec)
-    val x = ("foo", 10: Short)
+    val x     = ("foo", 10: Short)
     codec.decode(codec.encode(x)).right.get.value shouldBe x
   }
 

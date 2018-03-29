@@ -2,6 +2,8 @@ package com.wavesplatform.lang
 import com.wavesplatform.lang.ctx.Obj
 import scodec.bits.ByteVector
 
+import scala.reflect.runtime.universe._
+
 object Terms {
 
   case class FUNCTION(args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER)
@@ -10,15 +12,24 @@ object Terms {
   case class TYPEPARAM(char: Char)               extends TYPEPLACEHOLDER
   case class OPTIONTYPEPARAM(t: TYPEPLACEHOLDER) extends TYPEPLACEHOLDER
 
-  sealed trait TYPE                  extends TYPEPLACEHOLDER { type Underlying }
-  case object NOTHING                extends TYPE            { type Underlying = Nothing }
-  case object UNIT                   extends TYPE            { type Underlying = Unit }
-  case object LONG                   extends TYPE            { type Underlying = Long }
-  case object BYTEVECTOR             extends TYPE            { type Underlying = ByteVector }
-  case object BOOLEAN                extends TYPE            { type Underlying = Boolean }
-  case object STRING                 extends TYPE            { type Underlying = String }
-  case class OPTION(innerType: TYPE) extends TYPE            { type Underlying = Option[innerType.Underlying] }
-  case class TYPEREF(name: String)   extends TYPE            { type Underlying = Obj }
+  sealed trait TYPE extends TYPEPLACEHOLDER {
+    type Underlying
+    def typetag: TypeTag[Underlying]
+  }
+  sealed abstract class AUTO_TAGGED_TYPE[T](implicit override val typetag: TypeTag[T]) extends TYPE {
+    override type Underlying = T
+  }
+  case object NOTHING    extends AUTO_TAGGED_TYPE[Nothing]
+  case object UNIT       extends AUTO_TAGGED_TYPE[Unit]
+  case object LONG       extends AUTO_TAGGED_TYPE[Long]
+  case object BYTEVECTOR extends AUTO_TAGGED_TYPE[ByteVector]
+  case object BOOLEAN    extends AUTO_TAGGED_TYPE[Boolean]
+  case object STRING     extends AUTO_TAGGED_TYPE[String]
+  case class OPTION(innerType: TYPE) extends TYPE {
+    type Underlying = Option[innerType.Underlying]
+    override def typetag: TypeTag[Option[innerType.Underlying]] = typeTag[Underlying]
+  }
+  case class TYPEREF(name: String) extends AUTO_TAGGED_TYPE[Obj]
 
   sealed trait BINARY_OP_KIND
   case object SUM_OP extends BINARY_OP_KIND
@@ -31,10 +42,10 @@ object Terms {
   object Untyped {
     case class LET(name: String, value: EXPR)
     sealed trait EXPR
-    case class CONST_LONG(value: Long)                                   extends EXPR
+    case class CONST_LONG(value: Long)                               extends EXPR
     case class GETTER(ref: EXPR, field: String)                      extends EXPR
-    case class CONST_BYTEVECTOR(value: ByteVector)                      extends EXPR
-    case class CONST_STRING(value: String)                               extends EXPR
+    case class CONST_BYTEVECTOR(value: ByteVector)                   extends EXPR
+    case class CONST_STRING(value: String)                           extends EXPR
     case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR)     extends EXPR
     case class BLOCK(let: Option[LET], body: EXPR)                   extends EXPR
     case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)           extends EXPR

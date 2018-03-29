@@ -18,12 +18,12 @@ class ChannelGroupExtSpec extends FreeSpec with Matchers with MockFactory {
       val message = "test"
 
       val channelGroup = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-      val received = ConcurrentHashMap.newKeySet[Int]()
+      val received     = ConcurrentHashMap.newKeySet[Int]()
 
       def receiver(id: Int): Channel = new EmbeddedChannel(
         new ChannelId {
-          override def asShortText(): String = asLongText()
-          override def asLongText(): String = id.toString
+          override def asShortText(): String        = asLongText()
+          override def asLongText(): String         = id.toString
           override def compareTo(o: ChannelId): Int = o.asLongText().toInt - id
         },
         new ChannelOutboundHandlerAdapter {
@@ -34,11 +34,11 @@ class ChannelGroupExtSpec extends FreeSpec with Matchers with MockFactory {
         }
       )
 
-      val allIds = (0 to 5).toSet
+      val allIds      = (0 to 5).toSet
       val allChannels = allIds.map(receiver)
 
       val excludedChannels = allChannels.filter(_ => Random.nextBoolean)
-      val excludedIds = excludedChannels.map(_.id.asLongText().toInt)
+      val excludedIds      = excludedChannels.map(_.id.asLongText().toInt)
 
       allChannels.foreach(channelGroup.add)
       channelGroup.broadcast(message, excludedChannels).syncUninterruptibly()

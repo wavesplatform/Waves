@@ -8,13 +8,9 @@ import com.wavesplatform.lang.{Parser, TypeChecker}
 import com.wavesplatform.state2._
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json.{JsNumber, Json}
+import play.api.libs.json.JsNumber
 import scorex.account.PrivateKeyAccount
-import scorex.api.http.assets.SignedSetScriptRequest.jsonFormat
-import scorex.api.http.assets.SignedVersionedTransferRequest.jsonFormat
-import scorex.api.http.assets.{SignedSetScriptRequest, SignedVersionedTransferRequest}
 import scorex.transaction.Proofs
-import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.VersionedTransferTransaction
 import scorex.transaction.smart.{Script, SetScriptTransaction}
 
@@ -28,12 +24,11 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   private val acc2 = randomPk
   private val acc3 = randomPk
 
-  private val transferAmount: Long = 1.waves
-  private val fee: Long            = 0.001.waves
+  private val transferAmount: Long          = 1.waves
+  private val fee: Long                     = 0.001.waves
   private val senderPublicKeyString: String = ByteStr(sender.publicKey.publicKey).base58
 
   test("set 2of2 multisig") {
-
     val scriptText = {
       val untyped = Parser(s"""
 
@@ -49,23 +44,16 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
     }
 
-    val script               = Script(scriptText)
-    val setScriptTransaction = SetScriptTransaction.selfSigned(sender.privateKey, Some(script), fee, System.currentTimeMillis()).explicitGet()
-
-    val request = SignedSetScriptRequest(
-      senderPublicKey = senderPublicKeyString,
-      script = Some(script.bytes().base58),
-      fee = setScriptTransaction.fee,
-      timestamp = setScriptTransaction.timestamp,
-      proofs = List(setScriptTransaction.proofs.proofs.head.base58)
-    )
-
+    val script = Script(scriptText)
+    val setScriptTransaction = SetScriptTransaction
+      .selfSigned(SetScriptTransaction.supportedVersions.head, sender.privateKey, Some(script), fee, System.currentTimeMillis())
+      .explicitGet()
 
     val setScriptId = sender
-      .signedBroadcast(Json.toJsObject(request) + ("type" -> JsNumber(TransactionType.SetScriptTransaction.id)))
+      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId)))
       .id
 
-    nodes.waitForHeightAraiseAndTxPresent(setScriptId)
+    nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
     // get script by account
   }
@@ -93,44 +81,34 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val sig1 = ByteStr(crypto.sign(acc1, unsigned.bodyBytes()))
     val sig2 = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
 
-    val request = SignedVersionedTransferRequest(
-      senderPublicKey = senderPublicKeyString,
-      assetId = None,
-      recipient = unsigned.recipient.toString,
-      amount = unsigned.amount,
-      fee = unsigned.fee,
-      timestamp = unsigned.timestamp,
-      version = unsigned.version,
-      attachment = None,
-      proofs = List(sig1, sig2).map(_.base58)
-    )
+    val signed = unsigned.copy(proofs = Proofs(Seq(sig1, sig2)))
 
-    val versionedTransferId = sender.
-      signedBroadcast(Json.toJsObject(request) + ("type" -> JsNumber(TransactionType.VersionedTransferTransaction.id)))
-      .id
+    val versionedTransferId =
+      sender.signedBroadcast(signed.json() + ("type" -> JsNumber(VersionedTransferTransaction.typeId.toInt))).id
 
-    nodes.waitForHeightAraiseAndTxPresent(versionedTransferId)
+    nodes.waitForHeightAriseAndTxPresent(versionedTransferId)
   }
 
   test("can clear script") {
     val unsigned = SetScriptTransaction
-      .create(sender = sender.privateKey, script = None, fee = fee, timestamp = System.currentTimeMillis(), proofs = Proofs.empty)
+      .create(
+        version = SetScriptTransaction.supportedVersions.head,
+        sender = sender.privateKey,
+        script = None,
+        fee = fee,
+        timestamp = System.currentTimeMillis(),
+        proofs = Proofs.empty
+      )
       .explicitGet()
     val sig1 = ByteStr(crypto.sign(acc1, unsigned.bodyBytes()))
     val sig2 = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
 
-    val request = SignedSetScriptRequest(
-      senderPublicKey = senderPublicKeyString,
-      script = None,
-      fee = unsigned.fee,
-      timestamp = unsigned.timestamp,
-      proofs = List(sig1, sig2) map (_.base58)
-    )
+    val signed = unsigned.copy(proofs = Proofs(Seq(sig1, sig2)))
     val clearScriptId = sender
-      .signedBroadcast(Json.toJsObject(request) + ("type" -> JsNumber(TransactionType.SetScriptTransaction.id)))
+      .signedBroadcast(signed.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
       .id
 
-    nodes.waitForHeightAraiseAndTxPresent(clearScriptId)
+    nodes.waitForHeightAriseAndTxPresent(clearScriptId)
 
   }
 
@@ -138,6 +116,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val transferId = sender
       .transfer(sourceAddress = sender.address, recipient = acc3.address, amount = transferAmount, fee = fee, assetId = None, feeAssetId = None)
       .id
-    nodes.waitForHeightAraiseAndTxPresent(transferId)
+    nodes.waitForHeightAriseAndTxPresent(transferId)
   }
 }

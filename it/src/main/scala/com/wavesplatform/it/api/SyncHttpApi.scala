@@ -22,15 +22,15 @@ object SyncHttpApi extends Assertions {
 
   def assertBadRequest[R](f: => R): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Assertions.assert(statusCode == StatusCodes.BadRequest.intValue)
-    case Failure(e) => Assertions.fail(e)
-    case _          => Assertions.fail("Expecting bad request")
+    case Failure(e)                                               => Assertions.fail(e)
+    case _                                                        => Assertions.fail("Expecting bad request")
   }
 
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
       Assertions.assert(
         statusCode == StatusCodes.BadRequest.intValue &&
-        responseBody.replace("\n", "").matches(s".*$errorRegex.*"))
+          responseBody.replace("\n", "").matches(s".*$errorRegex.*"))
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail("Expecting bad request")
   }
@@ -75,8 +75,14 @@ object SyncHttpApi extends Assertions {
     def issue(sourceAddress: String, name: String, description: String, quantity: Long, decimals: Byte, reissuable: Boolean, fee: Long): Transaction =
       Await.result(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee), RequestAwaitTime)
 
+    def scriptCompile(code: String): CompiledScript =
+      Await.result(async(n).scriptCompile(code), RequestAwaitTime)
+
     def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Transaction =
       Await.result(async(n).burn(sourceAddress, assetId, quantity, fee), RequestAwaitTime)
+
+    def sign(jsObject: JsObject): JsObject =
+      Await.result(async(n).sign(jsObject), RequestAwaitTime)
 
     def createAlias(targetAddress: String, alias: String, fee: Long): Transaction =
       Await.result(async(n).createAlias(targetAddress, alias, fee), RequestAwaitTime)
@@ -98,13 +104,13 @@ object SyncHttpApi extends Assertions {
     def lease(sourceAddress: String, recipient: String, leasingAmount: Long, leasingFee: Long): Transaction =
       Await.result(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee), RequestAwaitTime)
 
-    def putData(sourceAddress:String, data: List[DataEntry[_]], fee: Long): Transaction =
+    def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Transaction =
       Await.result(async(n).putData(sourceAddress, data, fee), RequestAwaitTime)
 
-    def getData(sourceAddress:String): List[DataEntry[_]] =
+    def getData(sourceAddress: String): List[DataEntry[_]] =
       Await.result(async(n).getData(sourceAddress), RequestAwaitTime)
 
-    def getData(sourceAddress:String, key: String): DataEntry[_] =
+    def getData(sourceAddress: String, key: String): DataEntry[_] =
       Await.result(async(n).getData(sourceAddress, key), RequestAwaitTime)
 
     def broadcastRequest[A: Writes](req: A): Transaction =
@@ -116,7 +122,7 @@ object SyncHttpApi extends Assertions {
     def cancelLease(sourceAddress: String, leaseId: String, fee: Long): Transaction =
       Await.result(async(n).cancelLease(sourceAddress, leaseId, fee), RequestAwaitTime)
 
-    def signedBroadcast(tx: JsObject) : Transaction =
+    def signedBroadcast(tx: JsObject): Transaction =
       Await.result(async(n).signedBroadcast(tx), RequestAwaitTime)
 
     def signedIssue(tx: SignedIssueRequest): Transaction =
@@ -130,16 +136,19 @@ object SyncHttpApi extends Assertions {
 
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Transaction =
       Await.result(async(n).waitForTransaction(txId), RequestAwaitTime)
+
+    def signAndBroadcast(tx: JsObject): Transaction =
+      Await.result(async(n).signAndBroadcast(tx), RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
 
     import com.wavesplatform.it.api.AsyncHttpApi.{NodesAsyncHttpApi => async}
 
-    private val TxInBlockchainAwaitTime = 3 * nodes.head.blockDelay
+    private val TxInBlockchainAwaitTime = 6 * nodes.head.blockDelay
     private val ConditionAwaitTime      = 5.minutes
 
-    def waitForHeightAraiseAndTxPresent(transactionId: String): Unit =
+    def waitForHeightAriseAndTxPresent(transactionId: String): Unit =
       Await.result(async(nodes).waitForHeightAraiseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
 
     def waitForHeightAraise(): Unit =

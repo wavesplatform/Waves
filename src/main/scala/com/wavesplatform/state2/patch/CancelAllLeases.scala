@@ -10,11 +10,9 @@ object CancelAllLeases extends ScorexLogging {
   def apply(s: SnapshotStateReader): Diff = {
     log.info("Collecting all active leases")
     val leasesToCancel = s.allActiveLeases.map(_.id() -> false).toMap
-    val portfolios = s.collectPortfolios(_.lease != LeaseBalance.empty).mapValues(invertLeaseInfo)
+    val portfolios     = s.collectPortfolios(_.lease != LeaseBalance.empty).mapValues(invertLeaseInfo)
     log.info(s"Done collecting all active leases;\n${portfolios.mkString("\n")}")
 
-    Diff.empty.copy(
-      portfolios = portfolios,
-      leaseState = leasesToCancel)
+    Diff.empty.copy(portfolios = portfolios, leaseState = leasesToCancel)
   }
 }

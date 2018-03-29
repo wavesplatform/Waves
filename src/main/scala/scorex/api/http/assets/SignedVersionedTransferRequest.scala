@@ -9,7 +9,7 @@ import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransact
 import scorex.transaction.{AssetIdStringLength, Proofs, ValidationError}
 
 object SignedVersionedTransferRequest {
-   implicit val jsonFormat: OFormat[SignedVersionedTransferRequest] = Json.format
+  implicit val format: OFormat[SignedVersionedTransferRequest] = Json.format
 }
 
 @ApiModel(value = "Signed Asset transfer transaction")
@@ -26,7 +26,7 @@ case class SignedVersionedTransferRequest(@ApiModelProperty(value = "Base58 enco
                                           @ApiModelProperty(required = true)
                                           timestamp: Long,
                                           @ApiModelProperty(required = true)
-                                          version: Int,
+                                          version: Byte,
                                           @ApiModelProperty(value = "Base58 encoded attachment")
                                           attachment: Option[String],
                                           @ApiModelProperty(required = true)
@@ -38,8 +38,8 @@ case class SignedVersionedTransferRequest(@ApiModelProperty(value = "Base58 enco
       _assetId    <- parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      _recipient <- AddressOrAlias.fromString(recipient)
+      _recipient  <- AddressOrAlias.fromString(recipient)
       _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
-      t           <- VersionedTransferTransaction.create(version.toByte, _assetId, _sender,_recipient, amount, timestamp, fee, _attachment.arr, _proofs)
+      t           <- VersionedTransferTransaction.create(version, _assetId, _sender, _recipient, amount, timestamp, fee, _attachment.arr, _proofs)
     } yield t
 }

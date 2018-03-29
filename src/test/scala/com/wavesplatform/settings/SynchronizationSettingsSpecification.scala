@@ -9,8 +9,7 @@ import scala.concurrent.duration._
 
 class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
   "SynchronizationSettings" should "read values" in {
-    val config = ConfigFactory.parseString(
-      """
+    val config = ConfigFactory.parseString("""
         |waves {
         |  synchronization {
         |    max-rollback = 100

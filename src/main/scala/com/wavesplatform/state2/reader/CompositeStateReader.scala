@@ -3,10 +3,11 @@ package com.wavesplatform.state2.reader
 import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Address, Alias}
+import scorex.transaction.Transaction
+import scorex.transaction.Transaction.Type
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.Script
-import scorex.transaction.{Transaction, TransactionParser}
 
 class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff]) extends SnapshotStateReader {
 
@@ -40,10 +41,10 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
 
   override def height: Int = inner.height + (if (maybeDiff.isDefined) 1 else 0)
 
-  override def addressTransactions(address: Address, types: Set[TransactionParser.TransactionType.Value], from: Int, count: Int) = {
+  override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = {
     val transactionsFromDiff = diff.transactions.values.view
       .collect {
-        case (height, tx, addresses) if addresses(address) && (types(tx.transactionType) || types.isEmpty) => (height, tx)
+        case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder.typeId)) => (height, tx)
       }
       .slice(from, from + count)
       .toSeq
@@ -52,7 +53,7 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
 
     if (actualTxCount == count) transactionsFromDiff
     else {
-      transactionsFromDiff ++ inner.addressTransactions(address, types, 0, count - actualTxCount)
+      transactionsFromDiff ++ inner.addressTransactions(address, types, count - actualTxCount, 0)
     }
   }
 
@@ -99,7 +100,7 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
 
   override def accountData(acc: Address): AccountDataInfo = {
     val fromInner = inner.accountData(acc)
-    val fromDiff = diff.accountData.get(acc).orEmpty
+    val fromDiff  = diff.accountData.get(acc).orEmpty
     fromInner.combine(fromDiff)
   }
 

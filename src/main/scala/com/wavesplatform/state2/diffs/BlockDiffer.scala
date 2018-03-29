@@ -19,7 +19,11 @@ object BlockDiffer extends ScorexLogging with Instrumented {
 
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
-  def fromBlock(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, maybePrevBlock: Option[Block], block: Block): Either[ValidationError, Diff] = {
+  def fromBlock(settings: FunctionalitySettings,
+                fp: FeatureProvider,
+                s: SnapshotStateReader,
+                maybePrevBlock: Option[Block],
+                block: Block): Either[ValidationError, Diff] = {
     val blockSigner = block.signerData.generator.toAddress
     val stateHeight = s.height
 
@@ -29,8 +33,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     lazy val prevBlockFeeDistr: Option[Diff] =
       if (stateHeight > ng4060switchHeight)
         maybePrevBlock
-          .map(prevBlock => Diff.empty.copy(
-            portfolios = Map(blockSigner -> prevBlock.prevBlockFeePart())))
+          .map(prevBlock => Diff.empty.copy(portfolios = Map(blockSigner -> prevBlock.prevBlockFeePart())))
       else None
 
     lazy val currentBlockFeeDistr =
@@ -42,11 +45,21 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     val prevBlockTimestamp = maybePrevBlock.map(_.timestamp)
     for {
       _ <- block.signaturesValid()
-      r <- apply(settings, s, fp, prevBlockTimestamp)(block.signerData.generator, prevBlockFeeDistr, currentBlockFeeDistr, block.timestamp, block.transactionData, 1)
+      r <- apply(settings, s, fp, prevBlockTimestamp)(block.signerData.generator,
+                                                      prevBlockFeeDistr,
+                                                      currentBlockFeeDistr,
+                                                      block.timestamp,
+                                                      block.transactionData,
+                                                      1)
     } yield r
   }
 
-  def fromMicroBlock(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, prevBlockTimestamp: Option[Long], micro: MicroBlock, timestamp: Long): Either[ValidationError, Diff] = {
+  def fromMicroBlock(settings: FunctionalitySettings,
+                     fp: FeatureProvider,
+                     s: SnapshotStateReader,
+                     prevBlockTimestamp: Option[Long],
+                     micro: MicroBlock,
+                     timestamp: Long): Either[ValidationError, Diff] = {
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
       _ <- Either.cond(fp.activatedFeatures().contains(BlockchainFeatures.NG.id), (), ActivationError(s"MicroBlocks are not yet activated"))
@@ -55,33 +68,47 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     } yield r
   }
 
-  private def apply(settings: FunctionalitySettings, s: SnapshotStateReader, fp: FeatureProvider, prevBlockTimestamp: Option[Long])
-                   (blockGenerator: Address, prevBlockFeeDistr: Option[Diff], currentBlockFeeDistr: Option[Diff],
-                    timestamp: Long, txs: Seq[Transaction], heightDiff: Int): Either[ValidationError, Diff] = {
+  private def apply(settings: FunctionalitySettings, s: SnapshotStateReader, fp: FeatureProvider, prevBlockTimestamp: Option[Long])(
+      blockGenerator: Address,
+      prevBlockFeeDistr: Option[Diff],
+      currentBlockFeeDistr: Option[Diff],
+      timestamp: Long,
+      txs: Seq[Transaction],
+      heightDiff: Int): Either[ValidationError, Diff] = {
     val currentBlockHeight = s.height + heightDiff
-    val txDiffer = TransactionDiffer(settings, prevBlockTimestamp, timestamp, currentBlockHeight) _
+    val txDiffer           = TransactionDiffer(settings, prevBlockTimestamp, timestamp, currentBlockHeight) _
 
     val txsDiffEi = currentBlockFeeDistr match {
       case Some(feedistr) =>
-        txs.foldLeft(right(Monoid.combine(prevBlockFeeDistr.orEmpty, feedistr))) { case (ei, tx) => ei.flatMap(diff =>
-          txDiffer(composite(s, diff), fp, tx)
-            .map(newDiff => diff.combine(newDiff)))
+        txs.foldLeft(right(Monoid.combine(prevBlockFeeDistr.orEmpty, feedistr))) {
+          case (ei, tx) =>
+            ei.flatMap(
+              diff =>
+                txDiffer(composite(s, diff), fp, tx)
+                  .map(newDiff => diff.combine(newDiff)))
         }
       case None =>
-        txs.foldLeft(right(prevBlockFeeDistr.orEmpty)) { case (ei, tx) => ei.flatMap(diff =>
-          txDiffer(composite(s, diff), fp, tx)
-            .map(newDiff => diff.combine(newDiff.copy(portfolios = newDiff.portfolios.combine(Map(blockGenerator -> tx.feeDiff()).mapValues(_.multiply(Block.CurrentBlockFeePart)))))))
+        txs.foldLeft(right(prevBlockFeeDistr.orEmpty)) {
+          case (ei, tx) =>
+            ei.flatMap(diff =>
+              txDiffer(composite(s, diff), fp, tx).map { newDiff =>
+                diff.combine(
+                  newDiff.copy(
+                    portfolios = newDiff.portfolios.combine(Map(blockGenerator -> tx.feeDiff()).mapValues(_.multiply(Block.CurrentBlockFeePart)))))
+            })
         }
     }
 
     txsDiffEi.map { d =>
-      val diffWithCancelledLeases = if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
-        Monoid.combine(d, CancelAllLeases(composite(s, d)))
-      else d
+      val diffWithCancelledLeases =
+        if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
+          Monoid.combine(d, CancelAllLeases(composite(s, d)))
+        else d
 
-      val diffWithLeasePatches = if (currentBlockHeight == settings.blockVersion3AfterHeight)
-        Monoid.combine(diffWithCancelledLeases, CancelLeaseOverflow(composite(s, diffWithCancelledLeases)))
-      else diffWithCancelledLeases
+      val diffWithLeasePatches =
+        if (currentBlockHeight == settings.blockVersion3AfterHeight)
+          Monoid.combine(diffWithCancelledLeases, CancelLeaseOverflow(composite(s, diffWithCancelledLeases)))
+        else diffWithCancelledLeases
 
       diffWithLeasePatches
     }

@@ -1,9 +1,10 @@
-package com.wavesplatform.it
+package com.wavesplatform.it.async
 
 import com.typesafe.config.Config
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
 import org.scalatest._
 
 import scala.concurrent.Await
@@ -13,11 +14,12 @@ import scala.concurrent.duration._
 
 class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure with ReportingTestName with NodesFromDocker {
 
-  override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
-    .overrideBase(_.quorum(2))
-    .withDefault(3)
-    .withSpecial(_.quorum(0))
-    .buildNonConflicting()
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(2))
+      .withDefault(3)
+      .withSpecial(_.quorum(0))
+      .buildNonConflicting()
 
   private def primaryNode = dockerNodes().last
 
@@ -27,9 +29,14 @@ class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure 
 
   "primary node should blacklist other nodes" in Await.result(
     for {
-      _ <- traverse(otherNodes) { n => primaryNode.blacklist(n.containerNetworkAddress) }
+      _ <- traverse(otherNodes) { n =>
+        primaryNode.blacklist(n.containerNetworkAddress)
+      }
       expectedBlacklistedPeers = nodes.size - 1
-      _ <- primaryNode.waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers.size == $expectedBlacklistedPeers")(_.blacklistedPeers, _.lengthCompare(expectedBlacklistedPeers) == 0, 1.second)
+      _ <- primaryNode.waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers.size == $expectedBlacklistedPeers")(
+        _.blacklistedPeers,
+        _.lengthCompare(expectedBlacklistedPeers) == 0,
+        1.second)
     } yield (),
     1.minute
   )
@@ -42,7 +49,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure 
   "and sync again" in Await.result(
     for {
       baseHeight <- traverse(nodes)(_.height).map(_.max)
-      _ <- nodes.waitForSameBlocksAt(5.seconds, baseHeight + 5)
+      _          <- nodes.waitForSameBlocksAt(5.seconds, baseHeight + 5)
     } yield (),
     5.minutes
   )
