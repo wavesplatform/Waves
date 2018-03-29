@@ -6,11 +6,14 @@ import com.wavesplatform.crypto
 import com.wavesplatform.http.{ApiMarshallers, PlayJsonException, api_key, deprecated_api_key}
 import com.wavesplatform.settings.RestAPISettings
 import play.api.libs.json.Reads
+import scorex.account.AddressScheme
 import scorex.crypto.encode.Base58
 
 trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
   val settings: RestAPISettings
   val route: Route
+
+  implicit val addressScheme: AddressScheme
 
   private lazy val apiKeyHash = Base58.decode(settings.apiKeyHash).toOption
 

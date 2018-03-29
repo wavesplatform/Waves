@@ -50,14 +50,14 @@ case class TransferTransaction private (assetId: Option[AssetId],
     )
   }
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
+  override def json(implicit addressScheme: AddressScheme): JsObject =
+    jsonBase ++ Json.obj(
       "recipient"  -> recipient.stringRepr,
       "assetId"    -> assetId.map(_.base58),
       "amount"     -> amount,
       "feeAsset"   -> feeAssetId.map(_.base58),
       "attachment" -> Base58.encode(attachment)
-    ))
+    )
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), signature.arr, bodyBytes()))
 

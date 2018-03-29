@@ -34,12 +34,12 @@ case class ReissueTransaction private (sender: PublicKeyAccount,
       Longs.toByteArray(timestamp)
     ))
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
+  override def json(implicit addressScheme: AddressScheme): JsObject =
+    jsonBase ++ Json.obj(
       "assetId"    -> assetId.base58,
       "quantity"   -> quantity,
       "reissuable" -> reissuable
-    ))
+    )
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 

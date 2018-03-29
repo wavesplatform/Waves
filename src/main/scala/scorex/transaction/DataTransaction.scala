@@ -30,12 +30,12 @@ case class DataTransaction private (version: Byte, sender: PublicKeyAccount, dat
 
   implicit val dataItemFormat: Format[DataEntry[_]] = DataEntry.Format
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce {
-    jsonBase() ++ Json.obj(
+  override def json(implicit addressScheme: AddressScheme): JsObject =
+    jsonBase ++ Json.obj(
       "version" -> version,
       "data"    -> Json.toJson(data)
     )
-  }
+
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 }

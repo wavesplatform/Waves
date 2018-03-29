@@ -145,10 +145,10 @@ case class Block private (override val timestamp: Long,
       signerField.bytes()
   }
 
-  val json: Coeval[JsObject] = Coeval.evalOnce(
+  def json(implicit addressScheme: AddressScheme): JsObject =
     BlockHeader.json(this, bytes().length) ++
       Json.obj("fee" -> transactionData.filter(_.assetFee._1.isEmpty).map(_.assetFee._2).sum) ++
-      transactionField.json())
+      transactionField.json()
 
   val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(bytes().dropRight(SignatureLength))
 

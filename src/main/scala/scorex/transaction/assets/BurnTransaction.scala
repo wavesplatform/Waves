@@ -20,13 +20,12 @@ case class BurnTransaction private (sender: PublicKeyAccount, assetId: ByteStr, 
     Bytes
       .concat(Array(builder.typeId), sender.publicKey, assetId.arr, Longs.toByteArray(amount), Longs.toByteArray(fee), Longs.toByteArray(timestamp)))
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce {
-    jsonBase() ++ Json.obj(
-      "assetId" -> assetId.base58,
-      "amount"  -> amount,
-      "fee"     -> fee
-    )
-  }
+  override def json(implicit addressScheme: AddressScheme): JsObject = jsonBase ++ Json.obj(
+    "assetId" -> assetId.base58,
+    "amount" -> amount,
+    "fee" -> fee
+  )
+
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 

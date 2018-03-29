@@ -8,6 +8,7 @@ import akka.http.scaladsl.model.StatusCode
 import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers, Unmarshaller}
 import akka.util.ByteString
 import play.api.libs.json._
+import scorex.account.AddressScheme
 import scorex.api.http.ApiError
 import scorex.transaction.{Transaction, ValidationError}
 
@@ -17,14 +18,14 @@ case class PlayJsonException(cause: Option[Throwable] = None, errors: Seq[(JsPat
 
 trait ApiMarshallers {
   type TRM[A] = ToResponseMarshaller[A]
-
+  implicit val addressScheme: AddressScheme
   import akka.http.scaladsl.marshalling.PredefinedToResponseMarshallers._
   implicit val aem: TRM[ApiError] = fromStatusCodeAndValue[StatusCode, JsValue].compose { ae =>
     ae.code -> ae.json
   }
   implicit val vem: TRM[ValidationError] = aem.compose(ve => ApiError.fromValidationError(ve))
 
-  implicit val tw: Writes[Transaction] = Writes(_.json())
+  implicit val tw: Writes[Transaction] = Writes(_.json)
 
   private val jsonStringUnmarshaller =
     Unmarshaller.byteStringUnmarshaller
@@ -57,5 +58,3 @@ trait ApiMarshallers {
   // preserve support for using plain strings as request entities
   implicit val stringMarshaller = PredefinedToEntityMarshallers.stringMarshaller(`text/plain`)
 }
-
-object ApiMarshallers extends ApiMarshallers

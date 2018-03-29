@@ -18,7 +18,7 @@ case class PaymentTransaction private (sender: PublicKeyAccount, recipient: Addr
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val id: Coeval[AssetId]               = Coeval.evalOnce(signature)
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount))
+  override def json(implicit addressScheme: AddressScheme): JsObject = jsonBase ++ Json.obj("recipient" -> recipient.address, "amount" -> amount)
 
   private val hashBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(Array(builder.typeId),

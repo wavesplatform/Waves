@@ -21,8 +21,8 @@ case class CreateAliasTransaction private (sender: PublicKeyAccount, alias: Alia
     Bytes
       .concat(Array(builder.typeId), sender.publicKey, Deser.serializeArray(alias.bytes.arr), Longs.toByteArray(fee), Longs.toByteArray(timestamp)))
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
+  override def json(implicit addressScheme: AddressScheme): JsObject = (
+    jsonBase ++ Json.obj(
       "alias"     -> alias.name,
       "fee"       -> fee,
       "timestamp" -> timestamp

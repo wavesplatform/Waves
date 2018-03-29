@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.crypto
 import com.wavesplatform.state2._
 import monix.eval.Coeval
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 import scorex.account._
 import scorex.serialization.Deser
 import scorex.transaction.TransactionParsers.KeyLength
@@ -35,7 +35,7 @@ case class SetScriptTransaction private (version: Byte,
     ))
 
   override val assetFee = (None, fee)
-  override val json     = Coeval.evalOnce(jsonBase() ++ Json.obj("version" -> version, "script" -> script.map(_.bytes())))
+  override def json(implicit addressScheme: AddressScheme): JsObject = jsonBase ++ Json.obj("version" -> version, "script" -> script.map(_.bytes()))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 }

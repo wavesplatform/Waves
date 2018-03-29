@@ -30,13 +30,13 @@ case class LeaseTransaction private (sender: PublicKeyAccount,
                  Longs.toByteArray(fee),
                  Longs.toByteArray(timestamp)))
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
+  override def json(implicit addressScheme: AddressScheme): JsObject =
+    jsonBase ++ Json.obj(
       "amount"    -> amount,
       "recipient" -> recipient.stringRepr,
       "fee"       -> fee,
       "timestamp" -> timestamp
-    ))
+    )
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val bytes: Coeval[Array[Byte]]        = Coeval.evalOnce(Bytes.concat(bodyBytes(), signature.arr))

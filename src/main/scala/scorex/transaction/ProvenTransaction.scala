@@ -2,6 +2,7 @@ package scorex.transaction
 
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
+import scorex.account.AddressScheme
 import scorex.crypto.encode.Base58
 
 trait ProvenTransaction extends Transaction with Proven {
@@ -10,7 +11,7 @@ trait ProvenTransaction extends Transaction with Proven {
 
   val bodyBytes: Coeval[Array[Byte]]
 
-  protected def jsonBase(): JsObject =
+  protected def jsonBase(implicit addressScheme: AddressScheme): JsObject =
     Json.obj(
       "type"            -> builder.typeId,
       "id"              -> id().base58,

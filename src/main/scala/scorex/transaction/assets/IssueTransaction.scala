@@ -43,15 +43,15 @@ case class IssueTransaction private (sender: PublicKeyAccount,
       Longs.toByteArray(timestamp)
     ))
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
+  override def json(implicit addressScheme: AddressScheme): JsObject =
+    jsonBase++ Json.obj(
       "assetId"     -> assetId().base58,
       "name"        -> new String(name, Charsets.UTF_8),
       "description" -> new String(description, Charsets.UTF_8),
       "quantity"    -> quantity,
       "decimals"    -> decimals,
       "reissuable"  -> reissuable
-    ))
+    )
 
   override val bytes = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), signature.arr, bodyBytes()))
 

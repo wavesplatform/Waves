@@ -2,16 +2,14 @@ package scorex.transaction
 
 import com.wavesplatform.state2._
 import monix.eval.Coeval
-import scorex.serialization.{BytesSerializable, JsonSerializable}
+import scorex.serialization.{BytesSerializable, TxJsonSerializable}
 
-trait Transaction extends BytesSerializable with JsonSerializable {
+trait Transaction extends BytesSerializable with TxJsonSerializable {
   val id: Coeval[ByteStr]
 
   def builder: TransactionParser
   def assetFee: (Option[AssetId], Long)
   def timestamp: Long
-
-  override def toString: String = json().toString()
 
   override def equals(other: Any): Boolean = other match {
     case tx: Transaction => id() == tx.id()

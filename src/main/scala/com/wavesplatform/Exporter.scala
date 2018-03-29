@@ -84,7 +84,7 @@ object Exporter extends ScorexLogging {
           stream.write(bytes)
           bytes.length
         } else 0
-        val bytes = block.json().toString().getBytes(StandardCharsets.UTF_8)
+        val bytes = block.json.toString().getBytes(StandardCharsets.UTF_8)
         stream.write(bytes)
         len + bytes.length
       }

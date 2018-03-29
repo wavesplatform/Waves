@@ -48,8 +48,8 @@ case class MassTransferTransaction private (version: Byte,
     )
   }
 
-  override def jsonBase(): JsObject =
-    super.jsonBase() ++ Json.obj(
+  override def jsonBase(implicit addressScheme: AddressScheme): JsObject =
+    super.jsonBase ++ Json.obj(
       "version"       -> version,
       "assetId"       -> assetId.map(_.base58),
       "attachment"    -> Base58.encode(attachment),
@@ -57,11 +57,11 @@ case class MassTransferTransaction private (version: Byte,
       "totalAmount"   -> transfers.map(_.amount).sum
     )
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce {
-    jsonBase() ++ Json.obj("transfers" -> toJson(transfers))
-  }
+  override def json(implicit addressScheme: AddressScheme): JsObject =
+    jsonBase ++ Json.obj("transfers" -> toJson(transfers))
 
-  def compactJson(recipient: AddressOrAlias): JsObject = jsonBase() ++ Json.obj("transfers" -> toJson(transfers.filter(_.address == recipient)))
+
+  def compactJson(recipient: AddressOrAlias)(implicit addressScheme: AddressScheme): JsObject = jsonBase ++ Json.obj("transfers" -> toJson(transfers.filter(_.address == recipient)))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), proofs.bytes()))
 }
@@ -153,7 +153,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
   def parseTransfersList(transfers: List[Transfer])(implicit addressScheme: AddressScheme): Validation[List[ParsedTransfer]] = {
     transfers.traverse {
       case Transfer(recipient, amount) =>
-        AddressOrAlias.fromString(recipient).map(ParsedTransfer(_, amount))
+        AddressOrAlias.fromString(recipient)(addressScheme).map(ParsedTransfer(_, amount))
     }
   }
 

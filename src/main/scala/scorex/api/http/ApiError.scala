@@ -3,7 +3,7 @@ package scorex.api.http
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
 import play.api.libs.json._
-import scorex.account.{Address, AddressOrAlias, Alias}
+import scorex.account.{Address, AddressOrAlias, AddressScheme, Alias}
 import scorex.transaction.{Transaction, ValidationError}
 
 case class ApiErrorResponse(error: Int, message: String)
@@ -21,7 +21,7 @@ trait ApiError {
 }
 
 object ApiError {
-  def fromValidationError(e: ValidationError): ApiError = e match {
+  def fromValidationError(e: ValidationError)(implicit addressScheme: AddressScheme): ApiError = e match {
     case ValidationError.InvalidAddress(_)               => InvalidAddress
     case ValidationError.NegativeAmount(x, of)           => NegativeAmount(s"$x of $of")
     case ValidationError.InsufficientFee                 => InsufficientFee
@@ -42,7 +42,7 @@ object ApiError {
     case TransactionValidationError(error, tx) =>
       error match {
         case ValidationError.Mistiming(errorMessage) => Mistiming(errorMessage)
-        case _                                       => StateCheckFailed(tx, fromValidationError(error).message)
+        case _                                       => StateCheckFailed(tx.json, fromValidationError(error).message)
       }
     case error => CustomValidationError(error.toString)
   }
@@ -152,11 +152,11 @@ case object InvalidName extends ApiError {
   override val code: StatusCode = StatusCodes.BadRequest
 }
 
-case class StateCheckFailed(tx: Transaction, err: String) extends ApiError {
+case class StateCheckFailed(txjson: JsObject, err: String) extends ApiError {
   override val id: Int          = 112
   override val message: String  = s"State check failed. Reason: $err"
   override val code: StatusCode = StatusCodes.BadRequest
-  override lazy val json        = Json.obj("error" -> id, "message" -> message, "tx" -> tx.json())
+  override lazy val json        = Json.obj("error" -> id, "message" -> message, "tx" -> txjson)
 }
 
 case object OverflowError extends ApiError {

@@ -209,10 +209,10 @@ class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, al
               "balance"          -> balance,
               "reissuable"       -> assetInfo.reissuable,
               "quantity"         -> 0,
-              "issueTransaction" -> issueTransaction._2.json()
+              "issueTransaction" -> issueTransaction._2.json
             )).toSeq)
       )
-    }).left.map(ApiError.fromValidationError)
+    }).left.map(x => ApiError.fromValidationError(x))
   @Path("/order")
   @ApiOperation(value = "Sign Order",
                 notes = "Create order signed by address from wallet",

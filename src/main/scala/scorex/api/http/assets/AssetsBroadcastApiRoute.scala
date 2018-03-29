@@ -162,7 +162,7 @@ class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, val allCh
       r.map { xs =>
         xs.map {
           case Left(e)        => e.json
-          case Right((tx, _)) => tx.json()
+          case Right((tx, _)) => tx.json
         }
       }
     }

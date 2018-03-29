@@ -40,7 +40,7 @@ case class BlockIdField(override val name: String, override val value: Array[Byt
 }
 
 case class TransactionBlockField(override val name: String, override val value: Transaction) extends BlockField[Transaction] {
-  protected override def j: JsObject = value.json()
+  protected override def j: JsObject = value.json
 
   protected override def b = value.bytes()
 }

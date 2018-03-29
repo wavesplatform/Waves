@@ -39,15 +39,15 @@ case class ExchangeTransaction private (buyOrder: Order,
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature.arr)
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
+  override def json(implicit addressScheme: AddressScheme): JsObject =
+    jsonBase ++ Json.obj(
       "order1"         -> buyOrder.json(),
       "order2"         -> sellOrder.json(),
       "price"          -> price,
       "amount"         -> amount,
       "buyMatcherFee"  -> buyMatcherFee,
       "sellMatcherFee" -> sellMatcherFee
-    ))
+    )
 
   override val signedDescendants: Coeval[Seq[Order]] = Coeval.evalOnce(Seq(buyOrder, sellOrder))
 }

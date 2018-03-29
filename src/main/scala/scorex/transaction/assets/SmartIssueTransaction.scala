@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 import scorex.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import scorex.serialization.Deser
 import scorex.transaction.ValidationError.{GenericError, UnsupportedVersion}
@@ -46,11 +46,11 @@ case class SmartIssueTransaction private (version: Byte,
     ))
 
   override val assetFee = (None, fee)
-  override val json = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
+  override def json(implicit addressScheme: AddressScheme): JsObject =
+    jsonBase ++ Json.obj(
       "version" -> version,
       "script"  -> script.map(_.text)
-    ))
+    )
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 }

@@ -46,14 +46,14 @@ case class VersionedTransferTransaction private (version: Byte,
     )
   }
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
+  override def json(implicit addressScheme: AddressScheme): JsObject =
+    jsonBase ++ Json.obj(
       "version"    -> version,
       "recipient"  -> recipient.stringRepr,
       "assetId"    -> assetId.map(_.base58),
       "amount"     -> amount,
       "attachment" -> Base58.encode(attachment)
-    ))
+    )
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
