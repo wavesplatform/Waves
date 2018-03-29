@@ -36,9 +36,9 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
 
   implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase // IDEA bug
 
-  val log                     = LoggerFacade(LoggerFactory.getLogger("generator"))
+  val log = LoggerFacade(LoggerFactory.getLogger("generator"))
   val client: AsyncHttpClient = asyncHttpClient(clientConfig().setKeepAlive(false).setNettyTimer(GlobalTimer.instance))
-  val api: ApiRequests        = new ApiRequests(client)
+  val api: ApiRequests = new ApiRequests(client)
 
   val parser = new OptionParser[GeneratorSettings]("generator") {
     head("TransactionsGenerator - Waves load testing transactions generator")
@@ -86,7 +86,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
           .right
           .get)
 
-    val tradingAssets: Seq[AssetId]                  = assetsTx.map(tx => tx.id())
+    val tradingAssets: Seq[AssetId] = assetsTx.map(tx => tx.id())
     val signedIssueRequests: Seq[SignedIssueRequest] = assetsTx.map(tx => api.createSignedIssueRequest(tx))
 
     val issued: Seq[Future[Transaction]] = signedIssueRequests
@@ -103,7 +103,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
 
   def parsedTransfersList(endpoint: String, asset: Option[String], pk: PrivateKeyAccount, accounts: Seq[PrivateKeyAccount]): List[ParsedTransfer] = {
     val client: AsyncHttpClient = asyncHttpClient(clientConfig().setKeepAlive(false).setNettyTimer(GlobalTimer.instance))
-    val api: ApiRequests        = new ApiRequests(client)
+    val api: ApiRequests = new ApiRequests(client)
 
     val node = api.to(endpoint)
     var richAccountBalance = Await.result(
@@ -126,9 +126,9 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
   def massTransferAssets(endpoint: String, richAccountSeed: String, validAccounts: Seq[PrivateKeyAccount], tradingAssets: Seq[AssetId]) = {
 
     val node = api.to(endpoint)
-    val pk   = PrivateKeyAccount.fromSeed(richAccountSeed).right.get
+    val pk = PrivateKeyAccount.fromSeed(richAccountSeed).right.get
 
-    val wavesTransfers  = parsedTransfersList(endpoint, None, pk, validAccounts)
+    val wavesTransfers = parsedTransfersList(endpoint, None, pk, validAccounts)
     val assetsTransfers = parsedTransfersList(endpoint, Some(tradingAssets.seq.head.base58), pk, validAccounts)
 
     val wavesAndAssetTransfer = assetsTransfers :+ wavesTransfers
@@ -195,7 +195,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
           (k, Math.round(v * finalConfig.dex.orders).toInt)
       }
 
-      val threadPool                            = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
+      val threadPool = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(threadPool)
 
       val sender = new NetworkSender(finalConfig.addressScheme, "generator", nonce = Random.nextLong())
@@ -209,7 +209,8 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
 
       val tradingAssets = issueAssets(endpoint, finalConfig.richAccounts.head, finalConfig.assetPairsNum)
 
-      massTransferAssets(endpoint, finalConfig.richAccounts.head, finalConfig.validAccounts, tradingAssets)
+      massTransferAssets(endpoint, finalConfig.richAccounts.head, finalConfig.validAccounts, tradingAssets.take(finalConfig.assetPairsNum - 2))
+      massTransferAssets(endpoint, finalConfig.richAccounts.head, finalConfig.fakeAccounts, tradingAssets.drop(finalConfig.assetPairsNum - 2))
 
       val workers =
         ordersDistr.map(p => new Worker(finalConfig.worker, finalConfig, finalConfig.matcherConfig, tradingAssets, p._1, p._2, client))
