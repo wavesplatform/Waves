@@ -15,15 +15,29 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
 
   override def portfolio(a: Address) = inner.portfolio(a).combine(diff.portfolios.getOrElse(a, Portfolio.empty))
 
-  override def assetDescription(id: ByteStr) = {
-    inner
-      .assetDescription(id)
-      .orElse(diff.transactions.get(id).collectFirst {
-        case (_, it: IssueTransaction, _)      => AssetDescription(it.sender, it.name, it.decimals, it.reissuable, it.quantity, None)
-        case (_, it: SmartIssueTransaction, _) => AssetDescription(it.sender, it.name, it.decimals, it.reissuable, it.quantity, it.script)
-      })
-      .map(z => diff.issuedAssets.get(id).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume + z.totalVolume)))
-  }
+  override def assetDescription(id: ByteStr) =
+    inner.assetDescription(id) match {
+      case Some(ad) =>
+        diff.issuedAssets
+          .get(id)
+          .map { newAssetInfo =>
+            ad.copy(
+              reissuable = newAssetInfo.isReissuable,
+              totalVolume = ad.totalVolume + newAssetInfo.volume,
+              script = newAssetInfo.script
+            )
+          }
+          .orElse(Some(ad))
+      case None =>
+        diff.transactions
+          .get(id)
+          .collectFirst {
+            case (_, it: IssueTransaction, _) => AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, None)
+            case (_, it: SmartIssueTransaction, _) =>
+              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, it.script)
+          }
+          .map(z => diff.issuedAssets.get(id).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = r.script)))
+    }
 
   override def leaseDetails(leaseId: ByteStr) = {
     inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
