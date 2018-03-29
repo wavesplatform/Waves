@@ -31,13 +31,25 @@ object Terms {
   }
   case class TYPEREF(name: String) extends AUTO_TAGGED_TYPE[Obj]
 
-  sealed trait BINARY_OP_KIND
-  case object SUM_OP extends BINARY_OP_KIND
-  case object AND_OP extends BINARY_OP_KIND
-  case object OR_OP  extends BINARY_OP_KIND
-  case object EQ_OP  extends BINARY_OP_KIND
-  case object GT_OP  extends BINARY_OP_KIND
-  case object GE_OP  extends BINARY_OP_KIND
+  sealed trait BINARY_OP_KIND { val symbol: String }
+  case object SUM_OP extends BINARY_OP_KIND {
+    override val symbol: String = "+"
+  }
+  case object AND_OP extends BINARY_OP_KIND {
+    override val symbol: String = "&&"
+  }
+  case object OR_OP extends BINARY_OP_KIND {
+    override val symbol: String = "||"
+  }
+  case object EQ_OP extends BINARY_OP_KIND {
+    override val symbol: String = "=="
+  }
+  case object GT_OP extends BINARY_OP_KIND {
+    override val symbol: String = ">"
+  }
+  case object GE_OP extends BINARY_OP_KIND {
+    override val symbol: String = ">="
+  }
 
   object Untyped {
     case class LET(name: String, value: EXPR)

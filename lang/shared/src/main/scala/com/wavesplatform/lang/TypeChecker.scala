@@ -75,8 +75,10 @@ object TypeChecker {
       }
       value
 
-    case expr @ Untyped.BINARY_OP(a, op, b) =>
-      (setType(ctx, EitherT.pure(a)), setType(ctx, EitherT.pure(b))).tupled
+    case Untyped.BINARY_OP(a, op, b) =>
+      setType(ctx, EitherT.pure(Untyped.FUNCTION_CALL(op.symbol, List(a, b))))
+
+     /* (setType(ctx, EitherT.pure(a)), setType(ctx, EitherT.pure(b))).tupled
         .subflatMap {
           case operands @ (a, b) =>
             val aTpe = a.tpe
@@ -105,7 +107,7 @@ object TypeChecker {
                 }
             }
         }
-        .map { case (operands, tpe) => Typed.BINARY_OP(operands._1, op, operands._2, tpe) }
+        .flatMap { case (operands, tpe) => setType(ctx, EitherT.pure(Untyped.FUNCTION_CALL(op.symbol, List(a, b)))) }*/
 
     case block: Untyped.BLOCK =>
       block.let match {
@@ -166,7 +168,8 @@ object TypeChecker {
   }
 
   def apply(c: TypeCheckerContext, expr: Untyped.EXPR): TypeCheckResult[Typed.EXPR] = {
-    def result = setType(c, EitherT.pure(expr)).value().left.map { e =>
+    val ctx = c.copy(functionDefs = c.functionDefs ++ Evaluator.operators.map(x => (x.name, x.signature)))
+    def result = setType(ctx, EitherT.pure(expr)).value().left.map { e =>
       s"Typecheck failed: $e"
     }
     Try(result) match {
