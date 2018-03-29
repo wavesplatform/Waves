@@ -1,20 +1,17 @@
 package scorex.transaction.assets
 
-import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
-import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
-import io.netty.buffer.ByteBuf
 import monix.eval.Coeval
 import play.api.libs.json.Json
 import scorex.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import scorex.serialization.Deser
+import scorex.transaction._
 import scorex.transaction.ValidationError.{GenericError, UnsupportedVersion}
 import scorex.transaction.smart.Script
-import scorex.transaction._
 
 import scala.util.Try
 

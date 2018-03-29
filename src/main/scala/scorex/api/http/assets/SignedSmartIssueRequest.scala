@@ -7,9 +7,8 @@ import play.api.libs.json.{Format, Json}
 import scorex.account.{AddressScheme, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.{Proofs, ValidationError}
-import scorex.transaction.assets.{SmartIssueTransaction, VersionedTransferTransaction}
+import scorex.transaction.assets.SmartIssueTransaction
 import scorex.transaction.smart.Script
-import scorex.transaction.assets.exchange.OrderJson.orderFormat
 
 object SignedSmartIssueRequest {
   implicit val signedExchangeRequestFormat: Format[SignedSmartIssueRequest] = Json.format
