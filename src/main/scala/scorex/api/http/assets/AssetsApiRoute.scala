@@ -242,7 +242,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
               "assetId"          -> assetId.base58,
               "balance"          -> balance,
               "reissuable"       -> assetInfo.reissuable,
-              "quantity"         -> 0,
+              "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
               "issueTransaction" -> issueTransaction._2.json()
             )).toSeq)
       )
