@@ -75,8 +75,14 @@ object SyncHttpApi extends Assertions {
     def issue(sourceAddress: String, name: String, description: String, quantity: Long, decimals: Byte, reissuable: Boolean, fee: Long): Transaction =
       Await.result(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee), RequestAwaitTime)
 
+    def scriptCompile(code: String): CompiledScript =
+      Await.result(async(n).scriptCompile(code), RequestAwaitTime)
+
     def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Transaction =
       Await.result(async(n).burn(sourceAddress, assetId, quantity, fee), RequestAwaitTime)
+
+    def sign(jsObject: JsObject): JsObject =
+      Await.result(async(n).sign(jsObject), RequestAwaitTime)
 
     def createAlias(targetAddress: String, alias: String, fee: Long): Transaction =
       Await.result(async(n).createAlias(targetAddress, alias, fee), RequestAwaitTime)
@@ -130,6 +136,9 @@ object SyncHttpApi extends Assertions {
 
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Transaction =
       Await.result(async(n).waitForTransaction(txId), RequestAwaitTime)
+
+    def signAndBroadcast(tx: JsObject): Transaction =
+      Await.result(async(n).signAndBroadcast(tx), RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {

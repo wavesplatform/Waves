@@ -180,6 +180,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case LeaseCancelTransaction       => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
               case CreateAliasTransaction       => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
               case DataTransaction              => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
+              case SmartIssueTransaction        => TransactionFactory.smartIssue(jsv.as[SmartIssueRequest], wallet, time)
               case SetScriptTransaction         => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
             }
         }
@@ -221,6 +222,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case LeaseCancelTransaction       => jsv.as[SignedLeaseCancelRequest].toTx
               case CreateAliasTransaction       => jsv.as[SignedCreateAliasRequest].toTx
               case DataTransaction              => jsv.as[SignedDataRequest].toTx
+              case SmartIssueTransaction        => jsv.as[SignedSmartIssueRequest].toTx
               case SetScriptTransaction         => jsv.as[SignedSetScriptRequest].toTx
             }
         }
