@@ -682,9 +682,14 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
 
         rw.delete(txIdsAtHeight)
 
-        discardedBlocks += rw
+        val discardedBlock = rw
           .get(k.blockAt(currentHeight))
           .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
+
+        discardedBlocks += discardedBlock
+
+        rw.delete(k.blockAt(currentHeight))
+        rw.delete(k.heightOf(discardedBlock.uniqueId))
       }
 
       log.debug(s"Rollback to block $targetBlockId at $targetHeight completed")
