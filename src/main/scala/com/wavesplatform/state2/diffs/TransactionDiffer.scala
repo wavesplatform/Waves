@@ -4,6 +4,7 @@ import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
+import scorex.account.AddressScheme
 import scorex.transaction.ValidationError.UnsupportedTransactionType
 import scorex.transaction._
 import scorex.transaction.assets._
@@ -18,7 +19,7 @@ object TransactionDiffer {
   def apply(settings: FunctionalitySettings, prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int)(
       s: SnapshotStateReader,
       fp: FeatureProvider,
-      tx: Transaction): Either[ValidationError, Diff] = {
+      tx: Transaction)(implicit addressScheme: AddressScheme): Either[ValidationError, Diff] = {
     for {
       _ <- Verifier(s, currentBlockHeight)(tx)
       _ <- CommonValidation.disallowTxFromFuture(settings, currentBlockTimestamp, tx)

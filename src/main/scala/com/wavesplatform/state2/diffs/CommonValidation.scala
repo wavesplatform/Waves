@@ -5,7 +5,7 @@ import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures, Featur
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{Portfolio, _}
-import scorex.account.Address
+import scorex.account.{Address, AddressScheme}
 import scorex.transaction.ValidationError.{AlreadyInTheState, GenericError, Mistiming}
 import scorex.transaction._
 import scorex.transaction.assets._
@@ -21,10 +21,8 @@ object CommonValidation {
   val MaxTimeTransactionOverBlockDiff: FiniteDuration     = 90.minutes
   val MaxTimePrevBlockOverTransactionDiff: FiniteDuration = 2.hours
 
-  def disallowSendingGreaterThanBalance[T <: Transaction](s: SnapshotStateReader,
-                                                          settings: FunctionalitySettings,
-                                                          blockTime: Long,
-                                                          tx: T): Either[ValidationError, T] =
+  def disallowSendingGreaterThanBalance[T <: Transaction](s: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, tx: T)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, T] =
     if (blockTime >= settings.allowTemporaryNegativeUntil) {
       def checkTransfer(sender: Address, assetId: Option[AssetId], amount: Long, feeAssetId: Option[AssetId], feeAmount: Long) = {
         val amountDiff = assetId match {
@@ -62,13 +60,13 @@ object CommonValidation {
       }
 
       tx match {
-        case ptx: PaymentTransaction if s.portfolio(ptx.sender).balance < (ptx.amount + ptx.fee) =>
+        case ptx: PaymentTransaction if s.portfolio(ptx.sender.toAddress).balance < (ptx.amount + ptx.fee) =>
           Left(
             GenericError(
               "Attempt to pay unavailable funds: balance " +
-                s"${s.portfolio(ptx.sender).balance} is less than ${ptx.amount + ptx.fee}"))
-        case ttx: TransferTransaction     => checkTransfer(ttx.sender, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
-        case mtx: MassTransferTransaction => checkTransfer(mtx.sender, mtx.assetId, mtx.transfers.map(_.amount).sum, None, mtx.fee)
+                s"${s.portfolio(ptx.sender.toAddress).balance} is less than ${ptx.amount + ptx.fee}"))
+        case ttx: TransferTransaction     => checkTransfer(ttx.sender.toAddress, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
+        case mtx: MassTransferTransaction => checkTransfer(mtx.sender.toAddress, mtx.assetId, mtx.transfers.map(_.amount).sum, None, mtx.fee)
         case _                            => Right(tx)
       }
     } else Right(tx)

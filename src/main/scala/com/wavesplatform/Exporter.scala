@@ -27,10 +27,9 @@ object Exporter extends ScorexLogging {
     val format               = Try(args(3)).toOption.filter(s => s.toUpperCase == "JSON").getOrElse("BINARY").toUpperCase
 
     val settings = WavesSettings.fromConfig(loadConfig(ConfigFactory.parseFile(new File(configFilename))))
-    AddressScheme.current = new AddressScheme {
+    implicit val addressScheme = new AddressScheme {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
-
     val db               = openDB(settings.dataDirectory, settings.levelDbCacheSize)
     val (history, _, _)  = StorageFactory(settings, db, NTP)
     val blockchainHeight = history.height
@@ -76,7 +75,7 @@ object Exporter extends ScorexLogging {
       .getOrElse(0)
   }
 
-  private def exportBlockToJson(stream: OutputStream, history: History, height: Int): Int = {
+  private def exportBlockToJson(stream: OutputStream, history: History, height: Int)(implicit addressScheme: AddressScheme): Int = {
     val maybeBlock = history.blockAt(height)
     maybeBlock
       .map { block =>

@@ -3,7 +3,7 @@ package scorex.api.http.assets
 import cats.implicits._
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Json, OFormat}
-import scorex.account.{AddressOrAlias, PublicKeyAccount}
+import scorex.account.{AddressOrAlias, AddressScheme, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
 import scorex.transaction.{AssetIdStringLength, Proofs, ValidationError}
@@ -32,7 +32,7 @@ case class SignedVersionedTransferRequest(@ApiModelProperty(value = "Base58 enco
                                           @ApiModelProperty(required = true)
                                           proofs: List[String])
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, VersionedTransferTransaction] =
+  def toTx(implicit addressScheme: AddressScheme): Either[ValidationError, VersionedTransferTransaction] =
     for {
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _assetId    <- parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)

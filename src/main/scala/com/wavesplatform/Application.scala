@@ -56,6 +56,10 @@ import scala.util.Try
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject) extends ScorexLogging {
 
+  implicit val addressScheme = new AddressScheme {
+    override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
+  }
+
   import monix.execution.Scheduler.Implicits.{global => scheduler}
 
   private val db = openDB(settings.dataDirectory, settings.levelDbCacheSize)
@@ -121,6 +125,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   }
 
   def run(): Unit = {
+
     checkGenesis(history, settings, blockchainUpdater)
 
     if (wallet.privateKeyAccounts.isEmpty)
@@ -266,15 +271,21 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     nodeApi.foreach {
       case (tags, routes) =>
         val apiRoutes = routes ++ Seq(
-          BlocksApiRoute(settings.restAPISettings, history, blockchainUpdater, allChannels, c => processCheckpoint(None, c)),
-          TransactionsApiRoute(settings.restAPISettings, wallet, state, history, utxStorage, allChannels, time),
-          NxtConsensusApiRoute(settings.restAPISettings, state, history, settings.blockchainSettings.functionalitySettings),
-          WalletApiRoute(settings.restAPISettings, wallet),
-          PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
-          UtilsApiRoute(time, settings.restAPISettings),
-          PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
-          AddressApiRoute(settings.restAPISettings, wallet, state, utxStorage, allChannels, time, settings.blockchainSettings.functionalitySettings),
-          DebugApiRoute(
+          new BlocksApiRoute(settings.restAPISettings, history, blockchainUpdater, allChannels, c => processCheckpoint(None, c)),
+          new TransactionsApiRoute(settings.restAPISettings, wallet, state, history, utxStorage, allChannels, time),
+          new NxtConsensusApiRoute(settings.restAPISettings, state, history, settings.blockchainSettings.functionalitySettings),
+          new WalletApiRoute(settings.restAPISettings, wallet),
+          new PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
+          new UtilsApiRoute(time, settings.restAPISettings),
+          new PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
+          new AddressApiRoute(settings.restAPISettings,
+                              wallet,
+                              state,
+                              utxStorage,
+                              allChannels,
+                              time,
+                              settings.blockchainSettings.functionalitySettings),
+          new DebugApiRoute(
             settings.restAPISettings,
             wallet,
             state,
@@ -291,18 +302,18 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
             scoreStatsReporter,
             configRoot
           ),
-          WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
-          AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, state, time),
-          ActivationApiRoute(settings.restAPISettings,
-                             settings.blockchainSettings.functionalitySettings,
-                             settings.featuresSettings,
-                             history,
-                             history),
-          AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-          LeaseApiRoute(settings.restAPISettings, wallet, state, utxStorage, allChannels, time),
-          LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-          AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, state),
-          AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
+          new WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
+          new AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, state, time),
+          new ActivationApiRoute(settings.restAPISettings,
+                                 settings.blockchainSettings.functionalitySettings,
+                                 settings.featuresSettings,
+                                 history,
+                                 history),
+          new AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
+          new LeaseApiRoute(settings.restAPISettings, wallet, state, utxStorage, allChannels, time),
+          new LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
+          new AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, state),
+          new AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
         )
 
         val apiTypes = tags ++ Seq(
@@ -471,11 +482,6 @@ object Application extends ScorexLogging {
               .addField("mbs-wait-response-timeout", microBlockSynchronizer.waitResponseTimeout.toMillis)
           )
         }
-      }
-
-      // Initialize global var with actual address scheme
-      AddressScheme.current = new AddressScheme {
-        override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
       }
 
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")

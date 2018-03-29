@@ -37,7 +37,7 @@ object CreateAliasTransaction extends TransactionParserFor[CreateAliasTransactio
 
   override val typeId: Byte = 10
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(version: Byte, bytes: Array[Byte])(implicit addressScheme: AddressScheme): Try[TransactionT] =
     Try {
       val sender                 = PublicKeyAccount(bytes.slice(0, KeyLength))
       val (aliasBytes, aliasEnd) = Deser.parseArraySize(bytes, KeyLength)

@@ -5,7 +5,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.state2._
 import monix.eval.Coeval
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block.{BlockId, transParseBytes}
 import scorex.transaction.TransactionParsers.SignatureLength
 import scorex.transaction.ValidationError.GenericError
@@ -81,7 +81,7 @@ object MicroBlock extends ScorexLogging {
       nonSigned.copy(signature = ByteStr(signature))
     }
 
-  def parseBytes(bytes: Array[Byte]): Try[MicroBlock] =
+  def parseBytes(bytes: Array[Byte])(implicit addressScheme: AddressScheme): Try[MicroBlock] =
     Try {
 
       val version = bytes.head

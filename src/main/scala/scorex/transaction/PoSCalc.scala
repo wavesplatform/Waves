@@ -4,7 +4,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import scorex.account.{Address, PublicKeyAccount}
+import scorex.account.{Address, AddressScheme, PublicKeyAccount}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.utils.ScorexLogging
@@ -75,8 +75,8 @@ object PoSCalc extends ScorexLogging {
                               fs: FunctionalitySettings,
                               block: Block,
                               account: PublicKeyAccount,
-                              featureProvider: FeatureProvider): Either[String, (Long, Long)] = {
-    val balance = generatingBalance(state, fs, account, height)
+                              featureProvider: FeatureProvider)(implicit addressScheme: AddressScheme): Either[String, (Long, Long)] = {
+    val balance = generatingBalance(state, fs, account.toAddress, height)
     Either
       .cond(
         (!featureProvider
@@ -84,7 +84,7 @@ object PoSCalc extends ScorexLogging {
           (featureProvider
             .isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance, height) && balance >= MinimalEffectiveBalanceForGenerator2),
         balance,
-        s"Balance $balance of ${account.address} is lower than required for generation"
+        s"Balance $balance of ${account.toAddress} is lower than required for generation"
       )
       .flatMap { _ =>
         val cData        = block.consensusData

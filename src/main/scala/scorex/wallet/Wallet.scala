@@ -8,7 +8,7 @@ import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.utils.{JsonFileStorage, _}
 import play.api.libs.json._
-import scorex.account.{Address, PrivateKeyAccount}
+import scorex.account.{Address, AddressScheme, PrivateKeyAccount}
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.MissingSenderPrivateKey
 import scorex.utils.{ScorexLogging, randomBytes}
@@ -37,7 +37,7 @@ trait Wallet {
 object Wallet extends ScorexLogging {
 
   implicit class WalletExtension(w: Wallet) {
-    def findWallet(addressString: String): Either[ValidationError, PrivateKeyAccount] =
+    def findWallet(addressString: String)(implicit addressScheme: AddressScheme): Either[ValidationError, PrivateKeyAccount] =
       for {
         acc        <- Address.fromString(addressString)
         privKeyAcc <- w.privateKeyAccount(acc)
@@ -58,9 +58,11 @@ object Wallet extends ScorexLogging {
   def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] =
     crypto.secureHash(Bytes.concat(Ints.toByteArray(nonce), seed))
 
-  def apply(settings: WalletSettings): Wallet = new WalletImpl(settings.file, settings.password, settings.seed)
+  def apply(settings: WalletSettings)(implicit addressScheme: AddressScheme): Wallet = new WalletImpl(settings.file, settings.password, settings.seed)
 
-  private class WalletImpl(maybeFile: Option[File], password: String, maybeSeedFromConfig: Option[ByteStr]) extends ScorexLogging with Wallet {
+  private class WalletImpl(maybeFile: Option[File], password: String, maybeSeedFromConfig: Option[ByteStr])(implicit addressScheme: AddressScheme)
+      extends ScorexLogging
+      with Wallet {
 
     private val key = JsonFileStorage.prepareKey(password)
 
@@ -98,7 +100,7 @@ object Wallet extends ScorexLogging {
 
     private val accountsCache: TrieMap[String, PrivateKeyAccount] = {
       val accounts = walletData.accountSeeds.map(seed => PrivateKeyAccount(seed.arr))
-      TrieMap(accounts.map(acc => acc.address -> acc).toSeq: _*)
+      TrieMap(accounts.map(acc => acc.toAddress.address -> acc).toSeq: _*)
     }
 
     private def save(): Unit = maybeFile.foreach(f => JsonFileStorage.save(walletData, f.getCanonicalPath, Some(key)))
@@ -107,9 +109,9 @@ object Wallet extends ScorexLogging {
       val nonce   = getAndIncrementNonce()
       val account = Wallet.generateNewAccount(seed, nonce)
 
-      val address = account.address
+      val address = account.toAddress.address
       if (!accountsCache.contains(address)) {
-        accountsCache += account.address -> account
+        accountsCache += account.toAddress.address -> account
         walletData = walletData.copy(accountSeeds = walletData.accountSeeds + ByteStr(account.seed))
         log.info("Added account #" + privateKeyAccounts.size)
         Some(account)
@@ -133,7 +135,7 @@ object Wallet extends ScorexLogging {
     override def deleteAccount(account: PrivateKeyAccount): Boolean = lock {
       val before = walletData.accountSeeds.size
       walletData = walletData.copy(accountSeeds = walletData.accountSeeds - ByteStr(account.seed))
-      accountsCache -= account.address
+      accountsCache -= account.toAddress.address
       save()
       before > walletData.accountSeeds.size
     }

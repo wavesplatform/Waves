@@ -10,7 +10,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.LeaseDetails
 import org.iq80.leveldb.{DB, ReadOptions}
-import scorex.account.{Address, Alias}
+import scorex.account.{Address, AddressScheme, Alias}
 import scorex.block.{Block, BlockHeader}
 import scorex.transaction.Transaction.Type
 import scorex.transaction._
@@ -387,7 +387,7 @@ object LevelDBWriter {
   }
 }
 
-class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
+class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings)(implicit addressScheme: AddressScheme) extends Caches {
 
   import LevelDBWriter._
 

@@ -1,18 +1,20 @@
 package scorex.api.http.alias
 
 import javax.ws.rs.Path
-
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
+import scorex.account.AddressScheme
 import scorex.api.http._
 
 @Path("/alias/broadcast")
 @Api(value = "/alias")
-case class AliasBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allChannels: ChannelGroup) extends ApiRoute with BroadcastRoute {
+class AliasBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allChannels: ChannelGroup)(implicit addressScheme: AddressScheme)
+    extends ApiRoute
+    with BroadcastRoute {
   override val route = pathPrefix("alias" / "broadcast") {
     signedCreate
   }

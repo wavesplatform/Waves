@@ -3,7 +3,7 @@ package scorex.api.http.assets
 import cats.implicits._
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json._
-import scorex.account.PublicKeyAccount
+import scorex.account.{AddressScheme, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
@@ -31,7 +31,7 @@ case class SignedMassTransferRequest(@ApiModelProperty(required = true)
                                      @ApiModelProperty(required = true)
                                      proofs: List[String])
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, MassTransferTransaction] =
+  def toTx(implicit addressScheme: AddressScheme): Either[ValidationError, MassTransferTransaction] =
     for {
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _assetId    <- parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)

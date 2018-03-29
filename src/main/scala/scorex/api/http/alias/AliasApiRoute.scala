@@ -1,7 +1,6 @@
 package scorex.api.http.alias
 
 import javax.ws.rs.Path
-
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
@@ -10,7 +9,7 @@ import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import play.api.libs.json.{Format, Json}
 import scorex.BroadcastRoute
-import scorex.account.Alias
+import scorex.account.{AddressScheme, Alias}
 import scorex.api.http._
 import scorex.transaction._
 import scorex.utils.Time
@@ -18,7 +17,8 @@ import scorex.wallet.Wallet
 
 @Path("/alias")
 @Api(value = "/alias")
-case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time, state: SnapshotStateReader)
+class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time, state: SnapshotStateReader)(
+    implicit addressScheme: AddressScheme)
     extends ApiRoute
     with BroadcastRoute {
 

@@ -6,7 +6,7 @@ import com.wavesplatform.state2.ByteStr
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import scorex.transaction.ValidationError.{GenericError, OrderValidationError}
 import scorex.transaction.{ValidationError, _}
 
@@ -116,7 +116,7 @@ object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] wit
     }
   }
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(version: Byte, bytes: Array[Byte])(implicit addressScheme: AddressScheme): Try[TransactionT] =
     Try {
       var from   = 0
       val o1Size = Ints.fromByteArray(bytes.slice(from, from + 4))

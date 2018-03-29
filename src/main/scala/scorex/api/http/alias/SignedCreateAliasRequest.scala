@@ -2,7 +2,7 @@ package scorex.api.http.alias
 
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
-import scorex.account.{Alias, PublicKeyAccount}
+import scorex.account.{AddressScheme, Alias, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParsers.SignatureStringLength
 import scorex.transaction.{CreateAliasTransaction, ValidationError}
@@ -18,7 +18,7 @@ case class SignedCreateAliasRequest(@ApiModelProperty(value = "Base58 encoded se
                                     @ApiModelProperty(required = true)
                                     signature: String)
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, CreateAliasTransaction] =
+  def toTx(implicit addressScheme: AddressScheme): Either[ValidationError, CreateAliasTransaction] =
     for {
       _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)

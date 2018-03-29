@@ -6,7 +6,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import scorex.serialization.Deser
 import scorex.transaction.TransactionParsers._
 import scorex.transaction.{ValidationError, _}
@@ -66,7 +66,7 @@ object IssueTransaction extends TransactionParserFor[IssueTransaction] with Tran
   val MinAssetNameLength   = 4
   val MaxDecimals          = 8
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(version: Byte, bytes: Array[Byte])(implicit addressScheme: AddressScheme): Try[TransactionT] =
     Try {
       val signature = ByteStr(bytes.slice(0, SignatureLength))
       val txId      = bytes(SignatureLength)

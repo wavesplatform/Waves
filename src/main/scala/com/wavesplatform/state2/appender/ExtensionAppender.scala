@@ -13,6 +13,7 @@ import io.netty.channel.group.ChannelGroup
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
 import org.influxdb.dto.Point
+import scorex.account.AddressScheme
 import scorex.block.Block
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
@@ -34,7 +35,8 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
             peerDatabase: PeerDatabase,
             miner: Miner,
             allChannels: ChannelGroup,
-            scheduler: Scheduler)(ch: Channel, extensionBlocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = {
+            scheduler: Scheduler)(ch: Channel, extensionBlocks: Seq[Block])(
+      implicit addressScheme: AddressScheme): Task[Either[ValidationError, Option[BigInt]]] = {
     def p(blocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] =
       Task(Signed.validateOrdered(blocks).flatMap { newBlocks =>
         {

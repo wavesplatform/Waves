@@ -13,6 +13,7 @@ import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import monix.eval.Task
 import monix.execution.Scheduler
+import scorex.account.AddressScheme
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.{BlockAppendError, InvalidSignature}
@@ -31,7 +32,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
             utxStorage: UtxPool,
             settings: WavesSettings,
             featureProvider: FeatureProvider,
-            scheduler: Scheduler)(newBlock: Block): Task[Either[ValidationError, Option[BlockchainScore]]] =
+            scheduler: Scheduler)(newBlock: Block)(implicit addressScheme: AddressScheme): Task[Either[ValidationError, Option[BlockchainScore]]] =
     Task {
       measureSuccessful(
         blockProcessingTimeStats, {
@@ -59,7 +60,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
             allChannels: ChannelGroup,
             peerDatabase: PeerDatabase,
             miner: Miner,
-            scheduler: Scheduler)(ch: Channel, newBlock: Block): Task[Unit] = {
+            scheduler: Scheduler)(ch: Channel, newBlock: Block)(implicit addressScheme: AddressScheme): Task[Unit] = {
     BlockStats.received(newBlock, BlockStats.Source.Broadcast, ch)
     blockReceivingLag.safeRecord(System.currentTimeMillis() - newBlock.timestamp)
     (for {

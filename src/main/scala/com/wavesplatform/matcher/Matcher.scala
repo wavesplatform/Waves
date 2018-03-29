@@ -13,6 +13,7 @@ import com.wavesplatform.settings.{BlockchainSettings, RestAPISettings}
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
+import scorex.account.AddressScheme
 import scorex.api.http.CompositeHttpService
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
@@ -30,10 +31,10 @@ class Matcher(actorSystem: ActorSystem,
               history: History,
               blockchainSettings: BlockchainSettings,
               restAPISettings: RestAPISettings,
-              matcherSettings: MatcherSettings)
+              matcherSettings: MatcherSettings)(implicit val addressScheme: AddressScheme)
     extends ScorexLogging {
   lazy val matcherApiRoutes = Seq(
-    MatcherApiRoute(wallet, matcher, orderHistory, txWriter, restAPISettings, matcherSettings)
+    new MatcherApiRoute(wallet, matcher, orderHistory, txWriter, restAPISettings, matcherSettings)
   )
 
   lazy val matcherApiTypes = Seq(

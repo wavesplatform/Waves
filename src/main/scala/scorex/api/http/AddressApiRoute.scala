@@ -1,8 +1,8 @@
 package scorex.api.http
 
 import java.nio.charset.StandardCharsets
-import javax.ws.rs.Path
 
+import javax.ws.rs.Path
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.crypto
@@ -13,7 +13,7 @@ import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.BroadcastRoute
-import scorex.account.{Address, PublicKeyAccount}
+import scorex.account.{Address, AddressScheme, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.{PoSCalc, TransactionFactory}
 import scorex.utils.Time
@@ -23,13 +23,13 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/")
-case class AddressApiRoute(settings: RestAPISettings,
-                           wallet: Wallet,
-                           state: SnapshotStateReader,
-                           utx: UtxPool,
-                           allChannels: ChannelGroup,
-                           time: Time,
-                           functionalitySettings: FunctionalitySettings)
+class AddressApiRoute(settings: RestAPISettings,
+                      wallet: Wallet,
+                      state: SnapshotStateReader,
+                      utx: UtxPool,
+                      allChannels: ChannelGroup,
+                      time: Time,
+                      functionalitySettings: FunctionalitySettings)(implicit addressScheme: AddressScheme)
     extends ApiRoute
     with BroadcastRoute {
 
@@ -219,7 +219,7 @@ case class AddressApiRoute(settings: RestAPISettings,
     (path("seed" / Segment) & get & withAuth) { address =>
       complete(for {
         pk   <- wallet.findWallet(address)
-        seed <- wallet.exportAccountSeed(pk)
+        seed <- wallet.exportAccountSeed(pk.toAddress)
       } yield Json.obj("address" -> address, "seed" -> Base58.encode(seed)))
     }
   }
@@ -273,7 +273,7 @@ case class AddressApiRoute(settings: RestAPISettings,
   @ApiOperation(value = "Addresses", notes = "Get wallet accounts addresses", httpMethod = "GET")
   def root: Route = (path("addresses") & get) {
     val accounts = wallet.privateKeyAccounts
-    val json     = JsArray(accounts.map(a => JsString(a.address)))
+    val json     = JsArray(accounts.map(a => JsString(a.toAddress.address)))
     complete(json)
   }
 
@@ -289,7 +289,7 @@ case class AddressApiRoute(settings: RestAPISettings,
       case (start, end) =>
         if (start >= 0 && end >= 0 && start - end < MaxAddressesPerRequest) {
           val json = JsArray(
-            wallet.privateKeyAccounts.map(a => JsString(a.address)).slice(start, end)
+            wallet.privateKeyAccounts.map(a => JsString(a.toAddress.address)).slice(start, end)
           )
 
           complete(json)
@@ -301,7 +301,7 @@ case class AddressApiRoute(settings: RestAPISettings,
   @ApiOperation(value = "Create", notes = "Create a new account in the wallet(if it exists)", httpMethod = "POST")
   def create: Route = (path("addresses") & post & withAuth) {
     wallet.generateNewAccount() match {
-      case Some(pka) => complete(Json.obj("address" -> pka.address))
+      case Some(pka) => complete(Json.obj("address" -> pka.toAddress.address))
       case None      => complete(Unknown)
     }
   }
@@ -402,7 +402,7 @@ case class AddressApiRoute(settings: RestAPISettings,
     (msg, Base58.decode(signature), Base58.decode(publicKey)) match {
       case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
         val account = PublicKeyAccount(pubKeyBytes)
-        val isValid = account.address == address && crypto.verify(signatureBytes, msgBytes, pubKeyBytes)
+        val isValid = account.toAddress.address == address && crypto.verify(signatureBytes, msgBytes, pubKeyBytes)
         Right(Json.obj("valid" -> isValid))
       case _ => Left(InvalidMessage)
     }

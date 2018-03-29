@@ -2,7 +2,7 @@ package scorex.api.http.leasing
 
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
-import scorex.account.{AddressOrAlias, PublicKeyAccount}
+import scorex.account.{AddressOrAlias, AddressScheme, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParsers.SignatureStringLength
 import scorex.transaction.ValidationError
@@ -21,7 +21,7 @@ case class SignedLeaseRequest(@ApiModelProperty(value = "Base58 encoded sender p
                               @ApiModelProperty(required = true)
                               signature: String)
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, LeaseTransaction] =
+  def toTx(implicit addressScheme: AddressScheme): Either[ValidationError, LeaseTransaction] =
     for {
       _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)

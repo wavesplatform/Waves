@@ -1,7 +1,6 @@
 package com.wavesplatform.matcher.api
 
 import javax.ws.rs.Path
-
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.{StatusCodes, Uri}
 import akka.http.scaladsl.server.{Directive1, Route}
@@ -17,7 +16,7 @@ import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json._
-import scorex.account.PublicKeyAccount
+import scorex.account.{AddressScheme, PublicKeyAccount}
 import scorex.api.http._
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.OrderJson._
@@ -32,12 +31,12 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/matcher")
 @Api(value = "/matcher/")
-case class MatcherApiRoute(wallet: Wallet,
-                           matcher: ActorRef,
-                           orderHistory: ActorRef,
-                           txWriter: ActorRef,
-                           settings: RestAPISettings,
-                           matcherSettings: MatcherSettings)
+class MatcherApiRoute(wallet: Wallet,
+                      matcher: ActorRef,
+                      orderHistory: ActorRef,
+                      txWriter: ActorRef,
+                      settings: RestAPISettings,
+                      matcherSettings: MatcherSettings)(implicit addressScheme: AddressScheme)
     extends ApiRoute {
   private implicit val timeout: Timeout = 5.seconds
 
@@ -165,7 +164,7 @@ case class MatcherApiRoute(wallet: Wallet,
     withAssetPair(a1, a2) { pair =>
       json[CancelOrderRequest] { req =>
         if (req.isSignatureValid) {
-          (orderHistory ? DeleteOrderFromHistory(pair, req.senderPublicKey.address, Base58.encode(req.orderId), NTP.correctedTime()))
+          (orderHistory ? DeleteOrderFromHistory(pair, req.senderPublicKey.toAddress.address, Base58.encode(req.orderId), NTP.correctedTime()))
             .mapTo[MatcherResponse]
             .map(r => r.code -> r.json)
         } else {
@@ -257,7 +256,7 @@ case class MatcherApiRoute(wallet: Wallet,
       val ts  = timestamp.toLong
       require(math.abs(ts - NTP.correctedTime()).millis < matcherSettings.maxTimestampDiff, "Incorrect timestamp")
       require(crypto.verify(sig, pk ++ Longs.toByteArray(ts), pk), "Incorrect signature")
-      PublicKeyAccount(pk).address
+      PublicKeyAccount(pk).toAddress.address
     }
   }
 

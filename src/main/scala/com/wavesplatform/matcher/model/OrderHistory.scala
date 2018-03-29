@@ -9,6 +9,7 @@ import com.wavesplatform.matcher.model.OrderHistory.OrderHistoryOrdering
 import com.wavesplatform.state2._
 import org.iq80.leveldb.DB
 import play.api.libs.json.Json
+import scorex.account.AddressScheme
 import scorex.transaction.{AssetAcc, AssetId}
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.utils.ScorexLogging
@@ -61,7 +62,10 @@ object OrderHistory {
 
 }
 
-case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorage(db: DB, "matcher") with OrderHistory with ScorexLogging {
+class OrderHistoryImpl(db: DB, settings: MatcherSettings)(implicit addressScheme: AddressScheme)
+    extends SubStorage(db: DB, "matcher")
+    with OrderHistory
+    with ScorexLogging {
 
   private val OrdersPrefix                = "orders".getBytes(Charset)
   private val OrdersInfoPrefix            = "infos".getBytes(Charset)
@@ -131,9 +135,9 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
       case (orderId, (o, oi)) =>
         if (!oi.status.isFinal) {
           val assetId = if (o.orderType == OrderType.BUY) o.assetPair.priceAsset else o.assetPair.amountAsset
-          addToActive(o.senderPublicKey.address, assetId, orderId)
+          addToActive(o.senderPublicKey.toAddress.address, assetId, orderId)
         } else {
-          addToFinal(o.senderPublicKey.address, orderId)
+          addToFinal(o.senderPublicKey.toAddress.address, orderId)
         }
     }
   }
@@ -147,8 +151,8 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     updatedInfo.foreach {
       case (orderId, (o, oi)) =>
         if (oi.status.isFinal) {
-          deleteFromActive(o.senderPublicKey.address, orderId)
-          addToFinal(o.senderPublicKey.address, orderId)
+          deleteFromActive(o.senderPublicKey.toAddress.address, orderId)
+          addToFinal(o.senderPublicKey.toAddress.address, orderId)
         }
     }
   }
@@ -160,8 +164,8 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     updatedInfo.foreach {
       case (orderId, (o, oi)) =>
         if (oi.status.isFinal) {
-          deleteFromActive(o.senderPublicKey.address, orderId)
-          addToFinal(o.senderPublicKey.address, orderId)
+          deleteFromActive(o.senderPublicKey.toAddress.address, orderId)
+          addToFinal(o.senderPublicKey.toAddress.address, orderId)
         }
     }
   }

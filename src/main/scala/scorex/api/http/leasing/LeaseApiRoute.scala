@@ -1,7 +1,6 @@
 package scorex.api.http.leasing
 
 import javax.ws.rs.Path
-
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
@@ -9,7 +8,7 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
-import scorex.account.Address
+import scorex.account.{Address, AddressScheme}
 import scorex.api.http._
 import scorex.api.http.leasing.LeaseCancelRequest.leaseCancelRequestFormat
 import scorex.api.http.leasing.LeaseRequest.leaseCancelRequestFormat
@@ -19,7 +18,8 @@ import scorex.wallet.Wallet
 
 @Path("/leasing")
 @Api(value = "/leasing")
-case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, state: SnapshotStateReader, utx: UtxPool, allChannels: ChannelGroup, time: Time)
+class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, state: SnapshotStateReader, utx: UtxPool, allChannels: ChannelGroup, time: Time)(
+    implicit addressScheme: AddressScheme)
     extends ApiRoute
     with BroadcastRoute {
 
@@ -70,7 +70,7 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, state: Snaps
     pathPrefix(Segment) { address =>
       complete(Address.fromString(address) match {
         case Left(e)  => ApiError.fromValidationError(e)
-        case Right(a) => state.allActiveLeases.filter(_.sender.address == address)
+        case Right(a) => state.allActiveLeases.filter(_.sender.toAddress.address == address)
       })
     }
   }

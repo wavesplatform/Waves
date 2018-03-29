@@ -2,11 +2,12 @@ package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
+import scorex.account.AddressScheme
 import scorex.transaction.{DataTransaction, ValidationError}
 
 object DataTransactionDiff {
 
-  def apply(state: SnapshotStateReader, height: Int)(tx: DataTransaction): Either[ValidationError, Diff] = {
+  def apply(state: SnapshotStateReader, height: Int)(tx: DataTransaction)(implicit addressScheme: AddressScheme): Either[ValidationError, Diff] = {
     val sender = tx.sender.toAddress
     Right(
       Diff(

@@ -1,13 +1,13 @@
 package scorex.waves.http
 
 import javax.ws.rs.Path
-
 import akka.http.scaladsl.server.{Directive, Route}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
+import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.api.http.assets.TransferRequest
 import scorex.transaction.TransactionFactory
@@ -17,7 +17,8 @@ import scorex.wallet.Wallet
 @Path("/waves")
 @Api(value = "waves")
 @Deprecated
-case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time)
+case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time)(
+    implicit addressScheme: AddressScheme)
     extends ApiRoute
     with BroadcastRoute {
 

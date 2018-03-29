@@ -6,7 +6,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state2._
 import monix.eval.Coeval
 import play.api.libs.json.{Format, JsObject, JsValue, Json}
-import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
 import scorex.transaction.TransactionParsers._
@@ -79,7 +79,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
 
   implicit val transferFormat: Format[Transfer] = Json.format
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(version: Byte, bytes: Array[Byte])(implicit addressScheme: AddressScheme): Try[TransactionT] =
     Try {
       val sender           = PublicKeyAccount(bytes.slice(0, KeyLength))
       val (assetIdOpt, s0) = Deser.parseByteArrayOption(bytes, KeyLength, AssetIdLength)
@@ -150,7 +150,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
     }
   }
 
-  def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] = {
+  def parseTransfersList(transfers: List[Transfer])(implicit addressScheme: AddressScheme): Validation[List[ParsedTransfer]] = {
     transfers.traverse {
       case Transfer(recipient, amount) =>
         AddressOrAlias.fromString(recipient).map(ParsedTransfer(_, amount))

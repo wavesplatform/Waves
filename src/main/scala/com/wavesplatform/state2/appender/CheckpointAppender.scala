@@ -8,6 +8,7 @@ import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import monix.eval.Task
 import monix.execution.Scheduler
+import scorex.account.AddressScheme
 import scorex.transaction.{BlockchainUpdater, CheckpointService, History, ValidationError}
 import scorex.utils.ScorexLogging
 
@@ -18,7 +19,8 @@ object CheckpointAppender extends ScorexLogging {
             peerDatabase: PeerDatabase,
             miner: Miner,
             allChannels: ChannelGroup,
-            scheduler: Scheduler)(maybeChannel: Option[Channel], c: Checkpoint): Task[Either[ValidationError, Option[BigInt]]] = {
+            scheduler: Scheduler)(maybeChannel: Option[Channel], c: Checkpoint)(
+      implicit addressScheme: AddressScheme): Task[Either[ValidationError, Option[BigInt]]] = {
     val t = Task(checkpointService.set(c).map { _ =>
       log.info(s"Processing checkpoint $c")
       makeBlockchainCompliantWith(history, blockchainUpdater)(c)
@@ -39,7 +41,8 @@ object CheckpointAppender extends ScorexLogging {
     }
   }
 
-  private def makeBlockchainCompliantWith(history: History, blockchainUpdater: BlockchainUpdater)(checkpoint: Checkpoint): Unit = {
+  private def makeBlockchainCompliantWith(history: History, blockchainUpdater: BlockchainUpdater)(checkpoint: Checkpoint)(
+      implicit addressScheme: AddressScheme): Unit = {
     val existingItems = checkpoint.items.filter { checkpoint =>
       history.blockAt(checkpoint.height).isDefined
     }

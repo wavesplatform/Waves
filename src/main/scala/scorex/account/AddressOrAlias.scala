@@ -21,7 +21,7 @@ trait AddressOrAlias {
 
 object AddressOrAlias {
 
-  def fromBytes(bytes: Array[Byte], position: Int): Either[ValidationError, (AddressOrAlias, Int)] = {
+  def fromBytes(bytes: Array[Byte], position: Int)(implicit addressScheme: AddressScheme): Either[ValidationError, (AddressOrAlias, Int)] = {
     bytes(position) match {
       case Address.AddressVersion =>
         val addressEnd   = position + Address.AddressLength
@@ -34,7 +34,7 @@ object AddressOrAlias {
     }
   }
 
-  def fromString(s: String): Either[ValidationError, AddressOrAlias] = {
+  def fromString(s: String)(implicit addressScheme: AddressScheme): Either[ValidationError, AddressOrAlias] = {
     if (s.startsWith(Alias.Prefix))
       Alias.fromString(s)
     else Address.fromString(s)

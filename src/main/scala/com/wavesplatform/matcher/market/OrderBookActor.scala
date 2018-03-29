@@ -17,6 +17,7 @@ import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
+import scorex.account.AddressScheme
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
 import scorex.transaction.assets.exchange._
@@ -36,7 +37,7 @@ class OrderBookActor(assetPair: AssetPair,
                      val allChannels: ChannelGroup,
                      val settings: MatcherSettings,
                      val history: History,
-                     val functionalitySettings: FunctionalitySettings)
+                     val functionalitySettings: FunctionalitySettings)(implicit addressScheme: AddressScheme)
     extends PersistentActor
     with Stash
     with ScorexLogging
@@ -340,7 +341,7 @@ object OrderBookActor {
             utx: UtxPool,
             allChannels: ChannelGroup,
             history: History,
-            functionalitySettings: FunctionalitySettings): Props =
+            functionalitySettings: FunctionalitySettings)(implicit addressScheme: AddressScheme): Props =
     Props(new OrderBookActor(assetPair, orderHistory, storedState, wallet, utx, allChannels, settings, history, functionalitySettings))
 
   def name(assetPair: AssetPair): String = assetPair.toString

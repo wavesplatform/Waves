@@ -2,11 +2,15 @@ package scorex.transaction
 
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
+import scorex.account.AddressScheme
 import scorex.block.Block.BlockId
 import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.transaction.History.{BlockMinerInfo, BlockchainScore}
 
-class NgHistoryReader(ngState: () => Option[NgState], inner: History, fs: FunctionalitySettings) extends History with NgHistory with DebugNgHistory {
+class NgHistoryReader(ngState: () => Option[NgState], inner: History, fs: FunctionalitySettings)(implicit addressScheme: AddressScheme)
+    extends History
+    with NgHistory
+    with DebugNgHistory {
 
   private def newlyApprovedFeatures = ngState().fold(Map.empty[Short, Int])(_.approvedFeatures.map(_ -> height).toMap)
 

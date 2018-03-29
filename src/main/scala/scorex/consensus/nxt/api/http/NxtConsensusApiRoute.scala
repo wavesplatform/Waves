@@ -1,19 +1,19 @@
 package scorex.consensus.nxt.api.http
 
 import javax.ws.rs.Path
-
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import io.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.account.Address
+import scorex.account.{Address, AddressScheme}
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress}
 import scorex.transaction.{History, PoSCalc}
 
 @Path("/consensus")
 @Api(value = "/consensus")
-case class NxtConsensusApiRoute(settings: RestAPISettings, state: SnapshotStateReader, history: History, fs: FunctionalitySettings)
+class NxtConsensusApiRoute(settings: RestAPISettings, state: SnapshotStateReader, history: History, fs: FunctionalitySettings)(
+    implicit addressScheme: AddressScheme)
     extends ApiRoute
     with CommonApiFunctions {
 
@@ -44,7 +44,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, state: SnapshotStateR
       new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "string", paramType = "path")
     ))
   def generationSignatureId: Route = (path("generationsignature" / Segment) & get) { encodedSignature =>
-    withBlock(history, encodedSignature) { block =>
+    withBlock(history, encodedSignature)(addressScheme) { block =>
       complete(Json.obj("generationSignature" -> block.consensusData.generationSignature.base58))
     }
   }
@@ -62,7 +62,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, state: SnapshotStateR
       new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "string", paramType = "path")
     ))
   def baseTargetId: Route = (path("basetarget" / Segment) & get) { encodedSignature =>
-    withBlock(history, encodedSignature) { block =>
+    withBlock(history, encodedSignature)(addressScheme) { block =>
       complete(Json.obj("baseTarget" -> block.consensusData.baseTarget))
     }
   }

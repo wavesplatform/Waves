@@ -5,7 +5,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state2._
 import monix.eval.Coeval
 import play.api.libs.json._
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import scorex.transaction.TransactionParsers.KeyLength
 
 import scala.util.{Failure, Success, Try}
@@ -47,7 +47,7 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
 
   val MaxEntryCount: Byte = Byte.MaxValue
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(version: Byte, bytes: Array[Byte])(implicit addressScheme: AddressScheme): Try[TransactionT] =
     Try {
       val p0     = KeyLength
       val sender = PublicKeyAccount(bytes.slice(0, p0))

@@ -1,13 +1,14 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.state2.{Diff, LeaseBalance, Portfolio}
+import scorex.account.AddressScheme
 import scorex.transaction.ValidationError
 import scorex.transaction.smart.SetScriptTransaction
 
 import scala.util.Right
 
 object SetScriptTransactionDiff {
-  def apply(height: Int)(tx: SetScriptTransaction): Either[ValidationError, Diff] = {
+  def apply(height: Int)(tx: SetScriptTransaction)(implicit addressScheme: AddressScheme): Either[ValidationError, Diff] = {
     Right(
       Diff(
         height = height,

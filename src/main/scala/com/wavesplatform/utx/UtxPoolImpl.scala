@@ -14,7 +14,7 @@ import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
 import monix.eval.Task
 import monix.execution.Scheduler
-import scorex.account.Address
+import scorex.account.{Address, AddressScheme}
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
 import scorex.transaction._
@@ -30,7 +30,7 @@ class UtxPoolImpl(time: Time,
                   history: History,
                   feeCalculator: FeeCalculator,
                   fs: FunctionalitySettings,
-                  utxSettings: UtxSettings)
+                  utxSettings: UtxSettings)(implicit addressScheme: AddressScheme)
     extends ScorexLogging
     with Instrumented
     with AutoCloseable
@@ -80,7 +80,7 @@ class UtxPoolImpl(time: Time,
       Right(())
     } else {
       val sender: Option[String] = tx match {
-        case x: Authorized => Some(x.sender.address)
+        case x: Authorized => Some(x.sender.toAddress.address)
         case _             => None
       }
 

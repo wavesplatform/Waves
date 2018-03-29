@@ -25,23 +25,25 @@ object Address extends ScorexLogging {
   val AddressLength        = 1 + 1 + ChecksumLength + HashLength
   val AddressStringLength  = base58Length(AddressLength)
 
-  private def scheme = AddressScheme.current
-
   private class AddressImpl(val bytes: ByteStr) extends Address
 
-  def fromPublicKey(publicKey: Array[Byte], chainId: Byte = scheme.chainId): Address = {
+  def fromPublicKey(publicKey: Array[Byte])(implicit addressScheme: AddressScheme): Address = {
     val publicKeyHash   = crypto.secureHash(publicKey).take(HashLength)
-    val withoutChecksum = AddressVersion +: chainId +: publicKeyHash
+    val withoutChecksum = AddressVersion +: addressScheme.chainId +: publicKeyHash
     val bytes           = withoutChecksum ++ calcCheckSum(withoutChecksum)
     new AddressImpl(ByteStr(bytes))
   }
 
-  def fromBytes(addressBytes: Array[Byte], chainId: Byte = scheme.chainId): Either[InvalidAddress, Address] = {
+  def fromBytes(addressBytes: Array[Byte])(implicit addressScheme: AddressScheme): Either[InvalidAddress, Address] = {
     val version = addressBytes.head
     val network = addressBytes.tail.head
     (for {
       _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
-      _ <- Either.cond(network == chainId, (), s"Data from other network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})")
+      _ <- Either.cond(
+        network == addressScheme.chainId,
+        (),
+        s"Data from other network: expected: $addressScheme.chainId(${addressScheme.chainId.toChar}), actual: $network(${network.toChar})"
+      )
       _ <- Either.cond(addressBytes.length == Address.AddressLength,
                        (),
                        s"Wrong addressBytes length: expected: ${Address.AddressLength}, actual: ${addressBytes.length}")
@@ -51,7 +53,7 @@ object Address extends ScorexLogging {
     } yield new AddressImpl(ByteStr(addressBytes))).left.map(InvalidAddress)
   }
 
-  def fromString(addressStr: String): Either[ValidationError, Address] = {
+  def fromString(addressStr: String)(implicit addressScheme: AddressScheme): Either[ValidationError, Address] = {
     val base58String = if (addressStr.startsWith(Prefix)) addressStr.drop(Prefix.length) else addressStr
     for {
       _ <- Either.cond(base58String.length <= AddressStringLength,

@@ -9,7 +9,7 @@ import com.wavesplatform.state2._
 import com.wavesplatform.state2.patch.{CancelAllLeases, CancelLeaseOverflow}
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import scorex.account.Address
+import scorex.account.{Address, AddressScheme}
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.ValidationError.ActivationError
 import scorex.transaction.{Transaction, ValidationError}
@@ -19,11 +19,8 @@ object BlockDiffer extends ScorexLogging with Instrumented {
 
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
-  def fromBlock(settings: FunctionalitySettings,
-                fp: FeatureProvider,
-                s: SnapshotStateReader,
-                maybePrevBlock: Option[Block],
-                block: Block): Either[ValidationError, Diff] = {
+  def fromBlock(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, maybePrevBlock: Option[Block], block: Block)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, Diff] = {
     val blockSigner = block.signerData.generator.toAddress
     val stateHeight = s.height
 
@@ -45,7 +42,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     val prevBlockTimestamp = maybePrevBlock.map(_.timestamp)
     for {
       _ <- block.signaturesValid()
-      r <- apply(settings, s, fp, prevBlockTimestamp)(block.signerData.generator,
+      r <- apply(settings, s, fp, prevBlockTimestamp)(block.signerData.generator.toAddress,
                                                       prevBlockFeeDistr,
                                                       currentBlockFeeDistr,
                                                       block.timestamp,
@@ -59,12 +56,12 @@ object BlockDiffer extends ScorexLogging with Instrumented {
                      s: SnapshotStateReader,
                      prevBlockTimestamp: Option[Long],
                      micro: MicroBlock,
-                     timestamp: Long): Either[ValidationError, Diff] = {
+                     timestamp: Long)(implicit addressScheme: AddressScheme): Either[ValidationError, Diff] = {
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
       _ <- Either.cond(fp.activatedFeatures().contains(BlockchainFeatures.NG.id), (), ActivationError(s"MicroBlocks are not yet activated"))
       _ <- micro.signaturesValid()
-      r <- apply(settings, s, fp, prevBlockTimestamp)(micro.sender, None, None, timestamp, micro.transactionData, 0)
+      r <- apply(settings, s, fp, prevBlockTimestamp)(micro.sender.toAddress, None, None, timestamp, micro.transactionData, 0)
     } yield r
   }
 
@@ -74,7 +71,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
       currentBlockFeeDistr: Option[Diff],
       timestamp: Long,
       txs: Seq[Transaction],
-      heightDiff: Int): Either[ValidationError, Diff] = {
+      heightDiff: Int)(implicit addressScheme: AddressScheme): Either[ValidationError, Diff] = {
     val currentBlockHeight = s.height + heightDiff
     val txDiffer           = TransactionDiffer(settings, prevBlockTimestamp, timestamp, currentBlockHeight) _
 

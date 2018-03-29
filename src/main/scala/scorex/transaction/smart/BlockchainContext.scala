@@ -14,7 +14,8 @@ import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
-class BlockchainContext(override val networkByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], state: SnapshotStateReader) extends WavesContext {
+class BlockchainContext(tx: Coeval[Transaction], h: Coeval[Int], state: SnapshotStateReader)(implicit addressScheme: AddressScheme)
+    extends WavesContext {
 
   import BlockchainContext._
 
@@ -29,7 +30,7 @@ class BlockchainContext(override val networkByte: Byte, tx: Coeval[Transaction],
       .map(convert)
 
   override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any] = {
-    val address = Address.fromBytes(addressBytes).explicitGet()
+    val address = Address.fromBytes(addressBytes)(???).explicitGet()
     val data    = state.accountData(address, key)
     data.map((_, dataType)).flatMap {
       case (LongDataEntry(_, value), DataType.Long)        => Some(value)
@@ -45,14 +46,14 @@ class BlockchainContext(override val networkByte: Byte, tx: Coeval[Transaction],
       address <- state.resolveAliasEi(aoa._1)
     } yield address.bytes.arr).left.map(_.toString)
   }
+
+  override def networkByte: Byte = addressScheme.chainId
 }
 
 object BlockchainContext {
 
-  private val networkByte = AddressScheme.current.chainId
-
   lazy val typeCheckerContext: TypeCheckerContext =
-    TypeCheckerContext.fromContext(new BlockchainContext(networkByte, Coeval(???), Coeval(???), null).build())
+    TypeCheckerContext.fromContext(new BlockchainContext(Coeval(???), Coeval(???), null)(???).build())
 
   def convert(tx: Transaction): ContractTransaction = new ContractTransaction {
     override def bodyBytes: Either[String, ByteVector] = tx match {

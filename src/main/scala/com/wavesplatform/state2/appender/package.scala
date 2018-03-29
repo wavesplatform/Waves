@@ -9,6 +9,7 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
+import scorex.account.AddressScheme
 import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.PoSCalc._
@@ -60,14 +61,15 @@ package object appender extends ScorexLogging {
       s"generator's effective balance $effectiveBalance is less that required for generation"
     )
 
-  private[appender] def appendBlock(checkpoint: CheckpointService,
-                                    history: History,
-                                    blockchainUpdater: BlockchainUpdater,
-                                    stateReader: SnapshotStateReader,
-                                    utxStorage: UtxPool,
-                                    time: Time,
-                                    settings: WavesSettings,
-                                    featureProvider: FeatureProvider)(block: Block): Either[ValidationError, Option[Int]] =
+  private[appender] def appendBlock(
+      checkpoint: CheckpointService,
+      history: History,
+      blockchainUpdater: BlockchainUpdater,
+      stateReader: SnapshotStateReader,
+      utxStorage: UtxPool,
+      time: Time,
+      settings: WavesSettings,
+      featureProvider: FeatureProvider)(block: Block)(implicit addressScheme: AddressScheme): Either[ValidationError, Option[Int]] =
     for {
       _ <- Either.cond(
         checkpoint.isBlockValid(block.signerData.signature, history.height + 1),
@@ -75,12 +77,12 @@ package object appender extends ScorexLogging {
         BlockAppendError(s"Block $block at height ${history.height + 1} is not valid w.r.t. checkpoint", block)
       )
       _ <- Either.cond(
-        stateReader.accountScript(block.sender).isEmpty,
+        stateReader.accountScript(block.sender.toAddress).isEmpty,
         (),
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
       _ <- blockConsensusValidation(history, featureProvider, settings, time.correctedTime(), block) { height =>
-        val balance = PoSCalc.generatingBalance(stateReader, settings.blockchainSettings.functionalitySettings, block.sender, height)
+        val balance = PoSCalc.generatingBalance(stateReader, settings.blockchainSettings.functionalitySettings, block.sender.toAddress, height)
         validateEffectiveBalance(featureProvider, settings.blockchainSettings.functionalitySettings, block, height)(balance)
       }
       baseHeight = history.height

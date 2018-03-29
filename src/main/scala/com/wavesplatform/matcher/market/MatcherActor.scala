@@ -14,7 +14,7 @@ import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
-import scorex.account.Address
+import scorex.account.{Address, AddressScheme}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
@@ -32,7 +32,7 @@ class MatcherActor(orderHistory: ActorRef,
                    allChannels: ChannelGroup,
                    settings: MatcherSettings,
                    history: History,
-                   functionalitySettings: FunctionalitySettings)
+                   functionalitySettings: FunctionalitySettings)(implicit addressScheme: AddressScheme)
     extends PersistentActor
     with ScorexLogging {
 
@@ -139,13 +139,13 @@ class MatcherActor(orderHistory: ActorRef,
     wallet.findWallet(settings.account).map(_.publicKey).getOrElse(Array())
   }
 
-  def forwardToOrderBook: Receive = {
+  def forwardToOrderBook(implicit addressScheme: AddressScheme): Receive = {
     case GetMarkets =>
       sender() ! GetMarketsResponse(getMatcherPublicKey, tradedPairs.values.toSeq)
 
     case order: Order =>
       checkAssetPair(order) {
-        checkBlacklistedAddress(order.senderPublicKey) {
+        checkBlacklistedAddress(order.senderPublicKey.toAddress) {
           context
             .child(OrderBookActor.name(order.assetPair))
             .fold(createAndForward(order))(forwardReq(order))
@@ -231,7 +231,7 @@ object MatcherActor {
             allChannels: ChannelGroup,
             settings: MatcherSettings,
             history: History,
-            functionalitySettings: FunctionalitySettings): Props =
+            functionalitySettings: FunctionalitySettings)(implicit addressScheme: AddressScheme): Props =
     Props(new MatcherActor(orderHistoryActor, storedState, wallet, utx, allChannels, settings, history, functionalitySettings))
 
   case class OrderBookCreated(pair: AssetPair)

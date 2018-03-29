@@ -24,7 +24,7 @@ object Importer extends ScorexLogging {
     val configFilename = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
     val config         = loadConfig(ConfigFactory.parseFile(new File(configFilename)))
     val settings       = WavesSettings.fromConfig(config)
-    AddressScheme.current = new AddressScheme {
+    implicit val addressScheme = new AddressScheme {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
 

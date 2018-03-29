@@ -11,12 +11,14 @@ import com.wavesplatform.utils.{UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
+import scorex.account.AddressScheme
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
-class BlockchainUpdaterImpl(persisted: StateWriter with SnapshotStateReader, settings: WavesSettings, time: Time, history: History)
+class BlockchainUpdaterImpl(persisted: StateWriter with SnapshotStateReader, settings: WavesSettings, time: Time, history: History)(
+    implicit addressScheme: AddressScheme)
     extends BlockchainUpdater
     with ScorexLogging
     with Instrumented {

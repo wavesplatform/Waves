@@ -12,11 +12,12 @@ import cats.syntax.all._
 
 object Verifier {
 
-  def apply(s: SnapshotStateReader, currentBlockHeight: Int)(tx: Transaction): Either[ValidationError, Transaction] =
+  def apply(s: SnapshotStateReader, currentBlockHeight: Int)(tx: Transaction)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, Transaction] =
     (tx match {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
-        (pt, s.accountScript(pt.sender)) match {
+        (pt, s.accountScript(pt.sender.toAddress)) match {
           case (_, Some(script))              => verify(s, script, currentBlockHeight, pt)
           case (stx: SignedTransaction, None) => stx.signaturesValid()
           case _                              => verifyAsEllipticCurveSignature(pt)
@@ -36,8 +37,9 @@ object Verifier {
       } yield verify(s, script, currentBlockHeight, tx)
     }.getOrElse(Either.right(tx)))
 
-  def verify[T <: Transaction](s: SnapshotStateReader, script: Script, height: Int, transaction: T): Either[ValidationError, T] = {
-    val context = new BlockchainContext(AddressScheme.current.chainId, Coeval.evalOnce(transaction), Coeval.evalOnce(height), s).build()
+  def verify[T <: Transaction](s: SnapshotStateReader, script: Script, height: Int, transaction: T)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, T] = {
+    val context = new BlockchainContext(Coeval.evalOnce(transaction), Coeval.evalOnce(height), s).build()
     Evaluator[Boolean](context, script.script) match {
       case Left(execError) => Left(GenericError(s"Script execution error: $execError"))
       case Right(false)    => Left(TransactionNotAllowedByScript(transaction))

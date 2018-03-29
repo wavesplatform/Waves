@@ -3,7 +3,7 @@ package scorex.api.http.assets
 import cats.implicits._
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Json, OFormat}
-import scorex.account.PublicKeyAccount
+import scorex.account.{AddressScheme, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.smart.{Script, SetScriptTransaction}
 import scorex.transaction.{Proofs, ValidationError}
@@ -26,7 +26,7 @@ case class SignedSetScriptRequest(@ApiModelProperty(required = true)
                                   @ApiModelProperty(required = true)
                                   proofs: List[String])
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, SetScriptTransaction] =
+  def toTx(implicit addressScheme: AddressScheme): Either[ValidationError, SetScriptTransaction] =
     for {
       _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _script <- script match {

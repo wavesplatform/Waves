@@ -10,7 +10,7 @@ import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json._
 import scorex.BroadcastRoute
-import scorex.account.Address
+import scorex.account.{Address, AddressScheme}
 import scorex.api.http.{ApiError, ApiRoute, InvalidAddress, WrongJson}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
@@ -24,7 +24,8 @@ import scala.util.{Failure, Success}
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, state: SnapshotStateReader, time: Time)
+class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, state: SnapshotStateReader, time: Time)(
+    implicit addressScheme: AddressScheme)
     extends ApiRoute
     with BroadcastRoute {
   val MaxAddressesPerRequest = 1000
@@ -230,6 +231,6 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     ))
   def signOrder: Route =
     processRequest("order", (order: Order) => {
-      wallet.privateKeyAccount(order.senderPublicKey).map(pk => Order.sign(order, pk))
+      wallet.privateKeyAccount(order.senderPublicKey.toAddress).map(pk => Order.sign(order, pk))
     })
 }

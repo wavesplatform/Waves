@@ -2,8 +2,8 @@ package scorex.waves.http
 
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
-import javax.ws.rs.Path
 
+import javax.ws.rs.Path
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
@@ -20,7 +20,7 @@ import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import monix.eval.Coeval
 import play.api.libs.json._
-import scorex.account.Address
+import scorex.account.{Address, AddressScheme}
 import scorex.api.http._
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
@@ -49,7 +49,7 @@ case class DebugApiRoute(settings: RestAPISettings,
                          extLoaderStateReporter: Coeval[RxExtensionLoader.State],
                          mbsCacheSizesReporter: Coeval[MicroBlockSynchronizer.CacheSizes],
                          scoreReporter: Coeval[RxScoreObserver.Stats],
-                         configRoot: ConfigObject)
+                         configRoot: ConfigObject)(implicit addressScheme: AddressScheme)
     extends ApiRoute
     with ScorexLogging {
 

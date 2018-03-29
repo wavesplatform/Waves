@@ -1,18 +1,20 @@
 package scorex.api.http.leasing
 
 import javax.ws.rs.Path
-
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
+import scorex.account.AddressScheme
 import scorex.api.http._
 
 @Path("/leasing/broadcast")
 @Api(value = "/leasing")
-case class LeaseBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allChannels: ChannelGroup) extends ApiRoute with BroadcastRoute {
+class LeaseBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, val allChannels: ChannelGroup)(implicit addressScheme: AddressScheme)
+    extends ApiRoute
+    with BroadcastRoute {
   override val route = pathPrefix("leasing" / "broadcast") {
     signedLease ~ signedLeaseCancel
   }

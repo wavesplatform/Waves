@@ -4,12 +4,14 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
+import scorex.account.AddressScheme
 import scorex.transaction.ValidationError
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 trait ExchangeTransactionCreator extends ScorexLogging {
+  implicit val addressScheme: AddressScheme
   val functionalitySettings: FunctionalitySettings
   val storedState: SnapshotStateReader
   val wallet: Wallet
@@ -24,7 +26,7 @@ trait ExchangeTransactionCreator extends ScorexLogging {
 
   def createTransaction(submitted: LimitOrder, counter: LimitOrder): Either[ValidationError, ExchangeTransaction] = {
     wallet
-      .privateKeyAccount(submitted.order.matcherPublicKey)
+      .privateKeyAccount(submitted.order.matcherPublicKey.toAddress)
       .flatMap(matcherPrivateKey => {
         val price             = counter.price
         val amount            = math.min(submitted.amount, counter.amount)

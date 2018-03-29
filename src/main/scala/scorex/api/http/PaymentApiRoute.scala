@@ -1,13 +1,13 @@
 package scorex.api.http
 
 import javax.ws.rs.Path
-
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
+import scorex.account.AddressScheme
 import scorex.api.http.assets.TransferRequest
 import scorex.transaction.TransactionFactory
 import scorex.utils.Time
@@ -16,7 +16,8 @@ import scorex.wallet.Wallet
 @Path("/payment")
 @Api(value = "/payment")
 @Deprecated
-case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time)
+class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time)(
+    implicit addressScheme: AddressScheme)
     extends ApiRoute
     with BroadcastRoute {
 

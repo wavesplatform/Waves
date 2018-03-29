@@ -3,7 +3,7 @@ package com.wavesplatform.state2.diffs
 import cats.implicits._
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import scorex.account.Address
+import scorex.account.{Address, AddressScheme}
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.{GenericError, Validation}
 import scorex.transaction.assets.MassTransferTransaction
@@ -11,7 +11,8 @@ import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 
 object MassTransferTransactionDiff {
 
-  def apply(state: SnapshotStateReader, blockTime: Long, height: Int)(tx: MassTransferTransaction): Either[ValidationError, Diff] = {
+  def apply(state: SnapshotStateReader, blockTime: Long, height: Int)(tx: MassTransferTransaction)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, Diff] = {
     def parseTransfer(xfer: ParsedTransfer): Validation[(Map[Address, Portfolio], Long)] = {
       for {
         recipientAddr <- state.resolveAliasEi(xfer.address)

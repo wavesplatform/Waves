@@ -17,7 +17,8 @@ import scorex.wallet.Wallet
 
 object TransactionFactory {
 
-  def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
+  def transferAsset(request: TransferRequest, wallet: Wallet, time: Time)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, TransferTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipientAcc     <- AddressOrAlias.fromString(request.recipient)
@@ -34,7 +35,8 @@ object TransactionFactory {
         )
     } yield tx
 
-  def versionedTransfer(request: VersionedTransferRequest, wallet: Wallet, time: Time): Either[ValidationError, VersionedTransferTransaction] =
+  def versionedTransfer(request: VersionedTransferRequest, wallet: Wallet, time: Time)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, VersionedTransferTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipientAcc     <- AddressOrAlias.fromString(request.recipient)
@@ -51,7 +53,8 @@ object TransactionFactory {
         )
     } yield tx
 
-  def massTransferAsset(request: MassTransferRequest, wallet: Wallet, time: Time): Either[ValidationError, MassTransferTransaction] =
+  def massTransferAsset(request: MassTransferRequest, wallet: Wallet, time: Time)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, MassTransferTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       transfers        <- MassTransferTransaction.parseTransfersList(request.transfers)
@@ -66,7 +69,8 @@ object TransactionFactory {
       )
     } yield tx
 
-  def setScript(request: SetScriptRequest, wallet: Wallet, time: Time): Either[ValidationError, SetScriptTransaction] =
+  def setScript(request: SetScriptRequest, wallet: Wallet, time: Time)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, SetScriptTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       script <- request.script match {
@@ -82,7 +86,8 @@ object TransactionFactory {
       )
     } yield tx
 
-  def issueAsset(request: IssueRequest, wallet: Wallet, time: Time): Either[ValidationError, IssueTransaction] =
+  def issueAsset(request: IssueRequest, wallet: Wallet, time: Time)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, IssueTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
@@ -98,7 +103,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def lease(request: LeaseRequest, wallet: Wallet, time: Time): Either[ValidationError, LeaseTransaction] =
+  def lease(request: LeaseRequest, wallet: Wallet, time: Time)(implicit addressScheme: AddressScheme): Either[ValidationError, LeaseTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipientAcc     <- AddressOrAlias.fromString(request.recipient)
@@ -106,14 +111,16 @@ object TransactionFactory {
       tx <- LeaseTransaction.create(senderPrivateKey, request.amount, request.fee, timestamp, recipientAcc)
     } yield tx
 
-  def leaseCancel(request: LeaseCancelRequest, wallet: Wallet, time: Time): Either[ValidationError, LeaseCancelTransaction] =
+  def leaseCancel(request: LeaseCancelRequest, wallet: Wallet, time: Time)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, LeaseCancelTransaction] =
     for {
       pk <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
       tx <- LeaseCancelTransaction.create(pk, ByteStr.decodeBase58(request.txId).get, request.fee, timestamp)
     } yield tx
 
-  def alias(request: CreateAliasRequest, wallet: Wallet, time: Time): Either[ValidationError, CreateAliasTransaction] =
+  def alias(request: CreateAliasRequest, wallet: Wallet, time: Time)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, CreateAliasTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       alias            <- Alias.buildWithCurrentNetworkByte(request.alias)
@@ -121,21 +128,22 @@ object TransactionFactory {
       tx <- CreateAliasTransaction.create(senderPrivateKey, alias, request.fee, timestamp)
     } yield tx
 
-  def reissueAsset(request: ReissueRequest, wallet: Wallet, time: Time): Either[ValidationError, ReissueTransaction] =
+  def reissueAsset(request: ReissueRequest, wallet: Wallet, time: Time)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, ReissueTransaction] =
     for {
       pk <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
       tx <- ReissueTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.reissuable, request.fee, timestamp)
     } yield tx
 
-  def burnAsset(request: BurnRequest, wallet: Wallet, time: Time): Either[ValidationError, BurnTransaction] =
+  def burnAsset(request: BurnRequest, wallet: Wallet, time: Time)(implicit addressScheme: AddressScheme): Either[ValidationError, BurnTransaction] =
     for {
       pk <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
       tx <- BurnTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.fee, timestamp)
     } yield tx
 
-  def data(request: DataRequest, wallet: Wallet, time: Time): Either[ValidationError, DataTransaction] =
+  def data(request: DataRequest, wallet: Wallet, time: Time)(implicit addressScheme: AddressScheme): Either[ValidationError, DataTransaction] =
     for {
       pk <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())

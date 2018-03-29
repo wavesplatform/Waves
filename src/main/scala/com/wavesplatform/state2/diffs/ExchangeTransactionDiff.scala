@@ -4,6 +4,7 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
+import scorex.account.AddressScheme
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.{GenericError, OrderValidationError}
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -12,7 +13,7 @@ import scala.util.Right
 
 object ExchangeTransactionDiff {
 
-  def apply(s: SnapshotStateReader, height: Int)(tx: ExchangeTransaction): Either[ValidationError, Diff] = {
+  def apply(s: SnapshotStateReader, height: Int)(tx: ExchangeTransaction)(implicit addressScheme: AddressScheme): Either[ValidationError, Diff] = {
     val matcher = tx.buyOrder.matcherPublicKey.toAddress
     val buyer   = tx.buyOrder.senderPublicKey.toAddress
     val seller  = tx.sellOrder.senderPublicKey.toAddress

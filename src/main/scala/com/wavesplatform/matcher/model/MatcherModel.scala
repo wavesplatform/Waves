@@ -5,7 +5,7 @@ import cats.implicits._
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.state2.Portfolio
 import play.api.libs.json.{JsObject, JsValue, Json}
-import scorex.account.Address
+import scorex.account.{Address, AddressScheme}
 import scorex.transaction.{AssetAcc, AssetId}
 import scorex.transaction.assets.exchange._
 
@@ -20,11 +20,11 @@ object MatcherModel {
 case class LevelAgg(price: Long, amount: Long)
 
 sealed trait LimitOrder {
+  implicit val addressScheme: AddressScheme
   def price: Price
   def amount: Long
   def order: Order
   def partial(amount: Long): LimitOrder
-
   def getSpendAmount: Long
   def getReceiveAmount: Long
   def feeAmount: Long       = Try((BigInt(amount) * order.matcherFee / order.amount).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
@@ -32,9 +32,9 @@ sealed trait LimitOrder {
   val remainingFee: Long = order.matcherFee - Try((BigInt(remainingAmount) * order.matcherFee / order.amount).bigInteger.longValueExact())
     .getOrElse(0L)
 
-  def spentAcc: AssetAcc = AssetAcc(order.senderPublicKey, order.getSpendAssetId)
-  def rcvAcc: AssetAcc   = AssetAcc(order.senderPublicKey, order.getReceiveAssetId)
-  def feeAcc: AssetAcc   = AssetAcc(order.senderPublicKey, None)
+  def spentAcc: AssetAcc = AssetAcc(order.senderPublicKey.toAddress, order.getSpendAssetId)
+  def rcvAcc: AssetAcc   = AssetAcc(order.senderPublicKey.toAddress, order.getReceiveAssetId)
+  def feeAcc: AssetAcc   = AssetAcc(order.senderPublicKey.toAddress, None)
 
   def spentAsset: String = order.getSpendAssetId.map(_.base58).getOrElse(AssetPair.WavesName)
   def rcvAsset: String   = order.getReceiveAssetId.map(_.base58).getOrElse(AssetPair.WavesName)
@@ -145,7 +145,7 @@ object Events {
     }
   }
 
-  def createOpenPortfolio(event: Event): Map[String, OpenPortfolio] = {
+  def createOpenPortfolio(event: Event)(implicit addressScheme: AddressScheme): Map[String, OpenPortfolio] = {
     def overdraftFee(lo: LimitOrder): Long = {
       if (lo.feeAcc == lo.rcvAcc) math.max(lo.feeAmount - lo.getReceiveAmount, 0L) else lo.feeAmount
     }
@@ -153,7 +153,7 @@ object Events {
     event match {
       case OrderAdded(lo) =>
         Map(
-          lo.order.senderPublicKey.address -> OpenPortfolio(
+          lo.order.senderPublicKey.toAddress.address -> OpenPortfolio(
             Monoid.combine(
               Map(lo.spentAsset -> lo.getSpendAmount),
               Map(lo.feeAsset   -> overdraftFee(lo))
@@ -171,13 +171,13 @@ object Events {
             Map(o2.feeAsset   -> -overdraftFee(o2))
           ))
         Monoid.combine(
-          Map(o1.order.senderPublicKey.address -> op1),
-          Map(o2.order.senderPublicKey.address -> op2)
+          Map(o1.order.senderPublicKey.toAddress.address -> op1),
+          Map(o2.order.senderPublicKey.toAddress.address -> op2)
         )
       case OrderCanceled(lo) =>
         val feeDiff = if (lo.feeAcc == lo.rcvAcc) math.max(lo.remainingFee - lo.getReceiveAmount, 0L) else lo.remainingFee
         Map(
-          lo.order.senderPublicKey.address ->
+          lo.order.senderPublicKey.toAddress.address ->
             OpenPortfolio(
               Monoid.combine(
                 Map(lo.spentAsset -> -lo.getSpendAmount),

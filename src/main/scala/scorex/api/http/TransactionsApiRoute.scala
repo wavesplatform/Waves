@@ -13,7 +13,7 @@ import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json._
 import scorex.BroadcastRoute
-import scorex.account.Address
+import scorex.account.{Address, AddressScheme}
 import scorex.api.http.DataRequest._
 import scorex.api.http.alias.{CreateAliasRequest, SignedCreateAliasRequest}
 import scorex.api.http.assets._
@@ -31,13 +31,13 @@ import scala.util.control.Exception
 
 @Path("/transactions")
 @Api(value = "/transactions")
-case class TransactionsApiRoute(settings: RestAPISettings,
-                                wallet: Wallet,
-                                state: SnapshotStateReader,
-                                history: History,
-                                utx: UtxPool,
-                                allChannels: ChannelGroup,
-                                time: Time)
+class TransactionsApiRoute(settings: RestAPISettings,
+                           wallet: Wallet,
+                           state: SnapshotStateReader,
+                           history: History,
+                           utx: UtxPool,
+                           allChannels: ChannelGroup,
+                           time: Time)(implicit addressScheme: AddressScheme)
     extends ApiRoute
     with BroadcastRoute
     with CommonApiFunctions {

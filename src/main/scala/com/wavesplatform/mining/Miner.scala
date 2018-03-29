@@ -15,7 +15,7 @@ import kamon.metric.instrument
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
-import scorex.account.{Address, PrivateKeyAccount}
+import scorex.account.{Address, AddressScheme, PrivateKeyAccount}
 import scorex.block.Block._
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -62,7 +62,7 @@ class MinerImpl(allChannels: ChannelGroup,
                 utx: UtxPool,
                 wallet: Wallet,
                 val scheduler: SchedulerService,
-                val appenderScheduler: SchedulerService)
+                val appenderScheduler: SchedulerService)(implicit addressScheme: AddressScheme)
     extends Miner
     with MinerDebugInfo
     with ScorexLogging
@@ -119,9 +119,11 @@ class MinerImpl(allChannels: ChannelGroup,
         for {
           _ <- Either.cond(pc >= minerSettings.quorum,
                            (),
-                           s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
-          _ <- Either.cond(h < t, (), s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.address}")
-          _ = log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${referencedBlockInfo.blockId}")
+                           s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.toAddress}")
+          _ <- Either.cond(h < t,
+                           (),
+                           s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.toAddress}")
+          _ = log.debug(s"Forging with ${account.toAddress}, H $h < T $t, balance $balance, prev block ${referencedBlockInfo.blockId}")
           _ = log.debug(s"Previous block ID ${referencedBlockInfo.blockId} at $height with target ${referencedBlockInfo.consensus.baseTarget}")
           block <- {
             val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
@@ -164,7 +166,7 @@ class MinerImpl(allChannels: ChannelGroup,
     log.trace(s"Generating microBlock for $account")
     val pc = allChannels.size()
     if (pc < minerSettings.quorum) {
-      log.trace(s"Quorum not available ($pc/${minerSettings.quorum}, not forging microblock with ${account.address}")
+      log.trace(s"Quorum not available ($pc/${minerSettings.quorum}, not forging microBlock with ${account.toAddress}")
       Task.now(Retry)
     } else if (utx.size == 0) {
       log.trace(s"Skipping microBlock because utx is empty")
@@ -241,7 +243,7 @@ class MinerImpl(allChannels: ChannelGroup,
       val lastBlock = history.lastBlock.get
       for {
         _ <- checkAge(height, history.lastBlockTimestamp.get)
-        _ <- Either.cond(stateReader.accountScript(account).isEmpty,
+        _ <- Either.cond(stateReader.accountScript(account.toAddress).isEmpty,
                          (),
                          s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
         balanceAndTs <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account, history)
@@ -257,7 +259,7 @@ class MinerImpl(allChannels: ChannelGroup,
             BlockAppender(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, settings, history, appenderScheduler)(block).map {
               case Left(err) => log.warn("Error mining Block: " + err.toString)
               case Right(Some(score)) =>
-                log.debug(s"Forged and applied $block by ${account.address} with cumulative score $score")
+                log.debug(s"Forged and applied $block by ${account.toAddress} with cumulative score $score")
                 BlockStats.mined(block, history.height)
                 allChannels.broadcast(BlockForged(block))
                 scheduleMining()
@@ -277,7 +279,7 @@ class MinerImpl(allChannels: ChannelGroup,
 
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()
-    val nonScriptedAccounts = wallet.privateKeyAccounts.filter(acc => stateReader.accountScript(acc).isEmpty)
+    val nonScriptedAccounts = wallet.privateKeyAccounts.filter(acc => stateReader.accountScript(acc.toAddress).isEmpty)
     scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map(generateBlockTask).map(_.runAsyncLogErr).toSet)
     microBlockAttempt := SerialCancelable()
     debugState = MinerDebugInfo.MiningBlocks

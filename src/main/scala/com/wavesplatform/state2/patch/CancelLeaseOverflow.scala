@@ -2,11 +2,12 @@ package com.wavesplatform.state2.patch
 
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{Diff, LeaseBalance, Portfolio}
+import scorex.account.AddressScheme
 import scorex.transaction.lease.LeaseTransaction
 import scorex.utils.ScorexLogging
 
 object CancelLeaseOverflow extends ScorexLogging {
-  def apply(s: SnapshotStateReader): Diff = {
+  def apply(s: SnapshotStateReader)(implicit addressScheme: AddressScheme): Diff = {
     log.info("Cancelling all lease overflows for sender")
 
     val addressesWithLeaseOverflow = s.collectPortfolios { p =>

@@ -5,7 +5,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state2._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
 import scorex.transaction.TransactionParsers._
@@ -64,7 +64,7 @@ object VersionedTransferTransaction extends TransactionParserFor[VersionedTransf
   override val typeId: Byte                 = 4
   override val supportedVersions: Set[Byte] = Set(2)
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(version: Byte, bytes: Array[Byte])(implicit addressScheme: AddressScheme): Try[TransactionT] =
     Try {
       val sender           = PublicKeyAccount(bytes.slice(0, KeyLength))
       val (assetIdOpt, s0) = Deser.parseByteArrayOption(bytes, KeyLength, AssetIdLength)

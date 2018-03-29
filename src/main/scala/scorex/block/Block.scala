@@ -9,7 +9,7 @@ import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state2._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{Address, AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.fields.FeaturesBlockField
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.transaction.TransactionParsers._
@@ -201,7 +201,7 @@ object Block extends ScorexLogging {
 
   val TransactionSizeLength = 4
 
-  def transParseBytes(version: Int, bytes: Array[Byte]): Try[Seq[Transaction]] = Try {
+  def transParseBytes(version: Int, bytes: Array[Byte])(implicit addressScheme: AddressScheme): Try[Seq[Transaction]] = Try {
     if (bytes.isEmpty) {
       Seq.empty
     } else {
@@ -227,7 +227,7 @@ object Block extends ScorexLogging {
     }
   }
 
-  def parseBytes(bytes: Array[Byte]): Try[Block] =
+  def parseBytes(bytes: Array[Byte])(implicit addressScheme: AddressScheme): Try[Block] =
     for {
       (blockHeader, transactionBytes) <- BlockHeader.parseBytes(bytes)
       transactionsData                <- transParseBytes(blockHeader.version, transactionBytes)
@@ -272,14 +272,14 @@ object Block extends ScorexLogging {
     build(version, timestamp, reference, consensusData, transactionData, SignerData(signer, ByteStr.empty), featureVotes).right.map(unsigned =>
       unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))))
 
-  def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
+  def genesisTransactions(gs: GenesisSettings)(implicit addressScheme: AddressScheme): Seq[GenesisTransaction] = {
     gs.transactions.map { ts =>
       val acc = Address.fromString(ts.recipient).right.get
       GenesisTransaction.create(acc, ts.amount, gs.timestamp).right.get
     }
   }
 
-  def genesis(genesisSettings: GenesisSettings): Either[ValidationError, Block] = {
+  def genesis(genesisSettings: GenesisSettings)(implicit addressScheme: AddressScheme): Either[ValidationError, Block] = {
 
     val genesisSigner = PrivateKeyAccount(Array.empty)
 

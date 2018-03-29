@@ -60,9 +60,7 @@ object SmartIssueTransaction extends TransactionParserFor[SmartIssueTransaction]
   override val typeId: Byte                 = 3
   override val supportedVersions: Set[Byte] = Set(2)
 
-  private val networkByte = AddressScheme.current.chainId
-
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(version: Byte, bytes: Array[Byte])(implicit addressScheme: AddressScheme): Try[TransactionT] =
     Try {
       val chainId                       = bytes(0)
       val sender                        = PublicKeyAccount(bytes.slice(1, TransactionParsers.KeyLength + 1))
@@ -101,10 +99,10 @@ object SmartIssueTransaction extends TransactionParserFor[SmartIssueTransaction]
              script: Option[Script],
              fee: Long,
              timestamp: Long,
-             proofs: Proofs): Either[ValidationError, TransactionT] =
+             proofs: Proofs)(implicit addressScheme: AddressScheme): Either[ValidationError, TransactionT] =
     for {
       _ <- Either.cond(supportedVersions.contains(version), (), UnsupportedVersion(version))
-      _ <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
+      _ <- Either.cond(chainId == addressScheme.chainId, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
       _ <- IssueTransaction.validateIssueParams(name, description, quantity, decimals, reissuable, fee)
     } yield SmartIssueTransaction(version, chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs)
 
@@ -118,7 +116,7 @@ object SmartIssueTransaction extends TransactionParserFor[SmartIssueTransaction]
                  reissuable: Boolean,
                  script: Option[Script],
                  fee: Long,
-                 timestamp: Long): Either[ValidationError, TransactionT] =
+                 timestamp: Long)(implicit addressScheme: AddressScheme): Either[ValidationError, TransactionT] =
     for {
       unverified <- create(version, chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty)
       proofs     <- Proofs.create(Seq(ByteStr(crypto.sign(sender, unverified.bodyBytes()))))

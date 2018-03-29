@@ -1,12 +1,13 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.state2.{Diff, LeaseBalance, Portfolio}
+import scorex.account.AddressScheme
 import scorex.transaction.{CreateAliasTransaction, ValidationError}
 
 import scala.util.Right
 
 object CreateAliasTransactionDiff {
-  def apply(height: Int)(tx: CreateAliasTransaction): Either[ValidationError, Diff] = {
+  def apply(height: Int)(tx: CreateAliasTransaction)(implicit addressScheme: AddressScheme): Either[ValidationError, Diff] = {
     Right(
       Diff(height = height,
            tx = tx,

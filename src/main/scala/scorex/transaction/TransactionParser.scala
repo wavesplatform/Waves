@@ -1,5 +1,7 @@
 package scorex.transaction
 
+import scorex.account.AddressScheme
+
 import scala.reflect.ClassTag
 import scala.util.Try
 
@@ -10,7 +12,7 @@ trait TransactionParser {
   def typeId: Byte
   def supportedVersions: Set[Byte]
 
-  def parseBytes(bytes: Array[Byte]): Try[TransactionT] = parseHeader(bytes).flatMap {
+  def parseBytes(bytes: Array[Byte])(implicit addressScheme: AddressScheme): Try[TransactionT] = parseHeader(bytes).flatMap {
     case (version, offset) =>
       parseTail(version, bytes.drop(offset))
   }
@@ -19,7 +21,7 @@ trait TransactionParser {
     * @return (version, offset)
     */
   protected def parseHeader(bytes: Array[Byte]): Try[(Byte, Int)]
-  protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT]
+  protected def parseTail(version: Byte, bytes: Array[Byte])(implicit addressScheme: AddressScheme): Try[TransactionT]
 }
 
 object TransactionParser {

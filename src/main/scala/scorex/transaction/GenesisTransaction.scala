@@ -5,7 +5,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.Address
+import scorex.account.{Address, AddressScheme}
 import scorex.transaction.TransactionParsers._
 
 import scala.util.{Failure, Success, Try}
@@ -60,7 +60,7 @@ object GenesisTransaction extends TransactionParserFor[GenesisTransaction] with 
     Bytes.concat(h, h)
   }
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(version: Byte, bytes: Array[Byte])(implicit addressScheme: AddressScheme): Try[TransactionT] =
     Try {
       require(bytes.length >= BASE_LENGTH, "Data does not match base length")
 

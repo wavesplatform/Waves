@@ -5,7 +5,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Address, AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account._
 import scorex.transaction.TransactionParsers._
 import scorex.transaction._
 
@@ -52,7 +52,7 @@ object LeaseTransaction extends TransactionParserFor[LeaseTransaction] with Tran
     val Canceled = "canceled"
   }
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(version: Byte, bytes: Array[Byte])(implicit addressScheme: AddressScheme): Try[TransactionT] =
     Try {
       val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
       (for {
@@ -67,30 +67,23 @@ object LeaseTransaction extends TransactionParserFor[LeaseTransaction] with Tran
       } yield lt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
-  def create(sender: PublicKeyAccount,
-             amount: Long,
-             fee: Long,
-             timestamp: Long,
-             recipient: AddressOrAlias,
-             signature: ByteStr): Either[ValidationError, TransactionT] = {
+  def create(sender: PublicKeyAccount, amount: Long, fee: Long, timestamp: Long, recipient: AddressOrAlias, signature: ByteStr)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, TransactionT] = {
     if (amount <= 0) {
       Left(ValidationError.NegativeAmount(amount, "waves"))
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
       Left(ValidationError.OverflowError)
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
-    } else if (recipient.isInstanceOf[Address] && sender.stringRepr == recipient.stringRepr) {
+    } else if (recipient.isInstanceOf[Address] && sender.toAddress.stringRepr == recipient.stringRepr) {
       Left(ValidationError.ToSelf)
     } else {
       Right(LeaseTransaction(sender, amount, fee, timestamp, recipient, signature))
     }
   }
 
-  def create(sender: PrivateKeyAccount,
-             amount: Long,
-             fee: Long,
-             timestamp: Long,
-             recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
+  def create(sender: PrivateKeyAccount, amount: Long, fee: Long, timestamp: Long, recipient: AddressOrAlias)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, TransactionT] = {
     create(sender, amount, fee, timestamp, recipient, ByteStr.empty).right.map { unsigned =>
       unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
     }

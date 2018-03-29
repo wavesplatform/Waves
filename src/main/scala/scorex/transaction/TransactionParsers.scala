@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.utils.base58Length
+import scorex.account.AddressScheme
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -59,7 +60,7 @@ object TransactionParsers {
   def by(name: String): Option[TransactionParser]                = byName.get(name)
   def by(typeId: Byte, version: Byte): Option[TransactionParser] = all.get((typeId, version))
 
-  def parseBytes(data: Array[Byte]): Try[Transaction] =
+  def parseBytes(data: Array[Byte])(implicit addressScheme: AddressScheme): Try[Transaction] =
     data.headOption
       .fold[Try[Byte]](Failure(new IllegalArgumentException("Can't find the significant byte: the buffer is empty")))(Success(_))
       .flatMap { headByte =>
@@ -67,13 +68,13 @@ object TransactionParsers {
         else oldParseBytes(headByte, data)
       }
 
-  private def oldParseBytes(tpe: Byte, data: Array[Byte]): Try[Transaction] =
+  private def oldParseBytes(tpe: Byte, data: Array[Byte])(implicit addressScheme: AddressScheme): Try[Transaction] =
     old
       .get(tpe)
       .fold[Try[TransactionParser]](Failure(new IllegalArgumentException(s"Unknown transaction type (old encoding): '$tpe'")))(Success(_))
       .flatMap(_.parseBytes(data))
 
-  private def modernParseBytes(data: Array[Byte]): Try[Transaction] = {
+  private def modernParseBytes(data: Array[Byte])(implicit addressScheme: AddressScheme): Try[Transaction] = {
     if (data.length < 2)
       Failure(new IllegalArgumentException(s"Can't determine the type and the version of transaction: the buffer has ${data.length} bytes"))
     else {

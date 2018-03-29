@@ -5,6 +5,7 @@ import scorex.transaction.TransactionParsers
 import scorex.transaction.ValidationError.InvalidAddress
 
 trait PublicKeyAccount {
+
   def publicKey: Array[Byte]
 
   override def equals(b: Any): Boolean = b match {
@@ -23,10 +24,8 @@ object PublicKeyAccount {
 
   def apply(publicKey: Array[Byte]): PublicKeyAccount = PublicKeyAccountImpl(publicKey)
 
-  implicit def toAddress(publicKeyAccount: PublicKeyAccount): Address = Address.fromPublicKey(publicKeyAccount.publicKey)
-
   implicit class PublicKeyAccountExt(pk: PublicKeyAccount) {
-    def toAddress: Address = PublicKeyAccount.toAddress(pk)
+    def toAddress(implicit addressScheme: AddressScheme): Address = Address.fromPublicKey(pk.publicKey)
   }
 
   def fromBase58String(s: String): Either[InvalidAddress, PublicKeyAccount] =

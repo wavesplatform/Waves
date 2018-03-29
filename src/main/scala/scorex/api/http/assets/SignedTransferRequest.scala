@@ -3,7 +3,7 @@ package scorex.api.http.assets
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
-import scorex.account.{AddressOrAlias, PublicKeyAccount}
+import scorex.account.{AddressOrAlias, AddressScheme, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParsers.SignatureStringLength
 import scorex.transaction.assets.TransferTransaction
@@ -45,7 +45,7 @@ case class SignedTransferRequest(@ApiModelProperty(value = "Base58 encoded sende
                                  @ApiModelProperty(required = true)
                                  signature: String)
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, TransferTransaction] =
+  def toTx(implicit addressScheme: AddressScheme): Either[ValidationError, TransferTransaction] =
     for {
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _assetId    <- parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)

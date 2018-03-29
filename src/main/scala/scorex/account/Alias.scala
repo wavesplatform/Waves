@@ -25,12 +25,10 @@ object Alias {
 
   private val AliasPatternInfo = "Alias string pattern is 'alias:<chain-id>:<address-alias>"
 
-  private def schemeByte: Byte = AddressScheme.current.chainId
-
   private def validAliasChar(c: Char): Boolean =
     ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || c == '_' || c == '@' || c == '-' || c == '.'
 
-  private def buildAlias(networkByte: Byte, name: String): Either[ValidationError, Alias] = {
+  private def buildAlias(networkByte: Byte, name: String)(implicit addressScheme: AddressScheme): Either[ValidationError, Alias] = {
 
     case class AliasImpl(networkByte: Byte, name: String) extends Alias
 
@@ -38,15 +36,16 @@ object Alias {
       Left(GenericError(s"Alias '$name' length should be between $MinLength and $MaxLength"))
     else if (!name.forall(validAliasChar))
       Left(GenericError(s"Alias should contain only following characters: $aliasAlphabet"))
-    else if (networkByte != schemeByte)
+    else if (networkByte != addressScheme.chainId)
       Left(GenericError("Alias network char doesn't match current scheme"))
     else
       Right(AliasImpl(networkByte, name))
   }
 
-  def buildWithCurrentNetworkByte(name: String): Either[ValidationError, Alias] = buildAlias(schemeByte, name)
+  def buildWithCurrentNetworkByte(name: String)(implicit addressScheme: AddressScheme): Either[ValidationError, Alias] =
+    buildAlias(addressScheme.chainId, name)
 
-  def fromString(str: String): Either[ValidationError, Alias] =
+  def fromString(str: String)(implicit addressScheme: AddressScheme): Either[ValidationError, Alias] =
     if (!str.startsWith(Prefix)) {
       Left(GenericError(AliasPatternInfo))
     } else {
@@ -60,11 +59,11 @@ object Alias {
       }
     }
 
-  def fromBytes(bytes: Array[Byte]): Either[ValidationError, Alias] = {
+  def fromBytes(bytes: Array[Byte])(implicit addressScheme: AddressScheme): Either[ValidationError, Alias] = {
     bytes.headOption match {
       case Some(AddressVersion) =>
         val networkChar = bytes.tail.head
-        if (networkChar != schemeByte) {
+        if (networkChar != addressScheme.chainId) {
           Left(GenericError("Alias network byte doesn't match current scheme"))
         } else
           buildAlias(networkChar, new String(bytes.drop(4), "UTF-8"))

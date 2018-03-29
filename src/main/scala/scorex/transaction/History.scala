@@ -3,6 +3,7 @@ package scorex.transaction
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.state2.ByteStr
+import scorex.account.AddressScheme
 import scorex.block.Block.BlockId
 import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -76,17 +77,19 @@ object History {
     def contains(block: Block): Boolean       = history.contains(block.uniqueId)
     def contains(signature: ByteStr): Boolean = history.heightOf(signature).isDefined
 
-    def blockById(blockId: ByteStr): Option[Block] = history.blockBytes(blockId).flatMap(bb => Block.parseBytes(bb).toOption)
-    def blockAt(height: Int): Option[Block]        = history.blockBytes(height).flatMap(bb => Block.parseBytes(bb).toOption)
+    def blockById(blockId: ByteStr)(implicit addressScheme: AddressScheme): Option[Block] =
+      history.blockBytes(blockId).flatMap(bb => Block.parseBytes(bb).toOption)
+    def blockAt(height: Int)(implicit addressScheme: AddressScheme): Option[Block] =
+      history.blockBytes(height).flatMap(bb => Block.parseBytes(bb).toOption)
 
     def lastBlockHeaderAndSize: Option[(Block, Int)] = history.lastBlock.map(b => (b, b.bytes().length))
     def lastBlockId: Option[AssetId]                 = history.lastBlockHeaderAndSize.map(_._1.signerData.signature)
     def lastBlockTimestamp: Option[Long]             = history.lastBlockHeaderAndSize.map(_._1.timestamp)
 
-    def lastBlocks(howMany: Int): Seq[Block] = {
-      (Math.max(1, history.height - howMany + 1) to history.height).flatMap(history.blockAt).reverse
+    def lastBlocks(howMany: Int)(implicit addressScheme: AddressScheme): Seq[Block] = {
+      (Math.max(1, history.height - howMany + 1) to history.height).flatMap(h => history.blockAt(h)).reverse
     }
 
-    def genesis: Block = history.blockAt(1).get
+    def genesis(implicit addressScheme: AddressScheme): Block = history.blockAt(1).get
   }
 }

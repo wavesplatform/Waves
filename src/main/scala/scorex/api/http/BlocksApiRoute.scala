@@ -1,7 +1,6 @@
 package scorex.api.http
 
 import javax.ws.rs.Path
-
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.{Route, StandardRoute}
 import com.wavesplatform.network._
@@ -12,6 +11,7 @@ import io.swagger.annotations._
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler.Implicits.global
 import play.api.libs.json._
+import scorex.account.AddressScheme
 import scorex.block.BlockHeader
 import scorex.transaction._
 
@@ -20,11 +20,11 @@ import scala.util.Try
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(settings: RestAPISettings,
-                          history: History,
-                          blockchainUpdater: BlockchainUpdater,
-                          allChannels: ChannelGroup,
-                          checkpointProc: Checkpoint => Task[Either[ValidationError, Option[BigInt]]])
+class BlocksApiRoute(settings: RestAPISettings,
+                     history: History,
+                     blockchainUpdater: BlockchainUpdater,
+                     allChannels: ChannelGroup,
+                     checkpointProc: Checkpoint => Task[Either[ValidationError, Option[BigInt]]])(implicit addressScheme: AddressScheme)
     extends ApiRoute {
 
   // todo: make this configurable and fix integration tests
@@ -58,7 +58,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
             .map { pair =>
               (pair._1.get, pair._2)
             }
-            .filter(_._1.signerData.generator.address == address)
+            .filter(_._1.signerData.generator.toAddress.address == address)
             .map { pair =>
               pair._1.json() + ("height" -> Json.toJson(pair._2))
             })
@@ -73,7 +73,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
       new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "string", paramType = "path")
     ))
   def child: Route = (path("child" / Segment) & get) { encodedSignature =>
-    withBlock(history, encodedSignature) { block =>
+    withBlock(history, encodedSignature)(addressScheme) { block =>
       val childJson = for {
         h <- history.heightOf(block.uniqueId)
         b <- history.blockAt(h + 1)
@@ -93,7 +93,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
       new ApiImplicitParam(name = "blockNum", value = "Number of blocks to count delay", required = true, dataType = "string", paramType = "path")
     ))
   def delay: Route = (path("delay" / Segment / IntNumber) & get) { (encodedSignature, count) =>
-    withBlock(history, encodedSignature) { block =>
+    withBlock(history, encodedSignature)(addressScheme) { block =>
       val averageDelay = Try {
         (block.timestamp - history.parent(block, count).get.timestamp) / count
       }

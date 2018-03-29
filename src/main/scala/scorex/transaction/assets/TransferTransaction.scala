@@ -6,7 +6,7 @@ import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
 import scorex.transaction.TransactionParsers._
@@ -70,7 +70,7 @@ object TransferTransaction extends TransactionParserFor[TransferTransaction] wit
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(version: Byte, bytes: Array[Byte])(implicit addressScheme: AddressScheme): Try[TransactionT] =
     Try {
       val signature = ByteStr(bytes.slice(0, SignatureLength))
       val txId      = bytes(SignatureLength)

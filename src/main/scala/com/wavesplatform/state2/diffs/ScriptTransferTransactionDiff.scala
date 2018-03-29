@@ -3,13 +3,14 @@ package com.wavesplatform.state2.diffs
 import cats.implicits._
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import scorex.account.Address
+import scorex.account.{Address, AddressScheme}
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.VersionedTransferTransaction
 
 object ScriptTransferTransactionDiff {
-  def apply(state: SnapshotStateReader, height: Int)(tx: VersionedTransferTransaction): Either[ValidationError, Diff] = {
+  def apply(state: SnapshotStateReader, height: Int)(tx: VersionedTransferTransaction)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender.publicKey)
     for {
       recipient <- state.resolveAliasEi(tx.recipient)

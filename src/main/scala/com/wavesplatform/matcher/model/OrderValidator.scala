@@ -5,7 +5,7 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.matcher.model.Events.OrderAdded
 import com.wavesplatform.utx.UtxPool
-import scorex.account.PublicKeyAccount
+import scorex.account.{AddressScheme, PublicKeyAccount}
 import scorex.transaction.AssetAcc
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.Validation.booleanOperators
@@ -18,6 +18,7 @@ trait OrderValidator {
   val utxPool: UtxPool
   val settings: MatcherSettings
   val wallet: Wallet
+  implicit val addressScheme: AddressScheme
 
   lazy val matcherPubKey: PublicKeyAccount = wallet.findWallet(settings.account).right.get
   val MinExpiration                        = 60 * 1000L
@@ -29,8 +30,8 @@ trait OrderValidator {
       .map { case (a, _) => a -> spendableBalance(a) }
       .map { case (a, v) => a.assetId.map(_.base58).getOrElse(AssetPair.WavesName) -> v }
 
-    val newOrder = Events.createOpenPortfolio(OrderAdded(lo)).getOrElse(order.senderPublicKey.address, OpenPortfolio.empty)
-    val open     = orderHistory.openPortfolio(order.senderPublicKey.address).orders.filter { case (k, _) => b.contains(k) }
+    val newOrder = Events.createOpenPortfolio(OrderAdded(lo)).getOrElse(order.senderPublicKey.toAddress.address, OpenPortfolio.empty)
+    val open     = orderHistory.openPortfolio(order.senderPublicKey.toAddress.address).orders.filter { case (k, _) => b.contains(k) }
     val needs    = OpenPortfolio(open).combine(newOrder)
 
     val res: Boolean = b.combine(needs.orders.mapValues(-_)).forall(_._2 >= 0)

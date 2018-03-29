@@ -45,9 +45,7 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
   override val typeId: Byte                 = 13
   override val supportedVersions: Set[Byte] = Set(1)
 
-  private def networkByte = AddressScheme.current.chainId
-
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(version: Byte, bytes: Array[Byte])(implicit addressScheme: AddressScheme): Try[TransactionT] =
     Try {
       val chainId = bytes(0)
       val sender  = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
@@ -63,28 +61,21 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
       val timestamp = Longs.fromByteArray(bytes.slice(scriptEnd + 8, scriptEnd + 16))
       (for {
         scriptOpt <- scriptEiOpt
-        _         <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
+        _         <- Either.cond(chainId == addressScheme.chainId, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
         proofs    <- Proofs.fromBytes(bytes.drop(scriptEnd + 16))
         tx        <- create(version, sender, scriptOpt, fee, timestamp, proofs)
       } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
-  def create(version: Byte,
-             sender: PublicKeyAccount,
-             script: Option[Script],
-             fee: Long,
-             timestamp: Long,
-             proofs: Proofs): Either[ValidationError, TransactionT] =
+  def create(version: Byte, sender: PublicKeyAccount, script: Option[Script], fee: Long, timestamp: Long, proofs: Proofs)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, TransactionT] =
     for {
       _ <- Either.cond(supportedVersions.contains(version), (), ValidationError.UnsupportedVersion(version))
       _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee)
-    } yield new SetScriptTransaction(version, networkByte, sender, script, fee, timestamp, proofs)
+    } yield new SetScriptTransaction(version, addressScheme.chainId, sender, script, fee, timestamp, proofs)
 
-  def selfSigned(version: Byte,
-                 sender: PrivateKeyAccount,
-                 script: Option[Script],
-                 fee: Long,
-                 timestamp: Long): Either[ValidationError, TransactionT] =
+  def selfSigned(version: Byte, sender: PrivateKeyAccount, script: Option[Script], fee: Long, timestamp: Long)(
+      implicit addressScheme: AddressScheme): Either[ValidationError, TransactionT] =
     create(version, sender, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes())))).explicitGet())
     }

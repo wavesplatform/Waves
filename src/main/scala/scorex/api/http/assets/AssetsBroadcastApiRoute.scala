@@ -9,6 +9,7 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
+import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.transaction.{Transaction, ValidationError}
 
@@ -18,7 +19,9 @@ import scala.util.{Left, Right}
 
 @Path("/assets/broadcast")
 @Api(value = "assets")
-case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allChannels: ChannelGroup) extends ApiRoute with BroadcastRoute {
+class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, val allChannels: ChannelGroup)(implicit addressScheme: AddressScheme)
+    extends ApiRoute
+    with BroadcastRoute {
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
     issue ~ reissue ~ transfer ~ burnRoute ~ batchTransfer ~ exchange

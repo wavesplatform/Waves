@@ -9,9 +9,12 @@ import com.wavesplatform.matcher.model.Events._
 import com.wavesplatform.state2._
 import org.iq80.leveldb.DB
 import play.api.libs.json.JsArray
+import scorex.account.AddressScheme
 import scorex.transaction.assets.exchange.ExchangeTransaction
 
-class MatcherTransactionWriter(db: DB, val settings: MatcherSettings) extends SubStorage(db, "matcher") with Actor {
+class MatcherTransactionWriter(db: DB, val settings: MatcherSettings)(implicit val addressScheme: AddressScheme)
+    extends SubStorage(db, "matcher")
+    with Actor {
 
   import MatcherTransactionWriter._
 
@@ -62,7 +65,8 @@ object MatcherTransactionWriter {
 
   def name: String = "MatcherTransactionWriter"
 
-  def props(db: DB, settings: MatcherSettings): Props = Props(new MatcherTransactionWriter(db, settings))
+  def props(db: DB, settings: MatcherSettings)(implicit addressScheme: AddressScheme): Props =
+    Props(new MatcherTransactionWriter(db, settings))
 
   case class GetTransactionsByOrder(orderId: String)
 

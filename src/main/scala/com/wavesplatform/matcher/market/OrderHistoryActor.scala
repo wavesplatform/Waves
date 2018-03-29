@@ -12,7 +12,7 @@ import com.wavesplatform.matcher.model._
 import com.wavesplatform.utx.UtxPool
 import org.iq80.leveldb.DB
 import play.api.libs.json._
-import scorex.account.Address
+import scorex.account.{Address, AddressScheme}
 import scorex.transaction.{AssetAcc, AssetId}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.{AssetPair, Order}
@@ -22,9 +22,11 @@ import scorex.wallet.Wallet
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxPool, val wallet: Wallet) extends Actor with OrderValidator {
+class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxPool, val wallet: Wallet)(implicit val addressScheme: AddressScheme)
+    extends Actor
+    with OrderValidator {
 
-  val orderHistory = OrderHistoryImpl(db, settings)
+  val orderHistory = new OrderHistoryImpl(db, settings)
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[OrderAdded])
@@ -156,7 +158,7 @@ object OrderHistoryActor {
 
   def name: String = "OrderHistory"
 
-  def props(db: DB, settings: MatcherSettings, utxPool: UtxPool, wallet: Wallet): Props =
+  def props(db: DB, settings: MatcherSettings, utxPool: UtxPool, wallet: Wallet)(implicit addressScheme: AddressScheme): Props =
     Props(new OrderHistoryActor(db, settings, utxPool, wallet))
 
   sealed trait OrderHistoryRequest
