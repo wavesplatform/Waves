@@ -227,8 +227,6 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "", enable
 
       val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
       val configOverrides: String = {
-        val withAspectJ = Option(System.getenv("WITH_ASPECTJ")).fold(false)(_.toBoolean)
-
         var config = s"$javaOptions ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))} " +
           s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dwaves.network.declared-address=$ip:$networkPort "
 
@@ -237,6 +235,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "", enable
             s"sampling,monitors,sessionname=WavesNode,dir=$ContainerRoot/profiler,logdir=$ContainerRoot "
         }
 
+        val withAspectJ = Option(System.getenv("WITH_ASPECTJ")).fold(false)(_.toBoolean)
         if (withAspectJ) config += s"-javaagent:$ContainerRoot/aspectjweaver.jar "
         config
       }
