@@ -25,7 +25,7 @@ class ConsensusRouteSpec
     1 to 10 foreach { _ =>
       d.blockchainUpdater.processBlock(getNextTestBlock(d.history))
     }
-    f(d.history, NxtConsensusApiRoute(restAPISettings, d.stateReader, d.history, FunctionalitySettings.TESTNET).route)
+    f(d.history, NxtConsensusApiRoute(restAPISettings, d.state, d.history, FunctionalitySettings.TESTNET).route)
   }
 
   routePath("/generationsignature") - {

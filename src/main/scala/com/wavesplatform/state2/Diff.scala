@@ -1,10 +1,9 @@
 package com.wavesplatform.state2
 
 import cats.implicits._
-import scorex.transaction.AssetId
 import cats.kernel.Monoid
 import scorex.account.{Address, Alias, PublicKeyAccount}
-import scorex.transaction.Transaction
+import scorex.transaction.{AssetId, Transaction}
 import scorex.transaction.smart.Script
 
 case class LeaseBalance(in: Long, out: Long)
@@ -44,10 +43,23 @@ object AssetInfo {
 
 case class AssetDescription(issuer: PublicKeyAccount,
                             name: Array[Byte],
+                            description: Array[Byte],
                             decimals: Int,
                             reissuable: Boolean,
                             totalVolume: BigInt,
-                            script: Option[Script])
+                            script: Option[Script]) {
+  override def equals(obj: scala.Any) = obj match {
+    case o: AssetDescription =>
+      o.issuer == this.issuer &&
+        o.name.sameElements(name) &&
+        o.description.sameElements(description) &&
+        o.decimals == decimals &&
+        o.reissuable == reissuable &&
+        o.totalVolume == totalVolume &&
+        o.script == script
+    case _ => false
+  }
+}
 
 case class AccountDataInfo(data: Map[String, DataEntry[_]])
 

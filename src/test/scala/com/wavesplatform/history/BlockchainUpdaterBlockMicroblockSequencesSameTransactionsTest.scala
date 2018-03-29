@@ -36,7 +36,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
                   mbs.foreach(mb => d.blockchainUpdater.processMicroBlock(mb).explicitGet())
               }
               d.blockchainUpdater.processBlock(last)
-              d.stateReader.portfolio(last.signerData.generator.toAddress).balance
+              d.portfolio(last.signerData.generator.toAddress).balance
             }
         }
         finalMinerBalances.toSet.size shouldBe 1
@@ -63,8 +63,8 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
         domain.blockchainUpdater.processMicroBlock(micros.head).explicitGet()
         domain.blockchainUpdater.processBlock(emptyBlock).explicitGet()
 
-        domain.stateReader.portfolio(miner).balance shouldBe payment.fee
-        domain.stateReader.portfolio(genesis.recipient).balance shouldBe (genesis.amount - payment.fee)
+        domain.portfolio(miner).balance shouldBe payment.fee
+        domain.portfolio(genesis.recipient).balance shouldBe (genesis.amount - payment.fee)
     }
   }
 

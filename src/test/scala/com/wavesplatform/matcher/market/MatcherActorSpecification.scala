@@ -70,10 +70,12 @@ class MatcherActorSpecification
     .create(PrivateKeyAccount(Array.empty), "ForbiddenName".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
     .right
     .get
-  (storedState.assetDescription _).when(i2.id()).returns(Some(AssetDescription(i2.sender, "ForbiddenName".getBytes, 8, false, i2.quantity, None)))
+  (storedState.assetDescription _)
+    .when(i2.id())
+    .returns(Some(AssetDescription(i2.sender, "ForbiddenName".getBytes, "".getBytes, 8, false, i2.quantity, None)))
   (storedState.assetDescription _)
     .when(*)
-    .returns(Some(AssetDescription(PublicKeyAccount(Array(0: Byte)), "Unknown".getBytes, 8, false, i1.quantity, None)))
+    .returns(Some(AssetDescription(PublicKeyAccount(Array(0: Byte)), "Unknown".getBytes, "".getBytes, 8, false, i1.quantity, None)))
   (storedState.portfolio _).when(*).returns(Portfolio(Long.MaxValue, LeaseBalance.empty, Map(ByteStr("123".getBytes) -> Long.MaxValue)))
 
   override protected def beforeEach() = {

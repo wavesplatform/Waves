@@ -149,9 +149,10 @@ trait Caches extends SnapshotStateReader with History with StateWriter {
       assetInfoCache.put(id, Some(ai))
       diff.transactions.get(id) match {
         case Some((_, it: IssueTransaction, _)) =>
-          assetDescriptionCache.put(id, Some(AssetDescription(it.sender, it.name, it.decimals, ai.isReissuable, ai.volume, None)))
+          assetDescriptionCache.put(id, Some(AssetDescription(it.sender, it.name, it.description, it.decimals, ai.isReissuable, ai.volume, None)))
         case Some((_, it: SmartIssueTransaction, _)) =>
-          assetDescriptionCache.put(id, Some(AssetDescription(it.sender, it.name, it.decimals, ai.isReissuable, ai.volume, it.script)))
+          assetDescriptionCache.put(id,
+                                    Some(AssetDescription(it.sender, it.name, it.description, it.decimals, ai.isReissuable, ai.volume, it.script)))
         case _ =>
       }
     }
