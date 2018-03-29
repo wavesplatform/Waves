@@ -1,6 +1,7 @@
 package scorex.api.http.assets
 
 import akka.http.scaladsl.server.Route
+import com.google.common.base.Charsets
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.SnapshotStateReader
@@ -11,8 +12,9 @@ import javax.ws.rs.Path
 import play.api.libs.json._
 import scorex.BroadcastRoute
 import scorex.account.Address
-import scorex.api.http.{ApiError, ApiRoute, InvalidAddress, WrongJson}
+import scorex.api.http._
 import scorex.crypto.encode.Base58
+import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.{AssetIdStringLength, TransactionFactory}
@@ -31,7 +33,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistribution
+      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistribution ~ details
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -61,6 +63,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         }
       }
     }
+
   @Path("/balance/{address}")
   @ApiOperation(value = "Account's balance", notes = "Account's balances for all assets", httpMethod = "GET")
   @ApiImplicitParams(
@@ -70,6 +73,17 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
   def balances: Route =
     (get & path("balance" / Segment)) { address =>
       complete(fullAccountAssetsInfo(address))
+    }
+
+  @Path("/details/{assetId}")
+  @ApiOperation(value = "Information about an asset", notes = "Provides detailed information about given asset", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "assetId", value = "ID of the asset", required = true, dataType = "string", paramType = "path")
+    ))
+  def details: Route =
+    (get & path("details" / Segment)) { id =>
+      complete(assetDetails(id))
     }
 
   @Path("/transfer")
@@ -177,6 +191,27 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
   def burnRoute: Route =
     processRequest("burn", (b: BurnRequest) => doBroadcast(TransactionFactory.burnAsset(b, wallet, time)))
 
+  @Path("/order")
+  @ApiOperation(value = "Sign Order",
+                notes = "Create order signed by address from wallet",
+                httpMethod = "POST",
+                produces = "application/json",
+                consumes = "application/json")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "body",
+        value = "Order Json with data",
+        required = true,
+        paramType = "body",
+        dataType = "scorex.transaction.assets.exchange.Order"
+      )
+    ))
+  def signOrder: Route =
+    processRequest("order", (order: Order) => {
+      wallet.privateKeyAccount(order.senderPublicKey).map(pk => Order.sign(order, pk))
+    })
+
   private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {
     ByteStr.decodeBase58(assetIdStr) match {
       case Success(assetId) =>
@@ -207,29 +242,37 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
               "assetId"          -> assetId.base58,
               "balance"          -> balance,
               "reissuable"       -> assetInfo.reissuable,
-              "quantity"         -> 0,
+              "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
               "issueTransaction" -> issueTransaction._2.json()
             )).toSeq)
       )
     }).left.map(ApiError.fromValidationError)
-  @Path("/order")
-  @ApiOperation(value = "Sign Order",
-                notes = "Create order signed by address from wallet",
-                httpMethod = "POST",
-                produces = "application/json",
-                consumes = "application/json")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(
-        name = "body",
-        value = "Order Json with data",
-        required = true,
-        paramType = "body",
-        dataType = "scorex.transaction.assets.exchange.Order"
+
+  private def assetDetails(assetId: String): Either[ApiError, JsObject] =
+    (for {
+      id <- ByteStr.decodeBase58(assetId).toOption.toRight("Incorrect asset ID")
+      tt <- state.transactionInfo(id).toRight("Failed to find issue transaction by ID")
+      (h, mtx) = tt
+      tx <- (mtx match {
+        case t: IssueTransaction => Some(t)
+        case _                   => None
+      }).toRight("No issue transaction found with given asset ID")
+      description <- state.assetDescription(id).toRight("Failed to get description of the asset")
+    } yield {
+      JsObject(
+        Seq(
+          "assetId"        -> JsString(id.base58),
+          "issueHeight"    -> JsNumber(h),
+          "issueTimestamp" -> JsNumber(tx.timestamp),
+          "issuer"         -> JsString(tx.sender.toString),
+          "name"           -> JsString(new String(tx.name, Charsets.UTF_8)),
+          "description"    -> JsString(new String(tx.description, Charsets.UTF_8)),
+          "decimals"       -> JsNumber(tx.decimals.toInt),
+          "reissuable"     -> JsBoolean(description.reissuable),
+          "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
+          "script"         -> JsString(description.script.fold("")(s => s.bytes().base58))
+        )
       )
-    ))
-  def signOrder: Route =
-    processRequest("order", (order: Order) => {
-      wallet.privateKeyAccount(order.senderPublicKey).map(pk => Order.sign(order, pk))
-    })
+    }).left.map(m => CustomValidationError(m))
+
 }
