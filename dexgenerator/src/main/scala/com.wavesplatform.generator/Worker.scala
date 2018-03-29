@@ -5,29 +5,39 @@ import java.util.concurrent.ThreadLocalRandom
 import cats.Show
 import cats.data._
 import cats.implicits._
+import com.wavesplatform.crypto
 import com.wavesplatform.generator.Worker.Settings
 import com.wavesplatform.generator.utils.{ApiRequests, GenOrderType}
+import com.wavesplatform.it.api.{MatcherResponse, MatcherStatusResponse, OrderbookHistory, UnexpectedStatusCodeException}
 import com.wavesplatform.it.util._
+import com.wavesplatform.matcher.api.CancelOrderRequest
+import com.wavesplatform.matcher.model.LimitOrder.OrderStatus
+import com.wavesplatform.state2.ByteStr
+import monix.eval.Coeval
 import org.asynchttpclient.{AsyncHttpClient, Response}
+import play.api.libs.json._
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.crypto.encode.Base58
+import scorex.crypto.signatures.{Curve25519, PrivateKey}
 import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import settings.{GeneratorSettings, MatcherNodeSettings}
 
 import scala.collection.immutable
 import scala.concurrent.duration.{Duration, FiniteDuration, _}
-import scala.concurrent.{ExecutionContext, Future, blocking}
-import scala.util.Success
-import scala.util.Failure
+import scala.concurrent._
+import scala.util.{Failure, Success, Try}
+import Worker._
 
 class Worker(workerSettings: Settings,
              generatorSettings: GeneratorSettings,
              matcherSettings: MatcherNodeSettings.Settings,
-             val tradingAssets: Seq[AssetId],
+             tradingAssets: Seq[AssetId],
              orderType: GenOrderType.Value,
              ordersCount: Int,
              client: AsyncHttpClient)(implicit ec: ExecutionContext)
   extends ApiRequests(client) {
+
 
   log.info("started worker " + orderType)
 
@@ -39,6 +49,10 @@ class Worker(workerSettings: Settings,
     }.merge
 
   private val matcherPublicKey = PublicKeyAccount.fromBase58String(matcherSettings.matcherKey).right.get
+  private val validAccounts = generatorSettings.validAccounts
+  private val invalidAccounts = generatorSettings.invalidAccounts
+  private val fakeAccounts = generatorSettings.fakeAccounts
+
   private val fee = 0.003.waves
 
   private def ts = System.currentTimeMillis()
@@ -47,20 +61,47 @@ class Worker(workerSettings: Settings,
 
   private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(r.nextInt(c.size))) else None
 
-  def buyOrder(price: Long, amount: Long, accounts: Seq[PrivateKeyAccount]): Future[Response] = {
-    val pair = AssetPair(randomFrom(tradingAssets), None)
-    val buyer = randomFrom(accounts).get
+  def buyOrder(price: Long, amount: Long, buyer: PrivateKeyAccount, pair: AssetPair): (Order, Future[MatcherResponse]) = {
     val order = Order.buy(buyer, matcherPublicKey, pair, price, amount, ts, ts + 1.day.toMillis, fee)
     log.info("buy " + order)
-    to(matcherSettings.endpoint).placeOrder(order)
+    val response = to(matcherSettings.endpoint).placeOrder(order)
+    (order, response)
   }
 
-  def sellOrder(price: Long, amount: Long, accounts: Seq[PrivateKeyAccount]): Future[Response] = {
-    val pair = AssetPair(randomFrom(tradingAssets), None)
-    val seller = randomFrom(accounts).get
-    val order = Order.sell(seller, matcherPublicKey, pair, price, amount, ts, ts + 1.day.toMillis, fee)
-    log.info("sell " + order)
-    to(matcherSettings.endpoint).placeOrder(order)
+  def sellOrder(price: Long, amount: Long, buyer: PrivateKeyAccount, pair: AssetPair): (Order, Future[MatcherResponse]) = {
+    val order = Order.buy(buyer, matcherPublicKey, pair, price, amount, ts, ts + 1.day.toMillis, fee)
+    log.info("buy " + order)
+    val response = to(matcherSettings.endpoint).placeOrder(order)
+    (order, response)
+  }
+
+  def cancelOrder(pk: PrivateKeyAccount, pair: AssetPair, orderId: String): Future[MatcherStatusResponse] = {
+    val request = CancelOrderRequest(PublicKeyAccount(pk.publicKey), Base58.decode(orderId).get, Array.emptyByteArray)
+    val sig = crypto.sign(pk, request.toSign)
+    val signedRequest = request.copy(signature = sig)
+    to(matcherSettings.endpoint).cancelOrder(pair.amountAssetStr, pair.priceAssetStr, signedRequest)
+  }
+
+  def isActive(status: String): Boolean = {
+    status match {
+      case "PartiallyFilled" =>
+        true
+      case "Accepted" =>
+        true
+      case _ =>
+        false
+    }
+  }
+
+  def cancelAllOrders(fakeAccounts: Seq[PrivateKeyAccount]): Future[Seq[MatcherStatusResponse]] = {
+    val orderHistoriesPerAccount: Seq[(PrivateKeyAccount, Seq[OrderbookHistory])] = fakeAccounts.map(account =>
+      account -> to(matcherSettings.endpoint).orderHistory(account).filter(o => isActive(o.status)))
+    log.info(s"$orderHistoriesPerAccount")
+    val cancelOrders: Seq[Future[MatcherStatusResponse]] = orderHistoriesPerAccount.flatMap(account =>
+      account._2.map(o => cancelOrder(account._1, o.assetPair, o.id)))
+    Future.sequence(cancelOrders).andThen {
+      case x => log.info(s"ended with $x")
+    }
   }
 
   private def placeOrders(startStep: Int): Result[Unit] = {
@@ -74,26 +115,52 @@ class Worker(workerSettings: Settings,
           orderType match {
             case GenOrderType.ActiveBuy =>
               log.info("always active buy")
-              buyOrder(defaultPrice * 100, defaultAmount, generatorSettings.validAccounts)
-              //randomFrom({0,1}).get
+              val buyer = randomFrom(validAccounts).get
+              val pair = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+              buyOrder(defaultPrice / 100, defaultAmount, buyer, pair)._2
             case GenOrderType.ActiveSell =>
               log.info("always active sell")
-              sellOrder(defaultPrice / 100, defaultAmount, generatorSettings.validAccounts)
+              val seller = randomFrom(validAccounts).get
+              val pair = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+              sellOrder(defaultPrice / 100, defaultAmount, seller, pair)._2
             case GenOrderType.Buy =>
-              log.info("buy for filling" )
-              buyOrder(defaultPrice, defaultAmount, generatorSettings.validAccounts)
+              log.info("buy for filling")
+              val buyer = randomFrom(validAccounts).get
+              val pair = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+              buyOrder(defaultPrice, defaultAmount, buyer, pair)._2
             case GenOrderType.Sell =>
-              log.info("sell for filling" )
-              sellOrder(defaultPrice, defaultAmount, generatorSettings.validAccounts)
+              log.info("sell for filling")
+              val seller = randomFrom(validAccounts).get
+              val pair = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+              sellOrder(defaultPrice, defaultAmount, seller, pair)._2
+            case GenOrderType.Cancel =>
+              log.info("cancel order")
+              val buyer = randomFrom(validAccounts).get
+              val pair = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+              val orderInfo = buyOrder(defaultPrice * 100, defaultAmount, buyer, pair)
+              val placedOrder = Await.result(orderInfo._2, 30.seconds)
+              cancelOrder(buyer, pair, placedOrder.message.id)
             case GenOrderType.InvalidAmount =>
               log.info("invalid amount")
-              buyOrder(defaultPrice, defaultAmount, generatorSettings.invalidAccounts)
+              val invalidBuyer = randomFrom(invalidAccounts).get
+              val pair = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+              buyOrder(defaultPrice, defaultAmount, invalidBuyer, pair)._2
                 .transformWith {
                   case Failure(_: IllegalArgumentException) => Future.successful(())
-                  case Success(x) => Future.failed(new IllegalStateException(s"Order should not be placed: ${x.getResponseBody}"))
+                  case Failure(_: UnexpectedStatusCodeException) => Future.successful(())
+                  case Success(x) => Future.failed(new IllegalStateException(s"Order should not be placed: ${x}"))
                 }
             case GenOrderType.Fake =>
-              sellOrder(defaultPrice, defaultAmount, generatorSettings.fakeAccounts)
+              log.info("========start cancelling")
+              cancelAllOrders(fakeAccounts).flatMap { _ =>
+                log.info("=======stop cancelling")
+                val seller: PrivateKeyAccount = randomFrom(fakeAccounts).get
+                val pair = AssetPair(randomFrom(tradingAssets.drop(tradingAssets.size - 2)), None)
+                sellOrder(defaultPrice, defaultAmount, seller, pair)._2
+              }
+
+
+
           })
         result
       }
@@ -104,10 +171,15 @@ class Worker(workerSettings: Settings,
         log.info(s"${ordersCount} orders had been sent")
         if (step < workerSettings.iterations) {
           log.info(s" Sleeping for ${workerSettings.delay}")
-          blocking {
-            Thread.sleep(workerSettings.delay.toMillis)
+
+          EitherT.liftF(Future {
+            blocking {
+              Thread.sleep(workerSettings.delay.toMillis)
+            }
+          }).flatMap { _ =>
+
+            loop(step + 1)
           }
-          loop(step + 1)
         } else {
           log.info(s"Done")
           EitherT.right(Future.successful(Right(())))
@@ -138,4 +210,20 @@ object Worker {
     }
   }
 
+
+
+}
+object AssetPairCreator {
+  val WavesName = "WAVES"
+
+  private def extractAssetId(a: String): Try[Option[AssetId]] = a match {
+    case `WavesName` => Success(None)
+    case other => ByteStr.decodeBase58(other).map(Option(_))
+  }
+
+  def createAssetPair(amountAsset: String, priceAsset: String): Try[AssetPair] =
+    for {
+      a1 <- extractAssetId(amountAsset)
+      a2 <- extractAssetId(priceAsset)
+    } yield AssetPair(a1, a2)
 }

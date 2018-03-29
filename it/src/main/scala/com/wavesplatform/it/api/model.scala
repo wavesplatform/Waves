@@ -1,6 +1,11 @@
 package com.wavesplatform.it.api
 
-import play.api.libs.json.{Format, Json}
+import com.wavesplatform.state2.ByteStr
+import play.api.libs.json._
+import scorex.transaction.AssetId
+import scorex.transaction.assets.exchange.AssetPair
+
+import scala.util.{Failure, Success, Try}
 
 // USCE no longer contains references to non-serializable Request/Response objects
 // to work around https://github.com/scalatest/scalatest/issues/556
@@ -8,26 +13,31 @@ case class UnexpectedStatusCodeException(requestUrl: String, statusCode: Int, re
     extends Exception(s"Request: $requestUrl; Unexpected status code ($statusCode): $responseBody")
 
 case class Status(blockchainHeight: Int, stateHeight: Int, updatedTimestamp: Long, updatedDate: String)
+
 object Status {
   implicit val statusFormat: Format[Status] = Json.format
 }
 
 case class Peer(address: String, declaredAddress: String, peerName: String)
+
 object Peer {
   implicit val peerFormat: Format[Peer] = Json.format
 }
 
 case class Address(address: String)
+
 object Address {
   implicit val addressFormat: Format[Address] = Json.format
 }
 
 case class Balance(address: String, confirmations: Int, balance: Long)
+
 object Balance {
   implicit val balanceFormat: Format[Balance] = Json.format
 }
 
 case class AssetBalance(address: String, assetId: String, balance: Long)
+
 object AssetBalance {
   implicit val assetBalanceFormat: Format[AssetBalance] = Json.format
 }
@@ -38,11 +48,13 @@ object CompiledScript {
 }
 
 case class FullAssetInfo(assetId: String, balance: Long, reissuable: Boolean, quantity: Long)
+
 object FullAssetInfo {
   implicit val fullAssetInfoFormat: Format[FullAssetInfo] = Json.format
 }
 
 case class FullAssetsInfo(address: String, balances: List[FullAssetInfo])
+
 object FullAssetsInfo {
   implicit val fullAssetsInfoFormat: Format[FullAssetsInfo] = Json.format
 }
@@ -80,51 +92,76 @@ object BlockHeaders {
 }
 
 case class MatcherMessage(id: String)
+
 object MatcherMessage {
   implicit val matcherMessageFormat: Format[MatcherMessage] = Json.format
 }
 
 case class MatcherResponse(status: String, message: MatcherMessage)
+
 object MatcherResponse {
   implicit val matcherResponseFormat: Format[MatcherResponse] = Json.format
 }
 
 case class MatcherStatusResponse(status: String)
+
 object MatcherStatusResponse {
   implicit val matcherStatusResponseFormat: Format[MatcherStatusResponse] = Json.format
 }
 
 case class MessageMatcherResponse(message: String)
+
 object MessageMatcherResponse {
   implicit val messageMatcherResponseFormat: Format[MessageMatcherResponse] = Json.format
 }
 
 case class OrderbookHistory(id: String, `type`: String, amount: Long, price: Long, timestamp: Long, filled: Int, status: String)
 object OrderbookHistory {
+  implicit val byteStrFormat: Format[ByteStr] = Format(
+    Reads {
+      case JsString(str) =>
+        ByteStr.decodeBase58(str) match {
+          case Success(x) => JsSuccess(x)
+          case Failure(e) => JsError(e.getMessage)
+        }
+
+      case _ => JsError("Can't read ByteStr")
+    },
+    Writes(x => JsString(x.base58))
+  )
+
+  implicit val assetPairFormat: Format[AssetPair] = Json.format[AssetPair]
+
   implicit val orderbookHistory: Format[OrderbookHistory] = Json.format
 }
 
+
 case class PairResponse(amountAsset: String, priceAsset: String)
+
 object PairResponse {
   implicit val pairResponseFormat: Format[PairResponse] = Json.format
 }
 
 case class LevelResponse(price: Long, amount: Long)
+
 object LevelResponse {
   implicit val levelResponseFormat: Format[LevelResponse] = Json.format
 }
 
 case class OrderBookResponse(timestamp: Long, pair: PairResponse, bids: List[LevelResponse], asks: List[LevelResponse])
+
 object OrderBookResponse {
   implicit val orderBookResponseFormat: Format[OrderBookResponse] = Json.format
 }
 
 case class DebugInfo(stateHeight: Long, stateHash: Long)
+
 object DebugInfo {
   implicit val debugInfoFormat: Format[DebugInfo] = Json.format
 }
 
 case class BlacklistedPeer(hostname: String, timestamp: Long, reason: String)
+
 object BlacklistedPeer {
   implicit val blacklistedPeerFormat: Format[BlacklistedPeer] = Json.format
 }
@@ -136,6 +173,7 @@ object State {
 
 // Obsolete payment request
 case class PaymentRequest(amount: Long, fee: Long, sender: String, recipient: String)
+
 object PaymentRequest {
   implicit val paymentFormat: Format[PaymentRequest] = Json.format
 }
