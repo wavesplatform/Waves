@@ -17,33 +17,34 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase) extends ByteToMessageCodec[Ra
   import BasicMessagesRepo.specsByCodes
   import LegacyFrameCodec._
 
-  override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]) = try {
-    require(in.readInt() == Magic, "invalid magic number")
+  override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]) =
+    try {
+      require(in.readInt() == Magic, "invalid magic number")
 
-    val code = in.readByte()
-    require(specsByCodes.contains(code), s"Unexpected message code $code")
+      val code = in.readByte()
+      require(specsByCodes.contains(code), s"Unexpected message code $code")
 
-    val spec = specsByCodes(code)
-    val length = in.readInt()
-    require(length <= spec.maxLength, s"${spec.messageName} message length $length exceeds ${spec.maxLength}")
+      val spec   = specsByCodes(code)
+      val length = in.readInt()
+      require(length <= spec.maxLength, s"${spec.messageName} message length $length exceeds ${spec.maxLength}")
 
-    val dataBytes = new Array[Byte](length)
-    if (length > 0) {
-      val declaredChecksum = in.readSlice(ChecksumLength)
-      in.readBytes(dataBytes)
-      val actualChecksum = wrappedBuffer(crypto.fastHash(dataBytes), 0, ChecksumLength)
+      val dataBytes = new Array[Byte](length)
+      if (length > 0) {
+        val declaredChecksum = in.readSlice(ChecksumLength)
+        in.readBytes(dataBytes)
+        val actualChecksum = wrappedBuffer(crypto.fastHash(dataBytes), 0, ChecksumLength)
 
-      require(declaredChecksum.equals(actualChecksum), "invalid checksum")
-      actualChecksum.release()
+        require(declaredChecksum.equals(actualChecksum), "invalid checksum")
+        actualChecksum.release()
 
+      }
+
+      out.add(RawBytes(code, dataBytes))
+    } catch {
+      case NonFatal(e) =>
+        log.warn(s"${id(ctx)} Malformed network message", e)
+        peerDatabase.blacklistAndClose(ctx.channel(), s"Malformed network message: $e")
     }
-
-    out.add(RawBytes(code, dataBytes))
-  } catch {
-    case NonFatal(e) =>
-      log.warn(s"${id(ctx)} Malformed network message", e)
-      peerDatabase.blacklistAndClose(ctx.channel(), s"Malformed network message: $e")
-  }
 
   override def encode(ctx: ChannelHandlerContext, msg: RawBytes, out: ByteBuf) = {
     out.writeInt(Magic)

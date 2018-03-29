@@ -17,7 +17,7 @@ abstract class BlockField[T] extends BytesSerializable with JsonSerializable {
 
   protected def b: Array[Byte]
 
-  val json: Coeval[JsObject] = Coeval.evalOnce(j)
+  val json: Coeval[JsObject]     = Coeval.evalOnce(j)
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(b)
 }
 
@@ -38,7 +38,6 @@ case class BlockIdField(override val name: String, override val value: Array[Byt
 
   protected override def b = value
 }
-
 
 case class TransactionBlockField(override val name: String, override val value: Transaction) extends BlockField[Transaction] {
   protected override def j: JsObject = value.json()

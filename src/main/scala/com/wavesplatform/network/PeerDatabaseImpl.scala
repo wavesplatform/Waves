@@ -19,16 +19,18 @@ import scala.util.control.NonFatal
 
 class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with ScorexLogging {
 
-  private def cache[T <: AnyRef](timeout: FiniteDuration) = CacheBuilder.newBuilder()
-    .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
-    .build[T, java.lang.Long]()
+  private def cache[T <: AnyRef](timeout: FiniteDuration) =
+    CacheBuilder
+      .newBuilder()
+      .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
+      .build[T, java.lang.Long]()
 
   private type PeersPersistenceType = Set[String]
   private val peersPersistence = cache[InetSocketAddress](settings.peersDataResidenceTime)
-  private val blacklist = cache[InetAddress](settings.blackListResidenceTime)
-  private val suspension = cache[InetAddress](settings.suspensionResidenceTime)
-  private val reasons = mutable.Map.empty[InetAddress, String]
-  private val unverifiedPeers = EvictingQueue.create[InetSocketAddress](settings.maxUnverifiedPeers)
+  private val blacklist        = cache[InetAddress](settings.blackListResidenceTime)
+  private val suspension       = cache[InetAddress](settings.suspensionResidenceTime)
+  private val reasons          = mutable.Map.empty[InetAddress, String]
+  private val unverifiedPeers  = EvictingQueue.create[InetSocketAddress](settings.maxUnverifiedPeers)
 
   for (a <- settings.knownPeers.view.map(inetSocketAddress(_, 6863))) {
     // add peers from config with max timestamp so they never get evicted from the list of known peers
@@ -58,7 +60,9 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
   override def blacklist(socketAddress: InetSocketAddress, reason: String): Unit = getAddress(socketAddress).foreach { address =>
     if (settings.enableBlacklisting) {
       unverifiedPeers.synchronized {
-        unverifiedPeers.removeIf { x => Option(x.getAddress).contains(address) }
+        unverifiedPeers.removeIf { x =>
+          Option(x.getAddress).contains(address)
+        }
         blacklist.put(address, System.currentTimeMillis())
         reasons.put(address, reason)
       }
@@ -67,21 +71,28 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
 
   override def suspend(socketAddress: InetSocketAddress): Unit = getAddress(socketAddress).foreach { address =>
     unverifiedPeers.synchronized {
-      unverifiedPeers.removeIf { x => Option(x.getAddress).contains(address) }
+      unverifiedPeers.removeIf { x =>
+        Option(x.getAddress).contains(address)
+      }
       suspension.put(address, System.currentTimeMillis())
     }
   }
 
-  override def knownPeers: immutable.Map[InetSocketAddress, Long] = peersPersistence.asMap().asScala.collect {
-    case (addr, ts) if !(settings.enableBlacklisting && blacklistedHosts.contains(addr.getAddress)) => addr -> ts.toLong
-  }.toMap
+  override def knownPeers: immutable.Map[InetSocketAddress, Long] =
+    peersPersistence
+      .asMap()
+      .asScala
+      .collect {
+        case (addr, ts) if !(settings.enableBlacklisting && blacklistedHosts.contains(addr.getAddress)) => addr -> ts.toLong
+      }
+      .toMap
 
   override def blacklistedHosts: immutable.Set[InetAddress] = blacklist.asMap().asScala.keys.toSet
 
   override def suspendedHosts: immutable.Set[InetAddress] = suspension.asMap().asScala.keys.toSet
 
-  override def detailedBlacklist: immutable.Map[InetAddress, (Long, String)] = blacklist.asMap().asScala.mapValues(_.toLong)
-    .map { case ((h, t)) => h -> ((t, Option(reasons(h)).getOrElse(""))) }.toMap
+  override def detailedBlacklist: immutable.Map[InetAddress, (Long, String)] =
+    blacklist.asMap().asScala.mapValues(_.toLong).map { case ((h, t)) => h -> ((t, Option(reasons(h)).getOrElse(""))) }.toMap
 
   override def detailedSuspended: immutable.Map[InetAddress, Long] = suspension.asMap().asScala.mapValues(_.toLong).toMap
 
@@ -93,13 +104,13 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     // connection to, so it's safe to filter out all matching candidates
     unverifiedPeers.removeIf(excluded(_))
     val unverified = Option(unverifiedPeers.peek()).filterNot(excludeAddress)
-    val verified = Random.shuffle(knownPeers.keySet.diff(excluded).toSeq).headOption.filterNot(excludeAddress)
+    val verified   = Random.shuffle(knownPeers.keySet.diff(excluded).toSeq).headOption.filterNot(excludeAddress)
 
     (unverified, verified) match {
-      case (Some(_), v@Some(_)) => if (Random.nextBoolean()) Some(unverifiedPeers.poll()) else v
-      case (Some(_), None) => Some(unverifiedPeers.poll())
-      case (None, v@Some(_)) => v
-      case _ => None
+      case (Some(_), v @ Some(_)) => if (Random.nextBoolean()) Some(unverifiedPeers.poll()) else v
+      case (Some(_), None)        => Some(unverifiedPeers.poll())
+      case (None, v @ Some(_))    => v
+      case _                      => None
     }
   }
 
@@ -112,7 +123,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     log.info(s"Saving ${knownPeers.size} known peer(s) to ${f.getName}")
     val rawPeers = for {
       inetAddress <- knownPeers.keySet
-      address <- Option(inetAddress.getAddress)
+      address     <- Option(inetAddress.getAddress)
     } yield s"${address.getHostAddress}:${inetAddress.getPort}"
 
     JsonFileStorage.save[PeersPersistenceType](rawPeers, f.getCanonicalPath)

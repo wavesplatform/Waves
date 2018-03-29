@@ -10,8 +10,9 @@ trait TransactionParser {
   def typeId: Byte
   def supportedVersions: Set[Byte]
 
-  def parseBytes(bytes: Array[Byte]): Try[TransactionT] = parseHeader(bytes).flatMap { case (version, offset) =>
-    parseTail(version, bytes.drop(offset))
+  def parseBytes(bytes: Array[Byte]): Try[TransactionT] = parseHeader(bytes).flatMap {
+    case (version, offset) =>
+      parseTail(version, bytes.drop(offset))
   }
 
   /**

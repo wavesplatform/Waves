@@ -53,7 +53,12 @@ class DataTransactionSuite extends BaseTransactionSuite {
       DataTransaction.selfSigned(version, sender.privateKey, entries, fee, timestamp).right.get
 
     def request(tx: DataTransaction): SignedDataRequest =
-      SignedDataRequest(DataTransaction.supportedVersions.head, Base58.encode(tx.sender.publicKey), tx.data, tx.fee, tx.timestamp, tx.proofs.base58().toList)
+      SignedDataRequest(DataTransaction.supportedVersions.head,
+                        Base58.encode(tx.sender.publicKey),
+                        tx.data,
+                        tx.fee,
+                        tx.timestamp,
+                        tx.proofs.base58().toList)
 
     implicit val w = Json.writes[SignedDataRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(DataTransaction.typeId)))
 
@@ -151,19 +156,19 @@ class DataTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(noDataTx)
     sender.getData(thirdAddress) shouldBe List.empty
 
-    val emptyKey = List(LongDataEntry("", 7))
+    val emptyKey   = List(LongDataEntry("", 7))
     val emptyKeyTx = sender.putData(thirdAddress, emptyKey, fee).id
     nodes.waitForHeightAriseAndTxPresent(emptyKeyTx)
     sender.getData(thirdAddress, "") shouldBe emptyKey.head
 
-    val latinKey = "C,u!"
+    val latinKey    = "C,u!"
     val multiKey    = List.tabulate(5)(LongDataEntry(latinKey, _))
     val multiKeyFee = calcDataFee(multiKey)
     val multiKeyTx  = sender.putData(thirdAddress, multiKey, multiKeyFee).id
     nodes.waitForHeightAriseAndTxPresent(multiKeyTx)
     sender.getData(thirdAddress, latinKey) shouldBe multiKey.last
 
-    val nonLatinKey = "\u05EA\u05E8\u05D1\u05D5\u05EA, \u05E1\u05E4\u05D5\u05E8\u05D8 \u05D5\u05EA\u05D9\u05D9\u05E8\u05D5\u05EA"
+    val nonLatinKey   = "\u05EA\u05E8\u05D1\u05D5\u05EA, \u05E1\u05E4\u05D5\u05E8\u05D8 \u05D5\u05EA\u05D9\u05D9\u05E8\u05D5\u05EA"
     val typeChange    = List(BooleanDataEntry(nonLatinKey, true))
     val typeChangeFee = calcDataFee(typeChange)
     val typeChangeTx  = sender.putData(thirdAddress, typeChange, typeChangeFee).id
@@ -175,60 +180,34 @@ class DataTransactionSuite extends BaseTransactionSuite {
     def request(item: JsObject) = Json.obj("version" -> 1, "sender"   -> secondAddress, "fee" -> fee, "data" -> Seq(item))
     val validItem               = Json.obj("key"     -> "key", "type" -> "integer", "value"   -> 8)
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(validItem - "key")),
-      "key is missing")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "key")), "key is missing")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(validItem - "type")),
-      "type is missing")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "type")), "type is missing")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(validItem + ("type" -> JsString("falafel")))),
-      "unknown type falafel")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem + ("type" -> JsString("falafel")))), "unknown type falafel")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(validItem - "value")),
-      "value is missing")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "value")), "value is missing")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
-      "value is missing or not an integer")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
+                                "value is missing or not an integer")
 
-    val notValidIntValue = Json.obj(
-      "key" -> "key",
-      "type" -> "integer",
-      "value" -> JsNull)
+    val notValidIntValue = Json.obj("key" -> "key", "type" -> "integer", "value" -> JsNull)
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(notValidIntValue)),
-      "value is missing or not an integer")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidIntValue)), "value is missing or not an integer")
 
-    val notValidBoolValue = Json.obj(
-      "key" -> "bool",
-      "type" -> "boolean",
-      "value" -> JsNull)
+    val notValidBoolValue = Json.obj("key" -> "bool", "type" -> "boolean", "value" -> JsNull)
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(notValidBoolValue)),
-      "value is missing or not a boolean")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBoolValue)), "value is missing or not a boolean")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(notValidBoolValue + ("value" -> JsString("true")))),
-      "value is missing or not a boolean")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBoolValue + ("value" -> JsString("true")))),
+                                "value is missing or not a boolean")
 
-    val notValidBlobValue = Json.obj(
-      "key" -> "blob",
-      "type" -> "binary",
-      "value" -> JsNull)
+    val notValidBlobValue = Json.obj("key" -> "blob", "type" -> "binary", "value" -> JsNull)
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(notValidBlobValue)),
-      "value is missing or not a string")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue)), "value is missing or not a string")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("NOTaBase58")))),
-      "Wrong char in Base58 string")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("NOTaBase58")))),
+                                "Wrong char in Base58 string")
   }
 
   test("transaction requires a valid proof") {

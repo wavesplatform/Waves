@@ -10,7 +10,6 @@ import scorex.serialization.Deser
 
 import scala.util.Success
 
-
 sealed abstract class DataEntry[T](val key: String, val value: T) {
   def valueBytes: Array[Byte]
 
@@ -20,25 +19,24 @@ sealed abstract class DataEntry[T](val key: String, val value: T) {
   }
 
   def toJson: JsObject = Json.obj("key" -> key)
-  def valid: Boolean = key.length <= MaxKeySize
+  def valid: Boolean   = key.length <= MaxKeySize
 }
-
 
 object DataEntry {
   val MaxKeySize: Byte = 100
-  val MaxValueSize = 1024
+  val MaxValueSize     = 1024
 
   private val UTF8 = StandardCharsets.UTF_8
 
   object Type extends Enumeration {
     val Integer = Value(0)
     val Boolean = Value(1)
-    val Binary = Value(2)
+    val Binary  = Value(2)
   }
 
   def parse(bytes: Array[Byte], p: Int): (DataEntry[_], Int) = {
     val keyLength = Shorts.fromByteArray(bytes.drop(p))
-    val key = new String(bytes, p + 2, keyLength, UTF8)
+    val key       = new String(bytes, p + 2, keyLength, UTF8)
     parseValue(key, bytes, p + 2 + keyLength)
   }
 
@@ -58,24 +56,25 @@ object DataEntry {
       jsv \ "key" match {
         case JsDefined(JsString(key)) =>
           jsv \ "type" match {
-            case JsDefined(JsString("integer")) => jsv \ "value" match {
-              case JsDefined(JsNumber(n)) => JsSuccess(LongDataEntry(key, n.toLong))
-              case _ => JsError("value is missing or not an integer")
-            }
-            case JsDefined(JsString("boolean")) => jsv \ "value" match {
-              case JsDefined(JsBoolean(b)) => JsSuccess(BooleanDataEntry(key, b))
-              case _ => JsError("value is missing or not a boolean value")
-            }
-            case JsDefined(JsString("binary")) => jsv \ "value" match {
-              case JsDefined(JsString(base58)) =>
-                val t = if (base58.isEmpty) Success(Array.emptyByteArray) else Base58.decode(base58) /// Base58 bug
-                t.fold(
-                  ex => JsError(ex.getMessage),
-                  arr => JsSuccess(BinaryDataEntry(key, ByteStr(arr))))
-              case _ => JsError("value is missing or not a string")
-            }
+            case JsDefined(JsString("integer")) =>
+              jsv \ "value" match {
+                case JsDefined(JsNumber(n)) => JsSuccess(LongDataEntry(key, n.toLong))
+                case _                      => JsError("value is missing or not an integer")
+              }
+            case JsDefined(JsString("boolean")) =>
+              jsv \ "value" match {
+                case JsDefined(JsBoolean(b)) => JsSuccess(BooleanDataEntry(key, b))
+                case _                       => JsError("value is missing or not a boolean value")
+              }
+            case JsDefined(JsString("binary")) =>
+              jsv \ "value" match {
+                case JsDefined(JsString(base58)) =>
+                  val t = if (base58.isEmpty) Success(Array.emptyByteArray) else Base58.decode(base58) /// Base58 bug
+                  t.fold(ex => JsError(ex.getMessage), arr => JsSuccess(BinaryDataEntry(key, ByteStr(arr))))
+                case _ => JsError("value is missing or not a string")
+              }
             case JsDefined(JsString(t)) => JsError(s"unknown type $t")
-            case _ => JsError("type is missing")
+            case _                      => JsError("type is missing")
           }
         case _ => JsError("key is missing")
       }

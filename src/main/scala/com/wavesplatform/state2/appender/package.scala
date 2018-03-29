@@ -24,12 +24,17 @@ package object appender extends ScorexLogging {
 
   private val correctBlockId1 = ByteStr.decodeBase58("2GNCYVy7k3kEPXzz12saMtRDeXFKr8cymVsG8Yxx3sZZ75eHj9csfXnGHuuJe7XawbcwjKdifUrV1uMq4ZNCWPf1").get
   private val correctBlockId2 = ByteStr.decodeBase58("5uZoDnRKeWZV9Thu2nvJVZ5dBvPB7k2gvpzFD618FMXCbBVBMN2rRyvKBZBhAGnGdgeh2LXEeSr9bJqruJxngsE7").get
-  private val height1 = 812608
-  private val height2 = 813207
+  private val height1         = 812608
+  private val height2         = 813207
 
-  private[appender] def processAndBlacklistOnFailure[A, B](ch: Channel, peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup,
-                                                           start: => String, success: => String, errorPrefix: String)(
-                                                            f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
+  private[appender] def processAndBlacklistOnFailure[A, B](
+      ch: Channel,
+      peerDatabase: PeerDatabase,
+      miner: Miner,
+      allChannels: ChannelGroup,
+      start: => String,
+      success: => String,
+      errorPrefix: String)(f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
 
     log.debug(start)
     f map {
@@ -44,76 +49,111 @@ package object appender extends ScorexLogging {
     }
   }
 
-  private def validateEffectiveBalance(fp: FeatureProvider, fs: FunctionalitySettings, block: Block, baseHeight: Int)(effectiveBalance: Long): Either[String, Long] =
-    Either.cond(block.timestamp < fs.minimalGeneratingBalanceAfter ||
-      (block.timestamp >= fs.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
-      fp.featureActivationHeight(BlockchainFeatures.SmallerMinimalGeneratingBalance.id).exists(baseHeight >= _)
-        && effectiveBalance >= MinimalEffectiveBalanceForGenerator2, effectiveBalance,
-      s"generator's effective balance $effectiveBalance is less that required for generation")
+  private def validateEffectiveBalance(fp: FeatureProvider, fs: FunctionalitySettings, block: Block, baseHeight: Int)(
+      effectiveBalance: Long): Either[String, Long] =
+    Either.cond(
+      block.timestamp < fs.minimalGeneratingBalanceAfter ||
+        (block.timestamp >= fs.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
+        fp.featureActivationHeight(BlockchainFeatures.SmallerMinimalGeneratingBalance.id).exists(baseHeight >= _)
+          && effectiveBalance >= MinimalEffectiveBalanceForGenerator2,
+      effectiveBalance,
+      s"generator's effective balance $effectiveBalance is less that required for generation"
+    )
 
-  private[appender] def appendBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
-                                    stateReader: SnapshotStateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings,
-                                    featureProvider: FeatureProvider)(block: Block): Either[ValidationError, Option[Int]] = for {
-    _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height + 1), (),
-      BlockAppendError(s"Block $block at height ${history.height + 1} is not valid w.r.t. checkpoint", block))
-    _ <- Either.cond(stateReader.accountScript(block.sender).isEmpty, (), BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block))
-    _ <- blockConsensusValidation(history, featureProvider, settings, time.correctedTime(), block) { height =>
-      val balance = PoSCalc.generatingBalance(stateReader, settings.blockchainSettings.functionalitySettings, block.sender, height)
-      validateEffectiveBalance(featureProvider, settings.blockchainSettings.functionalitySettings, block, height)(balance)
+  private[appender] def appendBlock(checkpoint: CheckpointService,
+                                    history: History,
+                                    blockchainUpdater: BlockchainUpdater,
+                                    stateReader: SnapshotStateReader,
+                                    utxStorage: UtxPool,
+                                    time: Time,
+                                    settings: WavesSettings,
+                                    featureProvider: FeatureProvider)(block: Block): Either[ValidationError, Option[Int]] =
+    for {
+      _ <- Either.cond(
+        checkpoint.isBlockValid(block.signerData.signature, history.height + 1),
+        (),
+        BlockAppendError(s"Block $block at height ${history.height + 1} is not valid w.r.t. checkpoint", block)
+      )
+      _ <- Either.cond(
+        stateReader.accountScript(block.sender).isEmpty,
+        (),
+        BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
+      )
+      _ <- blockConsensusValidation(history, featureProvider, settings, time.correctedTime(), block) { height =>
+        val balance = PoSCalc.generatingBalance(stateReader, settings.blockchainSettings.functionalitySettings, block.sender, height)
+        validateEffectiveBalance(featureProvider, settings.blockchainSettings.functionalitySettings, block, height)(balance)
+      }
+      baseHeight = history.height
+      maybeDiscardedTxs <- blockchainUpdater.processBlock(block)
+    } yield {
+      utxStorage.removeAll(block.transactionData)
+      utxStorage.batched { ops =>
+        maybeDiscardedTxs.toSeq.flatten.foreach(ops.putIfNew)
+      }
+      maybeDiscardedTxs.map(_ => baseHeight)
     }
-    baseHeight = history.height
-    maybeDiscardedTxs <- blockchainUpdater.processBlock(block)
-  } yield {
-    utxStorage.removeAll(block.transactionData)
-    utxStorage.batched { ops =>
-      maybeDiscardedTxs.toSeq.flatten.foreach(ops.putIfNew)
-    }
-    maybeDiscardedTxs.map(_ => baseHeight)
-  }
 
-  private def blockConsensusValidation(history: History, fp: FeatureProvider, settings: WavesSettings, currentTs: Long, block: Block)
-                                      (genBalance: Int => Either[String, Long]): Either[ValidationError, Unit] = {
+  private def blockConsensusValidation(history: History, fp: FeatureProvider, settings: WavesSettings, currentTs: Long, block: Block)(
+      genBalance: Int => Either[String, Long]): Either[ValidationError, Unit] = {
 
-    val bcs = settings.blockchainSettings
-    val fs = bcs.functionalitySettings
+    val bcs       = settings.blockchainSettings
+    val fs        = bcs.functionalitySettings
     val blockTime = block.timestamp
     val generator = block.signerData.generator
 
     val r: Either[ValidationError, Unit] = for {
       height <- history.heightOf(block.reference).toRight(GenericError(s"height: history does not contain parent ${block.reference}"))
-      _ <- Either.cond(height > fs.blockVersion3AfterHeight
-        || block.version == Block.GenesisBlockVersion
-        || block.version == Block.PlainBlockVersion,
-        (), GenericError(s"Block Version 3 can only appear at height greater than ${fs.blockVersion3AfterHeight}"))
+      _ <- Either.cond(
+        height > fs.blockVersion3AfterHeight
+          || block.version == Block.GenesisBlockVersion
+          || block.version == Block.PlainBlockVersion,
+        (),
+        GenericError(s"Block Version 3 can only appear at height greater than ${fs.blockVersion3AfterHeight}")
+      )
       _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
       _ <- {
         val constraints = MiningEstimators(settings.minerSettings, fp, height)
         Either.cond(!OneDimensionalMiningConstraint.full(constraints.total).put(block).isOverfilled, (), GenericError("Block is full"))
       }
-      _ <- Either.cond(blockTime < fs.requireSortedTransactionsAfter
-        || height > fs.dontRequireSortedTransactionsAfter
-        || block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData,
-        (), GenericError("transactions are not sorted"))
+      _ <- Either.cond(
+        blockTime < fs.requireSortedTransactionsAfter
+          || height > fs.dontRequireSortedTransactionsAfter
+          || block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData,
+        (),
+        GenericError("transactions are not sorted")
+      )
       parent <- history.parent(block).toRight(GenericError(s"parent: history does not contain parent ${block.reference}"))
       prevBlockData = parent.consensusData
-      blockData = block.consensusData
-      ggp = history.parent(parent, 2)
-      cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay, height, parent.consensusData.baseTarget, parent.timestamp, ggp.map(_.timestamp), blockTime)
+      blockData     = block.consensusData
+      ggp           = history.parent(parent, 2)
+      cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay,
+                           height,
+                           parent.consensusData.baseTarget,
+                           parent.timestamp,
+                           ggp.map(_.timestamp),
+                           blockTime)
       bbt = blockData.baseTarget
       _ <- Either.cond(cbt == bbt, (), GenericError(s"declared baseTarget $bbt does not match calculated baseTarget $cbt"))
-      calcGs = calcGeneratorSignature(prevBlockData, generator)
+      calcGs  = calcGeneratorSignature(prevBlockData, generator)
       blockGs = blockData.generationSignature.arr
-      _ <- Either.cond(calcGs.sameElements(blockGs), (), GenericError(s"declared generation signature ${blockGs.mkString} does not match calculated generation signature ${calcGs.mkString}"))
+      _ <- Either.cond(
+        calcGs.sameElements(blockGs),
+        (),
+        GenericError(s"declared generation signature ${blockGs.mkString} does not match calculated generation signature ${calcGs.mkString}")
+      )
       effectiveBalance <- genBalance(height).left.map(GenericError(_))
-      hit = calcHit(prevBlockData, generator)
+      hit    = calcHit(prevBlockData, generator)
       target = calcTarget(parent.timestamp, parent.consensusData.baseTarget, blockTime, effectiveBalance)
-      _ <- Either.cond(hit < target || (height == height1 && block.uniqueId == correctBlockId1) || (height == height2 && block.uniqueId == correctBlockId2),
-        (), GenericError(s"calculated hit $hit >= calculated target $target"))
+      _ <- Either.cond(
+        hit < target || (height == height1 && block.uniqueId == correctBlockId1) || (height == height2 && block.uniqueId == correctBlockId2),
+        (),
+        GenericError(s"calculated hit $hit >= calculated target $target")
+      )
     } yield ()
 
     r.left.map {
       case GenericError(x) => GenericError(s"Block $block is invalid: $x")
-      case x => x
+      case x               => x
     }
   }
 }

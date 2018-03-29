@@ -10,12 +10,7 @@ import scorex.transaction.TransactionParsers.KeyLength
 
 import scala.util.{Failure, Success, Try}
 
-case class DataTransaction private (version: Byte,
-                                    sender: PublicKeyAccount,
-                                    data: List[DataEntry[_]],
-                                    fee: Long,
-                                    timestamp: Long,
-                                    proofs: Proofs)
+case class DataTransaction private (version: Byte, sender: PublicKeyAccount, data: List[DataEntry[_]], fee: Long, timestamp: Long, proofs: Proofs)
     extends ProvenTransaction
     with FastHashId {
 

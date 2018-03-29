@@ -8,8 +8,7 @@ import scala.concurrent.duration._
 
 class MinerSettingsSpecification extends FlatSpec with Matchers {
   "MinerSettings" should "read values" in {
-    val config = ConfigFactory.parseString(
-      """
+    val config = ConfigFactory.parseString("""
         |waves {
         |  miner {
         |    enable: yes

@@ -16,7 +16,7 @@ import scala.concurrent.{Future, Promise}
 class NetworkSender(chainId: Char, name: String, nonce: Long) extends ScorexLogging {
 
   private val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-  private val client = new NetworkClient(chainId, name, nonce, allChannels)
+  private val client      = new NetworkClient(chainId, name, nonce, allChannels)
 
   def connect(address: InetSocketAddress): Future[Channel] = {
     client.connect(address)
@@ -24,7 +24,7 @@ class NetworkSender(chainId: Char, name: String, nonce: Long) extends ScorexLogg
 
   def send(channel: Channel, messages: RawBytes*): Future[Unit] = {
     if (channel.isOpen) {
-      val p = Promise[Unit]
+      val p       = Promise[Unit]
       val counter = new AtomicLong(messages.size)
 
       messages.foreach { msg =>

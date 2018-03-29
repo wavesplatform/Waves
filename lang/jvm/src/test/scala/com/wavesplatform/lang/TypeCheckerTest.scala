@@ -19,8 +19,8 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   property("should infer generic function return type") {
     import Untyped._
     val idFunction = PredefFunction("idFunc", TYPEPARAM('T'), List("p1" -> TYPEPARAM('T')))(Right(_))
-    val ctx                          = Context(Map.empty, Map.empty, functions = Map((idFunction.name, idFunction)))
-    val Right(v)                     = TypeChecker(TypeCheckerContext.fromContext(ctx), FUNCTION_CALL(idFunction.name, List(CONST_LONG(1))))
+    val ctx        = Context(Map.empty, Map.empty, functions = Map((idFunction.name, idFunction)))
+    val Right(v)   = TypeChecker(TypeCheckerContext.fromContext(ctx), FUNCTION_CALL(idFunction.name, List(CONST_LONG(1))))
 
     v.tpe shouldBe LONG
   }
@@ -61,7 +61,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     treeTypeErasureTests(
       "CONST_LONG"       -> CONST_LONG(0),
       "CONST_BYTEVECTOR" -> CONST_BYTEVECTOR(ByteVector(1, 2, 3)),
-      "CONST_STRING" -> CONST_STRING("abc"),
+      "CONST_STRING"     -> CONST_STRING("abc"),
       "TRUE"             -> TRUE,
       "FALSE"            -> FALSE,
       "SUM"              -> BINARY_OP(CONST_LONG(0), SUM_OP, CONST_LONG(1), LONG),
@@ -145,8 +145,12 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   treeTypeTest(s"OPTFUNC(SOME(CONST_LONG(3)))")(
     ctx = typeCheckerCtx,
     expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.FUNCTION_CALL("Some", List(Untyped.FUNCTION_CALL("Some", List(Untyped.CONST_LONG(3))))))),
-    expectedResult =
-      Right(Typed.FUNCTION_CALL(optFunc.name, List(Typed.FUNCTION_CALL("Some", List(Typed.FUNCTION_CALL("Some", List(Typed.CONST_LONG(3)), OPTION(LONG))), OPTION(OPTION(LONG)))), UNIT))
+    expectedResult = Right(
+      Typed.FUNCTION_CALL(
+        optFunc.name,
+        List(Typed.FUNCTION_CALL("Some", List(Typed.FUNCTION_CALL("Some", List(Typed.CONST_LONG(3)), OPTION(LONG))), OPTION(OPTION(LONG)))),
+        UNIT)
+    )
   )
 
   {
@@ -163,13 +167,13 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       "BINARY_OP with wrong types"                   -> "The first operand is expected to be LONG" -> BINARY_OP(TRUE, SUM_OP, CONST_LONG(1)),
       "IF can't find common"                         -> "Can't find common type" -> IF(TRUE, TRUE, CONST_LONG(0)),
       "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(multiplierFunction.name, List(CONST_LONG(0))),
-      "FUNCTION_CALL with upper type"                -> "Non-matching types" -> FUNCTION_CALL(noneFunc.name,
-                                                                                        List(FUNCTION_CALL("Some", List(CONST_LONG(3))))),
-      "FUNCTION_CALL with wrong type of argument" -> "Typecheck failed: Non-matching types: expected: LONG, actual: BOOLEAN" -> FUNCTION_CALL(multiplierFunction.name,
-                                                                                                            List(CONST_LONG(0), FALSE)),
+      "FUNCTION_CALL with upper type"                -> "Non-matching types" -> FUNCTION_CALL(noneFunc.name, List(FUNCTION_CALL("Some", List(CONST_LONG(3))))),
+      "FUNCTION_CALL with wrong type of argument"    -> "Typecheck failed: Non-matching types: expected: LONG, actual: BOOLEAN" -> FUNCTION_CALL(
+        multiplierFunction.name,
+        List(CONST_LONG(0), FALSE)),
       "FUNCTION_CALL with uncommon types for parameter T" -> "Can't match inferred types" -> FUNCTION_CALL(genericFunc.name,
-                                                                                                  List(CONST_LONG(1),
-                                                                                                       CONST_BYTEVECTOR(ByteVector.empty)))
+                                                                                                           List(CONST_LONG(1),
+                                                                                                                CONST_BYTEVECTOR(ByteVector.empty)))
     )
   }
 
@@ -222,7 +226,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       Coeval.defer(root match {
         case x: Typed.CONST_LONG       => Coeval(Untyped.CONST_LONG(x.t))
         case x: Typed.CONST_BYTEVECTOR => Coeval(Untyped.CONST_BYTEVECTOR(x.bs))
-        case x: Typed.CONST_STRING => Coeval(Untyped.CONST_STRING(x.s))
+        case x: Typed.CONST_STRING     => Coeval(Untyped.CONST_STRING(x.s))
         case Typed.TRUE                => Coeval(Untyped.TRUE)
         case Typed.FALSE               => Coeval(Untyped.FALSE)
         case getter: Typed.GETTER      => aux(getter.ref).map(Untyped.GETTER(_, getter.field))
@@ -239,8 +243,8 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
                 }
             }
           }
-        case ifExpr: Typed.IF       => (aux(ifExpr.cond), aux(ifExpr.ifTrue), aux(ifExpr.ifFalse)).mapN(Untyped.IF)
-        case ref: Typed.REF         => Coeval(Untyped.REF(ref.key))
+        case ifExpr: Typed.IF => (aux(ifExpr.cond), aux(ifExpr.ifTrue), aux(ifExpr.ifFalse)).mapN(Untyped.IF)
+        case ref: Typed.REF   => Coeval(Untyped.REF(ref.key))
         case f: Typed.FUNCTION_CALL =>
           import cats.instances.vector._
           import cats.syntax.all._

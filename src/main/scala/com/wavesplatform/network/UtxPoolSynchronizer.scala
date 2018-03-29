@@ -12,7 +12,10 @@ import monix.execution.{CancelableFuture, Scheduler}
 import scorex.transaction.Transaction
 
 object UtxPoolSynchronizer {
-  def start(utx: UtxPool, settings: UtxSynchronizerSettings, allChannels: ChannelGroup, txSource: ChannelObservable[Transaction]): CancelableFuture[Unit] = {
+  def start(utx: UtxPool,
+            settings: UtxSynchronizerSettings,
+            allChannels: ChannelGroup,
+            txSource: ChannelObservable[Transaction]): CancelableFuture[Unit] = {
     implicit val scheduler: Scheduler = Scheduler.singleThread("utx-pool-sync")
 
     val dummy = new Object()
@@ -40,16 +43,17 @@ object UtxPoolSynchronizer {
               .foreach {
                 case (sender, xs) =>
                   val channelMatcher: ChannelMatcher = { (_: Channel) != sender }
-                  xs.foreach { case (_, tx) =>
-                    ops.putIfNew(tx) match {
-                      case Right((true, _)) => allChannels.write(RawBytes.from(tx), channelMatcher)
-                      case _ =>
-                    }
+                  xs.foreach {
+                    case (_, tx) =>
+                      ops.putIfNew(tx) match {
+                        case Right((true, _)) => allChannels.write(RawBytes.from(tx), channelMatcher)
+                        case _                =>
+                      }
                   }
               }
           }
           allChannels.flush()
         }
-    }
+      }
   }
 }

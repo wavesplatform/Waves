@@ -19,42 +19,44 @@ import scorex.wallet.Wallet
 @Path("/alias")
 @Api(value = "/alias")
 case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time, state: SnapshotStateReader)
-  extends ApiRoute with BroadcastRoute {
+    extends ApiRoute
+    with BroadcastRoute {
 
   override val route = pathPrefix("alias") {
     alias ~ addressOfAlias ~ aliasOfAddress
   }
 
   @Path("/create")
-  @ApiOperation(value = "Creates an alias",
-    httpMethod = "POST",
-    produces = "application/json",
-    consumes = "application/json")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(
-      name = "body",
-      value = "Json with data",
-      required = true,
-      paramType = "body",
-      dataType = "scorex.api.http.alias.CreateAliasRequest",
-      defaultValue = "{\n\t\"alias\": \"aliasalias\",\n\t\"sender\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n\t\"fee\": 100000\n}"
-    )
-  ))
+  @ApiOperation(value = "Creates an alias", httpMethod = "POST", produces = "application/json", consumes = "application/json")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "body",
+        value = "Json with data",
+        required = true,
+        paramType = "body",
+        dataType = "scorex.api.http.alias.CreateAliasRequest",
+        defaultValue = "{\n\t\"alias\": \"aliasalias\",\n\t\"sender\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n\t\"fee\": 100000\n}"
+      )
+    ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def alias: Route = processRequest("create", (t: CreateAliasRequest) => doBroadcast(TransactionFactory.alias(t, wallet, time)))
-
-
   @Path("/by-alias/{alias}")
-  @ApiOperation(value = "Account", notes = "Returns an address associated with an Alias. Alias should be plain text without an 'alias' prefix and network code.", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "alias", value = "Alias", required = true, dataType = "string", paramType = "path")
-  ))
+  @ApiOperation(
+    value = "Account",
+    notes = "Returns an address associated with an Alias. Alias should be plain text without an 'alias' prefix and network code.",
+    httpMethod = "GET"
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "alias", value = "Alias", required = true, dataType = "string", paramType = "path")
+    ))
   def addressOfAlias: Route = (get & path("by-alias" / Segment)) { aliasName =>
     val result = Alias.buildWithCurrentNetworkByte(aliasName) match {
       case Right(alias) =>
         state.resolveAlias(alias) match {
           case Some(addr) => Right(Address(addr.stringRepr))
-          case None => Left(AliasDoesNotExist(alias))
+          case None       => Left(AliasDoesNotExist(alias))
         }
       case Left(err) => Left(ApiError.fromValidationError(err))
     }
@@ -63,13 +65,16 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
 
   @Path("/by-address/{address}")
   @ApiOperation(value = "Alias", notes = "Returns a collection of aliases associated with an Address", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7", required = true, dataType = "string", paramType = "path")
-  ))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7", required = true, dataType = "string", paramType = "path")
+    ))
   def aliasOfAddress: Route = (get & path("by-address" / Segment)) { addressString =>
-    val result: Either[ApiError, Seq[String]] = scorex.account.Address.fromString(addressString)
+    val result: Either[ApiError, Seq[String]] = scorex.account.Address
+      .fromString(addressString)
       .map(acc => state.aliasesOfAddress(acc).map(_.stringRepr))
-      .left.map(ApiError.fromValidationError)
+      .left
+      .map(ApiError.fromValidationError)
     complete(result)
   }
 

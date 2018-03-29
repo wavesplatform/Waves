@@ -8,7 +8,7 @@ import scala.util.Try
 case class ByteStr(arr: Array[Byte]) {
   override def equals(a: Any): Boolean = a match {
     case other: ByteStr => arr.sameElements(other.arr)
-    case _ => false
+    case _              => false
   }
 
   override def hashCode(): Int = java.util.Arrays.hashCode(arr)
@@ -22,15 +22,13 @@ case class ByteStr(arr: Array[Byte]) {
 
 object ByteStr {
   def decodeBase58(s: String): Try[ByteStr] = Base58.decode(s).map(ByteStr(_))
-  val empty : ByteStr = ByteStr(Array.emptyByteArray)
+  val empty: ByteStr                        = ByteStr(Array.emptyByteArray)
 
   implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
     override def writes(o: ByteStr): JsValue = JsString(o.base58)
     override def reads(json: JsValue): JsResult[ByteStr] = json match {
       case JsString(v) => decodeBase58(v).fold(e => JsError(s"Error parsing base58: ${e.getMessage}"), b => JsSuccess(b))
-      case _ => JsError("Expected JsString")
+      case _           => JsError("Expected JsString")
     }
   }
 }
-
-

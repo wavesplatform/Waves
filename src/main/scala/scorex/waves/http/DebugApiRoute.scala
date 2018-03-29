@@ -33,8 +33,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
-
-
 @Path("/debug")
 @Api(value = "/debug")
 case class DebugApiRoute(settings: RestAPISettings,
@@ -51,11 +49,12 @@ case class DebugApiRoute(settings: RestAPISettings,
                          extLoaderStateReporter: Coeval[RxExtensionLoader.State],
                          mbsCacheSizesReporter: Coeval[MicroBlockSynchronizer.CacheSizes],
                          scoreReporter: Coeval[RxScoreObserver.Stats],
-                         configRoot: ConfigObject
-                        ) extends ApiRoute with ScorexLogging {
+                         configRoot: ConfigObject)
+    extends ApiRoute
+    with ScorexLogging {
 
-  private lazy val configStr = configRoot.render(ConfigRenderOptions.concise().setJson(true).setFormatted(true))
-  private lazy val fullConfig: JsValue = Json.parse(configStr)
+  private lazy val configStr             = configRoot.render(ConfigRenderOptions.concise().setJson(true).setFormatted(true))
+  private lazy val fullConfig: JsValue   = Json.parse(configStr)
   private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
 
   override lazy val route: Route = pathPrefix("debug") {
@@ -64,14 +63,10 @@ case class DebugApiRoute(settings: RestAPISettings,
 
   @Path("/blocks/{howMany}")
   @ApiOperation(value = "Blocks", notes = "Get sizes and full hashes for last blocks", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(
-      name = "howMany",
-      value = "How many last blocks to take",
-      required = true,
-      dataType = "string",
-      paramType = "path")
-  ))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "howMany", value = "How many last blocks to take", required = true, dataType = "string", paramType = "path")
+    ))
   def blocks: Route = {
     (path("blocks" / IntNumber) & get & withAuth) { howMany =>
       complete(JsArray(history.lastBlocks(howMany).map { block =>
@@ -87,16 +82,17 @@ case class DebugApiRoute(settings: RestAPISettings,
     notes = "Prints a string at DEBUG level, strips to 100 chars",
     httpMethod = "POST"
   )
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(
-      name = "body",
-      value = "Json with data",
-      required = true,
-      paramType = "body",
-      dataType = "scorex.waves.http.DebugMessage",
-      defaultValue = "{\n\t\"message\": \"foo\"\n}"
-    )
-  ))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "body",
+        value = "Json with data",
+        required = true,
+        paramType = "body",
+        dataType = "scorex.waves.http.DebugMessage",
+        defaultValue = "{\n\t\"message\": \"foo\"\n}"
+      )
+    ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json portfolio")))
   def print: Route = (path("print") & post & withAuth) {
     json[DebugMessage] { params =>
@@ -104,32 +100,30 @@ case class DebugApiRoute(settings: RestAPISettings,
       ""
     }
   }
-
-
-
   @Path("/portfolios/{address}")
   @ApiOperation(
     value = "Portfolio",
     notes = "Get current portfolio considering pessimistic transactions in the UTX pool",
     httpMethod = "GET"
   )
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(
-      name = "address",
-      value = "An address of portfolio",
-      required = true,
-      dataType = "string",
-      paramType = "path"
-    ),
-    new ApiImplicitParam(
-      name = "considerUnspent",
-      value = "Taking into account pessimistic transactions from UTX pool",
-      required = false,
-      dataType = "boolean",
-      paramType = "query",
-      defaultValue = "true"
-    )
-  ))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "address",
+        value = "An address of portfolio",
+        required = true,
+        dataType = "string",
+        paramType = "path"
+      ),
+      new ApiImplicitParam(
+        name = "considerUnspent",
+        value = "Taking into account pessimistic transactions from UTX pool",
+        required = false,
+        dataType = "boolean",
+        paramType = "query",
+        defaultValue = "true"
+      )
+    ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json portfolio")))
   def portfolios: Route = path("portfolios" / Segment) { (rawAddress) =>
     (get & withAuth & parameter('considerUnspent.as[Boolean])) { (considerUnspent) =>
@@ -151,9 +145,10 @@ case class DebugApiRoute(settings: RestAPISettings,
 
   @Path("/stateWaves/{height}")
   @ApiOperation(value = "State at block", notes = "Get state at specified height", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
-  ))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
+    ))
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get & withAuth) { height =>
     complete(stateReader.wavesDistribution(height).map { case (a, b) => a.stringRepr -> b })
   }
@@ -175,19 +170,21 @@ case class DebugApiRoute(settings: RestAPISettings,
 
   @Path("/rollback")
   @ApiOperation(value = "Rollback to height", notes = "Removes all blocks after given height", httpMethod = "POST")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(
-      name = "body",
-      value = "Json with data",
-      required = true,
-      paramType = "body",
-      dataType = "scorex.waves.http.RollbackParams",
-      defaultValue = "{\n\t\"rollbackTo\": 3,\n\t\"returnTransactionsToUTX\": false\n}"
-    )
-  ))
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "200 if success, 404 if there are no block at this height")
-  ))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "body",
+        value = "Json with data",
+        required = true,
+        paramType = "body",
+        dataType = "scorex.waves.http.RollbackParams",
+        defaultValue = "{\n\t\"rollbackTo\": 3,\n\t\"returnTransactionsToUTX\": false\n}"
+      )
+    ))
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "200 if success, 404 if there are no block at this height")
+    ))
   def rollback: Route = (path("rollback") & post & withAuth) {
     json[RollbackParams] { params =>
       history.blockAt(params.rollbackTo) match {
@@ -201,36 +198,41 @@ case class DebugApiRoute(settings: RestAPISettings,
 
   @Path("/info")
   @ApiOperation(value = "State", notes = "All info you need to debug", httpMethod = "GET")
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json state")
-  ))
-  def info: Route = (path("info") & get & withAuth) {
-    complete(Json.obj(
-      "stateHeight" -> stateReader.height,
-      "extensionLoaderState" -> extLoaderStateReporter().toString,
-      "historyReplierCacheSizes" -> Json.toJson(historyReplier.cacheSizes),
-      "microBlockSynchronizerCacheSizes" -> Json.toJson(mbsCacheSizesReporter()),
-      "scoreObserverStats" -> Json.toJson(scoreReporter()),
-      "minerState" -> Json.toJson(miner.state)
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Json state")
     ))
+  def info: Route = (path("info") & get & withAuth) {
+    complete(
+      Json.obj(
+        "stateHeight"                      -> stateReader.height,
+        "extensionLoaderState"             -> extLoaderStateReporter().toString,
+        "historyReplierCacheSizes"         -> Json.toJson(historyReplier.cacheSizes),
+        "microBlockSynchronizerCacheSizes" -> Json.toJson(mbsCacheSizesReporter()),
+        "scoreObserverStats"               -> Json.toJson(scoreReporter()),
+        "minerState"                       -> Json.toJson(miner.state)
+      ))
   }
 
   @Path("/minerInfo")
   @ApiOperation(value = "State", notes = "All miner info you need to debug", httpMethod = "GET")
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json state")
-  ))
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Json state")
+    ))
   def minerInfo: Route = (path("minerInfo") & get & withAuth) {
-    complete(miner.collectNextBlockGenerationTimes.map { case (a, t) =>
-      AccountMiningInfo(a.stringRepr, stateReader.effectiveBalance(a, stateReader.height, 1000), t)
+    complete(miner.collectNextBlockGenerationTimes.map {
+      case (a, t) =>
+        AccountMiningInfo(a.stringRepr, stateReader.effectiveBalance(a, stateReader.height, 1000), t)
     })
   }
 
   @Path("/historyInfo")
   @ApiOperation(value = "State", notes = "All history info you need to debug", httpMethod = "GET")
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json state")
-  ))
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Json state")
+    ))
   def historyInfo: Route = (path("historyInfo") & get & withAuth) {
     val a = history.lastPersistedBlockIds(10)
     val b = history.microblockIds()
@@ -240,27 +242,30 @@ case class DebugApiRoute(settings: RestAPISettings,
 
   @Path("/configInfo")
   @ApiOperation(value = "Config", notes = "Currently running node config", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(
-      name = "full",
-      value = "Exposes full typesafe config",
-      required = false,
-      dataType = "boolean",
-      paramType = "query",
-      defaultValue = "false"
-    )))
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json state")
-  ))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "full",
+        value = "Exposes full typesafe config",
+        required = false,
+        dataType = "boolean",
+        paramType = "query",
+        defaultValue = "false"
+      )))
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Json state")
+    ))
   def configInfo: Route = (path("configInfo") & get & parameter('full.as[Boolean]) & withAuth) { full =>
     complete(if (full) fullConfig else wavesConfig)
   }
 
   @Path("/rollback-to/{signature}")
   @ApiOperation(value = "Block signature", notes = "Rollback the state to the block with a given signature", httpMethod = "DELETE")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "signature", value = "Base58-encoded block signature", required = true, dataType = "string", paramType = "path")
-  ))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "signature", value = "Base58-encoded block signature", required = true, dataType = "string", paramType = "path")
+    ))
   def rollbackTo: Route = path("rollback-to" / Segment) { signature =>
     (delete & withAuth) {
       ByteStr.decodeBase58(signature) match {
@@ -274,16 +279,18 @@ case class DebugApiRoute(settings: RestAPISettings,
 
   @Path("/blacklist")
   @ApiOperation(value = "Blacklist given peer", notes = "Moving peer to blacklist", httpMethod = "POST")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "IP address of node", required = true, dataType = "string", paramType = "body")
-  ))
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "200 if success, 404 if there are no peer with such address")
-  ))
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "IP address of node", required = true, dataType = "string", paramType = "body")
+    ))
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "200 if success, 404 if there are no peer with such address")
+    ))
   def blacklist: Route = (path("blacklist") & post & withAuth) {
     entity(as[String]) { socketAddressString =>
       try {
-        val uri = new URI("node://" + socketAddressString)
+        val uri     = new URI("node://" + socketAddressString)
         val address = InetAddress.getByName(uri.getHost)
         establishedConnections.entrySet().stream().forEach { entry =>
           entry.getValue.remoteAddress match {
@@ -303,23 +310,24 @@ case class DebugApiRoute(settings: RestAPISettings,
 object DebugApiRoute {
   implicit val assetsFormat: Format[Map[ByteStr, Long]] = Format[Map[ByteStr, Long]](
     {
-      case JsObject(m) => m.foldLeft[JsResult[Map[ByteStr, Long]]](JsSuccess(Map.empty)) {
-        case (e: JsError, _) => e
-        case (JsSuccess(m, _), (rawAssetId, JsNumber(count))) =>
-          (ByteStr.decodeBase58(rawAssetId), count) match {
-            case (Success(assetId), count) if count.isValidLong => JsSuccess(m.updated(assetId, count.toLong))
-            case (Failure(_), _) => JsError(s"Can't parse '$rawAssetId' as base58 string")
-            case (_, count) => JsError(s"Invalid count of assets: $count")
-          }
-        case (_, (_, rawCount)) =>
-          JsError(s"Invalid count of assets: $rawCount")
-      }
+      case JsObject(m) =>
+        m.foldLeft[JsResult[Map[ByteStr, Long]]](JsSuccess(Map.empty)) {
+          case (e: JsError, _) => e
+          case (JsSuccess(m, _), (rawAssetId, JsNumber(count))) =>
+            (ByteStr.decodeBase58(rawAssetId), count) match {
+              case (Success(assetId), count) if count.isValidLong => JsSuccess(m.updated(assetId, count.toLong))
+              case (Failure(_), _)                                => JsError(s"Can't parse '$rawAssetId' as base58 string")
+              case (_, count)                                     => JsError(s"Invalid count of assets: $count")
+            }
+          case (_, (_, rawCount)) =>
+            JsError(s"Invalid count of assets: $rawCount")
+        }
       case _ => JsError("The map is expected")
     },
     m => Json.toJson(m.map { case (assetId, count) => assetId.base58 -> count })
   )
   implicit val leaseInfoFormat: Format[LeaseBalance] = Json.format
-  implicit val portfolioFormat: Format[Portfolio] = Json.format
+  implicit val portfolioFormat: Format[Portfolio]    = Json.format
 
   case class AccountMiningInfo(address: String, miningBalance: Long, timestamp: Long)
 
@@ -335,16 +343,17 @@ object DebugApiRoute {
 
   implicit val historyInfoFormat: Format[HistoryInfo] = Json.format
 
-  implicit val hrCacheSizesFormat: Format[HistoryReplier.CacheSizes] = Json.format
+  implicit val hrCacheSizesFormat: Format[HistoryReplier.CacheSizes]          = Json.format
   implicit val mbsCacheSizesFormat: Format[MicroBlockSynchronizer.CacheSizes] = Json.format
-  implicit val BigIntWrite: Writes[BigInt] = (bigInt: BigInt) => JsNumber(BigDecimal(bigInt))
-  implicit val scoreReporterStatsWrite: Writes[RxScoreObserver.Stats] = Json.writes[RxScoreObserver.Stats]
+  implicit val BigIntWrite: Writes[BigInt]                                    = (bigInt: BigInt) => JsNumber(BigDecimal(bigInt))
+  implicit val scoreReporterStatsWrite: Writes[RxScoreObserver.Stats]         = Json.writes[RxScoreObserver.Stats]
 
   import MinerDebugInfo._
-  implicit val minerStateWrites: Writes[MinerDebugInfo.State] = (s: MinerDebugInfo.State) => JsString(s match {
-    case MiningBlocks => "mining blocks"
-    case MiningMicroblocks => "mining microblocks"
-    case Disabled => "disabled"
-    case Error(err) => s"error: $err"
-  })
+  implicit val minerStateWrites: Writes[MinerDebugInfo.State] = (s: MinerDebugInfo.State) =>
+    JsString(s match {
+      case MiningBlocks      => "mining blocks"
+      case MiningMicroblocks => "mining microblocks"
+      case Disabled          => "disabled"
+      case Error(err)        => s"error: $err"
+    })
 }

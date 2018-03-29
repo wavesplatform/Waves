@@ -14,10 +14,10 @@ trait GenericMatcherResponse extends MatcherResponse {
 
   def result: JsValue = JsNull
 
-  def json: JsValue =  Json.obj(
+  def json: JsValue = Json.obj(
     "success" -> success,
     "message" -> message,
-    "result" -> result
+    "result"  -> result
   )
   def code: StatusCode = if (success) StatusCodes.OK else StatusCodes.BadRequest
 }

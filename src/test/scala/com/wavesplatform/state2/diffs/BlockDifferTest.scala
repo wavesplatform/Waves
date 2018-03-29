@@ -49,12 +49,14 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       |10 |10   |B       |0          |40         |+10        |40+10=50   | <- 2nd check
        */
       "height < enableMicroblocksAfterHeight - a miner should receive 100% of the current block's fee" in {
-        assertDiff(testChain.init, TestFunctionalitySettings.Enabled, 1000) { case (_, s) =>
-          s.portfolio(signerA).balance shouldBe 40
+        assertDiff(testChain.init, TestFunctionalitySettings.Enabled, 1000) {
+          case (_, s) =>
+            s.portfolio(signerA).balance shouldBe 40
         }
 
-        assertDiff(testChain, TestFunctionalitySettings.Enabled, 1000) { case (_, s) =>
-          s.portfolio(signerB).balance shouldBe 50
+        assertDiff(testChain, TestFunctionalitySettings.Enabled, 1000) {
+          case (_, s) =>
+            s.portfolio(signerB).balance shouldBe 50
         }
       }
 
@@ -74,8 +76,9 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       |10 |10   |B       |0          |40         |+4         |40+4=44    | <- check
        */
       "height = enableMicroblocksAfterHeight - a miner should receive 40% of the current block's fee only" in {
-        assertDiff(testChain, TestFunctionalitySettings.Enabled, 9) { case (_, s) =>
-          s.portfolio(signerB).balance shouldBe 44
+        assertDiff(testChain, TestFunctionalitySettings.Enabled, 9) {
+          case (_, s) =>
+            s.portfolio(signerB).balance shouldBe 44
         }
       }
 
@@ -95,19 +98,20 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       |10 |10   |B       |0          |34         |+4+6=10    |40+10=50   | <- 2nd check
        */
       "height > enableMicroblocksAfterHeight - a miner should receive 60% of previous block's fee and 40% of the current one" in {
-        assertDiff(testChain.init, TestFunctionalitySettings.Enabled, 4) { case (_, s) =>
-          s.portfolio(signerA).balance shouldBe 34
+        assertDiff(testChain.init, TestFunctionalitySettings.Enabled, 4) {
+          case (_, s) =>
+            s.portfolio(signerA).balance shouldBe 34
         }
 
-        assertDiff(testChain, TestFunctionalitySettings.Enabled, 4) { case (_, s) =>
-          s.portfolio(signerB).balance shouldBe 50
+        assertDiff(testChain, TestFunctionalitySettings.Enabled, 4) {
+          case (_, s) =>
+            s.portfolio(signerB).balance shouldBe 50
         }
       }
     }
   }
 
-  private def assertDiff(blocks: Seq[Block], fs: FunctionalitySettings, ngAtHeight: Int)
-                        (assertion: (Diff, SnapshotStateReader) => Unit): Unit = {
+  private def assertDiff(blocks: Seq[Block], fs: FunctionalitySettings, ngAtHeight: Int)(assertion: (Diff, SnapshotStateReader) => Unit): Unit = {
     val fp = new FeatureProvider {
       override def activatedFeatures() = Map(BlockchainFeatures.NG.id -> ngAtHeight)
 
@@ -118,14 +122,14 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
     assertDiffEiWithPrev(blocks.init, blocks.last, fp, fs)(assertion)
   }
 
-  private def assertDiffEiWithPrev(preconditions: Seq[Block], block: Block, fp: FeatureProvider, fs: FunctionalitySettings)
-                                  (assertion: (Diff, SnapshotStateReader) => Unit): Unit = withStateAndHistory(fs) { state =>
-
+  private def assertDiffEiWithPrev(preconditions: Seq[Block], block: Block, fp: FeatureProvider, fs: FunctionalitySettings)(
+      assertion: (Diff, SnapshotStateReader) => Unit): Unit = withStateAndHistory(fs) { state =>
     def differ(s: SnapshotStateReader, prev: Option[Block], b: Block): Either[ValidationError, Diff] =
       BlockDiffer.fromBlock(fs, fp, s, prev, b)
 
-    zipWithPrev(preconditions).foreach { case (prev, b) =>
-      state.append(differ(state, prev, b).explicitGet(), b)
+    zipWithPrev(preconditions).foreach {
+      case (prev, b) =>
+        state.append(differ(state, prev, b).explicitGet(), b)
     }
 
     val totalDiff1 = differ(state, preconditions.lastOption, block).explicitGet()
@@ -133,10 +137,8 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
     assertion(totalDiff1, state)
   }
 
-  private def getTwoMinersBlockChain(from: PrivateKeyAccount,
-                                     to: PrivateKeyAccount,
-                                     numPayments: Int): Seq[Block] = {
-    val ts = System.currentTimeMillis() - 100000
+  private def getTwoMinersBlockChain(from: PrivateKeyAccount, to: PrivateKeyAccount, numPayments: Int): Seq[Block] = {
+    val ts        = System.currentTimeMillis() - 100000
     val genesisTx = GenesisTransaction.create(from, Long.MaxValue - 1, ts).right.get
 
     val paymentTxs = (1 to numPayments).map { i =>
@@ -149,9 +151,10 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       ).right.get
     }
 
-    (genesisTx +: paymentTxs).zipWithIndex.map { case (x, i) =>
-      val signer = if (i % 2 == 0) signerA else signerB
-      TestBlock.create(signer, Seq(x))
+    (genesisTx +: paymentTxs).zipWithIndex.map {
+      case (x, i) =>
+        val signer = if (i % 2 == 0) signerA else signerB
+        TestBlock.create(signer, Seq(x))
     }
   }
 }

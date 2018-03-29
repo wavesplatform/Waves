@@ -7,7 +7,7 @@ import scorex.transaction.smart.Script
 package object database {
   implicit class ByteArrayDataOutputExt(val output: ByteArrayDataOutput) extends AnyVal {
     def writeBigInt(v: BigInt): Unit = {
-      val b = v.toByteArray
+      val b   = v.toByteArray
       val len = b.length
       output.writeByte(len)
       output.write(b)
@@ -26,7 +26,7 @@ package object database {
   implicit class ByteArrayDataInputExt(val input: ByteArrayDataInput) extends AnyVal {
     def readBigInt(): BigInt = {
       val len = input.readByte()
-      val b = new Array[Byte](len)
+      val b   = new Array[Byte](len)
       input.readFully(b)
       BigInt(b)
     }
@@ -34,7 +34,7 @@ package object database {
     def readScriptOption(): Option[Script] = {
       if (input.readBoolean()) {
         val len = input.readShort()
-        val b = new Array[Byte](len)
+        val b   = new Array[Byte](len)
         input.readFully(b)
         Some(Script.fromBytes(b).explicitGet())
       } else None

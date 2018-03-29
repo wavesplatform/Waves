@@ -17,30 +17,30 @@ class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
     }
 
     "put(block)" - tests { (maxTxs, txs) =>
-      val estimator = createConstConstraint(maxTxs, blockSize = 1)
-      val blocks = txs.map(tx => TestBlock.create(Seq(tx)))
+      val estimator  = createConstConstraint(maxTxs, blockSize = 1)
+      val blocks     = txs.map(tx => TestBlock.create(Seq(tx)))
       val constraint = OneDimensionalMiningConstraint.full(estimator)
       blocks.foldLeft(constraint)(_.put(_))
     }
 
     "put(transaction)" - tests { (maxTxs, txs) =>
-      val estimator = createConstConstraint(maxTxs, transactionSize = 1)
+      val estimator  = createConstConstraint(maxTxs, transactionSize = 1)
       val constraint = OneDimensionalMiningConstraint.full(estimator)
       txs.foldLeft(constraint)(_.put(_))
     }
   }
 
   private def createConstConstraint(maxSize: Long, blockSize: => Long = ???, transactionSize: => Long = ???) = new Estimator {
-    override def max: Long = maxSize
-    override implicit def estimate(x: Block): Long = blockSize
+    override def max: Long                               = maxSize
+    override implicit def estimate(x: Block): Long       = blockSize
     override implicit def estimate(x: Transaction): Long = transactionSize
   }
 
   private def tests(toConstraint: (Int, List[Transaction]) => MiningConstraint): Unit = {
     val dontReachLimitGen: Gen[MiningConstraint] = for {
-      maxTxs <- Gen.chooseNum(1, Int.MaxValue)
+      maxTxs   <- Gen.chooseNum(1, Int.MaxValue)
       txNumber <- Gen.chooseNum(0, maxTxs - 1)
-      txs <- Gen.listOfN(math.min(txNumber, 15), randomTransactionGen)
+      txs      <- Gen.listOfN(math.min(txNumber, 15), randomTransactionGen)
     } yield toConstraint(maxTxs, txs)
 
     "multiple items don't reach the limit" in forAll(dontReachLimitGen) { updatedConstraint =>
@@ -50,7 +50,7 @@ class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
 
     val reachSoftLimitGen: Gen[MiningConstraint] = for {
       maxTxs <- Gen.chooseNum(1, 10)
-      txs <- Gen.listOfN(maxTxs, randomTransactionGen)
+      txs    <- Gen.listOfN(maxTxs, randomTransactionGen)
     } yield toConstraint(maxTxs, txs)
 
     "multiple items reach the limit softly" in forAll(reachSoftLimitGen) { updatedConstraint =>
@@ -59,9 +59,9 @@ class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
     }
 
     val reachHardLimitGen: Gen[MiningConstraint] = for {
-      maxTxs <- Gen.chooseNum(1, 10)
+      maxTxs   <- Gen.chooseNum(1, 10)
       txNumber <- Gen.chooseNum(maxTxs + 1, maxTxs + 10)
-      txs <- Gen.listOfN(txNumber, randomTransactionGen)
+      txs      <- Gen.listOfN(txNumber, randomTransactionGen)
     } yield toConstraint(maxTxs, txs)
 
     "multiple items reach the limit with gap" in forAll(reachHardLimitGen) { updatedConstraint =>

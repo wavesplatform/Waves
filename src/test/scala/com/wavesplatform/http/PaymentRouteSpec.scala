@@ -14,7 +14,7 @@ import scorex.transaction.assets.TransferTransaction
 import scorex.utils.Time
 
 class PaymentRouteSpec
-  extends RouteSpec("/payment")
+    extends RouteSpec("/payment")
     with MockFactory
     with PropertyChecks
     with RestAPISettingsHelper
@@ -29,7 +29,6 @@ class PaymentRouteSpec
   "accepts payments" in {
     forAll(accountOrAliasGen.label("recipient"), positiveLongGen.label("amount"), smallFeeGen.label("fee")) {
       case (recipient, amount, fee) =>
-
         val timestamp = System.currentTimeMillis()
 
         val time = new Time {
@@ -39,7 +38,7 @@ class PaymentRouteSpec
         }
 
         val sender = testWallet.privateKeyAccounts.head
-        val tx = TransferTransaction.create(None, sender, recipient, amount, timestamp, None, fee, Array())
+        val tx     = TransferTransaction.create(None, sender, recipient, amount, timestamp, None, fee, Array())
 
         val route = PaymentApiRoute(restAPISettings, testWallet, utx, allChannels, time).route
 

@@ -123,14 +123,17 @@ class TransactionsApiSuite extends BaseTransactionSuite {
   }
 
   test("/transactions/sign should produce mass transfer transaction that is good for /transactions/broadcast") {
-    signAndBroadcast(Json.obj(
-      "type" -> 11,
-      "version" -> 1,
-      "sender" -> firstAddress,
-      "transfers" -> Json.toJson(Seq(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))),
-      "fee" -> 200000,
-      "attachment" -> Base58.encode("masspay".getBytes)
-    ),usesProofs = true)
+    signAndBroadcast(
+      Json.obj(
+        "type"       -> 11,
+        "version"    -> 1,
+        "sender"     -> firstAddress,
+        "transfers"  -> Json.toJson(Seq(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))),
+        "fee"        -> 200000,
+        "attachment" -> Base58.encode("masspay".getBytes)
+      ),
+      usesProofs = true
+    )
   }
 
   test("/transactions/sign should produce lease/cancel transactions that are good for /transactions/broadcast") {
@@ -145,16 +148,18 @@ class TransactionsApiSuite extends BaseTransactionSuite {
   }
 
   test("/transactions/sign should produce data transaction that is good for /transactions/broadcast") {
-    signAndBroadcast(Json.obj(
-      "type" -> 12,
-      "version" -> 1,
-      "sender" -> firstAddress,
-      "data" -> List(
-        LongDataEntry("int", 923275292849183L),
-        BooleanDataEntry("bool", true),
-        BinaryDataEntry("blob", ByteStr(Array.tabulate(445)(_.toByte)))),
-      "fee" -> 100000),
-      usesProofs = true)
+    signAndBroadcast(
+      Json.obj(
+        "type"    -> 12,
+        "version" -> 1,
+        "sender"  -> firstAddress,
+        "data" -> List(LongDataEntry("int", 923275292849183L),
+                       BooleanDataEntry("bool", true),
+                       BinaryDataEntry("blob", ByteStr(Array.tabulate(445)(_.toByte)))),
+        "fee" -> 100000
+      ),
+      usesProofs = true
+    )
   }
 
   private def signAndBroadcast(json: JsObject, usesProofs: Boolean = false): String = {
@@ -202,7 +207,10 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       _ = assert(transfers.equals(transfersAfterTrans))
 
       // ...and compact list for recipients
-      txRecipient <- sender.get(s"/transactions/address/$secondAddress/limit/10").as[JsArray].map(js => extractTransactionByType(js.apply(0), 11).head)
+      txRecipient <- sender
+        .get(s"/transactions/address/$secondAddress/limit/10")
+        .as[JsArray]
+        .map(js => extractTransactionByType(js.apply(0), 11).head)
       _                = assert(txRecipient.as[MassTransferRequest].transfers.size == 1)
       _                = assert((txRecipient \ "transferCount").as[Int] == 3)
       _                = assert((txRecipient \ "totalAmount").as[Long] == 10.waves)
