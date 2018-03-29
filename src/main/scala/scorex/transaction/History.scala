@@ -55,8 +55,9 @@ object CheckpointService {
   implicit class CheckpointServiceExt(cs: CheckpointService) {
     def isBlockValid(candidateSignature: ByteStr, estimatedHeight: Int): Boolean =
       !cs.get.exists {
-        _.items.exists { case BlockCheckpoint(h, sig) =>
-          h == estimatedHeight && candidateSignature != ByteStr(sig)
+        _.items.exists {
+          case BlockCheckpoint(h, sig) =>
+            h == estimatedHeight && candidateSignature != ByteStr(sig)
         }
       }
   }
@@ -72,15 +73,15 @@ object History {
   implicit class HistoryExt(history: History) {
     def isEmpty: Boolean = history.height == 0
 
-    def contains(block: Block): Boolean = history.contains(block.uniqueId)
+    def contains(block: Block): Boolean       = history.contains(block.uniqueId)
     def contains(signature: ByteStr): Boolean = history.heightOf(signature).isDefined
 
     def blockById(blockId: ByteStr): Option[Block] = history.blockBytes(blockId).flatMap(bb => Block.parseBytes(bb).toOption)
-    def blockAt(height: Int): Option[Block] = history.blockBytes(height).flatMap(bb => Block.parseBytes(bb).toOption)
+    def blockAt(height: Int): Option[Block]        = history.blockBytes(height).flatMap(bb => Block.parseBytes(bb).toOption)
 
     def lastBlockHeaderAndSize: Option[(Block, Int)] = history.lastBlock.map(b => (b, b.bytes().length))
-    def lastBlockId: Option[AssetId] = history.lastBlockHeaderAndSize.map(_._1.signerData.signature)
-    def lastBlockTimestamp: Option[Long] = history.lastBlockHeaderAndSize.map(_._1.timestamp)
+    def lastBlockId: Option[AssetId]                 = history.lastBlockHeaderAndSize.map(_._1.signerData.signature)
+    def lastBlockTimestamp: Option[Long]             = history.lastBlockHeaderAndSize.map(_._1.timestamp)
 
     def lastBlocks(howMany: Int): Seq[Block] = {
       (Math.max(1, history.height - howMany + 1) to history.height).flatMap(history.blockAt).reverse

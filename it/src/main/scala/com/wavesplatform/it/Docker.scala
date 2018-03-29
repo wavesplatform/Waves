@@ -34,24 +34,23 @@ import scala.sys.process.Process
 import scala.util.control.NonFatal
 import scala.util.{Random, Try}
 
-class Docker(suiteConfig: Config = ConfigFactory.empty,
-             tag: String = "",
-             enableProfiling: Boolean = false) extends AutoCloseable with ScorexLogging {
+class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "", enableProfiling: Boolean = false) extends AutoCloseable with ScorexLogging {
 
   import Docker._
 
-  private val http = asyncHttpClient(config()
-    .setNettyTimer(timer)
-    .setMaxConnections(18)
-    .setMaxConnectionsPerHost(3)
-    .setMaxRequestRetry(1)
-    .setReadTimeout(10000)
-    .setKeepAlive(false)
-    .setRequestTimeout(10000))
+  private val http = asyncHttpClient(
+    config()
+      .setNettyTimer(timer)
+      .setMaxConnections(18)
+      .setMaxConnectionsPerHost(3)
+      .setMaxRequestRetry(1)
+      .setReadTimeout(10000)
+      .setKeepAlive(false)
+      .setRequestTimeout(10000))
 
   private val client = DefaultDockerClient.fromEnv().build()
 
-  private val nodes = ConcurrentHashMap.newKeySet[DockerNode]()
+  private val nodes     = ConcurrentHashMap.newKeySet[DockerNode]()
   private val isStopped = new AtomicBoolean(false)
 
   dumpContainers(client.listContainers())
@@ -96,40 +95,52 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   private lazy val wavesNetwork: Network = {
     val networkName = s"waves-${hashCode().toLong.toHexString}"
 
-    def network: Option[Network] = try {
-      val networks = client.listNetworks(DockerClient.ListNetworksParam.byNetworkName(networkName))
-      if (networks.isEmpty) None else Some(networks.get(0))
-    } catch {
-      case NonFatal(_) => network
-    }
-
-    def attempt(rest: Int): Network = try {
-      network match {
-        case Some(n) =>
-          val ipam = s"ipam: ${n.ipam().config().asScala.map { n => s"subnet=${n.subnet()}, ip range=${n.ipRange()}" }.mkString(", ")}"
-          log.info(s"Network ${n.name()} (id: ${n.id()}) is created for $tag, $ipam")
-          n
-        case None =>
-          log.debug(s"Creating network $networkName for $tag")
-          // Specify the network manually because of race conditions: https://github.com/moby/moby/issues/20648
-          val r = client.createNetwork(NetworkConfig.builder()
-            .name(networkName)
-            .ipam(
-              Ipam.builder()
-                .driver("default")
-                .config(singletonList(IpamConfig.create(networkPrefix, networkPrefix, ipForNode(0xE))))
-                .build()
-            )
-            .checkDuplicate(true)
-            .build())
-          Option(r.warnings()).foreach(log.warn(_))
-          attempt(rest - 1)
+    def network: Option[Network] =
+      try {
+        val networks = client.listNetworks(DockerClient.ListNetworksParam.byNetworkName(networkName))
+        if (networks.isEmpty) None else Some(networks.get(0))
+      } catch {
+        case NonFatal(_) => network
       }
-    } catch {
-      case NonFatal(e) =>
-        log.warn(s"Can not create a network for $tag", e)
-        if (rest == 0) throw e else attempt(rest - 1)
-    }
+
+    def attempt(rest: Int): Network =
+      try {
+        network match {
+          case Some(n) =>
+            val ipam = s"ipam: ${n
+              .ipam()
+              .config()
+              .asScala
+              .map { n =>
+                s"subnet=${n.subnet()}, ip range=${n.ipRange()}"
+              }
+              .mkString(", ")}"
+            log.info(s"Network ${n.name()} (id: ${n.id()}) is created for $tag, $ipam")
+            n
+          case None =>
+            log.debug(s"Creating network $networkName for $tag")
+            // Specify the network manually because of race conditions: https://github.com/moby/moby/issues/20648
+            val r = client.createNetwork(
+              NetworkConfig
+                .builder()
+                .name(networkName)
+                .ipam(
+                  Ipam
+                    .builder()
+                    .driver("default")
+                    .config(singletonList(IpamConfig.create(networkPrefix, networkPrefix, ipForNode(0xE))))
+                    .build()
+                )
+                .checkDuplicate(true)
+                .build())
+            Option(r.warnings()).foreach(log.warn(_))
+            attempt(rest - 1)
+        }
+      } catch {
+        case NonFatal(e) =>
+          log.warn(s"Can not create a network for $tag", e)
+          if (rest == 0) throw e else attempt(rest - 1)
+      }
 
     attempt(5)
   }
@@ -159,8 +170,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   private def connectToAll(node: DockerNode): Future[Unit] = {
     def connectToOne(address: InetSocketAddress): Future[Unit] = {
       for {
-        _ <- node.connect(address)
-        _ <- Future(blocking(Thread.sleep(3.seconds.toMillis)))
+        _              <- node.connect(address)
+        _              <- Future(blocking(Thread.sleep(3.seconds.toMillis)))
         connectedPeers <- node.connectedPeers
         _ <- {
           val connectedAddresses = connectedPeers.map(_.address.replaceAll("""^.*/([\d\.]+).+$""", "$1")).sorted
@@ -179,95 +190,101 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       .map(_.containerNetworkAddress)
 
     if (seedAddresses.isEmpty) Future.successful(())
-    else Future
-      .traverse(seedAddresses)(connectToOne)
-      .map(_ => ())
+    else
+      Future
+        .traverse(seedAddresses)(connectToOne)
+        .map(_ => ())
   }
 
-  private def startNodeInternal(nodeConfig: Config): DockerNode = try {
-    val actualConfig = nodeConfig
-      .withFallback(suiteConfig)
-      .withFallback(NodeConfigs.DefaultConfigTemplate)
-      .withFallback(ConfigFactory.defaultApplication())
-      .withFallback(ConfigFactory.defaultReference())
-      .resolve()
+  private def startNodeInternal(nodeConfig: Config): DockerNode =
+    try {
+      val actualConfig = nodeConfig
+        .withFallback(suiteConfig)
+        .withFallback(NodeConfigs.DefaultConfigTemplate)
+        .withFallback(ConfigFactory.defaultApplication())
+        .withFallback(ConfigFactory.defaultReference())
+        .resolve()
 
-    val restApiPort = actualConfig.getString("waves.rest-api.port")
-    val networkPort = actualConfig.getString("waves.network.port")
-    val matcherApiPort = actualConfig.getString("waves.matcher.port")
+      val restApiPort    = actualConfig.getString("waves.rest-api.port")
+      val networkPort    = actualConfig.getString("waves.network.port")
+      val matcherApiPort = actualConfig.getString("waves.matcher.port")
 
-    val portBindings = new ImmutableMap.Builder[String, java.util.List[PortBinding]]()
-      .put(s"$ProfilerPort", singletonList(PortBinding.randomPort("0.0.0.0")))
-      .put(restApiPort, singletonList(PortBinding.randomPort("0.0.0.0")))
-      .put(networkPort, singletonList(PortBinding.randomPort("0.0.0.0")))
-      .put(matcherApiPort, singletonList(PortBinding.randomPort("0.0.0.0")))
-      .build()
+      val portBindings = new ImmutableMap.Builder[String, java.util.List[PortBinding]]()
+        .put(s"$ProfilerPort", singletonList(PortBinding.randomPort("0.0.0.0")))
+        .put(restApiPort, singletonList(PortBinding.randomPort("0.0.0.0")))
+        .put(networkPort, singletonList(PortBinding.randomPort("0.0.0.0")))
+        .put(matcherApiPort, singletonList(PortBinding.randomPort("0.0.0.0")))
+        .build()
 
-    val hostConfig = HostConfig.builder()
-      .portBindings(portBindings)
-      .build()
+      val hostConfig = HostConfig
+        .builder()
+        .portBindings(portBindings)
+        .build()
 
-    val nodeName = actualConfig.getString("waves.network.node-name")
-    val nodeNumber = nodeName.replace("node", "").toInt
-    val ip = ipForNode(nodeNumber)
+      val nodeName   = actualConfig.getString("waves.network.node-name")
+      val nodeNumber = nodeName.replace("node", "").toInt
+      val ip         = ipForNode(nodeNumber)
 
-    val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
-    val configOverrides = {
-      val common = s"$javaOptions ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))} " +
-        s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dwaves.network.declared-address=$ip:$networkPort"
+      val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
+      val configOverrides: String = {
+        val withAspectJ = Option(System.getenv("WITH_ASPECTJ")).fold(false)(_.toBoolean)
 
-      val additional = profilerController().fold("") { _ =>
-        s"-agentpath:$ContainerRoot/libyjpagent.so=listen=0.0.0.0:$ProfilerPort," +
-          s"sampling,monitors,sessionname=WavesNode,dir=$ContainerRoot/profiler,logdir=$ContainerRoot"
+        var config = s"$javaOptions ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))} " +
+          s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dwaves.network.declared-address=$ip:$networkPort "
+
+        if (profilerController().isDefined) {
+          config += s"-agentpath:$ContainerRoot/libyjpagent.so=listen=0.0.0.0:$ProfilerPort," +
+            s"sampling,monitors,sessionname=WavesNode,dir=$ContainerRoot/profiler,logdir=$ContainerRoot "
+        }
+
+        if (withAspectJ) config += s"-javaagent:$ContainerRoot/aspectjweaver.jar "
+        config
       }
 
-      s"$common $additional"
+      val containerConfig = ContainerConfig
+        .builder()
+        .image("com.wavesplatform/it:latest")
+        .exposedPorts(s"$ProfilerPort", restApiPort, networkPort, matcherApiPort)
+        .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(
+          wavesNetwork.name() -> endpointConfigFor(nodeName)
+        ).asJava))
+        .hostConfig(hostConfig)
+        .env(s"WAVES_OPTS=$configOverrides")
+        .build()
+
+      val containerId = {
+        val containerName = s"${wavesNetwork.name()}-$nodeName"
+        dumpContainers(
+          client.listContainers(DockerClient.ListContainersParam.filter("name", containerName)),
+          "Containers with same name"
+        )
+
+        log.debug(s"Creating container $containerName at $ip with options: $javaOptions")
+        val r = client.createContainer(containerConfig, containerName)
+        Option(r.warnings().asScala).toSeq.flatten.foreach(log.warn(_))
+        r.id()
+      }
+
+      client.startContainer(containerId)
+
+      val node = new DockerNode(actualConfig, containerId, getNodeInfo(containerId, WavesSettings.fromConfig(actualConfig)))
+      nodes.add(node)
+      log.debug(s"Started $containerId -> ${node.name}: ${node.nodeInfo}")
+      node
+    } catch {
+      case NonFatal(e) =>
+        log.error("Can't start a container", e)
+        dumpContainers(client.listContainers())
+        throw e
     }
-
-    val containerConfig = ContainerConfig.builder()
-      .image("com.wavesplatform/it:latest")
-      .exposedPorts(s"$ProfilerPort", restApiPort, networkPort, matcherApiPort)
-      .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(
-        wavesNetwork.name() -> endpointConfigFor(nodeName)
-      ).asJava))
-      .hostConfig(hostConfig)
-      .env(s"WAVES_OPTS=$configOverrides")
-      .build()
-
-    val containerId = {
-      val containerName = s"${wavesNetwork.name()}-$nodeName"
-      dumpContainers(
-        client.listContainers(DockerClient.ListContainersParam.filter("name", containerName)),
-        "Containers with same name"
-      )
-
-      log.debug(s"Creating container $containerName at $ip with options: $javaOptions")
-      val r = client.createContainer(containerConfig, containerName)
-      Option(r.warnings().asScala).toSeq.flatten.foreach(log.warn(_))
-      r.id()
-    }
-
-    client.startContainer(containerId)
-
-    val node = new DockerNode(actualConfig, containerId, getNodeInfo(containerId, WavesSettings.fromConfig(actualConfig)))
-    nodes.add(node)
-    log.debug(s"Started $containerId -> ${node.name}: ${node.nodeInfo}")
-    node
-  } catch {
-    case NonFatal(e) =>
-      log.error("Can't start a container", e)
-      dumpContainers(client.listContainers())
-      throw e
-  }
-
 
   private def getNodeInfo(containerId: String, settings: WavesSettings): NodeInfo = {
-    val restApiPort = settings.restAPISettings.port
+    val restApiPort    = settings.restAPISettings.port
     val matcherApiPort = settings.matcherSettings.port
-    val networkPort = settings.networkSettings.bindAddress.getPort
+    val networkPort    = settings.networkSettings.bindAddress.getPort
 
     val containerInfo = inspectContainer(containerId)
-    val ports = containerInfo.networkSettings().ports()
+    val ports         = containerInfo.networkSettings().ports()
 
     val wavesIpAddress = containerInfo.networkSettings().networks().get(wavesNetwork.name()).ipAddress()
 
@@ -275,7 +292,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       new URL(s"http://localhost:${extractHostPort(ports, restApiPort)}"),
       new URL(s"http://localhost:${extractHostPort(ports, matcherApiPort)}"),
       new InetSocketAddress("localhost", extractHostPort(ports, networkPort)),
-      new InetSocketAddress(wavesIpAddress, networkPort))
+      new InetSocketAddress(wavesIpAddress, networkPort)
+    )
   }
 
   private def inspectContainer(containerId: String): ContainerInfo = {
@@ -299,8 +317,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
         saveProfile(node)
         saveLog(node)
         val containerInfo = client.inspectContainer(node.containerId)
-        log.debug(
-          s"""Container information for ${node.name}:
+        log.debug(s"""Container information for ${node.name}:
              |Exit code: ${containerInfo.state().exitCode()}
              |Error: ${containerInfo.state().error()}
              |Status: ${containerInfo.state().status()}
@@ -328,7 +345,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
   private def saveLog(node: DockerNode): Unit = {
     val containerId = node.containerId
-    val logFile = logDir().resolve(s"${node.name}.log").toFile
+    val logFile     = logDir().resolve(s"${node.name}.log").toFile
     log.info(s"Writing logs of $containerId to ${logFile.getAbsolutePath}")
 
     val fileStream = new FileOutputStream(logFile, false)
@@ -349,14 +366,15 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   private def takeProfileSnapshot(node: DockerNode): Unit = profilerController().foreach { controller =>
     val containerInfo = inspectContainer(node.containerId)
     Option(containerInfo.networkSettings().ports()).foreach { ports =>
-      Process(Seq(
-        "java",
-        "-jar",
-        controller.toString,
-        "127.0.0.1",
-        extractHostPort(ports, ProfilerPort).toString,
-        "capture-performance-snapshot"
-      )).!!
+      Process(
+        Seq(
+          "java",
+          "-jar",
+          controller.toString,
+          "127.0.0.1",
+          extractHostPort(ports, ProfilerPort).toString,
+          "capture-performance-snapshot"
+        )).!!
     }
   }
 
@@ -408,7 +426,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   private def connectToNetwork(node: DockerNode): Unit = {
     client.connectToNetwork(
       wavesNetwork.id(),
-      NetworkConnection.builder()
+      NetworkConnection
+        .builder()
         .containerId(node.containerId)
         .endpointConfig(endpointConfigFor(node.name))
         .build()
@@ -420,28 +439,34 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
   private def endpointConfigFor(nodeName: String): EndpointConfig = {
     val nodeNumber = nodeName.replace("node", "").toInt
-    val ip = ipForNode(nodeNumber)
+    val ip         = ipForNode(nodeNumber)
 
-    EndpointConfig.builder()
+    EndpointConfig
+      .builder()
       .ipAddress(ip)
       .ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
       .build()
   }
 
   private def dumpContainers(containers: java.util.List[Container], label: String = "Containers"): Unit = {
-    val x = if (containers.isEmpty) "No" else "\n" + containers.asScala
-      .map { x => s"Container(${x.id()}, status: ${x.status()}, names: ${x.names().asScala.mkString(", ")})" }
-      .mkString("\n")
+    val x =
+      if (containers.isEmpty) "No"
+      else
+        "\n" + containers.asScala
+          .map { x =>
+            s"Container(${x.id()}, status: ${x.status()}, names: ${x.names().asScala.mkString(", ")})"
+          }
+          .mkString("\n")
 
     log.debug(s"$label: $x")
   }
 }
 
 object Docker {
-  private val ProfilerPort = 10001
+  private val ProfilerPort  = 10001
   private val ContainerRoot = Paths.get("/opt/waves")
-  private val jsonMapper = new ObjectMapper
-  private val propsMapper = new JavaPropsMapper
+  private val jsonMapper    = new ObjectMapper
+  private val propsMapper   = new JavaPropsMapper
 
   def apply(owner: Class[_]): Docker = new Docker(tag = owner.getSimpleName)
 
@@ -450,7 +475,14 @@ object Docker {
     propsMapper.writeValueAsProperties(jsonMapper.readTree(jsonConfig))
   }
 
-  private def renderProperties(p: Properties) = p.asScala.map { case (k, v) => s"-D$k=$v" } mkString " "
+  private def renderProperties(p: Properties) =
+    p.asScala
+      .map {
+        case (k, v) if v.contains(" ") => k -> s""""$v""""
+        case x                         => x
+      }
+      .map { case (k, v) => s"-D$k=$v" }
+      .mkString(" ")
 
   private def extractHostPort(m: JMap[String, JList[PortBinding]], containerPort: Int) =
     m.get(s"$containerPort/tcp").get(0).hostPort().toInt

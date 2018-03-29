@@ -6,8 +6,7 @@ import com.wavesplatform.generator.utils.Gen
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.Transaction
 
-class WideTransactionGenerator(settings: Settings,
-                               accounts: Seq[PrivateKeyAccount]) extends TransactionGenerator {
+class WideTransactionGenerator(settings: Settings, accounts: Seq[PrivateKeyAccount]) extends TransactionGenerator {
   require(accounts.nonEmpty)
 
   private val limitedRecipientGen = Gen.address(settings.limitDestAccounts)
@@ -20,10 +19,7 @@ class WideTransactionGenerator(settings: Settings,
 
 object WideTransactionGenerator {
 
-  case class Settings(transactions: Int,
-                      limitDestAccounts: Option[Int],
-                      minFee: Long,
-                      maxFee: Long) {
+  case class Settings(transactions: Int, limitDestAccounts: Option[Int], minFee: Long, maxFee: Long) {
     require(transactions > 0)
     require(limitDestAccounts.forall(_ > 0))
   }

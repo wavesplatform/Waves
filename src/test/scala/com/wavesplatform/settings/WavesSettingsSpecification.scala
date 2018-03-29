@@ -35,8 +35,7 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
   testConfig("devnet")()
 
   "WavesSettings" should "resolve folders correctly" in {
-    val config = loadConfig(ConfigFactory.parseString(
-      s"""waves {
+    val config = loadConfig(ConfigFactory.parseString(s"""waves {
          |  directory = "/xxx"
          |  data-directory = "/xxx/data"
          |}""".stripMargin))

@@ -12,7 +12,7 @@ class ExternalNode(config: Config) extends Node(config) {
   override def apiKey = config.getString("api-key")
 
   override def networkAddress = {
-    val hostAndPort = "([^:]+)\\:([\\d+])+".r
+    val hostAndPort             = "([^:]+)\\:([\\d+])+".r
     val hostAndPort(host, port) = config.getString("network-address")
     new InetSocketAddress(host, port.toInt)
   }

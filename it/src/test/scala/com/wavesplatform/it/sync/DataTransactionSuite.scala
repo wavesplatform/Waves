@@ -10,7 +10,6 @@ import play.api.libs.json._
 import scorex.api.http.SignedDataRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.DataTransaction
-import scorex.transaction.TransactionParser.TransactionType
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Try}
@@ -50,13 +49,18 @@ class DataTransactionSuite extends BaseTransactionSuite {
     def data(entries: List[DataEntry[_]] = List(LongDataEntry("int", 177)),
              fee: Long = 100000,
              timestamp: Long = System.currentTimeMillis,
-             version: Byte = DataTransaction.Version): DataTransaction =
+             version: Byte = DataTransaction.supportedVersions.head): DataTransaction =
       DataTransaction.selfSigned(version, sender.privateKey, entries, fee, timestamp).right.get
 
     def request(tx: DataTransaction): SignedDataRequest =
-      SignedDataRequest(DataTransaction.Version, Base58.encode(tx.sender.publicKey), tx.data, tx.fee, tx.timestamp, tx.proofs.base58().toList)
+      SignedDataRequest(DataTransaction.supportedVersions.head,
+                        Base58.encode(tx.sender.publicKey),
+                        tx.data,
+                        tx.fee,
+                        tx.timestamp,
+                        tx.proofs.base58().toList)
 
-    implicit val w = Json.writes[SignedDataRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(TransactionType.DataTransaction.id)))
+    implicit val w = Json.writes[SignedDataRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(DataTransaction.typeId)))
 
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val invalidTxs = Seq(
@@ -151,7 +155,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(noDataTx)
     sender.getData(thirdAddress) shouldBe List.empty
 
-    val emptyKey = List(LongDataEntry("", 7))
+    val emptyKey   = List(LongDataEntry("", 7))
     val emptyKeyTx = sender.putData(thirdAddress, emptyKey, fee).id
     nodes.waitForHeightAriseAndTxPresent(emptyKeyTx)
     sender.getData(thirdAddress, "") shouldBe emptyKey.head
@@ -174,70 +178,46 @@ class DataTransactionSuite extends BaseTransactionSuite {
     def request(item: JsObject) = Json.obj("version" -> 1, "sender"   -> secondAddress, "fee" -> fee, "data" -> Seq(item))
     val validItem               = Json.obj("key"     -> "key", "type" -> "integer", "value"   -> 8)
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(validItem - "key")),
-      "key is missing")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "key")), "key is missing")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(validItem - "type")),
-      "type is missing")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "type")), "type is missing")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(validItem + ("type" -> JsString("falafel")))),
-      "unknown type falafel")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem + ("type" -> JsString("falafel")))), "unknown type falafel")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(validItem - "value")),
-      "value is missing")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "value")), "value is missing")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
-      "value is missing or not an integer")
-    
-    val notValidIntValue = Json.obj(
-      "key" -> "key",
-      "type" -> "integer",
-      "value" -> JsNull)
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
+                                "value is missing or not an integer")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(notValidIntValue)),
-      "value is missing or not an integer")
+    val notValidIntValue = Json.obj("key" -> "key", "type" -> "integer", "value" -> JsNull)
 
-    val notValidBoolValue = Json.obj(
-      "key" -> "bool",
-      "type" -> "boolean",
-      "value" -> JsNull)
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidIntValue)), "value is missing or not an integer")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(notValidBoolValue)),
-      "value is missing or not a boolean")
+    val notValidBoolValue = Json.obj("key" -> "bool", "type" -> "boolean", "value" -> JsNull)
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(notValidBoolValue + ("value" -> JsString("true")))),
-      "value is missing or not a boolean")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBoolValue)), "value is missing or not a boolean")
 
-    val notValidBlobValue = Json.obj(
-      "key" -> "blob",
-      "type" -> "binary",
-      "value" -> JsNull)
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBoolValue + ("value" -> JsString("true")))),
+                                "value is missing or not a boolean")
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(notValidBlobValue)),
-      "value is missing or not a string")
+    val notValidBlobValue = Json.obj("key" -> "blob", "type" -> "binary", "value" -> JsNull)
 
-    assertBadRequestAndResponse(
-      sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("NOTaBase58")))),
-      "Wrong char in Base58 string")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue)), "value is missing or not a string")
+
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("NOTaBase58")))),
+                                "Wrong char in Base58 string")
   }
 
   test("transaction requires a valid proof") {
-    val request: JsObject = {
-      val rs = sender.postJsonWithApiKey("/transactions/sign", Json.obj(
-        "version" -> 1,
-        "type" -> TransactionType.DataTransaction.id,
-        "sender" -> firstAddress,
-        "data" -> List(LongDataEntry("int", 333)),
-        "fee" -> 100000))
+    def request: JsObject = {
+      val rs = sender.postJsonWithApiKey(
+        "/transactions/sign",
+        Json.obj("version" -> 1,
+                 "type"    -> DataTransaction.typeId,
+                 "sender"  -> firstAddress,
+                 "data"    -> List(LongDataEntry("int", 333)),
+                 "fee"     -> 100000)
+      )
       Json.parse(rs.getResponseBody).as[JsObject]
     }
     def id(obj: JsObject) = obj.value("id").as[String]
@@ -274,11 +254,10 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val extraSizedData = List.tabulate(MaxEntryCount + 1)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
     assertBadRequestAndResponse(sender.putData(firstAddress, extraSizedData, calcDataFee(extraSizedData)), message)
     nodes.waitForHeightAraise()
-
   }
 
   private def calcDataFee(data: List[DataEntry[_]]): Long = {
-    val dataSize = data.map(_.toBytes.size).sum + 128
+    val dataSize = data.map(_.toBytes.length).sum + 128
     if (dataSize > 1024) {
       fee * (dataSize / 1024 + 1)
     } else fee

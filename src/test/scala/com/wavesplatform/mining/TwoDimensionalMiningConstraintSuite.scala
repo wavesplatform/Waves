@@ -12,10 +12,10 @@ class TwoDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
   "TwoDimensionalMiningConstraint" - {
     "isEmpty" - {
       val emptyConstraintGen: Gen[TwoDimensionalMiningConstraint] = for {
-        isLeft <- Arbitrary.arbBool.arbitrary
+        isLeft  <- Arbitrary.arbBool.arbitrary
         isRight <- Arbitrary.arbBool.arbitrary
         if isLeft || isRight
-        leftMaxSize <- if (isLeft) Gen.const(0) else Gen.chooseNum(1, Int.MaxValue)
+        leftMaxSize  <- if (isLeft) Gen.const(0) else Gen.chooseNum(1, Int.MaxValue)
         rightMaxSize <- if (isRight) Gen.const(0) else Gen.chooseNum(1, Int.MaxValue)
       } yield TwoDimensionalMiningConstraint.full(createConstConstraint(leftMaxSize), createConstConstraint(rightMaxSize))
 
@@ -25,7 +25,7 @@ class TwoDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
       }
 
       val nonEmptyConstraintGen: Gen[TwoDimensionalMiningConstraint] = for {
-        leftMaxSize <- Gen.chooseNum(1, Int.MaxValue)
+        leftMaxSize  <- Gen.chooseNum(1, Int.MaxValue)
         rightMaxSize <- Gen.chooseNum(1, Int.MaxValue)
       } yield TwoDimensionalMiningConstraint.full(createConstConstraint(leftMaxSize), createConstConstraint(rightMaxSize))
 
@@ -46,8 +46,8 @@ class TwoDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
   }
 
   private def createConstConstraint(maxSize: Long, blockSize: => Long = ???, transactionSize: => Long = ???) = new Estimator {
-    override def max: Long = maxSize
-    override implicit def estimate(x: Block): Long = blockSize
+    override def max: Long                               = maxSize
+    override implicit def estimate(x: Block): Long       = blockSize
     override implicit def estimate(x: Transaction): Long = transactionSize
   }
 
@@ -55,7 +55,7 @@ class TwoDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
     "should return None if the operation is unsuccessful for one of dimensions" - {
       val noOverfillGen: Gen[TwoDimensionalMiningConstraint] = for {
         commonLimit <- Gen.chooseNum(1, 5)
-        txs <- Gen.listOfN(commonLimit - 1, randomTransactionGen)
+        txs         <- Gen.listOfN(commonLimit - 1, randomTransactionGen)
       } yield {
         val constraint = TwoDimensionalMiningConstraint.full(estimator(commonLimit), estimator(commonLimit))
         fold(constraint, txs)
@@ -73,9 +73,9 @@ class TwoDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
       }
 
       val firstOverfillsGen: Gen[TwoDimensionalMiningConstraint] = for {
-        firstLimit <- Gen.chooseNum(1, 5)
+        firstLimit  <- Gen.chooseNum(1, 5)
         secondLimit <- Gen.chooseNum(firstLimit + 2, firstLimit + 5)
-        txs <- Gen.listOfN(firstLimit + 1, randomTransactionGen)
+        txs         <- Gen.listOfN(firstLimit + 1, randomTransactionGen)
       } yield {
         val constraint = TwoDimensionalMiningConstraint.full(estimator(firstLimit), estimator(secondLimit))
         fold(constraint, txs)
@@ -93,9 +93,9 @@ class TwoDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
       }
 
       val secondOverfillsGen: Gen[TwoDimensionalMiningConstraint] = for {
-        firstLimit <- Gen.chooseNum(3, 9)
+        firstLimit  <- Gen.chooseNum(3, 9)
         secondLimit <- Gen.chooseNum(1, firstLimit - 2)
-        txs <- Gen.listOfN(firstLimit - 1, randomTransactionGen)
+        txs         <- Gen.listOfN(firstLimit - 1, randomTransactionGen)
       } yield {
         val constraint = TwoDimensionalMiningConstraint.full(estimator(firstLimit), estimator(secondLimit))
         fold(constraint, txs)
@@ -114,7 +114,7 @@ class TwoDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
 
       val bothOverfillGen: Gen[TwoDimensionalMiningConstraint] = for {
         commonLimit <- Gen.chooseNum(1, 5)
-        txs <- Gen.listOfN(commonLimit + 1, randomTransactionGen)
+        txs         <- Gen.listOfN(commonLimit + 1, randomTransactionGen)
       } yield {
         val constraint = TwoDimensionalMiningConstraint.full(estimator(commonLimit), estimator(commonLimit))
         fold(constraint, txs)

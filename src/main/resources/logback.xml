@@ -43,6 +43,8 @@
     <logger name="sun.rmi" level="INFO"/>
     <logger name="javax.management" level="INFO"/>
 
+    <logger name="org.aspectj" level="INFO"/>
+
     <root level="TRACE">
         <appender-ref ref="STDOUT"/>
         <appender-ref ref="FILE"/>

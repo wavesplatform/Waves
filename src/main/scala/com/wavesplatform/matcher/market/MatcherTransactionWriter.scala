@@ -11,12 +11,11 @@ import org.iq80.leveldb.DB
 import play.api.libs.json.JsArray
 import scorex.transaction.assets.exchange.ExchangeTransaction
 
-class MatcherTransactionWriter(db: DB, val settings: MatcherSettings)
-  extends SubStorage(db, "matcher") with Actor {
+class MatcherTransactionWriter(db: DB, val settings: MatcherSettings) extends SubStorage(db, "matcher") with Actor {
 
   import MatcherTransactionWriter._
 
-  private val TransactionsPrefix = "transactions".getBytes(Charset)
+  private val TransactionsPrefix  = "transactions".getBytes(Charset)
   private val OrdersToTxIdsPrefix = "ord-to-tx-ids".getBytes(Charset)
 
   override def preStart(): Unit = {
@@ -32,7 +31,9 @@ class MatcherTransactionWriter(db: DB, val settings: MatcherSettings)
 
   def fetchTransactionsByOrder(orderId: String): Unit = {
     val txs = get(makeKey(OrdersToTxIdsPrefix, orderId))
-      .map(OrderToTxIdsCodec.decode).map(_.explicitGet().value).getOrElse(Set())
+      .map(OrderToTxIdsCodec.decode)
+      .map(_.explicitGet().value)
+      .getOrElse(Set())
       .flatMap(id => get(makeKey(TransactionsPrefix, id)))
       .flatMap(b => ExchangeTransaction.parseBytes(b).toOption)
 
@@ -66,7 +67,7 @@ object MatcherTransactionWriter {
   case class GetTransactionsByOrder(orderId: String)
 
   case class GetTransactionsResponse(txs: Seq[ExchangeTransaction]) extends MatcherResponse {
-    val json = JsArray(txs.map(_.json()))
+    val json                      = JsArray(txs.map(_.json()))
     val code: StatusCodes.Success = StatusCodes.OK
   }
 

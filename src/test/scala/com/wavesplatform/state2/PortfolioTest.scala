@@ -44,8 +44,8 @@ class PortfolioTest extends FunSuite with Matchers {
 
   test("prevents overflow of assets") {
     val assetId = ByteStr(Array.empty)
-    val arg1 = Portfolio(0L, LeaseBalance.empty, Map(assetId -> (Long.MaxValue - 1L)))
-    val arg2 = Portfolio(0L, LeaseBalance.empty, Map(assetId -> (Long.MaxValue - 2L)))
+    val arg1    = Portfolio(0L, LeaseBalance.empty, Map(assetId -> (Long.MaxValue - 1L)))
+    val arg2    = Portfolio(0L, LeaseBalance.empty, Map(assetId -> (Long.MaxValue - 2L)))
     Monoid.combine(arg1, arg2).assets(assetId) shouldBe Long.MinValue
   }
 }

@@ -30,18 +30,22 @@ class UtxPoolImpl(time: Time,
                   history: History,
                   feeCalculator: FeeCalculator,
                   fs: FunctionalitySettings,
-                  utxSettings: UtxSettings) extends ScorexLogging with Instrumented with AutoCloseable with UtxPool {
+                  utxSettings: UtxSettings)
+    extends ScorexLogging
+    with Instrumented
+    with AutoCloseable
+    with UtxPool {
   outer =>
 
   import com.wavesplatform.utx.UtxPoolImpl._
 
   private implicit val scheduler = Scheduler.singleThread("utx-pool-cleanup")
 
-  private val transactions = new ConcurrentHashMap[ByteStr, Transaction]()
+  private val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private val pessimisticPortfolios = new PessimisticPortfolios
 
   private val removeInvalid = Task {
-    val state = stateReader
+    val state                = stateReader
     val transactionsToRemove = transactions.values.asScala.filter(t => state.containsTransaction(t.id()))
     removeAll(transactionsToRemove)
   }.delayExecution(utxSettings.cleanupInterval)
@@ -53,16 +57,14 @@ class UtxPoolImpl(time: Time,
     scheduler.shutdown()
   }
 
-  private val utxPoolSizeStats = Kamon.metrics.minMaxCounter("utx-pool-size", 500.millis)
+  private val utxPoolSizeStats    = Kamon.metrics.minMaxCounter("utx-pool-size", 500.millis)
   private val processingTimeStats = Kamon.metrics.histogram("utx-transaction-processing-time", KamonTime.Milliseconds)
-  private val putRequestStats = Kamon.metrics.counter("utx-pool-put-if-new")
+  private val putRequestStats     = Kamon.metrics.counter("utx-pool-put-if-new")
 
   private def removeExpired(currentTs: Long): Unit = {
     def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > utxSettings.maxTransactionAge
 
-    transactions
-      .values
-      .asScala
+    transactions.values.asScala
       .filter(isExpired)
       .foreach { tx =>
         transactions.remove(tx.id())
@@ -79,15 +81,15 @@ class UtxPoolImpl(time: Time,
     } else {
       val sender: Option[String] = tx match {
         case x: Authorized => Some(x.sender.address)
-        case _ => None
+        case _             => None
       }
 
       sender match {
         case Some(addr) if utxSettings.blacklistSenderAddresses.contains(addr) =>
           val recipients = tx match {
-            case tt: TransferTransaction => Seq(tt.recipient)
+            case tt: TransferTransaction      => Seq(tt.recipient)
             case mtt: MassTransferTransaction => mtt.transfers.map(_.address)
-            case _ => Seq()
+            case _                            => Seq()
           }
           val allowed =
             recipients.nonEmpty &&
@@ -121,13 +123,12 @@ class UtxPoolImpl(time: Time,
   override def packUnconfirmed(rest: TwoDimensionalMiningConstraint, sortInBlock: Boolean): (Seq[Transaction], TwoDimensionalMiningConstraint) = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
-    val s = stateReader
+    val s      = stateReader
     val differ = TransactionDiffer(fs, history.lastBlockTimestamp, currentTs, s.height) _
-    val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = transactions
-      .values.asScala.toSeq
+    val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = transactions.values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
-        case (curr@(_, _, _, _, skip), _) if skip => curr
+        case (curr @ (_, _, _, _, skip), _) if skip => curr
         case ((invalid, valid, diff, currRest, _), tx) =>
           differ(composite(s, diff), history, tx) match {
             case Right(newDiff) =>
@@ -155,18 +156,20 @@ class UtxPoolImpl(time: Time,
 
   private def putIfNew(s: SnapshotStateReader, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
     putRequestStats.increment()
-    measureSuccessful(processingTimeStats, {
-      for {
-        _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
-        _ <- checkNotBlacklisted(tx)
-        _ <- feeCalculator.enoughFee(tx)
-        diff <- TransactionDiffer(fs, history.lastBlockTimestamp, time.correctedTime(), history.height)(s, history, tx)
-      } yield {
-        utxPoolSizeStats.increment()
-        pessimisticPortfolios.add(tx.id(), diff)
-        (Option(transactions.put(tx.id(), tx)).isEmpty, diff)
+    measureSuccessful(
+      processingTimeStats, {
+        for {
+          _    <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+          _    <- checkNotBlacklisted(tx)
+          _    <- feeCalculator.enoughFee(tx)
+          diff <- TransactionDiffer(fs, history.lastBlockTimestamp, time.correctedTime(), history.height)(s, history, tx)
+        } yield {
+          utxPoolSizeStats.increment()
+          pessimisticPortfolios.add(tx.id(), diff)
+          (Option(transactions.put(tx.id(), tx)).isEmpty, diff)
+        }
       }
-    })
+    )
   }
 
 }
@@ -176,7 +179,7 @@ object UtxPoolImpl {
   private class PessimisticPortfolios {
     private type Portfolios = Map[Address, Portfolio]
     private val transactionPortfolios = new ConcurrentHashMap[ByteStr, Portfolios]()
-    private val transactions = new ConcurrentHashMap[Address, Set[ByteStr]]()
+    private val transactions          = new ConcurrentHashMap[Address, Set[ByteStr]]()
 
     def add(txId: ByteStr, txDiff: Diff): Unit = {
       val nonEmptyPessimisticPortfolios = txDiff.portfolios
@@ -188,7 +191,7 @@ object UtxPoolImpl {
         }
 
       if (nonEmptyPessimisticPortfolios.nonEmpty &&
-        Option(transactionPortfolios.put(txId, nonEmptyPessimisticPortfolios)).isEmpty) {
+          Option(transactionPortfolios.put(txId, nonEmptyPessimisticPortfolios)).isEmpty) {
         nonEmptyPessimisticPortfolios.keys.foreach { address =>
           transactions.put(address, transactions.getOrDefault(address, Set.empty) + txId)
         }

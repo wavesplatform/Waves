@@ -37,14 +37,17 @@ class OrderBookActor(assetPair: AssetPair,
                      val settings: MatcherSettings,
                      val history: History,
                      val functionalitySettings: FunctionalitySettings)
-  extends PersistentActor with Stash with ScorexLogging with ExchangeTransactionCreator {
+    extends PersistentActor
+    with Stash
+    with ScorexLogging
+    with ExchangeTransactionCreator {
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
   private val snapshotCancellable = context.system.scheduler.schedule(settings.snapshotsInterval, settings.snapshotsInterval, self, SaveSnapshot)
-  private val cleanupCancellable = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
-  private var orderBook = OrderBook.empty
-  private var apiSender = Option.empty[ActorRef]
-  private var cancellable = Option.empty[Cancellable]
+  private val cleanupCancellable  = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
+  private var orderBook           = OrderBook.empty
+  private var apiSender           = Option.empty[ActorRef]
+  private var cancellable         = Option.empty[Cancellable]
 
   private lazy val alreadyCanceledOrders = CacheBuilder
     .newBuilder()
@@ -56,7 +59,7 @@ class OrderBookActor(assetPair: AssetPair,
     .maximumSize(AlreadyCanceledCacheSize)
     .build[String, java.lang.Boolean]()
 
-  val okCancel: java.lang.Boolean = Boolean.box(true)
+  val okCancel: java.lang.Boolean     = Boolean.box(true)
   val failedCancel: java.lang.Boolean = Boolean.box(false)
 
   private def fullCommands: Receive = readOnlyCommands orElse snapshotsCommands orElse executeCommands
@@ -82,7 +85,9 @@ class OrderBookActor(assetPair: AssetPair,
     case SaveSnapshotFailure(metadata, reason) =>
       log.error(s"Failed to save snapshot: $metadata, $reason.")
     case DeleteOrderBookRequest(pair) =>
-      orderBook.asks.values.++(orderBook.bids.values).flatten
+      orderBook.asks.values
+        .++(orderBook.bids.values)
+        .flatten
         .foreach(x => context.system.eventStream.publish(Events.OrderCanceled(x)))
       deleteMessages(lastSequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
@@ -152,10 +157,15 @@ class OrderBookActor(assetPair: AssetPair,
   }
 
   private def onOrderCleanup(orderBook: OrderBook, ts: Long): Unit = {
-    orderBook.asks.values.++(orderBook.bids.values).flatten.filterNot(x => {
-      val validation = x.order.isValid(ts)
-      validation
-    }).map(_.order.idStr()).foreach(x => handleValidateCancelResult(Right(x)))
+    orderBook.asks.values
+      .++(orderBook.bids.values)
+      .flatten
+      .filterNot(x => {
+        val validation = x.order.isValid(ts)
+        validation
+      })
+      .map(_.order.idStr())
+      .foreach(x => handleValidateCancelResult(Right(x)))
   }
 
   private def handleValidateCancelResult(res: Either[GenericError, String]): Unit = {
@@ -185,8 +195,7 @@ class OrderBookActor(assetPair: AssetPair,
 
     if (pair == assetPair) {
       val d = Math.min(depth.getOrElse(MaxDepth), MaxDepth)
-      sender() ! GetOrderBookResponse(pair, orderBook.bids.take(d).map(aggregateLevel).toSeq,
-        orderBook.asks.take(d).map(aggregateLevel).toSeq)
+      sender() ! GetOrderBookResponse(pair, orderBook.bids.take(d).map(aggregateLevel).toSeq, orderBook.asks.take(d).map(aggregateLevel).toSeq)
     } else sender() ! GetOrderBookResponse(pair, Seq(), Seq())
   }
 
@@ -248,7 +257,7 @@ class OrderBookActor(assetPair: AssetPair,
     log.debug(s"Failed to execute order: $err")
     err match {
       case OrderValidationError(order, _) if order == event.submitted.order => None
-      case OrderValidationError(order, _) if order == event.counter.order => cancelCounterOrder()
+      case OrderValidationError(order, _) if order == event.counter.order   => cancelCounterOrder()
       case AccountBalanceError(errs) =>
         errs.foreach(e => log.error(s"Balance error: ${e._2}"))
         if (errs.contains(event.counter.order.senderPublicKey.toAddress)) {
@@ -269,10 +278,10 @@ class OrderBookActor(assetPair: AssetPair,
         processEvent(e)
         None
 
-      case event@OrderExecuted(o, c) =>
+      case event @ OrderExecuted(o, c) =>
         (for {
           tx <- createTransaction(o, c)
-          _ <- utx.putIfNew(tx)
+          _  <- utx.putIfNew(tx)
         } yield tx) match {
           case Right(tx) if tx.isInstanceOf[ExchangeTransaction] =>
             allChannels.broadcastTx(tx)
@@ -323,16 +332,22 @@ class OrderBookActor(assetPair: AssetPair,
 }
 
 object OrderBookActor {
-  def props(assetPair: AssetPair, orderHistory: ActorRef, storedState: SnapshotStateReader, settings: MatcherSettings,
-            wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, history: History,
+  def props(assetPair: AssetPair,
+            orderHistory: ActorRef,
+            storedState: SnapshotStateReader,
+            settings: MatcherSettings,
+            wallet: Wallet,
+            utx: UtxPool,
+            allChannels: ChannelGroup,
+            history: History,
             functionalitySettings: FunctionalitySettings): Props =
     Props(new OrderBookActor(assetPair, orderHistory, storedState, wallet, utx, allChannels, settings, history, functionalitySettings))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
-  val MaxDepth = 50
+  val MaxDepth                          = 50
   val ValidationTimeout: FiniteDuration = 5.seconds
-  val AlreadyCanceledCacheSize = 10000L
+  val AlreadyCanceledCacheSize          = 10000L
 
   //protocol
   sealed trait OrderBookRequest {
@@ -344,7 +359,7 @@ object OrderBookActor {
   case class DeleteOrderBookRequest(assetPair: AssetPair) extends OrderBookRequest
 
   case class CancelOrder(assetPair: AssetPair, req: CancelOrderRequest) extends OrderBookRequest {
-    lazy val orderId: String = Base58.encode(req.orderId)
+    lazy val orderId: String           = Base58.encode(req.orderId)
     override lazy val toString: String = s"CancelOrder($assetPair, ${req.senderPublicKey}, $orderId)"
   }
 
@@ -379,7 +394,7 @@ object OrderBookActor {
 
   case class GetOrderBookResponse(pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends MatcherResponse {
     val json: JsValue = Json.toJson(OrderBookResult(NTP.correctedTime(), pair, bids, asks))
-    val code = StatusCodes.OK
+    val code          = StatusCodes.OK
   }
 
   object GetOrderBookResponse {
@@ -402,4 +417,3 @@ object OrderBookActor {
   case object ValidationTimeoutExceeded
 
 }
-

@@ -1,6 +1,5 @@
 package com.wavesplatform.matcher.util
 
-
 import com.google.common.cache.{CacheBuilder, Cache => GuavaCache}
 import scala.concurrent.duration._
 

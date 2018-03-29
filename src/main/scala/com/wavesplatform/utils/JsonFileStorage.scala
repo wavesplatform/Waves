@@ -10,29 +10,30 @@ import scorex.crypto.encode.Base64
 import scala.io.{BufferedSource, Source}
 
 object JsonFileStorage {
-  private val encoding = "UTF-8"
-  private val keySalt = "0495c728-1614-41f6-8ac3-966c22b4a62d"
-  private val aes = "AES"
-  private val algorithm = aes + "/ECB/PKCS5Padding"
-  private val hashing = "PBKDF2WithHmacSHA512"
+  private val encoding          = "UTF-8"
+  private val keySalt           = "0495c728-1614-41f6-8ac3-966c22b4a62d"
+  private val aes               = "AES"
+  private val algorithm         = aes + "/ECB/PKCS5Padding"
+  private val hashing           = "PBKDF2WithHmacSHA512"
   private val hashingIterations = 999999
-  private val keyLength = 128
+  private val keyLength         = 128
 
   import java.security.NoSuchAlgorithmException
   import java.security.spec.InvalidKeySpecException
   import javax.crypto.SecretKeyFactory
   import javax.crypto.spec.PBEKeySpec
 
-  private def hashPassword(password: Array[Char], salt: Array[Byte], iterations: Int, keyLength: Int): Array[Byte] = try {
-    val skf = SecretKeyFactory.getInstance(hashing)
-    val spec = new PBEKeySpec(password, salt, iterations, keyLength)
-    val key = skf.generateSecret(spec)
-    val res = key.getEncoded
-    res
-  } catch {
-    case e@(_: NoSuchAlgorithmException | _: InvalidKeySpecException) =>
-      throw new RuntimeException(e)
-  }
+  private def hashPassword(password: Array[Char], salt: Array[Byte], iterations: Int, keyLength: Int): Array[Byte] =
+    try {
+      val skf  = SecretKeyFactory.getInstance(hashing)
+      val spec = new PBEKeySpec(password, salt, iterations, keyLength)
+      val key  = skf.generateSecret(spec)
+      val res  = key.getEncoded
+      res
+    } catch {
+      case e @ (_: NoSuchAlgorithmException | _: InvalidKeySpecException) =>
+        throw new RuntimeException(e)
+    }
 
   def prepareKey(key: String): SecretKeySpec =
     new SecretKeySpec(hashPassword(key.toCharArray, keySalt.getBytes(encoding), hashingIterations, keyLength), aes)
@@ -61,8 +62,7 @@ object JsonFileStorage {
         val data = key.fold(json)(k => encrypt(k, json))
         _.write(data)
       }
-    }
-    finally {
+    } finally {
       file.foreach(_.close())
     }
   }
@@ -76,8 +76,7 @@ object JsonFileStorage {
       file = Option(Source.fromFile(path))
       val data = file.get.mkString
       Json.parse(key.fold(data)(k => decrypt(k, data))).as[T]
-    }
-    finally {
+    } finally {
       file.foreach(_.close())
     }
   }

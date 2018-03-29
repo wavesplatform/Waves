@@ -5,12 +5,11 @@ import java.net.{InetAddress, InetSocketAddress}
 import com.google.common.base.Charsets
 import io.netty.buffer.ByteBuf
 
-case class Handshake(
-    applicationName: String,
-    applicationVersion: (Int, Int, Int),
-    nodeName: String,
-    nodeNonce: Long,
-    declaredAddress: Option[InetSocketAddress]) {
+case class Handshake(applicationName: String,
+                     applicationVersion: (Int, Int, Int),
+                     nodeName: String,
+                     nodeNonce: Long,
+                     declaredAddress: Option[InetSocketAddress]) {
   def encode(out: ByteBuf): out.type = {
     val applicationNameBytes = applicationName.getBytes(Charsets.UTF_8)
     require(applicationNameBytes.length <= Byte.MaxValue, "The application name is too long!")
@@ -30,7 +29,7 @@ case class Handshake(
 
     val peer = for {
       inetAddress <- declaredAddress
-      address <- Option(inetAddress.getAddress)
+      address     <- Option(inetAddress.getAddress)
     } yield (address.getAddress, inetAddress.getPort)
 
     peer match {
@@ -55,11 +54,11 @@ object Handshake {
     if (appNameSize < 0 || appNameSize > Byte.MaxValue) {
       throw new InvalidHandshakeException(s"An invalid application name's size: $appNameSize")
     }
-    val appName = in.readSlice(appNameSize).toString(Charsets.UTF_8)
+    val appName    = in.readSlice(appNameSize).toString(Charsets.UTF_8)
     val appVersion = (in.readInt(), in.readInt(), in.readInt())
 
     val nodeNameSize = in.readByte()
-    if(nodeNameSize < 0 || nodeNameSize > Byte.MaxValue) {
+    if (nodeNameSize < 0 || nodeNameSize > Byte.MaxValue) {
       throw new InvalidHandshakeException(s"An invalid node name's size: $nodeNameSize")
     }
     val nodeName = in.readSlice(nodeNameSize).toString(Charsets.UTF_8)
@@ -71,13 +70,15 @@ object Handshake {
     if (declaredAddressLength != 0 && declaredAddressLength != 8 && declaredAddressLength != 20) {
       throw new InvalidHandshakeException(s"An invalid declared address length: $declaredAddressLength")
     }
-    val isa = if (declaredAddressLength == 0) None else {
-      val addressBytes = new Array[Byte](declaredAddressLength - Integer.BYTES)
-      in.readBytes(addressBytes)
-      val address = InetAddress.getByAddress(addressBytes)
-      val port = in.readInt()
-      Some(new InetSocketAddress(address, port))
-    }
+    val isa =
+      if (declaredAddressLength == 0) None
+      else {
+        val addressBytes = new Array[Byte](declaredAddressLength - Integer.BYTES)
+        in.readBytes(addressBytes)
+        val address = InetAddress.getByAddress(addressBytes)
+        val port    = in.readInt()
+        Some(new InetSocketAddress(address, port))
+      }
     in.readLong() // time is ignored
 
     Handshake(appName, appVersion, nodeName, nonce, isa)

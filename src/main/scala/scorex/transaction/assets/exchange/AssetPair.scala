@@ -28,7 +28,7 @@ case class AssetPair(@ApiModelProperty(dataType = "java.lang.String") amountAsse
 
   def json: JsObject = Json.obj(
     "amountAsset" -> amountAsset.map(_.base58),
-    "priceAsset" -> priceAsset.map(_.base58)
+    "priceAsset"  -> priceAsset.map(_.base58)
   )
 }
 
@@ -37,7 +37,7 @@ object AssetPair {
 
   private def extractAssetId(a: String): Try[Option[AssetId]] = a match {
     case `WavesName` => Success(None)
-    case other => ByteStr.decodeBase58(other).map(Option(_))
+    case other       => ByteStr.decodeBase58(other).map(Option(_))
   }
 
   def createAssetPair(amountAsset: String, priceAsset: String): Try[AssetPair] =

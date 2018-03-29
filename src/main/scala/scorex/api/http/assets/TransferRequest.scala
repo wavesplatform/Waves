@@ -12,5 +12,5 @@ case class TransferRequest(assetId: Option[String],
                            timestamp: Option[Long] = None)
 
 object TransferRequest {
-  implicit val transferFormat: Format[TransferRequest] = Json.format
+  implicit val format: Format[TransferRequest] = Json.format
 }

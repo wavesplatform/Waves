@@ -21,6 +21,7 @@ import scorex.transaction.{AssetIdStringLength, TransactionFactory}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 @Path("/assets")
@@ -62,6 +63,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         }
       }
     }
+
   @Path("/balance/{address}")
   @ApiOperation(value = "Account's balance", notes = "Account's balances for all assets", httpMethod = "GET")
   @ApiImplicitParams(
@@ -103,7 +105,17 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       )
     ))
   def transfer: Route =
-    processRequest("transfer", (t: TransferRequest) => doBroadcast(TransactionFactory.transferAsset(t, wallet, time)))
+    processRequest[TransferRequests](
+      "transfer", { req =>
+        req.eliminate(
+          x => doBroadcast(TransactionFactory.transferAsset(x, wallet, time)),
+          _.eliminate(
+            x => doBroadcast(TransactionFactory.versionedTransfer(x, wallet, time)),
+            _ => Future.successful(WrongJson(Some(new IllegalArgumentException("Doesn't know how to process request"))))
+          )
+        )
+      }
+    )
 
   @Path("/masstransfer")
   @ApiOperation(value = "Mass Transfer",
@@ -120,7 +132,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         paramType = "body",
         dataType = "scorex.api.http.assets.MassTransferRequest",
         defaultValue =
-          "{\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"transfers\":(\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",100000000),\"fee\":100000,\"timestamp\":1517315595291}"
+          "{\"version\": 1, \"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"transfers\":(\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",100000000),\"fee\":100000,\"timestamp\":1517315595291}"
       )
     ))
   def massTransfer: Route =

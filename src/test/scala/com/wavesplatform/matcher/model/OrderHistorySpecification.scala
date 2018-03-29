@@ -12,16 +12,17 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 
 import scala.collection.mutable
 
-class OrderHistorySpecification extends PropSpec
-  with WithDB
-  with PropertyChecks
-  with Matchers
-  with MatcherTestData
-  with BeforeAndAfterAll
-  with BeforeAndAfterEach {
+class OrderHistorySpecification
+    extends PropSpec
+    with WithDB
+    with PropertyChecks
+    with Matchers
+    with MatcherTestData
+    with BeforeAndAfterAll
+    with BeforeAndAfterEach {
 
   val pair = AssetPair(Some(ByteStr("WCT".getBytes)), Some(ByteStr("BTC".getBytes)))
-  var oh = OrderHistoryImpl(db, matcherSettings)
+  var oh   = OrderHistoryImpl(db, matcherSettings)
 
   override def beforeEach(): Unit = {
     super.beforeEach()
@@ -84,7 +85,7 @@ class OrderHistorySpecification extends PropSpec
   }
 
   property("New buy and sell WAVES order added") {
-    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pk   = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
     val ord1 = buy(pair, 0.0008, 100000000, Some(pk))
     val ord2 = sell(pair, 0.0009, 210000000, Some(pk))
@@ -188,7 +189,7 @@ class OrderHistorySpecification extends PropSpec
   }
 
   property("Partially with own order") {
-    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pk   = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
     val ord1 = buy(pair, 0.0008, 100000000, Some(pk), Some(300000L))
     val ord2 = sell(pair, 0.00079, 210000000, Some(pk), Some(300000L))
@@ -257,7 +258,7 @@ class OrderHistorySpecification extends PropSpec
   }
 
   property("Delete order") {
-    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pk   = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
     val ord1 = buy(pair, 0.0008, 210000000, Some(pk), Some(300000L))
     val ord2 = sell(pair, 0.00079, 100000000, Some(pk), Some(300000L))
@@ -282,7 +283,7 @@ class OrderHistorySpecification extends PropSpec
   }
 
   property("Sorting by status then timestamp") {
-    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pk   = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
     val ord1 = buy(pair, 0.0008, 110000000, Some(pk), Some(300000L), Some(1L)) // Filled
     val ord2 = buy(pair, 0.0006, 120000000, Some(pk), Some(300000L), Some(2L)) // Accepted
@@ -306,8 +307,8 @@ class OrderHistorySpecification extends PropSpec
   }
 
   property("History with more than max limit") {
-    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
-    val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
+    val pk     = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pair   = AssetPair(None, Some(ByteStr("BTC".getBytes)))
     val orders = mutable.Buffer.empty[Order]
     (0 until matcherSettings.maxOrdersPerRequest).foreach { i =>
       val o = buy(pair, 0.0008 + 0.00001 * i, 100000000, Some(pk), Some(300000L), Some(100L + i))
@@ -322,8 +323,8 @@ class OrderHistorySpecification extends PropSpec
   }
 
   property("History with more than max limit and canceled order") {
-    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
-    val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
+    val pk     = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pair   = AssetPair(None, Some(ByteStr("BTC".getBytes)))
     val orders = mutable.Buffer.empty[Order]
     (0 until matcherSettings.maxOrdersPerRequest + 1).foreach { i =>
       val o = buy(pair, 0.0008 + 0.00001 * i, 100000000, Some(pk), Some(300000L), Some(100L + i))
@@ -336,24 +337,23 @@ class OrderHistorySpecification extends PropSpec
   }
 
   property("Open Portfolio for two assets") {
-    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
-    val ass1 = ByteStr("ASS1".getBytes)
-    val ass2 = ByteStr("ASS2".getBytes)
-    val pair1 = AssetPair(Some(ass1), None)
-    val pair2 = AssetPair(Some(ass2), None)
+    val pk         = PrivateKeyAccount("private".getBytes("utf-8"))
+    val ass1       = ByteStr("ASS1".getBytes)
+    val ass2       = ByteStr("ASS2".getBytes)
+    val pair1      = AssetPair(Some(ass1), None)
+    val pair2      = AssetPair(Some(ass2), None)
     val matcherFee = 300000L
-    val ord1 = sell(pair1, 0.0008, 10000, Some(pk), Some(matcherFee))
-    val ord2 = sell(pair2, 0.0009, 10001, Some(pk), Some(matcherFee))
+    val ord1       = sell(pair1, 0.0008, 10000, Some(pk), Some(matcherFee))
+    val ord2       = sell(pair2, 0.0009, 10001, Some(pk), Some(matcherFee))
 
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     oh.orderAccepted(OrderAdded(LimitOrder(ord2)))
 
     oh.openPortfolio(pk.address) shouldBe
-      OpenPortfolio(Map("WAVES" -> (2*matcherFee - LimitOrder(ord1).getReceiveAmount - LimitOrder(ord2).getReceiveAmount),
-        ass1.base58 -> ord1.amount, ass2.base58 -> ord2.amount))
+      OpenPortfolio(
+        Map("WAVES"     -> (2 * matcherFee - LimitOrder(ord1).getReceiveAmount - LimitOrder(ord2).getReceiveAmount),
+            ass1.base58 -> ord1.amount,
+            ass2.base58 -> ord2.amount))
   }
 
 }
-
-
-

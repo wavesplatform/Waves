@@ -4,8 +4,8 @@ import com.wavesplatform.database.LevelDBWriter.Key
 import org.iq80.leveldb.{DB, ReadOptions}
 
 class RW(db: DB) extends AutoCloseable {
-  private val batch = db.createWriteBatch()
-  private val snapshot = db.getSnapshot
+  private val batch       = db.createWriteBatch()
+  private val snapshot    = db.getSnapshot
   private val readOptions = new ReadOptions().snapshot(snapshot)
 
   def get[V](key: Key[V]): V = key.parse(db.get(key.keyBytes, readOptions))
@@ -17,8 +17,7 @@ class RW(db: DB) extends AutoCloseable {
   def delete[V](key: Key[V]): Unit = batch.delete(key.keyBytes)
 
   override def close(): Unit = {
-    try { db.write(batch) }
-    finally {
+    try { db.write(batch) } finally {
       batch.close()
       snapshot.close()
     }

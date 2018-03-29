@@ -7,7 +7,7 @@ import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, MicroBlock}
-import scorex.transaction.{History, Signed}
+import scorex.transaction.{History, Signed, Transaction}
 
 sealed trait Message
 
@@ -29,6 +29,10 @@ case class LocalScoreChanged(newLocalScore: History.BlockchainScore) extends Mes
 
 case class RawBytes(code: Byte, data: Array[Byte]) extends Message
 
+object RawBytes {
+  def from(tx: Transaction): RawBytes = RawBytes(TransactionSpec.messageCode, tx.bytes())
+}
+
 case class BlockForged(block: Block) extends Message
 
 case class MicroBlockRequest(totalBlockSig: ByteStr) extends Message
@@ -36,8 +40,8 @@ case class MicroBlockRequest(totalBlockSig: ByteStr) extends Message
 case class MicroBlockResponse(microblock: MicroBlock) extends Message
 
 case class MicroBlockInv(sender: PublicKeyAccount, totalBlockSig: ByteStr, prevBlockSig: ByteStr, signature: ByteStr) extends Message with Signed {
-  override protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce(
-    crypto.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr, sender.publicKey))
+  override protected val signatureValid: Coeval[Boolean] =
+    Coeval.evalOnce(crypto.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr, sender.publicKey))
 
   override def toString: String = s"MicroBlockInv(${totalBlockSig.trim} ~> ${prevBlockSig.trim})"
 }

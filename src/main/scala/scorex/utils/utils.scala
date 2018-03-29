@@ -10,9 +10,7 @@ import scala.util._
 package object utils {
 
   @tailrec
-  final def untilTimeout[T](timeout: FiniteDuration,
-                            delay: FiniteDuration = 100.milliseconds,
-                            onFailure: => Unit = {})(fn: => T): T = {
+  final def untilTimeout[T](timeout: FiniteDuration, delay: FiniteDuration = 100.milliseconds, onFailure: => Unit = {})(fn: => T): T = {
     Try {
       fn
     } match {
@@ -34,8 +32,8 @@ package object utils {
 
   def objectFromString[T](fullClassName: String): Try[T] = Try {
     val runtimeMirror = universe.runtimeMirror(getClass.getClassLoader)
-    val module = runtimeMirror.staticModule(fullClassName)
-    val obj = runtimeMirror.reflectModule(module)
+    val module        = runtimeMirror.staticModule(fullClassName)
+    val obj           = runtimeMirror.reflectModule(module)
     obj.instance.asInstanceOf[T]
   }
 
