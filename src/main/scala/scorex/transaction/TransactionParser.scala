@@ -45,7 +45,7 @@ object TransactionParser {
       val Array(parsedTypeId, parsedVersion) = bytes.take(2)
       if (parsedTypeId != typeId) throw new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'")
       if (!supportedVersions.contains(parsedVersion))
-        throw new IllegalArgumentException(s"Expected version of transaction '$supportedVersions', but got '$parsedVersion'")
+        throw new IllegalArgumentException(s"Expected version of transaction: $version, but got '$parsedVersion'")
 
       (parsedVersion, 2)
     }
@@ -59,7 +59,7 @@ object TransactionParser {
       if (parsedMark != 0) throw new IllegalArgumentException(s"Expected the '0' byte, but got '$parsedMark'")
       if (parsedTypeId != typeId) throw new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'")
       if (!supportedVersions.contains(parsedVersion))
-        throw new IllegalArgumentException(s"Expected version of transaction '$supportedVersions', but got '$parsedVersion'")
+        throw new IllegalArgumentException(s"Expected version of transaction ${supportedVersions.mkString(", ")}, but got '$parsedVersion'")
 
       (parsedVersion, 3)
     }
