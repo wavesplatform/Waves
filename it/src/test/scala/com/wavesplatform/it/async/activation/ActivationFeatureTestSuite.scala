@@ -24,7 +24,7 @@ class ActivationFeatureTestSuite
 
   private val votingInterval      = 12
   private val blocksForActivation = 12 // should be even
-  private val featureNum: Short   = 3
+  private val featureNum: Short   = 1
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
@@ -34,7 +34,7 @@ class ActivationFeatureTestSuite
          |  blockchain {
          |    custom {
          |      functionality {
-         |        pre-activated-features = {3 = 0}
+         |        pre-activated-features = {}
          |        feature-check-blocks-period = $votingInterval
          |        blocks-for-feature-activation = $blocksForActivation
          |      }
@@ -57,15 +57,15 @@ class ActivationFeatureTestSuite
     val featuresMapInGeneratedBlocks = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
     val votesForFeature1             = featuresMapInGeneratedBlocks.getOrElse(featureNum, Seq.empty).length
 
-//    assertVotingStatus(activationStatusWhileVoting, votesForFeature1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
-//    assertVotingStatus(activationStatusIntervalLastVotingBlock, blocksForActivation - 1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
+    assertVotingStatus(activationStatusWhileVoting, votesForFeature1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
+    assertVotingStatus(activationStatusIntervalLastVotingBlock, blocksForActivation - 1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
   }
 
   "supported blocks counter resets on the next voting interval" in {
     val checkHeight: Int = votingInterval * 2 - blocksForActivation / 2
     val info             = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
-  //  info.supportingBlocks.get shouldBe blocksForActivation / 2
-   // info.blockchainStatus shouldBe BlockchainFeatureStatus.Undefined
+    info.supportingBlocks.get shouldBe blocksForActivation / 2
+    info.blockchainStatus shouldBe BlockchainFeatureStatus.Undefined
   }
 
   "blockchain status is APPROVED in second voting interval" in {
@@ -73,19 +73,13 @@ class ActivationFeatureTestSuite
     val info             = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
 
     // Activation will be on a next voting interval
-    //assertApprovedStatus(info, checkHeight + votingInterval, NodeFeatureStatus.Voted)
+    assertApprovedStatus(info, checkHeight + votingInterval, NodeFeatureStatus.Voted)
   }
 
   "blockchain status is ACTIVATED in third voting interval" in {
     val checkHeight: Int = votingInterval * 3
     val info             = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
-    //assertActivatedStatus(info, checkHeight, NodeFeatureStatus.Voted)
-  }
-
-  "blockchain status is ACTIVATED in forth voting interval" in {
-    val checkHeight: Int = votingInterval * 4
-    val info             = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
-  //  assertActivatedStatus(info, checkHeight, NodeFeatureStatus.Voted)
+    assertActivatedStatus(info, checkHeight, NodeFeatureStatus.Voted)
   }
 
 }

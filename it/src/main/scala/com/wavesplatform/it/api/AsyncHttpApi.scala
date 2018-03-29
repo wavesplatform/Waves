@@ -80,6 +80,9 @@ object AsyncHttpApi extends Assertions {
         .build()
     }
 
+    def getOrderbookByPublicKey(publicKey: String, timestamp: Long, signature: ByteStr): Future[Seq[OrderbookHistory]] =
+      matcherGetWithSignature(s"/matcher/orderbook/$publicKey", timestamp, signature).as[Seq[OrderbookHistory]]
+
     def matcherGetStatusCode(path: String, statusCode: Int): Future[MessageMatcherResponse] =
       matcherGet(path, statusCode = statusCode).as[MessageMatcherResponse]
 
@@ -93,8 +96,7 @@ object AsyncHttpApi extends Assertions {
     def getOrderBook(asset: String): Future[OrderBookResponse] =
       matcherGet(s"/matcher/orderbook/$asset/WAVES").as[OrderBookResponse]
 
-    def getOrderbookByPublicKey(publicKey: String, timestamp: Long, signature: ByteStr): Future[Seq[OrderbookHistory]] =
-      matcherGetWithSignature(s"/matcher/orderbook/$publicKey", timestamp, signature).as[Seq[OrderbookHistory]]
+
 
     def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
       retrying(f(_get(s"${n.nodeApiEndpoint}$path")).build())

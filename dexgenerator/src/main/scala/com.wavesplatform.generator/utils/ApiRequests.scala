@@ -3,14 +3,28 @@ package com.wavesplatform.generator.utils
 import java.io.IOException
 import java.util.concurrent.TimeoutException
 
-import com.wavesplatform.it.api.{AssetBalance, Balance, ResponseFutureExt, Transaction, UnexpectedStatusCodeException}
+import com.google.common.primitives.Longs
+import com.wavesplatform.crypto
+import com.wavesplatform.it.api.{
+  AssetBalance,
+  Balance,
+  MatcherResponse,
+  MatcherStatusResponse,
+  OrderbookHistory,
+  ResponseFutureExt,
+  Transaction,
+  UnexpectedStatusCodeException
+}
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
+import com.wavesplatform.matcher.api.CancelOrderRequest
+import com.wavesplatform.state2.ByteStr
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json.Json.{stringify, toJson}
 import play.api.libs.json._
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http.assets.{MassTransferRequest, SignedIssueRequest, SignedMassTransferRequest}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, Transfer}
@@ -20,7 +34,7 @@ import scorex.utils.ScorexLogging
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
@@ -28,17 +42,17 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
 
   def retrying(r: Request, interval: FiniteDuration = 1.second, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[Response] = {
     def executeRequest: Future[Response] = {
-      log.trace(s"Executing request '$r'")
+      log.info(s"Executing request '$r'")
       client
         .executeRequest(
           r,
           new AsyncCompletionHandler[Response] {
             override def onCompleted(response: Response): Response = {
               if (response.getStatusCode == statusCode) {
-                log.debug(s"Request: ${r.getUrl}\nResponse: ${response.getResponseBody}")
+                log.info(s"Request: ${r.getUrl}\nResponse: ${response.getResponseBody}")
                 response
               } else {
-                log.debug(s"Request: ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
+                log.info(s"Request: ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
                 throw UnexpectedStatusCodeException(r.getUrl, response.getStatusCode, response.getResponseBody)
               }
             }
@@ -48,7 +62,7 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
         .toScala
         .recoverWith {
           case e @ (_: IOException | _: TimeoutException) =>
-            log.debug(s"Failed to execute request '$r' with error: ${e.getMessage}")
+            log.info(s"Failed to execute request '$r' with error: ${e.getMessage}")
             timer.schedule(executeRequest, interval)
         }
     }
@@ -85,7 +99,6 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
     )
   }
 
-
   def to(endpoint: String) = new Node(endpoint)
 
   class Node(endpoint: String) {
@@ -105,8 +118,8 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
     def matcherPost[A: Writes](path: String, body: A): Future[Response] =
       post(s"$endpoint$path", (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
 
-    def placeOrder(order: Order): Future[Response] =
-      matcherPost("/matcher/orderbook", order.json())
+    def placeOrder(order: Order): Future[MatcherResponse] =
+      matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
 
     def height(endpoint: String): Future[Int] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Int])
 
@@ -120,10 +133,34 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
     def signedIssue(issue: SignedIssueRequest): Future[Transaction] =
       postJson("/assets/broadcast/issue", issue).as[Transaction]
 
-//    def signedMassTransfer(massTx: SignedMassTransferRequest): Future[Transaction] =
-//      postJson("/assets/broadcast/issue", massTx).as[Transaction]
+    //    def signedMassTransfer(massTx: SignedMassTransferRequest): Future[Transaction] =
+    //      postJson("/assets/broadcast/issue", massTx).as[Transaction]
+
+    def orderbookByPublicKey(publicKey: String,
+                             ts: Long,
+                             signature: ByteStr,
+                             f: RequestBuilder => RequestBuilder = identity): Future[Seq[OrderbookHistory]] =
+      retrying {
+        _get(s"$endpoint/matcher/orderbook/$publicKey")
+          .setHeader("Timestamp", ts)
+          .setHeader("Signature", signature)
+          .build()
+      }.as[Seq[OrderbookHistory]]
+
+    //    def getOrderbookByPublicKey(publicKey: String, timestamp: Long, signature: ByteStr): Future[Seq[OrderbookHistory]] =
+    //      matcherGetWithSignature(s"/matcher/orderbook/$publicKey", timestamp, signature).as[Seq[OrderbookHistory]]
+
+    def cancelOrder(amountAsset: String, priceAsset: String, request: CancelOrderRequest): Future[MatcherStatusResponse] =
+      matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", request.json).as[MatcherStatusResponse]
 
     def broadcastRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
+
+    def orderHistory(pk: PrivateKeyAccount): Seq[OrderbookHistory] = {
+      val ts         = System.currentTimeMillis()
+      val privateKey = pk
+      val signature  = ByteStr(crypto.sign(pk, pk.publicKey ++ Longs.toByteArray(ts)))
+      Await.result(orderbookByPublicKey(Base58.encode(pk.publicKey), ts, signature), 1.minute)
+    }
 
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[Transaction] =
       waitFor[Option[Transaction]](s"transaction $txId")(

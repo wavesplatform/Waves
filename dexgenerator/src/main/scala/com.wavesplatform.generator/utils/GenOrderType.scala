@@ -9,6 +9,7 @@ object GenOrderType extends Enumeration {
   val Buy = Value(4)
   val Sell = Value(5)
   val Fake = Value(6)
+  val Cancel = Value(7)
 
 
 }
