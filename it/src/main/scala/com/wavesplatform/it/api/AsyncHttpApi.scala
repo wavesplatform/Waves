@@ -121,6 +121,14 @@ object AsyncHttpApi extends Assertions {
         .build()
     }
 
+    def postJsObjectWithApiKey(path: String, body: JsObject): Future[Response] = retrying {
+      _post(s"${n.nodeApiEndpoint}$path")
+        .withApiKey(n.apiKey)
+        .setHeader("Content-type", "application/json")
+        .setBody(stringify(body))
+        .build()
+    }
+
     def post(url: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
       retrying(f(_post(url).withApiKey(n.apiKey)).build())
 
@@ -256,6 +264,8 @@ object AsyncHttpApi extends Assertions {
               fee: Long): Future[Transaction] =
       postJson("/assets/issue", IssueRequest(sourceAddress, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
 
+    def scriptCompile(code: String) = post("/utils/script/compile", code).as[CompiledScript]
+
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Future[Transaction] =
       postJson("/assets/reissue", ReissueRequest(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
 
@@ -297,8 +307,13 @@ object AsyncHttpApi extends Assertions {
 
     def broadcastRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
 
+    def sign(jsobj: JsObject): Future[JsObject] =
+      postJsObjectWithApiKey("/transactions/sign", jsobj).as[JsObject]
+
     def signedBroadcast(jsobj: JsObject): Future[Transaction] =
       post("/transactions/broadcast", stringify(jsobj)).as[Transaction]
+
+    def signAndBroadcast(jsobj: JsObject): Future[Transaction] = sign(jsobj).flatMap(signedBroadcast)
 
     def signedIssue(issue: SignedIssueRequest): Future[Transaction] =
       postJson("/assets/broadcast/issue", issue).as[Transaction]

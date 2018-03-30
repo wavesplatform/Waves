@@ -24,7 +24,7 @@ val versionSource = Def.task {
     versionFile,
     s"""package com.wavesplatform
        |
-      |object Version {
+       |object Version {
        |  val VersionString = "${version.value}"
        |  val VersionTuple = ($major, $minor, $patch)
        |}

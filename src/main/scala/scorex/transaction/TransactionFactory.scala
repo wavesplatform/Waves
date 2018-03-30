@@ -1,6 +1,5 @@
 package scorex.transaction
 
-import cats.implicits._
 import com.google.common.base.Charsets
 import com.wavesplatform.state2.ByteStr
 import scorex.account._
@@ -79,6 +78,28 @@ object TransactionFactory {
         script = script,
         fee = request.fee,
         timestamp = request.timestamp.getOrElse(time.getTimestamp()),
+      )
+    } yield tx
+
+  def smartIssue(request: SmartIssueRequest, wallet: Wallet, time: Time): Either[ValidationError, SmartIssueTransaction] =
+    for {
+      senderPrivateKey <- wallet.findWallet(request.sender)
+      s <- request.script match {
+        case None    => Right(None)
+        case Some(s) => Script.fromBase58String(s).map(Some(_))
+      }
+      tx <- SmartIssueTransaction.selfSigned(
+        sender = senderPrivateKey,
+        script = s,
+        fee = request.fee,
+        timestamp = request.timestamp.getOrElse(time.getTimestamp()),
+        version = request.version,
+        chainId = AddressScheme.current.chainId,
+        name = request.name.getBytes(Charsets.UTF_8),
+        description = request.description.getBytes(Charsets.UTF_8),
+        quantity = request.quantity,
+        decimals = request.decimals,
+        reissuable = request.reissuable
       )
     } yield tx
 

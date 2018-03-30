@@ -5,14 +5,22 @@ import java.io._
 import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.db.openDB
-import com.wavesplatform.history.StorageFactory
+import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
+import com.wavesplatform.mining.TwoDimensionalMiningConstraint
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
+import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2.appender.BlockAppender
 import com.wavesplatform.utils._
+import com.wavesplatform.utx.UtxPool
+import monix.execution.Scheduler
 import org.slf4j.bridge.SLF4JBridgeHandler
-import scorex.account.AddressScheme
+import scorex.account.{Address, AddressScheme}
 import scorex.block.Block
+import scorex.transaction.Transaction
 import scorex.utils.{NTP, ScorexLogging}
 
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
@@ -28,13 +36,29 @@ object Importer extends ScorexLogging {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
+    implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
+    val utxPoolStub = new UtxPool {
+      override def putIfNew(tx: Transaction)                                                   = ???
+      override def removeAll(txs: Traversable[Transaction]): Unit                              = {}
+      override def accountPortfolio(addr: Address)                                             = ???
+      override def portfolio(addr: Address)                                                    = ???
+      override def all                                                                         = ???
+      override def size                                                                        = ???
+      override def transactionById(transactionId: ByteStr)                                     = ???
+      override def packUnconfirmed(rest: TwoDimensionalMiningConstraint, sortInBlock: Boolean) = ???
+      override def close(): Unit                                                               = {}
+    }
+
     Try(args(1)) match {
       case Success(filename) =>
         log.info(s"Loading file '$filename'")
+
         createInputStream(filename) match {
           case Success(inputStream) =>
-            val db                              = openDB(settings.dataDirectory, settings.levelDbCacheSize)
-            val (history, _, blockchainUpdater) = StorageFactory(settings, db, NTP)
+            val db                                  = openDB(settings.dataDirectory, settings.levelDbCacheSize)
+            val (history, state, blockchainUpdater) = StorageFactory(settings, db, NTP)
+            val checkpoint                          = new CheckpointServiceImpl(db, settings.checkpointsSettings)
+            val extAppender                         = BlockAppender(checkpoint, history, blockchainUpdater, NTP, state, utxPoolStub, settings, history, scheduler) _
             checkGenesis(history, settings, blockchainUpdater)
             val bis          = new BufferedInputStream(inputStream)
             var quit         = false
@@ -57,7 +81,7 @@ object Importer extends ScorexLogging {
                   } else {
                     val block = Block.parseBytes(buffer).get
                     if (history.lastBlockId.contains(block.reference)) {
-                      blockchainUpdater.processBlock(block) match {
+                      Await.result(extAppender.apply(block).runAsync, Duration.Inf) match {
                         case Left(ve) =>
                           log.error(s"Error appending block: $ve")
                           quit = true

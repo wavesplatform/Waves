@@ -18,6 +18,7 @@ import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.{Script, SetScriptTransaction}
+import scorex.utils.ScorexLogging
 
 import scala.annotation.tailrec
 import scala.collection.immutable
@@ -386,7 +387,7 @@ object LevelDBWriter {
   }
 }
 
-class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
+class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches with ScorexLogging {
 
   import LevelDBWriter._
 
@@ -464,10 +465,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
     db.get(k.transactionInfo(assetId)) match {
       case Some((_, i: IssueTransaction)) =>
         val ai = LevelDBWriter.loadAssetInfo(db, assetId).getOrElse(AssetInfo(false, 0, None))
-        Some(AssetDescription(i.sender, i.name, i.decimals, ai.isReissuable, ai.volume, ai.script))
+        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, ai.script))
       case Some((_, i: SmartIssueTransaction)) =>
         val ai = LevelDBWriter.loadAssetInfo(db, assetId).getOrElse(AssetInfo(false, 0, None))
-        Some(AssetDescription(i.sender, i.name, i.decimals, ai.isReissuable, ai.volume, ai.script))
+        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, ai.script))
       case _ => None
     }
   }
@@ -511,30 +512,36 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
       rw.put(k.idToAddress(id), address)
     }
 
-    val threshold = height - 2000
+    val threshold        = height - 2000
+    val changedAddresses = Set.newBuilder[BigInt]
 
     for ((addressId, balance) <- wavesBalances) {
       rw.put(k.wavesBalance(height, addressId), balance)
+      changedAddresses += addressId
       expiredKeys ++= updateHistory(rw, k.wavesBalanceHistory(addressId), threshold, h => k.wavesBalance(h, addressId))
     }
 
     for ((addressId, leaseBalance) <- leaseBalances) {
       rw.put(k.leaseBalance(height, addressId), leaseBalance)
+      changedAddresses += addressId
       expiredKeys ++= updateHistory(rw, k.leaseBalanceHistory(addressId), threshold, k.leaseBalance(_, addressId))
     }
+
+    for ((addressId, assets) <- assetBalances) {
+      rw.put(k.assetList(addressId), rw.get(k.assetList(addressId)) ++ assets.keySet)
+      changedAddresses += addressId
+      for ((assetId, balance) <- assets) {
+        rw.put(k.assetBalance(height, addressId, assetId), balance)
+        expiredKeys ++= updateHistory(rw, k.assetBalanceHistory(addressId, assetId), threshold, k.assetBalance(_, addressId, assetId))
+      }
+    }
+
+    rw.put(k.changedAddresses(height), changedAddresses.result().toSeq)
 
     for ((orderId, volumeAndFee) <- filledQuantity) {
       val kk = k.filledVolumeAndFee(height, orderId)
       rw.put(kk, volumeAndFee)
       expiredKeys ++= updateHistory(rw, k.filledVolumeAndFeeHistory(orderId), threshold, k.filledVolumeAndFee(_, orderId))
-    }
-
-    for ((addressId, assets) <- assetBalances) {
-      rw.put(k.assetList(addressId), rw.get(k.assetList(addressId)) ++ assets.keySet)
-      for ((assetId, balance) <- assets) {
-        rw.put(k.assetBalance(height, addressId, assetId), balance)
-        expiredKeys ++= updateHistory(rw, k.assetBalanceHistory(addressId, assetId), threshold, k.assetBalance(_, addressId, assetId))
-      }
     }
 
     for ((assetId, assetInfo) <- reissuedAssets) {
@@ -596,15 +603,18 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
     expiredKeys.foreach(rw.delete)
   }
 
-  override protected def doRollback(targetBlockId: ByteStr): Seq[Block] = readWrite { rw =>
-    rw.get(k.heightOf(targetBlockId)).fold(Seq.empty[Block]) { targetHeight =>
-      rw.put(k.height, targetHeight)
+  override protected def doRollback(targetBlockId: ByteStr): Seq[Block] = {
+    readOnly(_.get(k.heightOf(targetBlockId))).fold(Seq.empty[Block]) { targetHeight =>
+      log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-      for {
-        currentHeight <- height until targetHeight by -1
-        blockAtHeight <- rw.get(k.blockAt(currentHeight))
-      } yield {
+      val discardedBlocks = Seq.newBuilder[Block]
+
+      for (currentHeight <- height until targetHeight by -1) readWrite { rw =>
+        rw.put(k.height, currentHeight - 1)
+
         for (addressId <- rw.get(k.changedAddresses(currentHeight))) {
+          val address = rw.get(k.idToAddress(addressId))
+
           for (assetId <- rw.get(k.assetList(addressId))) {
             rw.delete(k.assetBalance(currentHeight, addressId, assetId))
             val kabh = k.assetBalanceHistory(addressId, assetId)
@@ -613,17 +623,21 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
 
           rw.delete(k.wavesBalance(currentHeight, addressId))
           val kwbh = k.wavesBalanceHistory(addressId)
-          rw.put(kwbh, rw.get(kwbh).filterNot(_ == currentHeight))
+          val ints = rw.get(kwbh).filterNot(_ == currentHeight)
+          rw.put(kwbh, ints)
 
           rw.delete(k.leaseBalance(currentHeight, addressId))
           val klbh = k.leaseBalanceHistory(addressId)
           rw.put(klbh, rw.get(klbh).filterNot(_ == currentHeight))
 
-          portfolioCache.invalidate(rw.get(k.idToAddress(addressId)))
+          log.trace(s"Discarding portfolio for $address")
+
+          portfolioCache.invalidate(address)
 
         }
 
-        for (txId <- rw.get(k.transactionIdsAtHeight(currentHeight))) {
+        val txIdsAtHeight = k.transactionIdsAtHeight(currentHeight)
+        for (txId <- rw.get(txIdsAtHeight)) {
           forgetTransaction(txId)
           val ktxId         = k.transactionInfo(txId)
           val Some((_, tx)) = rw.get(ktxId)
@@ -665,8 +679,21 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
           }
         }
 
-        blockAtHeight
+        rw.delete(txIdsAtHeight)
+
+        val discardedBlock = rw
+          .get(k.blockAt(currentHeight))
+          .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
+
+        discardedBlocks += discardedBlock
+
+        rw.delete(k.blockAt(currentHeight))
+        rw.delete(k.heightOf(discardedBlock.uniqueId))
       }
+
+      log.debug(s"Rollback to block $targetBlockId at $targetHeight completed")
+
+      discardedBlocks.result()
     }
   }
 
