@@ -26,9 +26,11 @@ class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFro
     val txId = miner.transfer(miner.address, nodeWithZeroBalance.address, transferAmount, transferFee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
+    val heightAfterTransfer = miner.height
+
     nodeWithZeroBalance.assertBalances(nodeWithZeroBalance.address, balance1 + transferAmount, eff1 + transferAmount)
 
-    nodeWithZeroBalance.waitForHeight(60, 6.minutes) // if you know how to reduce test time, please ping @monroid
+    nodeWithZeroBalance.waitForHeight(heightAfterTransfer + 51, 6.minutes) // if you know how to reduce test time, please ping @monroid
 
     val nodeMinerInfoAfter = nodeWithZeroBalance.debugMinerInfo()
     assert(nodeMinerInfoAfter.nonEmpty)
@@ -48,6 +50,7 @@ object MinerStateTestSuite {
     |        generation-balance-depth-from-50-to-1000-after-height = 100
     |        }
     |        genesis {
+    |           average-block-delay = 6s
     |           signature: "gC84PYfvJRdLpUKDXNddTcWmH3wWhhKD4W9d2Z1HY46xkvgAdqoksknXHKzCBe2PEhzmDW49VKxfWeyzoMB4LKi"
     |           transactions = [
     |              {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},
@@ -70,6 +73,7 @@ object MinerStateTestSuite {
     |        generation-balance-depth-from-50-to-1000-after-height = 100
     |        }
     |        genesis {
+    |           average-block-delay = 6s
     |           signature: "gC84PYfvJRdLpUKDXNddTcWmH3wWhhKD4W9d2Z1HY46xkvgAdqoksknXHKzCBe2PEhzmDW49VKxfWeyzoMB4LKi"
     |           transactions = [
     |              {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},
