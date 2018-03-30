@@ -20,7 +20,7 @@ class PaymentTransactionSuite extends BaseTransactionSuite {
         .zip(notMiner.accountBalances(secondAddress))
 
       transferId <- sender.payment(firstAddress, secondAddress, paymentAmount, defaulFee).map(_.id)
-      _          <- nodes.waitForHeightAraiseAndTxPresent(transferId)
+      _          <- nodes.waitForHeightAriseAndTxPresent(transferId)
       _ <- notMiner
         .assertBalances(firstAddress, firstBalance - paymentAmount - defaulFee, firstEffBalance - paymentAmount - defaulFee)
         .zip(notMiner.assertBalances(secondAddress, secondBalance + paymentAmount, secondEffBalance + paymentAmount))

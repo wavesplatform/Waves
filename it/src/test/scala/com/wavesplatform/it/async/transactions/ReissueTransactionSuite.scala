@@ -18,13 +18,13 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
       (balance, effectiveBalance) <- notMiner.accountBalances(firstAddress)
 
       issuedAssetId <- sender.issue(firstAddress, "name2", "description2", defaultQuantity, decimals = 2, reissuable = true, fee = issueFee).map(_.id)
-      _             <- nodes.waitForHeightAraiseAndTxPresent(issuedAssetId)
+      _             <- nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
       _ <- notMiner.assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee) zip notMiner.assertAssetBalance(firstAddress,
                                                                                                                                   issuedAssetId,
                                                                                                                                   defaultQuantity)
 
       reissueTxId <- sender.reissue(firstAddress, issuedAssetId, defaultQuantity, reissuable = true, fee = issueFee).map(_.id)
-      _           <- nodes.waitForHeightAraiseAndTxPresent(reissueTxId)
+      _           <- nodes.waitForHeightAriseAndTxPresent(reissueTxId)
       _ <- notMiner
         .assertBalances(firstAddress, balance - 2 * issueFee, effectiveBalance - 2 * issueFee)
         .zip(notMiner.assertAssetBalance(firstAddress, issuedAssetId, 2 * defaultQuantity))
@@ -38,14 +38,14 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
       (balance, effectiveBalance) <- notMiner.accountBalances(firstAddress)
 
       issuedAssetId <- sender.issue(firstAddress, "name2", "description2", defaultQuantity, decimals = 2, reissuable = false, issueFee).map(_.id)
-      _             <- nodes.waitForHeightAraiseAndTxPresent(issuedAssetId)
+      _             <- nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
       _ <- notMiner
         .assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee)
         .zip(notMiner.assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity))
 
       _ <- assertBadRequestAndMessage(sender.reissue(firstAddress, issuedAssetId, defaultQuantity, reissuable = true, fee = issueFee),
                                       "Asset is not reissuable")
-      _ <- nodes.waitForHeightAraise()
+      _ <- nodes.waitForHeightArise()
 
       _ <- notMiner
         .assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
@@ -63,11 +63,11 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
 
       issuedAssetId <- sender.issue(firstAddress, "name3", "description3", defaultQuantity, decimals = 2, reissuable = true, issueFee).map(_.id)
 
-      _ <- nodes.waitForHeightAraiseAndTxPresent(issuedAssetId)
+      _ <- nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
 
       _ <- assertBadRequestAndMessage(sender.reissue(firstAddress, issuedAssetId, defaultQuantity, reissuable = true, fee = reissueFee),
                                       "negative waves balance")
-      _ <- nodes.waitForHeightAraise()
+      _ <- nodes.waitForHeightArise()
 
       _ <- notMiner
         .assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)

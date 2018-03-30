@@ -27,7 +27,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
         .zip(notMiner.accountBalances(secondAddress))
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, leasingAmount, fee = defaultFee).map(_.id)
-      _                <- nodes.waitForHeightAraiseAndTxPresent(createdLeaseTxId)
+      _                <- nodes.waitForHeightAriseAndTxPresent(createdLeaseTxId)
       _ <- notMiner
         .assertBalances(firstAddress, firstBalance - defaultFee, firstEffBalance - leasingAmount - defaultFee)
         .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
@@ -91,7 +91,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, leasingAmount, fee = defaultFee).map(_.id)
 
-      _ <- nodes.waitForHeightAraiseAndTxPresent(createdLeaseTxId)
+      _ <- nodes.waitForHeightAriseAndTxPresent(createdLeaseTxId)
       _ <- notMiner
         .assertBalances(firstAddress, firstBalance - defaultFee, firstEffBalance - leasingAmount - defaultFee)
         .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
@@ -106,7 +106,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       _ = assert(leases1.exists(_.id == createdLeaseTxId))
 
       createdCancelLeaseTxId <- sender.cancelLease(firstAddress, createdLeaseTxId, fee = defaultFee).map(_.id)
-      _                      <- nodes.waitForHeightAraiseAndTxPresent(createdCancelLeaseTxId)
+      _                      <- nodes.waitForHeightAriseAndTxPresent(createdCancelLeaseTxId)
       _ <- notMiner
         .assertBalances(firstAddress, firstBalance - 2 * defaultFee, firstEffBalance - 2 * defaultFee)
         .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance))
@@ -129,13 +129,13 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
         .zip(notMiner.accountBalances(secondAddress))
 
       createdLeasingTxId <- sender.lease(firstAddress, secondAddress, leasingAmount, fee = defaultFee).map(_.id)
-      _                  <- nodes.waitForHeightAraiseAndTxPresent(createdLeasingTxId)
+      _                  <- nodes.waitForHeightAriseAndTxPresent(createdLeasingTxId)
       _ <- notMiner
         .assertBalances(firstAddress, firstBalance - defaultFee, firstEffBalance - leasingAmount - defaultFee)
         .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
 
       createdCancelLeaseTxId <- sender.cancelLease(firstAddress, createdLeasingTxId, fee = defaultFee).map(_.id)
-      _                      <- nodes.waitForHeightAraiseAndTxPresent(createdCancelLeaseTxId)
+      _                      <- nodes.waitForHeightAriseAndTxPresent(createdCancelLeaseTxId)
       _                      <- assertBadRequest(sender.cancelLease(firstAddress, createdLeasingTxId, fee = defaultFee).map(_.id))
       _ <- notMiner
         .assertBalances(firstAddress, firstBalance - 2 * defaultFee, firstEffBalance - 2 * defaultFee)
