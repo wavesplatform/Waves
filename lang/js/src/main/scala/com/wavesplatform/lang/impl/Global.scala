@@ -1,7 +1,5 @@
 package com.wavesplatform.lang.impl
 
-import com.wavesplatform.lang.traits.Transaction
-
 import scala.scalajs.js.annotation.JSGlobalScope
 import scala.scalajs.{js => platform}
 
@@ -15,9 +13,4 @@ object Global extends platform.Object {
   def keccack256(message: Array[Byte]): Array[Byte]                                       = platform.native
   def blake2b256(message: Array[Byte]): Array[Byte]                                       = platform.native
   def sha256(message: Array[Byte]): Array[Byte]                                           = platform.native
-
-  def height: Int                                           = platform.native
-  def networkByte: Byte                                     = platform.native
-  def transaction: Transaction                              = platform.native
-  def transactionById(id: Array[Byte]): Option[Transaction] = platform.native
 }
