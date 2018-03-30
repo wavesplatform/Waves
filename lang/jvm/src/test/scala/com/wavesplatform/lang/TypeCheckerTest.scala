@@ -1,11 +1,10 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang
+import com.wavesplatform.lang.BaseWavesContext.{none, some}
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Terms._
-import com.wavesplatform.lang.ctx._
 import com.wavesplatform.lang.TypeChecker.{TypeCheckResult, TypeCheckerContext, TypeDefs}
-import com.wavesplatform.lang.WavesContextImpl.none
+import com.wavesplatform.lang.ctx._
 import com.wavesplatform.lang.testing.ScriptGen
 import monix.eval.Coeval
 import org.scalatest.prop.PropertyChecks
@@ -41,7 +40,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
         functions = Map(
           genericFuncWithOptionParam.name -> genericFuncWithOptionParam,
           optionFunc.name                 -> optionFunc,
-          WavesContextImpl.some.name      -> WavesContextImpl.some
+          some.name                       -> some
         )
       )
     val Right(v) = TypeChecker(TypeCheckerContext.fromContext(ctx),
@@ -117,9 +116,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   private val typeCheckerCtx = TypeCheckerContext(
     predefTypes = Map.empty,
     varDefs = Map(("None", none.tpe)),
-    functionDefs = Map(lang.WavesContextImpl.some.name -> lang.WavesContextImpl.some.signature,
-                       optFunc.name                    -> optFunc.signature,
-                       noneFunc.name                   -> noneFunc.signature)
+    functionDefs = Map(some.name -> some.signature, optFunc.name -> optFunc.signature, noneFunc.name -> noneFunc.signature)
   )
 
   private val genericFunc = PredefFunction("idFunc", TYPEPARAM('T'), List("p1" -> TYPEPARAM('T'), "p2" -> TYPEPARAM('T')))(Right(_))
@@ -195,10 +192,10 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
             Map.empty,
             Map(("None", none.tpe)),
             Map(
-              multiplierFunction.name         -> multiplierFunction.signature,
-              noneFunc.name                   -> noneFunc.signature,
-              genericFunc.name                -> genericFunc.signature,
-              lang.WavesContextImpl.some.name -> lang.WavesContextImpl.some.signature
+              multiplierFunction.name -> multiplierFunction.signature,
+              noneFunc.name           -> noneFunc.signature,
+              genericFunc.name        -> genericFunc.signature,
+              some.name               -> some.signature
             )
           ),
           input
