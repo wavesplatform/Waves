@@ -30,13 +30,13 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
         .zip(notMiner.accountBalances(secondAddress))
 
       issuedAssetId <- sender.issue(firstAddress, "name", "description", defaultAssetQuantity, 2, reissuable = false, issueFee).map(_.id)
-      _             <- nodes.waitForHeightAraiseAndTxPresent(issuedAssetId)
+      _             <- nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
       _ <- notMiner
         .assertBalances(firstAddress, firstBalance - issueFee, firstEffBalance - issueFee)
         .zip(notMiner.assertAssetBalance(firstAddress, issuedAssetId, defaultAssetQuantity))
 
       transferTransactionId <- sender.transfer(firstAddress, secondAddress, defaultAssetQuantity, transferFee, Some(issuedAssetId)).map(_.id)
-      _                     <- nodes.waitForHeightAraiseAndTxPresent(transferTransactionId)
+      _                     <- nodes.waitForHeightAriseAndTxPresent(transferTransactionId)
       _ <- notMiner
         .assertBalances(firstAddress, firstBalance - transferFee - issueFee, firstEffBalance - transferFee - issueFee)
         .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance))
@@ -54,7 +54,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
         .zip(notMiner.accountBalances(secondAddress))
 
       transferId <- sender.transfer(firstAddress, secondAddress, transferAmount, transferFee).map(_.id)
-      _          <- nodes.waitForHeightAraiseAndTxPresent(transferId)
+      _          <- nodes.waitForHeightAriseAndTxPresent(transferId)
       _ <- notMiner
         .assertBalances(firstAddress, firstBalance - transferAmount - transferFee, firstEffBalance - transferAmount - transferFee)
         .zip(notMiner.assertBalances(secondAddress, secondBalance + transferAmount, secondEffBalance + transferAmount))
@@ -139,7 +139,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
         .zip(notMiner.accountBalances(secondAddress))
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee).map(_.id)
-      _                <- nodes.waitForHeightAraiseAndTxPresent(createdLeaseTxId)
+      _                <- nodes.waitForHeightAriseAndTxPresent(createdLeaseTxId)
 
       _ <- notMiner
         .assertBalances(firstAddress, firstBalance - leasingFee, firstEffBalance - leasingAmount - leasingFee)
@@ -168,7 +168,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, leasingAmount, fee = leasingFee).map(_.id)
 
-      _ <- nodes.waitForHeightAraiseAndTxPresent(createdLeaseTxId)
+      _ <- nodes.waitForHeightAriseAndTxPresent(createdLeaseTxId)
 
       _ <- notMiner
         .assertBalances(firstAddress, firstBalance - leasingFee, firstEffBalance - leasingAmount - leasingFee)
@@ -196,7 +196,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
 
       assetId <- sender.issue(firstAddress, "second asset", "description", defaultAssetQuantity, 0, reissuable = false, fee = issueFee).map(_.id)
 
-      _ <- nodes.waitForHeightAraiseAndTxPresent(assetId)
+      _ <- nodes.waitForHeightAriseAndTxPresent(assetId)
 
       _ <- notMiner
         .assertBalances(firstAddress, firstBalance - issueFee, firstEffBalance - issueFee)

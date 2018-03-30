@@ -524,7 +524,7 @@ object AsyncHttpApi extends Assertions {
     // if we first await tx and then height + 1, it could be gone with height + 1
     // if we first await height + 1 and then tx, it could be gone with height + 2
     // so we await tx twice
-    def waitForHeightAraiseAndTxPresent(transactionId: String): Future[Unit] =
+    def waitForHeightAriseAndTxPresent(transactionId: String): Future[Unit] =
       for {
         height <- traverse(nodes)(_.height).map(_.max)
         _      <- waitForSameBlocksAt(2.seconds, height)
@@ -533,7 +533,7 @@ object AsyncHttpApi extends Assertions {
         _      <- traverse(nodes)(_.waitForTransaction(transactionId))
       } yield ()
 
-    def waitForHeightAraise(): Future[Unit] =
+    def waitForHeightArise(): Future[Unit] =
       for {
         height <- traverse(nodes)(_.height).map(_.max)
         _      <- traverse(nodes)(_.waitForHeight(height + 1))

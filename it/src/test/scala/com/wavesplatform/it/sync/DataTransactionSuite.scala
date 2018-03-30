@@ -32,7 +32,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     val data = List(BooleanDataEntry("bool", false))
     assertBadRequestAndResponse(sender.putData(firstAddress, data, balance1 + 1), "negative waves balance")
-    nodes.waitForHeightAraise()
+    nodes.waitForHeightArise()
     notMiner.assertBalances(firstAddress, balance1, eff1)
 
     val leaseAmount = 1.waves
@@ -41,7 +41,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(leaseId)
 
     assertBadRequestAndResponse(sender.putData(firstAddress, data, balance1 - leaseAmount), "negative effective balance")
-    nodes.waitForHeightAraise()
+    nodes.waitForHeightArise()
     notMiner.assertBalances(firstAddress, balance1 - leaseFee, eff1 - leaseAmount - leaseFee)
   }
 
@@ -73,7 +73,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
       nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
     }
 
-    nodes.waitForHeightAraise()
+    nodes.waitForHeightArise()
     notMiner.assertBalances(firstAddress, balance1, eff1)
   }
 
@@ -247,15 +247,15 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val data     = List(BooleanDataEntry(extraKey, false))
 
     assertBadRequestAndResponse(sender.putData(firstAddress, data, calcDataFee(data)), message)
-    nodes.waitForHeightAraise()
+    nodes.waitForHeightArise()
 
     val extraValueData = List(BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1.toByte))))
     assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, calcDataFee(extraValueData)), message)
-    nodes.waitForHeightAraise()
+    nodes.waitForHeightArise()
 
     val extraSizedData = List.tabulate(MaxEntryCount + 1)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
     assertBadRequestAndResponse(sender.putData(firstAddress, extraSizedData, calcDataFee(extraSizedData)), message)
-    nodes.waitForHeightAraise()
+    nodes.waitForHeightArise()
   }
 
   private def calcDataFee(data: List[DataEntry[_]]): Long = {
