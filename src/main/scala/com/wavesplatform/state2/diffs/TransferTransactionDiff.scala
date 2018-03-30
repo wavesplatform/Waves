@@ -19,8 +19,8 @@ object TransferTransactionDiff {
     val isInvalidEi = for {
       recipient <- state.resolveAliasEi(tx.recipient)
       _ <- Either.cond((tx.feeAssetId >>= state.assetDescription >>= (_.script)).isEmpty,
-                      (),
-                      GenericError("Smart assets can't participate in TransferTransactions as a fee"))
+                       (),
+                       GenericError("Smart assets can't participate in TransferTransactions as a fee"))
       portfolios = (tx.assetId match {
         case None =>
           Map(sender -> Portfolio(-tx.amount, LeaseBalance.empty, Map.empty)).combine(
