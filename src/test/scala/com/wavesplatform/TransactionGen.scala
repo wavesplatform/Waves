@@ -430,7 +430,7 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
 
   val dataTxKeyGen = for {
     size <- Gen.choose[Byte](0, MaxKeySize)
-  } yield Random.alphanumeric.take(size).mkString
+  } yield Random.nextString(size)
 
   val longEntryGen = for {
     key   <- dataTxKeyGen

@@ -125,11 +125,11 @@ object LevelDBWriter {
     }
 
     private def writeStrings(strings: Seq[String]): Array[Byte] = {
-      val arrays = strings.flatMap { s =>
-        val bytes = s.getBytes(UTF8)
-        Seq(Shorts.toByteArray(bytes.length.toShort), bytes)
+      val b = ByteBuffer.allocate(strings.map(_.getBytes(UTF8).length + 2).sum)
+      for (s <- strings) {
+        b.putShort(s.length.toShort).put(s.getBytes(UTF8))
       }
-      Array.concat(arrays: _*)
+      b.array()
     }
 
     private def readTxIds(data: Array[Byte]): Seq[ByteStr] = Option(data).fold(Seq.empty[ByteStr]) { d =>
