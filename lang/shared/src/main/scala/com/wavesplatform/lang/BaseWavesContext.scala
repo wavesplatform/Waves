@@ -168,8 +168,7 @@ object BaseWavesContext {
 
   private val noneCoeval: Coeval[Either[String, Option[Nothing]]] = Coeval.evalOnce(Right(None))
 
-  val none: LazyVal = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval))
-  //val none: LazyVal = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval).subflatMap(Right(_: Option[Nothing]))) // @TODO
+  val none: LazyVal = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval).subflatMap(Right(_: Option[Nothing]))) // IDEA HACK
 
   private val optionByteVector: OPTION = OPTION(BYTEVECTOR)
   private val optionT                  = OPTIONTYPEPARAM(TYPEPARAM('T'))
