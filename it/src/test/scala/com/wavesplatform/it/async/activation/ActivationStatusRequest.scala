@@ -1,4 +1,4 @@
-package com.wavesplatform.it.activation
+package com.wavesplatform.it.async.activation
 
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus, NodeFeatureStatus}
@@ -10,20 +10,19 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 
 trait ActivationStatusRequest extends Matchers {
-  def activationStatus(node: Node, height: Int, featureNum: Short, timeout: Duration)
-                      (implicit ec: ExecutionContext): FeatureActivationStatus = Await.result(
-    activationStatusInternal(node, height).map(_.features.find(_.id == featureNum).get),
-    timeout
-  )
+  def activationStatus(node: Node, height: Int, featureNum: Short, timeout: Duration)(implicit ec: ExecutionContext): FeatureActivationStatus =
+    Await.result(
+      activationStatusInternal(node, height).map(_.features.find(_.id == featureNum).get),
+      timeout
+    )
 
-  def activationStatus(nodes: Seq[Node], height: Int, featureNum: Short, timeout: Duration)
-                      (implicit ec: ExecutionContext): FeatureActivationStatus = {
+  def activationStatus(nodes: Seq[Node], height: Int, featureNum: Short, timeout: Duration)(
+      implicit ec: ExecutionContext): FeatureActivationStatus = {
     Await.result(
       Future
         .traverse(nodes)(activationStatusInternal(_, height))
         .map { xs =>
-          xs
-            .collectFirst {
+          xs.collectFirst {
               case x if x.height == height => x
             }
             .flatMap(_.features.find(_.id == featureNum))
@@ -52,9 +51,7 @@ trait ActivationStatusRequest extends Matchers {
     }
   }
 
-  def assertApprovedStatus(activationStatusFeature: FeatureActivationStatus,
-                           height: Int,
-                           nodeFeatureStatus: NodeFeatureStatus): Unit = {
+  def assertApprovedStatus(activationStatusFeature: FeatureActivationStatus, height: Int, nodeFeatureStatus: NodeFeatureStatus): Unit = {
     withClue("activationHeight") {
       activationStatusFeature.activationHeight.get shouldBe height
     }
@@ -66,9 +63,7 @@ trait ActivationStatusRequest extends Matchers {
     }
   }
 
-  def assertActivatedStatus(activationStatusFeature: FeatureActivationStatus,
-                            height: Int,
-                            nodeFeatureStatus: NodeFeatureStatus): Unit = {
+  def assertActivatedStatus(activationStatusFeature: FeatureActivationStatus, height: Int, nodeFeatureStatus: NodeFeatureStatus): Unit = {
     withClue("activationHeight") {
       activationStatusFeature.activationHeight.get shouldBe height
     }

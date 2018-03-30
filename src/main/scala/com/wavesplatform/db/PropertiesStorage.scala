@@ -20,4 +20,3 @@ trait PropertiesStorage {
   def putProperty(property: String, value: Array[Byte], batch: Option[WriteBatch]): Unit =
     put(makeKey(PropertiesPrefix, property), value, batch)
 }
-

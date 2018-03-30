@@ -5,7 +5,6 @@ import java.net.InetSocketAddress
 import cats.Show
 import cats.implicits.showInterpolator
 import scorex.account.PrivateKeyAccount
-import scorex.crypto.encode.Base58
 
 case class GeneratorSettings(chainId: String,
                              accounts: Seq[String],
@@ -15,7 +14,7 @@ case class GeneratorSettings(chainId: String,
                              narrow: NarrowTransactionGenerator.Settings,
                              wide: WideTransactionGenerator.Settings,
                              dynWide: DynamicWideTransactionGenerator.Settings) {
-  val addressScheme: Char = chainId.head
+  val addressScheme: Char                        = chainId.head
   val privateKeyAccounts: Seq[PrivateKeyAccount] = accounts.map(s => PrivateKeyAccount.fromSeed(s).right.get)
 }
 
@@ -24,8 +23,8 @@ object GeneratorSettings {
     import x._
 
     val modeSettings: String = (mode match {
-      case Mode.NARROW => show"$narrow"
-      case Mode.WIDE => show"$wide"
+      case Mode.NARROW   => show"$narrow"
+      case Mode.WIDE     => show"$wide"
       case Mode.DYN_WIDE => show"$dynWide"
     }).toString
 

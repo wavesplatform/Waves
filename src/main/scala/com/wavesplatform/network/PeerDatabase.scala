@@ -5,7 +5,6 @@ import java.net.{InetAddress, InetSocketAddress}
 import io.netty.channel.Channel
 import scorex.utils.ScorexLogging
 
-
 trait PeerDatabase extends AutoCloseable {
 
   def addCandidate(socketAddress: InetSocketAddress): Boolean

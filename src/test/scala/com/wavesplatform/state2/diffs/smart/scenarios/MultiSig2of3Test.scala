@@ -26,9 +26,9 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
          |let B = base58'${ByteStr(pk1.publicKey)}'
          |let C = base58'${ByteStr(pk2.publicKey)}'
          |
-         |let AC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOFA,A)) then 1 else 0
-         |let BC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOFB,B)) then 1 else 0
-         |let CC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOFC,C)) then 1 else 0
+         |let AC = if(sigVerify(tx.bodyBytes,tx.proof0,A)) then 1 else 0
+         |let BC = if(sigVerify(tx.bodyBytes,tx.proof1,B)) then 1 else 0
+         |let CC = if(sigVerify(tx.bodyBytes,tx.proof2,C)) then 1 else 0
          |
          | AC + BC+ CC >= 2
          |
@@ -38,6 +38,7 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
   }
 
   val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, VersionedTransferTransaction, Seq[ByteStr])] = for {
+    version   <- Gen.oneOf(VersionedTransferTransaction.supportedVersions.toSeq)
     master    <- accountGen
     s0        <- accountGen
     s1        <- accountGen
@@ -52,7 +53,7 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
   } yield {
     val unsigned =
       VersionedTransferTransaction
-        .create(2, None, master, recepient, amount, timestamp, fee, Array.emptyByteArray, proofs = Proofs.empty)
+        .create(version, None, master, recepient, amount, timestamp, fee, Array.emptyByteArray, proofs = Proofs.empty)
         .explicitGet()
     val sig0 = ByteStr(crypto.sign(s0, unsigned.bodyBytes()))
     val sig1 = ByteStr(crypto.sign(s1, unsigned.bodyBytes()))

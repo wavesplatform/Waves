@@ -2,35 +2,40 @@ package scorex.transaction
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2._
+import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
-import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.smart.SetScriptTransaction
 
 class SetScriptTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
+  private val versionGen: Gen[Byte] = Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
+  private val versionAndAccountGen: Gen[(Byte, PrivateKeyAccount)] = for {
+    version <- versionGen
+    account <- accountGen
+  } yield (version, account)
+
   property("SetScriptTransaction serialization roundtrip") {
     forAll(setScriptTransactionGen) { tx: SetScriptTransaction =>
-      require(tx.bytes().head == TransactionType.SetScriptTransaction.id)
-      val recovered = SetScriptTransaction.parseTail(tx.bytes().tail).get
+      val recovered = SetScriptTransaction.parseBytes(tx.bytes()).get
       assertTxs(recovered, tx)
     }
   }
 
   property("SetScriptTransaction serialization from TypedTransaction") {
     forAll(setScriptTransactionGen) { tx: SetScriptTransaction =>
-      val recovered = TransactionParser.parseBytes(tx.bytes()).get
+      val recovered = TransactionParsers.parseBytes(tx.bytes()).get
       assertTxs(recovered.asInstanceOf[SetScriptTransaction], tx)
     }
   }
 
-
   property("SetScriptTransaction id doesn't depend on proof") {
-    forAll(accountGen, byteArrayGen(10), byteArrayGen(15), proofsGen, proofsGen, scriptGen) { case (acc: PrivateKeyAccount, p1, p2, proofs1, proofs2, script) =>
-      val tx1 = SetScriptTransaction.create(acc, Some(script), 1, 1, proofs1).explicitGet()
-      val tx2 = SetScriptTransaction.create(acc, Some(script), 1, 1, proofs2).explicitGet()
-      tx1.id() shouldBe tx2.id()
+    forAll(versionAndAccountGen, byteArrayGen(10), byteArrayGen(15), proofsGen, proofsGen, scriptGen) {
+      case ((version, acc: PrivateKeyAccount), p1, p2, proofs1, proofs2, script) =>
+        val tx1 = SetScriptTransaction.create(version, acc, Some(script), 1, 1, proofs1).explicitGet()
+        val tx2 = SetScriptTransaction.create(version, acc, Some(script), 1, 1, proofs2).explicitGet()
+        tx1.id() shouldBe tx2.id()
     }
   }
 

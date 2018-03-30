@@ -8,8 +8,7 @@ import com.wavesplatform.generator.utils.Gen
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.Transaction
 
-class DynamicWideTransactionGenerator(settings: Settings,
-                                      accounts: Seq[PrivateKeyAccount]) extends TransactionGenerator {
+class DynamicWideTransactionGenerator(settings: Settings, accounts: Seq[PrivateKeyAccount]) extends TransactionGenerator {
   require(accounts.nonEmpty)
 
   private val nextTxsNumber = new AtomicReference[Double](settings.start)
@@ -17,12 +16,10 @@ class DynamicWideTransactionGenerator(settings: Settings,
   private val limitedRecipientGen = Gen.address(settings.limitDestAccounts)
 
   override def next(): Iterator[Transaction] = {
-    val currTxsNumber = nextTxsNumber
-      .getAndUpdate { x =>
-        val newValue = x + settings.growAdder
-        settings.maxTxsPerRequest.foldLeft(newValue)(Math.min(_, _))
-      }
-      .toInt
+    val currTxsNumber = nextTxsNumber.getAndUpdate { x =>
+      val newValue = x + settings.growAdder
+      settings.maxTxsPerRequest.foldLeft(newValue)(Math.min(_, _))
+    }.toInt
 
     Gen.txs(settings.minFee, settings.maxFee, accounts, limitedRecipientGen).take(currTxsNumber)
   }
@@ -31,12 +28,7 @@ class DynamicWideTransactionGenerator(settings: Settings,
 
 object DynamicWideTransactionGenerator {
 
-  case class Settings(start: Int,
-                      growAdder: Double,
-                      maxTxsPerRequest: Option[Int],
-                      limitDestAccounts: Option[Int],
-                      minFee: Long,
-                      maxFee: Long) {
+  case class Settings(start: Int, growAdder: Double, maxTxsPerRequest: Option[Int], limitDestAccounts: Option[Int], minFee: Long, maxFee: Long) {
     require(start >= 1)
   }
 

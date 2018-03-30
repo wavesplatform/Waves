@@ -8,7 +8,7 @@ import scala.concurrent.duration.FiniteDuration
 trait ScoptImplicits {
   implicit def scoptOptionReads[T](implicit r: Read[T]): Read[Option[T]] = Read.stringRead.map {
     case "null" => None
-    case x => Option(r.reads(x))
+    case x      => Option(r.reads(x))
   }
 
   implicit val modeRead: Read[Mode.Value] = Read.reads(Mode withName _.toUpperCase)

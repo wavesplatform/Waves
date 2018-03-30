@@ -17,7 +17,7 @@ package object state2 {
 
   implicit class EitherExt2[A, B](ei: Either[A, B]) {
     def explicitGet(): B = ei match {
-      case Left(value) => throw new Exception(value.toString)
+      case Left(value)  => throw new Exception(value.toString)
       case Right(value) => value
     }
   }
@@ -26,7 +26,7 @@ package object state2 {
     def cast[B: ClassTag]: Option[B] = {
       a match {
         case b: B => Some(b)
-        case _ => None
+        case _    => None
       }
     }
   }

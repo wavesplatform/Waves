@@ -10,7 +10,7 @@ case class FeaturesBlockField(version: Byte, override val value: Set[Short]) ext
 
   protected override def j: JsObject = version match {
     case v if v < 3 => JsObject.empty
-    case _ => Json.obj(name -> JsArray(value.map(id => JsNumber(id.toInt)).toSeq))
+    case _          => Json.obj(name -> JsArray(value.map(id => JsNumber(id.toInt)).toSeq))
   }
 
   protected override def b = version match {

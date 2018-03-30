@@ -4,6 +4,8 @@ import com.google.common.primitives.{Bytes, Shorts}
 
 object Deser {
 
+  def serializeBoolean(b: Boolean): Array[Byte] = if (b) Array(1: Byte) else Array(0: Byte)
+
   def serializeArray(b: Array[Byte]): Array[Byte] = Shorts.toByteArray(b.length.toShort) ++ b
 
   def parseArraySize(bytes: Array[Byte], position: Int): (Array[Byte], Int) = {
@@ -27,9 +29,10 @@ object Deser {
 
   def parseArrays(bytes: Array[Byte]): Seq[Array[Byte]] = {
     val length = Shorts.fromByteArray(bytes.slice(0, 2))
-    val r = (0 until length).foldLeft((Seq.empty[Array[Byte]], 2)) { case ((acc, pos), _) =>
-      val (arr, nextPos) = parseArraySize(bytes, pos)
-      (acc :+ arr, nextPos)
+    val r = (0 until length).foldLeft((Seq.empty[Array[Byte]], 2)) {
+      case ((acc, pos), _) =>
+        val (arr, nextPos) = parseArraySize(bytes, pos)
+        (acc :+ arr, nextPos)
     }
     r._1
   }

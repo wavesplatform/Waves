@@ -6,18 +6,14 @@ import org.scalacheck.Gen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.transaction.TransactionParser
+import scorex.transaction.TransactionParsers
 
-class MicroBlockInvSpecSpec extends FreeSpec
-  with Matchers
-  with PropertyChecks
-  with Eventually
-  with TransactionGen {
+class MicroBlockInvSpecSpec extends FreeSpec with Matchers with PropertyChecks with Eventually with TransactionGen {
 
   private val microBlockInvGen: Gen[MicroBlockInv] = for {
-    acc <- accountGen
-    totalSig <- byteArrayGen(TransactionParser.SignatureLength)
-    prevBlockSig <- byteArrayGen(TransactionParser.SignatureLength)
+    acc          <- accountGen
+    totalSig     <- byteArrayGen(TransactionParsers.SignatureLength)
+    prevBlockSig <- byteArrayGen(TransactionParsers.SignatureLength)
   } yield MicroBlockInv(acc, ByteStr(totalSig), ByteStr(prevBlockSig))
 
   "MicroBlockInvMessageSpec" - {

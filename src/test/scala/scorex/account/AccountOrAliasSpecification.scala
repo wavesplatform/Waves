@@ -8,7 +8,7 @@ class AccountOrAliasSpecification extends PropSpec with PropertyChecks with Matc
 
   property("Account serialization round trip") {
     forAll(accountGen) { account: PrivateKeyAccount =>
-      val bytes = account.bytes.arr
+      val bytes   = account.bytes.arr
       val address = Address.fromBytes(bytes).right.get
       address.stringRepr shouldBe account.stringRepr
     }
@@ -16,7 +16,7 @@ class AccountOrAliasSpecification extends PropSpec with PropertyChecks with Matc
 
   property("Alias serialization round trip") {
     forAll(aliasGen) { alias: Alias =>
-      val bytes = alias.bytes.arr
+      val bytes          = alias.bytes.arr
       val representation = Alias.fromBytes(bytes).right.get
       representation.stringRepr shouldBe representation.stringRepr
     }
@@ -24,7 +24,7 @@ class AccountOrAliasSpecification extends PropSpec with PropertyChecks with Matc
 
   property("AccountOrAlias serialization round trip") {
     forAll(accountOrAliasGen) { aoa: AddressOrAlias =>
-      val bytes = aoa.bytes.arr
+      val bytes          = aoa.bytes.arr
       val addressOrAlias = AddressOrAlias.fromBytes(bytes, 0).right.get
       addressOrAlias._1.stringRepr shouldBe aoa.stringRepr
     }

@@ -1,18 +1,35 @@
 package com.wavesplatform.lang
+import com.wavesplatform.lang.ctx.Obj
 import scodec.bits.ByteVector
+
+import scala.reflect.runtime.universe._
 
 object Terms {
 
-  case class FUNCTION(args: List[TYPE], result: TYPE)
+  case class FUNCTION(args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER)
 
-  sealed trait TYPE { type Underlying }
-  case object NOTHING              extends TYPE { type Underlying = Nothing              }
-  case object UNIT                 extends TYPE { type Underlying = Unit                 }
-  case object LONG                 extends TYPE { type Underlying = Long                 }
-  case object BYTEVECTOR           extends TYPE { type Underlying = ByteVector           }
-  case object BOOLEAN              extends TYPE { type Underlying = Boolean              }
-  case class OPTION(t: TYPE)       extends TYPE { type Underlying = Option[t.Underlying] }
-  case class TYPEREF(name: String) extends TYPE { type Underlying = Any                  }
+  sealed trait TYPEPLACEHOLDER
+  case class TYPEPARAM(char: Char)               extends TYPEPLACEHOLDER
+  case class OPTIONTYPEPARAM(t: TYPEPLACEHOLDER) extends TYPEPLACEHOLDER
+
+  sealed trait TYPE extends TYPEPLACEHOLDER {
+    type Underlying
+    def typetag: TypeTag[Underlying]
+  }
+  sealed abstract class AUTO_TAGGED_TYPE[T](implicit override val typetag: TypeTag[T]) extends TYPE {
+    override type Underlying = T
+  }
+  case object NOTHING    extends AUTO_TAGGED_TYPE[Nothing]
+  case object UNIT       extends AUTO_TAGGED_TYPE[Unit]
+  case object LONG       extends AUTO_TAGGED_TYPE[Long]
+  case object BYTEVECTOR extends AUTO_TAGGED_TYPE[ByteVector]
+  case object BOOLEAN    extends AUTO_TAGGED_TYPE[Boolean]
+  case object STRING     extends AUTO_TAGGED_TYPE[String]
+  case class OPTION(innerType: TYPE) extends TYPE {
+    type Underlying = Option[innerType.Underlying]
+    override def typetag: TypeTag[Option[innerType.Underlying]] = typeTag[Underlying]
+  }
+  case class TYPEREF(name: String) extends AUTO_TAGGED_TYPE[Obj]
 
   sealed trait BINARY_OP_KIND
   case object SUM_OP extends BINARY_OP_KIND
@@ -25,17 +42,16 @@ object Terms {
   object Untyped {
     case class LET(name: String, value: EXPR)
     sealed trait EXPR
-    case class CONST_LONG(t: Long)                                    extends EXPR
+    case class CONST_LONG(value: Long)                               extends EXPR
     case class GETTER(ref: EXPR, field: String)                      extends EXPR
-    case class CONST_BYTEVECTOR(bs: ByteVector)                      extends EXPR
+    case class CONST_BYTEVECTOR(value: ByteVector)                   extends EXPR
+    case class CONST_STRING(value: String)                           extends EXPR
     case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR)     extends EXPR
     case class BLOCK(let: Option[LET], body: EXPR)                   extends EXPR
     case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)           extends EXPR
     case class REF(key: String)                                      extends EXPR
     case object TRUE                                                 extends EXPR
     case object FALSE                                                extends EXPR
-    case object NONE                                                 extends EXPR
-    case class SOME(t: EXPR)                                         extends EXPR
     case class FUNCTION_CALL(functionName: String, args: List[EXPR]) extends EXPR
   }
 
@@ -45,14 +61,13 @@ object Terms {
     case class CONST_LONG(t: Long)                                                           extends EXPR(LONG)
     case class GETTER(ref: EXPR, field: String, override val tpe: TYPE)                      extends EXPR(tpe)
     case class CONST_BYTEVECTOR(bs: ByteVector)                                              extends EXPR(BYTEVECTOR)
+    case class CONST_STRING(s: String)                                                       extends EXPR(STRING)
     case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR, override val tpe: TYPE)     extends EXPR(tpe)
     case class BLOCK(let: Option[LET], body: EXPR, override val tpe: TYPE)                   extends EXPR(tpe)
     case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, override val tpe: TYPE)           extends EXPR(tpe)
     case class REF(key: String, override val tpe: TYPE)                                      extends EXPR(tpe)
     case object TRUE                                                                         extends EXPR(BOOLEAN)
     case object FALSE                                                                        extends EXPR(BOOLEAN)
-    case object NONE                                                                         extends EXPR(OPTION(NOTHING))
-    case class SOME(t: EXPR, override val tpe: TYPE)                                         extends EXPR(tpe)
     case class FUNCTION_CALL(functionName: String, args: List[EXPR], override val tpe: TYPE) extends EXPR(tpe)
   }
 
@@ -69,11 +84,4 @@ object Terms {
         case (OPTION(it1), OPTION(it2)) => findCommonType(it1, it2, biDirectional).map(OPTION)
         case _                          => None
       }
-
-  def inferTypeParams(actual: TYPE, expected: TYPE): List[(String, TYPE)] =
-    (actual, expected) match {
-      case (actualType, TYPEREF(name)) => List((name, actualType))
-      case (OPTION(t1), OPTION(t2))    => inferTypeParams(t1, t2)
-      case _                           => List.empty
-    }
 }

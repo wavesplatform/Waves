@@ -24,7 +24,10 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parse("(10+11)") shouldBe BINARY_OP(CONST_LONG(10), SUM_OP, CONST_LONG(11))
     parse("(10+11) + 12") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(10), SUM_OP, CONST_LONG(11)), SUM_OP, CONST_LONG(12))
     parse("10   + 11 + 12") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(10), SUM_OP, CONST_LONG(11)), SUM_OP, CONST_LONG(12))
-    parse("1+2+3+4+5") shouldBe BINARY_OP(BINARY_OP(BINARY_OP(BINARY_OP(CONST_LONG(1), SUM_OP, CONST_LONG(2)), SUM_OP, CONST_LONG(3)), SUM_OP, CONST_LONG(4)), SUM_OP, CONST_LONG(5))
+    parse("1+2+3+4+5") shouldBe BINARY_OP(
+      BINARY_OP(BINARY_OP(BINARY_OP(CONST_LONG(1), SUM_OP, CONST_LONG(2)), SUM_OP, CONST_LONG(3)), SUM_OP, CONST_LONG(4)),
+      SUM_OP,
+      CONST_LONG(5))
     parse("1==1") shouldBe BINARY_OP(CONST_LONG(1), EQ_OP, CONST_LONG(1))
     parse("true && true") shouldBe BINARY_OP(TRUE, AND_OP, TRUE)
     parse("true || false") shouldBe BINARY_OP(TRUE, OR_OP, FALSE)
@@ -34,17 +37,19 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("priority in binary expressions") {
-    parse("1 == 0 || 3 == 2") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(1), EQ_OP, CONST_LONG(0)), OR_OP, BINARY_OP(CONST_LONG(3), EQ_OP, CONST_LONG(2)))
+    parse("1 == 0 || 3 == 2") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(1), EQ_OP, CONST_LONG(0)),
+                                                 OR_OP,
+                                                 BINARY_OP(CONST_LONG(3), EQ_OP, CONST_LONG(2)))
     parse("3 + 2 > 2 + 1") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(3), SUM_OP, CONST_LONG(2)), GT_OP, BINARY_OP(CONST_LONG(2), SUM_OP, CONST_LONG(1)))
     parse("1 >= 0 || 3 > 2") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(1), GE_OP, CONST_LONG(0)), OR_OP, BINARY_OP(CONST_LONG(3), GT_OP, CONST_LONG(2)))
   }
 
   property("bytestr expressions") {
-    parse("false || SIGVERIFY(base58'333', base58'222', base58'111')") shouldBe BINARY_OP(
+    parse("false || sigVerify(base58'333', base58'222', base58'111')") shouldBe BINARY_OP(
       FALSE,
       OR_OP,
       FUNCTION_CALL(
-        "SIGVERIFY",
+        "sigVerify",
         List(
           CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("333").get)),
           CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("222").get)),
@@ -101,7 +106,9 @@ X > Y
 
   property("if") {
     parse("if(true) then 1 else 2") shouldBe IF(TRUE, CONST_LONG(1), CONST_LONG(2))
-    parse("if(true) then 1 else if(X==Y) then 2 else 3") shouldBe IF(TRUE, CONST_LONG(1), IF(BINARY_OP(REF("X"), EQ_OP, REF("Y")), CONST_LONG(2), CONST_LONG(3)))
+    parse("if(true) then 1 else if(X==Y) then 2 else 3") shouldBe IF(TRUE,
+                                                                     CONST_LONG(1),
+                                                                     IF(BINARY_OP(REF("X"), EQ_OP, REF("Y")), CONST_LONG(2), CONST_LONG(3)))
     parse("""if ( true )
         |then 1
         |else if(X== Y)
@@ -131,6 +138,14 @@ X > Y
       """.stripMargin) shouldBe GETTER(REF("X"), "Y")
   }
 
+  property("string literal") {
+    parse("""
+            |
+            | "asdf"
+            |
+      """.stripMargin) shouldBe CONST_STRING("asdf")
+  }
+
   property("reserved keywords are invalid variable names") {
     def script(keyword: String): String =
       s"""
@@ -151,13 +166,13 @@ X > Y
         |let B = base58'PK2PK2PK2PK2PK2'
         |let C = base58'PK3PK3PK3PK3PK3'
         |
-        |let W = TX.BODYBYTES
-        |let P = TX.PROOF
-        |let V = SIGVERIFY(W,P,A)
+        |let W = tx.bodyBytes
+        |let P = tx.PROOF
+        |let V = sigVerify(W,P,A)
         |
         |let AC = if(V) then 1 else 0
-        |let BC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOF,B)) then 1 else 0
-        |let CC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOF,C)) then 1 else 0
+        |let BC = if(sigVerify(tx.bodyBytes,tx.PROOF,B)) then 1 else 0
+        |let CC = if(sigVerify(tx.bodyBytes,tx.PROOF,C)) then 1 else 0
         |
         | AC + BC+ CC >= 2
         |
@@ -166,7 +181,7 @@ X > Y
   }
 
   property("function call") {
-    parse("FOO(1,2)".stripMargin) shouldBe FUNCTION_CALL("FOO", List(CONST_LONG(1),CONST_LONG(2)))
+    parse("FOO(1,2)".stripMargin) shouldBe FUNCTION_CALL("FOO", List(CONST_LONG(1), CONST_LONG(2)))
     parse("FOO(X)".stripMargin) shouldBe FUNCTION_CALL("FOO", List(REF("X")))
   }
 

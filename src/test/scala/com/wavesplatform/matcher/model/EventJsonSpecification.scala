@@ -14,11 +14,7 @@ import scorex.transaction.assets.exchange.AssetPair
 
 import scala.collection.immutable.TreeMap
 
-class EventJsonSpecification extends PropSpec
-  with PropertyChecks
-  with Matchers
-  with MatcherTestData
-  with NoShrink {
+class EventJsonSpecification extends PropSpec with PropertyChecks with Matchers with MatcherTestData with NoShrink {
 
   val buyLevelGen: Gen[Vector[BuyLimitOrder]] =
     Gen.containerOf[Vector, BuyLimitOrder](buyLimitOrderGenerator)
@@ -28,8 +24,8 @@ class EventJsonSpecification extends PropSpec
 
   property("Write/Read Bids TreeMap") {
     forAll(buyLevelGen) { xs: Vector[BuyLimitOrder] =>
-      val q = TreeMap.empty[Price, Level[BuyLimitOrder]](OrderBook.bidsOrdering) ++ xs.groupBy(_.price)
-      val j = Json.toJson(q)
+      val q   = TreeMap.empty[Price, Level[BuyLimitOrder]](OrderBook.bidsOrdering) ++ xs.groupBy(_.price)
+      val j   = Json.toJson(q)
       val res = j.validate[TreeMap[Price, Level[BuyLimitOrder]]]
       res.get should ===(q)
       res.get.ordering shouldBe q.ordering
@@ -38,8 +34,8 @@ class EventJsonSpecification extends PropSpec
 
   property("Write/Read Asks TreeMap") {
     forAll(sellLevelGen) { xs: Vector[SellLimitOrder] =>
-      val q = TreeMap.empty[Price, Level[SellLimitOrder]](OrderBook.asksOrdering) ++ xs.groupBy(_.price)
-      val j = Json.toJson(q)
+      val q   = TreeMap.empty[Price, Level[SellLimitOrder]](OrderBook.asksOrdering) ++ xs.groupBy(_.price)
+      val j   = Json.toJson(q)
       val res = j.validate[TreeMap[Price, Level[SellLimitOrder]]]
       res.get should ===(q)
       res.get.ordering shouldBe q.ordering
@@ -50,15 +46,15 @@ class EventJsonSpecification extends PropSpec
     forAll(buyLevelGen, sellLevelGen) { (bs: Vector[BuyLimitOrder], ss: Vector[SellLimitOrder]) =>
       val bids = TreeMap.empty[Price, Level[BuyLimitOrder]] ++ bs.groupBy(_.price)
       val asks = TreeMap.empty[Price, Level[SellLimitOrder]] ++ ss.groupBy(_.price)
-      val ob = OrderBook(bids, asks)
+      val ob   = OrderBook(bids, asks)
 
-      val j = Json.toJson(ob)
+      val j   = Json.toJson(ob)
       val res = j.validate[OrderBook]
       res.get should ===(ob)
 
       val s = Snapshot(ob)
 
-      val js = Json.toJson(s)
+      val js       = Json.toJson(s)
       val restored = js.validate[Snapshot]
       restored.get should ===(s)
     }
@@ -67,8 +63,8 @@ class EventJsonSpecification extends PropSpec
   property("OrderBookCreated json serialization roundtrip") {
     forAll(assetPairGen) { pair: AssetPair =>
       val obc = OrderBookCreated(pair)
-      val js = orderBookCreatedFormat.writes(obc)
-      val r = js.as[OrderBookCreated]
+      val js  = orderBookCreatedFormat.writes(obc)
+      val r   = js.as[OrderBookCreated]
       obc shouldBe r
     }
   }

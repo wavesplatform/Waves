@@ -32,4 +32,3 @@ case object Validation {
 
   val success = Validation(status = true)
 }
-

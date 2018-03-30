@@ -12,12 +12,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 
-class HandshakeDecoderSpec extends FreeSpec
-  with Matchers
-  with MockFactory
-  with PropertyChecks
-  with TransactionGen
-  with NoShrink {
+class HandshakeDecoderSpec extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen with NoShrink {
 
   "should read a handshake and remove itself from the pipeline" in {
     var mayBeDecodedHandshake: Option[Handshake] = None
@@ -27,7 +22,7 @@ class HandshakeDecoderSpec extends FreeSpec
       new ChannelInboundHandlerAdapter {
         override def channelRead(ctx: ChannelHandlerContext, msg: Any): Unit = msg match {
           case x: Handshake => mayBeDecodedHandshake = Some(x)
-          case _ =>
+          case _            =>
         }
       }
     )
@@ -51,13 +46,13 @@ class HandshakeDecoderSpec extends FreeSpec
 
   private val invalidHandshakeBytes: Gen[Array[Byte]] = {
     // To bypass situations where the appNameLength > whole buffer and HandshakeDecoder waits for next bytes
-    val appName = "x" * Byte.MaxValue
+    val appName  = "x" * Byte.MaxValue
     val nodeName = "y" * Byte.MaxValue
 
-    val appNameBytes = appName.getBytes(StandardCharsets.UTF_8)
-    val versionBytes = Array(1, 2, 3).flatMap(Ints.toByteArray)
-    val nodeNameBytes = nodeName.getBytes(StandardCharsets.UTF_8)
-    val nonceBytes = Longs.toByteArray(1)
+    val appNameBytes   = appName.getBytes(StandardCharsets.UTF_8)
+    val versionBytes   = Array(1, 2, 3).flatMap(Ints.toByteArray)
+    val nodeNameBytes  = nodeName.getBytes(StandardCharsets.UTF_8)
+    val nonceBytes     = Longs.toByteArray(1)
     val timestampBytes = Longs.toByteArray(System.currentTimeMillis() / 1000)
 
     val validDeclaredAddressLen = Set(0, 8, 20)

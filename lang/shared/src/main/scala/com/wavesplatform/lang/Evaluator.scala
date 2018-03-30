@@ -5,25 +5,29 @@ import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.ctx._
 import monix.eval.Coeval
 
+import scala.reflect.runtime.universe.TypeTag
+
 import scala.util.{Failure, Success, Try}
 
 object Evaluator {
 
-  private def r[T](ctx: Context, t: TrampolinedExecResult[Typed.EXPR]): TrampolinedExecResult[T] =
+  private def r[T: TypeTag](ctx: Context, t: TrampolinedExecResult[Typed.EXPR]): TrampolinedExecResult[T] =
     t flatMap { (typedExpr: Typed.EXPR) =>
       (typedExpr match {
         case Typed.BLOCK(mayBeLet, inner, blockTpe) =>
           mayBeLet match {
-            case None => r[blockTpe.Underlying](ctx, EitherT.pure(inner))
+            case None => r(ctx, EitherT.pure(inner))(blockTpe.typetag)
             case Some(Typed.LET(newVarName, newVarBlock)) =>
-              ctx.letDefs.get(newVarName) match {
-                case Some(_) => EitherT.leftT[Coeval, T](s"Value '$newVarName' already defined in the scope")
-                case None =>
+              (ctx.letDefs.get(newVarName), ctx.functions.get(newVarName)) match {
+                case (Some(_), _) => EitherT.leftT[Coeval, T](s"Value '$newVarName' already defined in the scope")
+                case (_, Some(_)) =>
+                  EitherT.leftT[Coeval, Typed.EXPR](s"Value '$newVarName' can't be defined because function with such name is predefined")
+                case (None, None) =>
                   val varBlockTpe                                                  = newVarBlock.tpe
-                  val eitherTCoeval: TrampolinedExecResult[varBlockTpe.Underlying] = r[varBlockTpe.Underlying](ctx, EitherT.pure(newVarBlock))
+                  val eitherTCoeval: TrampolinedExecResult[varBlockTpe.Underlying] = r(ctx, EitherT.pure(newVarBlock))(varBlockTpe.typetag)
                   val lz: LazyVal                                                  = LazyVal(varBlockTpe)(eitherTCoeval)
                   val updatedCtx: Context                                          = ctx.copy(letDefs = ctx.letDefs.updated(newVarName, lz))
-                  r[blockTpe.Underlying](updatedCtx, EitherT.pure(inner))
+                  r(updatedCtx, EitherT.pure(inner))(blockTpe.typetag)
               }
           }
         case Typed.REF(str, _) =>
@@ -32,8 +36,9 @@ object Evaluator {
             case None      => EitherT.leftT[Coeval, T](s"A definition of '$str' is not found")
           }
 
-        case Typed.CONST_LONG(v)        => EitherT.rightT[Coeval, String](v)
+        case Typed.CONST_LONG(v)       => EitherT.rightT[Coeval, String](v)
         case Typed.CONST_BYTEVECTOR(v) => EitherT.rightT[Coeval, String](v)
+        case Typed.CONST_STRING(v)     => EitherT.rightT[Coeval, String](v)
         case Typed.TRUE                => EitherT.rightT[Coeval, String](true)
         case Typed.FALSE               => EitherT.rightT[Coeval, String](false)
 
@@ -56,8 +61,8 @@ object Evaluator {
 
         case Typed.IF(cond, t1, t2, tpe) =>
           r[Boolean](ctx, EitherT.pure(cond)) flatMap {
-            case true  => r[tpe.Underlying](ctx, EitherT.pure(t1))
-            case false => r[tpe.Underlying](ctx, EitherT.pure(t2))
+            case true  => r(ctx, EitherT.pure(t1))(tpe.typetag)
+            case false => r(ctx, EitherT.pure(t2))(tpe.typetag)
           }
 
         case Typed.BINARY_OP(t1, AND_OP, t2, BOOLEAN) =>
@@ -73,12 +78,10 @@ object Evaluator {
 
         case Typed.BINARY_OP(it1, EQ_OP, it2, tpe) =>
           for {
-            i1 <- r[tpe.Underlying](ctx, EitherT.pure(it1))
-            i2 <- r[tpe.Underlying](ctx, EitherT.pure(it2))
-          } yield i1 == i2
+            i1 <- r(ctx, EitherT.pure(it1))(it1.tpe.typetag)
+            i2 <- r(ctx, EitherT.pure(it2))(it2.tpe.typetag)
 
-        case Typed.NONE         => EitherT.rightT[Coeval, String](None)
-        case Typed.SOME(b, tpe) => r[tpe.Underlying](ctx, EitherT.pure(b)).map(Some(_))
+          } yield i1 == i2
         case Typed.GETTER(expr, field, _) =>
           r[Obj](ctx, EitherT.pure(expr)).flatMap { (obj: Obj) =>
             val value: EitherT[Coeval, ExecutionError, Any] = obj.fields.find(_._1 == field) match {
@@ -87,7 +90,7 @@ object Evaluator {
             }
             value
           }
-        case Typed.FUNCTION_CALL(name, args, tpe) =>
+        case Typed.FUNCTION_CALL(name, args, _) =>
           import cats.data._
           import cats.instances.vector._
           import cats.syntax.all._
@@ -95,7 +98,7 @@ object Evaluator {
             case Some(func) =>
               val argsVector = args
                 .map(a =>
-                  r[a.tpe.Underlying](ctx, EitherT.pure(a))
+                  r(ctx, EitherT.pure(a))(a.tpe.typetag)
                     .map(_.asInstanceOf[Any]))
                 .toVector
               val argsSequenced = argsVector.sequence[TrampolinedExecResult, Any]
@@ -105,14 +108,20 @@ object Evaluator {
               } yield r
             case None => EitherT.leftT[Coeval, Any](s"function '$name' not found")
           }
-        case Typed.BINARY_OP(_, SUM_OP, _, tpe) if tpe != LONG             => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
+        case Typed.BINARY_OP(_, SUM_OP, _, tpe) if tpe != LONG            => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
         case Typed.BINARY_OP(_, GE_OP | GT_OP, _, tpe) if tpe != BOOLEAN  => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
         case Typed.BINARY_OP(_, AND_OP | OR_OP, _, tpe) if tpe != BOOLEAN => EitherT.leftT[Coeval, Any](s"Expected BOOLEAN, but got $tpe: $t")
 
-      }).map(_.asInstanceOf[T])
+      }).map { v =>
+        val tt = implicitly[TypeTag[T]]
+        v match {
+          case x if typedExpr.tpe.typetag.tpe <:< tt.tpe => x.asInstanceOf[T]
+          case _                                         => throw new Exception(s"Bad type: expected: ${tt.tpe} actual: ${typedExpr.tpe.typetag.tpe}")
+        }
+      }
     }
 
-  def apply[A](c: Context, expr: Typed.EXPR): Either[ExecutionError, A] = {
+  def apply[A: TypeTag](c: Context, expr: Typed.EXPR): Either[ExecutionError, A] = {
     def result = r[A](c, EitherT.pure(expr)).value.apply()
     Try(result) match {
       case Failure(ex)  => Left(ex.toString)
