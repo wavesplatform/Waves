@@ -588,7 +588,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
       if (newlyApprovedFeatures.nonEmpty) {
         approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(k.approvedFeatures)
         rw.put(k.approvedFeatures, approvedFeaturesCache)
-        activatedFeaturesCache = newlyApprovedFeatures.mapValues(_ + activationWindowSize) ++ rw.get(k.activatedFeatures)
+        activatedFeaturesCache = newlyApprovedFeatures.mapValues(_ + activationWindowSize) ++ activatedFeaturesCache
         rw.put(k.activatedFeatures, activatedFeaturesCache)
       }
     }
