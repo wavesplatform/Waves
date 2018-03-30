@@ -139,6 +139,15 @@ object SyncHttpApi extends Assertions {
 
     def signAndBroadcast(tx: JsObject): Transaction =
       Await.result(async(n).signAndBroadcast(tx), RequestAwaitTime)
+
+    def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
+      Await.result(async(n).waitForHeight(expectedHeight), requestAwaitTime)
+
+    def debugMinerInfo(): Seq[State] =
+      Await.result(async(n).debugMinerInfo(), RequestAwaitTime)
+
+    def height: Int =
+      Await.result(async(n).height, RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
