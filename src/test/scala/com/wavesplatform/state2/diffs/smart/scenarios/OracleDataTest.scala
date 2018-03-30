@@ -23,9 +23,9 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       ts     <- positiveIntGen
       genesis  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       genesis2 = GenesisTransaction.create(oracle, ENOUGH_AMT, ts).explicitGet()
-      long            <- longEntryGen
-      bool            <- booleanEntryGen
-      bin             <- binaryEntryGen
+      long            <- longEntryGen(dataAsciiKeyGen)
+      bool            <- booleanEntryGen(dataAsciiKeyGen).filter(_.key != long.key)
+      bin             <- binaryEntryGen(dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key)
       dataTransaction <- dataTransactionGenP(oracle, List(long, bool, bin))
       allFieldsRequiredScript        = s"""
                     |

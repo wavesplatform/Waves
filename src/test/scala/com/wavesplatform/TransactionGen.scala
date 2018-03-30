@@ -428,27 +428,34 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
   import DataEntry.{MaxKeySize, MaxValueSize}
   import DataTransaction.MaxEntryCount
 
-  val dataTxKeyGen = for {
+  val dataKeyGen = for {
     size <- Gen.choose[Byte](0, MaxKeySize)
   } yield Random.nextString(size)
 
-  val longEntryGen = for {
-    key   <- dataTxKeyGen
-    value <- Gen.choose[Long](Long.MinValue, Long.MaxValue)
-  } yield LongDataEntry(key, value)
+  val dataAsciiKeyGen = for {
+    size <- Gen.choose[Byte](0, MaxKeySize)
+  } yield Random.alphanumeric.take(size).mkString
 
-  val booleanEntryGen = for {
-    key   <- dataTxKeyGen
-    value <- Gen.oneOf(true, false)
-  } yield BooleanDataEntry(key, value)
+  def longEntryGen(keyGen: Gen[String] = dataKeyGen) =
+    for {
+      key   <- keyGen
+      value <- Gen.choose[Long](Long.MinValue, Long.MaxValue)
+    } yield LongDataEntry(key, value)
 
-  val binaryEntryGen = for {
-    key   <- dataTxKeyGen
-    size  <- Gen.choose(0, MaxValueSize)
-    value <- byteArrayGen(size)
-  } yield BinaryDataEntry(key, ByteStr(value))
+  def booleanEntryGen(keyGen: Gen[String] = dataKeyGen) =
+    for {
+      key   <- keyGen
+      value <- Gen.oneOf(true, false)
+    } yield BooleanDataEntry(key, value)
 
-  val dataEntryGen = Gen.oneOf(longEntryGen, booleanEntryGen, binaryEntryGen)
+  def binaryEntryGen(keyGen: Gen[String] = dataKeyGen) =
+    for {
+      key   <- keyGen
+      size  <- Gen.choose(0, MaxValueSize)
+      value <- byteArrayGen(size)
+    } yield BinaryDataEntry(key, ByteStr(value))
+
+  val dataEntryGen = Gen.oneOf(longEntryGen(), booleanEntryGen(), binaryEntryGen())
 
   val dataTransactionGen = {
     import DataTransaction.MaxEntryCount
