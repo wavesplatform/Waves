@@ -492,6 +492,8 @@ object AsyncHttpApi extends Assertions {
       getWithApiKey(s"/debug/portfolios/$address?considerUnspent=$considerUnspent")
     }.as[Portfolio]
 
+    def debugMinerInfo(): Future[Seq[State]] = getWithApiKey(s"/debug/minerInfo").as[Seq[State]]
+
     def accountEffectiveBalance(acc: String): Future[Long] = n.effectiveBalance(acc).map(_.balance)
 
     def accountBalance(acc: String): Future[Long] = n.balance(acc).map(_.balance)

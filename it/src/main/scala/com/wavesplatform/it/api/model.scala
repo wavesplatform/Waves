@@ -124,6 +124,11 @@ object BlacklistedPeer {
   implicit val blacklistedPeerFormat: Format[BlacklistedPeer] = Json.format
 }
 
+case class State(address: String, miningBalance: Long, timestamp: Long)
+object State {
+  implicit val StateFormat: Format[State] = Json.format
+}
+
 // Obsolete payment request
 case class PaymentRequest(amount: Long, fee: Long, sender: String, recipient: String)
 object PaymentRequest {
