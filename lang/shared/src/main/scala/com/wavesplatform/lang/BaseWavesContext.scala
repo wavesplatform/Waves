@@ -13,7 +13,7 @@ abstract class BaseWavesContext extends Environment {
 
   private val Global = com.wavesplatform.lang.hacks.Global // Hack for IDEA
 
-  val keccack256F: PredefFunction = hashFunction("keccack256")(Global.keccack256)
+  val keccak256F: PredefFunction = hashFunction("keccak256")(Global.keccak256)
   val blake2b256F: PredefFunction = hashFunction("blake2b256")(Global.blake2b256)
   val sha256F: PredefFunction     = hashFunction("sha256")(Global.sha256)
 
@@ -95,7 +95,7 @@ abstract class BaseWavesContext extends Environment {
         some.name       -> some,
         size.name       -> size,
         //hashing
-        keccack256F.name -> keccack256F,
+        keccak256F.name -> keccak256F,
         blake2b256F.name -> blake2b256F,
         sha256F.name     -> sha256F,
         //utils
@@ -117,7 +117,7 @@ abstract class BaseWavesContext extends Environment {
   private val HashLength                 = 20
   private val AddressVersion             = 1: Byte
   private val AddressLength              = 1 + 1 + ChecksumLength + HashLength
-  private def secureHash(a: Array[Byte]) = Global.keccack256(Global.blake2b256(a))
+  private def secureHash(a: Array[Byte]) = Global.keccak256(Global.blake2b256(a))
 
   val toBase58StringF: PredefFunction = PredefFunction("toBase58String", STRING, List(("bytes", BYTEVECTOR))) {
     case (bytes: ByteVector) :: Nil =>
