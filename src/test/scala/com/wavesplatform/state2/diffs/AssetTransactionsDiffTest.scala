@@ -1,6 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import com.wavesplatform.lang.{Parser, TypeChecker}
 import fastparse.core.Parsed
@@ -15,6 +16,8 @@ import scorex.transaction.smart.Script
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.smart.smartEnabledFS
+import scorex.settings.TestFunctionalitySettings
+import cats.implicits._
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
@@ -85,6 +88,33 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
         }
         assertDiffEi(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(burn))) { blockDiffEi =>
           blockDiffEi should produce("Asset was issued by other address")
+        }
+    }
+  }
+
+  property("Can burn non-owned alias if feature 'BurnAnyTokens' activated") {
+    val setup = for {
+      issuer    <- accountGen
+      burner    <- accountGen.suchThat(_ != issuer)
+      timestamp <- timestampGen
+      genesis: GenesisTransaction = GenesisTransaction.create(issuer, ENOUGH_AMT, timestamp).right.get
+      (issue, _, _) <- issueReissueBurnGeneratorP(ENOUGH_AMT, issuer)
+      assetTransfer <- transferGeneratorP(issuer, burner, issue.assetId().some, None)
+      wavesTransfer <- wavesTransferGeneratorP(issuer, burner)
+      burn = BurnTransaction.create(burner, issue.assetId(), assetTransfer.amount, wavesTransfer.amount, timestamp).right.get
+    } yield (genesis, issue, assetTransfer, wavesTransfer, burn)
+
+    val fs =
+      TestFunctionalitySettings.Enabled
+        .copy(
+          preActivatedFeatures = Map(BlockchainFeatures.BurnAnyTokens.id -> 0)
+        )
+
+    forAll(setup) {
+      case (genesis, issue, assetTransfer, wavesTransfer, burn) =>
+        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, issue, assetTransfer, wavesTransfer))), TestBlock.create(Seq(burn)), fs) {
+          case (_, newState) =>
+            newState.portfolio(burn.sender).assets shouldBe Map(burn.assetId -> 0)
         }
     }
   }
