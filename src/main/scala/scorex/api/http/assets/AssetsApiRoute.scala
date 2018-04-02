@@ -270,7 +270,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           "decimals"       -> JsNumber(tx.decimals.toInt),
           "reissuable"     -> JsBoolean(description.reissuable),
           "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
-          "script"         -> JsString(description.script.fold("")(s => s.bytes().base58))
+          "script"         -> JsString(description.script.fold("")(s => s.bytes().base58)),
+          "scriptText"     -> JsString(description.script.fold("")(s => s.text))
         )
       )
     }).left.map(m => CustomValidationError(m))

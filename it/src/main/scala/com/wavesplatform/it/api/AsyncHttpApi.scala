@@ -23,7 +23,7 @@ import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
-import scorex.api.http.{ApiErrorResponse, DataRequest}
+import scorex.api.http.{AddressApiRoute, ApiErrorResponse, DataRequest}
 import scorex.transaction.assets.MassTransferTransaction
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 import scorex.transaction.assets.exchange.Order
@@ -206,6 +206,9 @@ object AsyncHttpApi extends Assertions {
     def activationStatus: Future[ActivationStatus] = get("/activation/status").as[ActivationStatus]
 
     def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
+
+    def scriptInfo(address: String): Future[AddressApiRoute.AddressScriptInfo] =
+      get(s"/addresses/scriptInfo/$address").as[AddressApiRoute.AddressScriptInfo]
 
     def findTransactionInfo(txId: String): Future[Option[Transaction]] = transactionInfo(txId).transform {
       case Success(tx)                                       => Success(Some(tx))
