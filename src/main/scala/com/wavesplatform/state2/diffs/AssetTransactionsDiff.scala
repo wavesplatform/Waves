@@ -1,8 +1,10 @@
 package com.wavesplatform.state2.diffs
 
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{AssetInfo, Diff, LeaseBalance, Portfolio}
+import scorex.account.PublicKeyAccount
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SmartIssueTransaction}
 import scorex.transaction.{AssetId, SignedTransaction, ValidationError}
@@ -35,7 +37,7 @@ object AssetTransactionsDiff {
 
   def reissue(state: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(
       tx: ReissueTransaction): Either[ValidationError, Diff] =
-    validateAsset(tx, state, tx.assetId).flatMap { _ =>
+    validateAsset(tx, state, tx.assetId, shouldMatch = true).flatMap { _ =>
       val oldInfo = state.assetDescription(tx.assetId).get
       if (oldInfo.reissuable || blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) {
         Right(
@@ -52,8 +54,10 @@ object AssetTransactionsDiff {
       }
     }
 
-  def burn(state: SnapshotStateReader, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] = {
-    validateAsset(tx, state, tx.assetId).map(itx => {
+  def burn(state: SnapshotStateReader, fp: FeatureProvider, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] = {
+    val burnAnyTokensEnabled = fp.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, state.height)
+
+    validateAsset(tx, state, tx.assetId, !burnAnyTokensEnabled).map(itx => {
       Diff(
         height = height,
         tx = tx,
@@ -63,13 +67,24 @@ object AssetTransactionsDiff {
     })
   }
 
-  private def validateAsset(tx: SignedTransaction, state: SnapshotStateReader, assetId: AssetId): Either[ValidationError, Unit] = {
+  private def validateAsset(tx: SignedTransaction,
+                            state: SnapshotStateReader,
+                            assetId: AssetId,
+                            shouldMatch: Boolean): Either[ValidationError, Unit] = {
     state.transactionInfo(assetId) match {
-      case Some((_, itx: IssueTransaction)) if !(itx.sender equals tx.sender) => Left(GenericError("Asset was issued by other address"))
-      case Some((_, sitx: SmartIssueTransaction)) if sitx.script.isEmpty && !sitx.sender.equals(tx.sender) =>
+      case Some((_, itx: IssueTransaction)) if !validIssuer(shouldMatch, tx.sender, itx.sender) =>
         Left(GenericError("Asset was issued by other address"))
-      case None    => Left(GenericError("Referenced assetId not found"))
-      case Some(_) => Right({})
+      case Some((_, sitx: SmartIssueTransaction)) if sitx.script.isEmpty && !validIssuer(shouldMatch, tx.sender, sitx.sender) =>
+        Left(GenericError("Asset was issued by other address"))
+      case None =>
+        Left(GenericError("Referenced assetId not found"))
+      case Some(_) =>
+        Right({})
     }
+  }
+
+  private def validIssuer(shouldMatch: Boolean, sender: PublicKeyAccount, issuer: PublicKeyAccount): Boolean = {
+    if (shouldMatch) sender equals issuer
+    else true
   }
 }
