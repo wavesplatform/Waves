@@ -48,13 +48,13 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
   val transferWithSmartAssetFee: Gen[(GenesisTransaction, IssueTransaction, SmartIssueTransaction, TransferTransaction)] = {
     for {
-      master <- accountGen
+      master    <- accountGen
       recepient <- otherAccountGen(master)
-      ts <- positiveIntGen
+      ts        <- positiveIntGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      issue: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
+      issue: IssueTransaction         <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
       feeIssue: SmartIssueTransaction <- smartIssueTransactionGen(master, scriptGen.map(_.some))
-      transfer <- transferGeneratorP(master, recepient, issue.id().some, feeIssue.id().some)
+      transfer                        <- transferGeneratorP(master, recepient, issue.id().some, feeIssue.id().some)
     } yield (genesis, issue, feeIssue, transfer)
   }
 
