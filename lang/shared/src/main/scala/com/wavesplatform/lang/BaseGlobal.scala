@@ -10,7 +10,7 @@ trait BaseGlobal {
 
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean
 
-  def keccack256(message: Array[Byte]): Array[Byte]
+  def keccak256(message: Array[Byte]): Array[Byte]
   def blake2b256(message: Array[Byte]): Array[Byte]
   def sha256(message: Array[Byte]): Array[Byte]
 }
