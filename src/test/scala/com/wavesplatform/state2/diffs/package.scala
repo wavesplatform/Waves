@@ -39,14 +39,15 @@ package object diffs extends WithState with Matchers {
     assertion(totalDiff1, state)
   }
 
-  def assertDiffAndState(fs: FunctionalitySettings)(test: ((Seq[Transaction]) => Either[ValidationError, Unit]) => Unit): Unit = withStateAndHistory(fs) { state =>
-    def differ(s: SnapshotStateReader, b: Block) = BlockDiffer.fromBlock(fs, state, s, None, b)
+  def assertDiffAndState(fs: FunctionalitySettings)(test: ((Seq[Transaction]) => Either[ValidationError, Unit]) => Unit): Unit =
+    withStateAndHistory(fs) { state =>
+      def differ(s: SnapshotStateReader, b: Block) = BlockDiffer.fromBlock(fs, state, s, None, b)
 
-    test(txs => {
-      val block = TestBlock.create(txs)
-      differ(state, block).map(diff => state.append(diff, block))
-    })
-  }
+      test(txs => {
+        val block = TestBlock.create(txs)
+        differ(state, block).map(diff => state.append(diff, block))
+      })
+    }
 
   def assertBalanceInvariant(diff: Diff): Unit = {
     val portfolioDiff = Monoid.combineAll(diff.portfolios.values)

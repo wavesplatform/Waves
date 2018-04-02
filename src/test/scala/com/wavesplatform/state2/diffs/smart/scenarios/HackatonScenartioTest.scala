@@ -14,7 +14,6 @@ import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
 import scorex.account.AddressScheme
-import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.{DataTransaction, GenesisTransaction}
 import scorex.transaction.assets.{SmartIssueTransaction, TransferTransaction}
 import scorex.transaction.smart.Script
