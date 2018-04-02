@@ -2,7 +2,31 @@ package com.wavesplatform.discovery.network
 
 import java.util
 
-import com.wavesplatform.network.{BasicMessagesRepo, BlockForged, BlockSpec, GetBlock, GetBlockSpec, GetPeers, GetPeersSpec, GetSignatures, GetSignaturesSpec, KnownPeers, LocalScoreChanged, Message, MicroBlockInv, MicroBlockInvSpec, MicroBlockRequest, MicroBlockRequestSpec, MicroBlockResponse, MicroBlockResponseSpec, PeersSpec, RawBytes, ScoreSpec, Signatures, SignaturesSpec}
+import com.wavesplatform.network.{
+  BasicMessagesRepo,
+  BlockForged,
+  BlockSpec,
+  GetBlock,
+  GetBlockSpec,
+  GetPeers,
+  GetPeersSpec,
+  GetSignatures,
+  GetSignaturesSpec,
+  KnownPeers,
+  LocalScoreChanged,
+  Message,
+  MicroBlockInv,
+  MicroBlockInvSpec,
+  MicroBlockRequest,
+  MicroBlockRequestSpec,
+  MicroBlockResponse,
+  MicroBlockResponseSpec,
+  PeersSpec,
+  RawBytes,
+  ScoreSpec,
+  Signatures,
+  SignaturesSpec
+}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.MessageToMessageCodec
@@ -17,9 +41,9 @@ class MessageCodec() extends MessageToMessageCodec[RawBytes, Message] with Score
   import BasicMessagesRepo.specsByCodes
 
   override def encode(ctx: ChannelHandlerContext, msg: Message, out: util.List[AnyRef]): Unit = msg match {
-    case GetPeers => out.add(RawBytes(GetPeersSpec.messageCode, Array[Byte]()))
+    case GetPeers    => out.add(RawBytes(GetPeersSpec.messageCode, Array[Byte]()))
     case r: RawBytes => out.add(r)
-    case _ =>
+    case _           =>
   }
 
   override def decode(ctx: ChannelHandlerContext, msg: RawBytes, out: util.List[AnyRef]): Unit = {

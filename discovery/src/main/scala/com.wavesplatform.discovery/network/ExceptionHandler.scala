@@ -8,7 +8,7 @@ import scala.concurrent.{Future, Promise}
 
 class ExceptionHandler extends ChannelDuplexHandler {
 
-  private val p = Promise[Boolean]()
+  private val p               = Promise[Boolean]()
   val closed: Future[Boolean] = p.future
 
   override def close(ctx: ChannelHandlerContext, promise: ChannelPromise): Unit = {
