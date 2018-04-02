@@ -100,7 +100,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       _ = assert(status1 == Active)
 
       leases0 <- activeLeases(secondAddress)
-      _ = assert(leases0.isEmpty)
+      _ = assert(leases0.forall(!_.sender.contains(secondAddress)))
 
       leases1 <- activeLeases(firstAddress)
       _ = assert(leases1.exists(_.id == createdLeaseTxId))
