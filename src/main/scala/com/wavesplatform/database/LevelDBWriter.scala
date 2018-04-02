@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
-import com.google.common.primitives.{Ints, Longs}
+import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
@@ -113,22 +113,21 @@ object LevelDBWriter {
     }
 
     private def readStrings(data: Array[Byte]): Seq[String] = Option(data).fold(Seq.empty[String]) { d =>
-      val b = ByteBuffer.wrap(d)
+      var i = 0
       val s = Seq.newBuilder[String]
 
-      while (b.remaining() > 0) {
-        val len    = b.get()
-        val buffer = new Array[Byte](len)
-        b.get(buffer)
-        s += new String(buffer, UTF8)
+      while (i < data.length) {
+        val len = Shorts.fromByteArray(data.drop(i))
+        s += new String(data, i + 2, len, UTF8)
+        i += (2 + len)
       }
       s.result()
     }
 
     private def writeStrings(strings: Seq[String]): Array[Byte] = {
-      val b = ByteBuffer.allocate(strings.map(_.length + 1).sum)
+      val b = ByteBuffer.allocate(strings.map(_.getBytes(UTF8).length + 2).sum)
       for (s <- strings) {
-        b.put(s.length.toByte).put(s.getBytes(UTF8))
+        b.putShort(s.length.toShort).put(s.getBytes(UTF8))
       }
       b.array()
     }
@@ -595,8 +594,11 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
       if (newlyApprovedFeatures.nonEmpty) {
         approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(k.approvedFeatures)
         rw.put(k.approvedFeatures, approvedFeaturesCache)
-        activatedFeaturesCache = newlyApprovedFeatures.mapValues(_ + activationWindowSize) ++ rw.get(k.activatedFeatures)
-        rw.put(k.activatedFeatures, activatedFeaturesCache)
+
+        val featuresToSave = newlyApprovedFeatures.mapValues(_ + activationWindowSize) ++ rw.get(k.activatedFeatures)
+
+        activatedFeaturesCache = featuresToSave ++ fs.preActivatedFeatures
+        rw.put(k.activatedFeatures, featuresToSave)
       }
     }
 

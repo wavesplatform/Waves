@@ -1,5 +1,6 @@
 package com.wavesplatform.state2.diffs
 
+import cats.implicits._
 import com.wavesplatform.state2.{LeaseBalance, Portfolio}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -8,7 +9,8 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.account.Address
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
+import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction, TransferTransaction}
 
 class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -40,6 +42,32 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
                 case None      => recipientPortfolio shouldBe Portfolio(transfer.amount, LeaseBalance.empty, Map.empty)
               }
             }
+        }
+    }
+  }
+
+  val transferWithSmartAssetFee: Gen[(GenesisTransaction, IssueTransaction, SmartIssueTransaction, TransferTransaction)] = {
+    for {
+      master    <- accountGen
+      recepient <- otherAccountGen(master)
+      ts        <- positiveIntGen
+      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+      issue: IssueTransaction         <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
+      feeIssue: SmartIssueTransaction <- smartIssueTransactionGen(master, scriptGen.map(_.some))
+      transfer                        <- transferGeneratorP(master, recepient, issue.id().some, feeIssue.id().some)
+    } yield (genesis, issue, feeIssue, transfer)
+  }
+
+  property("fails, if smart asset used as a fee") {
+    import smart._
+
+    forAll(transferWithSmartAssetFee) {
+      case (genesis, issue, fee, transfer) =>
+        assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(issue, fee)), smartEnabledFS) {
+          case (_, state) => {
+            val diffOrError = TransferTransactionDiff(state, smartEnabledFS, System.currentTimeMillis(), state.height)(transfer)
+            diffOrError shouldBe Left(GenericError("Smart assets can't participate in TransferTransactions as a fee"))
+          }
         }
     }
   }

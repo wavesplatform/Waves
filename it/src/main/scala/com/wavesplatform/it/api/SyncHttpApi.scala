@@ -75,8 +75,14 @@ object SyncHttpApi extends Assertions {
     def issue(sourceAddress: String, name: String, description: String, quantity: Long, decimals: Byte, reissuable: Boolean, fee: Long): Transaction =
       Await.result(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee), RequestAwaitTime)
 
+    def scriptCompile(code: String): CompiledScript =
+      Await.result(async(n).scriptCompile(code), RequestAwaitTime)
+
     def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Transaction =
       Await.result(async(n).burn(sourceAddress, assetId, quantity, fee), RequestAwaitTime)
+
+    def sign(jsObject: JsObject): JsObject =
+      Await.result(async(n).sign(jsObject), RequestAwaitTime)
 
     def createAlias(targetAddress: String, alias: String, fee: Long): Transaction =
       Await.result(async(n).createAlias(targetAddress, alias, fee), RequestAwaitTime)
@@ -130,6 +136,18 @@ object SyncHttpApi extends Assertions {
 
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Transaction =
       Await.result(async(n).waitForTransaction(txId), RequestAwaitTime)
+
+    def signAndBroadcast(tx: JsObject): Transaction =
+      Await.result(async(n).signAndBroadcast(tx), RequestAwaitTime)
+
+    def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
+      Await.result(async(n).waitForHeight(expectedHeight), requestAwaitTime)
+
+    def debugMinerInfo(): Seq[State] =
+      Await.result(async(n).debugMinerInfo(), RequestAwaitTime)
+
+    def height: Int =
+      Await.result(async(n).height, RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
@@ -140,10 +158,10 @@ object SyncHttpApi extends Assertions {
     private val ConditionAwaitTime      = 5.minutes
 
     def waitForHeightAriseAndTxPresent(transactionId: String): Unit =
-      Await.result(async(nodes).waitForHeightAraiseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
+      Await.result(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
 
-    def waitForHeightAraise(): Unit =
-      Await.result(async(nodes).waitForHeightAraise(), TxInBlockchainAwaitTime)
+    def waitForHeightArise(): Unit =
+      Await.result(async(nodes).waitForHeightArise(), TxInBlockchainAwaitTime)
 
     def waitForSameBlocksAt(retryInterval: FiniteDuration, height: Int): Boolean =
       Await.result(async(nodes).waitForSameBlocksAt(retryInterval, height), ConditionAwaitTime)

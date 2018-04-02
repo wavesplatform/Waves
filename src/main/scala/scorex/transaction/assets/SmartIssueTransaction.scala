@@ -1,5 +1,7 @@
 package scorex.transaction.assets
 
+import java.nio.charset.StandardCharsets
+
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
@@ -7,9 +9,9 @@ import monix.eval.Coeval
 import play.api.libs.json.Json
 import scorex.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import scorex.serialization.Deser
+import scorex.transaction._
 import scorex.transaction.ValidationError.{GenericError, UnsupportedVersion}
 import scorex.transaction.smart.Script
-import scorex.transaction._
 
 import scala.util.Try
 
@@ -48,8 +50,13 @@ case class SmartIssueTransaction private (version: Byte,
   override val assetFee = (None, fee)
   override val json = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
-      "version" -> version,
-      "script"  -> script.map(_.text)
+      "version"     -> version,
+      "name"        -> new String(name, StandardCharsets.UTF_8),
+      "quantity"    -> quantity,
+      "reissuable"  -> reissuable,
+      "decimals"    -> decimals,
+      "description" -> new String(description, StandardCharsets.UTF_8),
+      "script"      -> script.map(_.text)
     ))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
@@ -60,7 +67,7 @@ object SmartIssueTransaction extends TransactionParserFor[SmartIssueTransaction]
   override val typeId: Byte                 = 3
   override val supportedVersions: Set[Byte] = Set(2)
 
-  private val networkByte = AddressScheme.current.chainId
+  private def networkByte = AddressScheme.current.chainId
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
@@ -104,7 +111,7 @@ object SmartIssueTransaction extends TransactionParserFor[SmartIssueTransaction]
              proofs: Proofs): Either[ValidationError, TransactionT] =
     for {
       _ <- Either.cond(supportedVersions.contains(version), (), UnsupportedVersion(version))
-      _ <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
+      _ <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $networkByte"))
       _ <- IssueTransaction.validateIssueParams(name, description, quantity, decimals, reissuable, fee)
     } yield SmartIssueTransaction(version, chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs)
 

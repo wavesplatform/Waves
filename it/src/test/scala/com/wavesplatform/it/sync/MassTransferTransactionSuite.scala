@@ -73,7 +73,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     assertBadRequestAndResponse(sender.massTransfer(firstAddress, transfers, calcFee(transfers.size)), "negative waves balance")
 
-    nodes.waitForHeightAraise()
+    nodes.waitForHeightArise()
     notMiner.assertBalances(firstAddress, balance1, eff1)
     notMiner.assertBalances(secondAddress, balance2, eff2)
   }
@@ -85,7 +85,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     val transfers        = List(Transfer(secondAddress, transferAmount))
 
     assertBadRequestAndResponse(sender.massTransfer(firstAddress, transfers, transferFee), "Fee .* does not exceed minimal value")
-    nodes.waitForHeightAraise()
+    nodes.waitForHeightArise()
     notMiner.assertBalances(firstAddress, balance1, eff1)
     notMiner.assertBalances(secondAddress, balance2, eff2)
   }
@@ -99,7 +99,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     nodes.waitForHeightAriseAndTxPresent(leaseTxId)
 
     assertBadRequestAndResponse(sender.massTransfer(firstAddress, transfers, calcFee(transfers.size)), "negative waves balance")
-    nodes.waitForHeightAraise()
+    nodes.waitForHeightArise()
     notMiner.assertBalances(firstAddress, balance1 - leasingFee, eff1 - leasingAmount - leasingFee)
     notMiner.assertBalances(secondAddress, balance2, eff2 + leasingAmount)
   }
@@ -150,7 +150,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
       idOpt.foreach(id => nodes.foreach(_.ensureTxDoesntExist(id.base58)))
     }
 
-    nodes.waitForHeightAraise()
+    nodes.waitForHeightArise()
     notMiner.assertBalances(firstAddress, balance1, eff1)
   }
 

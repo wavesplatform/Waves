@@ -7,11 +7,9 @@ import java.util.concurrent.ConcurrentHashMap
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import cats.instances.all._
 import com.typesafe.config._
-import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.db.openDB
 import com.wavesplatform.features.api.ActivationApiRoute
@@ -31,9 +29,8 @@ import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
 import monix.eval.Coeval
-import monix.execution.Scheduler.global
+import monix.execution.Scheduler._
 import monix.execution.schedulers.SchedulerService
-import monix.execution.{Scheduler, UncaughtExceptionReporter}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
@@ -62,20 +59,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val LocalScoreBroadcastDebounce = 1.second
 
-  // Start /node API right away
-  private implicit val as: ActorSystem                 = actorSystem
-  private implicit val materializer: ActorMaterializer = ActorMaterializer()
-  private val (history, state, blockchainUpdater)      = StorageFactory(settings, db, NTP)
-  private val nodeApi = Option(settings.restAPISettings.enable).collect {
-    case true =>
-      val tags                 = Seq(typeOf[NodeApiRoute])
-      val routes               = Seq(NodeApiRoute(settings.restAPISettings, history, state, () => apiShutdown()))
-      val combinedRoute: Route = CompositeHttpService(actorSystem, tags, routes, settings.restAPISettings).compositeRoute
-      val httpFuture           = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
-      serverBinding = Await.result(httpFuture, 10.seconds)
-      log.info(s"Node REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
-      (tags, routes)
-  }
+  private val (history, state, blockchainUpdater) = StorageFactory(settings, db, NTP)
 
   private val checkpointService = new CheckpointServiceImpl(db, settings.checkpointsSettings)
   private lazy val upnp         = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
@@ -89,24 +73,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   }
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
-  private val extensionLoaderScheduler = Scheduler.singleThread("tx-extension-loader", reporter = UncaughtExceptionReporter { ex =>
-    log.error(s"ExtensionLoader: $ex")
-  })
-  private val microblockSynchronizerScheduler = Scheduler.singleThread("microblock-synchronizer", reporter = UncaughtExceptionReporter { ex =>
-    log.error(s"MicroblockSynchronizer: $ex")
-  })
-  private val scoreObserverScheduler = Scheduler.singleThread("rx-score-observer", reporter = UncaughtExceptionReporter { ex =>
-    log.error(s"ScoreObserver: $ex")
-  })
-  private val appenderScheduler = Scheduler.singleThread("appender", reporter = UncaughtExceptionReporter { ex =>
-    log.error(s"Appender: $ex")
-  })
-  private val historyRepliesScheduler = Scheduler.fixedPool(name = "history-replier", poolSize = 2, reporter = UncaughtExceptionReporter { ex =>
-    log.error(s"HistoryReplier: $ex")
-  })
-  private val minerScheduler = Scheduler.fixedPool(name = "miner-pool", poolSize = 2, reporter = UncaughtExceptionReporter { ex =>
-    log.error(s"Miner: $ex")
-  })
+  private val extensionLoaderScheduler        = singleThread("rx-extension-loader", reporter = log.error("Error in Extension Loader", _))
+  private val microblockSynchronizerScheduler = singleThread("microblock-synchronizer", reporter = log.error("Error in Microblock Synchronizer", _))
+  private val scoreObserverScheduler          = singleThread("rx-score-observer", reporter = log.error("Error in Score Observer", _))
+  private val appenderScheduler               = singleThread("appender", reporter = log.error("Error in Appender", _))
+  private val historyRepliesScheduler         = fixedPool("history-replier", poolSize = 2, reporter = log.error("Error in History Replier", _))
+  private val minerScheduler                  = fixedPool("miner-pool", poolSize = 2, reporter = log.error("Error in Miner", _))
 
   private var matcher: Option[Matcher]                                         = None
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
@@ -255,81 +227,78 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val blockSink      = newBlocks.mapTask(scala.Function.tupled(processBlock))
     val checkpointSink = checkpoints.mapTask { case ((s, c)) => processCheckpoint(Some(s), c) }
 
-    Observable.merge(microBlockSink, blockSink, checkpointSink).subscribe()(monix.execution.Scheduler.Implicits.global)
+    Observable.merge(microBlockSink, blockSink, checkpointSink).subscribe()
     miner.scheduleMining()
 
     for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
       upnp.addPort(addr.getPort)
     }
 
-    // Start complete REST API. Node API is already running, so we need to re-bind
-    nodeApi.foreach {
-      case (tags, routes) =>
-        val apiRoutes = routes ++ Seq(
-          BlocksApiRoute(settings.restAPISettings, history, blockchainUpdater, allChannels, c => processCheckpoint(None, c)),
-          TransactionsApiRoute(settings.restAPISettings, wallet, state, history, utxStorage, allChannels, time),
-          NxtConsensusApiRoute(settings.restAPISettings, state, history, settings.blockchainSettings.functionalitySettings),
-          WalletApiRoute(settings.restAPISettings, wallet),
-          PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
-          UtilsApiRoute(time, settings.restAPISettings),
-          PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
-          AddressApiRoute(settings.restAPISettings, wallet, state, utxStorage, allChannels, time, settings.blockchainSettings.functionalitySettings),
-          DebugApiRoute(
-            settings.restAPISettings,
-            wallet,
-            state,
-            history,
-            peerDatabase,
-            establishedConnections,
-            blockchainUpdater,
-            allChannels,
-            utxStorage,
-            miner,
-            historyReplier,
-            extLoaderState,
-            mbSyncCacheSizes,
-            scoreStatsReporter,
-            configRoot
-          ),
-          WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
-          AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, state, time),
-          ActivationApiRoute(settings.restAPISettings,
-                             settings.blockchainSettings.functionalitySettings,
-                             settings.featuresSettings,
-                             history,
-                             history),
-          AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-          LeaseApiRoute(settings.restAPISettings, wallet, state, utxStorage, allChannels, time),
-          LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-          AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, state),
-          AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
-        )
+    implicit val as: ActorSystem                 = actorSystem
+    implicit val materializer: ActorMaterializer = ActorMaterializer()
 
-        val apiTypes = tags ++ Seq(
-          typeOf[BlocksApiRoute],
-          typeOf[TransactionsApiRoute],
-          typeOf[NxtConsensusApiRoute],
-          typeOf[WalletApiRoute],
-          typeOf[PaymentApiRoute],
-          typeOf[UtilsApiRoute],
-          typeOf[PeersApiRoute],
-          typeOf[AddressApiRoute],
-          typeOf[DebugApiRoute],
-          typeOf[WavesApiRoute],
-          typeOf[AssetsApiRoute],
-          typeOf[ActivationApiRoute],
-          typeOf[AssetsBroadcastApiRoute],
-          typeOf[LeaseApiRoute],
-          typeOf[LeaseBroadcastApiRoute],
-          typeOf[AliasApiRoute],
-          typeOf[AliasBroadcastApiRoute]
-        )
-        val combinedRoute: Route = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings.restAPISettings).loggingCompositeRoute
-        val httpFuture = serverBinding.unbind().flatMap { _ =>
-          Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
-        }
-        serverBinding = Await.result(httpFuture, 20.seconds)
-        log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
+    if (settings.restAPISettings.enable) {
+      val apiRoutes = Seq(
+        NodeApiRoute(settings.restAPISettings, history, state, () => apiShutdown()),
+        BlocksApiRoute(settings.restAPISettings, history, blockchainUpdater, allChannels, c => processCheckpoint(None, c)),
+        TransactionsApiRoute(settings.restAPISettings, wallet, state, history, utxStorage, allChannels, time),
+        NxtConsensusApiRoute(settings.restAPISettings, state, history, settings.blockchainSettings.functionalitySettings),
+        WalletApiRoute(settings.restAPISettings, wallet),
+        PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
+        UtilsApiRoute(time, settings.restAPISettings),
+        PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
+        AddressApiRoute(settings.restAPISettings, wallet, state, utxStorage, allChannels, time, settings.blockchainSettings.functionalitySettings),
+        DebugApiRoute(
+          settings.restAPISettings,
+          wallet,
+          state,
+          history,
+          peerDatabase,
+          establishedConnections,
+          blockchainUpdater,
+          allChannels,
+          utxStorage,
+          miner,
+          historyReplier,
+          extLoaderState,
+          mbSyncCacheSizes,
+          scoreStatsReporter,
+          configRoot
+        ),
+        WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
+        AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, state, time),
+        ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, history, history),
+        AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
+        LeaseApiRoute(settings.restAPISettings, wallet, state, utxStorage, allChannels, time),
+        LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
+        AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, state),
+        AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
+      )
+
+      val apiTypes = Seq(
+        typeOf[NodeApiRoute],
+        typeOf[BlocksApiRoute],
+        typeOf[TransactionsApiRoute],
+        typeOf[NxtConsensusApiRoute],
+        typeOf[WalletApiRoute],
+        typeOf[PaymentApiRoute],
+        typeOf[UtilsApiRoute],
+        typeOf[PeersApiRoute],
+        typeOf[AddressApiRoute],
+        typeOf[DebugApiRoute],
+        typeOf[WavesApiRoute],
+        typeOf[AssetsApiRoute],
+        typeOf[ActivationApiRoute],
+        typeOf[AssetsBroadcastApiRoute],
+        typeOf[LeaseApiRoute],
+        typeOf[LeaseBroadcastApiRoute],
+        typeOf[AliasApiRoute],
+        typeOf[AliasBroadcastApiRoute]
+      )
+      val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings.restAPISettings).loggingCompositeRoute
+      val httpFuture    = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
+      serverBinding = Await.result(httpFuture, 20.seconds)
+      log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 
     //on unexpected shutdown

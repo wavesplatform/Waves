@@ -7,19 +7,19 @@ import com.wavesplatform.lang.traits._
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 
-import scala.util.{Failure, Success}
+abstract class BaseWavesContext extends Environment {
 
-abstract class WavesContextImpl { this: Crypto with Environment with Base58 =>
+  import BaseWavesContext._
 
-  import WavesContextImpl._
+  private val Global = com.wavesplatform.lang.hacks.Global // Hack for IDEA
 
-  val keccack256F: PredefFunction = hashFunction("keccack256")(this.keccack256)
-  val blake2b256F: PredefFunction = hashFunction("blake2b256")(this.blake2b256)
-  val sha256F: PredefFunction     = hashFunction("sha256")(this.sha256)
+  val keccack256F: PredefFunction = hashFunction("keccack256")(Global.keccack256)
+  val blake2b256F: PredefFunction = hashFunction("blake2b256")(Global.blake2b256)
+  val sha256F: PredefFunction     = hashFunction("sha256")(Global.sha256)
 
   val sigVerifyF: PredefFunction = PredefFunction("sigVerify", BOOLEAN, List(("message", BYTEVECTOR), ("sig", BYTEVECTOR), ("pub", BYTEVECTOR))) {
     case (m: ByteVector) :: (s: ByteVector) :: (p: ByteVector) :: Nil =>
-      Right(this.curve25519verify(m.toArray, s.toArray, p.toArray))
+      Right(Global.curve25519verify(m.toArray, s.toArray, p.toArray))
     case _ => ???
   }
 
@@ -115,7 +115,7 @@ abstract class WavesContextImpl { this: Crypto with Environment with Base58 =>
   private val HashLength                 = 20
   private val AddressVersion             = 1: Byte
   private val AddressLength              = 1 + 1 + ChecksumLength + HashLength
-  private def secureHash(a: Array[Byte]) = keccack256(blake2b256(a))
+  private def secureHash(a: Array[Byte]) = Global.keccack256(Global.blake2b256(a))
 
   val addressFromPublicKeyF: PredefFunction = PredefFunction("addressFromPublicKey", addressType.typeRef, List(("publicKey", BYTEVECTOR))) {
     case (pk: ByteVector) :: Nil =>
@@ -130,8 +130,8 @@ abstract class WavesContextImpl { this: Crypto with Environment with Base58 =>
     case (addressString: String) :: Nil =>
       val Prefix: String = "address:"
       val base58String   = if (addressString.startsWith(Prefix)) addressString.drop(Prefix.length) else addressString
-      base58Decode(base58String) match {
-        case Success(addressBytes) =>
+      Global.base58Decode(base58String) match {
+        case Right(addressBytes) =>
           val version = addressBytes.head
           val network = addressBytes.tail.head
           lazy val checksumCorrect = {
@@ -142,7 +142,7 @@ abstract class WavesContextImpl { this: Crypto with Environment with Base58 =>
           if (version == AddressVersion && network == networkByte && addressBytes.length == AddressLength && checksumCorrect)
             Right(Some(Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(addressBytes)))))))
           else Right(None)
-        case Failure(_) => Left(s"Can't decode $addressString as Base58")
+        case Left(e) => Left(e)
       }
 
     case _ => ???
@@ -161,16 +161,18 @@ abstract class WavesContextImpl { this: Crypto with Environment with Base58 =>
     }
 }
 
-object WavesContextImpl {
+object BaseWavesContext {
 
   val addressType        = PredefType("Address", List("bytes"        -> BYTEVECTOR))
   val addressOrAliasType = PredefType("AddressOrAlias", List("bytes" -> BYTEVECTOR))
 
   private val noneCoeval: Coeval[Either[String, Option[Nothing]]] = Coeval.evalOnce(Right(None))
-  val none: LazyVal                                               = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval))
-  private val optionByteVector: OPTION                            = OPTION(BYTEVECTOR)
-  private val optionT                                             = OPTIONTYPEPARAM(TYPEPARAM('T'))
-  private val optionAddress                                       = OPTION(addressType.typeRef)
+
+  val none: LazyVal = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval).subflatMap(Right(_: Option[Nothing]))) // IDEA HACK
+
+  private val optionByteVector: OPTION = OPTION(BYTEVECTOR)
+  private val optionT                  = OPTIONTYPEPARAM(TYPEPARAM('T'))
+  private val optionAddress            = OPTION(addressType.typeRef)
 
   private def hashFunction(name: String)(h: Array[Byte] => Array[Byte]) = PredefFunction(name, BYTEVECTOR, List(("bytes", BYTEVECTOR))) {
     case (m: ByteVector) :: Nil => Right(ByteVector(h(m.toArray)))

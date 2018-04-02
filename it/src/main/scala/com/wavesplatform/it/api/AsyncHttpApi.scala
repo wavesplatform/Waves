@@ -116,8 +116,16 @@ object AsyncHttpApi extends Assertions {
     def postJsonWithApiKey[A: Writes](path: String, body: A): Future[Response] = retrying {
       _post(s"${n.nodeApiEndpoint}$path")
         .withApiKey(n.apiKey)
-        .setHeader("Content-type", "application/json")
+        .setHeader("Content-type", "application/json;charset=utf-8")
         .setBody(stringify(toJson(body)))
+        .build()
+    }
+
+    def postJsObjectWithApiKey(path: String, body: JsObject): Future[Response] = retrying {
+      _post(s"${n.nodeApiEndpoint}$path")
+        .withApiKey(n.apiKey)
+        .setHeader("Content-type", "application/json")
+        .setBody(stringify(body))
         .build()
     }
 
@@ -128,7 +136,7 @@ object AsyncHttpApi extends Assertions {
       post(path, stringify(toJson(body)))
 
     def post(path: String, body: String): Future[Response] =
-      post(s"${n.nodeApiEndpoint}$path", (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(body))
+      post(s"${n.nodeApiEndpoint}$path", (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json;charset=utf-8").setBody(body))
 
     def blacklist(address: InetSocketAddress): Future[Unit] =
       post("/debug/blacklist", s"${address.getHostString}:${address.getPort}").map(_ => ())
@@ -256,6 +264,8 @@ object AsyncHttpApi extends Assertions {
               fee: Long): Future[Transaction] =
       postJson("/assets/issue", IssueRequest(sourceAddress, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
 
+    def scriptCompile(code: String) = post("/utils/script/compile", code).as[CompiledScript]
+
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Future[Transaction] =
       postJson("/assets/reissue", ReissueRequest(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
 
@@ -297,8 +307,13 @@ object AsyncHttpApi extends Assertions {
 
     def broadcastRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
 
+    def sign(jsobj: JsObject): Future[JsObject] =
+      postJsObjectWithApiKey("/transactions/sign", jsobj).as[JsObject]
+
     def signedBroadcast(jsobj: JsObject): Future[Transaction] =
       post("/transactions/broadcast", stringify(jsobj)).as[Transaction]
+
+    def signAndBroadcast(jsobj: JsObject): Future[Transaction] = sign(jsobj).flatMap(signedBroadcast)
 
     def signedIssue(issue: SignedIssueRequest): Future[Transaction] =
       postJson("/assets/broadcast/issue", issue).as[Transaction]
@@ -477,6 +492,8 @@ object AsyncHttpApi extends Assertions {
       getWithApiKey(s"/debug/portfolios/$address?considerUnspent=$considerUnspent")
     }.as[Portfolio]
 
+    def debugMinerInfo(): Future[Seq[State]] = getWithApiKey(s"/debug/minerInfo").as[Seq[State]]
+
     def accountEffectiveBalance(acc: String): Future[Long] = n.effectiveBalance(acc).map(_.balance)
 
     def accountBalance(acc: String): Future[Long] = n.balance(acc).map(_.balance)
@@ -509,7 +526,7 @@ object AsyncHttpApi extends Assertions {
     // if we first await tx and then height + 1, it could be gone with height + 1
     // if we first await height + 1 and then tx, it could be gone with height + 2
     // so we await tx twice
-    def waitForHeightAraiseAndTxPresent(transactionId: String): Future[Unit] =
+    def waitForHeightAriseAndTxPresent(transactionId: String): Future[Unit] =
       for {
         height <- traverse(nodes)(_.height).map(_.max)
         _      <- waitForSameBlocksAt(2.seconds, height)
@@ -518,7 +535,7 @@ object AsyncHttpApi extends Assertions {
         _      <- traverse(nodes)(_.waitForTransaction(transactionId))
       } yield ()
 
-    def waitForHeightAraise(): Future[Unit] =
+    def waitForHeightArise(): Future[Unit] =
       for {
         height <- traverse(nodes)(_.height).map(_.max)
         _      <- traverse(nodes)(_.waitForHeight(height + 1))

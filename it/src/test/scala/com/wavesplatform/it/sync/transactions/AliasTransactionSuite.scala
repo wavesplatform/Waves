@@ -23,7 +23,6 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val aliasFull = fullAliasByAddress(firstAddress, alias)
 
     val transferId = sender.transfer(firstAddress, aliasFull, transferAmount, transferFee).id
-
     nodes.waitForHeightAriseAndTxPresent(transferId)
     notMiner.assertBalances(firstAddress, balance1 - transferFee - aliasFee, eff1 - transferFee - aliasFee)
   }

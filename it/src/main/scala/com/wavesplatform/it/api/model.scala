@@ -32,6 +32,11 @@ object AssetBalance {
   implicit val assetBalanceFormat: Format[AssetBalance] = Json.format
 }
 
+case class CompiledScript(script: String)
+object CompiledScript {
+  implicit val compiledScriptFormat: Format[CompiledScript] = Json.format
+}
+
 case class FullAssetInfo(assetId: String, balance: Long, reissuable: Boolean, quantity: Long)
 object FullAssetInfo {
   implicit val fullAssetInfoFormat: Format[FullAssetInfo] = Json.format
@@ -117,6 +122,11 @@ object DebugInfo {
 case class BlacklistedPeer(hostname: String, timestamp: Long, reason: String)
 object BlacklistedPeer {
   implicit val blacklistedPeerFormat: Format[BlacklistedPeer] = Json.format
+}
+
+case class State(address: String, miningBalance: Long, timestamp: Long)
+object State {
+  implicit val StateFormat: Format[State] = Json.format
 }
 
 // Obsolete payment request

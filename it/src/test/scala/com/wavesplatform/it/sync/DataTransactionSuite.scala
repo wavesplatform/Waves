@@ -32,7 +32,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     val data = List(BooleanDataEntry("bool", false))
     assertBadRequestAndResponse(sender.putData(firstAddress, data, balance1 + 1), "negative waves balance")
-    nodes.waitForHeightAraise()
+    nodes.waitForHeightArise()
     notMiner.assertBalances(firstAddress, balance1, eff1)
 
     val leaseAmount = 1.waves
@@ -41,7 +41,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(leaseId)
 
     assertBadRequestAndResponse(sender.putData(firstAddress, data, balance1 - leaseAmount), "negative effective balance")
-    nodes.waitForHeightAraise()
+    nodes.waitForHeightArise()
     notMiner.assertBalances(firstAddress, balance1 - leaseFee, eff1 - leaseAmount - leaseFee)
   }
 
@@ -73,7 +73,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
       nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
     }
 
-    nodes.waitForHeightAraise()
+    nodes.waitForHeightArise()
     notMiner.assertBalances(firstAddress, balance1, eff1)
   }
 
@@ -81,12 +81,13 @@ class DataTransactionSuite extends BaseTransactionSuite {
     import DataEntry.{MaxKeySize, MaxValueSize}
     import DataTransaction.MaxEntryCount
 
-    val maxKey = "a" * MaxKeySize
+    val maxKey = "\u6fae" * MaxKeySize
     val data   = List.tabulate(MaxEntryCount)(n => BinaryDataEntry(maxKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
     val fee    = calcDataFee(data)
     val txId   = sender.putData(firstAddress, data, fee).id
 
     nodes.waitForHeightAriseAndTxPresent(txId)
+    sender.getData(firstAddress, maxKey) shouldBe data.last
   }
 
   test("data definition and retrieval") {
@@ -160,18 +161,19 @@ class DataTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(emptyKeyTx)
     sender.getData(thirdAddress, "") shouldBe emptyKey.head
 
-    val key         = "myKey"
-    val multiKey    = List.tabulate(5)(LongDataEntry(key, _))
+    val latinKey    = "C,u!"
+    val multiKey    = List.tabulate(5)(LongDataEntry(latinKey, _))
     val multiKeyFee = calcDataFee(multiKey)
     val multiKeyTx  = sender.putData(thirdAddress, multiKey, multiKeyFee).id
     nodes.waitForHeightAriseAndTxPresent(multiKeyTx)
-    sender.getData(thirdAddress, key) shouldBe multiKey.last
+    sender.getData(thirdAddress, latinKey) shouldBe multiKey.last
 
-    val typeChange    = List(BooleanDataEntry(key, true))
+    val nonLatinKey   = "\u05EA\u05E8\u05D1\u05D5\u05EA, \u05E1\u05E4\u05D5\u05E8\u05D8 \u05D5\u05EA\u05D9\u05D9\u05E8\u05D5\u05EA"
+    val typeChange    = List(BooleanDataEntry(nonLatinKey, true))
     val typeChangeFee = calcDataFee(typeChange)
     val typeChangeTx  = sender.putData(thirdAddress, typeChange, typeChangeFee).id
     nodes.waitForHeightAriseAndTxPresent(typeChangeTx)
-    sender.getData(thirdAddress, key) shouldBe typeChange.head
+    sender.getData(thirdAddress, nonLatinKey) shouldBe typeChange.head
   }
 
   test("malformed JSON") {
@@ -245,15 +247,15 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val data     = List(BooleanDataEntry(extraKey, false))
 
     assertBadRequestAndResponse(sender.putData(firstAddress, data, calcDataFee(data)), message)
-    nodes.waitForHeightAraise()
+    nodes.waitForHeightArise()
 
     val extraValueData = List(BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1.toByte))))
     assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, calcDataFee(extraValueData)), message)
-    nodes.waitForHeightAraise()
+    nodes.waitForHeightArise()
 
     val extraSizedData = List.tabulate(MaxEntryCount + 1)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
     assertBadRequestAndResponse(sender.putData(firstAddress, extraSizedData, calcDataFee(extraSizedData)), message)
-    nodes.waitForHeightAraise()
+    nodes.waitForHeightArise()
   }
 
   private def calcDataFee(data: List[DataEntry[_]]): Long = {

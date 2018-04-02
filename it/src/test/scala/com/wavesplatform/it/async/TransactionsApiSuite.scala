@@ -21,7 +21,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
   test("height should always be reported for transactions") {
     val f = for {
       txId <- sender.transfer(firstAddress, secondAddress, 1.waves, fee = 1.waves).map(_.id)
-      _    <- nodes.waitForHeightAraiseAndTxPresent(txId)
+      _    <- nodes.waitForHeightAriseAndTxPresent(txId)
 
       jsv1 <- sender.get(s"/transactions/info/$txId").as[JsValue]
       hasPositiveHeight1 = (jsv1 \ "height").asOpt[Int].map(_ > 0)
@@ -176,7 +176,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       _  = assert(rb.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
       id = (Json.parse(rb.getResponseBody) \ "id").as[String]
       _  = assert(id.nonEmpty)
-      _ <- nodes.waitForHeightAraiseAndTxPresent(id)
+      _ <- nodes.waitForHeightAriseAndTxPresent(id)
     } yield id
 
     Await.result(f, timeout)
@@ -191,7 +191,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
     val transfers = List(Transfer(firstAddress, 5.waves), Transfer(secondAddress, 2.waves), Transfer(thirdAddress, 3.waves))
     val f = for {
       txId <- sender.massTransfer(firstAddress, transfers, 250000).map(_.id)
-      _    <- nodes.waitForHeightAraiseAndTxPresent(txId)
+      _    <- nodes.waitForHeightAriseAndTxPresent(txId)
 
       // /transactions/txInfo should return complete list of transfers
       txInfo <- sender.get(s"/transactions/info/$txId").as[MassTransferRequest]
