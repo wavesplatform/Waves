@@ -8,6 +8,7 @@ import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
 import play.api.libs.json.{Format, JsObject, Json, Writes}
+import scorex.api.http.AddressApiRoute
 import scorex.api.http.assets.SignedIssueRequest
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 
@@ -68,6 +69,10 @@ object SyncHttpApi extends Assertions {
 
     def assetBalance(address: String, asset: String): AssetBalance =
       Await.result(async(n).assetBalance(address, asset), RequestAwaitTime)
+
+    def addressScriptInfo(address: String): AddressApiRoute.AddressScriptInfo =
+      Await.result(async(n).scriptInfo(address), RequestAwaitTime)
+
 
     def assetsBalance(address: String): FullAssetsInfo =
       Await.result(async(n).assetsBalance(address), RequestAwaitTime)
