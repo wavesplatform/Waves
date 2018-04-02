@@ -139,6 +139,15 @@ object SyncHttpApi extends Assertions {
 
     def signAndBroadcast(tx: JsObject): Transaction =
       Await.result(async(n).signAndBroadcast(tx), RequestAwaitTime)
+
+    def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
+      Await.result(async(n).waitForHeight(expectedHeight), requestAwaitTime)
+
+    def debugMinerInfo(): Seq[State] =
+      Await.result(async(n).debugMinerInfo(), RequestAwaitTime)
+
+    def height: Int =
+      Await.result(async(n).height, RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
@@ -149,10 +158,10 @@ object SyncHttpApi extends Assertions {
     private val ConditionAwaitTime      = 5.minutes
 
     def waitForHeightAriseAndTxPresent(transactionId: String): Unit =
-      Await.result(async(nodes).waitForHeightAraiseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
+      Await.result(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
 
-    def waitForHeightAraise(): Unit =
-      Await.result(async(nodes).waitForHeightAraise(), TxInBlockchainAwaitTime)
+    def waitForHeightArise(): Unit =
+      Await.result(async(nodes).waitForHeightArise(), TxInBlockchainAwaitTime)
 
     def waitForSameBlocksAt(retryInterval: FiniteDuration, height: Int): Boolean =
       Await.result(async(nodes).waitForSameBlocksAt(retryInterval, height), ConditionAwaitTime)

@@ -1,18 +1,15 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.js.Base58
-import com.wavesplatform.lang.traits.{DataType, Environment, Transaction}
+import com.wavesplatform.lang.traits.{DataType, Transaction}
 
-object WavesContext extends WavesContextImpl with js.Crypto with Environment with Base58 {
-  override def height: Int = ???
+class WavesContext extends BaseWavesContext {
+  override def height: Int       = impl.Environment.height
+  override def networkByte: Byte = impl.Environment.networkByte
 
-  override def networkByte: Byte = ???
+  override def transaction: Transaction                              = impl.Environment.transaction
+  override def transactionById(id: Array[Byte]): Option[Transaction] = impl.Environment.transactionById(id)
 
-  override def transaction: Transaction = ???
+  override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any] = impl.Environment.data(addressBytes, key, dataType)
 
-  override def transactionById(id: Array[Byte]): Option[Transaction] = ???
-
-  override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any] = ???
-
-  override def resolveAddress(addressOrAlias: Array[Byte]): Either[String, Array[Byte]] = ???
+  override def resolveAddress(addressOrAlias: Array[Byte]): Either[String, Array[Byte]] = impl.Environment.resolveAddress(addressOrAlias)
 }

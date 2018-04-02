@@ -2,7 +2,7 @@ package com.wavesplatform.state2
 
 import java.nio.charset.StandardCharsets
 
-import com.google.common.primitives.{Bytes, Longs}
+import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.state2.DataEntry._
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
@@ -15,16 +15,16 @@ sealed abstract class DataEntry[T](val key: String, val value: T) {
 
   def toBytes: Array[Byte] = {
     val keyBytes = key.getBytes(UTF8)
-    Bytes.concat(Array(keyBytes.length.toByte), keyBytes, valueBytes)
+    Array.concat(Shorts.toByteArray(keyBytes.length.toShort), keyBytes, valueBytes)
   }
 
   def toJson: JsObject = Json.obj("key" -> key)
-  def valid: Boolean   = key.getBytes(UTF8).length <= MaxKeySize
+  def valid: Boolean   = key.length <= MaxKeySize
 }
 
 object DataEntry {
-  val MaxKeySize   = Byte.MaxValue
-  val MaxValueSize = 1024
+  val MaxKeySize: Byte = 100
+  val MaxValueSize     = 1024
 
   private val UTF8 = StandardCharsets.UTF_8
 
@@ -35,9 +35,9 @@ object DataEntry {
   }
 
   def parse(bytes: Array[Byte], p: Int): (DataEntry[_], Int) = {
-    val keyLength = bytes(p)
-    val key       = new String(bytes, p + 1, keyLength, UTF8)
-    parseValue(key, bytes, p + 1 + keyLength)
+    val keyLength = Shorts.fromByteArray(bytes.drop(p))
+    val key       = new String(bytes, p + 2, keyLength, UTF8)
+    parseValue(key, bytes, p + 2 + keyLength)
   }
 
   def parseValue(key: String, bytes: Array[Byte], p: Int): (DataEntry[_], Int) = {
