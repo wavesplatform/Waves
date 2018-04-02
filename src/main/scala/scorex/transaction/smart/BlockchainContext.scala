@@ -75,7 +75,7 @@ object BlockchainContext {
     }
 
     override def recipient: Either[String, ByteVector] = tx match {
-      case pt: PaymentTransaction           => Right(ByteVector(pt.recipient.bytes.arr))
+      case pt: PaymentTransaction            => Right(ByteVector(pt.recipient.bytes.arr))
       case tt: TransferTransaction           => Right(ByteVector(tt.recipient.bytes.arr))
       case lt: LeaseTransaction              => Right(ByteVector(lt.recipient.bytes.arr))
       case vtt: VersionedTransferTransaction => Right(ByteVector(vtt.recipient.bytes.arr))
@@ -105,7 +105,7 @@ object BlockchainContext {
       case _: SetScriptTransaction         => Left("Transaction doesn't contain amount")
       case _: MassTransferTransaction      => Left("Transaction doesn't contain amount")
       case _: LeaseCancelTransaction       => Left("Transaction doesn't contain amount")
-      case _: DataTransaction       => Left("Transaction doesn't contain amount")
+      case _: DataTransaction              => Left("Transaction doesn't contain amount")
     }
 
     override def feeAssetId: Option[ByteVector] =
