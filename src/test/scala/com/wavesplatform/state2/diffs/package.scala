@@ -6,8 +6,9 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import org.scalatest.Matchers
 import scorex.block.Block
+import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.{TestFunctionalitySettings => TFS}
-import scorex.transaction.ValidationError
+import scorex.transaction.{Transaction, ValidationError}
 
 package object diffs extends WithState with Matchers {
   val ENOUGH_AMT: Long = Long.MaxValue / 3
@@ -36,6 +37,15 @@ package object diffs extends WithState with Matchers {
     val totalDiff1 = differ(state, block).explicitGet()
     state.append(totalDiff1, block)
     assertion(totalDiff1, state)
+  }
+
+  def assertDiffAndState(fs: FunctionalitySettings)(test: ((Seq[Transaction]) => Either[ValidationError, Unit]) => Unit): Unit = withStateAndHistory(fs) { state =>
+    def differ(s: SnapshotStateReader, b: Block) = BlockDiffer.fromBlock(fs, state, s, None, b)
+
+    test(txs => {
+      val block = TestBlock.create(txs)
+      differ(state, block).map(diff => state.append(diff, block))
+    })
   }
 
   def assertBalanceInvariant(diff: Diff): Unit = {

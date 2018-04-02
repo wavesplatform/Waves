@@ -81,7 +81,7 @@ object Evaluator {
             i1 <- r(ctx, EitherT.pure(it1))(it1.tpe.typetag)
             i2 <- r(ctx, EitherT.pure(it2))(it2.tpe.typetag)
 
-          } yield { println(i1); println(i2); println(i1 == i2); i1 == i2 }
+          } yield i1 == i2
         case Typed.GETTER(expr, field, _) =>
           r[Obj](ctx, EitherT.pure(expr)).flatMap { (obj: Obj) =>
             val value: EitherT[Coeval, ExecutionError, Any] = obj.fields.find(_._1 == field) match {
@@ -120,9 +120,6 @@ object Evaluator {
         }
       }
     }
-
-  def objEquals(a: Obj, b: Obj) =
-    a.fields.map(f => f._2.value.value() == b.fields(f._1))
 
   def apply[A: TypeTag](c: Context, expr: Typed.EXPR): Either[ExecutionError, A] = {
     def result = r[A](c, EitherT.pure(expr)).value.apply()

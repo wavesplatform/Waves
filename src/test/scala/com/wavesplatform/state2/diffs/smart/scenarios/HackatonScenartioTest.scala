@@ -20,7 +20,8 @@ import scorex.transaction.assets.{SmartIssueTransaction, TransferTransaction}
 import scorex.transaction.smart.Script
 
 class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
-  val preconditions: Gen[(Seq[GenesisTransaction], SmartIssueTransaction, DataTransaction, TransferTransaction)] =
+  val preconditions: Gen[
+    (Seq[GenesisTransaction], SmartIssueTransaction, DataTransaction, TransferTransaction, DataTransaction, DataTransaction, TransferTransaction)] =
     for {
       company  <- accountGen
       king     <- accountGen
@@ -28,11 +29,13 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
       accountA <- accountGen
       accountB <- accountGen
       ts       <- timestampGen
-      genesis1    = GenesisTransaction.create(company, ENOUGH_AMT, ts).explicitGet()
-      genesis2    = GenesisTransaction.create(king, ENOUGH_AMT, ts).explicitGet()
-      genesis3    = GenesisTransaction.create(notary, ENOUGH_AMT, ts).explicitGet()
-      genesis4    = GenesisTransaction.create(accountA, ENOUGH_AMT, ts).explicitGet()
-      genesis5    = GenesisTransaction.create(accountB, ENOUGH_AMT, ts).explicitGet()
+      genesis1 = GenesisTransaction.create(company, ENOUGH_AMT, ts).explicitGet()
+      genesis2 = GenesisTransaction.create(king, ENOUGH_AMT, ts).explicitGet()
+      genesis3 = GenesisTransaction.create(notary, ENOUGH_AMT, ts).explicitGet()
+      genesis4 = GenesisTransaction.create(accountA, ENOUGH_AMT, ts).explicitGet()
+      genesis5 = GenesisTransaction.create(accountB, ENOUGH_AMT, ts).explicitGet()
+
+      // senderAddress.bytes == company.bytes || (isNotary1Agreed && isRecipientAgreed)
       assetScript = s"""
                     |
                     | let king = extract(addressFromString("${king.address}"))
@@ -44,8 +47,8 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
                     | let recipientAddress = addressFromRecipient(tx.recipient)
                     | let recipientAgreement = getBoolean(recipientAddress,txIdBase58String)
                     | let isRecipientAgreed = if(isDefined(recipientAgreement)) then extract(recipientAgreement) else false
-                    |
-                    | addressFromPublicKey(tx.senderPk) == company || (isNotary1Agreed && isRecipientAgreed)
+                    | let senderAddress = addressFromPublicKey(tx.senderPk)
+                    | senderAddress.bytes == company.bytes || (isNotary1Agreed && isRecipientAgreed)
                     |
                     |
         """.stripMargin
@@ -69,17 +72,35 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
         )
         .explicitGet()
 
+      assetId = issueTransaction.id()
+
       kingDataTransaction = DataTransaction
         .selfSigned(1, king, List(BinaryDataEntry("notary1PK", ByteStr(notary.publicKey))), 1000, ts + 1)
         .explicitGet()
 
-      transferFromCompany = TransferTransaction
-        .create(Some(issueTransaction.id()), company, accountA, 1, ts + 2, None, 1000, Array.empty)
+      transferFromCompanyToA = TransferTransaction
+        .create(Some(assetId), company, accountA, 1, ts + 20, None, 1000, Array.empty)
         .explicitGet()
-      // setScript            <- selfSignedSetScriptTransactionGenP(master, Script(typedScript))
-      //transferFromScripted <- versionedTransferGenP(master, alice, Proofs.empty)
 
-    } yield (Seq(genesis1, genesis2, genesis3, genesis4, genesis5), issueTransaction, kingDataTransaction, transferFromCompany)
+      transferFromAToB = TransferTransaction
+        .create(Some(assetId), accountA, accountB, 1, ts + 30, None, 1000, Array.empty)
+        .explicitGet()
+
+      notaryDataTransaction = DataTransaction
+        .selfSigned(1, notary, List(BooleanDataEntry(transferFromAToB.id().base58, true)), 1000, ts + 4)
+        .explicitGet()
+
+      accountBDataTransaction = DataTransaction
+        .selfSigned(1, accountB, List(BooleanDataEntry(transferFromAToB.id().base58, true)), 1000, ts + 5)
+        .explicitGet()
+    } yield
+      (Seq(genesis1, genesis2, genesis3, genesis4, genesis5),
+       issueTransaction,
+       kingDataTransaction,
+       transferFromCompanyToA,
+       notaryDataTransaction,
+       accountBDataTransaction,
+       transferFromAToB)
 
   private def eval[T: TypeTag](code: String) = {
     val untyped = Parser(code).get.value
@@ -93,34 +114,16 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
 
   property("Scenario") {
     forAll(preconditions) {
-      case (genesis, issue, kingDataTransaction, transfer) =>
-        assertDiffAndState(Seq(TestBlock.create(genesis)), TestBlock.create(Seq(issue, kingDataTransaction, transfer)), smartEnabledFS) {
-          case (_, state) =>
+      case (genesis, issue, kingDataTransaction, transferFromCompanyToA, notaryDataTransaction, accountBDataTransaction, transferFromAToB) =>
+        assertDiffAndState(smartEnabledFS) { append =>
+          append(genesis).explicitGet()
+          append(Seq(issue, kingDataTransaction, transferFromCompanyToA)).explicitGet()
+          append(Seq(transferFromAToB)) should produce("NotAllowedByScript")
+          append(Seq(notaryDataTransaction)).explicitGet()
+          append(Seq(transferFromAToB)) should produce("NotAllowedByScript") //recipient should accept tx
+          append(Seq(accountBDataTransaction)).explicitGet()
+          append(Seq(transferFromAToB)).explicitGet()
         }
     }
   }
-
-  property("equals on obj") {
-    forAll(accountGen) {
-      addr =>
-        eval[Boolean](
-          s"""
-
-extract(addressFromString("${addr.address}")) == extract(addressFromString("${addr.address}"))
-
-           """.stripMargin) shouldBe Right(true)
-    }
-
-  }
-
-  /* property("simple oracle value required to transfer") {
-    forAll(preconditions) {
-      case ((genesis, genesis2, setScript, dataTransaction, transferFromScripted)) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, genesis2, setScript, dataTransaction))),
-                           TestBlock.create(Seq(transferFromScripted)),
-                           smartEnabledFS) { case _ => () }
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis, genesis2, setScript))), TestBlock.create(Seq(transferFromScripted)), smartEnabledFS)(
-          totalDiffEi => totalDiffEi should produce("Script execution error"))
-    }
-  }*/
 }
