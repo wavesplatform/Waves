@@ -14,23 +14,24 @@ object Evaluator {
   val operators: List[PredefFunction] = {
     def createOp(op: BINARY_OP_KIND, t: TYPE, r: TYPE)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
       PredefFunction(op.symbol, t, List("a" -> t, "b" -> t)) {
-        case (a: t.Underlying) :: (b: t.Underlying) :: Nil =>
+        case a :: b :: Nil =>
           Right(body(a, b))
         case _ => ???
       }
     }
 
+    val eqOperation = PredefFunction(EQ_OP.symbol, BOOLEAN, List("a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T'))) {
+      case a :: b :: Nil =>
+        Right(a == b)
+      case _ => ???
+    }
     List(
       createOp(SUM_OP, LONG, LONG)((a, b) => a + b),
       createOp(GE_OP, LONG, BOOLEAN)((a, b) => a >= b),
       createOp(GT_OP, LONG, BOOLEAN)((a, b) => a > b),
       createOp(OR_OP, BOOLEAN, BOOLEAN)((a, b) => a || b),
       createOp(AND_OP, BOOLEAN, BOOLEAN)((a, b) => a && b),
-      PredefFunction(EQ_OP.symbol, BOOLEAN, List("a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T'))) {
-        case (a: Any) :: (b: Any) :: Nil =>
-          Right(a == b)
-        case _ => ???
-      }
+      eqOperation
     )
   }
 
