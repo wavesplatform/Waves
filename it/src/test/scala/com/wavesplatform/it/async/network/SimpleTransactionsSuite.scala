@@ -40,7 +40,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
       _  <- node.sendByNetwork(RawBytes.from(tx))
       tx <- node.waitForTransaction(tx.id().base58)
     } yield {
-      tx shouldBe Transaction(tx.`type`, tx.id, tx.fee, tx.timestamp)
+      tx shouldBe Transaction(tx.`type`, tx.id, tx.fee, tx.timestamp, Some(node.address))
     }
     Await.result(f, waitCompletion)
   }
