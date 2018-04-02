@@ -40,9 +40,25 @@ case class AddressApiRoute(settings: RestAPISettings,
   override lazy val route =
     pathPrefix("addresses") {
       validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
-        signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ getDataItem ~ postData
+        signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ getDataItem ~ postData ~ scriptInfo
     } ~ root ~ create
 
+  @Path("/scriptInfo/{address}")
+  @ApiOperation(value = "Details for account", notes = "Account's script", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
+    ))
+  def scriptInfo: Route = (path("scriptInfo" / Segment) & get) { address =>
+    complete(
+      Address
+        .fromString(address)
+        .right
+        .map(acc => {
+          ToResponseMarshallable(addressScriptInfoJson(acc))
+        })
+        .getOrElse(InvalidAddress))
+  }
   @Path("/{address}")
   @ApiOperation(value = "Delete", notes = "Remove the account with address {address} from the wallet", httpMethod = "DELETE")
   @ApiImplicitParams(
@@ -347,6 +363,11 @@ case class AddressApiRoute(settings: RestAPISettings,
     )
   }
 
+  private def addressScriptInfoJson(account: Address): AddressScriptInfo = {
+    val script = state.accountScript(account)
+    AddressScriptInfo(address = account.address, script = script.map(_.bytes().base58), scriptText = script.map(_.text))
+  }
+
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
     Address
       .fromString(address)
@@ -441,4 +462,8 @@ object AddressApiRoute {
   case class Validity(address: String, valid: Boolean)
 
   implicit val validityFormat: Format[Validity] = Json.format
+
+  case class AddressScriptInfo(address: String, script: Option[String], scriptText: Option[String])
+
+  implicit val accountScriptInfoFormat: Format[AddressScriptInfo] = Json.format
 }

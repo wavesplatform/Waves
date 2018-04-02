@@ -76,7 +76,10 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
-    // get script by account
+    val acc0ScriptInfo = sender.addressScriptInfo(acc0.address)
+
+    acc0ScriptInfo.script.isEmpty shouldBe false
+    acc0ScriptInfo.scriptText.isEmpty shouldBe false
   }
 
   test("can't send from acc0 using old pk") {

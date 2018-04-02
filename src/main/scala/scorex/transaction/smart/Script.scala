@@ -22,7 +22,7 @@ case class Script(script: Typed.EXPR) {
     ByteStr(s ++ crypto.secureHash(s).take(checksumLength))
   }
 
-  override def toString: String = s"Script(base58=${bytes()}, $text"
+  override def toString: String = text
 }
 
 object Script {
