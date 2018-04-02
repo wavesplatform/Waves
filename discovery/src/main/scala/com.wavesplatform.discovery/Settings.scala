@@ -10,11 +10,7 @@ import scala.concurrent.duration.FiniteDuration
 
 case class ChainSettings(chainId: Char, initialPeers: Seq[InetSocketAddress])
 
-case class Settings(chains: Seq[ChainSettings],
-                    webSocketHost: String,
-                    webSocketPort: Int,
-                    workersCount: Int,
-                    discoveryInterval: FiniteDuration)
+case class Settings(chains: Seq[ChainSettings], webSocketHost: String, webSocketPort: Int, workersCount: Int, discoveryInterval: FiniteDuration)
 
 object Settings {
   implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase // IDEA bug

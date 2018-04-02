@@ -10,9 +10,8 @@ case class SmallestMailboxWithThresholdRoutingLogic(mailboxThreshold: Int) exten
 
     if (routees.exists(numberOfMessages(_) < mailboxThreshold)) {
       super.select(message, routees)
-    }
-    else {
-      (_: Any, _: ActorRef) => ()
+    } else { (_: Any, _: ActorRef) =>
+      ()
     }
   }
 }
