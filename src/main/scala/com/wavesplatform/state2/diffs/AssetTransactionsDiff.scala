@@ -37,7 +37,7 @@ object AssetTransactionsDiff {
 
   def reissue(state: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(
       tx: ReissueTransaction): Either[ValidationError, Diff] =
-    validateAsset(tx, state, tx.assetId, shouldMatch = true).flatMap { _ =>
+    validateAsset(tx, state, tx.assetId, issuerOnly = true).flatMap { _ =>
       val oldInfo = state.assetDescription(tx.assetId).get
       if (oldInfo.reissuable || blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) {
         Right(
@@ -70,11 +70,11 @@ object AssetTransactionsDiff {
   private def validateAsset(tx: SignedTransaction,
                             state: SnapshotStateReader,
                             assetId: AssetId,
-                            shouldMatch: Boolean): Either[ValidationError, Unit] = {
+                            issuerOnly: Boolean): Either[ValidationError, Unit] = {
     state.transactionInfo(assetId) match {
-      case Some((_, itx: IssueTransaction)) if !validIssuer(shouldMatch, tx.sender, itx.sender) =>
+      case Some((_, itx: IssueTransaction)) if !validIssuer(issuerOnly, tx.sender, itx.sender) =>
         Left(GenericError("Asset was issued by other address"))
-      case Some((_, sitx: SmartIssueTransaction)) if sitx.script.isEmpty && !validIssuer(shouldMatch, tx.sender, sitx.sender) =>
+      case Some((_, sitx: SmartIssueTransaction)) if sitx.script.isEmpty && !validIssuer(issuerOnly, tx.sender, sitx.sender) =>
         Left(GenericError("Asset was issued by other address"))
       case None =>
         Left(GenericError("Referenced assetId not found"))
@@ -83,8 +83,8 @@ object AssetTransactionsDiff {
     }
   }
 
-  private def validIssuer(shouldMatch: Boolean, sender: PublicKeyAccount, issuer: PublicKeyAccount): Boolean = {
-    if (shouldMatch) sender equals issuer
+  private def validIssuer(issuerOnly: Boolean, sender: PublicKeyAccount, issuer: PublicKeyAccount): Boolean = {
+    if (issuerOnly) sender equals issuer
     else true
   }
 }
