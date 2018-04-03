@@ -4,13 +4,13 @@ import com.google.common.primitives.Longs
 import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import io.swagger.annotations.ApiModelProperty
-import monix.eval.Coeval
+import monix.eval.{Coeval, Task}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
 import scorex.transaction.TransactionParsers._
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.ValidationError.{GenericError, InvalidSignature}
 import scorex.transaction._
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 
@@ -143,6 +143,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
       }
     }.toEither.left.map(x => GenericError(x.getMessage))
 
+  @ApiModelProperty(hidden = true)
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     Json.obj(
       "id"               -> Base58.encode(id()),
@@ -180,6 +181,13 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   }
 
   override def hashCode(): Int = idStr.hashCode()
+
+  @ApiModelProperty(hidden = true)
+  def getSignedDescendants: Coeval[Seq[Signed]] = signedDescendants
+  @ApiModelProperty(hidden = true)
+  def getSignaturesValidMemoized: Task[Either[InvalidSignature, Order.this.type]] = signaturesValidMemoized
+  @ApiModelProperty(hidden = true)
+  def getSignaturesValid: Coeval[Either[InvalidSignature, Order.this.type]] = signaturesValid
 }
 
 object Order {
