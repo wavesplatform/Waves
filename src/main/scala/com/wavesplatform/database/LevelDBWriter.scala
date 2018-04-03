@@ -127,7 +127,8 @@ object LevelDBWriter {
     private def writeStrings(strings: Seq[String]): Array[Byte] = {
       val b = ByteBuffer.allocate(strings.map(_.getBytes(UTF8).length + 2).sum)
       for (s <- strings) {
-        b.putShort(s.length.toShort).put(s.getBytes(UTF8))
+        val bytes = s.getBytes(UTF8)
+        b.putShort(bytes.length.toShort).put(bytes)
       }
       b.array()
     }

@@ -139,7 +139,8 @@ package object appender extends ScorexLogging {
       _ <- Either.cond(
         calcGs.sameElements(blockGs),
         (),
-        GenericError(s"declared generation signature ${blockGs.mkString} does not match calculated generation signature ${calcGs.mkString}")
+        GenericError(
+          s"declared generation signature ${blockData.generationSignature.base58} does not match calculated generation signature ${ByteStr(calcGs).base58}")
       )
       effectiveBalance <- genBalance(height).left.map(GenericError(_))
       hit    = calcHit(prevBlockData, generator)

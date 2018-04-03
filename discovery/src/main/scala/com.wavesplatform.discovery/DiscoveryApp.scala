@@ -18,42 +18,47 @@ import scala.concurrent.duration.FiniteDuration
 
 object DiscoveryApp extends App with ScorexLogging {
 
-  implicit val ec: ExecutionContext = ExecutionContext.global
-  implicit val system: ActorSystem = ActorSystem("Default")
+  implicit val ec: ExecutionContext                = ExecutionContext.global
+  implicit val system: ActorSystem                 = ActorSystem("Default")
   implicit val flowMaterializer: ActorMaterializer = ActorMaterializer()
 
   import akka.http.scaladsl.server.Directives._
 
-  val (route, timer) = Settings.default.chains.map { cs =>
-    val mainActor = MainActor(cs.chainId, Settings.default.workersCount)
-    mainActor ! MainActor.Peers(cs.initialPeers.toSet)
+  val (route, timer) = Settings.default.chains
+    .map { cs =>
+      val mainActor = MainActor(cs.chainId, Settings.default.workersCount)
+      mainActor ! MainActor.Peers(cs.initialPeers.toSet)
 
-    val route = get {
-      path(cs.chainId.toLower.toString) {
+      val route = get {
+        path(cs.chainId.toLower.toString) {
 
-        val sink: Sink[akka.http.scaladsl.model.ws.Message, _] = Sink.ignore
-        val source: Source[akka.http.scaladsl.model.ws.Message, NotUsed] =
-          Source.actorRef[String](1, OverflowStrategy.dropTail)
-            .mapMaterializedValue { actor =>
-              mainActor ! WebSocketConnected(actor)
-              NotUsed
-            }.map(
-            (outMsg: String) => TextMessage(outMsg))
+          val sink: Sink[akka.http.scaladsl.model.ws.Message, _] = Sink.ignore
+          val source: Source[akka.http.scaladsl.model.ws.Message, NotUsed] =
+            Source
+              .actorRef[String](1, OverflowStrategy.dropTail)
+              .mapMaterializedValue { actor =>
+                mainActor ! WebSocketConnected(actor)
+                NotUsed
+              }
+              .map((outMsg: String) => TextMessage(outMsg))
 
-        handleWebSocketMessages(Flow.fromSinkAndSource(sink, source))
+          handleWebSocketMessages(Flow.fromSinkAndSource(sink, source))
+        }
       }
-    }
 
-    (route, system.scheduler.schedule(FiniteDuration(0, TimeUnit.SECONDS), Settings.default.discoveryInterval, mainActor, MainActor.Discover))
-  }.reduce((a, b) => (a._1 ~ b._1, a._2.combine(b._2)))
+      (route, system.scheduler.schedule(FiniteDuration(0, TimeUnit.SECONDS), Settings.default.discoveryInterval, mainActor, MainActor.Discover))
+    }
+    .reduce((a, b) => (a._1 ~ b._1, a._2.combine(b._2)))
 
   val binding = Http().bindAndHandle(route, Settings.default.webSocketHost, Settings.default.webSocketPort)
 
   sys.addShutdownHook {
-    binding.flatMap(_.unbind()).onComplete(_ => {
-      timer.cancel()
-      system.terminate()
-    })
+    binding
+      .flatMap(_.unbind())
+      .onComplete(_ => {
+        timer.cancel()
+        system.terminate()
+      })
   }
 
   log.info(s"Server is now online at http://${Settings.default.webSocketHost}:${Settings.default.webSocketPort}")

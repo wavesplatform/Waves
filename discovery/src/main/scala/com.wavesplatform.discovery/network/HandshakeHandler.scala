@@ -14,8 +14,7 @@ import scala.util.Random
 
 class HandshakeHandler(chainId: Char) extends ReplayingDecoder[Void] with ScorexLogging {
   private val handshake =
-    Handshake(Constants.ApplicationName + chainId, Version.VersionTuple,
-      "discovery", new Random().nextLong(), None)
+    Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, "discovery", new Random().nextLong(), None)
 
   override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]): Unit = {
     out.add(Handshake.decode(in))
