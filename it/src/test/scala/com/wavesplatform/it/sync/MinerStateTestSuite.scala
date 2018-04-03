@@ -43,6 +43,9 @@ object MinerStateTestSuite {
   val microblockActivationHeight = 0
   private val minerConfig        = ConfigFactory.parseString(s"""
     |waves {
+    |   synchronization {
+    |      synchronization-timeout = 10s
+    |   }
     |   blockchain {
     |     custom {
     |        functionality {
@@ -66,6 +69,9 @@ object MinerStateTestSuite {
 
   private val notMinerConfig = ConfigFactory.parseString(s"""
     |waves {
+    |   synchronization {
+    |      synchronization-timeout = 10s
+    |   }
     |   blockchain {
     |     custom {
     |        functionality {
