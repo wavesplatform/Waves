@@ -2,9 +2,9 @@ package com.wavesplatform.lang
 import com.wavesplatform.lang.ctx.Obj
 import scodec.bits.ByteVector
 
-import scala.reflect.runtime.universe._
-
 object Terms {
+
+  final case class WrappedManifest[T](inner: Manifest[T]) extends AnyVal
 
   case class FUNCTION(args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER)
 
@@ -14,11 +14,12 @@ object Terms {
 
   sealed trait TYPE extends TYPEPLACEHOLDER {
     type Underlying
-    def typetag: TypeTag[Underlying]
+    def typeInfo: TypeInfo[Underlying]
   }
-  sealed abstract class AUTO_TAGGED_TYPE[T](implicit override val typetag: TypeTag[T]) extends TYPE {
+  sealed abstract class AUTO_TAGGED_TYPE[T](implicit override val typeInfo: TypeInfo[T]) extends TYPE {
     override type Underlying = T
   }
+
   case object NOTHING    extends AUTO_TAGGED_TYPE[Nothing]
   case object UNIT       extends AUTO_TAGGED_TYPE[Unit]
   case object LONG       extends AUTO_TAGGED_TYPE[Long]
@@ -27,7 +28,7 @@ object Terms {
   case object STRING     extends AUTO_TAGGED_TYPE[String]
   case class OPTION(innerType: TYPE) extends TYPE {
     type Underlying = Option[innerType.Underlying]
-    override def typetag: TypeTag[Option[innerType.Underlying]] = typeTag[Underlying]
+    override def typeInfo: TypeInfo[Option[innerType.Underlying]] = TypeInfo.optionTypeInfo(innerType.typeInfo)
   }
   case class TYPEREF(name: String) extends AUTO_TAGGED_TYPE[Obj]
 

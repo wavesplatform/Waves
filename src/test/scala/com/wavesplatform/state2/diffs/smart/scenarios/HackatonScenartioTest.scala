@@ -2,21 +2,20 @@ package com.wavesplatform.state2.diffs.smart.scenarios
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.{NoShrink, TransactionGen}
-import com.wavesplatform.lang.{Evaluator, Parser, TypeChecker}
+import com.wavesplatform.lang.TypeInfo._
+import com.wavesplatform.lang.{Evaluator, Parser, TypeChecker, TypeInfo}
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
 import com.wavesplatform.state2.diffs.smart._
 import com.wavesplatform.utils._
-
-import scala.reflect.runtime.universe.TypeTag
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
 import scorex.account.AddressScheme
-import scorex.transaction.{DataTransaction, GenesisTransaction}
 import scorex.transaction.assets.{SmartIssueTransaction, TransferTransaction}
 import scorex.transaction.smart.Script
+import scorex.transaction.{DataTransaction, GenesisTransaction}
 
 class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions: Gen[
@@ -101,7 +100,7 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
        accountBDataTransaction,
        transferFromAToB)
 
-  private def eval[T: TypeTag](code: String) = {
+  private def eval[T: TypeInfo](code: String) = {
     val untyped = Parser(code).get.value
     val typed   = TypeChecker(dummyTypeCheckerContext, untyped)
     typed.flatMap(Evaluator[T](dummyContext, _))
