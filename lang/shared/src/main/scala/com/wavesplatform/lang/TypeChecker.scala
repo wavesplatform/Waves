@@ -68,18 +68,17 @@ object TypeChecker {
               for {
                 resolvedTypeParams <- TypeInferrer(typePairs)
                 resolvedResultType <- TypeInferrer.inferResultType(resultType, resolvedTypeParams)
-              } yield Typed.FUNCTION_CALL(name, typedExpressionArgumentsAndTypedPlaceholders.map(_._1).toList, resolvedResultType)
+              } yield
+                Typed.FUNCTION_CALL(FunctionHeader(name, f.args), typedExpressionArgumentsAndTypedPlaceholders.map(_._1).toList, resolvedResultType)
             }
 
         }
       }
 
-      import cats.instances.vector._
       ctx.functionByName(name) match {
         case Nil                   => EitherT.fromEither[Coeval](Left(s"Function '$name' not found"))
         case singleOverload :: Nil => matchOverload(singleOverload)
-        case many =>
-          ???
+        case many => ???
       }
 
     case Untyped.BINARY_OP(a, op, b) =>

@@ -2,7 +2,7 @@ package com.wavesplatform.lang.ctx
 
 import cats.data.EitherT
 import com.wavesplatform.lang.Terms.{FUNCTION, TYPEPLACEHOLDER}
-import com.wavesplatform.lang.TrampolinedExecResult
+import com.wavesplatform.lang.{FunctionHeader, TrampolinedExecResult}
 import monix.eval.Coeval
 
 sealed trait PredefFunction {
@@ -11,10 +11,14 @@ sealed trait PredefFunction {
   val resultType: TYPEPLACEHOLDER
   def eval(args: List[Any]): TrampolinedExecResult[Any]
   val signature: FUNCTION
+  lazy val header = FunctionHeader(name, args.map(_._2))
 }
 object PredefFunction {
 
-  case class PredefFunctionImpl(name: String, resultType: TYPEPLACEHOLDER, args: List[(String, TYPEPLACEHOLDER)], ev: List[Any] => Either[String, Any])
+  case class PredefFunctionImpl(name: String,
+                                resultType: TYPEPLACEHOLDER,
+                                args: List[(String, TYPEPLACEHOLDER)],
+                                ev: List[Any] => Either[String, Any])
       extends PredefFunction {
     override def eval(args: List[Any]): TrampolinedExecResult[Any] = {
       EitherT.fromEither[Coeval](ev(args))

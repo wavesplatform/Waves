@@ -13,7 +13,7 @@ abstract class BaseWavesContext extends Environment {
 
   private val Global = com.wavesplatform.lang.hacks.Global // Hack for IDEA
 
-  val keccak256F: PredefFunction = hashFunction("keccak256")(Global.keccak256)
+  val keccak256F: PredefFunction  = hashFunction("keccak256")(Global.keccak256)
   val blake2b256F: PredefFunction = hashFunction("blake2b256")(Global.blake2b256)
   val sha256F: PredefFunction     = hashFunction("sha256")(Global.sha256)
 
@@ -89,26 +89,26 @@ abstract class BaseWavesContext extends Environment {
         ("tx", LazyVal(TYPEREF(transactionType.name))(EitherT(txCoeval)))
       ),
       Map(
-        sigVerifyF.name -> sigVerifyF,
-        extract.name    -> extract,
-        isDefined.name  -> isDefined,
-        some.name       -> some,
-        size.name       -> size,
+        sigVerifyF.header -> sigVerifyF,
+        extract.header    -> extract,
+        isDefined.header  -> isDefined,
+        some.header       -> some,
+        size.header       -> size,
         //hashing
-        keccak256F.name -> keccak256F,
-        blake2b256F.name -> blake2b256F,
-        sha256F.name     -> sha256F,
+        keccak256F.header  -> keccak256F,
+        blake2b256F.header -> blake2b256F,
+        sha256F.header     -> sha256F,
         //utils
-        toBase58StringF.name     -> toBase58StringF,
+        toBase58StringF.header -> toBase58StringF,
         //dsl
-        addressFromPublicKeyF.name -> addressFromPublicKeyF,
-        addressFromStringF.name     -> addressFromStringF,
+        addressFromPublicKeyF.header -> addressFromPublicKeyF,
+        addressFromStringF.header    -> addressFromStringF,
         //state
-        txByIdF.name               -> txByIdF,
-        getLongF.name              -> getLongF,
-        getBooleanF.name           -> getBooleanF,
-        getByteArrayF.name         -> getByteArrayF,
-        addressFromRecipientF.name -> addressFromRecipientF
+        txByIdF.header               -> txByIdF,
+        getLongF.header              -> getLongF,
+        getBooleanF.header           -> getBooleanF,
+        getByteArrayF.header         -> getByteArrayF,
+        addressFromRecipientF.header -> addressFromRecipientF
       )
     )
   }
