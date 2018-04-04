@@ -55,7 +55,7 @@ object ValidationError {
 
   case class AccountBalanceError(errs: Map[Address, String]) extends ValidationError
 
-  case class AliasNotExists(a: Alias) extends ValidationError
+  case class AliasDoesNotExist(a: Alias) extends ValidationError
 
   case class OrderValidationError(order: Order, err: String) extends ValidationError
 

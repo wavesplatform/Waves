@@ -6,7 +6,7 @@ import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.patch.{CancelAllLeases, CancelLeaseOverflow}
+import com.wavesplatform.state2.patch.{CancelAllLeases, CancelInvalidLeaseIn, CancelLeaseOverflow}
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.account.Address
@@ -110,7 +110,12 @@ object BlockDiffer extends ScorexLogging with Instrumented {
           Monoid.combine(diffWithCancelledLeases, CancelLeaseOverflow(composite(s, diffWithCancelledLeases)))
         else diffWithCancelledLeases
 
-      diffWithLeasePatches
+      val diffWithCancelledLeaseIns =
+        if (fp.featureActivationHeight(BlockchainFeatures.DataTransaction.id).contains(currentBlockHeight))
+          Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn.v2(composite(s, diffWithLeasePatches)))
+        else diffWithLeasePatches
+
+      diffWithCancelledLeaseIns
     }
   }
 }
