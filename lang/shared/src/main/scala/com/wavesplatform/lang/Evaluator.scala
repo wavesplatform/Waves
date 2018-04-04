@@ -11,6 +11,30 @@ import scala.util.{Failure, Success, Try}
 
 object Evaluator {
 
+  val operators: List[PredefFunction] = {
+    def createOp(op: BINARY_OP_KIND, t: TYPE, r: TYPE)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
+      PredefFunction(op.symbol, t, List("a" -> t, "b" -> t)) {
+        case (a: t.Underlying) :: (b: t.Underlying) :: Nil =>
+          Right(body(a, b))
+        case _ => ???
+      }
+    }
+
+    val eqOperation = PredefFunction(EQ_OP.symbol, BOOLEAN, List("a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T'))) {
+      case a :: b :: Nil =>
+        Right(a == b)
+      case _ => ???
+    }
+    List(
+      createOp(SUM_OP, LONG, LONG)((a, b) => a + b),
+      createOp(GE_OP, LONG, BOOLEAN)((a, b) => a >= b),
+      createOp(GT_OP, LONG, BOOLEAN)((a, b) => a > b),
+      createOp(OR_OP, BOOLEAN, BOOLEAN)((a, b) => a || b),
+      createOp(AND_OP, BOOLEAN, BOOLEAN)((a, b) => a && b),
+      eqOperation
+    )
+  }
+
   private def r[T: TypeTag](ctx: Context, t: TrampolinedExecResult[Typed.EXPR]): TrampolinedExecResult[T] =
     t flatMap { (typedExpr: Typed.EXPR) =>
       (typedExpr match {
@@ -18,11 +42,11 @@ object Evaluator {
           mayBeLet match {
             case None => r(ctx, EitherT.pure(inner))(blockTpe.typetag)
             case Some(Typed.LET(newVarName, newVarBlock)) =>
-              (ctx.letDefs.get(newVarName), ctx.functions.get(newVarName)) match {
+              (ctx.letDefs.get(newVarName), ctx.functionByName(newVarName)) match {
                 case (Some(_), _) => EitherT.leftT[Coeval, T](s"Value '$newVarName' already defined in the scope")
-                case (_, Some(_)) =>
+                case (_, list) if list.nonEmpty =>
                   EitherT.leftT[Coeval, Typed.EXPR](s"Value '$newVarName' can't be defined because function with such name is predefined")
-                case (None, None) =>
+                case (None, Nil) =>
                   val varBlockTpe                                                  = newVarBlock.tpe
                   val eitherTCoeval: TrampolinedExecResult[varBlockTpe.Underlying] = r(ctx, EitherT.pure(newVarBlock))(varBlockTpe.typetag)
                   val lz: LazyVal                                                  = LazyVal(varBlockTpe)(eitherTCoeval)
@@ -90,11 +114,11 @@ object Evaluator {
             }
             value
           }
-        case Typed.FUNCTION_CALL(name, args, _) =>
+        case Typed.FUNCTION_CALL(header, args, _) =>
           import cats.data._
           import cats.instances.vector._
           import cats.syntax.all._
-          ctx.functions.get(name) match {
+          ctx.functions.get(header) match {
             case Some(func) =>
               val argsVector = args
                 .map(a =>
@@ -106,7 +130,7 @@ object Evaluator {
                 actualArgs <- argsSequenced
                 r          <- func.eval(actualArgs.toList)
               } yield r
-            case None => EitherT.leftT[Coeval, Any](s"function '$name' not found")
+            case None => EitherT.leftT[Coeval, Any](s"function '$header' not found")
           }
         case Typed.BINARY_OP(_, SUM_OP, _, tpe) if tpe != LONG            => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
         case Typed.BINARY_OP(_, GE_OP | GT_OP, _, tpe) if tpe != BOOLEAN  => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")

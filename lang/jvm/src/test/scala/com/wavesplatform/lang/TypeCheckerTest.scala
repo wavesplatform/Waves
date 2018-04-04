@@ -247,7 +247,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
           import cats.syntax.all._
           val auxedArgs: Vector[Coeval[Untyped.EXPR]]          = f.args.map(aux).toVector
           val sequencedAuxedArgs: Coeval[Vector[Untyped.EXPR]] = auxedArgs.sequence
-          sequencedAuxedArgs.map(args => Untyped.FUNCTION_CALL(f.functionName, args.toList))
+          sequencedAuxedArgs.map(args => Untyped.FUNCTION_CALL(f.functionHeader, args.toList))
       })
 
     aux(expr)()

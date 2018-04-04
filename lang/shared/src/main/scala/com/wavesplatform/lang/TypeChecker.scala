@@ -10,9 +10,9 @@ import scala.util.{Failure, Success, Try}
 
 object TypeChecker {
 
-  type TypeDefs     = Map[String, TYPE]
-  type FunctionSigs = Map[String, FUNCTION]
-  case class TypeCheckerContext(predefTypes: Map[String, PredefType], varDefs: TypeDefs, functionDefs: FunctionSigs)
+  case class TypeCheckerContext(predefTypes: Map[String, PredefType], varDefs: TypeDefs, functionDefs: FunctionSigs) {
+    def functionByName(name: String): List[FUNCTION] = functionDefs.filter(_._1.name == name).values.toList
+  }
 
   object TypeCheckerContext {
     val empty = TypeCheckerContext(Map.empty, Map.empty, Map.empty)
@@ -52,60 +52,37 @@ object TypeChecker {
         }
 
     case expr @ Untyped.FUNCTION_CALL(name, args) =>
-      val value: EitherT[Coeval, String, Typed.EXPR] = ctx.functionDefs.get(name) match {
-        case Some(FUNCTION(argTypes, resultType)) =>
-          if (args.lengthCompare(argTypes.size) != 0)
-            EitherT.fromEither[Coeval](Left(s"Function '$name' requires ${argTypes.size} arguments, but ${args.size} are provided"))
-          else {
-            import cats.instances.vector._
-            val actualArgTypes: Vector[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg))).toVector
-            val sequencedActualArgTypes                           = actualArgTypes.sequence[SetTypeResult, Typed.EXPR].map(x => x.zip(argTypes))
+      def matchOverload(f: FUNCTION): EitherT[Coeval, String, Typed.EXPR] = {
+        val argTypes   = f.args
+        val resultType = f.result
+        if (args.lengthCompare(argTypes.size) != 0)
+          EitherT.fromEither[Coeval](Left(s"Function '$name' requires ${argTypes.size} arguments, but ${args.size} are provided"))
+        else {
+          import cats.instances.vector._
+          val actualArgTypes: Vector[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg))).toVector
+          val sequencedActualArgTypes                           = actualArgTypes.sequence[SetTypeResult, Typed.EXPR].map(x => x.zip(argTypes))
 
-            sequencedActualArgTypes
-              .subflatMap { typedExpressionArgumentsAndTypedPlaceholders =>
-                val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case ((typedExpr, tph)) => (typedExpr.tpe, tph) }
-                for {
-                  resolvedTypeParams <- TypeInferrer(typePairs)
-                  resolvedResultType <- TypeInferrer.inferResultType(resultType, resolvedTypeParams)
-                } yield Typed.FUNCTION_CALL(name, typedExpressionArgumentsAndTypedPlaceholders.map(_._1).toList, resolvedResultType)
-              }
-
-          }
-        case None => EitherT.fromEither[Coeval](Left(s"Function '$name' not found"))
-      }
-      value
-
-    case expr @ Untyped.BINARY_OP(a, op, b) =>
-      (setType(ctx, EitherT.pure(a)), setType(ctx, EitherT.pure(b))).tupled
-        .subflatMap {
-          case operands @ (a, b) =>
-            val aTpe = a.tpe
-            val bTpe = b.tpe
-
-            op match {
-              case SUM_OP =>
-                if (aTpe != LONG) Left(s"The first operand is expected to be LONG, but got $aTpe: $a in $expr")
-                else if (bTpe != LONG) Left(s"The second operand is expected to be LONG, but got $bTpe: $b in $expr")
-                else Right(operands -> LONG)
-
-              case GT_OP | GE_OP =>
-                if (aTpe != LONG) Left(s"The first operand is expected to be LONG, but got $aTpe: $a in $expr")
-                else if (bTpe != LONG) Left(s"The second operand is expected to be LONG, but got $bTpe: $b in $expr")
-                else Right(operands -> BOOLEAN)
-
-              case AND_OP | OR_OP =>
-                if (aTpe != BOOLEAN) Left(s"The first operand is expected to be BOOLEAN, but got $aTpe: $a in $expr")
-                else if (bTpe != BOOLEAN) Left(s"The second operand is expected to be BOOLEAN, but got $bTpe: $b in $expr")
-                else Right(operands -> BOOLEAN)
-
-              case EQ_OP =>
-                findCommonType(aTpe, bTpe) match {
-                  case Some(_) => Right(operands -> BOOLEAN)
-                  case None    => Left(s"Can't find common type for $aTpe and $bTpe: $a and $b in $expr")
-                }
+          sequencedActualArgTypes
+            .subflatMap { typedExpressionArgumentsAndTypedPlaceholders =>
+              val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case ((typedExpr, tph)) => (typedExpr.tpe, tph) }
+              for {
+                resolvedTypeParams <- TypeInferrer(typePairs)
+                resolvedResultType <- TypeInferrer.inferResultType(resultType, resolvedTypeParams)
+              } yield
+                Typed.FUNCTION_CALL(FunctionHeader(name, f.args), typedExpressionArgumentsAndTypedPlaceholders.map(_._1).toList, resolvedResultType)
             }
+
         }
-        .map { case (operands, tpe) => Typed.BINARY_OP(operands._1, op, operands._2, tpe) }
+      }
+
+      ctx.functionByName(name) match {
+        case Nil                   => EitherT.fromEither[Coeval](Left(s"Function '$name' not found"))
+        case singleOverload :: Nil => matchOverload(singleOverload)
+        case many => ???
+      }
+
+    case Untyped.BINARY_OP(a, op, b) =>
+      setType(ctx, EitherT.pure(Untyped.FUNCTION_CALL(op.symbol, List(a, b))))
 
     case block: Untyped.BLOCK =>
       block.let match {
@@ -115,11 +92,11 @@ object TypeChecker {
           }
 
         case Some(let) =>
-          (ctx.varDefs.get(let.name), ctx.functionDefs.get(let.name)) match {
+          (ctx.varDefs.get(let.name), ctx.functionByName(let.name)) match {
             case (Some(_), _) => EitherT.leftT[Coeval, Typed.EXPR](s"Value '${let.name}' already defined in the scope")
-            case (_, Some(_)) =>
+            case (_, list) if list.nonEmpty =>
               EitherT.leftT[Coeval, Typed.EXPR](s"Value '${let.name}' can't be defined because function with such name is predefined")
-            case (None, None) =>
+            case (None, Nil) =>
               setType(ctx, EitherT.pure(let.value)).flatMap { exprTpe =>
                 val updatedCtx = ctx.copy(varDefs = ctx.varDefs + (let.name -> exprTpe.tpe))
                 setType(updatedCtx, EitherT.pure(block.body))
@@ -166,7 +143,8 @@ object TypeChecker {
   }
 
   def apply(c: TypeCheckerContext, expr: Untyped.EXPR): TypeCheckResult[Typed.EXPR] = {
-    def result = setType(c, EitherT.pure(expr)).value().left.map { e =>
+    val ctx = c.copy(functionDefs = c.functionDefs ++ Evaluator.operators.map(x => (FunctionHeader(x.name, x.args.map(_._2)), x.signature)))
+    def result = setType(ctx, EitherT.pure(expr)).value().left.map { e =>
       s"Typecheck failed: $e"
     }
     Try(result) match {

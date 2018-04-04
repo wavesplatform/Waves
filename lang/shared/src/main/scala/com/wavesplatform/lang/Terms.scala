@@ -31,13 +31,25 @@ object Terms {
   }
   case class TYPEREF(name: String) extends AUTO_TAGGED_TYPE[Obj]
 
-  sealed trait BINARY_OP_KIND
-  case object SUM_OP extends BINARY_OP_KIND
-  case object AND_OP extends BINARY_OP_KIND
-  case object OR_OP  extends BINARY_OP_KIND
-  case object EQ_OP  extends BINARY_OP_KIND
-  case object GT_OP  extends BINARY_OP_KIND
-  case object GE_OP  extends BINARY_OP_KIND
+  sealed trait BINARY_OP_KIND { val symbol: String }
+  case object SUM_OP extends BINARY_OP_KIND {
+    override val symbol: String = "+"
+  }
+  case object AND_OP extends BINARY_OP_KIND {
+    override val symbol: String = "&&"
+  }
+  case object OR_OP extends BINARY_OP_KIND {
+    override val symbol: String = "||"
+  }
+  case object EQ_OP extends BINARY_OP_KIND {
+    override val symbol: String = "=="
+  }
+  case object GT_OP extends BINARY_OP_KIND {
+    override val symbol: String = ">"
+  }
+  case object GE_OP extends BINARY_OP_KIND {
+    override val symbol: String = ">="
+  }
 
   object Untyped {
     case class LET(name: String, value: EXPR)
@@ -68,7 +80,7 @@ object Terms {
     case class REF(key: String, override val tpe: TYPE)                                      extends EXPR(tpe)
     case object TRUE                                                                         extends EXPR(BOOLEAN)
     case object FALSE                                                                        extends EXPR(BOOLEAN)
-    case class FUNCTION_CALL(functionName: String, args: List[EXPR], override val tpe: TYPE) extends EXPR(tpe)
+    case class FUNCTION_CALL(functionHeader: FunctionHeader, args: List[EXPR], override val tpe: TYPE) extends EXPR(tpe)
   }
 
   def findCommonType(t1: TYPE, t2: TYPE): Option[TYPE] = findCommonType(t1, t2, biDirectional = true)

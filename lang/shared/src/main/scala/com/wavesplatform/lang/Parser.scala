@@ -61,20 +61,20 @@ object Parser {
     case ((all, y)) => all.foldRight(y) { case (r, curr) => BLOCK(Some(r), curr) }
   }
 
-  private val opsByPriority = List[(String, BINARY_OP_KIND)](
-    "||" -> OR_OP,
-    "&&" -> AND_OP,
-    "==" -> EQ_OP,
-    ">=" -> GE_OP,
-    ">"  -> GT_OP,
-    "+"  -> SUM_OP
+  private val opsByPriority = List[BINARY_OP_KIND](
+    OR_OP,
+    AND_OP,
+    EQ_OP,
+    GE_OP,
+    GT_OP,
+    SUM_OP
   )
 
-  private def binaryOp(rest: List[(String, BINARY_OP_KIND)]): P[EXPR] = rest match {
+  private def binaryOp(priority: List[BINARY_OP_KIND]): P[EXPR] = priority match {
     case Nil => atom
-    case (lessPriorityOp, kind) :: restOps =>
+    case kind :: restOps =>
       val operand = binaryOp(restOps)
-      P(operand ~ (lessPriorityOp.!.map(_ => kind) ~ operand).rep()).map {
+      P(operand ~ (kind.symbol.!.map(_ => kind) ~ operand).rep()).map {
         case ((left: EXPR, r: Seq[(BINARY_OP_KIND, EXPR)])) =>
           r.foldLeft(left) { case (acc, (currKind, currOperand)) => BINARY_OP(acc, currKind, currOperand) }
       }
