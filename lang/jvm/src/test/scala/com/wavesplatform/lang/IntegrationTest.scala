@@ -1,14 +1,14 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.TypeInfo._
+import com.wavesplatform.lang.ctx._
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.ctx._
-import scala.reflect.runtime.universe.TypeTag
 
 class IntegrationTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
 
-  private def eval[T: TypeTag](code: String) = {
+  private def eval[T: TypeInfo](code: String) = {
     val untyped = Parser(code).get.value
     val ctx     = Context(Map.empty, Map.empty, Map(multiplierFunction.name -> multiplierFunction))
     val typed   = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(ctx), untyped)

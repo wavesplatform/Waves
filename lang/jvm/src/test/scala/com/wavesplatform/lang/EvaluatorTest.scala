@@ -4,15 +4,16 @@ import cats.data.EitherT
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Terms.Typed._
 import com.wavesplatform.lang.Terms._
+import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.ctx._
 import com.wavesplatform.lang.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scala.reflect.runtime.universe.TypeTag
+
 class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def ev[T: TypeTag](context: Context = Context.empty, expr: EXPR): Either[_, _] = Evaluator[T](context, expr)
-  private def simpleDeclarationAndUsage(i: Int)                                          = BLOCK(Some(LET("x", CONST_LONG(i))), REF("x", LONG), LONG)
+  private def ev[T: TypeInfo](context: Context = Context.empty, expr: EXPR): Either[_, _] = Evaluator[T](context, expr)
+  private def simpleDeclarationAndUsage(i: Int)                                           = BLOCK(Some(LET("x", CONST_LONG(i))), REF("x", LONG), LONG)
 
   property("successful on very deep expressions (stack overflow check)") {
     val term = (1 to 100000).foldLeft[EXPR](CONST_LONG(0))((acc, _) => BINARY_OP(acc, SUM_OP, CONST_LONG(1), LONG))

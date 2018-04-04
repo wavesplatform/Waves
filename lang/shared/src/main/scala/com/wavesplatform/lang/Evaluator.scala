@@ -2,21 +2,20 @@ package com.wavesplatform.lang
 
 import cats.data.EitherT
 import com.wavesplatform.lang.Terms._
+import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.ctx._
 import monix.eval.Coeval
-
-import scala.reflect.runtime.universe.TypeTag
 
 import scala.util.{Failure, Success, Try}
 
 object Evaluator {
 
-  private def r[T: TypeTag](ctx: Context, t: TrampolinedExecResult[Typed.EXPR]): TrampolinedExecResult[T] =
+  private def r[T: TypeInfo](ctx: Context, t: TrampolinedExecResult[Typed.EXPR]): TrampolinedExecResult[T] =
     t flatMap { (typedExpr: Typed.EXPR) =>
       (typedExpr match {
         case Typed.BLOCK(mayBeLet, inner, blockTpe) =>
           mayBeLet match {
-            case None => r(ctx, EitherT.pure(inner))(blockTpe.typetag)
+            case None => r(ctx, EitherT.pure(inner))(blockTpe.typeInfo)
             case Some(Typed.LET(newVarName, newVarBlock)) =>
               (ctx.letDefs.get(newVarName), ctx.functions.get(newVarName)) match {
                 case (Some(_), _) => EitherT.leftT[Coeval, T](s"Value '$newVarName' already defined in the scope")
@@ -24,10 +23,10 @@ object Evaluator {
                   EitherT.leftT[Coeval, Typed.EXPR](s"Value '$newVarName' can't be defined because function with such name is predefined")
                 case (None, None) =>
                   val varBlockTpe                                                  = newVarBlock.tpe
-                  val eitherTCoeval: TrampolinedExecResult[varBlockTpe.Underlying] = r(ctx, EitherT.pure(newVarBlock))(varBlockTpe.typetag)
+                  val eitherTCoeval: TrampolinedExecResult[varBlockTpe.Underlying] = r(ctx, EitherT.pure(newVarBlock))(varBlockTpe.typeInfo)
                   val lz: LazyVal                                                  = LazyVal(varBlockTpe)(eitherTCoeval)
                   val updatedCtx: Context                                          = ctx.copy(letDefs = ctx.letDefs.updated(newVarName, lz))
-                  r(updatedCtx, EitherT.pure(inner))(blockTpe.typetag)
+                  r(updatedCtx, EitherT.pure(inner))(blockTpe.typeInfo)
               }
           }
         case Typed.REF(str, _) =>
@@ -61,8 +60,8 @@ object Evaluator {
 
         case Typed.IF(cond, t1, t2, tpe) =>
           r[Boolean](ctx, EitherT.pure(cond)) flatMap {
-            case true  => r(ctx, EitherT.pure(t1))(tpe.typetag)
-            case false => r(ctx, EitherT.pure(t2))(tpe.typetag)
+            case true  => r(ctx, EitherT.pure(t1))(tpe.typeInfo)
+            case false => r(ctx, EitherT.pure(t2))(tpe.typeInfo)
           }
 
         case Typed.BINARY_OP(t1, AND_OP, t2, BOOLEAN) =>
@@ -78,9 +77,8 @@ object Evaluator {
 
         case Typed.BINARY_OP(it1, EQ_OP, it2, tpe) =>
           for {
-            i1 <- r(ctx, EitherT.pure(it1))(it1.tpe.typetag)
-            i2 <- r(ctx, EitherT.pure(it2))(it2.tpe.typetag)
-
+            i1 <- r(ctx, EitherT.pure(it1))(it1.tpe.typeInfo)
+            i2 <- r(ctx, EitherT.pure(it2))(it2.tpe.typeInfo)
           } yield i1 == i2
         case Typed.GETTER(expr, field, _) =>
           r[Obj](ctx, EitherT.pure(expr)).flatMap { (obj: Obj) =>
@@ -98,7 +96,7 @@ object Evaluator {
             case Some(func) =>
               val argsVector = args
                 .map(a =>
-                  r(ctx, EitherT.pure(a))(a.tpe.typetag)
+                  r(ctx, EitherT.pure(a))(a.tpe.typeInfo)
                     .map(_.asInstanceOf[Any]))
                 .toVector
               val argsSequenced = argsVector.sequence[TrampolinedExecResult, Any]
@@ -113,15 +111,15 @@ object Evaluator {
         case Typed.BINARY_OP(_, AND_OP | OR_OP, _, tpe) if tpe != BOOLEAN => EitherT.leftT[Coeval, Any](s"Expected BOOLEAN, but got $tpe: $t")
 
       }).map { v =>
-        val tt = implicitly[TypeTag[T]]
+        val ti = typeInfo[T]
         v match {
-          case x if typedExpr.tpe.typetag.tpe <:< tt.tpe => x.asInstanceOf[T]
-          case _                                         => throw new Exception(s"Bad type: expected: ${tt.tpe} actual: ${typedExpr.tpe.typetag.tpe}")
+          case x if typedExpr.tpe.typeInfo <:< ti => x.asInstanceOf[T]
+          case _                                  => throw new Exception(s"Bad type: expected: ${ti} actual: ${typedExpr.tpe.typeInfo}")
         }
       }
     }
 
-  def apply[A: TypeTag](c: Context, expr: Typed.EXPR): Either[ExecutionError, A] = {
+  def apply[A: TypeInfo](c: Context, expr: Typed.EXPR): Either[ExecutionError, A] = {
     def result = r[A](c, EitherT.pure(expr)).value.apply()
     Try(result) match {
       case Failure(ex)  => Left(ex.toString)
