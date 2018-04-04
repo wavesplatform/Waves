@@ -30,26 +30,32 @@ final case class TypeInfo[T](classTag: ClassTag[T],
 
 object TypeInfo {
   def typeInfo[T](implicit ti: TypeInfo[T]): TypeInfo[T] = ti
+
+  private def fromAny[A: ClassTag](typeParams: Set[TypeInfo[_]] = Set.empty, interfaces: Set[TypeInfo[_]] = Set.empty): TypeInfo[A] = {
+    TypeInfo(reflect.classTag[A], anyTypeInfo.some, typeParams, interfaces)
+  }
+
+  private def fromAnyVal[A: ClassTag](typeParams: Set[TypeInfo[_]] = Set.empty, interfaces: Set[TypeInfo[_]] = Set.empty): TypeInfo[A] = {
+    TypeInfo(reflect.classTag[A], anyValTypeInfo.some, typeParams, interfaces)
+  }
+
   implicit val anyTypeInfo: TypeInfo[Any] = {
     val tag = reflect.classTag[Any]
     TypeInfo(tag, None, Set.empty, Set.empty)
   }
-  implicit val equalsTypeInfo: TypeInfo[Equals] = {
-    val tag = reflect.classTag[Equals]
-    TypeInfo(tag, anyTypeInfo.some, Set.empty, Set.empty)
-  }
-  implicit val serializableTypeInfo: TypeInfo[Serializable] = {
-    val tag = reflect.classTag[Serializable]
-    TypeInfo(tag, anyTypeInfo.some, Set.empty, Set.empty)
-  }
-  implicit val productTypeInfo: TypeInfo[Product] = {
-    val tag = reflect.classTag[Product]
-    TypeInfo(tag, anyTypeInfo.some, Set.empty, Set(equalsTypeInfo))
-  }
-  implicit val anyValTypeInfo: TypeInfo[AnyVal] = {
-    val tag = reflect.classTag[AnyVal]
-    TypeInfo(tag, anyTypeInfo.some, Set.empty, Set.empty)
-  }
+
+  implicit val equalsTypeInfo: TypeInfo[Equals] =
+    fromAny()
+
+  implicit val serializableTypeInfo: TypeInfo[Serializable] =
+    fromAny()
+
+  implicit val productTypeInfo: TypeInfo[Product] =
+    fromAny(interfaces = Set(serializableTypeInfo))
+
+  implicit val anyValTypeInfo: TypeInfo[AnyVal] =
+    fromAny()
+
   implicit val nothingTypeInfo: TypeInfo[Nothing] = {
     val tag = reflect.classTag[Nothing]
     TypeInfo[Nothing](
@@ -59,70 +65,29 @@ object TypeInfo {
       Set.empty
     )
   }
-  implicit val unitTypeInfo: TypeInfo[Unit] = {
-    val tag = reflect.classTag[Unit]
-    TypeInfo(
-      tag,
-      anyValTypeInfo.some,
-      Set.empty,
-      Set.empty
-    )
-  }
-  implicit val longTypeInfo: TypeInfo[Long] = {
-    val tag = reflect.classTag[Long]
-    TypeInfo(
-      tag,
-      anyValTypeInfo.some,
-      Set.empty,
-      Set.empty
-    )
-  }
-  implicit val byteVectorTypeInfo: TypeInfo[ByteVector] = {
-    val tag = reflect.classTag[ByteVector]
-    TypeInfo(
-      tag,
-      None, //oh, shii~
-      Set.empty,
-      Set(serializableTypeInfo)
-    )
-  }
 
-  implicit val booleanTypeInfo: TypeInfo[Boolean] = {
-    val tag = reflect.classTag[Boolean]
-    TypeInfo(
-      tag,
-      anyValTypeInfo.some,
-      Set.empty,
-      Set.empty
-    )
-  }
+  implicit val unitTypeInfo: TypeInfo[Unit] =
+    fromAnyVal()
+  implicit val longTypeInfo: TypeInfo[Long] =
+    fromAnyVal()
 
-  implicit val stringTypeInfo: TypeInfo[String] = {
-    val tag = reflect.classTag[String]
-    TypeInfo(
-      tag,
-      anyValTypeInfo.some,
-      Set.empty,
-      Set(serializableTypeInfo)
-    )
-  }
+  /**
+    * BitwiseOperations also should be in interfaces,
+    * but i dont know how to create TypeInfo with
+    * recursive type parameters.
+    */
+  implicit val byteVectorTypeInfo: TypeInfo[ByteVector] =
+    fromAny(interfaces = Set(serializableTypeInfo))
 
-  implicit val objTypeInfo: TypeInfo[Obj] = {
-    val tag = reflect.classTag[Obj]
-    TypeInfo(
-      tag,
-      anyTypeInfo.some,
-      Set.empty,
-      Set(productTypeInfo, serializableTypeInfo)
-    )
-  }
+  implicit val booleanTypeInfo: TypeInfo[Boolean] =
+    fromAnyVal()
 
-  implicit def optionTypeInfo[A](implicit tia: TypeInfo[A]): TypeInfo[Option[A]] = {
-    TypeInfo(
-      reflect.classTag[Option[A]],
-      anyTypeInfo.some,
-      Set(tia),
-      Set(productTypeInfo, serializableTypeInfo)
-    )
-  }
+  implicit val stringTypeInfo: TypeInfo[String] =
+    fromAnyVal(interfaces = Set(serializableTypeInfo))
+
+  implicit val objTypeInfo: TypeInfo[Obj] =
+    fromAny(interfaces = Set(productTypeInfo, serializableTypeInfo))
+
+  implicit def optionTypeInfo[A](implicit tia: TypeInfo[A]): TypeInfo[Option[A]] =
+    fromAny(Set(tia), Set(productTypeInfo, serializableTypeInfo))
 }
