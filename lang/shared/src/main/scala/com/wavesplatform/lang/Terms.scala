@@ -4,8 +4,6 @@ import scodec.bits.ByteVector
 
 object Terms {
 
-  final case class WrappedManifest[T](inner: Manifest[T]) extends AnyVal
-
   case class FUNCTION(args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER)
 
   sealed trait TYPEPLACEHOLDER
