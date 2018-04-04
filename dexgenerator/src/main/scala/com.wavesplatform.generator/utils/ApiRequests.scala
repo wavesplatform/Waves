@@ -25,10 +25,12 @@ import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json.Json.{stringify, toJson}
 import play.api.libs.json._
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.api.http.assets.{MassTransferRequest, SignedIssueRequest, SignedMassTransferRequest}
+import scorex.api.http.assets.{MassTransferRequest, SignedIssueRequest, SignedMassTransferRequest, SignedTransferRequest}
 import scorex.crypto.encode.Base58
+import scorex.transaction.AssetId
+import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, Transfer}
-import scorex.transaction.assets.{IssueTransaction, MassTransferTransaction}
+import scorex.transaction.assets.{IssueTransaction, MassTransferTransaction, TransferTransaction}
 import scorex.transaction.assets.exchange.Order
 import scorex.utils.ScorexLogging
 
@@ -99,6 +101,22 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
     )
   }
 
+  def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {
+
+    import tx._
+    SignedTransferRequest(
+      Base58.encode(tx.sender.publicKey),
+      assetId.map(_.base58),
+      recipient.stringRepr,
+      amount,
+      fee,
+      feeAssetId.map(_.base58),
+      timestamp,
+      attachment.headOption.map(_ => Base58.encode(attachment)),
+      signature.base58
+    )
+  }
+
   def to(endpoint: String) = new Node(endpoint)
 
   class Node(endpoint: String) {
@@ -129,6 +147,16 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
 
     def assetBalance(address: String, asset: String): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset").as[AssetBalance]
+
+    def balance(address: String, asset: Option[AssetId]): Long = {
+
+      asset match {
+        case None =>
+          Await.result(to(endpoint).balance(address), 30.seconds).balance
+        case _ =>
+          Await.result(to(endpoint).assetBalance(address, asset.map(_.base58).get), 30.seconds).balance
+      }
+    }
 
     def signedIssue(issue: SignedIssueRequest): Future[Transaction] =
       postJson("/assets/broadcast/issue", issue).as[Transaction]
@@ -162,18 +190,51 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
       Await.result(orderbookByPublicKey(Base58.encode(pk.publicKey), ts, signature), 1.minute)
     }
 
-    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[Transaction] =
-      waitFor[Option[Transaction]](s"transaction $txId")(
-        _.transactionInfo(txId).transform {
-          case Success(tx)                                       => Success(Some(tx))
-          case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
-          case Failure(ex)                                       => Failure(ex)
-        },
-        tOpt => tOpt.exists(_.id == txId),
-        retryInterval
-      ).map(_.get)
+    def orderHistoryFuture(pk: PrivateKeyAccount): Future[Seq[OrderbookHistory]] = {
+      val ts         = System.currentTimeMillis()
+      val privateKey = pk
+      val signature  = ByteStr(crypto.sign(pk, pk.publicKey ++ Longs.toByteArray(ts)))
+      orderbookByPublicKey(Base58.encode(pk.publicKey), ts, signature)
+    }
 
-    private val RequestAwaitTime = 15.seconds
+    def utx = get(s"/transactions/unconfirmed").as[Seq[Transaction]]
+
+    def unconfirmedTxInfo(txId: String) = get(s"/transactions/unconfirmed/info/$txId").as[Transaction]
+
+    def findTransactionInfo(txId: String): Future[Option[Transaction]] = transactionInfo(txId).transform {
+      case Success(tx)                                       => Success(Some(tx))
+      case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
+      case Failure(ex)                                       => Failure(ex)
+    }
+
+    def ensureTxDoesntExist(txId: String): Future[Unit] =
+      utx
+        .zip(findTransactionInfo(txId))
+        .flatMap({
+          case (utx, _) if utx.map(_.id).contains(txId) =>
+            Future.failed(new IllegalStateException(s"Tx $txId is in UTX"))
+          case (_, txOpt) if txOpt.isDefined =>
+            Future.failed(new IllegalStateException(s"Tx $txId is in blockchain"))
+          case _ =>
+            Future.successful(())
+        })
+
+    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[Transaction] =
+      waitFor[(Boolean, Option[Transaction])](s"transaction $txId")(
+        _.transactionInfo(txId)
+          .map(x => (true, Option(x)))
+          .recoverWith {
+            case e: UnexpectedStatusCodeException if e.statusCode == 404 =>
+              unconfirmedTxInfo(txId).map(x => (false, Option(x)))
+          }, {
+          case (false, _) => false
+          case (_, tOpt)  => tOpt.exists(_.id == txId)
+        },
+        retryInterval
+      ).map(_._2.get)
+
+    private val RequestAwaitTime =
+      15.seconds
 
     def waitFor[A](desc: String)(f: this.type => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] = {
       log.debug(s"Awaiting condition '$desc'")

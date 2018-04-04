@@ -485,7 +485,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches {
 
   override protected def loadApprovedFeatures(): Map[Short, Int] = readOnly(_.get(k.approvedFeatures))
 
-  override protected def loadActivatedFeatures(): Map[Short, Int] = readOnly(_.get(k.activatedFeatures)) ++ fs.preActivatedFeatures
+  override protected def loadActivatedFeatures(): Map[Short, Int] = fs.preActivatedFeatures ++ readOnly(_.get(k.activatedFeatures))
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] = {
     val (c1, c2) = rw.get(key).partition(_ > threshold)
