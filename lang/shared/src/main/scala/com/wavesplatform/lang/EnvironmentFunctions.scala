@@ -38,11 +38,10 @@ class EnvironmentFunctions(environment: Environment) {
 
   def getData(addr: Obj, key: String, dataType: DataType): Either[String, Any] =
     for {
-      bytes           <- addr.fields.get("bytes").fold[Either[String, LazyVal]](Left("Can't find 'bytes'"))(Right(_))
+      bytes <- addr.fields.get("bytes").fold[Either[String, LazyVal]](Left("Can't find 'bytes'"))(Right(_))
       rawAddressBytes <- bytes.value.value()
-      addressBytes    <- Try(rawAddressBytes.asInstanceOf[ByteVector].toArray).toEither.left.map(_.getMessage)
-      r               <- environment.data(addressBytes, key, dataType).fold[Either[String, Any]](Left("Data is empty"))(Right(_))
-    } yield r
+      addressBytes <- Try(rawAddressBytes.asInstanceOf[ByteVector].toArray).toEither.left.map(_.getMessage)
+    } yield environment.data(addressBytes, key, dataType)
 
   def addressFromRecipient(fields: Map[String, LazyVal]): Either[ExecutionError, Array[Byte]] = {
     val bytes = fields("bytes").value.map(_.asInstanceOf[ByteVector]).value()

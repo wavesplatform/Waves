@@ -110,9 +110,7 @@ abstract class BaseWavesContext extends Environment {
   }
 
   val toBase58StringF: PredefFunction = PredefFunction("toBase58String", STRING, List(("bytes", BYTEVECTOR))) {
-    case (bytes: ByteVector) :: Nil =>
-      import scorex.crypto.encode.Base58
-      Right(Base58.encode(bytes.toArray))
+    case (bytes: ByteVector) :: Nil => Right(Global.base58Encode(bytes.toArray))
     case _ => ???
   }
 
@@ -193,7 +191,7 @@ object BaseWavesContext {
   val extract: PredefFunction = PredefFunction("extract", TYPEPARAM('T'), List(("opt", optionT))) {
     case Some(v) :: Nil => Right(v)
     case None :: Nil    => Left("Extract from empty option")
-    case _              => ???
+    case x              => Left(s"Can't extract an Option inner value from '$x'")
   }
 
   val some: PredefFunction = PredefFunction("Some", optionT, List(("obj", TYPEPARAM('T')))) {
