@@ -77,7 +77,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
             PrivateKeyAccount.fromSeed(richAddressSeed).right.get,
             name = s"asset$n".getBytes(),
             description = "asset description".getBytes(),
-            quantity = 987654321,
+            quantity = 99999999999L,
             decimals = 8,
             reissuable = false,
             fee = 100000000,
@@ -123,33 +123,46 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
     assetsTransfers.toList
   }
 
-  def massTransferAssets(endpoint: String, richAccountSeed: String, validAccounts: Seq[PrivateKeyAccount], tradingAssets: Seq[AssetId]) = {
-
+  def massTransferWaves(endpoint: String, richAccountSeed: String, accounts: Seq[PrivateKeyAccount]) = {
     val node = api.to(endpoint)
     val pk = PrivateKeyAccount.fromSeed(richAccountSeed).right.get
 
-    val wavesTransfers = parsedTransfersList(endpoint, None, pk, validAccounts)
-    val assetsTransfers = parsedTransfersList(endpoint, Some(tradingAssets.seq.head.base58), pk, validAccounts)
+    val wavesTransfers = parsedTransfersList(endpoint, None, pk, accounts)
 
-    val wavesAndAssetTransfer = assetsTransfers :+ wavesTransfers
+    val massTransferTx: MassTransferTransaction =
+      MassTransferTransaction
+        .selfSigned(
+          MassTransferTransaction.Version,
+          None,
+          PrivateKeyAccount.fromSeed(richAccountSeed).right.get,
+          wavesTransfers,
+          System.currentTimeMillis(),
+          100000 + 50000 * wavesTransfers.size,
+          Array.emptyByteArray
+        )
+        .right
+        .get
 
-    val tradingAssetsAndWaves: Seq[Option[AssetId]] = tradingAssets.map(Some(_)) :+ None
+    implicit val w =
+      Json.writes[SignedMassTransferRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(TransactionType.MassTransferTransaction.id)))
 
-    val massTransferTxSeq: Seq[MassTransferTransaction] = tradingAssetsAndWaves.map {
-      case None =>
-        MassTransferTransaction
-          .selfSigned(
-            MassTransferTransaction.Version,
-            None,
-            PrivateKeyAccount.fromSeed(richAccountSeed).right.get,
-            wavesTransfers,
-            System.currentTimeMillis(),
-            100000 + 50000 * assetsTransfers.size,
-            Array.emptyByteArray
-          )
-          .right
-          .get
-      case Some(assetId) =>
+    val signedMassTransfer: SignedMassTransferRequest = api.createSignedMassTransferRequest(massTransferTx)
+
+    val transferred =
+      node.broadcastRequest(signedMassTransfer).flatMap { tx =>
+        node.waitForTransaction(tx.id)
+      }
+    Await.result(transferred, 30.seconds)
+  }
+
+  def massTransferAssets(endpoint: String, richAccountSeed: String, accounts: Seq[PrivateKeyAccount], tradingAssets: Seq[AssetId]) = {
+
+    val node = api.to(endpoint)
+    val pk = PrivateKeyAccount.fromSeed(richAccountSeed).right.get
+    val assetsTransfers = parsedTransfersList(endpoint, Some(tradingAssets.seq.head.base58), pk, accounts)
+
+    val massTransferTxSeq: Seq[MassTransferTransaction] = tradingAssets.map {
+      assetId =>
         MassTransferTransaction
           .selfSigned(
             MassTransferTransaction.Version,
@@ -211,6 +224,8 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
 
       massTransferAssets(endpoint, finalConfig.richAccounts.head, finalConfig.validAccounts, tradingAssets.take(finalConfig.assetPairsNum - 2))
       massTransferAssets(endpoint, finalConfig.richAccounts.head, finalConfig.fakeAccounts, tradingAssets.drop(finalConfig.assetPairsNum - 2))
+      massTransferWaves(endpoint, finalConfig.richAccounts.head, finalConfig.validAccounts ++ finalConfig.fakeAccounts)
+
 
       val workers =
         ordersDistr.map(p => new Worker(finalConfig.worker, finalConfig, finalConfig.matcherConfig, tradingAssets, p._1, p._2, client))
