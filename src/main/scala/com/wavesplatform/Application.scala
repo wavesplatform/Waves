@@ -11,6 +11,7 @@ import akka.stream.ActorMaterializer
 import cats.instances.all._
 import com.typesafe.config._
 import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
@@ -124,6 +125,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     maybeUtx = Some(utxStorage)
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
+
     val miner =
       if (settings.minerSettings.enable)
         new MinerImpl(allChannels,
@@ -139,12 +141,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
                       appenderScheduler)
       else Miner.Disabled
 
+    val pos = new PoSSelector(history)
     val processBlock = BlockAppender(checkpointService,
                                      history,
                                      blockchainUpdater,
                                      time,
                                      state,
                                      utxStorage,
+                                     pos,
                                      settings,
                                      history,
                                      allChannels,
@@ -158,6 +162,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       blockchainUpdater,
       state,
       utxStorage,
+      pos,
       time,
       settings,
       history,

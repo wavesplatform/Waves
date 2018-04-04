@@ -1,6 +1,7 @@
 package com.wavesplatform.state2.appender
 
 import cats.data.EitherT
+import com.wavesplatform.consensus.PoSCalculator
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.Miner
@@ -29,6 +30,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
             time: Time,
             stateReader: SnapshotStateReader,
             utxStorage: UtxPool,
+            pos: PoSCalculator,
             settings: WavesSettings,
             featureProvider: FeatureProvider,
             scheduler: Scheduler)(newBlock: Block): Task[Either[ValidationError, Option[BlockchainScore]]] =
@@ -41,7 +43,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
               _ <- Either.cond(history.heightOf(newBlock.reference).exists(_ >= history.height - 1),
                                (),
                                BlockAppendError("Irrelevant block", newBlock))
-              maybeBaseHeight <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings, featureProvider)(
+              maybeBaseHeight <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, pos, time, settings, featureProvider)(
                 newBlock)
             } yield maybeBaseHeight map (_ => history.score)
         }
@@ -54,6 +56,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
             time: Time,
             stateReader: SnapshotStateReader,
             utxStorage: UtxPool,
+            pos: PoSCalculator,
             settings: WavesSettings,
             featureProvider: FeatureProvider,
             allChannels: ChannelGroup,
@@ -65,7 +68,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
     (for {
       _ <- EitherT(Task.now(newBlock.signaturesValid()))
       validApplication <- EitherT(
-        apply(checkpoint, history, blockchainUpdater, time, stateReader, utxStorage, settings, featureProvider, scheduler)(newBlock))
+        apply(checkpoint, history, blockchainUpdater, time, stateReader, utxStorage, pos, settings, featureProvider, scheduler)(newBlock))
     } yield validApplication).value.map {
       case Right(None) =>
         log.trace(s"${id(ch)} $newBlock already appended")

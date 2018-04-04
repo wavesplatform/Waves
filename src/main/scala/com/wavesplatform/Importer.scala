@@ -4,6 +4,7 @@ import java.io._
 
 import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
 import com.wavesplatform.mining.TwoDimensionalMiningConstraint
@@ -57,8 +58,9 @@ object Importer extends ScorexLogging {
           case Success(inputStream) =>
             val db                                  = openDB(settings.dataDirectory, settings.levelDbCacheSize)
             val (history, state, blockchainUpdater) = StorageFactory(settings, db, NTP)
+            val pos                                 = new PoSSelector(history)
             val checkpoint                          = new CheckpointServiceImpl(db, settings.checkpointsSettings)
-            val extAppender                         = BlockAppender(checkpoint, history, blockchainUpdater, NTP, state, utxPoolStub, settings, history, scheduler) _
+            val extAppender                         = BlockAppender(checkpoint, history, blockchainUpdater, NTP, state, utxPoolStub, pos, settings, history, scheduler) _
             checkGenesis(history, settings, blockchainUpdater)
             val bis          = new BufferedInputStream(inputStream)
             var quit         = false

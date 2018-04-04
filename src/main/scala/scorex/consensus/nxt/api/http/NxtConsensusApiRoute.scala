@@ -1,15 +1,15 @@
 package scorex.consensus.nxt.api.http
 
-import javax.ws.rs.Path
-
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import io.swagger.annotations._
+import javax.ws.rs.Path
 import play.api.libs.json.Json
 import scorex.account.Address
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress}
-import scorex.transaction.{History, PoSCalc}
+import scorex.transaction.History
 
 @Path("/consensus")
 @Api(value = "/consensus")
@@ -33,7 +33,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, state: SnapshotStateR
       case Left(_) => complete(InvalidAddress)
       case Right(account) =>
         val s = state
-        complete(Json.obj("address" -> account.address, "balance" -> PoSCalc.generatingBalance(s, fs, account, s.height)))
+        complete(Json.obj("address" -> account.address, "balance" -> GeneratingBalanceProvider.balance(s, fs, s.height, account)))
     }
   }
 

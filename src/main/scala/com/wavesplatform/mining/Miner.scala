@@ -1,10 +1,11 @@
 package com.wavesplatform.mining
 
 import cats.data.EitherT
+import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSCalculator, PoSSelector}
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics.{BlockStats, HistogramExt, Instrumented}
 import com.wavesplatform.network._
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.appender.{BlockAppender, MicroblockAppender}
 import com.wavesplatform.state2.reader.SnapshotStateReader
@@ -15,11 +16,10 @@ import kamon.metric.instrument
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
-import scorex.account.{Address, PrivateKeyAccount}
+import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block._
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.transaction.PoSCalc._
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
@@ -75,6 +75,7 @@ class MinerImpl(allChannels: ChannelGroup,
   private lazy val minerSettings              = settings.minerSettings
   private lazy val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
   private lazy val blockchainSettings         = settings.blockchainSettings
+  private lazy val featureProvider            = history
 
   private val scheduledAttempts = SerialCancelable()
   private val microBlockAttempt = SerialCancelable()
@@ -83,6 +84,8 @@ class MinerImpl(allChannels: ChannelGroup,
   private val microBlockBuildTimeStats = Kamon.metrics.histogram("forge-microblock-time", instrument.Time.Milliseconds)
 
   private val nextBlockGenerationTimes: MMap[Address, Long] = MMap.empty
+
+  private val pos: PoSCalculator = new PoSSelector(featureProvider)
 
   @volatile private var debugState: MinerDebugInfo.State = MinerDebugInfo.Disabled
 
@@ -112,8 +115,8 @@ class MinerImpl(allChannels: ChannelGroup,
       val referencedBlockInfo       = history.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
       val pc                        = allChannels.size()
       lazy val currentTime          = timeService.correctedTime()
-      lazy val h                    = calcHit(referencedBlockInfo.consensus, account)
-      lazy val t                    = calcTarget(referencedBlockInfo.timestamp, referencedBlockInfo.consensus.baseTarget, currentTime, balance)
+      lazy val h                    = pos.hit(pos.generatorSignature(referencedBlockInfo.consensus.generationSignature.arr, account.publicKey))
+      lazy val t                    = pos.target(referencedBlockInfo.timestamp, referencedBlockInfo.consensus.baseTarget, currentTime, balance)
       measureSuccessful(
         blockBuildTimeStats,
         for {
@@ -125,13 +128,13 @@ class MinerImpl(allChannels: ChannelGroup,
           _ = log.debug(s"Previous block ID ${referencedBlockInfo.blockId} at $height with target ${referencedBlockInfo.consensus.baseTarget}")
           block <- {
             val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
-            val btg = calcBaseTarget(avgBlockDelay,
+            val btg = pos.baseTarget(avgBlockDelay.toSeconds,
                                      height,
                                      referencedBlockInfo.consensus.baseTarget,
                                      referencedBlockInfo.timestamp,
                                      greatGrandParentTimestamp,
                                      currentTime)
-            val gs            = calcGeneratorSignature(referencedBlockInfo.consensus, account)
+            val gs            = pos.generatorSignature(referencedBlockInfo.consensus.generationSignature.arr, account.publicKey)
             val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
             val sortInBlock   = history.height <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
 
@@ -235,6 +238,26 @@ class MinerImpl(allChannels: ChannelGroup,
     }
   }
 
+  private def nextBlockGenerationTime(state: SnapshotStateReader,
+                                      fs: FunctionalitySettings,
+                                      fp: FeatureProvider,
+                                      height: Int,
+                                      block: Block,
+                                      account: PublicKeyAccount): Either[String, (Long, Long)] = {
+    val b = GeneratingBalanceProvider.balance(state, fs, height, account.toAddress)
+    if (GeneratingBalanceProvider.validateHeight(fp, height, b)) {
+      val cData        = block.consensusData
+      val s            = pos.generatorSignature(cData.generationSignature.arr, account.publicKey)
+      val h            = pos.hit(s)
+      val t            = cData.baseTarget
+      val calculatedTs = pos.time(h, t, b) + block.timestamp
+      if (0 < calculatedTs && calculatedTs < Long.MaxValue) {
+        Right((b, calculatedTs))
+      } else
+        Left(s"Invalid next block generation time: $calculatedTs")
+    } else Left(s"Balance $b of ${account.address} is lower than required for generation")
+  }
+
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = {
     {
       val height    = history.height
@@ -244,7 +267,7 @@ class MinerImpl(allChannels: ChannelGroup,
         _ <- Either.cond(stateReader.accountScript(account).isEmpty,
                          (),
                          s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
-        balanceAndTs <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account, history)
+        balanceAndTs <- nextBlockGenerationTime(stateReader, blockchainSettings.functionalitySettings, featureProvider, height, lastBlock, account)
         (balance, ts) = balanceAndTs
         offset        = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
       } yield (offset, balance)
@@ -254,16 +277,17 @@ class MinerImpl(allChannels: ChannelGroup,
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(account, balance)(offset).flatMap {
           case Right((estimators, block, totalConstraint)) =>
-            BlockAppender(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, settings, history, appenderScheduler)(block).map {
-              case Left(err) => log.warn("Error mining Block: " + err.toString)
-              case Right(Some(score)) =>
-                log.debug(s"Forged and applied $block by ${account.address} with cumulative score $score")
-                BlockStats.mined(block, history.height)
-                allChannels.broadcast(BlockForged(block))
-                scheduleMining()
-                if (ngEnabled && !totalConstraint.isEmpty) startMicroBlockMining(account, block, estimators.micro, totalConstraint)
-              case Right(None) => log.warn("Newly created block has already been appended, should not happen")
-            }
+            BlockAppender(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, pos, settings, history, appenderScheduler)(block)
+              .map {
+                case Left(err) => log.warn("Error mining Block: " + err.toString)
+                case Right(Some(score)) =>
+                  log.debug(s"Forged and applied $block by ${account.address} with cumulative score $score")
+                  BlockStats.mined(block, history.height)
+                  allChannels.broadcast(BlockForged(block))
+                  scheduleMining()
+                  if (ngEnabled && !totalConstraint.isEmpty) startMicroBlockMining(account, block, estimators.micro, totalConstraint)
+                case Right(None) => log.warn("Newly created block has already been appended, should not happen")
+              }
           case Left(err) =>
             log.debug(s"No block generated because $err, retrying")
             generateBlockTask(account)

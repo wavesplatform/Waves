@@ -1,21 +1,22 @@
 package scorex.api.http
 
 import java.nio.charset.StandardCharsets
-import javax.ws.rs.Path
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
+import javax.ws.rs.Path
 import play.api.libs.json._
 import scorex.BroadcastRoute
 import scorex.account.{Address, PublicKeyAccount}
 import scorex.crypto.encode.Base58
-import scorex.transaction.{PoSCalc, TransactionFactory}
+import scorex.transaction.TransactionFactory
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
@@ -357,7 +358,7 @@ case class AddressApiRoute(settings: RestAPISettings,
     BalanceDetails(
       account.address,
       portfolio.balance,
-      PoSCalc.generatingBalance(state, functionalitySettings, account, state.height),
+      GeneratingBalanceProvider.balance(state, functionalitySettings, state.height, account),
       portfolio.balance - portfolio.lease.out,
       portfolio.effectiveBalance
     )

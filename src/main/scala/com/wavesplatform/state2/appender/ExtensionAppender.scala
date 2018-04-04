@@ -1,5 +1,6 @@
 package com.wavesplatform.state2.appender
 
+import com.wavesplatform.consensus.PoSCalculator
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.{BlockStats, Instrumented, Metrics}
 import com.wavesplatform.mining.Miner
@@ -27,6 +28,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
             blockchainUpdater: BlockchainUpdater,
             stateReader: SnapshotStateReader,
             utxStorage: UtxPool,
+            pos: PoSCalculator,
             time: Time,
             settings: WavesSettings,
             featureProvider: FeatureProvider,
@@ -48,9 +50,10 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
               val forkApplicationResultEi = Coeval {
                 extension.view
                   .map { b =>
-                    b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings, featureProvider)(b).right.map {
-                      _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
-                    }
+                    b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, pos, time, settings, featureProvider)(b).right
+                      .map {
+                        _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
+                      }
                   }
                   .zipWithIndex
                   .collectFirst { case ((b, Left(e)), i) => (i, b, e) }
