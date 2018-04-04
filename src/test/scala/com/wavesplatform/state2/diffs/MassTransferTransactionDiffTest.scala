@@ -79,7 +79,7 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
     forAll(setup) {
       case (genesis, transfer) =>
         assertDiffEi(Seq(block(Seq(genesis))), block(Seq(transfer)), fs) { blockDiffEi =>
-          blockDiffEi should produce("AliasNotExists")
+          blockDiffEi should produce("AliasDoesNotExist")
         }
     }
   }

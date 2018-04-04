@@ -66,7 +66,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
       case (gen, _, _, transferViaAlias) =>
         assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq())) {
           case (_, state) =>
-            evalScript(transferViaAlias, state) should produce("AliasNotExists")
+            evalScript(transferViaAlias, state) should produce("AliasDoesNotExist")
         }
     }
   }
