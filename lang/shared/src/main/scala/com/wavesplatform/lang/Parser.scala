@@ -41,7 +41,9 @@ object Parser {
     case (functionName, args) => FUNCTION_CALL(functionName, args.toList)
   }
 
-  private def getterP: P[GETTER] = P(refP ~ "." ~ varName).map { case ((b, f)) => GETTER(b, f) }
+  private def extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | functionCallP | refP)
+
+  private def getterP: P[GETTER] = P(extractableAtom ~ "." ~ varName).map { case (e, f) => GETTER(e, f) }
 
   private def byteVectorP: P[CONST_BYTEVECTOR] =
     P("base58'" ~ CharsWhileIn(Base58Chars, 0).! ~ "'")
@@ -83,7 +85,7 @@ object Parser {
   private def expr = P(binaryOp(opsByPriority) | atom)
 
   private def atom =
-    P(ifP | functionCallP | byteVectorP | stringP | numberP | trueP | falseP | bracesP | curlyBracesP | getterP | refP)
+    P(ifP | byteVectorP | stringP | numberP | trueP | falseP |  getterP | bracesP | curlyBracesP | functionCallP | refP )
 
   def apply(str: String): core.Parsed[EXPR, Char, String] = P(block ~ End).parse(str)
 }

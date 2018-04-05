@@ -129,14 +129,6 @@ X > Y
     )
 
   }
-  property("get field of ref") {
-    parse("XXX.YYY") shouldBe GETTER(REF("XXX"), "YYY")
-    parse("""
-        |
-        | X.Y
-        |
-      """.stripMargin) shouldBe GETTER(REF("X"), "Y")
-  }
 
   property("string literal") {
     parse("""
@@ -192,4 +184,54 @@ X > Y
                                                                  REF("Y"))
   }
 
+  property("getter") {
+    parse("xxx.yyy") shouldBe GETTER(REF("xxx"), "yyy")
+    parse(
+      """
+        |
+        | xxx.yyy
+        |
+      """.stripMargin
+    ) shouldBe GETTER(REF("xxx"), "yyy")
+
+    parse("xxx(yyy).zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parse(
+      """
+        |
+        | xxx(yyy).zzz
+        |
+      """.stripMargin
+    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+
+    parse("(xxx(yyy)).zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parse(
+      """
+        |
+        | (xxx(yyy)).zzz
+        |
+      """.stripMargin
+    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+
+    parse("{xxx(yyy)}.zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parse(
+      """
+        |
+        | {
+        |   xxx(yyy)
+        | }.zzz
+        |
+      """.stripMargin
+    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+
+    parse(
+      """
+        |
+        | {
+        |   let yyy = aaa(bbb)
+        |   xxx(yyy)
+        | }.zzz
+        |
+      """.stripMargin
+    ) shouldBe GETTER(BLOCK(Some(LET("yyy", FUNCTION_CALL("aaa", List(REF("bbb"))))), FUNCTION_CALL("xxx", List(REF("yyy")))), "zzz")
+  }
 }
