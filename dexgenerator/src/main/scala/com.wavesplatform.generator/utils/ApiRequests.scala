@@ -41,7 +41,8 @@ import scala.util.{Failure, Success}
 
 class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
 
-  def retrying(r: Request, interval: FiniteDuration = 1.second, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200)(implicit tag: String): Future[Response] = {
+  def retrying(r: Request, interval: FiniteDuration = 1.second, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200)(
+      implicit tag: String): Future[Response] = {
     def executeRequest: Future[Response] = {
       log.info(s"[$tag] Executing request '$r'")
       client
@@ -158,10 +159,8 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
     //    def signedMassTransfer(massTx: SignedMassTransferRequest): Future[Transaction] =
     //      postJson("/assets/broadcast/issue", massTx).as[Transaction]
 
-    def orderbookByPublicKey(publicKey: String,
-                             ts: Long,
-                             signature: ByteStr,
-                             f: RequestBuilder => RequestBuilder = identity)(implicit tag: String): Future[Seq[OrderBookHistory]] =
+    def orderbookByPublicKey(publicKey: String, ts: Long, signature: ByteStr, f: RequestBuilder => RequestBuilder = identity)(
+        implicit tag: String): Future[Seq[OrderBookHistory]] =
       retrying {
         _get(s"$endpoint/matcher/orderbook/$publicKey")
           .setHeader("Timestamp", ts)
@@ -206,17 +205,15 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
         })
 
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second)(implicit tag: String): Future[Transaction] =
-      waitFor[(Boolean, Option[Transaction])](s"transaction $txId")(
+      waitFor[Option[Transaction]](s"transaction $txId")(
         _.transactionInfo(txId)
-          .map(x => (true, Option(x)))
+          .map(x => Option(x))
           .recoverWith {
-            case e: UnexpectedStatusCodeException if e.statusCode == 404 => unconfirmedTxInfo(txId).map(x => (false, Option(x)))
-          }, {
-          case (false, _) => false
-          case (_, tOpt)  => tOpt.exists(_.id == txId)
-        },
+            case e: UnexpectedStatusCodeException if e.statusCode == 404 => Future.successful(None)
+          },
+        _.exists(_.id == txId),
         retryInterval
-      ).map(_._2.get)
+      ).map(_.get)
 
     def waitFor[A](desc: String)(f: this.type => Future[A], cond: A => Boolean, retryInterval: FiniteDuration)(implicit tag: String): Future[A] = {
       log.debug(s"[$tag] Awaiting condition '$desc'")
