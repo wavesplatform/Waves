@@ -10,7 +10,7 @@ import com.wavesplatform.it.api.{
   Balance,
   MatcherResponse,
   MatcherStatusResponse,
-  OrderbookHistory,
+  OrderBookHistory,
   ResponseFutureExt,
   Transaction,
   UnexpectedStatusCodeException
@@ -24,37 +24,36 @@ import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json.Json.{stringify, toJson}
 import play.api.libs.json._
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.api.http.assets.{MassTransferRequest, SignedIssueRequest, SignedMassTransferRequest, SignedTransferRequest}
+import scorex.account.PrivateKeyAccount
+import scorex.api.http.assets.{SignedIssueRequest, SignedMassTransferRequest, SignedTransferRequest}
 import scorex.crypto.encode.Base58
 import scorex.transaction.AssetId
-import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, Transfer}
-import scorex.transaction.assets.{IssueTransaction, MassTransferTransaction, TransferTransaction}
 import scorex.transaction.assets.exchange.Order
+import scorex.transaction.assets.{IssueTransaction, MassTransferTransaction, TransferTransaction}
 import scorex.utils.ScorexLogging
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
 
-  def retrying(r: Request, interval: FiniteDuration = 1.second, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[Response] = {
+  def retrying(r: Request, interval: FiniteDuration = 1.second, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200)(implicit tag: String): Future[Response] = {
     def executeRequest: Future[Response] = {
-      log.info(s"Executing request '$r'")
+      log.info(s"[$tag] Executing request '$r'")
       client
         .executeRequest(
           r,
           new AsyncCompletionHandler[Response] {
             override def onCompleted(response: Response): Response = {
               if (response.getStatusCode == statusCode) {
-                log.info(s"Request: ${r.getUrl}\nResponse: ${response.getResponseBody}")
+                log.info(s"[$tag] Request: ${r.getUrl}\nResponse: ${response.getResponseBody}")
                 response
               } else {
-                log.info(s"Request: ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
+                log.info(s"[$tag] Request: ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
                 throw UnexpectedStatusCodeException(r.getUrl, response.getStatusCode, response.getResponseBody)
               }
             }
@@ -64,7 +63,7 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
         .toScala
         .recoverWith {
           case e @ (_: IOException | _: TimeoutException) =>
-            log.info(s"Failed to execute request '$r' with error: ${e.getMessage}")
+            log.info(s"[$tag] Failed to execute request '$r' with error: ${e.getMessage}")
             timer.schedule(executeRequest, interval)
         }
     }
@@ -121,44 +120,39 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
 
   class Node(endpoint: String) {
 
-    def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
+    def get(path: String, f: RequestBuilder => RequestBuilder = identity)(implicit tag: String): Future[Response] =
       retrying(f(_get(s"$endpoint$path")).build())
 
-    def post(url: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
+    def post(url: String, f: RequestBuilder => RequestBuilder = identity)(implicit tag: String): Future[Response] =
       retrying(f(_post(url)).build())
 
-    def post(path: String, body: String): Future[Response] =
+    def post(path: String, body: String)(implicit tag: String): Future[Response] =
       post(s"$endpoint$path", (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(body))
 
-    def postJson[A: Writes](path: String, body: A): Future[Response] =
+    def postJson[A: Writes](path: String, body: A)(implicit tag: String): Future[Response] =
       post(path, stringify(toJson(body)))
 
-    def matcherPost[A: Writes](path: String, body: A): Future[Response] =
+    def matcherPost[A: Writes](path: String, body: A)(implicit tag: String): Future[Response] =
       post(s"$endpoint$path", (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
 
-    def placeOrder(order: Order): Future[MatcherResponse] =
+    def placeOrder(order: Order)(implicit tag: String): Future[MatcherResponse] =
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
 
-    def height(endpoint: String): Future[Int] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Int])
+    def height(endpoint: String)(implicit tag: String): Future[Int] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Int])
 
-    def transactionInfo(txId: String): Future[Transaction] = get(s"/transactions/info/$txId").as[Transaction]
+    def transactionInfo(txId: String)(implicit tag: String): Future[Transaction] = get(s"/transactions/info/$txId").as[Transaction]
 
-    def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
+    def balance(address: String)(implicit tag: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 
-    def assetBalance(address: String, asset: String): Future[AssetBalance] =
+    def assetBalance(address: String, asset: String)(implicit tag: String): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset").as[AssetBalance]
 
-    def balance(address: String, asset: Option[AssetId]): Long = {
-
-      asset match {
-        case None =>
-          Await.result(to(endpoint).balance(address), 30.seconds).balance
-        case _ =>
-          Await.result(to(endpoint).assetBalance(address, asset.map(_.base58).get), 30.seconds).balance
-      }
+    def balance(address: String, asset: Option[AssetId])(implicit tag: String): Future[Long] = asset match {
+      case None => to(endpoint).balance(address).map(_.balance)
+      case _    => to(endpoint).assetBalance(address, asset.map(_.base58).get).map(_.balance)
     }
 
-    def signedIssue(issue: SignedIssueRequest): Future[Transaction] =
+    def signedIssue(issue: SignedIssueRequest)(implicit tag: String): Future[Transaction] =
       postJson("/assets/broadcast/issue", issue).as[Transaction]
 
     //    def signedMassTransfer(massTx: SignedMassTransferRequest): Future[Transaction] =
@@ -167,65 +161,56 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
     def orderbookByPublicKey(publicKey: String,
                              ts: Long,
                              signature: ByteStr,
-                             f: RequestBuilder => RequestBuilder = identity): Future[Seq[OrderbookHistory]] =
+                             f: RequestBuilder => RequestBuilder = identity)(implicit tag: String): Future[Seq[OrderBookHistory]] =
       retrying {
         _get(s"$endpoint/matcher/orderbook/$publicKey")
           .setHeader("Timestamp", ts)
           .setHeader("Signature", signature)
           .build()
-      }.as[Seq[OrderbookHistory]]
+      }.as[Seq[OrderBookHistory]]
 
     //    def getOrderbookByPublicKey(publicKey: String, timestamp: Long, signature: ByteStr): Future[Seq[OrderbookHistory]] =
     //      matcherGetWithSignature(s"/matcher/orderbook/$publicKey", timestamp, signature).as[Seq[OrderbookHistory]]
 
-    def cancelOrder(amountAsset: String, priceAsset: String, request: CancelOrderRequest): Future[MatcherStatusResponse] =
+    def cancelOrder(amountAsset: String, priceAsset: String, request: CancelOrderRequest)(implicit tag: String): Future[MatcherStatusResponse] =
       matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", request.json).as[MatcherStatusResponse]
 
-    def broadcastRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
+    def broadcastRequest[A: Writes](req: A)(implicit tag: String): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
 
-    def orderHistory(pk: PrivateKeyAccount): Seq[OrderbookHistory] = {
-      val ts         = System.currentTimeMillis()
-      val privateKey = pk
-      val signature  = ByteStr(crypto.sign(pk, pk.publicKey ++ Longs.toByteArray(ts)))
-      Await.result(orderbookByPublicKey(Base58.encode(pk.publicKey), ts, signature), 1.minute)
-    }
-
-    def orderHistoryFuture(pk: PrivateKeyAccount): Future[Seq[OrderbookHistory]] = {
-      val ts         = System.currentTimeMillis()
-      val privateKey = pk
-      val signature  = ByteStr(crypto.sign(pk, pk.publicKey ++ Longs.toByteArray(ts)))
+    def orderHistory(pk: PrivateKeyAccount)(implicit tag: String): Future[Seq[OrderBookHistory]] = {
+      val ts        = System.currentTimeMillis()
+      val signature = ByteStr(crypto.sign(pk, pk.publicKey ++ Longs.toByteArray(ts)))
       orderbookByPublicKey(Base58.encode(pk.publicKey), ts, signature)
     }
 
-    def utx = get(s"/transactions/unconfirmed").as[Seq[Transaction]]
+    def utx(implicit tag: String): Future[Seq[Transaction]] = get(s"/transactions/unconfirmed").as[Seq[Transaction]]
 
-    def unconfirmedTxInfo(txId: String) = get(s"/transactions/unconfirmed/info/$txId").as[Transaction]
+    def unconfirmedTxInfo(txId: String)(implicit tag: String): Future[Transaction] = get(s"/transactions/unconfirmed/info/$txId").as[Transaction]
 
-    def findTransactionInfo(txId: String): Future[Option[Transaction]] = transactionInfo(txId).transform {
+    def findTransactionInfo(txId: String)(implicit tag: String): Future[Option[Transaction]] = transactionInfo(txId).transform {
       case Success(tx)                                       => Success(Some(tx))
       case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
       case Failure(ex)                                       => Failure(ex)
     }
 
-    def ensureTxDoesntExist(txId: String): Future[Unit] =
+    def ensureTxDoesntExist(txId: String)(implicit tag: String): Future[Unit] =
       utx
         .zip(findTransactionInfo(txId))
         .flatMap({
           case (utx, _) if utx.map(_.id).contains(txId) =>
-            Future.failed(new IllegalStateException(s"Tx $txId is in UTX"))
+            Future.failed(new IllegalStateException(s"[$tag] Tx $txId is in UTX"))
           case (_, txOpt) if txOpt.isDefined =>
-            Future.failed(new IllegalStateException(s"Tx $txId is in blockchain"))
+            Future.failed(new IllegalStateException(s"[$tag] Tx $txId is in blockchain"))
           case _ =>
             Future.successful(())
         })
 
-    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[Transaction] =
+    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second)(implicit tag: String): Future[Transaction] =
       waitFor[(Boolean, Option[Transaction])](s"transaction $txId")(
         _.transactionInfo(txId)
           .map(x => (true, Option(x)))
           .recoverWith {
-            case e: UnexpectedStatusCodeException if e.statusCode == 404 =>
-              unconfirmedTxInfo(txId).map(x => (false, Option(x)))
+            case e: UnexpectedStatusCodeException if e.statusCode == 404 => unconfirmedTxInfo(txId).map(x => (false, Option(x)))
           }, {
           case (false, _) => false
           case (_, tOpt)  => tOpt.exists(_.id == txId)
@@ -233,15 +218,12 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
         retryInterval
       ).map(_._2.get)
 
-    private val RequestAwaitTime =
-      15.seconds
-
-    def waitFor[A](desc: String)(f: this.type => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] = {
-      log.debug(s"Awaiting condition '$desc'")
+    def waitFor[A](desc: String)(f: this.type => Future[A], cond: A => Boolean, retryInterval: FiniteDuration)(implicit tag: String): Future[A] = {
+      log.debug(s"[$tag] Awaiting condition '$desc'")
       timer
         .retryUntil(f(this), cond, retryInterval)
         .map(a => {
-          log.debug(s"Condition '$desc' met")
+          log.debug(s"[$tag] Condition '$desc' met")
           a
         })
     }

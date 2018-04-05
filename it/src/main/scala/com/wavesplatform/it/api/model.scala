@@ -2,10 +2,9 @@ package com.wavesplatform.it.api
 
 import com.wavesplatform.state2.ByteStr
 import play.api.libs.json._
-import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.AssetPair
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 // USCE no longer contains references to non-serializable Request/Response objects
 // to work around https://github.com/scalatest/scalatest/issues/556
@@ -132,9 +131,8 @@ object OrderbookHistory {
 
   implicit val assetPairFormat: Format[AssetPair] = Json.format[AssetPair]
 
-  implicit val orderbookHistory: Format[OrderbookHistory] = Json.format
+  implicit val orderbookHistory: Format[OrderBookHistory] = Json.format
 }
-
 
 case class PairResponse(amountAsset: String, priceAsset: String)
 

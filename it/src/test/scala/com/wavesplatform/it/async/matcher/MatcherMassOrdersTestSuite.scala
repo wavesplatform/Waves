@@ -5,7 +5,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.crypto
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.api.OrderbookHistory
+import com.wavesplatform.it.api.OrderBookHistory
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.state.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
@@ -57,7 +57,7 @@ class MatcherMassOrdersTestSuite
     execute(xs, Future.successful(()))
   }
 
-  private def aliceOrderHistory(): Seq[OrderbookHistory] = {
+  private def aliceOrderHistory(): Seq[OrderBookHistory] = {
     val ts         = System.currentTimeMillis()
     val privateKey = aliceNode.privateKey
     val signature  = ByteStr(crypto.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts)))
