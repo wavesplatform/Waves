@@ -111,7 +111,6 @@ class Worker(workerSettings: Settings,
   def transfer(sender: PrivateKeyAccount, assetId: Option[AssetId], recipient: PrivateKeyAccount, halfBalance: Boolean)(
       implicit tag: String): Future[Transaction] =
     to(endpoint).balance(sender.address, assetId).flatMap { balance =>
-      log.info(s"[$tag] ${assetId.fold("Waves")(_.base58)} balance of ${sender.address}: $balance")
       val halfAmount     = if (halfBalance) balance / 2 else balance
       val transferAmount = assetId.fold(halfAmount - 0.001.waves)(_ => halfAmount)
 
@@ -125,6 +124,8 @@ class Worker(workerSettings: Settings,
                                  Array.emptyByteArray) match {
         case Left(e) => throw new RuntimeException(s"[$tag] Generated transaction is wrong: $e")
         case Right(txRequest) =>
+          log.info(
+            s"[$tag] ${assetId.fold("Waves")(_.base58)} balance of ${sender.address}: $balance, sending $transferAmount to ${recipient.address}")
           val signedTx = createSignedTransferRequest(txRequest)
           to(endpoint).broadcastRequest(signedTx).flatMap { tx =>
             to(endpoint).waitForTransaction(tx.id)
@@ -138,34 +139,34 @@ class Worker(workerSettings: Settings,
     val work = orderType match {
       case GenOrderType.ActiveBuy =>
         val buyer = randomFrom(validAccounts).get
-        val pair  = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+        val pair  = AssetPair(randomFrom(tradingAssets.dropRight(2)), None)
         buyOrder(DefaultPrice / 100, DefaultAmount, buyer, pair)._2
 
       case GenOrderType.ActiveSell =>
         val seller = randomFrom(validAccounts).get
-        val pair   = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+        val pair   = AssetPair(randomFrom(tradingAssets.dropRight(2)), None)
         sellOrder(DefaultPrice * 10, DefaultAmount, seller, pair)._2
 
       case GenOrderType.Buy =>
         val buyer = randomFrom(validAccounts).get
-        val pair  = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+        val pair  = AssetPair(randomFrom(tradingAssets.dropRight(2)), None)
         buyOrder(DefaultPrice, DefaultAmount, buyer, pair)._2
 
       case GenOrderType.Sell =>
         val seller = randomFrom(validAccounts).get
-        val pair   = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+        val pair   = AssetPair(randomFrom(tradingAssets.dropRight(2)), None)
         sellOrder(DefaultPrice, DefaultAmount, seller, pair)._2
 
       case GenOrderType.Cancel =>
         val buyer = randomFrom(validAccounts).get
-        val pair  = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+        val pair  = AssetPair(randomFrom(tradingAssets.dropRight(2)), None)
         sellOrder(DefaultPrice * 15, DefaultAmount, buyer, pair)._2.flatMap { orderInfo =>
           cancelOrder(buyer, pair, orderInfo.message.id)
         }
 
       case GenOrderType.InvalidAmount =>
         val invalidBuyer = randomFrom(invalidAccounts).get
-        val pair         = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+        val pair         = AssetPair(randomFrom(tradingAssets.takeRight(2)), None)
         buyOrder(DefaultPrice, DefaultAmount, invalidBuyer, pair)._2
           .transformWith {
             case Success(x) => Future.failed(new IllegalStateException(s"Order should not be placed: $x"))
@@ -178,19 +179,20 @@ class Worker(workerSettings: Settings,
       case GenOrderType.FakeSell =>
         val seller: PrivateKeyAccount = fakeAccounts.head
         val buyer: PrivateKeyAccount  = fakeAccounts(1)
-        val pair                      = AssetPair(randomFrom(tradingAssets.drop(tradingAssets.size - 2)), None)
+        val pair                      = AssetPair(randomFrom(tradingAssets.takeRight(2)), None)
         for {
           _ <- cancelAllOrders(fakeAccounts)
           _ <- sellOrder(DefaultPrice, DefaultAmount, seller, pair)._2
           _ <- transfer(seller, pair.amountAsset, buyer, halfBalance = false)
           _ <- buyOrder(DefaultPrice, DefaultAmount, buyer, pair)._2
           _ <- transfer(buyer, pair.amountAsset, seller, halfBalance = true)
+          _ <- cancelAllOrders(fakeAccounts)
         } yield ()
 
       case GenOrderType.FakeBuy =>
         val seller: PrivateKeyAccount = fakeAccounts(2)
         val buyer: PrivateKeyAccount  = fakeAccounts(3)
-        val pair                      = AssetPair(randomFrom(tradingAssets.drop(tradingAssets.size - 2)), None)
+        val pair                      = AssetPair(randomFrom(tradingAssets.takeRight(2)), None)
         for {
           _ <- cancelAllOrders(fakeAccounts)
           _ <- buyOrder(DefaultPrice, DefaultAmount, buyer, pair)._2
@@ -205,10 +207,22 @@ class Worker(workerSettings: Settings,
     }
   }
 
+  private def serial(times: Int)(f: => Future[Any]): Future[Unit] = {
+    def loop(rest: Int, acc: Future[Unit]): Future[Unit] = {
+      if (rest <= 0) acc
+      else {
+        val newAcc = acc.flatMap(_ => f).map(_ => ())
+        loop(rest - 1, newAcc)
+      }
+    }
+
+    loop(times, Future.successful(()))
+  }
+
   private def placeOrders(maxIterations: Int): Future[Unit] = {
     def sendAll(step: Int): Future[Unit] = {
       log.info(s"Step $step")
-      Future.traverse(1 to ordersCount)(_ => send(orderType)).map(_ => ())
+      serial(ordersCount)(send(orderType)) // @TODO Should work in parallel, but now it leads to invalid transfers
     }
 
     def runStepsFrom(step: Int): Future[Unit] = sendAll(step).flatMap { _ =>
