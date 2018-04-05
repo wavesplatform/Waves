@@ -2,15 +2,14 @@ package com.wavesplatform.it.api
 
 import com.wavesplatform.state2.ByteStr
 import play.api.libs.json._
-import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.AssetPair
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 // USCE no longer contains references to non-serializable Request/Response objects
 // to work around https://github.com/scalatest/scalatest/issues/556
 case class UnexpectedStatusCodeException(requestUrl: String, statusCode: Int, responseBody: String)
-  extends Exception(s"Request: $requestUrl; Unexpected status code ($statusCode): $responseBody")
+    extends Exception(s"Request: $requestUrl; Unexpected status code ($statusCode): $responseBody")
 
 case class Status(blockchainHeight: Int, stateHeight: Int, updatedTimestamp: Long, updatedDate: String)
 
@@ -60,14 +59,25 @@ object Transaction {
   implicit val transactionFormat: Format[Transaction] = Json.format
 }
 
-case class Block(signature: String, height: Int, timestamp: Long, generator: String, transactions: Seq[Transaction],
-                 fee: Long, features: Option[Seq[Short]])
+case class Block(signature: String,
+                 height: Int,
+                 timestamp: Long,
+                 generator: String,
+                 transactions: Seq[Transaction],
+                 fee: Long,
+                 features: Option[Seq[Short]])
 
 object Block {
   implicit val blockFormat: Format[Block] = Json.format
 }
 
-case class BlockHeaders(signature: String, height: Int, timestamp: Long, generator: String, transactionCount: Int, blocksize: Int, features: Set[Short])
+case class BlockHeaders(signature: String,
+                        height: Int,
+                        timestamp: Long,
+                        generator: String,
+                        transactionCount: Int,
+                        blocksize: Int,
+                        features: Set[Short])
 
 object BlockHeaders {
   implicit val blockHeadersFormat: Format[BlockHeaders] = Json.format
@@ -97,10 +107,18 @@ object MessageMatcherResponse {
   implicit val messageMatcherResponseFormat: Format[MessageMatcherResponse] = Json.format
 }
 
-case class OrderbookHistory(id: String, `type`: String, amount: Long, price: Long, timestamp: Long, filled: Int,
-                            status: String, assetPair: AssetPair)
+case class OrderBookHistory(id: String,
+                            `type`: String,
+                            amount: Long,
+                            price: Long,
+                            timestamp: Long,
+                            filled: Int,
+                            status: String,
+                            assetPair: AssetPair) {
+  def isActive: Boolean = status == "PartiallyFilled" || status == "Accepted"
+}
 
-object OrderbookHistory {
+object OrderBookHistory {
   implicit val byteStrFormat: Format[ByteStr] = Format(
     Reads {
       case JsString(str) =>
@@ -116,9 +134,8 @@ object OrderbookHistory {
 
   implicit val assetPairFormat: Format[AssetPair] = Json.format[AssetPair]
 
-  implicit val orderbookHistory: Format[OrderbookHistory] = Json.format
+  implicit val orderbookHistory: Format[OrderBookHistory] = Json.format
 }
-
 
 case class PairResponse(amountAsset: String, priceAsset: String)
 

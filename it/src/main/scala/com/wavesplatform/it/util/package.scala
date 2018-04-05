@@ -19,8 +19,9 @@ package object util {
       p.future
     }
 
-    def retryUntil[A](f: => Future[A], cond: A => Boolean, retryInterval: FiniteDuration)
-                     (implicit ec: ExecutionContext): Future[A] =
+    def sleep(term: FiniteDuration): Future[Unit] = schedule(Future.successful(()), term)
+
+    def retryUntil[A](f: => Future[A], cond: A => Boolean, retryInterval: FiniteDuration)(implicit ec: ExecutionContext): Future[A] =
       f.flatMap(v => if (cond(v)) Future.successful(v) else schedule(retryUntil(f, cond, retryInterval), retryInterval))
   }
   implicit class DoubleExt(val d: Double) extends AnyVal {
