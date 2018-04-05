@@ -10,6 +10,7 @@ import com.wavesplatform.generator.utils.{ApiRequests, GenOrderType}
 import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.network.client.NetworkSender
+import com.wavesplatform.state2.ByteStr
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
@@ -18,7 +19,7 @@ import org.asynchttpclient.Dsl.{config => clientConfig, _}
 import org.slf4j.LoggerFactory
 import play.api.libs.json._
 import scopt.OptionParser
-import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import scorex.api.http.assets.{SignedIssueRequest, SignedMassTransferRequest}
 import scorex.transaction.AssetId
 import scorex.transaction.TransactionParser.TransactionType
@@ -104,91 +105,44 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
     tradingAssets
   }
 
-  def parsedTransfersList(endpoint: String, asset: Option[String], pk: PrivateKeyAccount, accounts: Seq[PrivateKeyAccount])(
+  def parsedTransfersList(endpoint: String, assetId: Option[ByteStr], transferAmount: Long, pk: PrivateKeyAccount, accounts: Seq[PrivateKeyAccount])(
       implicit tag: String): List[ParsedTransfer] = {
-    val client: AsyncHttpClient = asyncHttpClient(clientConfig().setKeepAlive(false).setNettyTimer(GlobalTimer.instance))
-    val api: ApiRequests        = new ApiRequests(client)
-
-    val node = api.to(endpoint)
-    val richAccountBalance = Await.result(
-      asset match {
-        case None => node.balance(PublicKeyAccount(pk.publicKey).address).map(_.balance)
-        case Some(assetId) =>
-          node.assetBalance(PublicKeyAccount(pk.publicKey).address, assetId).map(_.balance)
-      },
-      30.seconds
-    )
-
-    val transferAmount: Long = (richAccountBalance / accounts.size) / 1000
-    val assetsTransfers =
-      accounts.map { accountPk =>
-        ParsedTransfer(AddressOrAlias.fromString(PublicKeyAccount(accountPk.publicKey).address).right.get, transferAmount)
-      }
+    val assetsTransfers = accounts.map { accountPk =>
+      ParsedTransfer(AddressOrAlias.fromString(accountPk.address).right.get, transferAmount)
+    }
     assetsTransfers.toList
   }
 
-  def massTransferWaves(endpoint: String, richAccountSeed: String, accounts: Seq[PrivateKeyAccount])(implicit tag: String): Transaction = {
-    val node = api.to(endpoint)
-    val pk   = PrivateKeyAccount.fromSeed(richAccountSeed).right.get
+  def massTransfer(endpoint: String, richAccountSeed: String, accounts: Seq[PrivateKeyAccount], tradingAssets: Seq[Option[AssetId]])(
+      implicit tag: String): Future[Seq[Transaction]] = {
+    val node          = api.to(endpoint)
+    val richAccountPk = PrivateKeyAccount.fromSeed(richAccountSeed).right.get
 
-    val wavesTransfers = parsedTransfersList(endpoint, None, pk, accounts)
+    val massTransferTxSeq: Seq[Future[Transaction]] = tradingAssets.map { assetId =>
+      node
+        .balance(richAccountPk.address, assetId)
+        .flatMap { balance =>
+          val transferAmount  = (balance / accounts.size) / 1000
+          val assetsTransfers = parsedTransfersList(endpoint, assetId, transferAmount, richAccountPk, accounts)
+          val tx = MassTransferTransaction
+            .selfSigned(
+              version = MassTransferTransaction.Version,
+              assetId = assetId,
+              sender = richAccountPk,
+              transfers = assetsTransfers,
+              timestamp = System.currentTimeMillis(),
+              feeAmount = 100000 + 50000 * assetsTransfers.size,
+              attachment = Array.emptyByteArray
+            )
+            .right
+            .get
 
-    val massTransferTx: MassTransferTransaction =
-      MassTransferTransaction
-        .selfSigned(
-          MassTransferTransaction.Version,
-          None,
-          PrivateKeyAccount.fromSeed(richAccountSeed).right.get,
-          wavesTransfers,
-          System.currentTimeMillis(),
-          100000 + 50000 * wavesTransfers.size,
-          Array.emptyByteArray
-        )
-        .right
-        .get
-
-    val signedMassTransfer: SignedMassTransferRequest = api.createSignedMassTransferRequest(massTransferTx)
-
-    val transferred =
-      node.broadcastRequest(signedMassTransfer).flatMap { tx =>
-        node.waitForTransaction(tx.id)
-      }
-    Await.result(transferred, 30.seconds)
-  }
-
-  def massTransferAssets(endpoint: String, richAccountSeed: String, accounts: Seq[PrivateKeyAccount], tradingAssets: Seq[AssetId])(
-      implicit tag: String): Seq[Transaction] = {
-
-    val node            = api.to(endpoint)
-    val pk              = PrivateKeyAccount.fromSeed(richAccountSeed).right.get
-    val assetsTransfers = parsedTransfersList(endpoint, Some(tradingAssets.seq.head.base58), pk, accounts)
-
-    val massTransferTxSeq: Seq[MassTransferTransaction] = tradingAssets.map { assetId =>
-      MassTransferTransaction
-        .selfSigned(
-          MassTransferTransaction.Version,
-          Some(assetId),
-          PrivateKeyAccount.fromSeed(richAccountSeed).right.get,
-          assetsTransfers,
-          System.currentTimeMillis(),
-          100000 + 50000 * assetsTransfers.size,
-          Array.emptyByteArray
-        )
-        .right
-        .get
+          val txReq = api.createSignedMassTransferRequest(tx)
+          node.broadcastRequest(txReq).flatMap(tx => node.waitForTransaction(tx.id))
+        }
     }
 
-    val signedMassTransfer: Seq[SignedMassTransferRequest] = massTransferTxSeq.map(tx => api.createSignedMassTransferRequest(tx))
-
-    val transferred: Seq[Future[Transaction]] = signedMassTransfer
-      .map { txReq =>
-        node.broadcastRequest(txReq).flatMap { tx =>
-          node.waitForTransaction(tx.id)
-        }
-      }
-
-    val allIssued: Future[Seq[Transaction]] = Future.sequence(transferred)
-    Await.result(allIssued, 30.seconds)
+    Future.sequence(massTransferTxSeq)
   }
 
   parser.parse(args, defaultConfig) match {
@@ -207,7 +161,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
           (k, Math.round(v * finalConfig.dex.orders).toInt)
       }
 
-      val threadPool                            = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
+      val threadPool                            = Executors.newFixedThreadPool(ordersDistr.size + 1)
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(threadPool)
 
       val sender = new NetworkSender(finalConfig.addressScheme, "generator", nonce = Random.nextLong())
@@ -217,12 +171,15 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
 
       val tradingAssets = issueAssets(endpoint, finalConfig.richAccounts.head, finalConfig.assetPairsNum)
 
-      massTransferAssets(endpoint, finalConfig.richAccounts.head, finalConfig.validAccounts, tradingAssets.take(finalConfig.assetPairsNum - 2))
-      massTransferAssets(endpoint, finalConfig.richAccounts.head, finalConfig.fakeAccounts, tradingAssets.drop(finalConfig.assetPairsNum - 2))
-      massTransferWaves(endpoint, finalConfig.richAccounts.head, finalConfig.validAccounts ++ finalConfig.fakeAccounts)
+      val transfers = Seq(
+        massTransfer(endpoint, finalConfig.richAccounts.head, finalConfig.validAccounts, None +: tradingAssets.dropRight(2).map(Option(_))),
+        massTransfer(endpoint, finalConfig.richAccounts.head, finalConfig.fakeAccounts, None +: tradingAssets.takeRight(2).map(Option(_)))
+      )
 
-      val workers =
-        ordersDistr.map(p => new Worker(finalConfig.worker, finalConfig, finalConfig.matcherConfig, tradingAssets, p._1, p._2, client))
+      Await.ready(Future.sequence(transfers), 30.seconds)
+
+      log.info(s"Running ${ordersDistr.size} workers")
+      val workers = ordersDistr.map(p => new Worker(finalConfig.worker, finalConfig, finalConfig.matcherConfig, tradingAssets, p._1, p._2, client))
 
       def close(status: Int): Unit = {
         sender.close()
