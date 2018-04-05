@@ -3,36 +3,29 @@ package com.wavesplatform.generator
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Show
-import cats.data._
-import cats.implicits._
 import com.wavesplatform.crypto
-import com.wavesplatform.generator.Worker.Settings
+import com.wavesplatform.generator.Worker._
 import com.wavesplatform.generator.utils.{ApiRequests, GenOrderType}
-import com.wavesplatform.it.api.{MatcherResponse, MatcherStatusResponse, OrderbookHistory, Transaction, UnexpectedStatusCodeException}
+import com.wavesplatform.it.api.{MatcherResponse, MatcherStatusResponse, OrderBookHistory, Transaction, UnexpectedStatusCodeException}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.matcher.model.LimitOrder.OrderStatus
 import com.wavesplatform.state2.ByteStr
-import monix.eval.Coeval
-import org.asynchttpclient.{AsyncHttpClient, Response}
+import org.asynchttpclient.AsyncHttpClient
+import org.slf4j.LoggerFactory
 import play.api.libs.json._
 import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import scorex.api.http.assets.SignedTransferRequest
 import scorex.crypto.encode.Base58
-import scorex.crypto.signatures.{Curve25519, PrivateKey}
-import scorex.transaction.{AssetId, ValidationError}
-import scorex.transaction.assets.exchange.{AssetPair, Order}
-import settings.{GeneratorSettings, MatcherNodeSettings}
-
-import scala.collection.immutable
-import scala.concurrent.duration.{Duration, FiniteDuration, _}
-import scala.concurrent._
-import scala.util.{Failure, Success, Try}
-import Worker._
-import org.slf4j.LoggerFactory
-import scorex.api.http.assets.{SignedMassTransferRequest, SignedTransferRequest}
+import scorex.transaction.AssetId
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.LoggerFacade
+import settings.{GeneratorSettings, MatcherNodeSettings}
+
+import scala.concurrent._
+import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 class Worker(workerSettings: Settings,
              generatorSettings: GeneratorSettings,
@@ -41,246 +34,204 @@ class Worker(workerSettings: Settings,
              orderType: GenOrderType.Value,
              ordersCount: Int,
              client: AsyncHttpClient)(implicit ec: ExecutionContext)
-  extends ApiRequests(client) {
+    extends ApiRequests(client) {
 
   log.info("started worker " + orderType)
 
-  private type Result[T] = EitherT[Future, (Int, Throwable), T]
+  def run(): Future[Unit] = placeOrders(workerSettings.iterations)
 
-  def run(): Future[Unit] =
-    placeOrders(1).leftMap { _ =>
-      ()
-    }.merge
-
-  val endpoint = generatorSettings.sendTo.head.getHostString
+  private val endpoint: String = generatorSettings.sendTo.head.getHostString
 
   private val matcherPublicKey = PublicKeyAccount.fromBase58String(matcherSettings.matcherKey).right.get
-  private val validAccounts = generatorSettings.validAccounts
-  private val invalidAccounts = generatorSettings.invalidAccounts
-  private val fakeAccounts = generatorSettings.fakeAccounts
+  private val validAccounts    = generatorSettings.validAccounts
+  private val invalidAccounts  = generatorSettings.invalidAccounts
+  private val fakeAccounts     = generatorSettings.fakeAccounts
 
   private val fee = 0.003.waves
 
-  private def ts = System.currentTimeMillis()
+  private def now = System.currentTimeMillis()
 
-  private def r = ThreadLocalRandom.current
+  private def Random = ThreadLocalRandom.current()
 
-  private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(r.nextInt(c.size))) else None
+  private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(Random.nextInt(c.size))) else None
 
-  def buyOrder(price: Long, amount: Long, buyer: PrivateKeyAccount, pair: AssetPair): (Order, Future[MatcherResponse]) = {
-    val order = Order.buy(buyer, matcherPublicKey, pair, price, amount, ts, ts + 1.day.toMillis, fee)
-    log.info("buy " + order)
-    val response = to(matcherSettings.endpoint).placeOrder(order)
+  def buyOrder(price: Long, amount: Long, buyer: PrivateKeyAccount, pair: AssetPair)(implicit tag: String): (Order, Future[MatcherResponse]) = {
+    val order = Order.buy(buyer, matcherPublicKey, pair, price, amount, now, now + 1.day.toMillis, fee)
+    log.info(s"[$tag] Buy ${order.idStr()}: $order")
+    val response = to(matcherSettings.endpoint).placeOrder(order).andThen {
+      case Failure(e) => log.error(s"[$tag] Can't place buy order ${order.idStr()}: $e")
+    }
     log.info(order.idStr())
     (order, response)
   }
 
-  def sellOrder(price: Long, amount: Long, seller: PrivateKeyAccount, pair: AssetPair): (Order, Future[MatcherResponse]) = {
-    val order = Order.sell(seller, matcherPublicKey, pair, price, amount, ts, ts + 1.day.toMillis, fee)
-    log.info("sell " + order)
-    val response = to(matcherSettings.endpoint).placeOrder(order)
-    log.info(order.idStr())
+  def sellOrder(price: Long, amount: Long, seller: PrivateKeyAccount, pair: AssetPair)(implicit tag: String): (Order, Future[MatcherResponse]) = {
+    val order = Order.sell(seller, matcherPublicKey, pair, price, amount, now, now + 1.day.toMillis, fee)
+    log.info(s"[$tag] Sell ${order.idStr()}: $order")
+    val response = to(matcherSettings.endpoint).placeOrder(order).andThen {
+      case Failure(e) => log.error(s"[$tag] Can't place sell order ${order.idStr()}: $e")
+    }
     (order, response)
   }
 
-  def cancelOrder(pk: PrivateKeyAccount, pair: AssetPair, orderId: String): Future[MatcherStatusResponse] = {
-    val request = CancelOrderRequest(PublicKeyAccount(pk.publicKey), Base58.decode(orderId).get, Array.emptyByteArray)
-    val sig = crypto.sign(pk, request.toSign)
+  def cancelOrder(pk: PrivateKeyAccount, pair: AssetPair, orderId: String)(implicit tag: String): Future[MatcherStatusResponse] = {
+    log.info(s"[$tag] Cancel $orderId in $pair")
+    val request       = CancelOrderRequest(PublicKeyAccount(pk.publicKey), Base58.decode(orderId).get, Array.emptyByteArray)
+    val sig           = crypto.sign(pk, request.toSign)
     val signedRequest = request.copy(signature = sig)
-    to(matcherSettings.endpoint).cancelOrder(pair.amountAssetStr, pair.priceAssetStr, signedRequest)
-  }
-
-  def isActive(status: String): Boolean = {
-    status match {
-      case "PartiallyFilled" =>
-        true
-      case "Accepted" =>
-        true
-      case _ =>
-        false
+    to(matcherSettings.endpoint).cancelOrder(pair.amountAssetStr, pair.priceAssetStr, signedRequest).andThen {
+      case Failure(e) => log.error(s"[$tag] Can't cancel order $orderId: $e")
     }
   }
 
-  def orderHistory(account: PrivateKeyAccount): Seq[OrderbookHistory] = {
+  def orderHistory(account: PrivateKeyAccount)(implicit tag: String): Future[Seq[OrderBookHistory]] = {
     to(matcherSettings.endpoint).orderHistory(account)
   }
 
-  def cancelAllOrders(fakeAccounts: Seq[PrivateKeyAccount]): Future[Seq[MatcherStatusResponse]] = {
-    val orderHistoriesPerAccount: Seq[(PrivateKeyAccount, Seq[OrderbookHistory])] =
-      fakeAccounts.map(account => account -> orderHistory(account).filter(o => isActive(o.status)))
-    log.info(s"$orderHistoriesPerAccount")
-    val cancelOrders: Seq[Future[MatcherStatusResponse]] =
-      orderHistoriesPerAccount.flatMap(account => account._2.map(o => cancelOrder(account._1, o.assetPair, o.id)))
-    Future.sequence(cancelOrders).andThen {
-      case x => log.info(s"ended with $x")
-    }
-  }
-
-  def transfer(sender: PrivateKeyAccount, assetId: Option[AssetId], recipient: PrivateKeyAccount, halfBalance: Boolean): Future[Transaction] = {
-
-    log.info("waves balance: " + to(endpoint).balance(PublicKeyAccount(sender.publicKey).address, None))
-    val balance = to(endpoint).balance(PublicKeyAccount(sender.publicKey).address, assetId)
-    log.info("asset balance: " + balance)
-    val amount =
-      assetId match {
-        case None =>
-          if (halfBalance)
-            (balance / 2) - 0.001.waves
-          else balance - 0.0001.waves
-
-        case _ =>
-          if (halfBalance)
-            balance / 2
-          else balance
-
-      }
-
-    implicit val w =
-      Json.writes[SignedTransferRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(TransactionType.TransferTransaction.id)))
-
-    val txRequest1 = TransferTransaction
-      .create(assetId,
-        sender,
-        AddressOrAlias.fromString(PublicKeyAccount(recipient.publicKey).address).right.get,
-        amount,
-        ts,
-        None,
-        fee,
-        Array.emptyByteArray)
-
-    if (txRequest1.isLeft) log.error(s"$txRequest1")
-    val txRequest = txRequest1.right.get
-    val signedTx = createSignedTransferRequest(txRequest)
-    to(endpoint).broadcastRequest(signedTx).flatMap { tx =>
-      to(endpoint).waitForTransaction(tx.id)
-    }
-  }
-
-  private def placeOrders(startStep: Int): Result[Unit] = {
-    val defaultAmount = 10000
-    val defaultPrice = 10000
-
-    def loop(step: Int): Result[Unit] = {
-
-      def trySend = Future.sequence {
-        val result = (1 to ordersCount).map(_ =>
-          orderType match {
-            case GenOrderType.ActiveBuy =>
-              log.info("always active buy")
-              val buyer = randomFrom(validAccounts).get
-              to(matcherSettings.endpoint).orderHistory(buyer)
-              val pair = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
-              buyOrder(defaultPrice / 100, defaultAmount, buyer, pair)._2
-            case GenOrderType.ActiveSell =>
-              log.info("always active sell")
-              val seller = randomFrom(validAccounts).get
-              val pair = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
-              sellOrder(defaultPrice * 10, defaultAmount, seller, pair)._2
-            case GenOrderType.Buy =>
-              log.info("buy for filling")
-              val buyer = randomFrom(validAccounts).get
-              to(matcherSettings.endpoint).orderHistory(buyer)
-              val pair = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
-              buyOrder(defaultPrice, defaultAmount, buyer, pair)._2
-            case GenOrderType.Sell =>
-              log.info("sell for filling")
-              val seller = randomFrom(validAccounts).get
-              val pair = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
-              sellOrder(defaultPrice, defaultAmount, seller, pair)._2
-            case GenOrderType.Cancel =>
-              log.info("cancel order")
-              val buyer = randomFrom(validAccounts).get
-              to(matcherSettings.endpoint).orderHistory(buyer)
-              val pair = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
-              sellOrder(defaultPrice * 15, defaultAmount, buyer, pair)._2.flatMap { orderInfo =>
-                to(matcherSettings.endpoint).orderHistory(buyer)
-                cancelOrder(buyer, pair, orderInfo.message.id)
-              }
-            case GenOrderType.InvalidAmount =>
-              log.info("invalid amount")
-              val invalidBuyer = randomFrom(invalidAccounts).get
-              val pair = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
-              buyOrder(defaultPrice, defaultAmount, invalidBuyer, pair)._2
-                .transformWith {
-                  case Failure(e: UnexpectedStatusCodeException) => e.statusCode match {
-                    case 400 => Future.successful(())
-                    case code => Future.failed(e)
-                  }
-                  case Success(x) => Future.failed(new IllegalStateException(s"Order should not be placed: ${x}"))
-                }
-            case GenOrderType.FakeSell =>
-              log.info("fake sell account")
-              cancelAllOrders(fakeAccounts).flatMap { _ =>
-                val seller: PrivateKeyAccount = fakeAccounts.head
-                val buyer: PrivateKeyAccount = fakeAccounts(1)
-                val pair = AssetPair(randomFrom(tradingAssets.drop(tradingAssets.size - 2)), None)
-                sellOrder(defaultPrice, defaultAmount, seller, pair)._2
-                val hist = fakeAccounts.map(account => account -> to(matcherSettings.endpoint).orderHistory(account).filter(o => isActive(o.status)))
-                log.info(s"$hist")
-                transfer(seller, pair.amountAsset, buyer, halfBalance = false).flatMap { _ =>
-                  to(matcherSettings.endpoint).orderHistoryFuture(seller).flatMap { _ =>
-                    buyOrder(defaultPrice, defaultAmount, buyer, pair)._2
-                    to(matcherSettings.endpoint).orderHistoryFuture(seller).flatMap { _ =>
-                      transfer(buyer, pair.amountAsset, seller, halfBalance = true)
-                    }
-                  }
-                }
-              }
-            case GenOrderType.FakeBuy =>
-              log.info("fake buy account")
-              cancelAllOrders(fakeAccounts).flatMap { _ =>
-                val seller: PrivateKeyAccount = fakeAccounts(2)
-                val buyer: PrivateKeyAccount = fakeAccounts(3)
-                val pair = AssetPair(randomFrom(tradingAssets.drop(tradingAssets.size - 2)), None)
-                buyOrder(defaultPrice, defaultAmount, buyer, pair)._2
-                transfer(buyer, pair.amountAsset, seller, halfBalance = false).flatMap { _ =>
-                  to(matcherSettings.endpoint).orderHistoryFuture(buyer).flatMap { _ =>
-                    sellOrder(defaultPrice, defaultAmount, seller, pair)._2
-                    to(matcherSettings.endpoint).orderHistoryFuture(buyer).flatMap { _ =>
-                      transfer(seller, pair.amountAsset, buyer, halfBalance = true)
-                    }
-                  }
-                }
-              }
-          })
-        result
-      }
-
-      def xxx: EitherT[Future, Nothing, immutable.IndexedSeq[Any]] = EitherT.liftF(trySend)
-
-      def next: Result[Unit] = {
-        log.info(s"${ordersCount} orders had been sent")
-        if (step < workerSettings.iterations) {
-          log.info(s" Sleeping for ${workerSettings.delay}")
-
-          EitherT
-            .liftF(Future {
-              blocking {
-                Thread.sleep(workerSettings.delay.toMillis)
-              }
-            })
-            .flatMap { _ =>
-              loop(step + 1)
+  def cancelAllOrders(fakeAccounts: Seq[PrivateKeyAccount])(implicit tag: String): Future[Seq[MatcherStatusResponse]] = {
+    log.info(s"[$tag] Cancel orders of accounts: ${fakeAccounts.map(_.address).mkString(", ")}")
+    def cancelOrdersOf(account: PrivateKeyAccount): Future[Seq[MatcherStatusResponse]] = {
+      orderHistory(account).flatMap { orders =>
+        Future.sequence {
+          orders
+            .filter(_.isActive)
+            .map { order =>
+              cancelOrder(account, order.assetPair, order.id)
             }
-        } else {
-          log.info(s"Done")
-          EitherT.right(Future.successful(Right(())))
         }
       }
-
-      xxx.flatMap(_ => next)
     }
 
-    loop(startStep)
+    Future.sequence(fakeAccounts.map(cancelOrdersOf)).map(_.flatten)
   }
 
+  implicit val signedTransferRequestWrites: Writes[SignedTransferRequest] =
+    Json.writes[SignedTransferRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(TransactionType.TransferTransaction.id)))
 
-  override protected def log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"${this.getClass.getSimpleName}$hashCode()"))
+  def transfer(sender: PrivateKeyAccount, assetId: Option[AssetId], recipient: PrivateKeyAccount, halfBalance: Boolean)(
+      implicit tag: String): Future[Transaction] =
+    to(endpoint).balance(sender.address, assetId).flatMap { balance =>
+      log.info(s"[$tag] ${assetId.fold("Waves")(_.base58)} balance of ${sender.address}: $balance")
+      val halfAmount     = if (halfBalance) balance / 2 else balance
+      val transferAmount = assetId.fold(halfAmount - 0.001.waves)(_ => halfAmount)
 
-  override def toString: String = s"${super.toString}($hashCode())"
+      TransferTransaction.create(assetId,
+                                 sender,
+                                 AddressOrAlias.fromString(PublicKeyAccount(recipient.publicKey).address).right.get,
+                                 transferAmount,
+                                 now,
+                                 None,
+                                 fee,
+                                 Array.emptyByteArray) match {
+        case Left(e) => throw new RuntimeException(s"[$tag] Generated transaction is wrong: $e")
+        case Right(txRequest) =>
+          val signedTx = createSignedTransferRequest(txRequest)
+          to(endpoint).broadcastRequest(signedTx).flatMap { tx =>
+            to(endpoint).waitForTransaction(tx.id)
+          }
+      }
+    }
+
+  def send(orderType: GenOrderType.Value): Future[Any] = {
+    implicit val tag: String = s"$orderType, ${Random.nextInt(1, 1000000)}"
+
+    val work = orderType match {
+      case GenOrderType.ActiveBuy =>
+        val buyer = randomFrom(validAccounts).get
+        val pair  = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+        buyOrder(DefaultPrice / 100, DefaultAmount, buyer, pair)._2
+
+      case GenOrderType.ActiveSell =>
+        val seller = randomFrom(validAccounts).get
+        val pair   = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+        sellOrder(DefaultPrice * 10, DefaultAmount, seller, pair)._2
+
+      case GenOrderType.Buy =>
+        val buyer = randomFrom(validAccounts).get
+        val pair  = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+        buyOrder(DefaultPrice, DefaultAmount, buyer, pair)._2
+
+      case GenOrderType.Sell =>
+        val seller = randomFrom(validAccounts).get
+        val pair   = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+        sellOrder(DefaultPrice, DefaultAmount, seller, pair)._2
+
+      case GenOrderType.Cancel =>
+        val buyer = randomFrom(validAccounts).get
+        val pair  = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+        sellOrder(DefaultPrice * 15, DefaultAmount, buyer, pair)._2.flatMap { orderInfo =>
+          cancelOrder(buyer, pair, orderInfo.message.id)
+        }
+
+      case GenOrderType.InvalidAmount =>
+        val invalidBuyer = randomFrom(invalidAccounts).get
+        val pair         = AssetPair(randomFrom(tradingAssets.take(tradingAssets.size - 2)), None)
+        buyOrder(DefaultPrice, DefaultAmount, invalidBuyer, pair)._2
+          .transformWith {
+            case Success(x) => Future.failed(new IllegalStateException(s"Order should not be placed: $x"))
+            case Failure(e: UnexpectedStatusCodeException) =>
+              if (e.statusCode == 400) Future.successful(())
+              else Future.failed(e)
+            case Failure(e) => Future.failed(e)
+          }
+
+      case GenOrderType.FakeSell =>
+        val seller: PrivateKeyAccount = fakeAccounts.head
+        val buyer: PrivateKeyAccount  = fakeAccounts(1)
+        val pair                      = AssetPair(randomFrom(tradingAssets.drop(tradingAssets.size - 2)), None)
+        for {
+          _ <- cancelAllOrders(fakeAccounts)
+          _ <- sellOrder(DefaultPrice, DefaultAmount, seller, pair)._2
+          _ <- transfer(seller, pair.amountAsset, buyer, halfBalance = false)
+          _ <- buyOrder(DefaultPrice, DefaultAmount, buyer, pair)._2
+          _ <- transfer(buyer, pair.amountAsset, seller, halfBalance = true)
+        } yield ()
+
+      case GenOrderType.FakeBuy =>
+        val seller: PrivateKeyAccount = fakeAccounts(2)
+        val buyer: PrivateKeyAccount  = fakeAccounts(3)
+        val pair                      = AssetPair(randomFrom(tradingAssets.drop(tradingAssets.size - 2)), None)
+        for {
+          _ <- cancelAllOrders(fakeAccounts)
+          _ <- buyOrder(DefaultPrice, DefaultAmount, buyer, pair)._2
+          _ <- transfer(buyer, pair.amountAsset, seller, halfBalance = false)
+          _ <- sellOrder(DefaultPrice, DefaultAmount, seller, pair)._2
+          _ <- transfer(seller, pair.amountAsset, buyer, halfBalance = true)
+        } yield ()
+    }
+
+    work.andThen {
+      case Failure(e) => log.error(s"[$tag] Failed: ${e.getMessage}", e)
+    }
+  }
+
+  private def placeOrders(maxIterations: Int): Future[Unit] = {
+    def sendAll(step: Int): Future[Unit] = {
+      log.info(s"Step $step")
+      Future.traverse(1 to ordersCount)(_ => send(orderType)).map(_ => ())
+    }
+
+    def runStepsFrom(step: Int): Future[Unit] = sendAll(step).flatMap { _ =>
+      val nextStep = step + 1
+      if (nextStep < maxIterations) {
+        log.info(s"Sleeping ${workerSettings.delay.toMillis}ms")
+        GlobalTimer.instance.sleep(workerSettings.delay).flatMap(_ => runStepsFrom(nextStep))
+      } else {
+        log.info("Done")
+        Future.successful(())
+      }
+    }
+
+    runStepsFrom(1)
+  }
+
+  override protected def log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(toString))
 }
 
 object Worker {
+
+  private val DefaultAmount = 10000
+  private val DefaultPrice  = 10000
 
   case class Settings(autoReconnect: Boolean, iterations: Int, delay: FiniteDuration, reconnectDelay: FiniteDuration)
 
@@ -303,7 +254,7 @@ object AssetPairCreator {
 
   private def extractAssetId(a: String): Try[Option[AssetId]] = a match {
     case `WavesName` => Success(None)
-    case other => ByteStr.decodeBase58(other).map(Option(_))
+    case other       => ByteStr.decodeBase58(other).map(Option(_))
   }
 
   def createAssetPair(amountAsset: String, priceAsset: String): Try[AssetPair] =
