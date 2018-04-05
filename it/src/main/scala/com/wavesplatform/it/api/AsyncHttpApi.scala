@@ -392,10 +392,10 @@ object AsyncHttpApi extends Assertions {
         n.client.executeRequest(r, new AsyncCompletionHandler[Response] {
           override def onCompleted(response: Response): Response = {
             if (response.getStatusCode == statusCode) {
-              n.log.debug(s"Request: ${r.getUrl}\nResponse: ${response.getResponseBody}")
+              n.log.debug(s"Request: ${r.getMethod} ${r.getUrl}\nResponse: ${response.getResponseBody}")
               response
             } else {
-              n.log.debug(s"Request: ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
+              n.log.debug(s"Request: ${r.getMethod} ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
               throw UnexpectedStatusCodeException(r.getUrl, response.getStatusCode, response.getResponseBody)
             }
           }
@@ -411,11 +411,11 @@ object AsyncHttpApi extends Assertions {
     }
 
     def once(r: Request): Future[Response] = {
-      n.log.debug(s"Request: ${r.getUrl}")
+      n.log.debug(s"Request: ${r.getMethod} ${r.getUrl}")
       n.client
         .executeRequest(r, new AsyncCompletionHandler[Response] {
           override def onCompleted(response: Response): Response = {
-            n.log.debug(s"Response for ${r.getUrl} is ${response.getStatusCode}")
+            n.log.debug(s"Response for ${r.getMethod} ${r.getUrl} is ${response.getStatusCode}")
             response
           }
         })

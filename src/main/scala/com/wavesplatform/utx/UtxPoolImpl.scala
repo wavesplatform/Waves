@@ -134,7 +134,8 @@ class UtxPoolImpl(time: Time,
               val updatedRest = currRest.put(tx)
               if (updatedRest.isOverfilled) (invalid, valid, diff, currRest, true)
               else (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, updatedRest.isEmpty)
-            case Left(_) =>
+            case Left(e) =>
+              log.trace(s"Tx ${tx.id().base58} became invalid: $e")
               (tx.id() +: invalid, valid, diff, currRest, false)
           }
       }
