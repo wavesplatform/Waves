@@ -1,7 +1,7 @@
 package com.wavesplatform.mining
 
 import cats.data.EitherT
-import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSCalculator, PoSSelector}
+import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics.{BlockStats, HistogramExt, Instrumented}
 import com.wavesplatform.network._
@@ -85,7 +85,7 @@ class MinerImpl(allChannels: ChannelGroup,
 
   private val nextBlockGenerationTimes: MMap[Address, Long] = MMap.empty
 
-  private val pos: PoSCalculator = new PoSSelector(featureProvider)
+  private val pos = new PoSSelector(featureProvider)
 
   @volatile private var debugState: MinerDebugInfo.State = MinerDebugInfo.Disabled
 
@@ -115,7 +115,7 @@ class MinerImpl(allChannels: ChannelGroup,
       val referencedBlockInfo       = history.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
       val pc                        = allChannels.size()
       lazy val currentTime          = timeService.correctedTime()
-      lazy val h                    = pos.hit(pos.generatorSignature(referencedBlockInfo.consensus.generationSignature.arr, account.publicKey))
+      lazy val h                    = pos.hit(height, pos.generatorSignature(referencedBlockInfo.consensus.generationSignature.arr, account.publicKey))
       lazy val t                    = pos.target(referencedBlockInfo.timestamp, referencedBlockInfo.consensus.baseTarget, currentTime, balance)
       measureSuccessful(
         blockBuildTimeStats,
@@ -248,9 +248,9 @@ class MinerImpl(allChannels: ChannelGroup,
     if (GeneratingBalanceProvider.validateHeight(fp, height, b)) {
       val cData        = block.consensusData
       val s            = pos.generatorSignature(cData.generationSignature.arr, account.publicKey)
-      val h            = pos.hit(s)
+      val h            = pos.hit(height, s)
       val t            = cData.baseTarget
-      val calculatedTs = pos.time(h, t, b) + block.timestamp
+      val calculatedTs = pos.time(height, h, t, b) + block.timestamp
       if (0 < calculatedTs && calculatedTs < Long.MaxValue) {
         Right((b, calculatedTs))
       } else

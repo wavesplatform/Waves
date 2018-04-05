@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.appender
 
 import cats.data.EitherT
-import com.wavesplatform.consensus.PoSCalculator
+import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.Miner
@@ -30,7 +30,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
             time: Time,
             stateReader: SnapshotStateReader,
             utxStorage: UtxPool,
-            pos: PoSCalculator,
+            pos: PoSSelector,
             settings: WavesSettings,
             featureProvider: FeatureProvider,
             scheduler: Scheduler)(newBlock: Block): Task[Either[ValidationError, Option[BlockchainScore]]] =
@@ -56,7 +56,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
             time: Time,
             stateReader: SnapshotStateReader,
             utxStorage: UtxPool,
-            pos: PoSCalculator,
+            pos: PoSSelector,
             settings: WavesSettings,
             featureProvider: FeatureProvider,
             allChannels: ChannelGroup,

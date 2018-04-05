@@ -1,6 +1,6 @@
 package com.wavesplatform.state2.appender
 
-import com.wavesplatform.consensus.PoSCalculator
+import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.{BlockStats, Instrumented, Metrics}
 import com.wavesplatform.mining.Miner
@@ -28,7 +28,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
             blockchainUpdater: BlockchainUpdater,
             stateReader: SnapshotStateReader,
             utxStorage: UtxPool,
-            pos: PoSCalculator,
+            pos: PoSSelector,
             time: Time,
             settings: WavesSettings,
             featureProvider: FeatureProvider,

@@ -69,13 +69,17 @@ trait PoSCalculator {
 }
 
 class PoSSelector(val fp: FeatureProvider) extends PoSCalculator {
-  private def fair: Boolean = fp.activatedFeatures().contains(BlockchainFeatures.FairPOS.id)
+  override def hit(generatorSignature: Array[Byte]): BigInt = throw new NotImplementedError()
 
-  override def hit(generatorSignature: Array[Byte]): BigInt =
-    if (fair) FairPoSCalculator.hit(generatorSignature) else NxtPoSCalculator.hit(generatorSignature)
+  override def time(hit: BigInt, bt: Long, balance: Long): Long = throw new NotImplementedError()
 
-  override def time(hit: BigInt, bt: Long, balance: Long): Long =
-    if (fair) FairPoSCalculator.time(hit, bt, balance) else NxtPoSCalculator.time(hit, bt, balance)
+  def hit(height: Int, generatorSignature: Array[Byte]): BigInt =
+    if (fair(height)) FairPoSCalculator.hit(generatorSignature) else NxtPoSCalculator.hit(generatorSignature)
+
+  def time(height: Int, hit: BigInt, bt: Long, balance: Long): Long =
+    if (fair(height)) FairPoSCalculator.time(hit, bt, balance) else NxtPoSCalculator.time(hit, bt, balance)
+
+  private def fair(height: Int): Boolean = fp.isFeatureActivated(BlockchainFeatures.FairPOS, height)
 }
 
 object NxtPoSCalculator extends PoSCalculator
@@ -93,8 +97,12 @@ object FairPoSCalculator extends PoSCalculator {
   }
 
   override def time(hit: BigInt, bt: Long, balance: Long): Long = {
-    val r = (BigDecimal(hit) * Correction * 1000) / (bt * balance)
-    round(math.abs(log2(1 + r) * 120)).toLong
+    val h = BigDecimal(hit)
+    val t = BigDecimal(bt)
+    val b = BigDecimal(balance)
+    println(s"hit=$hit bt=$bt balance=$balance")
+    val r: BigDecimal = (h * Correction * 1000) / (t * b)
+    round(log2(1 + r) * 120).toLong
   }
 
   private def log2(x: BigDecimal): Double = math.log10(x.toDouble) / math.log10(2.0)

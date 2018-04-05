@@ -1,6 +1,6 @@
 package com.wavesplatform.state2
 
-import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSCalculator}
+import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
@@ -54,7 +54,7 @@ package object appender extends ScorexLogging {
                                     blockchainUpdater: BlockchainUpdater,
                                     stateReader: SnapshotStateReader,
                                     utxStorage: UtxPool,
-                                    pos: PoSCalculator,
+                                    pos: PoSSelector,
                                     time: Time,
                                     settings: WavesSettings,
                                     featureProvider: FeatureProvider)(block: Block): Either[ValidationError, Option[Int]] =
@@ -91,7 +91,7 @@ package object appender extends ScorexLogging {
   private def blockConsensusValidation(history: History,
                                        fp: FeatureProvider,
                                        settings: WavesSettings,
-                                       pos: PoSCalculator,
+                                       pos: PoSSelector,
                                        currentTs: Long,
                                        block: Block)(genBalance: Int => Either[String, Long]): Either[ValidationError, Unit] = {
 
@@ -142,7 +142,7 @@ package object appender extends ScorexLogging {
           s"declared generation signature ${blockData.generationSignature.base58} does not match calculated generation signature ${ByteStr(calcGs).base58}")
       )
       effectiveBalance <- genBalance(height).left.map(GenericError(_))
-      hit    = pos.hit(blockGs)
+      hit    = pos.hit(height, blockGs)
       target = pos.target(parent.timestamp, parent.consensusData.baseTarget, blockTime, effectiveBalance)
       _ <- Either.cond(
         hit < target || (height == height1 && block.uniqueId == correctBlockId1) || (height == height2 && block.uniqueId == correctBlockId2),
