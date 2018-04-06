@@ -131,11 +131,35 @@ X > Y
   }
 
   property("string literal") {
-    parse("""
-            |
-            | "asdf"
-            |
-      """.stripMargin) shouldBe CONST_STRING("asdf")
+    forAll { (in: String) =>
+      parse(s"""
+           |
+           | "$in"
+           |
+        """.stripMargin) shouldBe CONST_STRING(in)
+    }
+  }
+
+  property("string literal with \\t and \\n") {
+    val stringWithTabAndLineBreak = "as\ndf"
+
+    parse(s"""
+         |
+         | "$stringWithTabAndLineBreak"
+         |
+      """.stripMargin) shouldBe CONST_STRING(stringWithTabAndLineBreak)
+  }
+
+  property("string literal with unicode chars") {
+    val stringWithUnicodeChars = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD"
+
+    parse(
+      s"""
+         |
+         | "$stringWithUnicodeChars"
+         |
+       """.stripMargin
+    ) shouldBe CONST_STRING(stringWithUnicodeChars)
   }
 
   property("reserved keywords are invalid variable names") {
