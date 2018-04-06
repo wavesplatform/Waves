@@ -7,6 +7,7 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.state2.ByteStr
 import scorex.account.PublicKeyAccount
+import scorex.account.PublicKeyAccount.KeyLength
 import scorex.block.{Block, MicroBlock}
 import scorex.network.message.Message._
 import scorex.network.message._

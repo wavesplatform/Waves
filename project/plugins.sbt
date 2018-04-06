@@ -15,7 +15,8 @@ Seq(
   "org.scala-js"       % "sbt-scalajs"              % "0.6.22",
   "org.portable-scala" % "sbt-crossproject"         % "0.3.1",
   "org.portable-scala" % "sbt-scalajs-crossproject" % "0.3.1",
-  "com.lucidchart"     % "sbt-scalafmt"             % "1.15"
+  "com.lucidchart"     % "sbt-scalafmt"             % "1.15",
+  "pl.project13.scala" % "sbt-jmh" % "0.3.3"
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(

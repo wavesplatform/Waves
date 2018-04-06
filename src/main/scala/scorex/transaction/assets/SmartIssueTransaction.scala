@@ -72,8 +72,8 @@ object SmartIssueTransaction extends TransactionParserFor[SmartIssueTransaction]
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
       val chainId                       = bytes(0)
-      val sender                        = PublicKeyAccount(bytes.slice(1, TransactionParsers.KeyLength + 1))
-      val (assetName, descriptionStart) = Deser.parseArraySize(bytes, TransactionParsers.KeyLength + 1)
+      val sender                        = PublicKeyAccount(bytes.slice(1, PublicKeyAccount.KeyLength + 1))
+      val (assetName, descriptionStart) = Deser.parseArraySize(bytes, PublicKeyAccount.KeyLength + 1)
       val (description, quantityStart)  = Deser.parseArraySize(bytes, descriptionStart)
       val quantity                      = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
       val decimals                      = bytes.slice(quantityStart + 8, quantityStart + 9).head

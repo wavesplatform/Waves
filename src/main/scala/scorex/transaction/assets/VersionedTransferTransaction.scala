@@ -5,10 +5,10 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state2._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
+import scorex.account.PublicKeyAccount.KeyLength
 import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
-import scorex.transaction.TransactionParsers._
 import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}

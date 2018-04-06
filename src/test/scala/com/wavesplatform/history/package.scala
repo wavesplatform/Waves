@@ -4,12 +4,12 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state2._
-import scorex.account.PrivateKeyAccount
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{Transaction, TransactionParsers}
+import scorex.transaction.Transaction
 
 package object history {
   val MaxTransactionsPerBlockDiff = 10
@@ -33,7 +33,7 @@ package object history {
 
   val DefaultWavesSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings)
 
-  val defaultSigner       = PrivateKeyAccount(Array.fill(TransactionParsers.KeyLength)(0))
+  val defaultSigner       = PrivateKeyAccount(Array.fill(PublicKeyAccount.KeyLength)(0))
   val generationSignature = ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))
 
   def buildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction]): Block = customBuildBlockOfTxs(refTo, txs, defaultSigner, 1, 0L)

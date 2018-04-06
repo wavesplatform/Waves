@@ -2,13 +2,13 @@ package com.wavesplatform.state2.diffs.smart.scenarios
 
 import java.nio.charset.StandardCharsets
 
+import com.wavesplatform.{NoShrink, TransactionGen}
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.{Evaluator, Parser, TypeChecker, TypeInfo}
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
 import com.wavesplatform.state2.diffs.smart._
 import com.wavesplatform.utils._
-import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}

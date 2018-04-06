@@ -9,6 +9,7 @@ import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state2._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
+import scorex.account.PublicKeyAccount.KeyLength
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.fields.FeaturesBlockField
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
