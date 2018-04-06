@@ -7,8 +7,8 @@ import monix.reactive.Observer
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock, SignerData}
+import scorex.crypto.signatures.Curve25519.SignatureLength
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.TransactionParsers
 import scorex.transaction.assets.TransferTransaction
 
 import scala.concurrent.duration._
@@ -18,7 +18,7 @@ trait RxScheduler extends BeforeAndAfterAll { _: Suite =>
   implicit val implicitScheduler: SchedulerService = Scheduler.singleThread("rx-scheduler")
 
   def testSchedulerName: String
-  lazy val testScheduler = Scheduler.singleThread(testSchedulerName)
+  lazy val testScheduler: SchedulerService = Scheduler.singleThread(testSchedulerName)
 
   def test[A](f: => Future[A]): A = Await.result(f, 10.seconds)
 
@@ -29,7 +29,7 @@ trait RxScheduler extends BeforeAndAfterAll { _: Suite =>
         ack
       })
 
-  def byteStr(id: Int): ByteStr = ByteStr(Array.concat(Array.fill(TransactionParsers.SignatureLength - 1)(0), Array(id.toByte)))
+  def byteStr(id: Int): ByteStr = ByteStr(Array.concat(Array.fill(SignatureLength - 1)(0), Array(id.toByte)))
 
   val signer: PrivateKeyAccount = TestBlock.defaultSigner
 

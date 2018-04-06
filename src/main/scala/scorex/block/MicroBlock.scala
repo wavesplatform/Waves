@@ -7,7 +7,7 @@ import com.wavesplatform.state2._
 import monix.eval.Coeval
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block.{BlockId, transParseBytes}
-import scorex.transaction.TransactionParsers.SignatureLength
+import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.utils.ScorexLogging
@@ -71,9 +71,7 @@ object MicroBlock extends ScorexLogging {
       _ <- Either.cond(totalResBlockSig.arr.length == SignatureLength,
                        (),
                        GenericError(s"Incorrect totalResBlockSig: ${totalResBlockSig.arr.length}"))
-      _ <- Either.cond(generator.publicKey.length == PublicKeyAccount.KeyLength,
-                       (),
-                       GenericError(s"Incorrect generator.publicKey: ${generator.publicKey.length}"))
+      _         <- Either.cond(generator.publicKey.length == KeyLength, (), GenericError(s"Incorrect generator.publicKey: ${generator.publicKey.length}"))
       nonSigned <- create(version = 3: Byte, generator, transactionData, prevResBlockSig, totalResBlockSig, ByteStr.empty)
     } yield {
       val toSign    = nonSigned.bytes
@@ -100,8 +98,8 @@ object MicroBlock extends ScorexLogging {
       val txBlockField = transParseBytes(version, tBytes).get
       position += tBytesLength
 
-      val genPK = bytes.slice(position, position + PublicKeyAccount.KeyLength)
-      position += PublicKeyAccount.KeyLength
+      val genPK = bytes.slice(position, position + KeyLength)
+      position += KeyLength
 
       val signature = ByteStr(bytes.slice(position, position + SignatureLength))
 

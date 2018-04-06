@@ -8,6 +8,7 @@ import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import scorex.crypto.signatures.Curve25519.SignatureLength
 import scorex.transaction.TransactionParsers._
 
 import scala.util.{Failure, Success, Try}

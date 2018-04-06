@@ -2,6 +2,7 @@ package scorex.account
 
 import com.wavesplatform.utils.base58Length
 import scorex.crypto.encode.Base58
+import scorex.crypto.signatures.Curve25519
 import scorex.transaction.ValidationError.InvalidAddress
 
 trait PublicKeyAccount {
@@ -19,8 +20,7 @@ trait PublicKeyAccount {
 
 object PublicKeyAccount {
 
-  val KeyLength            = 32
-  val KeyStringLength: Int = base58Length(KeyLength)
+  val KeyStringLength: Int = base58Length(Curve25519.KeyLength)
 
   private case class PublicKeyAccountImpl(publicKey: Array[Byte]) extends PublicKeyAccount
 

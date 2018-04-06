@@ -1,16 +1,16 @@
 package scorex.lagonaki.mocks
 
 import com.wavesplatform.state2._
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.PrivateKeyAccount
 import scorex.block._
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
+import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.transaction.Transaction
-import scorex.transaction.TransactionParsers._
 
 import scala.util.{Random, Try}
 
 object TestBlock {
-  val defaultSigner = PrivateKeyAccount(Array.fill(PublicKeyAccount.KeyLength)(0))
+  val defaultSigner = PrivateKeyAccount(Array.fill(KeyLength)(0))
 
   val random: Random = new Random()
 

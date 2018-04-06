@@ -11,8 +11,8 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import scorex.account.{Address, AddressScheme, PrivateKeyAccount}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
+import scorex.crypto.signatures.Curve25519.SignatureLength
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.TransactionParsers.SignatureLength
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
