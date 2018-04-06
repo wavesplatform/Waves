@@ -39,7 +39,13 @@ object AssetTransactionsDiff {
       tx: ReissueTransaction): Either[ValidationError, Diff] =
     validateAsset(tx, state, tx.assetId, issuerOnly = true).flatMap { _ =>
       val oldInfo = state.assetDescription(tx.assetId).get
-      if (oldInfo.reissuable || blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) {
+      if (!oldInfo.reissuable && blockTime > settings.allowInvalidReissueInSameBlockUntilTimestamp) {
+        Left(
+          GenericError(s"Asset is not reissuable and blockTime=$blockTime is greater than " +
+            s"settings.allowInvalidReissueInSameBlockUntilTimestamp=${settings.allowInvalidReissueInSameBlockUntilTimestamp}"))
+      } else if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume) {
+        Left(GenericError(s"Asset total value overflow"))
+      } else {
         Right(
           Diff(
             height = height,
@@ -47,10 +53,6 @@ object AssetTransactionsDiff {
             portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.assetId -> tx.quantity))),
             assetInfos = Map(tx.assetId          -> AssetInfo(volume = tx.quantity, isReissuable = tx.reissuable, script = None))
           ))
-      } else {
-        Left(
-          GenericError(s"Asset is not reissuable and blockTime=$blockTime is greater than " +
-            s"settings.allowInvalidReissueInSameBlockUntilTimestamp=${settings.allowInvalidReissueInSameBlockUntilTimestamp}"))
       }
     }
 
