@@ -3,7 +3,7 @@ package com.wavesplatform.state2.reader
 import com.wavesplatform.state2._
 import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.transaction.Transaction.Type
-import scorex.transaction.ValidationError.AliasNotExists
+import scorex.transaction.ValidationError.AliasDoesNotExist
 import scorex.transaction._
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.Script
@@ -36,17 +36,18 @@ trait SnapshotStateReader {
 
   def accountScript(address: Address): Option[Script]
 
+  def accountData(acc: Address): AccountDataInfo
+  def accountData(acc: Address, key: String): Option[DataEntry[_]]
+
   def assetDistribution(height: Int, assetId: ByteStr): Map[Address, Long]
   def wavesDistribution(height: Int): Map[Address, Long]
 
   // the following methods are used exclusively by patches
   def allActiveLeases: Set[LeaseTransaction]
 
-  def collectPortfolios(filter: Portfolio => Boolean): Map[Address, Portfolio]
-
-  def accountData(acc: Address): AccountDataInfo
-
-  def accountData(acc: Address, key: String): Option[DataEntry[_]]
+  /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
+    * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
+  def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
 }
 
 object SnapshotStateReader {
@@ -55,7 +56,7 @@ object SnapshotStateReader {
     def resolveAliasEi[T <: Transaction](aoa: AddressOrAlias): Either[ValidationError, Address] =
       aoa match {
         case a: Address => Right(a)
-        case a: Alias   => s.resolveAlias(a).toRight(AliasNotExists(a))
+        case a: Alias   => s.resolveAlias(a).toRight(AliasDoesNotExist(a))
       }
 
     def effectiveBalance(address: Address, atHeight: Int, confirmations: Int): Long = {
@@ -74,9 +75,8 @@ object SnapshotStateReader {
       s.addressTransactions(address, Set(CreateAliasTransaction.typeId), Int.MaxValue, 0)
         .collect { case (_, a: CreateAliasTransaction) => a.alias }
 
-    def activeLeases(address: Address): Seq[LeaseTransaction] =
+    def activeLeases(address: Address): Seq[(Int, LeaseTransaction)] =
       s.addressTransactions(address, Set(LeaseTransaction.typeId), Int.MaxValue, 0)
-        .collect { case (_, l: LeaseTransaction) if s.leaseDetails(l.id()).exists(_.isActive) => l }
+        .collect { case (h, l: LeaseTransaction) if s.leaseDetails(l.id()).exists(_.isActive) => h -> l }
   }
-
 }

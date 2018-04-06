@@ -446,17 +446,21 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
       lastChange <- db.get(key(addressId)).headOption
     } yield db.get(v(lastChange, addressId))
 
-  private def loadPortfolio(addressId: BigInt, db: ReadOnlyDB) = Portfolio(
+  private def loadLposPortfolio(db: ReadOnlyDB, addressId: BigInt) = Portfolio(
     loadFromHistory(db, addressId, k.wavesBalanceHistory, k.wavesBalance).getOrElse(0L),
     loadFromHistory(db, addressId, k.leaseBalanceHistory, k.leaseBalance).getOrElse(LeaseBalance.empty),
-    (for {
+    Map.empty
+  )
+
+  private def loadPortfolio(db: ReadOnlyDB, addressId: BigInt) = loadLposPortfolio(db, addressId).copy(
+    assets = (for {
       assetId <- db.get(k.assetList(addressId))
       h       <- db.get(k.assetBalanceHistory(addressId, assetId)).headOption
     } yield assetId -> db.get(k.assetBalance(h, addressId, assetId))).toMap
   )
 
   override protected def loadPortfolio(address: Address): Portfolio = readOnly { db =>
-    addressIdCache.get(address).fold(Portfolio.empty)(loadPortfolio(_, db))
+    addressIdCache.get(address).fold(Portfolio.empty)(loadPortfolio(db, _))
   }
 
   override protected def loadAssetInfo(assetId: ByteStr): Option[AssetInfo] =
@@ -764,12 +768,13 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
     txs.collect { case lt: LeaseTransaction => lt }.toSet
   }
 
-  override def collectPortfolios(filter: Portfolio => Boolean) = readOnly { db =>
-    (for {
-      addressId <- BigInt(1) to db.get(k.lastAddressId).getOrElse(BigInt(0))
-      portfolio = loadPortfolio(addressId, db)
-      if filter(portfolio)
-    } yield db.get(k.idToAddress(addressId)) -> portfolio).toMap
+  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]) = readOnly { db =>
+    val b = Map.newBuilder[Address, A]
+    for (id <- BigInt(1) to db.get(k.lastAddressId).getOrElse(BigInt(0))) {
+      val address = db.get(k.idToAddress(id))
+      pf.runWith(b += address -> _)(address -> loadLposPortfolio(db, id))
+    }
+    b.result()
   }
 
   override def scoreOf(blockId: ByteStr): Option[BigInt] = readOnly(db => db.get(k.heightOf(blockId)).map(h => db.get(k.score(h))))
