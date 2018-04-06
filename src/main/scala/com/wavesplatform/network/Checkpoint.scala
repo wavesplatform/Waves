@@ -4,6 +4,7 @@ import com.google.common.primitives.{Bytes, Ints}
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
+import scorex.crypto.signatures.Curve25519.SignatureLength
 
 import scala.collection.immutable.Stream
 import scala.util.{Failure, Success}
@@ -35,9 +36,9 @@ object Checkpoint {
     def reads(json: JsValue) = json match {
       case JsString(s) =>
         Base58.decode(s) match {
-          case Success(bytes) if bytes.length == scorex.transaction.TransactionParsers.SignatureLength => JsSuccess(bytes)
-          case Success(bytes)                                                                          => JsError(JsonValidationError("error.incorrect.signatureLength", bytes.length.toString))
-          case Failure(t)                                                                              => JsError(JsonValidationError(Seq("error.incorrect.base58", t.getLocalizedMessage), s))
+          case Success(bytes) if bytes.length == SignatureLength => JsSuccess(bytes)
+          case Success(bytes)                                    => JsError(JsonValidationError("error.incorrect.signatureLength", bytes.length.toString))
+          case Failure(t)                                        => JsError(JsonValidationError(Seq("error.incorrect.base58", t.getLocalizedMessage), s))
         }
       case _ => JsError("error.expected.jsstring")
     }
