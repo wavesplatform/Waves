@@ -60,4 +60,35 @@ class BurnTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(burnId)
     sender.assertAssetBalance(secondAddress, issuedAssetId, transferredQuantity - burnedQuantity)
   }
+
+  test("issuer can't burn more tokens than he own") {
+    val issuedQuantity = defaultQuantity
+    val burnedQuantity = issuedQuantity * 2
+
+    val issuedAssetId = sender.issue(firstAddress, "name", "description", issuedQuantity, decimals, reissuable = false, defaultFee).id
+
+    nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
+    sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity)
+
+    assertBadRequestAndMessage(sender.burn(secondAddress, issuedAssetId, burnedQuantity, defaultFee).id, "negative asset balance")
+  }
+
+  test("user can't burn more tokens than he own") {
+    val issuedQuantity      = defaultQuantity
+    val transferredQuantity = issuedQuantity / 2
+    val burnedQuantity      = transferredQuantity * 2
+
+    val issuedAssetId = sender.issue(firstAddress, "name", "description", issuedQuantity, decimals, reissuable = false, defaultFee).id
+
+    nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
+    sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity)
+
+    val transferId = sender.transfer(firstAddress, secondAddress, transferredQuantity, defaultFee, issuedAssetId.some).id
+
+    nodes.waitForHeightAriseAndTxPresent(transferId)
+    sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity - transferredQuantity)
+    sender.assertAssetBalance(secondAddress, issuedAssetId, transferredQuantity)
+
+    assertBadRequestAndMessage(sender.burn(secondAddress, issuedAssetId, burnedQuantity, defaultFee).id, "negative asset balance")
+  }
 }
