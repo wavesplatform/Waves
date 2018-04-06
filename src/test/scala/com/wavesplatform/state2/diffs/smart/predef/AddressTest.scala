@@ -33,4 +33,17 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
       runScript[ByteVector](script) shouldBe Right(ByteVector(Address.fromBytes(addressBytes.arr, networkByte).explicitGet().bytes.arr))
     }
   }
+
+  property("should calculate address and return bytes without intermediate ref") {
+    forAll(accountGen) { acc =>
+      val addressBytes = Address.fromPublicKey(acc.publicKey, networkByte).bytes
+      val script =
+        s"""
+           | let addressString = "${addressBytes.base58}"
+           | let maybeAddress = addressFromString(addressString)
+           | extract(maybeAddress).bytes
+        """.stripMargin
+      runScript[ByteVector](script) shouldBe Right(ByteVector(Address.fromBytes(addressBytes.arr, networkByte).explicitGet().bytes.arr))
+    }
+  }
 }
