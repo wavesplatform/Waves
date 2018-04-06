@@ -17,13 +17,14 @@ object Parser {
   import White._
   import fastparse.noApi._
   private val Base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-  private val StringChars = """1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-"""
   private val keywords    = Set("let", "base58", "true", "false", "if", "then", "else")
 
   private val lowerChar = CharIn('a' to 'z')
   private val upperChar = CharIn('A' to 'Z')
   private val char      = lowerChar | upperChar
   private val digit     = CharIn('0' to '9')
+  private val unicodeSymbolP = P( "u" ~ P( digit | char ) ~ P( digit | char ) ~ P( digit | char ) ~ P( digit | char ) )
+  private val escapedUnicodeSymbolP = P( "\\" ~ (CharIn("\"\\bfnrt") | unicodeSymbolP) )
   private val varName   = (char.repX(min = 1, max = 1) ~~ (digit | char).repX()).!.filter(!keywords.contains(_))
 
   private def numberP: P[CONST_LONG] = P((CharIn(Seq('+', '-')).rep(max = 1) ~ digit.rep(min = 1)).!.map(t => CONST_LONG(t.toLong)))
@@ -56,7 +57,7 @@ object Parser {
       }
 
   private def stringP: P[CONST_STRING] =
-    P("\"" ~ CharsWhileIn(StringChars, 0).! ~ "\"").map(x => CONST_STRING(x))
+    P( "\"" ~ (CharsWhile(!"\"\\".contains(_:Char)) | escapedUnicodeSymbolP).rep.! ~ "\"").map(CONST_STRING)
 
   private def block: P[EXPR] = P("\n".rep ~ letP.rep ~ expr ~ ";".rep).map {
     case ((Nil, y)) => y
