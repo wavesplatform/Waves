@@ -35,7 +35,7 @@ object AssetTransactionsDiff {
       ))
   }
 
-  def reissue(state: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(
+  def reissue(state: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, height: Int, fp: FeatureProvider)(
       tx: ReissueTransaction): Either[ValidationError, Diff] =
     validateAsset(tx, state, tx.assetId, issuerOnly = true).flatMap { _ =>
       val oldInfo = state.assetDescription(tx.assetId).get
@@ -43,7 +43,7 @@ object AssetTransactionsDiff {
         Left(
           GenericError(s"Asset is not reissuable and blockTime=$blockTime is greater than " +
             s"settings.allowInvalidReissueInSameBlockUntilTimestamp=${settings.allowInvalidReissueInSameBlockUntilTimestamp}"))
-      } else if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume) {
+      } else if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume && fp.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, state.height)) {
         Left(GenericError(s"Asset total value overflow"))
       } else {
         Right(
