@@ -59,7 +59,6 @@ object GlobalFunctionsBenchmark {
   val NetworkByte: Byte = 'P'
   val DataBytesLength   = 512
   val SeedBytesLength   = 128
-  val PublicKeyBytes    = 32 // PublicKeyAccount.KeyLength
 
   private val defaultEnvironment: Environment = new Environment {
     override def height: Int                                                                   = 1
@@ -78,7 +77,7 @@ object GlobalFunctionsBenchmark {
     bytes
   }
 
-  def randomAddress: ByteVector = environmentFunctions.addressFromPublicKey(ByteVector(randomBytes(PublicKeyBytes)))
+  def randomAddress: ByteVector = environmentFunctions.addressFromPublicKey(ByteVector(randomBytes(Curve25519.KeyLength)))
 
   def hashTest(f: Array[Byte] => Array[Byte]): Array[Byte] = f(randomBytes(DataBytesLength))
 
