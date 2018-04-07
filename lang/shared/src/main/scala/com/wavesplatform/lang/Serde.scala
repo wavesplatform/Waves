@@ -32,7 +32,7 @@ object Serde {
   implicit def dTrue            = d.bind[Typed.TRUE.type](8)
   implicit def dFalse           = d.bind[Typed.FALSE.type](9)
   implicit def dGetter          = d.bind[Typed.GETTER](12)
-  implicit def dFunctionCall2   = d.bind[Typed.FUNCTION_CALL](13)
+  implicit def dFunctionCall   = d.bind[Typed.FUNCTION_CALL](13)
 
   implicit def bkD    = Discriminated[BINARY_OP_KIND, Int](uint8)
   implicit def bkDSum = bkD.bind[SUM_OP.type](0)
