@@ -11,7 +11,7 @@ import scala.util.{Failure, Success, Try}
 object TypeChecker {
 
   type TypeDefs     = Map[String, TYPE]
-  type FunctionSigs = Map[String, FUNCTION]
+  type FunctionSigs = Map[String, FunctionTypeSignarure]
   case class TypeCheckerContext(predefTypes: Map[String, PredefType], varDefs: TypeDefs, functionDefs: FunctionSigs)
 
   object TypeCheckerContext {
@@ -53,7 +53,7 @@ object TypeChecker {
 
     case expr @ Untyped.FUNCTION_CALL(name, args) =>
       val value: EitherT[Coeval, String, Typed.EXPR] = ctx.functionDefs.get(name) match {
-        case Some(FUNCTION(argTypes, resultType)) =>
+        case Some(FunctionTypeSignarure(argTypes, resultType)) =>
           if (args.lengthCompare(argTypes.size) != 0)
             EitherT.fromEither[Coeval](Left(s"Function '$name' requires ${argTypes.size} arguments, but ${args.size} are provided"))
           else {

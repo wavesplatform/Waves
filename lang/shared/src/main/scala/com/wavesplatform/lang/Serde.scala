@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.lang.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.Terms._
 import scodec._
 import scodec.codecs._
@@ -7,6 +8,18 @@ import scodec.codecs._
 object Serde {
 
   import codecs.implicits._
+
+  implicit def d0            = Discriminated[FunctionHeaderType, Int](uint8)
+  implicit def dTypeParam    = d0.bind[FunctionHeaderType.TYPEPARAM](0)
+  implicit def dOptTypeParam = d0.bind[FunctionHeaderType.OPTIONTYPEPARAM](1)
+  implicit def d0Nothing     = d0.bind[FunctionHeaderType.NOTHING.type](0)
+  implicit def d0Unit        = d0.bind[FunctionHeaderType.UNIT.type](1)
+  implicit def d0Long        = d0.bind[FunctionHeaderType.LONG.type](2)
+  implicit def d0ByteVector  = d0.bind[FunctionHeaderType.BYTEVECTOR.type](3)
+  implicit def d0Boolean     = d0.bind[FunctionHeaderType.BOOLEAN.type](4)
+  implicit def d0Option      = d0.bind[FunctionHeaderType.OPTION](5)
+  implicit def d0TypeRef     = d0.bind[FunctionHeaderType.TYPEREF](6)
+  implicit def d0String      = d0.bind[FunctionHeaderType.STRING.type](7)
 
   implicit def d                = Discriminated[Typed.EXPR, Int](uint8)
   implicit def dConstInt        = d.bind[Typed.CONST_LONG](0)
@@ -20,6 +33,7 @@ object Serde {
   implicit def dFalse           = d.bind[Typed.FALSE.type](9)
   implicit def dGetter          = d.bind[Typed.GETTER](12)
   implicit def dFunctionCall    = d.bind[Typed.FUNCTION_CALL](13)
+  implicit def dFunctionCall2   = d.bind[Typed.FUNCTION_CALL2](13)
 
   implicit def bkD    = Discriminated[BINARY_OP_KIND, Int](uint8)
   implicit def bkDSum = bkD.bind[SUM_OP.type](0)
@@ -39,6 +53,6 @@ object Serde {
   implicit def tDTypeRef    = tD.bind[TYPEREF](6)
   implicit def tDString     = tD.bind[STRING.type](7)
 
-  val codec: Codec[Typed.EXPR] = Codec[Typed.EXPR]
+  val codec: Codec[Typed.EXPR] = ???
 
 }

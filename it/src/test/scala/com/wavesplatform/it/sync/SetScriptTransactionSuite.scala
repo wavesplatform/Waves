@@ -9,7 +9,7 @@ import com.wavesplatform.state2._
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.JsNumber
-import scorex.account.PrivateKeyAccount
+import scorex.account.{AddressScheme, PrivateKeyAccount}
 import scorex.transaction.Proofs
 import scorex.transaction.assets.VersionedTransferTransaction
 import scorex.transaction.smart.{Script, SetScriptTransaction}

@@ -6,6 +6,7 @@ import sbtassembly.MergeStrategy
 
 enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
 scalafmtOnCompile in ThisBuild := true
+scalacOptions in ThisBuild += "-Xlog-implicits"
 
 val versionSource = Def.task {
   // WARNING!!!
