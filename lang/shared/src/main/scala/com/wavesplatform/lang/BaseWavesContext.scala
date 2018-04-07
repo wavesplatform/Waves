@@ -240,4 +240,25 @@ object BaseWavesContext {
     case _                       => ???
   }
 
+  val operators: Seq[PredefFunction] = {
+    def createOp(op: BINARY_OP_KIND, t: TYPE, r: TYPE)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
+      PredefFunction(op.symbol, t, List("a" -> t, "b" -> t)) {
+        case (a: t.Underlying) :: (b: t.Underlying) :: Nil =>
+          Right(body(a, b))
+        case _ => ???
+      }
+    }
+    Seq(
+      createOp(SUM_OP, LONG, LONG)((a, b) => a + b),
+      createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR)((a, b) => ByteVector(a.toArray ++ b.toArray)),
+      createOp(EQ_OP, LONG, BOOLEAN)((a, b) => a == b),
+      createOp(EQ_OP, BYTEVECTOR, BOOLEAN)((a, b) => a == b),
+      createOp(EQ_OP, BOOLEAN, BOOLEAN)((a, b) => a == b),
+      createOp(GE_OP, LONG, BOOLEAN)((a, b) => a >= b),
+      createOp(GT_OP, LONG, BOOLEAN)((a, b) => a > b)
+    )
+  }
+  val baseContext = Context.build(types = Seq.empty, letDefs = Map(("None", none)), functions = Seq(extract, isDefined, some, size) ++ operators)
+
+  val cryptoContext = ???
 }
