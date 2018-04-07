@@ -53,6 +53,6 @@ object Serde {
   implicit def tDTypeRef    = tD.bind[TYPEREF](6)
   implicit def tDString     = tD.bind[STRING.type](7)
 
-  val codec: Codec[Typed.EXPR] = ???
+  val codec: Codec[Typed.EXPR] = Codec[Typed.EXPR]
 
 }

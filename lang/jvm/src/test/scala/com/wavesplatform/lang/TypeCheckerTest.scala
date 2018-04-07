@@ -18,7 +18,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   property("should infer generic function return type") {
     import Untyped._
     val idFunction = PredefFunction("idFunc", TYPEPARAM('T'), List("p1" -> TYPEPARAM('T')))(Right(_))
-    val ctx        = Context(Map.empty, Map.empty, functions = Map((idFunction.name, idFunction)))
+    val ctx        = Context(Map.empty, Map.empty, functions = Map((idFunction.header, idFunction)))
     val Right(v)   = TypeChecker(TypeCheckerContext.fromContext(ctx), FUNCTION_CALL(idFunction.name, List(CONST_LONG(1))))
 
     v.tpe shouldBe LONG
@@ -38,9 +38,9 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
         Map.empty,
         Map.empty,
         functions = Map(
-          genericFuncWithOptionParam.name -> genericFuncWithOptionParam,
-          optionFunc.name                 -> optionFunc,
-          some.name                       -> some
+          genericFuncWithOptionParam.header -> genericFuncWithOptionParam,
+          optionFunc.header                 -> optionFunc,
+          some.header                       -> some
         )
       )
     val Right(v) = TypeChecker(TypeCheckerContext.fromContext(ctx),

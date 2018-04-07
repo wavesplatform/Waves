@@ -10,7 +10,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with Matchers with No
 
   private def eval[T: TypeInfo](code: String) = {
     val untyped = Parser(code).get.value
-    val ctx     = Context(Map.empty, Map.empty, Map(multiplierFunction.name -> multiplierFunction))
+    val ctx     = Context(Map.empty, Map.empty, Map(multiplierFunction.header -> multiplierFunction))
     val typed   = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(ctx), untyped)
     typed.flatMap(Evaluator[T](ctx, _))
   }

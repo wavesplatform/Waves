@@ -164,7 +164,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     val context = Context(
       typeDefs = Map.empty,
       letDefs = Map.empty,
-      functions = Map(f.name -> f)
+      functions = Map(f.header -> f)
     )
     ev[Long](
       context = context,
@@ -180,7 +180,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
       context = Context(
         typeDefs = Map.empty,
         letDefs = Map.empty,
-        functions = Map(multiplierFunction.name -> multiplierFunction)
+        functions = Map(multiplierFunction.header -> multiplierFunction)
       ),
       expr = FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_LONG(3), Typed.CONST_LONG(4)), LONG)
     ) shouldBe Right(12)

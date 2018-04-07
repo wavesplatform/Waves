@@ -18,7 +18,9 @@ object TypeChecker {
     val empty = TypeCheckerContext(Map.empty, Map.empty, Map.empty)
 
     def fromContext(ctx: Context): TypeCheckerContext =
-      TypeCheckerContext(predefTypes = ctx.typeDefs, varDefs = ctx.letDefs.mapValues(_.tpe), functionDefs = ctx.functions.mapValues(x => x.signature))
+      TypeCheckerContext(predefTypes = ctx.typeDefs,
+                         varDefs = ctx.letDefs.mapValues(_.tpe),
+                         functionDefs = ctx.functions.map(x => (x._1.name, x._2.signature)).toMap)
   }
 
   type TypeResolutionError      = String

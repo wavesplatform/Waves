@@ -104,7 +104,7 @@ object Evaluator {
                 actualArgs <- argsSequenced
                 r          <- func.eval(actualArgs.toList)
               } yield r
-            case None => EitherT.leftT[Coeval, Any](s"function '$name' not found")
+            case None => EitherT.leftT[Coeval, Any](s"function '$header' not found")
           }
         case Typed.BINARY_OP(_, SUM_OP, _, tpe) if tpe != LONG            => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
         case Typed.BINARY_OP(_, GE_OP | GT_OP, _, tpe) if tpe != BOOLEAN  => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
