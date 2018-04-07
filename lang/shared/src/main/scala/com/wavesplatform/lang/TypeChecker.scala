@@ -2,6 +2,7 @@ package com.wavesplatform.lang
 
 import cats.data._
 import cats.syntax.all._
+import com.wavesplatform.lang.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.ctx.{Context, PredefType}
 import monix.eval.Coeval
@@ -12,7 +13,9 @@ object TypeChecker {
 
   type TypeDefs     = Map[String, TYPE]
   type FunctionSigs = Map[String, FunctionTypeSignarure]
-  case class TypeCheckerContext(predefTypes: Map[String, PredefType], varDefs: TypeDefs, functionDefs: FunctionSigs)
+  case class TypeCheckerContext(predefTypes: Map[String, PredefType], varDefs: TypeDefs, functionDefs: FunctionSigs) {
+    def functionTypeSignaturesByName(name: String): List[FunctionTypeSignarure] = functionDefs.filter(_._1 == name).values.toList
+  }
 
   object TypeCheckerContext {
     val empty = TypeCheckerContext(Map.empty, Map.empty, Map.empty)
@@ -53,29 +56,36 @@ object TypeChecker {
           }
         }
 
-    case expr @ Untyped.FUNCTION_CALL(name, args) =>
-      val value: EitherT[Coeval, String, Typed.EXPR] = ctx.functionDefs.get(name) match {
-        case Some(FunctionTypeSignarure(argTypes, resultType)) =>
-          if (args.lengthCompare(argTypes.size) != 0)
-            EitherT.fromEither[Coeval](Left(s"Function '$name' requires ${argTypes.size} arguments, but ${args.size} are provided"))
-          else {
-            import cats.instances.vector._
-            val actualArgTypes: Vector[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg))).toVector
-            val sequencedActualArgTypes                           = actualArgTypes.sequence[SetTypeResult, Typed.EXPR].map(x => x.zip(argTypes))
+    case expr @ Untyped.FUNCTION_CALL(name, args) => {
+      def matchOverload(f: FunctionTypeSignarure): EitherT[Coeval, String, Typed.EXPR] = {
+        val argTypes = f.args
+        val resultType = f.result
+        if (args.lengthCompare(argTypes.size) != 0)
+          EitherT.fromEither[Coeval](Left(s"Function '$name' requires ${argTypes.size} arguments, but ${args.size} are provided"))
+        else {
+          import cats.instances.vector._
+          val actualArgTypes: Vector[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg))).toVector
+          val sequencedActualArgTypes = actualArgTypes.sequence[SetTypeResult, Typed.EXPR].map(x => x.zip(argTypes))
 
-            sequencedActualArgTypes
-              .subflatMap { typedExpressionArgumentsAndTypedPlaceholders =>
-                val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case ((typedExpr, tph)) => (typedExpr.tpe, tph) }
-                for {
-                  resolvedTypeParams <- TypeInferrer(typePairs)
-                  resolvedResultType <- TypeInferrer.inferResultType(resultType, resolvedTypeParams)
-                } yield Typed.FUNCTION_CALL(name, typedExpressionArgumentsAndTypedPlaceholders.map(_._1).toList, resolvedResultType)
-              }
+          sequencedActualArgTypes
+            .subflatMap { typedExpressionArgumentsAndTypedPlaceholders =>
+              val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case ((typedExpr, tph)) => (typedExpr.tpe, tph) }
+              for {
+                resolvedTypeParams <- TypeInferrer(typePairs)
+                resolvedResultType <- TypeInferrer.inferResultType(resultType, resolvedTypeParams)
+              } yield
+                Typed.FUNCTION_CALL(FunctionHeader(name, f.args.map(FunctionHeaderType.fromTypePlaceholder)), typedExpressionArgumentsAndTypedPlaceholders.map(_._1).toList, resolvedResultType)
+            }
 
-          }
-        case None => EitherT.fromEither[Coeval](Left(s"Function '$name' not found"))
+        }
       }
-      value
+
+      ctx.functionTypeSignaturesByName(name) match {
+        case Nil => EitherT.fromEither[Coeval](Left(s"Function '$name' not found"))
+        case singleOverload :: Nil => matchOverload(singleOverload)
+        case many => ???
+      }
+    }
 
     case expr @ Untyped.BINARY_OP(a, op, b) =>
       (setType(ctx, EitherT.pure(a)), setType(ctx, EitherT.pure(b))).tupled

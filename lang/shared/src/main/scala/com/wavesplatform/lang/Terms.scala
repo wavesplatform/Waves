@@ -68,8 +68,7 @@ object Terms {
     case class REF(key: String, override val tpe: TYPE)                                           extends EXPR(tpe)
     case object TRUE                                                                              extends EXPR(BOOLEAN)
     case object FALSE                                                                             extends EXPR(BOOLEAN)
-    case class FUNCTION_CALL(functionName: String, args: List[EXPR], override val tpe: TYPE)      extends EXPR(tpe)
-    case class FUNCTION_CALL2(function: FunctionHeader, args: List[EXPR], override val tpe: TYPE) extends EXPR(tpe)
+    case class FUNCTION_CALL(function: FunctionHeader, args: List[EXPR], override val tpe: TYPE) extends EXPR(tpe)
   }
 
   def findCommonType(t1: TYPE, t2: TYPE): Option[TYPE] = findCommonType(t1, t2, biDirectional = true)

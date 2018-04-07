@@ -168,7 +168,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     )
     ev[Long](
       context = context,
-      expr = BLOCK(Some(LET("X", FUNCTION_CALL("F", List(CONST_LONG(1000)), LONG))), BINARY_OP(REF("X", LONG), SUM_OP, REF("X", LONG), LONG), LONG)
+      expr = BLOCK(Some(LET("X", FUNCTION_CALL(f.header, List(CONST_LONG(1000)), LONG))), BINARY_OP(REF("X", LONG), SUM_OP, REF("X", LONG), LONG), LONG)
     ) shouldBe Right(2L)
 
     functionEvaluated shouldBe 1
@@ -182,7 +182,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
         letDefs = Map.empty,
         functions = Map(multiplierFunction.header -> multiplierFunction)
       ),
-      expr = FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_LONG(3), Typed.CONST_LONG(4)), LONG)
+      expr = FUNCTION_CALL(multiplierFunction.header, List(Typed.CONST_LONG(3), Typed.CONST_LONG(4)), LONG)
     ) shouldBe Right(12)
   }
 }

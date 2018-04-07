@@ -88,7 +88,7 @@ object Evaluator {
             }
             value
           }
-        case Typed.FUNCTION_CALL2(header, args, _) =>
+        case Typed.FUNCTION_CALL(header, args, _) =>
           import cats.data._
           import cats.instances.vector._
           import cats.syntax.all._

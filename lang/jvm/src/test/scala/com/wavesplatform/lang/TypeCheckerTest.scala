@@ -108,7 +108,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     ctx =
       TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(multiplierFunction.name -> multiplierFunction.signature)),
     expr = Untyped.FUNCTION_CALL(multiplierFunction.name, List(Untyped.CONST_LONG(1), Untyped.CONST_LONG(2))),
-    expectedResult = Right(Typed.FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_LONG(1), Typed.CONST_LONG(2)), LONG))
+    expectedResult = Right(Typed.FUNCTION_CALL(multiplierFunction.header, List(Typed.CONST_LONG(1), Typed.CONST_LONG(2)), LONG))
   )
 
   private val optFunc  = PredefFunction("OPTFUNC", UNIT, List("opt"  -> OPTION(OPTION(LONG))))(_ => Right(()))
@@ -123,20 +123,20 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   treeTypeTest(s"NONEFUNC(NONE)")(
     ctx = typeCheckerCtx,
     expr = Untyped.FUNCTION_CALL(noneFunc.name, List(Untyped.REF("None"))),
-    expectedResult = Right(Typed.FUNCTION_CALL(noneFunc.name, List(Typed.REF("None", OPTION(NOTHING))), UNIT))
+    expectedResult = Right(Typed.FUNCTION_CALL(noneFunc.header, List(Typed.REF("None", OPTION(NOTHING))), UNIT))
   )
 
   treeTypeTest(s"OPTFUNC(NONE)")(
     ctx = typeCheckerCtx,
     expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.REF("None"))),
-    expectedResult = Right(Typed.FUNCTION_CALL(optFunc.name, List(Typed.REF("None", OPTION(NOTHING))), UNIT))
+    expectedResult = Right(Typed.FUNCTION_CALL(optFunc.header, List(Typed.REF("None", OPTION(NOTHING))), UNIT))
   )
 
   treeTypeTest(s"OPTFUNC(SOME(NONE))")(
     ctx = typeCheckerCtx,
     expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.FUNCTION_CALL("Some", List(Untyped.REF("None"))))),
     expectedResult = Right(
-      Typed.FUNCTION_CALL(optFunc.name, List(Typed.FUNCTION_CALL("Some", List(Typed.REF("None", OPTION(NOTHING))), OPTION(OPTION(NOTHING)))), UNIT))
+      Typed.FUNCTION_CALL(optFunc.header, List(Typed.FUNCTION_CALL(some.header, List(Typed.REF("None", OPTION(NOTHING))), OPTION(OPTION(NOTHING)))), UNIT))
   )
 
   treeTypeTest(s"OPTFUNC(SOME(CONST_LONG(3)))")(
@@ -144,8 +144,8 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.FUNCTION_CALL("Some", List(Untyped.FUNCTION_CALL("Some", List(Untyped.CONST_LONG(3))))))),
     expectedResult = Right(
       Typed.FUNCTION_CALL(
-        optFunc.name,
-        List(Typed.FUNCTION_CALL("Some", List(Typed.FUNCTION_CALL("Some", List(Typed.CONST_LONG(3)), OPTION(LONG))), OPTION(OPTION(LONG)))),
+        some.header,
+        List(Typed.FUNCTION_CALL(some.header, List(Typed.FUNCTION_CALL(some.header, List(Typed.CONST_LONG(3)), OPTION(LONG))), OPTION(OPTION(LONG)))),
         UNIT)
     )
   )
@@ -247,7 +247,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
           import cats.syntax.all._
           val auxedArgs: Vector[Coeval[Untyped.EXPR]]          = f.args.map(aux).toVector
           val sequencedAuxedArgs: Coeval[Vector[Untyped.EXPR]] = auxedArgs.sequence
-          sequencedAuxedArgs.map(args => Untyped.FUNCTION_CALL(f.functionName, args.toList))
+          sequencedAuxedArgs.map(args => Untyped.FUNCTION_CALL(f.function.name, args.toList))
       })
 
     aux(expr)()

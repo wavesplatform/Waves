@@ -1,5 +1,7 @@
 package com.wavesplatform.state2.diffs.smart.scenarios
 
+import com.wavesplatform.lang.FunctionHeader
+import com.wavesplatform.lang.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.state2.diffs._
 import com.wavesplatform.state2.diffs.smart._
@@ -22,7 +24,7 @@ class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matche
       ),
       AND_OP,
       FUNCTION_CALL(
-        "sigVerify",
+        FunctionHeader("sigVerify", List(FunctionHeaderType.BYTEVECTOR, FunctionHeaderType.BYTEVECTOR, FunctionHeaderType.BYTEVECTOR)),
         List(
           GETTER(REF("tx", TYPEREF("Transaction")), "bodyBytes", BYTEVECTOR),
           GETTER(REF("tx", TYPEREF("Transaction")), "proof0", BYTEVECTOR),
