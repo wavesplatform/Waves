@@ -11,9 +11,7 @@ object Context {
     override def empty: Context = Context.empty
 
     override def combine(x: Context, y: Context): Context =
-      Context(typeDefs = Monoid.combine(x.typeDefs, y.typeDefs),
-              letDefs = Monoid.combine(x.letDefs, y.letDefs),
-              functions = Monoid.combine(x.functions, y.functions))
+      Context(typeDefs = x.typeDefs ++ y.typeDefs, letDefs = x.letDefs ++ y.letDefs, functions = x.functions ++ y.functions)
   }
 
   def build(types: Seq[PredefType], letDefs: Map[String, LazyVal], functions: Seq[PredefFunction]): Context =
