@@ -8,8 +8,8 @@ import monix.eval.{Coeval, Task}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
+import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
-import scorex.transaction.TransactionParsers._
 import scorex.transaction.ValidationError.{GenericError, InvalidSignature}
 import scorex.transaction._
 import scorex.transaction.assets.exchange.Validation.booleanOperators

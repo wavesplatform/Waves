@@ -7,8 +7,9 @@ import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.crypto.signatures.Curve25519.SignatureLength
 import scorex.transaction.ValidationError.{GenericError, OrderValidationError}
-import scorex.transaction.{ValidationError, _}
+import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
@@ -139,8 +140,8 @@ object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] wit
       from += 8
       val timestamp = Longs.fromByteArray(bytes.slice(from, from + 8))
       from += 8
-      val signature = ByteStr(bytes.slice(from, from + TransactionParsers.SignatureLength))
-      from += TransactionParsers.SignatureLength
+      val signature = ByteStr(bytes.slice(from, from + SignatureLength))
+      from += SignatureLength
 
       create(o1, o2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
         .fold(left => Failure(new Exception(left.toString)), right => Success(right))

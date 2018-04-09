@@ -7,6 +7,7 @@ import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{Address, AddressOrAlias, PrivateKeyAccount}
+import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.transaction._
 import scorex.transaction.assets.TransferTransaction
 
@@ -129,7 +130,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
       case (domain, (genesis, masterToAlice, aliceToBob, aliceToBob2)) =>
         val block0                 = buildBlockOfTxs(randomSig, Seq(genesis))
         val (block1, microBlocks1) = chainBaseAndMicro(block0.uniqueId, masterToAlice, Seq(Seq(aliceToBob)))
-        val otherSigner            = PrivateKeyAccount(Array.fill(TransactionParsers.KeyLength)(1))
+        val otherSigner            = PrivateKeyAccount(Array.fill(KeyLength)(1))
         val block2                 = customBuildBlockOfTxs(block0.uniqueId, Seq(masterToAlice, aliceToBob2), otherSigner, 1, 0L, DefaultBaseTarget / 2)
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processBlock(block1).explicitGet()

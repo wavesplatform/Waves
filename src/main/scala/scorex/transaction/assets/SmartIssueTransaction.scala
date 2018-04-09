@@ -8,9 +8,10 @@ import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.Json
 import scorex.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
+import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
-import scorex.transaction._
 import scorex.transaction.ValidationError.{GenericError, UnsupportedVersion}
+import scorex.transaction._
 import scorex.transaction.smart.Script
 
 import scala.util.Try
@@ -72,8 +73,8 @@ object SmartIssueTransaction extends TransactionParserFor[SmartIssueTransaction]
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
       val chainId                       = bytes(0)
-      val sender                        = PublicKeyAccount(bytes.slice(1, TransactionParsers.KeyLength + 1))
-      val (assetName, descriptionStart) = Deser.parseArraySize(bytes, TransactionParsers.KeyLength + 1)
+      val sender                        = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
+      val (assetName, descriptionStart) = Deser.parseArraySize(bytes, KeyLength + 1)
       val (description, quantityStart)  = Deser.parseArraySize(bytes, descriptionStart)
       val quantity                      = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
       val decimals                      = bytes.slice(quantityStart + 8, quantityStart + 9).head

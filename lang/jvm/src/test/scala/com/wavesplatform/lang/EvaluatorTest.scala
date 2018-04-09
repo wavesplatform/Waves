@@ -168,11 +168,92 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     )
     ev[Long](
       context = context,
-      expr = BLOCK(Some(LET("X", FUNCTION_CALL(f.header, List(CONST_LONG(1000)), LONG))), BINARY_OP(REF("X", LONG), SUM_OP, REF("X", LONG), LONG), LONG)
+      expr =
+        BLOCK(Some(LET("X", FUNCTION_CALL(f.header, List(CONST_LONG(1000)), LONG))), BINARY_OP(REF("X", LONG), SUM_OP, REF("X", LONG), LONG), LONG)
     ) shouldBe Right(2L)
 
     functionEvaluated shouldBe 1
 
+  }
+
+  property("successful on ref getter evaluation") {
+    val fooType = PredefType("Foo", List(("bar", STRING), ("buz", LONG)))
+
+    val fooInstance =
+      Obj(Map("bar" -> LazyVal(STRING)(EitherT.pure("bAr")), "buz" -> LazyVal(LONG)(EitherT.pure(1L))))
+
+    val context = Context(
+      typeDefs = Map(fooType.name -> fooType),
+      letDefs = Map("fooInstance" -> LazyVal(fooType.typeRef)(EitherT.pure(fooInstance))),
+      functions = Map.empty
+    )
+
+    val expr = GETTER(REF("fooInstance", fooType.typeRef), "bar", STRING)
+
+    ev[String](context, expr) shouldBe Right("bAr")
+  }
+
+  property("successful on function call getter evaluation") {
+    val fooType = PredefType("Foo", List(("bar", STRING), ("buz", LONG)))
+    val fooCtor = PredefFunction("createFoo", fooType.typeRef, List.empty) { _ =>
+      Right(
+        Obj(
+          Map(
+            "bar" -> LazyVal(STRING)(EitherT.pure("bAr")),
+            "buz" -> LazyVal(LONG)(EitherT.pure(1L))
+          )
+        )
+      )
+    }
+
+    val context = Context(
+      typeDefs = Map(fooType.name -> fooType),
+      letDefs = Map.empty,
+      functions = Map(fooCtor.header -> fooCtor)
+    )
+
+    val expr = GETTER(FUNCTION_CALL(fooCtor.header, List.empty, fooType.typeRef), "bar", STRING)
+
+    ev[String](context, expr) shouldBe Right("bAr")
+  }
+
+  property("successful on block getter evaluation") {
+    val fooType = PredefType("Foo", List(("bar", STRING), ("buz", LONG)))
+    val fooCtor = PredefFunction("createFoo", fooType.typeRef, List.empty) { _ =>
+      Right(
+        Obj(
+          Map(
+            "bar" -> LazyVal(STRING)(EitherT.pure("bAr")),
+            "buz" -> LazyVal(LONG)(EitherT.pure(1L))
+          )
+        )
+      )
+    }
+    val fooTransform = PredefFunction("transformFoo", fooType.typeRef, List(("foo", fooType.typeRef))) {
+      case (fooObj: Obj) :: Nil => Right(fooObj.copy(fooObj.fields.updated("bar", LazyVal(STRING)(EitherT.pure("TRANSFORMED_BAR")))))
+      case _                    => ???
+    }
+
+    val context = Context(
+      typeDefs = Map(fooType.name -> fooType),
+      letDefs = Map.empty,
+      functions = Map(
+        fooCtor.header      -> fooCtor,
+        fooTransform.header -> fooTransform
+      )
+    )
+
+    val expr = GETTER(
+      BLOCK(
+        Some(LET("fooInstance", FUNCTION_CALL(fooCtor.header, List.empty, fooType.typeRef))),
+        FUNCTION_CALL(fooTransform.header, List(REF("fooInstance", fooType.typeRef)), fooType.typeRef),
+        fooType.typeRef
+      ),
+      "bar",
+      STRING
+    )
+
+    ev[String](context, expr) shouldBe Right("TRANSFORMED_BAR")
   }
 
   property("successful on simple function evaluation") {

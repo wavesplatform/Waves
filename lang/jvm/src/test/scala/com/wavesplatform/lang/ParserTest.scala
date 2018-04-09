@@ -129,21 +129,37 @@ X > Y
     )
 
   }
-  property("get field of ref") {
-    parse("XXX.YYY") shouldBe GETTER(REF("XXX"), "YYY")
-    parse("""
-        |
-        | X.Y
-        |
-      """.stripMargin) shouldBe GETTER(REF("X"), "Y")
-  }
 
   property("string literal") {
-    parse("""
-            |
-            | "asdf"
-            |
-      """.stripMargin) shouldBe CONST_STRING("asdf")
+    forAll { (in: String) =>
+      parse(s"""
+           |
+           | "$in"
+           |
+        """.stripMargin) shouldBe CONST_STRING(in)
+    }
+  }
+
+  property("string literal with \\t and \\n") {
+    val stringWithTabAndLineBreak = "as\ndf"
+
+    parse(s"""
+         |
+         | "$stringWithTabAndLineBreak"
+         |
+      """.stripMargin) shouldBe CONST_STRING(stringWithTabAndLineBreak)
+  }
+
+  property("string literal with unicode chars") {
+    val stringWithUnicodeChars = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD"
+
+    parse(
+      s"""
+         |
+         | "$stringWithUnicodeChars"
+         |
+       """.stripMargin
+    ) shouldBe CONST_STRING(stringWithUnicodeChars)
   }
 
   property("reserved keywords are invalid variable names") {
@@ -192,4 +208,54 @@ X > Y
                                                                  REF("Y"))
   }
 
+  property("getter") {
+    parse("xxx.yyy") shouldBe GETTER(REF("xxx"), "yyy")
+    parse(
+      """
+        |
+        | xxx.yyy
+        |
+      """.stripMargin
+    ) shouldBe GETTER(REF("xxx"), "yyy")
+
+    parse("xxx(yyy).zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parse(
+      """
+        |
+        | xxx(yyy).zzz
+        |
+      """.stripMargin
+    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+
+    parse("(xxx(yyy)).zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parse(
+      """
+        |
+        | (xxx(yyy)).zzz
+        |
+      """.stripMargin
+    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+
+    parse("{xxx(yyy)}.zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parse(
+      """
+        |
+        | {
+        |   xxx(yyy)
+        | }.zzz
+        |
+      """.stripMargin
+    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+
+    parse(
+      """
+        |
+        | {
+        |   let yyy = aaa(bbb)
+        |   xxx(yyy)
+        | }.zzz
+        |
+      """.stripMargin
+    ) shouldBe GETTER(BLOCK(Some(LET("yyy", FUNCTION_CALL("aaa", List(REF("bbb"))))), FUNCTION_CALL("xxx", List(REF("yyy")))), "zzz")
+  }
 }

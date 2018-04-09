@@ -1,6 +1,5 @@
 package com.wavesplatform.lang
 
-
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.TypeChecker.{TypeCheckResult, TypeCheckerContext, TypeDefs}
@@ -137,7 +136,9 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     ctx = typeCheckerCtx,
     expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.FUNCTION_CALL("Some", List(Untyped.REF("None"))))),
     expectedResult = Right(
-      Typed.FUNCTION_CALL(optFunc.header, List(Typed.FUNCTION_CALL(some.header, List(Typed.REF("None", OPTION(NOTHING))), OPTION(OPTION(NOTHING)))), UNIT))
+      Typed.FUNCTION_CALL(optFunc.header,
+                          List(Typed.FUNCTION_CALL(some.header, List(Typed.REF("None", OPTION(NOTHING))), OPTION(OPTION(NOTHING)))),
+                          UNIT))
   )
 
   treeTypeTest(s"OPTFUNC(SOME(CONST_LONG(3)))")(
@@ -147,7 +148,8 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       Typed.FUNCTION_CALL(
         some.header,
         List(Typed.FUNCTION_CALL(some.header, List(Typed.FUNCTION_CALL(some.header, List(Typed.CONST_LONG(3)), OPTION(LONG))), OPTION(OPTION(LONG)))),
-        UNIT)
+        UNIT
+      )
     )
   )
 

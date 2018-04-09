@@ -8,9 +8,9 @@ import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.state2.ByteStr
 import scorex.account.PublicKeyAccount
 import scorex.block.{Block, MicroBlock}
+import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.network.message.Message._
 import scorex.network.message._
-import scorex.transaction.TransactionParsers._
 import scorex.transaction.{History, Transaction, TransactionParsers}
 
 import scala.util.Try
@@ -71,8 +71,6 @@ object PeersSpec extends MessageSpec[KnownPeers] {
 
 trait SignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
 
-  import scorex.transaction.TransactionParsers.SignatureLength
-
   private val DataLength = 4
 
   def wrap(signatures: Seq[Array[Byte]]): A
@@ -122,7 +120,7 @@ object SignaturesSpec extends SignaturesSeqSpec[Signatures] {
 object GetBlockSpec extends MessageSpec[GetBlock] {
   override val messageCode: MessageCode = 22: Byte
 
-  override val maxLength: Int = TransactionParsers.SignatureLength
+  override val maxLength: Int = SignatureLength
 
   override def serializeData(signature: GetBlock): Array[Byte] = signature.signature.arr
 

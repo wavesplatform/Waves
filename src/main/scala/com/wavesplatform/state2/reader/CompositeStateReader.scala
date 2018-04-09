@@ -85,9 +85,13 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
     fromDiff ++ fromInner
   }
 
-  override def collectPortfolios(filter: Portfolio => Boolean) = {
-    inner.collectPortfolios(filter) ++
-      diff.portfolios.keys.map(a => a -> portfolio(a)).filter { case (_, p) => filter(p) }.toMap
+  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]) = {
+    val b = Map.newBuilder[Address, A]
+    for ((a, p) <- diff.portfolios if p.lease != LeaseBalance.empty || p.balance != 0) {
+      pf.runWith(b += a -> _)(a -> portfolio(a).copy(assets = Map.empty))
+    }
+
+    inner.collectLposPortfolios(pf) ++ b.result()
   }
 
   override def containsTransaction(id: ByteStr): Boolean = diff.transactions.contains(id) || inner.containsTransaction(id)

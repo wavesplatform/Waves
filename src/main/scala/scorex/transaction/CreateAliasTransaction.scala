@@ -6,8 +6,8 @@ import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account._
+import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.serialization.Deser
-import scorex.transaction.TransactionParsers._
 
 import scala.util.{Failure, Success, Try}
 

@@ -12,7 +12,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.fields.FeaturesBlockField
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
-import scorex.transaction.TransactionParsers._
+import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.utils.ScorexLogging
@@ -197,7 +197,7 @@ object Block extends ScorexLogging {
   val BaseTargetLength: Int                = 8
   val GeneratorSignatureLength: Int        = 32
 
-  val BlockIdLength = SignatureLength
+  val BlockIdLength: Int = SignatureLength
 
   val TransactionSizeLength = 4
 
