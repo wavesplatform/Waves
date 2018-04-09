@@ -263,6 +263,8 @@ object LevelDBWriter {
     private def readTransactionInfo(data: Array[Byte]) =
       (Ints.fromByteArray(data), TransactionParsers.parseBytes(data.drop(4)).get)
 
+    private def readTransactionHeight(data: Array[Byte]): Int = Ints.fromByteArray(data)
+
     private def writeTransactionInfo(txInfo: (Int, Transaction)) = {
       val (h, tx) = txInfo
       val txBytes = tx.bytes()
@@ -270,6 +272,8 @@ object LevelDBWriter {
     }
 
     def transactionInfo(txId: ByteStr): Key[Option[(Int, Transaction)]] = Key.opt(hash(18, txId), readTransactionInfo, writeTransactionInfo)
+
+    def transactionHeight(txId: ByteStr): Key[Option[Int]] = Key.opt(hash(18, txId), readTransactionHeight, i => Array(i.toByte))
 
     def addressTransactionHistory(addressId: BigInt): Key[Seq[Int]] = historyKey(19, addressId.toByteArray)
 
@@ -721,6 +725,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(db => db.get(k.transactionInfo(id)))
+
+  override def transactionHeight(id: ByteStr): Option[Int] = readOnly(db => db.get(k.transactionHeight(id)))
 
   override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = readOnly { db =>
     db.get(k.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { addressId =>

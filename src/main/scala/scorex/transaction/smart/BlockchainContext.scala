@@ -28,6 +28,9 @@ object BlockchainContext {
           .map(_._2)
           .map(convert)
 
+      override def transactionHeightById(id: Array[Byte]): Option[Int] =
+        state.transactionHeight(ByteStr(id))
+
       override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any] = {
         val address = Address.fromBytes(addressBytes).explicitGet()
         val data    = state.accountData(address, key)

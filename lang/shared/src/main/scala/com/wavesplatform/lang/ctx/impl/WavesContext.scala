@@ -149,10 +149,16 @@ object WavesContext {
       }
     }
 
+    val txHeightByIdF =
+    PredefFunction("transactionHeightById", OPTION(LONG), List(("id", BYTEVECTOR))) {
+      case (id: ByteVector) :: Nil => Right(env.transactionHeightById(id.toArray))
+      case _ => ???
+    }
+
     Context.build(
       Seq(addressType, addressOrAliasType, transactionType),
       Map(("height", LazyVal(LONG)(EitherT(heightCoeval))), ("tx", LazyVal(TYPEREF(transactionType.name))(EitherT(txCoeval)))),
-      Seq(txByIdF, getLongF, getBooleanF, getByteArrayF, addressFromPublicKeyF, addressFromStringF, addressFromRecipientF)
+      Seq(txByIdF, txHeightByIdF, getLongF, getBooleanF, getByteArrayF, addressFromPublicKeyF, addressFromStringF, addressFromRecipientF)
     )
   }
 }
