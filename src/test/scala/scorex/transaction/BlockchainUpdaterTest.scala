@@ -11,6 +11,7 @@ import com.wavesplatform.state2.diffs.produce
 import org.scalatest.words.ShouldVerb
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.block.Block
+import com.wavesplatform.features.FeatureProvider._
 
 class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with ShouldVerb with WithState {
 

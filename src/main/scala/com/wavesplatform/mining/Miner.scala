@@ -1,7 +1,8 @@
 package com.wavesplatform.mining
 
 import cats.data.EitherT
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{BlockStats, HistogramExt, Instrumented}
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
@@ -55,7 +56,7 @@ object MinerDebugInfo {
 class MinerImpl(allChannels: ChannelGroup,
                 blockchainUpdater: BlockchainUpdater,
                 checkpoint: CheckpointService,
-                history: NgHistory with FeatureProvider,
+                history: NgHistory,
                 stateReader: SnapshotStateReader,
                 settings: WavesSettings,
                 timeService: Time,
@@ -254,7 +255,7 @@ class MinerImpl(allChannels: ChannelGroup,
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(account, balance)(offset).flatMap {
           case Right((estimators, block, totalConstraint)) =>
-            BlockAppender(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, settings, history, appenderScheduler)(block).map {
+            BlockAppender(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, settings, appenderScheduler)(block).map {
               case Left(err) => log.warn("Error mining Block: " + err.toString)
               case Right(Some(score)) =>
                 log.debug(s"Forged and applied $block by ${account.address} with cumulative score $score")

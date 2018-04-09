@@ -1,9 +1,10 @@
 package com.wavesplatform.mining
 
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.MinerSettings
 import scorex.block.Block
-import scorex.transaction.Transaction
+import scorex.transaction.{History, Transaction}
 
 trait Estimator {
   def max: Long
@@ -30,8 +31,8 @@ object MiningEstimators {
   private val ClassicAmountOfTxsInBlock = 100
   private val MaxTxsSizeInBytes         = 1 * 1024 * 1024 // 1 megabyte
 
-  def apply(minerSettings: MinerSettings, featureProvider: FeatureProvider, height: Int): MiningEstimators = {
-    val activatedFeatures     = featureProvider.activatedFeatures(height)
+  def apply(minerSettings: MinerSettings, history: History, height: Int): MiningEstimators = {
+    val activatedFeatures     = history.activatedFeatures(height)
     val isNgEnabled           = activatedFeatures.contains(BlockchainFeatures.NG.id)
     val isMassTransferEnabled = activatedFeatures.contains(BlockchainFeatures.MassTransfer.id)
 

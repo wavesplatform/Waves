@@ -1,6 +1,7 @@
 package com.wavesplatform.state2
 
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
@@ -49,12 +50,12 @@ package object appender extends ScorexLogging {
     }
   }
 
-  private def validateEffectiveBalance(fp: FeatureProvider, fs: FunctionalitySettings, block: Block, baseHeight: Int)(
+  private def validateEffectiveBalance(history: History, fs: FunctionalitySettings, block: Block, baseHeight: Int)(
       effectiveBalance: Long): Either[String, Long] =
     Either.cond(
       block.timestamp < fs.minimalGeneratingBalanceAfter ||
         (block.timestamp >= fs.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
-        fp.featureActivationHeight(BlockchainFeatures.SmallerMinimalGeneratingBalance.id).exists(baseHeight >= _)
+        history.featureActivationHeight(BlockchainFeatures.SmallerMinimalGeneratingBalance.id).exists(baseHeight >= _)
           && effectiveBalance >= MinimalEffectiveBalanceForGenerator2,
       effectiveBalance,
       s"generator's effective balance $effectiveBalance is less that required for generation"
@@ -66,8 +67,7 @@ package object appender extends ScorexLogging {
                                     stateReader: SnapshotStateReader,
                                     utxStorage: UtxPool,
                                     time: Time,
-                                    settings: WavesSettings,
-                                    featureProvider: FeatureProvider)(block: Block): Either[ValidationError, Option[Int]] =
+                                    settings: WavesSettings)(block: Block): Either[ValidationError, Option[Int]] =
     for {
       _ <- Either.cond(
         checkpoint.isBlockValid(block.signerData.signature, history.height + 1),
@@ -79,9 +79,9 @@ package object appender extends ScorexLogging {
         (),
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
-      _ <- blockConsensusValidation(history, featureProvider, settings, time.correctedTime(), block) { height =>
+      _ <- blockConsensusValidation(history, settings, time.correctedTime(), block) { height =>
         val balance = PoSCalc.generatingBalance(stateReader, settings.blockchainSettings.functionalitySettings, block.sender, height)
-        validateEffectiveBalance(featureProvider, settings.blockchainSettings.functionalitySettings, block, height)(balance)
+        validateEffectiveBalance(history, settings.blockchainSettings.functionalitySettings, block, height)(balance)
       }
       baseHeight = history.height
       maybeDiscardedTxs <- blockchainUpdater.processBlock(block)
@@ -93,7 +93,7 @@ package object appender extends ScorexLogging {
       maybeDiscardedTxs.map(_ => baseHeight)
     }
 
-  private def blockConsensusValidation(history: History, fp: FeatureProvider, settings: WavesSettings, currentTs: Long, block: Block)(
+  private def blockConsensusValidation(history: History, settings: WavesSettings, currentTs: Long, block: Block)(
       genBalance: Int => Either[String, Long]): Either[ValidationError, Unit] = {
 
     val bcs       = settings.blockchainSettings
@@ -112,7 +112,7 @@ package object appender extends ScorexLogging {
       )
       _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
       _ <- {
-        val constraints = MiningEstimators(settings.minerSettings, fp, height)
+        val constraints = MiningEstimators(settings.minerSettings, history, height)
         Either.cond(!OneDimensionalMiningConstraint.full(constraints.total).put(block).isOverfilled, (), GenericError("Block is full"))
       }
       _ <- Either.cond(

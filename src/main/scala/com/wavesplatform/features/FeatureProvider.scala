@@ -1,13 +1,9 @@
 package com.wavesplatform.features
 
-trait FeatureProvider {
-  def approvedFeatures(): Map[Short, Int]
-  def activatedFeatures(): Map[Short, Int]
-  def featureVotes(height: Int): Map[Short, Int]
-}
+import scorex.transaction.History
 
 object FeatureProvider {
-  implicit class FeatureProviderExt(provider: FeatureProvider) {
+  implicit class FeatureProviderExt(provider: History) {
     def isFeatureActivated(feature: BlockchainFeature, height: Int): Boolean =
       provider.activatedFeatures().get(feature.id).exists(_ <= height)
 

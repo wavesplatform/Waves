@@ -1,7 +1,6 @@
 package com.wavesplatform.state2.appender
 
 import cats.data.EitherT
-import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network._
@@ -30,7 +29,6 @@ object BlockAppender extends ScorexLogging with Instrumented {
             stateReader: SnapshotStateReader,
             utxStorage: UtxPool,
             settings: WavesSettings,
-            featureProvider: FeatureProvider,
             scheduler: Scheduler)(newBlock: Block): Task[Either[ValidationError, Option[BlockchainScore]]] =
     Task {
       measureSuccessful(
@@ -41,8 +39,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
               _ <- Either.cond(history.heightOf(newBlock.reference).exists(_ >= history.height - 1),
                                (),
                                BlockAppendError("Irrelevant block", newBlock))
-              maybeBaseHeight <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings, featureProvider)(
-                newBlock)
+              maybeBaseHeight <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings)(newBlock)
             } yield maybeBaseHeight map (_ => history.score)
         }
       )
@@ -55,7 +52,6 @@ object BlockAppender extends ScorexLogging with Instrumented {
             stateReader: SnapshotStateReader,
             utxStorage: UtxPool,
             settings: WavesSettings,
-            featureProvider: FeatureProvider,
             allChannels: ChannelGroup,
             peerDatabase: PeerDatabase,
             miner: Miner,
@@ -63,9 +59,8 @@ object BlockAppender extends ScorexLogging with Instrumented {
     BlockStats.received(newBlock, BlockStats.Source.Broadcast, ch)
     blockReceivingLag.safeRecord(System.currentTimeMillis() - newBlock.timestamp)
     (for {
-      _ <- EitherT(Task.now(newBlock.signaturesValid()))
-      validApplication <- EitherT(
-        apply(checkpoint, history, blockchainUpdater, time, stateReader, utxStorage, settings, featureProvider, scheduler)(newBlock))
+      _                <- EitherT(Task.now(newBlock.signaturesValid()))
+      validApplication <- EitherT(apply(checkpoint, history, blockchainUpdater, time, stateReader, utxStorage, settings, scheduler)(newBlock))
     } yield validApplication).value.map {
       case Right(None) =>
         log.trace(s"${id(ch)} $newBlock already appended")

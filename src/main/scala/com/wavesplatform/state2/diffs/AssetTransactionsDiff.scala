@@ -1,13 +1,14 @@
 package com.wavesplatform.state2.diffs
 
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{AssetInfo, Diff, LeaseBalance, Portfolio}
 import scorex.account.PublicKeyAccount
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SmartIssueTransaction}
-import scorex.transaction.{AssetId, SignedTransaction, ValidationError}
+import scorex.transaction.{AssetId, History, SignedTransaction, ValidationError}
 
 import scala.util.{Left, Right}
 
@@ -35,7 +36,7 @@ object AssetTransactionsDiff {
       ))
   }
 
-  def reissue(state: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, height: Int, fp: FeatureProvider)(
+  def reissue(state: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, height: Int, history: History)(
       tx: ReissueTransaction): Either[ValidationError, Diff] =
     validateAsset(tx, state, tx.assetId, issuerOnly = true).flatMap { _ =>
       val oldInfo = state.assetDescription(tx.assetId).get
@@ -43,7 +44,7 @@ object AssetTransactionsDiff {
         Left(
           GenericError(s"Asset is not reissuable and blockTime=$blockTime is greater than " +
             s"settings.allowInvalidReissueInSameBlockUntilTimestamp=${settings.allowInvalidReissueInSameBlockUntilTimestamp}"))
-      } else if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume && fp.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, state.height)) {
+      } else if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume && history.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, state.height)) {
         Left(GenericError(s"Asset total value overflow"))
       } else {
         Right(
@@ -56,8 +57,8 @@ object AssetTransactionsDiff {
       }
     }
 
-  def burn(state: SnapshotStateReader, fp: FeatureProvider, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] = {
-    val burnAnyTokensEnabled = fp.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, state.height)
+  def burn(state: SnapshotStateReader, history: History, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] = {
+    val burnAnyTokensEnabled = history.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, state.height)
 
     validateAsset(tx, state, tx.assetId, !burnAnyTokensEnabled).map(itx => {
       Diff(

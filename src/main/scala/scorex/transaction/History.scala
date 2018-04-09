@@ -1,6 +1,5 @@
 package scorex.transaction
 
-import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.state2.ByteStr
 import scorex.block.Block.BlockId
@@ -8,7 +7,7 @@ import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction.History.{BlockMinerInfo, BlockchainScore}
 
-trait History extends FeatureProvider {
+trait History {
   def height: Int
   def score: BlockchainScore
   def scoreOf(blockId: ByteStr): Option[BlockchainScore]
@@ -29,6 +28,12 @@ trait History extends FeatureProvider {
   def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]]
 
   def parent(block: Block, back: Int = 1): Option[Block]
+
+  /** Features related */
+  def approvedFeatures(): Map[Short, Int]
+  def activatedFeatures(): Map[Short, Int]
+  def featureVotes(height: Int): Map[Short, Int]
+
 }
 
 trait NgHistory extends History {

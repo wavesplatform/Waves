@@ -1,6 +1,7 @@
 package com.wavesplatform.state2
 
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{Instrumented, TxsInBlockchainStats}
 import com.wavesplatform.mining.MiningEstimators
 import com.wavesplatform.settings.WavesSettings
@@ -39,7 +40,7 @@ class BlockchainUpdaterImpl(persisted: StateWriter with SnapshotStateReader, set
     lastBlock + maxBlockReadinessAge > time.correctedTime()
   }
 
-  def historyReader: NgHistory with DebugNgHistory with FeatureProvider = new NgHistoryReader(() => ngState, history, functionalitySettings)
+  def historyReader: NgHistory with DebugNgHistory = new NgHistoryReader(() => ngState, history, functionalitySettings)
 
   def stateReader: SnapshotStateReader = composite(persisted, ngState.map(_.bestLiquidDiff))
 

@@ -58,7 +58,7 @@ object Importer extends ScorexLogging {
             val db                                  = openDB(settings.dataDirectory, settings.levelDbCacheSize)
             val (history, state, blockchainUpdater) = StorageFactory(settings, db, NTP)
             val checkpoint                          = new CheckpointServiceImpl(db, settings.checkpointsSettings)
-            val extAppender                         = BlockAppender(checkpoint, history, blockchainUpdater, NTP, state, utxPoolStub, settings, history, scheduler) _
+            val extAppender                         = BlockAppender(checkpoint, history, blockchainUpdater, NTP, state, utxPoolStub, settings, scheduler) _
             checkGenesis(history, settings, blockchainUpdater)
             val bis          = new BufferedInputStream(inputStream)
             var quit         = false

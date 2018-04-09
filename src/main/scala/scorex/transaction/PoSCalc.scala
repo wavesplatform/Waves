@@ -1,7 +1,8 @@
 package scorex.transaction
 
 import com.wavesplatform.crypto
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.account.{Address, PublicKeyAccount}
@@ -75,7 +76,7 @@ object PoSCalc extends ScorexLogging {
                               fs: FunctionalitySettings,
                               block: Block,
                               account: PublicKeyAccount,
-                              featureProvider: FeatureProvider): Either[String, (Long, Long)] = {
+                              featureProvider: History): Either[String, (Long, Long)] = {
     val balance = generatingBalance(state, fs, account, height)
     Either
       .cond(

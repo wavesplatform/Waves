@@ -1,11 +1,11 @@
 package com.wavesplatform.features.api
 
-import javax.ws.rs.Path
-
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings, RestAPISettings}
 import io.swagger.annotations._
+import javax.ws.rs.Path
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.transaction.History
@@ -16,8 +16,7 @@ import scorex.utils.ScorexLogging
 case class ActivationApiRoute(settings: RestAPISettings,
                               functionalitySettings: FunctionalitySettings,
                               featuresSettings: FeaturesSettings,
-                              history: History,
-                              featureProvider: FeatureProvider)
+                              history: History)
     extends ApiRoute
     with CommonApiFunctions
     with ScorexLogging {
@@ -42,10 +41,10 @@ case class ActivationApiRoute(settings: RestAPISettings,
         functionalitySettings.activationWindowSize(height),
         functionalitySettings.blocksForFeatureActivation(height),
         functionalitySettings.activationWindow(height).last,
-        (featureProvider.featureVotes(height).keySet ++
-          featureProvider.approvedFeatures().keySet ++
+        (history.featureVotes(height).keySet ++
+          history.approvedFeatures().keySet ++
           BlockchainFeatures.implemented).toSeq.sorted.map(id => {
-          val status = featureProvider.featureStatus(id, height)
+          val status = history.featureStatus(id, height)
           FeatureActivationStatus(
             id,
             BlockchainFeatures.feature(id).description,
@@ -55,8 +54,8 @@ case class ActivationApiRoute(settings: RestAPISettings,
               case (_, true)  => NodeFeatureStatus.Voted
               case _          => NodeFeatureStatus.Implemented
             },
-            featureProvider.featureActivationHeight(id),
-            if (status == BlockchainFeatureStatus.Undefined) featureProvider.featureVotes(height).get(id).orElse(Some(0)) else None
+            history.featureActivationHeight(id),
+            if (status == BlockchainFeatureStatus.Undefined) history.featureVotes(height).get(id).orElse(Some(0)) else None
           )
         })
       )))

@@ -4,17 +4,18 @@ import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.BlockGen
 import com.wavesplatform.db.WithState
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.Diff
 import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state2.{ByteStr, Diff}
 import org.scalatest.{FreeSpecLike, Matchers}
 import scorex.account.PrivateKeyAccount
-import scorex.block.Block
+import scorex.block.{Block, BlockHeader}
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{GenesisTransaction, ValidationError}
+import scorex.transaction.History.BlockchainScore
+import scorex.transaction.{GenesisTransaction, History, ValidationError}
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with WithState {
 
@@ -113,7 +114,34 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
   }
 
   private def assertDiff(blocks: Seq[Block], fs: FunctionalitySettings, ngAtHeight: Int)(assertion: (Diff, SnapshotStateReader) => Unit): Unit = {
-    val fp = new FeatureProvider {
+    val fp = new History {
+      override def height: Int = ???
+
+      override def score: BlockchainScore = ???
+
+      override def scoreOf(blockId: ByteStr): Option[BlockchainScore] = ???
+
+      override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = ???
+
+      override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = ???
+
+      override def lastBlock: Option[Block] = ???
+
+      override def blockBytes(height: Int): Option[Array[Byte]] = ???
+
+      override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = ???
+
+      override def heightOf(blockId: ByteStr): Option[Int] = ???
+
+      /** Returns the most recent block IDs, starting from the most recent  one */
+      override def lastBlockIds(howMany: Int): Seq[ByteStr] = ???
+
+      /** Returns a chain of blocks starting with the block with the given ID (from oldest to newest) */
+      override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = ???
+
+      override def parent(block: Block, back: Int): Option[Block] = ???
+
+      /** Features related */
       override def activatedFeatures() = Map(BlockchainFeatures.NG.id -> ngAtHeight)
 
       override def featureVotes(height: Int) = ???
@@ -123,10 +151,10 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
     assertDiffEiWithPrev(blocks.init, blocks.last, fp, fs)(assertion)
   }
 
-  private def assertDiffEiWithPrev(preconditions: Seq[Block], block: Block, fp: FeatureProvider, fs: FunctionalitySettings)(
+  private def assertDiffEiWithPrev(preconditions: Seq[Block], block: Block, history: History, fs: FunctionalitySettings)(
       assertion: (Diff, SnapshotStateReader) => Unit): Unit = withStateAndHistory(fs) { state =>
     def differ(s: SnapshotStateReader, prev: Option[Block], b: Block): Either[ValidationError, Diff] =
-      BlockDiffer.fromBlock(fs, fp, s, prev, b)
+      BlockDiffer.fromBlock(fs, history, s, prev, b)
 
     zipWithPrev(preconditions).foreach {
       case (prev, b) =>

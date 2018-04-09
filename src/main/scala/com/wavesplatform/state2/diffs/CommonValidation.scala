@@ -1,7 +1,8 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
-import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{Portfolio, _}
@@ -81,11 +82,11 @@ object CommonValidation {
     case _                     => if (state.containsTransaction(tx.id())) Left(AlreadyInTheState(tx.id(), 0)) else Right(tx)
   }
 
-  def disallowBeforeActivationTime[T <: Transaction](featureProvider: FeatureProvider, height: Int, tx: T): Either[ValidationError, T] = {
+  def disallowBeforeActivationTime[T <: Transaction](history: History, height: Int, tx: T): Either[ValidationError, T] = {
 
     def activationBarrier(b: BlockchainFeature) =
       Either.cond(
-        featureProvider.isFeatureActivated(b, height),
+        history.isFeatureActivated(b, height),
         tx,
         ValidationError.ActivationError(s"${tx.getClass.getSimpleName} transaction has not been activated yet")
       )
