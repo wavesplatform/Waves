@@ -84,7 +84,7 @@ object Metrics extends ScorexLogging {
               .time(ts, TimeUnit.MILLISECONDS)
               .build())
         } catch {
-          case e: Throwable => log.warn("Failed to send data to InfluxDB", e)
+          case e: Throwable => log.warn(s"Failed to send data to InfluxDB (${e.getMessage()})")
       })
     }.runAsyncLogErr
   }
