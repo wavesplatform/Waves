@@ -12,6 +12,7 @@ import monix.eval.Coeval
 import scodec.bits.ByteVector
 import scorex.account.{Address, AddressOrAlias}
 import scorex.crypto.encode.Base58
+import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.transaction._
 
 object BlockchainContext {
@@ -56,11 +57,11 @@ object BlockchainContext {
       override def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean =
         crypto.verify(sig, message, pub)
 
-      override def keccak256(message: Array[Byte]): Array[Byte] = ???
+      override def keccak256(message: Array[Byte]): Array[Byte] = Keccak256.hash(message)
 
-      override def blake2b256(message: Array[Byte]): Array[Byte] = ???
+      override def blake2b256(message: Array[Byte]): Array[Byte] = Blake2b256.hash(message)
 
-      override def sha256(message: Array[Byte]): Array[Byte] = ???
+      override def sha256(message: Array[Byte]): Array[Byte] = Sha256.hash(message)
     }
 
     Monoid.combineAll(Seq(PureContext.instance, CryptoContext.build(global), WavesContext.build(env, global)))
