@@ -41,7 +41,6 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
     forAll(CONST_LONGgen) { constLong =>
       val code = toString(constLong)
-      println(s"code: $code")
       parse(code) shouldBe constLong
     }
   }
