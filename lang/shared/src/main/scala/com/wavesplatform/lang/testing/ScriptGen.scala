@@ -64,7 +64,7 @@ trait ScriptGen {
       f   <- INTGen((gas - 3) / 3)
     } yield IF(cnd, t, f)
 
-  private val spaceChars: Seq[Char] = Vector('\u0020', '\u0009', '\u000D')
+  private val spaceChars: Seq[Char] = Vector('\u0020', '\u0009', '\u000D', '\u000A')
 
   def whitespaceChar: Gen[Char] = Gen.oneOf(spaceChars)
   val whitespaces: Gen[String]  = Gen.listOf(whitespaceChar).map(_.mkString)
