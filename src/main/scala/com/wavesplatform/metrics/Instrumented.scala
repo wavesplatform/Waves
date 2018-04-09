@@ -27,6 +27,15 @@ trait Instrumented {
     r
   }
 
+  def measureSuccessfulAndLog[A, B](s: String)(h: Histogram, f: => Either[A, B]): Either[A, B] = {
+    val (r, time) = withTime(f)
+    if (r.isRight) {
+      h.safeRecord(time)
+      log.trace(s"$s took ${time}ms")
+    }
+    r
+  }
+
   def measureSuccessful[A](h: Histogram, f: => Option[A]): Option[A] = {
     val (r, time) = withTime(f)
     if (r.isDefined)
