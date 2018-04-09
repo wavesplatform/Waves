@@ -73,15 +73,19 @@ object Metrics extends ScorexLogging {
   def write(b: Point.Builder): Unit = {
     val ts = time.getTimestamp()
     Task {
-      db.foreach(
-        _.write(
-          b
-          // Should be a tag, but tags are the strings now
-          // https://docs.influxdata.com/influxdb/v1.3/concepts/glossary/#tag-value
-            .addField("node", settings.nodeId)
-            .tag("node", settings.nodeId.toString)
-            .time(ts, TimeUnit.MILLISECONDS)
-            .build()))
+      db.foreach(db =>
+        try {
+          db.write(
+            b
+            // Should be a tag, but tags are the strings now
+            // https://docs.influxdata.com/influxdb/v1.3/concepts/glossary/#tag-value
+              .addField("node", settings.nodeId)
+              .tag("node", settings.nodeId.toString)
+              .time(ts, TimeUnit.MILLISECONDS)
+              .build())
+        } catch {
+          case e: Throwable => log.warn("Failed to send data to InfluxDB", e)
+      })
     }.runAsyncLogErr
   }
 
