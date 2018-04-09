@@ -113,6 +113,7 @@ inConfig(Linux)(
     packageDescription := "Waves node"
   ))
 
+
 inConfig(Universal)(
   Seq(
     mappings += (baseDirectory.value / s"waves-${network.value}.conf" -> "doc/waves.conf.sample"),
