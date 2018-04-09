@@ -71,9 +71,9 @@ object Metrics extends ScorexLogging {
     }.runAsyncLogErr
 
   def write(b: Point.Builder): Unit = {
-    val ts = time.getTimestamp()
-    Task {
-      db.foreach(db =>
+    db.foreach { db =>
+      val ts = time.getTimestamp()
+      Task {
         try {
           db.write(
             b
@@ -85,8 +85,9 @@ object Metrics extends ScorexLogging {
               .build())
         } catch {
           case e: Throwable => log.warn(s"Failed to send data to InfluxDB (${e.getMessage()})")
-      })
-    }.runAsyncLogErr
+        }
+      }.runAsyncLogErr
+    }
   }
 
   def writeEvent(name: String): Unit = write(Point.measurement(name))
