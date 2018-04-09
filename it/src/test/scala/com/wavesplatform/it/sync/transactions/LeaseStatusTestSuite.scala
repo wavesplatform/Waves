@@ -9,7 +9,7 @@ import play.api.libs.json.Json
 import scorex.transaction.lease.LeaseTransaction.Status.{Active, Canceled}
 
 class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure {
-  import LeaseStatusTestSuiteConfig._
+  import LeaseStatusTestSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -38,7 +38,7 @@ class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure 
   }
 }
 
-object LeaseStatusTestSuiteConfig {
+object LeaseStatusTestSuite {
   private val blockGenerationOffest = "10000ms"
   import com.wavesplatform.it.NodeConfigs.Default
 
