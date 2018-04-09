@@ -6,10 +6,12 @@ import com.wavesplatform.lang.ctx.Context
 import com.wavesplatform.lang.ctx.impl.{CryptoContext, PureContext, WavesContext}
 import com.wavesplatform.lang.traits.{DataType, Environment, Transaction => ContractTransaction}
 import com.wavesplatform.state2._
+import com.wavesplatform.crypto
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 import scorex.account.{Address, AddressOrAlias}
+import scorex.crypto.encode.Base58
 import scorex.transaction._
 
 object BlockchainContext {
@@ -47,7 +49,19 @@ object BlockchainContext {
 
       override def networkByte: Byte = nByte
     }
-    val global: BaseGlobal = ???
+    val global: BaseGlobal = new BaseGlobal {
+      override def base58Encode(input: Array[Byte]): String                 = Base58.encode(input)
+      override def base58Decode(input: String): Either[String, Array[Byte]] = Base58.decode(input).toEither.left.map(_.toString)
+
+      override def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean =
+        crypto.verify(sig, message, pub)
+
+      override def keccak256(message: Array[Byte]): Array[Byte] = ???
+
+      override def blake2b256(message: Array[Byte]): Array[Byte] = ???
+
+      override def sha256(message: Array[Byte]): Array[Byte] = ???
+    }
 
     Monoid.combineAll(Seq(PureContext.instance, CryptoContext.build(global), WavesContext.build(env, global)))
   }
