@@ -3,7 +3,7 @@ package scorex.transaction
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.FeesSettings
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Assertion, Matchers, PropSpec}
 import scorex.account.{Address, PrivateKeyAccount}

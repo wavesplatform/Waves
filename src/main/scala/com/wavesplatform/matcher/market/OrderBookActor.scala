@@ -13,14 +13,15 @@ import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
+import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
 import scorex.transaction.assets.exchange._
-import scorex.transaction.{History, ValidationError}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
@@ -35,7 +36,7 @@ class OrderBookActor(assetPair: AssetPair,
                      val utx: UtxPool,
                      val allChannels: ChannelGroup,
                      val settings: MatcherSettings,
-                     val history: History,
+                     val blockchain: Blockchain,
                      val functionalitySettings: FunctionalitySettings)
     extends PersistentActor
     with Stash
@@ -339,9 +340,9 @@ object OrderBookActor {
             wallet: Wallet,
             utx: UtxPool,
             allChannels: ChannelGroup,
-            history: History,
+            blockchain: Blockchain,
             functionalitySettings: FunctionalitySettings): Props =
-    Props(new OrderBookActor(assetPair, orderHistory, storedState, wallet, utx, allChannels, settings, history, functionalitySettings))
+    Props(new OrderBookActor(assetPair, orderHistory, storedState, wallet, utx, allChannels, settings, blockchain, functionalitySettings))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 

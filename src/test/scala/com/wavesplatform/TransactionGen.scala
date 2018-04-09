@@ -4,8 +4,8 @@ import com.wavesplatform.lang.Terms.Typed
 import com.wavesplatform.lang.TypeChecker
 import com.wavesplatform.lang.testing.ScriptGen
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs.ENOUGH_AMT
+import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.ENOUGH_AMT
 import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{BeforeAndAfterAll, Suite}

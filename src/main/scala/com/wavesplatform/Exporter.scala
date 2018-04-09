@@ -8,10 +8,10 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils._
 import org.slf4j.bridge.SLF4JBridgeHandler
 import scorex.account.AddressScheme
-import scorex.transaction.History
 import scorex.utils.{NTP, ScorexLogging}
 
 import scala.util.{Failure, Success, Try}
@@ -64,8 +64,8 @@ object Exporter extends ScorexLogging {
       new FileOutputStream(filename)
     }
 
-  private def exportBlockToBinary(stream: OutputStream, history: History, height: Int): Int = {
-    val maybeBlockBytes = history.blockBytes(height)
+  private def exportBlockToBinary(stream: OutputStream, blockchain: Blockchain, height: Int): Int = {
+    val maybeBlockBytes = blockchain.blockBytes(height)
     maybeBlockBytes
       .map { bytes =>
         val len = bytes.length
@@ -76,8 +76,8 @@ object Exporter extends ScorexLogging {
       .getOrElse(0)
   }
 
-  private def exportBlockToJson(stream: OutputStream, history: History, height: Int): Int = {
-    val maybeBlock = history.blockAt(height)
+  private def exportBlockToJson(stream: OutputStream, blockchain: Blockchain, height: Int): Int = {
+    val maybeBlock = blockchain.blockAt(height)
     maybeBlock
       .map { block =>
         val len = if (height != 2) {

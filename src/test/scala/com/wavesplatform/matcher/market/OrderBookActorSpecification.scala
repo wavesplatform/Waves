@@ -11,8 +11,8 @@ import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, Valida
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, WalletSettings}
-import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{ByteStr, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.state.reader.SnapshotStateReader
+import com.wavesplatform.state.{Blockchain, ByteStr, Diff, LeaseBalance, Portfolio}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
@@ -84,7 +84,7 @@ class OrderBookActorSpecification
                          stub[UtxPool],
                          stub[ChannelGroup],
                          settings,
-                         stub[History],
+                         stub[Blockchain],
                          FunctionalitySettings.TESTNET) with RestartableActor))
 
   private def getOrders(actor: ActorRef) = {
@@ -100,7 +100,7 @@ class OrderBookActorSpecification
     tp.expectMsg(akka.actor.Status.Success(""))
     super.beforeEach()
 
-    val history               = stub[History]
+    val blockchain            = stub[Blockchain]
     val functionalitySettings = TestFunctionalitySettings.Stub
 
     val utx = stub[UtxPool]
@@ -108,7 +108,7 @@ class OrderBookActorSpecification
     val allChannels = stub[ChannelGroup]
     actor = system.actorOf(
       Props(
-        new OrderBookActor(pair, orderHistoryRef, storedState, wallet, utx, allChannels, settings, history, functionalitySettings)
+        new OrderBookActor(pair, orderHistoryRef, storedState, wallet, utx, allChannels, settings, blockchain, functionalitySettings)
         with RestartableActor))
 
     eventsProbe = TestProbe()
@@ -279,7 +279,7 @@ class OrderBookActorSpecification
     }
 
     "order matched with invalid order should keep matching with others, invalid is removed" in {
-      val history               = stub[History]
+      val blockchain            = stub[Blockchain]
       val functionalitySettings = TestFunctionalitySettings.Stub
       val ord1                  = buy(pair, 100, 20 * Order.PriceConstant)
       val ord2                  = buy(pair, 5000, 1000 * Order.PriceConstant)
@@ -295,7 +295,7 @@ class OrderBookActorSpecification
       }
       val allChannels = stub[ChannelGroup]
       actor = system.actorOf(
-        Props(new OrderBookActor(pair, orderHistoryRef, storedState, wallet, pool, allChannels, settings, history, functionalitySettings)
+        Props(new OrderBookActor(pair, orderHistoryRef, storedState, wallet, pool, allChannels, settings, blockchain, functionalitySettings)
         with RestartableActor))
 
       actor ! ord1

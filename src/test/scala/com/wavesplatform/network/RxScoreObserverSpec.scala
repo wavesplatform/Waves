@@ -7,17 +7,15 @@ import io.netty.channel.local.LocalChannel
 import monix.eval.Coeval
 import monix.reactive.subjects.PublishSubject
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.transaction.History.BlockchainScore
 
 import scala.concurrent.duration._
 
 class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen with RxScheduler {
   override def testSchedulerName = "test-rx-score-observer"
 
-  def withObserver(
-      f: (Coeval[Seq[SyncWith]], PublishSubject[BlockchainScore], PublishSubject[(Channel, BlockchainScore)], PublishSubject[Channel]) => Any) = {
-    val localScores   = PublishSubject[BlockchainScore]
-    val remoteScores  = PublishSubject[(Channel, BlockchainScore)]
+  def withObserver(f: (Coeval[Seq[SyncWith]], PublishSubject[BigInt], PublishSubject[(Channel, BigInt)], PublishSubject[Channel]) => Any) = {
+    val localScores   = PublishSubject[BigInt]
+    val remoteScores  = PublishSubject[(Channel, BigInt)]
     val channelClosed = PublishSubject[Channel]
     val timeout       = PublishSubject[Channel]
 

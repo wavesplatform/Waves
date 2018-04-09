@@ -6,7 +6,7 @@ import com.wavesplatform.matcher.market.OrderBookActor.ForceCancelOrder
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ForceCancelOrderFromHistory, GetActiveOrdersByAddress, GetActiveOrdersByAddressResponse}
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.matcher.model.LimitOrder
-import com.wavesplatform.state2.LeaseBalance
+import com.wavesplatform.state.LeaseBalance
 import scorex.account.Address
 import scorex.transaction.assets.exchange.AssetPair
 import scorex.utils.ScorexLogging

@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.model
 import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.state2.Portfolio
+import com.wavesplatform.state.Portfolio
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.account.Address
 import scorex.transaction.{AssetAcc, AssetId}

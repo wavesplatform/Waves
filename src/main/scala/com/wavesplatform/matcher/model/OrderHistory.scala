@@ -6,7 +6,7 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.{Filled, OrderStatus}
 import com.wavesplatform.matcher.model.OrderHistory.OrderHistoryOrdering
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import org.iq80.leveldb.DB
 import play.api.libs.json.Json
 import scorex.transaction.{AssetAcc, AssetId}

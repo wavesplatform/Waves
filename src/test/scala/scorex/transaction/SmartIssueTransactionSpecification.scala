@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.{TransactionGen, WithDB}
-import com.wavesplatform.state2.HistoryTest
+import com.wavesplatform.state.HistoryTest
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.assets.SmartIssueTransaction

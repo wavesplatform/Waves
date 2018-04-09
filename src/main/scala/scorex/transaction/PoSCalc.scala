@@ -4,7 +4,8 @@ import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.reader.SnapshotStateReader
 import scorex.account.{Address, PublicKeyAccount}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -76,13 +77,13 @@ object PoSCalc extends ScorexLogging {
                               fs: FunctionalitySettings,
                               block: Block,
                               account: PublicKeyAccount,
-                              featureProvider: History): Either[String, (Long, Long)] = {
+                              blockchain: Blockchain): Either[String, (Long, Long)] = {
     val balance = generatingBalance(state, fs, account, height)
     Either
       .cond(
-        (!featureProvider
+        (!blockchain
           .isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance, height) && balance >= MinimalEffectiveBalanceForGenerator1) ||
-          (featureProvider
+          (blockchain
             .isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance, height) && balance >= MinimalEffectiveBalanceForGenerator2),
         balance,
         s"Balance $balance of ${account.address} is lower than required for generation"

@@ -3,7 +3,7 @@ package scorex.transaction.smart
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.Serde
 import com.wavesplatform.lang.Terms.Typed
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import scodec.Attempt.{Failure, Successful}
 import scodec.DecodeResult

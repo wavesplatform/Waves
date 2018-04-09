@@ -3,7 +3,7 @@ package scorex.transaction.assets
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.crypto
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}

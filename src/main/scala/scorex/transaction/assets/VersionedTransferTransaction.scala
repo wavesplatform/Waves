@@ -2,7 +2,7 @@ package scorex.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.crypto
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}

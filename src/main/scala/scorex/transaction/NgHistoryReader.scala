@@ -1,12 +1,11 @@
 package scorex.transaction
 
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import scorex.block.Block.BlockId
 import scorex.block.{Block, BlockHeader, MicroBlock}
-import scorex.transaction.History.{BlockMinerInfo, BlockchainScore}
 
-class NgHistoryReader(ngState: () => Option[NgState], inner: History, fs: FunctionalitySettings) extends History with NgHistory with DebugNgHistory {
+class NgHistoryReader(ngState: () => Option[NgState], inner: Blockchain, fs: FunctionalitySettings) extends NG {
 
   private def newlyApprovedFeatures = ngState().fold(Map.empty[Short, Int])(_.approvedFeatures.map(_ -> height).toMap)
 
@@ -42,7 +41,7 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History, fs: Functi
       .blockBytes(height)
       .orElse(ngState().collect { case ng if height == inner.height + 1 => ng.bestLiquidBlock.bytes() })
 
-  override def scoreOf(blockId: BlockId): Option[BlockchainScore] =
+  override def scoreOf(blockId: BlockId): Option[BigInt] =
     inner
       .scoreOf(blockId)
       .orElse(ngState().collect { case ng if ng.contains(blockId) => inner.score + ng.base.blockScore() })
@@ -83,7 +82,7 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History, fs: Functi
       .orElse(inner.lastBlock.map(b => BlockMinerInfo(b.consensusData, b.timestamp, b.uniqueId)))
   }
 
-  override def score: BlockchainScore = inner.score + ngState().fold(BigInt(0))(_.bestLiquidBlock.blockScore())
+  override def score: BigInt = inner.score + ngState().fold(BigInt(0))(_.bestLiquidBlock.blockScore())
 
   override def lastBlock: Option[Block] = ngState().map(_.bestLiquidBlock).orElse(inner.lastBlock)
 

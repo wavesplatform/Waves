@@ -5,17 +5,17 @@ import java.time.Instant
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.Shutdownable
 import com.wavesplatform.settings.{Constants, RestAPISettings}
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.reader.SnapshotStateReader
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
-import scorex.transaction.History
 import scorex.utils.ScorexLogging
 
 @Path("/node")
 @Api(value = "node")
-case class NodeApiRoute(settings: RestAPISettings, history: History, state: SnapshotStateReader, application: Shutdownable)
+case class NodeApiRoute(settings: RestAPISettings, blockchain: Blockchain, state: SnapshotStateReader, application: Shutdownable)
     extends ApiRoute
     with CommonApiFunctions
     with ScorexLogging {
@@ -45,10 +45,10 @@ case class NodeApiRoute(settings: RestAPISettings, history: History, state: Snap
   @Path("/status")
   @ApiOperation(value = "Status", notes = "Get status of the running core", httpMethod = "GET")
   def status: Route = (get & path("status")) {
-    val lastUpdated = history.lastBlock.get.timestamp
+    val lastUpdated = blockchain.lastBlock.get.timestamp
     complete(
       Json.obj(
-        "blockchainHeight" -> history.height,
+        "blockchainHeight" -> blockchain.height,
         "stateHeight"      -> state.height,
         "updatedTimestamp" -> lastUpdated,
         "updatedDate"      -> Instant.ofEpochMilli(lastUpdated).toString

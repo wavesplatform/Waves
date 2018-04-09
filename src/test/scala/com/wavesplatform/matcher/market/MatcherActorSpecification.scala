@@ -13,17 +13,17 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.LevelAgg
 import com.wavesplatform.settings.WalletSettings
-import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{AssetDescription, ByteStr, LeaseBalance, Portfolio}
+import com.wavesplatform.state.reader.SnapshotStateReader
+import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, LeaseBalance, Portfolio}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.settings.TestFunctionalitySettings
+import scorex.transaction.AssetId
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.transaction.{AssetId, History}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
@@ -46,7 +46,7 @@ class MatcherActorSpecification
     account = MatcherAccount.address,
     balanceWatching = BalanceWatcherWorkerActor.Settings(enable = false, oneAddressProcessingTimeout = 1.second)
   )
-  val history               = stub[History]
+  val blockchain            = stub[Blockchain]
   val functionalitySettings = TestFunctionalitySettings.Stub
   val wallet                = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
   wallet.generateNewAccount()
@@ -59,7 +59,7 @@ class MatcherActorSpecification
   })
   var actor: ActorRef = system.actorOf(
     Props(
-      new MatcherActor(orderHistoryRef, storedState, wallet, mock[UtxPool], mock[ChannelGroup], settings, history, functionalitySettings)
+      new MatcherActor(orderHistoryRef, storedState, wallet, mock[UtxPool], mock[ChannelGroup], settings, blockchain, functionalitySettings)
       with RestartableActor))
 
   val i1 = IssueTransaction
@@ -86,7 +86,7 @@ class MatcherActorSpecification
 
     actor = system.actorOf(
       Props(
-        new MatcherActor(orderHistoryRef, storedState, wallet, mock[UtxPool], mock[ChannelGroup], settings, history, functionalitySettings)
+        new MatcherActor(orderHistoryRef, storedState, wallet, mock[UtxPool], mock[ChannelGroup], settings, blockchain, functionalitySettings)
         with RestartableActor))
   }
 

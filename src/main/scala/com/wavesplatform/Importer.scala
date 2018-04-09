@@ -8,8 +8,8 @@ import com.wavesplatform.db.openDB
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
 import com.wavesplatform.mining.TwoDimensionalMiningConstraint
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state2.ByteStr
-import com.wavesplatform.state2.appender.BlockAppender
+import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.UtxPool
 import monix.execution.Scheduler

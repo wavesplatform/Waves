@@ -1,8 +1,8 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs._
+import com.wavesplatform.state._
+import com.wavesplatform.state.diffs._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -52,7 +52,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
         domain.blockchainUpdater.processMicroBlock(microBlocks(0)).explicitGet()
         domain.blockchainUpdater.processMicroBlock(microBlocks(1)).explicitGet()
         domain.blockchainUpdater.processMicroBlock(microBlocks(2)) should produce("unavailable funds")
-        domain.history.lastBlock.get.transactionData shouldBe Seq(genesis, masterToAlice, aliceToBob)
+        domain.blockchain.lastBlock.get.transactionData shouldBe Seq(genesis, masterToAlice, aliceToBob)
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
         effBalance(masterToAlice.recipient, domain) > 0 shouldBe true

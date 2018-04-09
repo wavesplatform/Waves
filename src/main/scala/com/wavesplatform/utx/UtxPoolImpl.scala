@@ -6,10 +6,10 @@ import cats._
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.mining.TwoDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
-import com.wavesplatform.state2.diffs.TransactionDiffer
-import com.wavesplatform.state2.reader.CompositeStateReader.composite
-import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
+import com.wavesplatform.state.diffs.TransactionDiffer
+import com.wavesplatform.state.reader.CompositeStateReader.composite
+import com.wavesplatform.state.reader.SnapshotStateReader
+import com.wavesplatform.state.{Blockchain, ByteStr, Diff, Portfolio}
 import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
 import monix.eval.Task
@@ -27,7 +27,7 @@ import scala.util.{Left, Right}
 
 class UtxPoolImpl(time: Time,
                   stateReader: SnapshotStateReader,
-                  history: History,
+                  blockchain: Blockchain,
                   feeCalculator: FeeCalculator,
                   fs: FunctionalitySettings,
                   utxSettings: UtxSettings)
@@ -124,13 +124,13 @@ class UtxPoolImpl(time: Time,
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
     val s      = stateReader
-    val differ = TransactionDiffer(fs, history.lastBlockTimestamp, currentTs, s.height) _
+    val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, currentTs, s.height) _
     val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = transactions.values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
         case (curr @ (_, _, _, _, skip), _) if skip => curr
         case ((invalid, valid, diff, currRest, _), tx) =>
-          differ(composite(s, diff), history, tx) match {
+          differ(composite(s, diff), blockchain, tx) match {
             case Right(newDiff) =>
               val updatedRest = currRest.put(tx)
               if (updatedRest.isOverfilled) (invalid, valid, diff, currRest, true)
@@ -162,7 +162,7 @@ class UtxPoolImpl(time: Time,
           _    <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
           _    <- checkNotBlacklisted(tx)
           _    <- feeCalculator.enoughFee(tx)
-          diff <- TransactionDiffer(fs, history.lastBlockTimestamp, time.correctedTime(), history.height)(s, history, tx)
+          diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(s, blockchain, tx)
         } yield {
           utxPoolSizeStats.increment()
           pessimisticPortfolios.add(tx.id(), diff)

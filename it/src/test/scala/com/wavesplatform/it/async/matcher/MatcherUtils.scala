@@ -6,7 +6,7 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.{AssetBalance, MatcherStatusResponse, OrderBookResponse}
 import com.wavesplatform.it.util._
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order

@@ -4,17 +4,28 @@ import java.util
 
 import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
-import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{AccountDataInfo, AssetDescription, AssetInfo, ByteStr, Diff, LeaseBalance, Portfolio, StateWriter, VolumeAndFee}
+import com.wavesplatform.state.reader.SnapshotStateReader
+import com.wavesplatform.state.{
+  AccountDataInfo,
+  AssetDescription,
+  AssetInfo,
+  Blockchain,
+  ByteStr,
+  Diff,
+  LeaseBalance,
+  Portfolio,
+  StateWriter,
+  VolumeAndFee
+}
 import scorex.account.{Address, Alias}
 import scorex.block.Block
+import scorex.transaction.Transaction
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
 import scorex.transaction.smart.Script
-import scorex.transaction.{History, Transaction}
 
 import scala.collection.JavaConverters._
 
-trait Caches extends SnapshotStateReader with History with StateWriter {
+trait Caches extends SnapshotStateReader with Blockchain with StateWriter {
   import Caches._
 
   private val MaxSize = 100000

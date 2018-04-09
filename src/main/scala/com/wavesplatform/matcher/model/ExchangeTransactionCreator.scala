@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import scorex.transaction.ValidationError
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}

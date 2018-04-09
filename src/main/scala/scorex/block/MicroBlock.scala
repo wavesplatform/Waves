@@ -3,7 +3,7 @@ package scorex.block
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.crypto
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import monix.eval.Coeval
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block.{BlockId, transParseBytes}

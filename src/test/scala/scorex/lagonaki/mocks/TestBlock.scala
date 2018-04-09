@@ -1,6 +1,6 @@
 package scorex.lagonaki.mocks
 
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import scorex.account.PrivateKeyAccount
 import scorex.block._
 import scorex.consensus.nxt.NxtLikeConsensusBlockData

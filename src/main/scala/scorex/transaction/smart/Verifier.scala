@@ -2,7 +2,7 @@ package scorex.transaction.smart
 
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.Evaluator
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.reader.SnapshotStateReader
 import monix.eval.Coeval
 import scorex.account.AddressScheme
 import scorex.transaction.ValidationError.{GenericError, TransactionNotAllowedByScript}

@@ -1,4 +1,4 @@
-package com.wavesplatform.state2
+package com.wavesplatform.state
 
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._

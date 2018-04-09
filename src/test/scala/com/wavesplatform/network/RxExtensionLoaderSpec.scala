@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import com.wavesplatform.network.RxExtensionLoader.ExtensionBlocks
 import com.wavesplatform.network.RxScoreObserver.{BestChannel, ChannelClosedAndSyncWith}
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import com.wavesplatform.{BlockGen, RxScheduler, TransactionGen}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
@@ -12,7 +12,6 @@ import monix.reactive.Observable
 import monix.reactive.subjects.{PublishSubject => PS}
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.block.Block
-import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
 
@@ -21,7 +20,7 @@ import scala.concurrent.duration._
 class RxExtensionLoaderSpec extends FreeSpec with Matchers with TransactionGen with RxScheduler with BlockGen {
 
   val MaxRollback = 10
-  type Applier = (Channel, ExtensionBlocks) => Task[Either[ValidationError, Option[BlockchainScore]]]
+  type Applier = (Channel, ExtensionBlocks) => Task[Either[ValidationError, Option[BigInt]]]
   val simpleApplier: Applier = (_, _) => Task(Right(Some(0)))
 
   override def testSchedulerName: String = "test-rx-extension-loader"

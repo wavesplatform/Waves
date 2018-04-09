@@ -2,7 +2,7 @@ package scorex.transaction.smart
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.crypto
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import monix.eval.Coeval
 import play.api.libs.json.Json
 import scorex.account._

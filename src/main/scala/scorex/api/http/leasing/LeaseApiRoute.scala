@@ -2,7 +2,7 @@ package scorex.api.http.leasing
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._

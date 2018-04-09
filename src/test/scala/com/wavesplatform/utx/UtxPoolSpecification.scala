@@ -5,7 +5,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.mining._
 import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings, WavesSettings}
-import com.wavesplatform.state2.diffs._
+import com.wavesplatform.state.diffs._
 import com.wavesplatform.{NoShrink, TestHelpers, TestTime, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalacheck.Gen._

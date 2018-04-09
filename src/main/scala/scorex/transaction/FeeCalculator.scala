@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.settings.FeesSettings
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 

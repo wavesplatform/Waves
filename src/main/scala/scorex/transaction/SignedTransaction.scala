@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.crypto
-import com.wavesplatform.state2.{ByteStr, _}
+import com.wavesplatform.state.{ByteStr, _}
 import monix.eval.Coeval
 
 trait SignedTransaction extends ProvenTransaction with Signed {

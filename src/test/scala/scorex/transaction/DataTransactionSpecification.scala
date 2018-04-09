@@ -2,8 +2,8 @@ package scorex.transaction
 
 import com.google.common.primitives.Shorts
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.state2.DataEntry._
-import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, LongDataEntry}
+import com.wavesplatform.state.DataEntry._
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, LongDataEntry}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks

@@ -5,8 +5,8 @@ import java.util.NoSuchElementException
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.ByteStr
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.reader.SnapshotStateReader
+import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
@@ -19,9 +19,9 @@ import scorex.api.http.alias.{CreateAliasRequest, SignedCreateAliasRequest}
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.transaction.ValidationError.GenericError
+import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction._
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.utils.Time
 import scorex.wallet.Wallet
@@ -34,7 +34,7 @@ import scala.util.control.Exception
 case class TransactionsApiRoute(settings: RestAPISettings,
                                 wallet: Wallet,
                                 state: SnapshotStateReader,
-                                history: History,
+                                blockchain: Blockchain,
                                 utx: UtxPool,
                                 allChannels: ChannelGroup,
                                 time: Time)

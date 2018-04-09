@@ -4,8 +4,8 @@ import com.wavesplatform.WithDB
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
 import com.wavesplatform.settings.{Constants, WalletSettings}
-import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{ByteStr, LeaseBalance, Portfolio}
+import com.wavesplatform.state.reader.SnapshotStateReader
+import com.wavesplatform.state.{ByteStr, LeaseBalance, Portfolio}
 import com.wavesplatform.utx.UtxPool
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._

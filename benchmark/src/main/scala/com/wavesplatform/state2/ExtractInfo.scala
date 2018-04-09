@@ -1,4 +1,4 @@
-package com.wavesplatform.state2
+package com.wavesplatform.state
 
 import java.io.{File, PrintWriter}
 import java.util.concurrent.ThreadLocalRandom

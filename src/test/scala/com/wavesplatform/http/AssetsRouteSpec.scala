@@ -4,8 +4,8 @@ import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.Diff
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.Diff
+import com.wavesplatform.state.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{RequestGen, TestTime}
 import io.netty.channel.group.ChannelGroup

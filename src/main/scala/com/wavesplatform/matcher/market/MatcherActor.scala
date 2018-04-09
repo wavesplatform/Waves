@@ -10,15 +10,16 @@ import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.account.Address
 import scorex.crypto.encode.Base58
+import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
-import scorex.transaction.{AssetId, History}
 import scorex.utils._
 import scorex.wallet.Wallet
 
@@ -31,7 +32,7 @@ class MatcherActor(orderHistory: ActorRef,
                    utx: UtxPool,
                    allChannels: ChannelGroup,
                    settings: MatcherSettings,
-                   history: History,
+                   blockchain: Blockchain,
                    functionalitySettings: FunctionalitySettings)
     extends PersistentActor
     with ScorexLogging {
@@ -57,7 +58,7 @@ class MatcherActor(orderHistory: ActorRef,
     )
     tradedPairs += pair -> md
 
-    context.actorOf(OrderBookActor.props(pair, orderHistory, storedState, settings, wallet, utx, allChannels, history, functionalitySettings),
+    context.actorOf(OrderBookActor.props(pair, orderHistory, storedState, settings, wallet, utx, allChannels, blockchain, functionalitySettings),
                     OrderBookActor.name(pair))
   }
 
@@ -230,9 +231,9 @@ object MatcherActor {
             utx: UtxPool,
             allChannels: ChannelGroup,
             settings: MatcherSettings,
-            history: History,
+            blockchain: Blockchain,
             functionalitySettings: FunctionalitySettings): Props =
-    Props(new MatcherActor(orderHistoryActor, storedState, wallet, utx, allChannels, settings, history, functionalitySettings))
+    Props(new MatcherActor(orderHistoryActor, storedState, wallet, utx, allChannels, settings, blockchain, functionalitySettings))
 
   case class OrderBookCreated(pair: AssetPair)
 

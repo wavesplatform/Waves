@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import scorex.transaction.smart.Script
 
 package object database {

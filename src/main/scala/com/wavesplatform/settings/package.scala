@@ -3,7 +3,7 @@ package com.wavesplatform
 import java.io.File
 
 import com.typesafe.config.{Config, ConfigFactory, ConfigUtil}
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 
 import collection.JavaConverters._
 import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper

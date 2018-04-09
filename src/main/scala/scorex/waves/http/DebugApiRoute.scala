@@ -2,7 +2,6 @@ package scorex.waves.http
 
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
-import javax.ws.rs.Path
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
@@ -12,12 +11,13 @@ import com.wavesplatform.crypto
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{ByteStr, LeaseBalance, Portfolio}
+import com.wavesplatform.state.reader.SnapshotStateReader
+import com.wavesplatform.state.{ByteStr, LeaseBalance, NG, Portfolio}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
+import javax.ws.rs.Path
 import monix.eval.Coeval
 import play.api.libs.json._
 import scorex.account.Address
@@ -38,7 +38,7 @@ import scala.util.{Failure, Success}
 case class DebugApiRoute(settings: RestAPISettings,
                          wallet: Wallet,
                          stateReader: SnapshotStateReader,
-                         history: History with DebugNgHistory,
+                         ng: NG,
                          peerDatabase: PeerDatabase,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo],
                          blockchainUpdater: BlockchainUpdater,
@@ -69,7 +69,7 @@ case class DebugApiRoute(settings: RestAPISettings,
     ))
   def blocks: Route = {
     (path("blocks" / IntNumber) & get & withAuth) { howMany =>
-      complete(JsArray(history.lastBlocks(howMany).map { block =>
+      complete(JsArray(ng.lastBlocks(howMany).map { block =>
         val bytes = block.bytes()
         Json.obj(bytes.length.toString -> Base58.encode(crypto.fastHash(bytes)))
       }))
@@ -156,7 +156,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] = Future {
     blockchainUpdater.removeAfter(blockId) match {
       case Right(blocks) =>
-        allChannels.broadcast(LocalScoreChanged(history.score))
+        allChannels.broadcast(LocalScoreChanged(ng.score))
         if (returnTransactionsToUtx) {
           utxStorage.batched { ops =>
             blocks.flatMap(_.transactionData).foreach(ops.putIfNew)
@@ -187,7 +187,7 @@ case class DebugApiRoute(settings: RestAPISettings,
     ))
   def rollback: Route = (path("rollback") & post & withAuth) {
     json[RollbackParams] { params =>
-      history.blockAt(params.rollbackTo) match {
+      ng.blockAt(params.rollbackTo) match {
         case Some(block) =>
           rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
         case None =>
@@ -234,8 +234,8 @@ case class DebugApiRoute(settings: RestAPISettings,
       new ApiResponse(code = 200, message = "Json state")
     ))
   def historyInfo: Route = (path("historyInfo") & get & withAuth) {
-    val a = history.lastPersistedBlockIds(10)
-    val b = history.microblockIds()
+    val a = ng.lastPersistedBlockIds(10)
+    val b = ng.microblockIds()
     complete(HistoryInfo(a, b))
 
   }

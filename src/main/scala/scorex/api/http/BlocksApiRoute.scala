@@ -1,14 +1,13 @@
 package scorex.api.http
 
-import javax.ws.rs.Path
-
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.{Route, StandardRoute}
 import com.wavesplatform.network._
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.{Blockchain, ByteStr}
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
+import javax.ws.rs.Path
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler.Implicits.global
 import play.api.libs.json._
@@ -21,7 +20,7 @@ import scala.util.Try
 @Path("/blocks")
 @Api(value = "/blocks")
 case class BlocksApiRoute(settings: RestAPISettings,
-                          history: History,
+                          blockchain: Blockchain,
                           blockchainUpdater: BlockchainUpdater,
                           allChannels: ChannelGroup,
                           checkpointProc: Checkpoint => Task[Either[ValidationError, Option[BigInt]]])
@@ -52,7 +51,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
         val blocks = JsArray(
           (start to end)
             .map { height =>
-              (history.blockAt(height), height)
+              (blockchain.blockAt(height), height)
             }
             .filter(_._1.isDefined)
             .map { pair =>
@@ -73,10 +72,10 @@ case class BlocksApiRoute(settings: RestAPISettings,
       new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "string", paramType = "path")
     ))
   def child: Route = (path("child" / Segment) & get) { encodedSignature =>
-    withBlock(history, encodedSignature) { block =>
+    withBlock(blockchain, encodedSignature) { block =>
       val childJson = for {
-        h <- history.heightOf(block.uniqueId)
-        b <- history.blockAt(h + 1)
+        h <- blockchain.heightOf(block.uniqueId)
+        b <- blockchain.blockAt(h + 1)
       } yield b.json()
 
       complete(childJson.getOrElse[JsObject](Json.obj("status" -> "error", "details" -> "No child blocks")))
@@ -93,9 +92,9 @@ case class BlocksApiRoute(settings: RestAPISettings,
       new ApiImplicitParam(name = "blockNum", value = "Number of blocks to count delay", required = true, dataType = "string", paramType = "path")
     ))
   def delay: Route = (path("delay" / Segment / IntNumber) & get) { (encodedSignature, count) =>
-    withBlock(history, encodedSignature) { block =>
+    withBlock(blockchain, encodedSignature) { block =>
       val averageDelay = Try {
-        (block.timestamp - history.parent(block, count).get.timestamp) / count
+        (block.timestamp - blockchain.parent(block, count).get.timestamp) / count
       }
 
       complete(
@@ -119,7 +118,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
         .decodeBase58(encodedSignature)
         .toOption
         .toRight(InvalidSignature)
-        .flatMap(s => history.heightOf(s).toRight(BlockDoesNotExist)) match {
+        .flatMap(s => blockchain.heightOf(s).toRight(BlockDoesNotExist)) match {
         case Right(h) => complete(Json.obj("height" -> h))
         case Left(e)  => complete(e)
       }
@@ -151,9 +150,9 @@ case class BlocksApiRoute(settings: RestAPISettings,
 
   private def at(height: Int, includeTransactions: Boolean): StandardRoute = {
     (if (includeTransactions) {
-       history.blockAt(height).map(_.json())
+       blockchain.blockAt(height).map(_.json())
      } else {
-       history.blockHeaderAndSize(height).map { case ((bh, s)) => BlockHeader.json(bh, s) }
+       blockchain.blockHeaderAndSize(height).map { case ((bh, s)) => BlockHeader.json(bh, s) }
      }) match {
       case Some(json) => complete(json + ("height" -> JsNumber(height)))
       case None       => complete(Json.obj("status" -> "error", "details" -> "No block for this height"))
@@ -186,9 +185,9 @@ case class BlocksApiRoute(settings: RestAPISettings,
     if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
       val blocks = JsArray((start to end).flatMap { height =>
         (if (includeTransactions) {
-           history.blockAt(height).map(_.json())
+           blockchain.blockAt(height).map(_.json())
          } else {
-           history.blockHeaderAndSize(height).map { case ((bh, s)) => BlockHeader.json(bh, s) }
+           blockchain.blockHeaderAndSize(height).map { case ((bh, s)) => BlockHeader.json(bh, s) }
          }).map(_ + ("height" -> Json.toJson(height)))
       })
       complete(blocks)
@@ -206,12 +205,12 @@ case class BlocksApiRoute(settings: RestAPISettings,
   def last(includeTransactions: Boolean): StandardRoute = {
     complete(Future {
       {
-        val height = history.height
+        val height = blockchain.height
 
         (if (includeTransactions) {
-           history.blockAt(height).get.json()
+           blockchain.blockAt(height).get.json()
          } else {
-           val bhs = history.blockHeaderAndSize(height).get
+           val bhs = blockchain.blockHeaderAndSize(height).get
            BlockHeader.json(bhs._1, bhs._2)
          }) + ("height" -> Json.toJson(height))
       }
@@ -221,7 +220,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
   @Path("/first")
   @ApiOperation(value = "First", notes = "Get genesis block data", httpMethod = "GET")
   def first: Route = (path("first") & get) {
-    complete(history.genesis.json() + ("height" -> Json.toJson(1)))
+    complete(blockchain.genesis.json() + ("height" -> Json.toJson(1)))
   }
 
   @Path("/signature/{signature}")
@@ -237,8 +236,8 @@ case class BlocksApiRoute(settings: RestAPISettings,
         .decodeBase58(encodedSignature)
         .toOption
         .toRight(InvalidSignature)
-        .flatMap(s => history.blockById(s).toRight(BlockDoesNotExist)) match {
-        case Right(block) => complete(block.json() + ("height" -> history.heightOf(block.uniqueId).map(Json.toJson(_)).getOrElse(JsNull)))
+        .flatMap(s => blockchain.blockById(s).toRight(BlockDoesNotExist)) match {
+        case Right(block) => complete(block.json() + ("height" -> blockchain.heightOf(block.uniqueId).map(Json.toJson(_)).getOrElse(JsNull)))
         case Left(e)      => complete(e)
       }
     }
@@ -263,7 +262,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
       checkpointProc(checkpoint)
         .runAsync(rollbackExecutor)
         .map {
-          _.map(score => allChannels.broadcast(LocalScoreChanged(score.getOrElse(history.score))))
+          _.map(score => allChannels.broadcast(LocalScoreChanged(score.getOrElse(blockchain.score))))
         }
         .map(_.fold(ApiError.fromValidationError, _ => Json.obj("" -> "")): ToResponseMarshallable)
     }

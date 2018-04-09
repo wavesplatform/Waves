@@ -3,8 +3,8 @@ package scorex.transaction.smart
 import com.wavesplatform.lang.TypeChecker.TypeCheckerContext
 import com.wavesplatform.lang.WavesContext
 import com.wavesplatform.lang.traits.{DataType, Transaction => ContractTransaction}
-import com.wavesplatform.state2._
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state._
+import com.wavesplatform.state.reader.SnapshotStateReader
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 import scorex.account.Address

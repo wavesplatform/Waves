@@ -7,7 +7,7 @@ import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.OrderbookHistory
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 

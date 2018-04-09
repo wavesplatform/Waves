@@ -7,8 +7,8 @@ import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2._
-import com.wavesplatform.state2.reader.LeaseDetails
+import com.wavesplatform.state._
+import com.wavesplatform.state.reader.LeaseDetails
 import org.iq80.leveldb.{DB, ReadOptions}
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}

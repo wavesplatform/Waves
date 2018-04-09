@@ -5,7 +5,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.crypto
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.loadConfig
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}

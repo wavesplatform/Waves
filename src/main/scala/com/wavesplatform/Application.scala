@@ -21,7 +21,7 @@ import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
-import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
+import com.wavesplatform.state.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.utils.{SystemInformationReporter, forceStopApplication}
 import com.wavesplatform.utx.{MatcherUtxPool, UtxPool, UtxPoolImpl}
 import io.netty.channel.Channel
