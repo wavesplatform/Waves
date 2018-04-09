@@ -152,7 +152,7 @@ object WavesContext {
     Context.build(
       Seq(addressType, addressOrAliasType, transactionType),
       Map(("height", LazyVal(LONG)(EitherT(heightCoeval))), ("tx", LazyVal(TYPEREF(transactionType.name))(EitherT(txCoeval)))),
-      Seq(getLongF, getBooleanF, getByteArrayF, addressFromPublicKeyF, addressFromStringF, addressFromRecipientF)
+      Seq(txByIdF, getLongF, getBooleanF, getByteArrayF, addressFromPublicKeyF, addressFromStringF, addressFromRecipientF)
     )
   }
 }

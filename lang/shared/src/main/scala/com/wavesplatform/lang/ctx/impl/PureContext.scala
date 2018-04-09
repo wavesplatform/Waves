@@ -37,8 +37,8 @@ object PureContext {
   val operators: Seq[PredefFunction] = {
     def createOp(op: BINARY_OP_KIND, t: TYPE, r: TYPE)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
       PredefFunction(op.symbol, t, List("a" -> t, "b" -> t)) {
-        case (a: t.Underlying) :: (b: t.Underlying) :: Nil =>
-          Right(body(a, b))
+        case a :: b :: Nil =>
+          Right(body(a.asInstanceOf[t.Underlying], b.asInstanceOf[t.Underlying]))
         case _ => ???
       }
     }
