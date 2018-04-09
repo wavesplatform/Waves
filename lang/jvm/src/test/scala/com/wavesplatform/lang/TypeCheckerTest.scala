@@ -1,10 +1,11 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.BaseWavesContext.{none, some}
+
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.TypeChecker.{TypeCheckResult, TypeCheckerContext, TypeDefs}
 import com.wavesplatform.lang.ctx._
+import com.wavesplatform.lang.ctx.impl.PureContext._
 import com.wavesplatform.lang.testing.ScriptGen
 import monix.eval.Coeval
 import org.scalatest.prop.PropertyChecks

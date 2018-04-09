@@ -11,6 +11,6 @@ package object predef {
   def runScript[T: TypeInfo](script: String, tx: Transaction = null): Either[String, T] = {
     val Success(expr, _) = com.wavesplatform.lang.Parser(script)
     val Right(typedExpr) = com.wavesplatform.lang.TypeChecker(dummyTypeCheckerContext, expr)
-    Evaluator[T](new BlockchainContext(networkByte, Coeval(tx), Coeval(???), null).build(), typedExpr)
+    Evaluator[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr)
   }
 }

@@ -37,7 +37,7 @@ object Verifier {
     }.getOrElse(Either.right(tx)))
 
   def verify[T <: Transaction](s: SnapshotStateReader, script: Script, height: Int, transaction: T): Either[ValidationError, T] = {
-    val context = new BlockchainContext(AddressScheme.current.chainId, Coeval.evalOnce(transaction), Coeval.evalOnce(height), s).build()
+    val context = BlockchainContext.build(AddressScheme.current.chainId, Coeval.evalOnce(transaction), Coeval.evalOnce(height), s)
     Evaluator[Boolean](context, script.script) match {
       case Left(execError) => Left(GenericError(s"Script execution error: $execError"))
       case Right(false)    => Left(TransactionNotAllowedByScript(transaction))

@@ -35,8 +35,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
 
   def evalScript(tx: Transaction, state: SnapshotStateReader): Either[com.wavesplatform.lang.ExecutionError, Obj] = {
     val context =
-      new BlockchainContext(AddressScheme.current.chainId, Coeval.evalOnce(tx), Coeval.evalOnce(state.height), state)
-        .build()
+      BlockchainContext.build(AddressScheme.current.chainId, Coeval.evalOnce(tx), Coeval.evalOnce(state.height), state)
 
     val Parsed.Success(expr, _) = Parser("addressFromRecipient(tx.recipient)")
     val Right(typedExpr)        = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(context), expr)

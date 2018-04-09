@@ -75,6 +75,6 @@ package object utils extends ScorexLogging {
   }
 
   val dummyNetworkByte: Byte                                  = 84
-  val dummyContext: Context                                   = new BlockchainContext(dummyNetworkByte, Coeval(???), Coeval(???), null).build()
+  val dummyContext: Context                                   = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), null)
   val dummyTypeCheckerContext: TypeChecker.TypeCheckerContext = TypeChecker.TypeCheckerContext.fromContext(dummyContext)
 }
