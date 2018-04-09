@@ -146,7 +146,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.FUNCTION_CALL("Some", List(Untyped.FUNCTION_CALL("Some", List(Untyped.CONST_LONG(3))))))),
     expectedResult = Right(
       Typed.FUNCTION_CALL(
-        some.header,
+        optFunc.header,
         List(Typed.FUNCTION_CALL(some.header, List(Typed.FUNCTION_CALL(some.header, List(Typed.CONST_LONG(3)), OPTION(LONG))), OPTION(OPTION(LONG)))),
         UNIT
       )
