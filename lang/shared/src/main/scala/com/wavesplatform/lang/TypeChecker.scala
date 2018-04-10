@@ -12,18 +12,18 @@ import scala.util.{Failure, Success, Try}
 object TypeChecker {
 
   type TypeDefs     = Map[String, TYPE]
-  type FunctionSigs = Map[String, FunctionTypeSignarure]
+  type FunctionSigs = Map[String, Seq[FunctionTypeSignarure]]
   case class TypeCheckerContext(predefTypes: Map[String, PredefType], varDefs: TypeDefs, functionDefs: FunctionSigs) {
-    def functionTypeSignaturesByName(name: String): List[FunctionTypeSignarure] = functionDefs.filter(_._1 == name).values.toList
+    def functionTypeSignaturesByName(name: String): Seq[FunctionTypeSignarure] = functionDefs.getOrElse(name, Seq.empty)
   }
 
   object TypeCheckerContext {
     val empty = TypeCheckerContext(Map.empty, Map.empty, Map.empty)
 
-    def fromContext(ctx: Context): TypeCheckerContext =
-      TypeCheckerContext(predefTypes = ctx.typeDefs,
-                         varDefs = ctx.letDefs.mapValues(_.tpe),
-                         functionDefs = ctx.functions.map(x => (x._1.name, x._2.signature)).toMap)
+    def fromContext(ctx: Context): TypeCheckerContext = {
+      val map = ctx.functions.values.groupBy(_.name).mapValues(_.map(_.signature).toSeq)
+      TypeCheckerContext(predefTypes = ctx.typeDefs, varDefs = ctx.letDefs.mapValues(_.tpe), functionDefs = map)
+    }
   }
 
   type TypeResolutionError      = String
@@ -58,14 +58,14 @@ object TypeChecker {
 
     case expr @ Untyped.FUNCTION_CALL(name, args) => {
       def matchOverload(f: FunctionTypeSignarure): EitherT[Coeval, String, Typed.EXPR] = {
-        val argTypes = f.args
+        val argTypes   = f.args
         val resultType = f.result
         if (args.lengthCompare(argTypes.size) != 0)
           EitherT.fromEither[Coeval](Left(s"Function '$name' requires ${argTypes.size} arguments, but ${args.size} are provided"))
         else {
           import cats.instances.vector._
           val actualArgTypes: Vector[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg))).toVector
-          val sequencedActualArgTypes = actualArgTypes.sequence[SetTypeResult, Typed.EXPR].map(x => x.zip(argTypes))
+          val sequencedActualArgTypes                           = actualArgTypes.sequence[SetTypeResult, Typed.EXPR].map(x => x.zip(argTypes))
 
           sequencedActualArgTypes
             .subflatMap { typedExpressionArgumentsAndTypedPlaceholders =>
@@ -74,50 +74,29 @@ object TypeChecker {
                 resolvedTypeParams <- TypeInferrer(typePairs)
                 resolvedResultType <- TypeInferrer.inferResultType(resultType, resolvedTypeParams)
               } yield
-                Typed.FUNCTION_CALL(FunctionHeader(name, f.args.map(FunctionHeaderType.fromTypePlaceholder)), typedExpressionArgumentsAndTypedPlaceholders.map(_._1).toList, resolvedResultType)
+                Typed.FUNCTION_CALL(
+                  FunctionHeader(name, f.args.map(FunctionHeaderType.fromTypePlaceholder)),
+                  typedExpressionArgumentsAndTypedPlaceholders.map(_._1).toList,
+                  resolvedResultType
+                )
             }
 
         }
       }
-
-      ctx.functionTypeSignaturesByName(name) match {
-        case Nil => EitherT.fromEither[Coeval](Left(s"Function '$name' not found"))
+      val x: Seq[FunctionTypeSignarure] = ctx.functionTypeSignaturesByName(name)
+      x match {
+        case Nil                   => EitherT.fromEither[Coeval](Left(s"Function '$name' not found"))
         case singleOverload :: Nil => matchOverload(singleOverload)
-        case many => ???
+        case many                  => ???
       }
     }
 
-    case expr @ Untyped.BINARY_OP(a, op, b) =>
-      (setType(ctx, EitherT.pure(a)), setType(ctx, EitherT.pure(b))).tupled
-        .subflatMap {
-          case operands @ (a, b) =>
-            val aTpe = a.tpe
-            val bTpe = b.tpe
-
-            op match {
-              case SUM_OP =>
-                if (aTpe != LONG) Left(s"The first operand is expected to be LONG, but got $aTpe: $a in $expr")
-                else if (bTpe != LONG) Left(s"The second operand is expected to be LONG, but got $bTpe: $b in $expr")
-                else Right(operands -> LONG)
-
-              case GT_OP | GE_OP =>
-                if (aTpe != LONG) Left(s"The first operand is expected to be LONG, but got $aTpe: $a in $expr")
-                else if (bTpe != LONG) Left(s"The second operand is expected to be LONG, but got $bTpe: $b in $expr")
-                else Right(operands -> BOOLEAN)
-
-              case AND_OP | OR_OP =>
-                if (aTpe != BOOLEAN) Left(s"The first operand is expected to be BOOLEAN, but got $aTpe: $a in $expr")
-                else if (bTpe != BOOLEAN) Left(s"The second operand is expected to be BOOLEAN, but got $bTpe: $b in $expr")
-                else Right(operands -> BOOLEAN)
-
-              case EQ_OP =>
-                findCommonType(aTpe, bTpe) match {
-                  case Some(_) => Right(operands -> BOOLEAN)
-                  case None    => Left(s"Can't find common type for $aTpe and $bTpe: $a and $b in $expr")
-                }
-            }
-        }
-        .map { case (operands, tpe) => Typed.BINARY_OP(operands._1, op, operands._2, tpe) }
+    case Untyped.BINARY_OP(a, op, b) =>
+      op match {
+        case AND_OP => setType(ctx, EitherT.pure(Untyped.IF(a, b, Untyped.FALSE)))
+        case OR_OP  => setType(ctx, EitherT.pure(Untyped.IF(a, Untyped.TRUE, b)))
+        case _      => setType(ctx, EitherT.pure(Untyped.FUNCTION_CALL(opsToFunctions(op), List(a, b))))
+      }
 
     case block: Untyped.BLOCK =>
       block.let match {
