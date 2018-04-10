@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.ctx.impl
 
 import cats.data.EitherT
+import com.wavesplatform.lang.Terms
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.ctx.{Context, LazyVal, PredefFunction}
 import monix.eval.Coeval
@@ -36,7 +37,7 @@ object PureContext {
 
   val operators: Seq[PredefFunction] = {
     def createOp(op: BINARY_OP_KIND, t: TYPE, r: TYPE)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
-      PredefFunction(op.symbol, t, List("a" -> t, "b" -> t)) {
+      PredefFunction(Terms.opsToFunctions(op), t, List("a" -> t, "b" -> t)) {
         case a :: b :: Nil =>
           Right(body(a.asInstanceOf[t.Underlying], b.asInstanceOf[t.Underlying]))
         case _ => ???
@@ -44,6 +45,7 @@ object PureContext {
     }
     Seq(
       createOp(SUM_OP, LONG, LONG)((a, b) => a + b),
+      createOp(SUM_OP, STRING, STRING)((a, b) => a + b),
       createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR)((a, b) => ByteVector(a.toArray ++ b.toArray)),
       createOp(EQ_OP, LONG, BOOLEAN)((a, b) => a == b),
       createOp(EQ_OP, BYTEVECTOR, BOOLEAN)((a, b) => a == b),

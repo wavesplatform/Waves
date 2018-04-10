@@ -19,13 +19,13 @@ object Parser {
   private val Base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
   private val keywords    = Set("let", "base58", "true", "false", "if", "then", "else")
 
-  private val lowerChar = CharIn('a' to 'z')
-  private val upperChar = CharIn('A' to 'Z')
-  private val char      = lowerChar | upperChar
-  private val digit     = CharIn('0' to '9')
-  private val unicodeSymbolP = P( "u" ~ P( digit | char ) ~ P( digit | char ) ~ P( digit | char ) ~ P( digit | char ) )
-  private val escapedUnicodeSymbolP = P( "\\" ~ (CharIn("\"\\bfnrt") | unicodeSymbolP) )
-  private val varName   = (char.repX(min = 1, max = 1) ~~ (digit | char).repX()).!.filter(!keywords.contains(_))
+  private val lowerChar             = CharIn('a' to 'z')
+  private val upperChar             = CharIn('A' to 'Z')
+  private val char                  = lowerChar | upperChar
+  private val digit                 = CharIn('0' to '9')
+  private val unicodeSymbolP        = P("u" ~ P(digit | char) ~ P(digit | char) ~ P(digit | char) ~ P(digit | char))
+  private val escapedUnicodeSymbolP = P("\\" ~ (CharIn("\"\\bfnrt") | unicodeSymbolP))
+  private val varName               = (char.repX(min = 1, max = 1) ~~ (digit | char).repX()).!.filter(!keywords.contains(_))
 
   private def numberP: P[CONST_LONG] = P((CharIn(Seq('+', '-')).rep(max = 1) ~ digit.rep(min = 1)).!.map(t => CONST_LONG(t.toLong)))
   private def trueP: P[TRUE.type]    = P("true").map(_ => TRUE)
@@ -57,27 +57,18 @@ object Parser {
       }
 
   private def stringP: P[CONST_STRING] =
-    P( "\"" ~ (CharsWhile(!"\"\\".contains(_:Char)) | escapedUnicodeSymbolP).rep.! ~ "\"").map(CONST_STRING)
+    P("\"" ~ (CharsWhile(!"\"\\".contains(_: Char)) | escapedUnicodeSymbolP).rep.! ~ "\"").map(CONST_STRING)
 
   private def block: P[EXPR] = P("\n".rep ~ letP.rep ~ expr ~ ";".rep).map {
     case ((Nil, y)) => y
     case ((all, y)) => all.foldRight(y) { case (r, curr) => BLOCK(Some(r), curr) }
   }
 
-  private val opsByPriority = List[BINARY_OP_KIND](
-    OR_OP,
-    AND_OP,
-    EQ_OP,
-    GE_OP,
-    GT_OP,
-    SUM_OP
-  )
-
-  private def binaryOp(priority: List[BINARY_OP_KIND]): P[EXPR] = priority match {
+  private def binaryOp(rest: List[(String, BINARY_OP_KIND)]): P[EXPR] = rest match {
     case Nil => atom
-    case kind :: restOps =>
+    case (lessPriorityOp, kind) :: restOps =>
       val operand = binaryOp(restOps)
-      P(operand ~ (kind.symbol.!.map(_ => kind) ~ operand).rep()).map {
+      P(operand ~ (lessPriorityOp.!.map(_ => kind) ~ operand).rep()).map {
         case ((left: EXPR, r: Seq[(BINARY_OP_KIND, EXPR)])) =>
           r.foldLeft(left) { case (acc, (currKind, currOperand)) => BINARY_OP(acc, currKind, currOperand) }
       }
@@ -86,7 +77,7 @@ object Parser {
   private def expr = P(binaryOp(opsByPriority) | atom)
 
   private def atom =
-    P(ifP | byteVectorP | stringP | numberP | trueP | falseP |  getterP | bracesP | curlyBracesP | functionCallP | refP )
+    P(ifP | byteVectorP | stringP | numberP | trueP | falseP | getterP | bracesP | curlyBracesP | functionCallP | refP)
 
   def apply(str: String): core.Parsed[EXPR, Char, String] = P(block ~ End).parse(str)
 }
