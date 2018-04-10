@@ -274,8 +274,8 @@ object Block extends ScorexLogging {
 
   def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
     gs.transactions.map { ts =>
-      val acc = Address.fromString(ts.recipient).right.get
-      GenesisTransaction.create(acc, ts.amount, gs.timestamp).right.get
+      val acc = Address.fromString(ts.recipient).explicitGet()
+      GenesisTransaction.create(acc, ts.amount, gs.timestamp).explicitGet()
     }
   }
 
