@@ -2,7 +2,7 @@ package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.TypeInfo._
-import com.wavesplatform.lang.ctx._
+import com.wavesplatform.lang.ctx.impl.PureContext
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
@@ -10,13 +10,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with Matchers with No
 
   private def eval[T: TypeInfo](code: String) = {
     val untyped = Parser(code).get.value
-    val ctx     = Context(Map.empty, Map.empty, Map(multiplierFunction.header -> multiplierFunction))
+    val ctx     = PureContext.instance
     val typed   = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(ctx), untyped)
     typed.flatMap(Evaluator[T](ctx, _))
   }
 
   property("function call") {
-    eval[Long]("MULTIPLY(3,4)".stripMargin) shouldBe Right(12)
+    eval[Long]("10 + 2".stripMargin) shouldBe Right(12)
   }
 
   property("equals on byte array") {
