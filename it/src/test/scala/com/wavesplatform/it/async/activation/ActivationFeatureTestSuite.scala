@@ -1,7 +1,7 @@
 package com.wavesplatform.it.async.activation
 
 import com.typesafe.config.Config
-import com.wavesplatform.features.BlockchainFeatureStatus
+import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.features.api.NodeFeatureStatus
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
@@ -11,6 +11,8 @@ import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+
+
 
 class ActivationFeatureTestSuite
     extends FreeSpec
@@ -24,8 +26,8 @@ class ActivationFeatureTestSuite
 
   private val votingInterval       = 12
   private val blocksForActivation  = 12 // should be even
-  private val featureNum: Short    = 1
-  private val featureDescr: String = "Minimum Generating Balance of 1000 WAVES"
+  private val featureNum: Short    = BlockchainFeatures.SmallerMinimalGeneratingBalance.id
+  private val featureDescr: String = BlockchainFeatures.SmallerMinimalGeneratingBalance.description
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
