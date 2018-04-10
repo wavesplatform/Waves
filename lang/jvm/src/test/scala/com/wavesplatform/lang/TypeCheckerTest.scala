@@ -2,7 +2,7 @@ package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Terms._
-import com.wavesplatform.lang.TypeChecker.{TypeCheckResult, TypeCheckerContext, TypeDefs}
+import com.wavesplatform.lang.TypeChecker.{TypeCheckResult, TypeCheckerContext}
 import com.wavesplatform.lang.ctx._
 import com.wavesplatform.lang.ctx.impl.PureContext._
 import com.wavesplatform.lang.testing.ScriptGen
@@ -15,39 +15,43 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
 
   private val pointType = PredefType("Point", List("x" -> LONG, "y" -> LONG))
 
+  private val idT = PredefFunction("idT", TYPEPARAM('T'), List("p1" -> TYPEPARAM('T')))(Right(_))
+  private val extract = PredefFunction("extract", TYPEPARAM('T'), List("p1" -> OPTIONTYPEPARAM(TYPEPARAM('T')))) {
+    case Some(vl) :: Nil => Right(vl)
+    case _               => Left("extracting from empty option")
+  }
+  private val undefinedOptionLong = PredefFunction("undefinedOptionLong", OPTION(LONG), List.empty)(_ => ???)
+  private val idOptionLong        = PredefFunction("idOptionLong", UNIT, List("opt" -> OPTION(OPTION(LONG))))(_ => Right(()))
+  private val unitOnNone          = PredefFunction("unitOnNone", UNIT, List("opt" -> OPTION(NOTHING)))(_ => Right(()))
+  private val functionWithTwoPrarmsOfTheSameType =
+    PredefFunction("functionWithTwoPrarmsOfTheSameType", TYPEPARAM('T'), List("p1" -> TYPEPARAM('T'), "p2" -> TYPEPARAM('T')))(Right(_))
+
+  private val ctx = Context.build(
+    Seq(pointType),
+    Map(("None", none)),
+    functions = Seq(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, unitOnNone, extract, undefinedOptionLong, idOptionLong, some)
+  )
+
+  private val typeCheckerContext = TypeCheckerContext.fromContext(ctx)
   property("should infer generic function return type") {
     import Untyped._
-    val idFunction = PredefFunction("idFunc", TYPEPARAM('T'), List("p1" -> TYPEPARAM('T')))(Right(_))
-    val ctx        = Context(Map.empty, Map.empty, functions = Map((idFunction.header, idFunction)))
-    val Right(v)   = TypeChecker(TypeCheckerContext.fromContext(ctx), FUNCTION_CALL(idFunction.name, List(CONST_LONG(1))))
+    val Right(v) = TypeChecker(typeCheckerContext, FUNCTION_CALL(idT.name, List(CONST_LONG(1))))
 
     v.tpe shouldBe LONG
   }
 
   property("should infer inner types") {
     import Untyped._
-    val genericFuncWithOptionParam = PredefFunction("idFunc", TYPEPARAM('T'), List("p1" -> OPTIONTYPEPARAM(TYPEPARAM('T')))) {
-      case Some(vl) :: Nil => Right(vl)
-      case _               => Left("extracting from empty option")
-    }
-
-    val optionFunc = PredefFunction("optionFunc", OPTION(LONG), List.empty)(null)
-
-    val ctx =
-      Context(
-        Map.empty,
-        Map.empty,
-        functions = Map(
-          genericFuncWithOptionParam.header -> genericFuncWithOptionParam,
-          optionFunc.header                 -> optionFunc,
-          some.header                       -> some
-        )
-      )
-    val Right(v) = TypeChecker(TypeCheckerContext.fromContext(ctx),
-                               FUNCTION_CALL(genericFuncWithOptionParam.name, List(FUNCTION_CALL(optionFunc.name, List.empty))))
+    val Right(v) = TypeChecker(typeCheckerContext, FUNCTION_CALL(extract.name, List(FUNCTION_CALL(undefinedOptionLong.name, List.empty))))
 
     v.tpe shouldBe LONG
   }
+
+  treeTypeTest(s"unitOnNone(NONE)")(
+    ctx = typeCheckerContext,
+    expr = Untyped.FUNCTION_CALL(unitOnNone.name, List(Untyped.REF("None"))),
+    expectedResult = Right(Typed.FUNCTION_CALL(unitOnNone.header, List(Typed.REF("None", OPTION(NOTHING))), UNIT))
+  )
 
   rootTypeTest("successful on very deep expressions (stack overflow check)")(
     expr = (1 to 100000).foldLeft[Untyped.EXPR](Untyped.CONST_LONG(0))((acc, _) => Untyped.BINARY_OP(acc, SUM_OP, Untyped.CONST_LONG(1))),
@@ -105,48 +109,33 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   )
 
   treeTypeTest("MULTIPLY(1,2)")(
-    ctx =
-      TypeCheckerContext(predefTypes = Map.empty, varDefs = Map.empty, functionDefs = Map(multiplierFunction.name -> multiplierFunction.signature)),
+    ctx = typeCheckerContext,
     expr = Untyped.FUNCTION_CALL(multiplierFunction.name, List(Untyped.CONST_LONG(1), Untyped.CONST_LONG(2))),
     expectedResult = Right(Typed.FUNCTION_CALL(multiplierFunction.header, List(Typed.CONST_LONG(1), Typed.CONST_LONG(2)), LONG))
   )
 
-  private val optFunc  = PredefFunction("OPTFUNC", UNIT, List("opt"  -> OPTION(OPTION(LONG))))(_ => Right(()))
-  private val noneFunc = PredefFunction("NONEFUNC", UNIT, List("opt" -> OPTION(NOTHING)))(_ => Right(()))
-  private val typeCheckerCtx = TypeCheckerContext(
-    predefTypes = Map.empty,
-    varDefs = Map(("None", none.tpe)),
-    functionDefs = Map(some.name -> some.signature, optFunc.name -> optFunc.signature, noneFunc.name -> noneFunc.signature)
+  treeTypeTest(s"idOptionLong(NONE)")(
+    ctx = typeCheckerContext,
+    expr = Untyped.FUNCTION_CALL(idOptionLong.name, List(Untyped.REF("None"))),
+    expectedResult = Right(Typed.FUNCTION_CALL(idOptionLong.header, List(Typed.REF("None", OPTION(NOTHING))), UNIT))
   )
 
-  private val genericFunc = PredefFunction("idFunc", TYPEPARAM('T'), List("p1" -> TYPEPARAM('T'), "p2" -> TYPEPARAM('T')))(Right(_))
-  treeTypeTest(s"NONEFUNC(NONE)")(
-    ctx = typeCheckerCtx,
-    expr = Untyped.FUNCTION_CALL(noneFunc.name, List(Untyped.REF("None"))),
-    expectedResult = Right(Typed.FUNCTION_CALL(noneFunc.header, List(Typed.REF("None", OPTION(NOTHING))), UNIT))
-  )
-
-  treeTypeTest(s"OPTFUNC(NONE)")(
-    ctx = typeCheckerCtx,
-    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.REF("None"))),
-    expectedResult = Right(Typed.FUNCTION_CALL(optFunc.header, List(Typed.REF("None", OPTION(NOTHING))), UNIT))
-  )
-
-  treeTypeTest(s"OPTFUNC(SOME(NONE))")(
-    ctx = typeCheckerCtx,
-    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.FUNCTION_CALL("Some", List(Untyped.REF("None"))))),
+  treeTypeTest(s"idOptionLong(SOME(NONE))")(
+    ctx = typeCheckerContext,
+    expr = Untyped.FUNCTION_CALL(idOptionLong.name, List(Untyped.FUNCTION_CALL("Some", List(Untyped.REF("None"))))),
     expectedResult = Right(
-      Typed.FUNCTION_CALL(optFunc.header,
+      Typed.FUNCTION_CALL(idOptionLong.header,
                           List(Typed.FUNCTION_CALL(some.header, List(Typed.REF("None", OPTION(NOTHING))), OPTION(OPTION(NOTHING)))),
                           UNIT))
   )
 
-  treeTypeTest(s"OPTFUNC(SOME(CONST_LONG(3)))")(
-    ctx = typeCheckerCtx,
-    expr = Untyped.FUNCTION_CALL(optFunc.name, List(Untyped.FUNCTION_CALL("Some", List(Untyped.FUNCTION_CALL("Some", List(Untyped.CONST_LONG(3))))))),
+  treeTypeTest(s"idOptionLong(SOME(CONST_LONG(3)))")(
+    ctx = typeCheckerContext,
+    expr =
+      Untyped.FUNCTION_CALL(idOptionLong.name, List(Untyped.FUNCTION_CALL("Some", List(Untyped.FUNCTION_CALL("Some", List(Untyped.CONST_LONG(3))))))),
     expectedResult = Right(
       Typed.FUNCTION_CALL(
-        optFunc.header,
+        idOptionLong.header,
         List(Typed.FUNCTION_CALL(some.header, List(Typed.FUNCTION_CALL(some.header, List(Typed.CONST_LONG(3)), OPTION(LONG))), OPTION(OPTION(LONG)))),
         UNIT
       )
@@ -167,21 +156,18 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       "BINARY_OP with wrong types"                   -> "The first operand is expected to be LONG" -> BINARY_OP(TRUE, SUM_OP, CONST_LONG(1)),
       "IF can't find common"                         -> "Can't find common type" -> IF(TRUE, TRUE, CONST_LONG(0)),
       "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(multiplierFunction.name, List(CONST_LONG(0))),
-      "FUNCTION_CALL with upper type"                -> "Non-matching types" -> FUNCTION_CALL(noneFunc.name, List(FUNCTION_CALL("Some", List(CONST_LONG(3))))),
+      "FUNCTION_CALL with upper type"                -> "Non-matching types" -> FUNCTION_CALL(unitOnNone.name, List(FUNCTION_CALL("Some", List(CONST_LONG(3))))),
       "FUNCTION_CALL with wrong type of argument"    -> "Typecheck failed: Non-matching types: expected: LONG, actual: BOOLEAN" -> FUNCTION_CALL(
         multiplierFunction.name,
         List(CONST_LONG(0), FALSE)),
-      "FUNCTION_CALL with uncommon types for parameter T" -> "Can't match inferred types" -> FUNCTION_CALL(genericFunc.name,
+      "FUNCTION_CALL with uncommon types for parameter T" -> "Can't match inferred types" -> FUNCTION_CALL(functionWithTwoPrarmsOfTheSameType.name,
                                                                                                            List(CONST_LONG(1),
                                                                                                                 CONST_BYTEVECTOR(ByteVector.empty)))
     )
   }
 
-  private def rootTypeTest(propertyName: String)(expr: Untyped.EXPR,
-                                                 expectedResult: TypeCheckResult[TYPE],
-                                                 varDefs: TypeDefs = Map.empty,
-                                                 predefTypes: Map[String, PredefType] = Map.empty): Unit = property(propertyName) {
-    TypeChecker(TypeCheckerContext(predefTypes, varDefs, Map.empty), expr).map(_.tpe) match {
+  private def rootTypeTest(propertyName: String)(expr: Untyped.EXPR, expectedResult: TypeCheckResult[TYPE]): Unit = property(propertyName) {
+    TypeChecker(TypeCheckerContext.empty, expr).map(_.tpe) match {
       case Right(x)    => Right(x) shouldBe expectedResult
       case e @ Left(_) => e shouldBe expectedResult
     }
@@ -190,19 +176,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   private def errorTests(exprs: ((String, String), Untyped.EXPR)*): Unit = exprs.foreach {
     case ((label, error), input) =>
       property(s"Error: $label") {
-        TypeChecker(
-          TypeCheckerContext(
-            Map.empty,
-            Map(("None", none.tpe)),
-            Map(
-              multiplierFunction.name -> multiplierFunction.signature,
-              noneFunc.name           -> noneFunc.signature,
-              genericFunc.name        -> genericFunc.signature,
-              some.name               -> some.signature
-            )
-          ),
-          input
-        ) should produce(error)
+        TypeChecker(typeCheckerContext, input) should produce(error)
       }
   }
 
