@@ -73,7 +73,6 @@ object Terms {
     case class GETTER(ref: EXPR, field: String, override val tpe: TYPE)                          extends EXPR(tpe)
     case class CONST_BYTEVECTOR(bs: ByteVector)                                                  extends EXPR(BYTEVECTOR)
     case class CONST_STRING(s: String)                                                           extends EXPR(STRING)
-    case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR, override val tpe: TYPE)         extends EXPR(tpe)
     case class BLOCK(let: Option[LET], body: EXPR, override val tpe: TYPE)                       extends EXPR(tpe)
     case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, override val tpe: TYPE)               extends EXPR(tpe)
     case class REF(key: String, override val tpe: TYPE)                                          extends EXPR(tpe)

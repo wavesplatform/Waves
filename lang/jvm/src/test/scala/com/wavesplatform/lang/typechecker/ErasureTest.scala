@@ -29,13 +29,13 @@ class ErasureTest extends PropSpec with PropertyChecks with Matchers with Script
       "CONST_STRING"     -> CONST_STRING("abc"),
       "TRUE"             -> TRUE,
       "FALSE"            -> FALSE,
-      "SUM"              -> BINARY_OP(CONST_LONG(0), SUM_OP, CONST_LONG(1), LONG),
-      "AND"              -> BINARY_OP(TRUE, AND_OP, FALSE, BOOLEAN),
-      "OR"               -> BINARY_OP(TRUE, OR_OP, FALSE, BOOLEAN),
-      "EQ(LONG)"         -> BINARY_OP(CONST_LONG(0), EQ_OP, CONST_LONG(1), BOOLEAN),
-      "EQ(BOOL)"         -> BINARY_OP(TRUE, EQ_OP, FALSE, BOOLEAN),
-      "GT"               -> BINARY_OP(CONST_LONG(0), GT_OP, CONST_LONG(1), BOOLEAN),
-      "GE"               -> BINARY_OP(CONST_LONG(0), GE_OP, CONST_LONG(1), BOOLEAN),
+//      "SUM"              -> BINARY_OP(CONST_LONG(0), SUM_OP, CONST_LONG(1), LONG),
+//      "AND"              -> BINARY_OP(TRUE, AND_OP, FALSE, BOOLEAN),
+//      "OR"               -> BINARY_OP(TRUE, OR_OP, FALSE, BOOLEAN),
+//      "EQ(LONG)"         -> BINARY_OP(CONST_LONG(0), EQ_OP, CONST_LONG(1), BOOLEAN),
+//      "EQ(BOOL)"         -> BINARY_OP(TRUE, EQ_OP, FALSE, BOOLEAN),
+//      "GT"               -> BINARY_OP(CONST_LONG(0), GT_OP, CONST_LONG(1), BOOLEAN),
+//      "GE"               -> BINARY_OP(CONST_LONG(0), GE_OP, CONST_LONG(1), BOOLEAN),
       "BLOCK" -> BLOCK(
         let = None,
         body = CONST_LONG(0),
@@ -55,7 +55,7 @@ class ErasureTest extends PropSpec with PropertyChecks with Matchers with Script
         case Typed.TRUE                => Coeval(Untyped.TRUE)
         case Typed.FALSE               => Coeval(Untyped.FALSE)
         case getter: Typed.GETTER      => aux(getter.ref).map(Untyped.GETTER(_, getter.field))
-        case binaryOp: Typed.BINARY_OP => (aux(binaryOp.a), aux(binaryOp.b)).mapN(Untyped.BINARY_OP(_, binaryOp.kind, _))
+//        case binaryOp: Typed.BINARY_OP => (aux(binaryOp.a), aux(binaryOp.b)).mapN(Untyped.BINARY_OP(_, binaryOp.kind, _))
         case block: Typed.BLOCK =>
           aux(block.body).flatMap { t =>
             val x = Untyped.BLOCK(let = None, body = t)

@@ -36,6 +36,12 @@ object TypeChecker {
     case x: Untyped.CONST_STRING     => EitherT.pure(Typed.CONST_STRING(x.value))
     case Untyped.TRUE                => EitherT.pure(Typed.TRUE)
     case Untyped.FALSE               => EitherT.pure(Typed.FALSE)
+    case Untyped.BINARY_OP(a, op, b) =>
+      op match {
+        case AND_OP => setType(ctx, EitherT.pure(Untyped.IF(a, b, Untyped.FALSE)))
+        case OR_OP  => setType(ctx, EitherT.pure(Untyped.IF(a, Untyped.TRUE, b)))
+        case _      => setType(ctx, EitherT.pure(Untyped.FUNCTION_CALL(opsToFunctions(op), List(a, b))))
+      }
 
     case getter: Untyped.GETTER =>
       setType(ctx, EitherT.pure(getter.ref))
@@ -56,7 +62,7 @@ object TypeChecker {
           }
         }
 
-    case expr @ Untyped.FUNCTION_CALL(name, args) => {
+    case Untyped.FUNCTION_CALL(name, args) => {
       def matchOverload(f: FunctionTypeSignarure): EitherT[Coeval, String, Typed.EXPR] = {
         val argTypes   = f.args
         val resultType = f.result
@@ -90,13 +96,6 @@ object TypeChecker {
         case many                  => ???
       }
     }
-
-    case Untyped.BINARY_OP(a, op, b) =>
-      op match {
-        case AND_OP => setType(ctx, EitherT.pure(Untyped.IF(a, b, Untyped.FALSE)))
-        case OR_OP  => setType(ctx, EitherT.pure(Untyped.IF(a, Untyped.TRUE, b)))
-        case _      => setType(ctx, EitherT.pure(Untyped.FUNCTION_CALL(opsToFunctions(op), List(a, b))))
-      }
 
     case block: Untyped.BLOCK =>
       block.let match {
