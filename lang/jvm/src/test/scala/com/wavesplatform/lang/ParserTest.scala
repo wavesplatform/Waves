@@ -18,8 +18,12 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     case Failure(_, _, _) => false
   }
 
+  def toString(expr: EXPR): String = expr match {
+    case CONST_LONG(x) => whitespaces.sample.get + s"$x" + whitespaces.sample.get
+    case _             => ???
+  }
+
   property("simple expressions") {
-    parse("10") shouldBe CONST_LONG(10)
     parse("10+11") shouldBe BINARY_OP(CONST_LONG(10), SUM_OP, CONST_LONG(11))
     parse("(10+11)") shouldBe BINARY_OP(CONST_LONG(10), SUM_OP, CONST_LONG(11))
     parse("(10+11) + 12") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(10), SUM_OP, CONST_LONG(11)), SUM_OP, CONST_LONG(12))
@@ -34,6 +38,11 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parse("true || (true && false)") shouldBe BINARY_OP(TRUE, OR_OP, BINARY_OP(TRUE, AND_OP, FALSE))
     parse("false || false || false") shouldBe BINARY_OP(BINARY_OP(FALSE, OR_OP, FALSE), OR_OP, FALSE)
     parse("(1>= 0)||(3 >2)") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(1), GE_OP, CONST_LONG(0)), OR_OP, BINARY_OP(CONST_LONG(3), GT_OP, CONST_LONG(2)))
+
+    forAll(CONST_LONGgen) { constLong =>
+      val code = toString(constLong)
+      parse(code) shouldBe constLong
+    }
   }
 
   property("priority in binary expressions") {
