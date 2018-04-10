@@ -1,13 +1,14 @@
 package com.wavesplatform.lang
+
 import com.wavesplatform.lang.ctx.Obj
 import scodec.bits.ByteVector
 
 object Terms {
 
-  case class FUNCTION(args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER)
+  case class FunctionTypeSignarure(args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER)
 
   sealed trait TYPEPLACEHOLDER
-  case class TYPEPARAM(char: Char)               extends TYPEPLACEHOLDER
+  case class TYPEPARAM(char: Byte)               extends TYPEPLACEHOLDER
   case class OPTIONTYPEPARAM(t: TYPEPLACEHOLDER) extends TYPEPLACEHOLDER
 
   sealed trait TYPE extends TYPEPLACEHOLDER {
@@ -38,6 +39,17 @@ object Terms {
   case object GT_OP  extends BINARY_OP_KIND
   case object GE_OP  extends BINARY_OP_KIND
 
+  val opsByPriority = List[(String, BINARY_OP_KIND)](
+    "||" -> OR_OP,
+    "&&" -> AND_OP,
+    "==" -> EQ_OP,
+    ">=" -> GE_OP,
+    ">"  -> GT_OP,
+    "+"  -> SUM_OP
+  )
+
+  val opsToFunctions = opsByPriority.map { case (str, op) => op -> str }.toMap
+
   object Untyped {
     case class LET(name: String, value: EXPR)
     sealed trait EXPR
@@ -57,17 +69,17 @@ object Terms {
   object Typed {
     case class LET(name: String, value: EXPR)
     sealed abstract class EXPR(val tpe: TYPE)
-    case class CONST_LONG(t: Long)                                                           extends EXPR(LONG)
-    case class GETTER(ref: EXPR, field: String, override val tpe: TYPE)                      extends EXPR(tpe)
-    case class CONST_BYTEVECTOR(bs: ByteVector)                                              extends EXPR(BYTEVECTOR)
-    case class CONST_STRING(s: String)                                                       extends EXPR(STRING)
-    case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR, override val tpe: TYPE)     extends EXPR(tpe)
-    case class BLOCK(let: Option[LET], body: EXPR, override val tpe: TYPE)                   extends EXPR(tpe)
-    case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, override val tpe: TYPE)           extends EXPR(tpe)
-    case class REF(key: String, override val tpe: TYPE)                                      extends EXPR(tpe)
-    case object TRUE                                                                         extends EXPR(BOOLEAN)
-    case object FALSE                                                                        extends EXPR(BOOLEAN)
-    case class FUNCTION_CALL(functionName: String, args: List[EXPR], override val tpe: TYPE) extends EXPR(tpe)
+    case class CONST_LONG(t: Long)                                                               extends EXPR(LONG)
+    case class GETTER(ref: EXPR, field: String, override val tpe: TYPE)                          extends EXPR(tpe)
+    case class CONST_BYTEVECTOR(bs: ByteVector)                                                  extends EXPR(BYTEVECTOR)
+    case class CONST_STRING(s: String)                                                           extends EXPR(STRING)
+    case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR, override val tpe: TYPE)         extends EXPR(tpe)
+    case class BLOCK(let: Option[LET], body: EXPR, override val tpe: TYPE)                       extends EXPR(tpe)
+    case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, override val tpe: TYPE)               extends EXPR(tpe)
+    case class REF(key: String, override val tpe: TYPE)                                          extends EXPR(tpe)
+    case object TRUE                                                                             extends EXPR(BOOLEAN)
+    case object FALSE                                                                            extends EXPR(BOOLEAN)
+    case class FUNCTION_CALL(function: FunctionHeader, args: List[EXPR], override val tpe: TYPE) extends EXPR(tpe)
   }
 
   def findCommonType(t1: TYPE, t2: TYPE): Option[TYPE] = findCommonType(t1, t2, biDirectional = true)

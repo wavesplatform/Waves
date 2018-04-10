@@ -2,16 +2,16 @@ package scorex.api.http
 
 import java.security.SecureRandom
 
-import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.{Parser, TypeChecker}
 import com.wavesplatform.settings.RestAPISettings
 import fastparse.core.Parsed.{Failure, Success}
 import io.swagger.annotations._
+import javax.ws.rs.Path
 import play.api.libs.json.Json
 import scorex.crypto.encode.Base58
-import scorex.transaction.smart.{BlockchainContext, Script}
+import scorex.transaction.smart.Script
 import scorex.utils.Time
 
 @Path("/utils")
@@ -44,7 +44,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     (post & entity(as[String])) { code =>
       complete((Parser(code) match {
         case Success(value, _) =>
-          TypeChecker(BlockchainContext.typeCheckerContext, value) match {
+          TypeChecker(com.wavesplatform.utils.dummyTypeCheckerContext, value) match {
             case Left(err)   => Left[String, String](err.toString)
             case Right(expr) => Right[String, String](Script(expr).bytes().base58)
           }
