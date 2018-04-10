@@ -12,39 +12,39 @@ trait ScriptGen {
     if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1))
     else Gen.const(TRUE)
 
-  private def SUMgen(gas: Int): Gen[EXPR] =
+  def SUMgen(gas: Int): Gen[EXPR] =
     for {
       i1 <- INTGen((gas - 2) / 2)
       i2 <- INTGen((gas - 2) / 2)
     } yield BINARY_OP(i1, SUM_OP, i2)
 
-  private def INTGen(gas: Int): Gen[EXPR] = if (gas > 0) Gen.oneOf(CONST_LONGgen, SUMgen(gas - 1), IF_INTgen(gas - 1)) else CONST_LONGgen
+  def INTGen(gas: Int): Gen[EXPR] = if (gas > 0) Gen.oneOf(CONST_LONGgen, SUMgen(gas - 1), IF_INTgen(gas - 1)) else CONST_LONGgen
 
-  private def GEgen(gas: Int): Gen[EXPR] =
+  def GEgen(gas: Int): Gen[EXPR] =
     for {
       i1 <- INTGen((gas - 2) / 2)
       i2 <- INTGen((gas - 2) / 2)
     } yield BINARY_OP(i1, GE_OP, i2)
 
-  private def GTgen(gas: Int): Gen[EXPR] =
+  def GTgen(gas: Int): Gen[EXPR] =
     for {
       i1 <- INTGen((gas - 2) / 2)
       i2 <- INTGen((gas - 2) / 2)
     } yield BINARY_OP(i1, GT_OP, i2)
 
-  private def EQ_INTgen(gas: Int): Gen[EXPR] =
+  def EQ_INTgen(gas: Int): Gen[EXPR] =
     for {
       i1 <- INTGen((gas - 2) / 2)
       i2 <- INTGen((gas - 2) / 2)
     } yield BINARY_OP(i1, EQ_OP, i2)
 
-  private def ANDgen(gas: Int): Gen[EXPR] =
+  def ANDgen(gas: Int): Gen[EXPR] =
     for {
       i1 <- BOOLgen((gas - 2) / 2)
       i2 <- BOOLgen((gas - 2) / 2)
     } yield BINARY_OP(i1, AND_OP, i2)
 
-  private def ORgen(gas: Int): Gen[EXPR] =
+  def ORgen(gas: Int): Gen[EXPR] =
     for {
       i1 <- BOOLgen((gas - 2) / 2)
       i2 <- BOOLgen((gas - 2) / 2)
