@@ -1,11 +1,12 @@
 package com.wavesplatform.lang
-
+import cats.syntax.semigroup._
 import cats.data.EitherT
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Terms.Typed._
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.ctx._
+import com.wavesplatform.lang.ctx.Context._
 import com.wavesplatform.lang.ctx.impl.PureContext
 import com.wavesplatform.lang.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
@@ -109,7 +110,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     val pointType     = PredefType("Point", List("X" -> LONG, "Y"                           -> LONG))
     val pointInstance = Obj(Map("X"                  -> LazyVal(LONG)(EitherT.pure(3)), "Y" -> LazyVal(LONG)(EitherT.pure(4))))
     ev[Long](
-      context = Context(
+      context = PureContext.instance |+| Context(
         typeDefs = Map(pointType.name -> pointType),
         letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance)))),
         functions = Map.empty
@@ -121,7 +122,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   property("lazy let evaluation doesn't throw if not used") {
     val pointType     = PredefType("Point", List(("X", LONG), ("Y", LONG)))
     val pointInstance = Obj(Map(("X", LazyVal(LONG)(EitherT.pure(3))), ("Y", LazyVal(LONG)(EitherT.pure(4)))))
-    val context = Context(
+    val context = PureContext.instance |+| Context(
       typeDefs = Map((pointType.name, pointType)),
       letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance))), ("badVal", LazyVal(LONG)(EitherT.leftT("Error")))),
       functions = Map.empty
@@ -143,7 +144,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
       fieldCalculated = fieldCalculated + 1
       3
     })), ("Y", LazyVal(LONG)(EitherT.pure(4)))))
-    val context = Context(
+    val context = PureContext.instance |+| Context(
       typeDefs = Map((pointType.name, pointType)),
       letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance))), ("h", LazyVal(LONG)(EitherT.pure {
         valueCalculated = valueCalculated + 1
@@ -173,7 +174,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
       Right(1L)
     }
 
-    val context = Context(
+    val context = PureContext.instance |+| Context(
       typeDefs = Map.empty,
       letDefs = Map.empty,
       functions = Map(f.header -> f)
