@@ -164,11 +164,12 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     val context = Context(
       typeDefs = Map.empty,
       letDefs = Map.empty,
-      functions = Map(f.name -> f)
+      functions = Map(f.header -> f)
     )
     ev[Long](
       context = context,
-      expr = BLOCK(Some(LET("X", FUNCTION_CALL("F", List(CONST_LONG(1000)), LONG))), BINARY_OP(REF("X", LONG), SUM_OP, REF("X", LONG), LONG), LONG)
+      expr =
+        BLOCK(Some(LET("X", FUNCTION_CALL(f.header, List(CONST_LONG(1000)), LONG))), BINARY_OP(REF("X", LONG), SUM_OP, REF("X", LONG), LONG), LONG)
     ) shouldBe Right(2L)
 
     functionEvaluated shouldBe 1
@@ -208,10 +209,10 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     val context = Context(
       typeDefs = Map(fooType.name -> fooType),
       letDefs = Map.empty,
-      functions = Map(fooCtor.name -> fooCtor)
+      functions = Map(fooCtor.header -> fooCtor)
     )
 
-    val expr = GETTER(FUNCTION_CALL("createFoo", List.empty, fooType.typeRef), "bar", STRING)
+    val expr = GETTER(FUNCTION_CALL(fooCtor.header, List.empty, fooType.typeRef), "bar", STRING)
 
     ev[String](context, expr) shouldBe Right("bAr")
   }
@@ -237,15 +238,15 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
       typeDefs = Map(fooType.name -> fooType),
       letDefs = Map.empty,
       functions = Map(
-        fooCtor.name      -> fooCtor,
-        fooTransform.name -> fooTransform
+        fooCtor.header      -> fooCtor,
+        fooTransform.header -> fooTransform
       )
     )
 
     val expr = GETTER(
       BLOCK(
-        Some(LET("fooInstance", FUNCTION_CALL("createFoo", List.empty, fooType.typeRef))),
-        FUNCTION_CALL("transformFoo", List(REF("fooInstance", fooType.typeRef)), fooType.typeRef),
+        Some(LET("fooInstance", FUNCTION_CALL(fooCtor.header, List.empty, fooType.typeRef))),
+        FUNCTION_CALL(fooTransform.header, List(REF("fooInstance", fooType.typeRef)), fooType.typeRef),
         fooType.typeRef
       ),
       "bar",
@@ -260,9 +261,9 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
       context = Context(
         typeDefs = Map.empty,
         letDefs = Map.empty,
-        functions = Map(multiplierFunction.name -> multiplierFunction)
+        functions = Map(multiplierFunction.header -> multiplierFunction)
       ),
-      expr = FUNCTION_CALL(multiplierFunction.name, List(Typed.CONST_LONG(3), Typed.CONST_LONG(4)), LONG)
+      expr = FUNCTION_CALL(multiplierFunction.header, List(Typed.CONST_LONG(3), Typed.CONST_LONG(4)), LONG)
     ) shouldBe Right(12)
   }
 }
