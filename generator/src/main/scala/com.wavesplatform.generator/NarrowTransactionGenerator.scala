@@ -173,11 +173,11 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
             import com.wavesplatform.state2.DataEntry._
 
             val sender = randomFrom(accounts).get
-            val count  = r.nextInt(DataTransaction.MaxEntryCount + 1)
+            val count  = r.nextInt(10)
 
             val data = for {
               _ <- 0 until count
-              keyLen = r.nextInt(MaxKeySize + 1)
+              keyLen = r.nextInt(10)
               key    = Random.nextString(keyLen)
               etype  = r.nextInt(Type.maxId)
             } yield
@@ -185,7 +185,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
                 case t if t == Type.Integer.id => LongDataEntry(key, r.nextLong)
                 case t if t == Type.Boolean.id => BooleanDataEntry(key, r.nextBoolean)
                 case t if t == Type.Binary.id =>
-                  val size = r.nextInt(MaxValueSize)
+                  val size = r.nextInt(MaxValueSize + 1)
                   val b    = new Array[Byte](size)
                   r.nextBytes(b)
                   BinaryDataEntry(key, ByteStr(b))
