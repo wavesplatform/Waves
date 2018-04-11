@@ -46,6 +46,14 @@ object BlockchainContext {
         } yield address.bytes.arr).left.map(_.toString)
       }
 
+      override def accountBalanceOf(addressOrAlias: Array[Byte], maybeAssetId: Option[Array[Byte]]): Either[String, Long] = {
+        (for {
+          aoa     <- AddressOrAlias.fromBytes(bytes = addressOrAlias, position = 0)
+          address <- state.resolveAliasEi(aoa._1)
+          balance = state.portfolio(address).balanceOf(maybeAssetId.map(ByteStr.apply))
+        } yield balance).left.map(_.toString)
+      }
+
       def convert(tx: Transaction) = RealTransactionWrapper(tx)
 
       override def networkByte: Byte = nByte
