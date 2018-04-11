@@ -1,7 +1,9 @@
 package com.wavesplatform
 
+import cats.syntax.semigroup._
 import com.wavesplatform.lang.Terms.Typed
 import com.wavesplatform.lang.TypeChecker
+import com.wavesplatform.lang.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.testing.ScriptGen
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state2._
@@ -16,7 +18,7 @@ import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.smart.{Script, SetScriptTransaction}
+import scorex.transaction.smart.{Script, SetScriptTransaction, WavesCrypto}
 import scorex.utils.TimeImpl
 
 import scala.util.Random
@@ -101,7 +103,7 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
   } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
 
   val scriptGen = BOOLgen(1000).map { expr =>
-    val typed = TypeChecker(TypeChecker.TypeCheckerContext.empty, expr).right.get
+    val typed = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(PureContext.instance |+| CryptoContext.build(WavesCrypto)), expr).explicitGet()
     Script(typed)
   }
 
