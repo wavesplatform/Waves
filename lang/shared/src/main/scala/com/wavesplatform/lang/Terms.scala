@@ -5,7 +5,7 @@ import scodec.bits.ByteVector
 
 object Terms {
 
-  case class FunctionTypeSignarure(args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER)
+  case class FunctionTypeSignature(args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER)
 
   sealed trait TYPEPLACEHOLDER
   case class TYPEPARAM(char: Byte)               extends TYPEPLACEHOLDER
@@ -73,7 +73,6 @@ object Terms {
     case class GETTER(ref: EXPR, field: String, override val tpe: TYPE)                          extends EXPR(tpe)
     case class CONST_BYTEVECTOR(bs: ByteVector)                                                  extends EXPR(BYTEVECTOR)
     case class CONST_STRING(s: String)                                                           extends EXPR(STRING)
-    case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR, override val tpe: TYPE)         extends EXPR(tpe)
     case class BLOCK(let: Option[LET], body: EXPR, override val tpe: TYPE)                       extends EXPR(tpe)
     case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, override val tpe: TYPE)               extends EXPR(tpe)
     case class REF(key: String, override val tpe: TYPE)                                          extends EXPR(tpe)
@@ -83,6 +82,7 @@ object Terms {
   }
 
   def findCommonType(t1: TYPE, t2: TYPE): Option[TYPE] = findCommonType(t1, t2, biDirectional = true)
+  def isSubtype(tpe: TYPE, subType: TYPE): Boolean     = ???
 
   def matchType(required: TYPE, actual: TYPE): Option[TYPE] = findCommonType(required, actual, biDirectional = false)
 
