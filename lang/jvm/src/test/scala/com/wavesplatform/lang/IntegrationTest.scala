@@ -31,6 +31,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with Matchers with No
   }
 
   property("equals shouldn't compile on option") {
-    eval[Boolean]("Some(1) == Some(2)") should produce("ERROR")
+    eval[Boolean]("Some(1) == Some(2)") should produce("Can't find a function '=='")
   }
 }

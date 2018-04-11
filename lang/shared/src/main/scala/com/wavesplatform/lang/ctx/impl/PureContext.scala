@@ -49,10 +49,11 @@ object PureContext {
   val eqLong        = createOp(EQ_OP, LONG, BOOLEAN)((a, b) => a == b)
   val eqByteVector  = createOp(EQ_OP, BYTEVECTOR, BOOLEAN)((a, b) => a == b)
   val eqBool        = createOp(EQ_OP, BOOLEAN, BOOLEAN)((a, b) => a == b)
+  val eqString      = createOp(EQ_OP, STRING, BOOLEAN)((a, b) => a == b)
   val ge            = createOp(GE_OP, LONG, BOOLEAN)((a, b) => a >= b)
   val gt            = createOp(GT_OP, LONG, BOOLEAN)((a, b) => a > b)
 
-  val operators: Seq[PredefFunction] = Seq(sumLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, ge, gt)
+  val operators: Seq[PredefFunction] = Seq(sumLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt)
 
   lazy val instance = Context.build(types = Seq.empty, letDefs = Map(("None", none)), functions = Seq(extract, isDefined, some, size) ++ operators)
 

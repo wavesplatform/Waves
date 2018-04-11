@@ -62,40 +62,56 @@ object TypeChecker {
           }
         }
 
-    case Untyped.FUNCTION_CALL(name, args) => {
-      def matchOverload(f: FunctionTypeSignarure): EitherT[Coeval, String, Typed.EXPR] = {
+    case Untyped.FUNCTION_CALL(name, args) =>
+      type ResolvedArgsResult = EitherT[Coeval, String, List[Typed.EXPR]]
+
+      def resolvedArguments(args: List[Terms.Untyped.EXPR]): ResolvedArgsResult = {
+        import cats.instances.list._
+        val r: List[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg)))(collection.breakOut)
+        r.sequence[SetTypeResult, Typed.EXPR]
+      }
+
+      def matchOverload(resolvedArgs: List[Typed.EXPR], f: FunctionTypeSignarure): Either[String, Typed.EXPR] = {
         val argTypes   = f.args
         val resultType = f.result
         if (args.lengthCompare(argTypes.size) != 0)
-          EitherT.fromEither[Coeval](Left(s"Function '$name' requires ${argTypes.size} arguments, but ${args.size} are provided"))
+          Left(s"Function '$name' requires ${argTypes.size} arguments, but ${args.size} are provided")
         else {
-          import cats.instances.vector._
-          val actualArgTypes: Vector[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg))).toVector
-          val sequencedActualArgTypes                           = actualArgTypes.sequence[SetTypeResult, Typed.EXPR].map(x => x.zip(argTypes))
+          val typedExpressionArgumentsAndTypedPlaceholders: List[(Typed.EXPR, TYPEPLACEHOLDER)] = resolvedArgs.zip(argTypes)
 
-          sequencedActualArgTypes
-            .subflatMap { typedExpressionArgumentsAndTypedPlaceholders =>
-              val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case ((typedExpr, tph)) => (typedExpr.tpe, tph) }
-              for {
-                resolvedTypeParams <- TypeInferrer(typePairs)
-                resolvedResultType <- TypeInferrer.inferResultType(resultType, resolvedTypeParams)
-              } yield
-                Typed.FUNCTION_CALL(
-                  FunctionHeader(name, f.args.map(FunctionHeaderType.fromTypePlaceholder)),
-                  typedExpressionArgumentsAndTypedPlaceholders.map(_._1).toList,
-                  resolvedResultType
-                )
-            }
-
+          val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case ((typedExpr, tph)) => (typedExpr.tpe, tph) }
+          for {
+            resolvedTypeParams <- TypeInferrer(typePairs)
+            resolvedResultType <- TypeInferrer.inferResultType(resultType, resolvedTypeParams)
+          } yield
+            Typed.FUNCTION_CALL(
+              FunctionHeader(name, f.args.map(FunctionHeaderType.fromTypePlaceholder)),
+              typedExpressionArgumentsAndTypedPlaceholders.map(_._1),
+              resolvedResultType
+            )
         }
       }
-      val x: Seq[FunctionTypeSignarure] = ctx.functionTypeSignaturesByName(name)
-      x match {
+
+      ctx.functionTypeSignaturesByName(name) match {
         case Nil                   => EitherT.fromEither[Coeval](Left(s"Function '$name' not found"))
-        case singleOverload :: Nil => matchOverload(singleOverload)
-        case many                  => ???
+        case singleOverload :: Nil => resolvedArguments(args).subflatMap(matchOverload(_, singleOverload))
+        case many =>
+          resolvedArguments(args).subflatMap { resolvedArgs =>
+            val matchedSignatures = many
+              .zip(many.map(matchOverload(resolvedArgs, _)))
+              .collect {
+                case (sig, result) if result.isRight => (sig, result)
+              }
+
+            matchedSignatures match {
+              case Nil                       => Left(s"Can't find a function '$name'(${resolvedArgs.map(_.tpe.typeInfo).mkString(", ")})")
+              case (_, oneFuncResult) :: Nil => oneFuncResult
+              case manyPairs =>
+                val candidates = manyPairs.map { case (sig, _) => s"'$name'(${sig.args.mkString(", ")})" }
+                Left(s"Can't choose an overloaded function. Candidates: ${candidates.mkString("; ")}")
+            }
+          }
       }
-    }
 
     case block: Untyped.BLOCK =>
       block.let match {

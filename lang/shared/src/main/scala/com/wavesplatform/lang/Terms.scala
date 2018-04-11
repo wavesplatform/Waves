@@ -82,6 +82,7 @@ object Terms {
   }
 
   def findCommonType(t1: TYPE, t2: TYPE): Option[TYPE] = findCommonType(t1, t2, biDirectional = true)
+  def isSubtype(tpe: TYPE, subType: TYPE): Boolean     = ???
 
   def matchType(required: TYPE, actual: TYPE): Option[TYPE] = findCommonType(required, actual, biDirectional = false)
 

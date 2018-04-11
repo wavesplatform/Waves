@@ -6,7 +6,7 @@ import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.TypeChecker.TypeCheckerContext
 import com.wavesplatform.lang.ctx.impl.PureContext
 import com.wavesplatform.lang.ctx.{Context, PredefFunction, PredefType}
-import com.wavesplatform.lang.ctx.impl.PureContext.{none, some}
+import com.wavesplatform.lang.ctx.impl.PureContext.none
 
 package object typechecker {
 
