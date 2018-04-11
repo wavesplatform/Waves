@@ -446,6 +446,7 @@ object AsyncHttpApi extends Assertions {
     def retrying(r: Request, interval: FiniteDuration = 1.second, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[Response] = {
       def executeRequest: Future[Response] = {
         n.log.trace(s"Executing request '$r'")
+        if (r.getStringData != null) n.log.debug(s"Request's body '${r.getStringData}'")
         n.client
           .executeRequest(
             r,

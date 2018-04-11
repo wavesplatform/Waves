@@ -1,7 +1,7 @@
 package com.wavesplatform.it.async.activation
 
 import com.typesafe.config.Config
-import com.wavesplatform.features.BlockchainFeatureStatus
+import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.features.api.NodeFeatureStatus
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
@@ -11,6 +11,8 @@ import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+
+
 
 class ActivationFeatureTestSuite
     extends FreeSpec
@@ -22,9 +24,10 @@ class ActivationFeatureTestSuite
 
   private val waitCompletion = 6.minutes
 
-  private val votingInterval      = 12
-  private val blocksForActivation = 12 // should be even
-  private val featureNum: Short   = 1
+  private val votingInterval       = 12
+  private val blocksForActivation  = 12 // should be even
+  private val featureNum: Short    = BlockchainFeatures.SmallerMinimalGeneratingBalance.id
+  private val featureDescr: String = BlockchainFeatures.SmallerMinimalGeneratingBalance.description
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
@@ -50,7 +53,9 @@ class ActivationFeatureTestSuite
   "supported blocks increased when voting starts" in {
     val checkHeight: Int = votingInterval * 2 / 3
 
-    val activationStatusWhileVoting             = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
+    val activationStatusWhileVoting = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
+    activationStatusWhileVoting.description shouldBe featureDescr
+
     val activationStatusIntervalLastVotingBlock = activationStatus(nodes, votingInterval, featureNum, waitCompletion)
 
     val generatedBlocks              = Await.result(nodes.head.blockSeq(1, checkHeight), waitCompletion)
@@ -70,16 +75,17 @@ class ActivationFeatureTestSuite
 
   "blockchain status is APPROVED in second voting interval" in {
     val checkHeight: Int = votingInterval * 2
-    val info             = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
-
+    val statusInfo       = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
+    statusInfo.description shouldBe featureDescr
     // Activation will be on a next voting interval
-    assertApprovedStatus(info, checkHeight + votingInterval, NodeFeatureStatus.Voted)
+    assertApprovedStatus(statusInfo, checkHeight + votingInterval, NodeFeatureStatus.Voted)
   }
 
   "blockchain status is ACTIVATED in third voting interval" in {
     val checkHeight: Int = votingInterval * 3
-    val info             = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
-    assertActivatedStatus(info, checkHeight, NodeFeatureStatus.Voted)
+    val statusInfo       = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
+    statusInfo.description shouldBe featureDescr
+    assertActivatedStatus(statusInfo, checkHeight, NodeFeatureStatus.Voted)
   }
 
 }
