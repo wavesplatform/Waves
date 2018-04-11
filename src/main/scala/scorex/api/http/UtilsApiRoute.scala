@@ -4,14 +4,12 @@ import java.security.SecureRandom
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.{Parser, TypeChecker}
 import com.wavesplatform.settings.RestAPISettings
-import fastparse.core.Parsed.{Failure, Success}
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.Json
 import scorex.crypto.encode.Base58
-import scorex.transaction.smart.Script
+import scorex.transaction.smart.{Script, ScriptCompiler}
 import scorex.utils.Time
 
 @Path("/utils")
@@ -42,14 +40,10 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     ))
   def compile: Route = path("script" / "compile") {
     (post & entity(as[String])) { code =>
-      complete((Parser(code) match {
-        case Success(value, _) =>
-          TypeChecker(com.wavesplatform.utils.dummyTypeCheckerContext, value) match {
-            case Left(err)   => Left[String, String](err.toString)
-            case Right(expr) => Right[String, String](Script(expr).bytes().base58)
-          }
-        case f @ Failure(_, _, _) => Left[String, String](f.toString)
-      }).fold(x => Json.obj("error" -> x), x => Json.obj("script" -> x)))
+      complete(
+        ScriptCompiler(code)
+          .map(expr => Script(expr).bytes().base58)
+          .fold(x => Json.obj("error" -> x), x => Json.obj("script" -> x)))
     }
   }
 

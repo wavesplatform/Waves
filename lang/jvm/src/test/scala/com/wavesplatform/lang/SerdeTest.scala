@@ -1,9 +1,10 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.TypeChecker.TypeCheckerContext
-import com.wavesplatform.lang.ctx.impl.PureContext
-import com.wavesplatform.lang.testing.ScriptGen
+import com.wavesplatform.lang.v1.TypeChecker.TypeCheckerContext
+import com.wavesplatform.lang.v1.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.{Serde, TypeChecker}
+import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.BitVector

@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.impl
 
-import com.wavesplatform.lang.traits.{DataType, Transaction}
+import com.wavesplatform.lang.v1.traits.{DataType, Transaction}
 
 import scala.scalajs.js.annotation.JSGlobalScope
 import scala.scalajs.{js => platform}

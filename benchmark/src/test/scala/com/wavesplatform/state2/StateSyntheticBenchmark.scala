@@ -2,7 +2,7 @@ package com.wavesplatform.state2
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.lang.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.{Parser, ScriptExprV1, TypeChecker}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.StateSyntheticBenchmark._
 import com.wavesplatform.utils.dummyTypeCheckerContext
@@ -79,7 +79,7 @@ object StateSyntheticBenchmark {
             .selfSigned(
               SetScriptTransaction.supportedVersions.head,
               richAccount,
-              Some(Script(typedScript)),
+              Some(Script(ScriptExprV1(typedScript))),
               100000,
               System.currentTimeMillis()
             )

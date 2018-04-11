@@ -1,7 +1,7 @@
 package scorex.transaction.smart
 
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.BaseGlobal
+import com.wavesplatform.lang.v1.BaseGlobal
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 

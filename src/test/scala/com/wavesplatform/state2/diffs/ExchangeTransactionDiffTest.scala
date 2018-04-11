@@ -2,7 +2,8 @@ package com.wavesplatform.state2.diffs
 
 import cats._
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.Terms.Typed.TRUE
+import com.wavesplatform.lang.v1.ScriptExprV1
+import com.wavesplatform.lang.v1.Terms.Typed.TRUE
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
@@ -63,7 +64,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       ts      <- timestampGen
       gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).right.get
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
-      setScript                = SetScriptTransaction.selfSigned(version, seller, Some(Script(TRUE)), fee, ts).explicitGet()
+      setScript                = SetScriptTransaction.selfSigned(version, seller, Some(Script(ScriptExprV1(TRUE))), fee, ts).explicitGet()
       issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1)
       issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1)
       maybeAsset1              <- Gen.option(issue1.id())

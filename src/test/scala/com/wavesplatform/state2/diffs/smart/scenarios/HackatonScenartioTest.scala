@@ -4,7 +4,8 @@ import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.{NoShrink, TransactionGen}
 import com.wavesplatform.lang.TypeInfo._
-import com.wavesplatform.lang.{Evaluator, Parser, TypeChecker, TypeInfo}
+import com.wavesplatform.lang.v1.{EvaluatorV1, Parser, ScriptExprV1, TypeChecker}
+import com.wavesplatform.lang.TypeInfo
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
 import com.wavesplatform.state2.diffs.smart._
@@ -52,7 +53,7 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
         """.stripMargin
 
       untypedScript = Parser(assetScript).get.value
-      typedScript   = Script(TypeChecker(dummyTypeCheckerContext, untypedScript).explicitGet())
+      typedScript   = Script(ScriptExprV1(TypeChecker(dummyTypeCheckerContext, untypedScript).explicitGet()))
 
       issueTransaction = SmartIssueTransaction
         .selfSigned(
@@ -103,7 +104,7 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
   private def eval[T: TypeInfo](code: String) = {
     val untyped = Parser(code).get.value
     val typed   = TypeChecker(dummyTypeCheckerContext, untyped)
-    typed.flatMap(Evaluator[T](dummyContext, _))
+    typed.flatMap(EvaluatorV1[T](dummyContext, _))
   }
 
   property("Script toBase58String") {

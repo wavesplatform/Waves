@@ -2,8 +2,8 @@ package com.wavesplatform
 
 import com.google.common.base.Throwables
 import com.wavesplatform.db.{Storage, VersionedStorage}
-import com.wavesplatform.lang.TypeChecker
-import com.wavesplatform.lang.ctx.Context
+import com.wavesplatform.lang.v1.TypeChecker
+import com.wavesplatform.lang.v1.ctx.Context
 import monix.eval.Coeval
 import monix.execution.UncaughtExceptionReporter
 import org.joda.time.Duration

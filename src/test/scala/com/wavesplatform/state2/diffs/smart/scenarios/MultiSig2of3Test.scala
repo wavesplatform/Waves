@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs.smart.scenarios
 
-import com.wavesplatform.lang.Terms._
-import com.wavesplatform.lang._
+import com.wavesplatform.lang.v1.Terms._
+import com.wavesplatform.lang.v1.{Parser, ScriptExprV1, TypeChecker}
 import com.wavesplatform.utils._
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
@@ -46,7 +46,7 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
     recepient <- accountGen
     ts        <- positiveIntGen
     genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    setSctipt <- selfSignedSetScriptTransactionGenP(master, Script(multisigTypedExpr(s0, s1, s2)))
+    setSctipt <- selfSignedSetScriptTransactionGenP(master, Script(ScriptExprV1(multisigTypedExpr(s0, s1, s2))))
     amount    <- positiveLongGen
     fee       <- smallFeeGen
     timestamp <- timestampGen

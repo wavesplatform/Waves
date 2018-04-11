@@ -2,7 +2,8 @@ package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.TypeInfo._
-import com.wavesplatform.lang.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.{EvaluatorV1, Parser, TypeChecker}
+import com.wavesplatform.lang.v1.ctx.impl.PureContext
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
@@ -12,7 +13,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with Matchers with No
     val untyped = Parser(code).get.value
     val ctx     = PureContext.instance
     val typed   = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(ctx), untyped)
-    typed.flatMap(Evaluator[T](ctx, _))
+    typed.flatMap(EvaluatorV1[T](ctx, _))
   }
 
   property("function call") {

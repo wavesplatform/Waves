@@ -1,6 +1,6 @@
 package com.wavesplatform.state2.diffs.smart.scenarios
 
-import com.wavesplatform.lang.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.{Parser, TypeChecker}
 import com.wavesplatform.state2.diffs.smart._
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.{assertDiffAndState, assertDiffEi, produce}
