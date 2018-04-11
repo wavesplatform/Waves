@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.ctx
 
 import cats.data.EitherT
-import com.wavesplatform.lang.Terms.{FunctionTypeSignarure, TYPEPLACEHOLDER}
+import com.wavesplatform.lang.Terms.{FunctionTypeSignature, TYPEPLACEHOLDER}
 import com.wavesplatform.lang.{FunctionHeader, TrampolinedExecResult}
 import monix.eval.Coeval
 
@@ -10,7 +10,7 @@ sealed trait PredefFunction {
   val args: List[(String, TYPEPLACEHOLDER)]
   val resultType: TYPEPLACEHOLDER
   def eval(args: List[Any]): TrampolinedExecResult[Any]
-  val signature: FunctionTypeSignarure
+  val signature: FunctionTypeSignature
   val header: FunctionHeader
 }
 object PredefFunction {
@@ -23,7 +23,7 @@ object PredefFunction {
     override def eval(args: List[Any]): TrampolinedExecResult[Any] = {
       EitherT.fromEither[Coeval](ev(args))
     }
-    override lazy val signature              = FunctionTypeSignarure(args.map(_._2), resultType)
+    override lazy val signature              = FunctionTypeSignature(args.map(_._2), resultType)
     override lazy val header: FunctionHeader = FunctionHeader(name, args.map(_._2).map(FunctionHeader.FunctionHeaderType.fromTypePlaceholder))
   }
 

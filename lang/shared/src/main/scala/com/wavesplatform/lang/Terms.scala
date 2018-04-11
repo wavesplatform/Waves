@@ -5,7 +5,7 @@ import scodec.bits.ByteVector
 
 object Terms {
 
-  case class FunctionTypeSignarure(args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER)
+  case class FunctionTypeSignature(args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER)
 
   sealed trait TYPEPLACEHOLDER
   case class TYPEPARAM(char: Byte)               extends TYPEPLACEHOLDER

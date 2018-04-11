@@ -12,9 +12,9 @@ import scala.util.{Failure, Success, Try}
 object TypeChecker {
 
   type TypeDefs     = Map[String, TYPE]
-  type FunctionSigs = Map[String, Seq[FunctionTypeSignarure]]
+  type FunctionSigs = Map[String, Seq[FunctionTypeSignature]]
   case class TypeCheckerContext(predefTypes: Map[String, PredefType], varDefs: TypeDefs, functionDefs: FunctionSigs) {
-    def functionTypeSignaturesByName(name: String): Seq[FunctionTypeSignarure] = functionDefs.getOrElse(name, Seq.empty)
+    def functionTypeSignaturesByName(name: String): Seq[FunctionTypeSignature] = functionDefs.getOrElse(name, Seq.empty)
   }
 
   object TypeCheckerContext {
@@ -71,7 +71,7 @@ object TypeChecker {
         r.sequence[SetTypeResult, Typed.EXPR]
       }
 
-      def matchOverload(resolvedArgs: List[Typed.EXPR], f: FunctionTypeSignarure): Either[String, Typed.EXPR] = {
+      def matchOverload(resolvedArgs: List[Typed.EXPR], f: FunctionTypeSignature): Either[String, Typed.EXPR] = {
         val argTypes   = f.args
         val resultType = f.result
         if (args.lengthCompare(argTypes.size) != 0)
