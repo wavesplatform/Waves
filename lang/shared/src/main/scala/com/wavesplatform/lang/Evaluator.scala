@@ -41,45 +41,12 @@ object Evaluator {
         case Typed.TRUE                => EitherT.rightT[Coeval, String](true)
         case Typed.FALSE               => EitherT.rightT[Coeval, String](false)
 
-        case Typed.BINARY_OP(a, SUM_OP, b, LONG) =>
-          for {
-            evaluatedA <- r[Long](ctx, EitherT.pure(a))
-            evaluatedB <- r[Long](ctx, EitherT.pure(b))
-          } yield evaluatedA + evaluatedB
-
-        case Typed.BINARY_OP(a, op @ (GE_OP | GT_OP), b, BOOLEAN) =>
-          for {
-            evaluatedA <- r[Long](ctx, EitherT.pure(a))
-            evaluatedB <- r[Long](ctx, EitherT.pure(b))
-          } yield
-            op match {
-              case GE_OP => evaluatedA >= evaluatedB
-              case GT_OP => evaluatedA > evaluatedB
-              case x     => throw new IllegalStateException(s"$x") // supress pattern match warning
-            }
-
         case Typed.IF(cond, t1, t2, tpe) =>
           r[Boolean](ctx, EitherT.pure(cond)) flatMap {
             case true  => r(ctx, EitherT.pure(t1))(tpe.typeInfo)
             case false => r(ctx, EitherT.pure(t2))(tpe.typeInfo)
           }
 
-        case Typed.BINARY_OP(t1, AND_OP, t2, BOOLEAN) =>
-          r[Boolean](ctx, EitherT.pure(t1)) flatMap {
-            case false => EitherT.rightT[Coeval, String](false)
-            case true  => r[Boolean](ctx, EitherT.pure(t2))
-          }
-        case Typed.BINARY_OP(t1, OR_OP, t2, BOOLEAN) =>
-          r[Boolean](ctx, EitherT.pure(t1)).flatMap {
-            case true  => EitherT.rightT[Coeval, String](true)
-            case false => r[Boolean](ctx, EitherT.pure(t2))
-          }
-
-        case Typed.BINARY_OP(it1, EQ_OP, it2, tpe) =>
-          for {
-            i1 <- r(ctx, EitherT.pure(it1))(it1.tpe.typeInfo)
-            i2 <- r(ctx, EitherT.pure(it2))(it2.tpe.typeInfo)
-          } yield i1 == i2
         case Typed.GETTER(expr, field, _) =>
           r[Obj](ctx, EitherT.pure(expr)).flatMap { (obj: Obj) =>
             val value: EitherT[Coeval, ExecutionError, Any] = obj.fields.find(_._1 == field) match {
@@ -106,10 +73,6 @@ object Evaluator {
               } yield r
             case None => EitherT.leftT[Coeval, Any](s"function '$header' not found")
           }
-        case Typed.BINARY_OP(_, SUM_OP, _, tpe) if tpe != LONG            => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
-        case Typed.BINARY_OP(_, GE_OP | GT_OP, _, tpe) if tpe != BOOLEAN  => EitherT.leftT[Coeval, Any](s"Expected LONG, but got $tpe: $t")
-        case Typed.BINARY_OP(_, AND_OP | OR_OP, _, tpe) if tpe != BOOLEAN => EitherT.leftT[Coeval, Any](s"Expected BOOLEAN, but got $tpe: $t")
-
       }).map { v =>
         val ti = typeInfo[T]
         v match {

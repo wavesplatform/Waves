@@ -5,6 +5,7 @@ import com.wavesplatform.lang.Terms.Untyped._
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.testing.ScriptGen
 import fastparse.core.Parsed.{Failure, Success}
+import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
@@ -20,29 +21,38 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
   def toString(expr: EXPR): String = expr match {
     case CONST_LONG(x) => whitespaces.sample.get + s"$x" + whitespaces.sample.get
-    case _             => ???
+    case TRUE          => whitespaces.sample.get + s"true" + whitespaces.sample.get
+    case FALSE         => whitespaces.sample.get + s"false" + whitespaces.sample.get
+    case BINARY_OP(x: EXPR, op: BINARY_OP_KIND, y: EXPR) =>
+      op match {
+        case SUM_OP => s"(${toString(x)}+${toString(y)})"
+        case GT_OP  => s"(${toString(x)}>${toString(y)})"
+        case AND_OP => s"(${toString(x)}&&${toString(y)})"
+        case OR_OP  => s"(${toString(x)}||${toString(y)})"
+        case EQ_OP  => s"(${toString(x)}==${toString(y)})"
+        case GE_OP  => s"(${toString(x)}>=${toString(y)})"
+      }
+    case IF(cond: EXPR, x: EXPR, y: EXPR) => s"(if(${toString(cond)}) then ${toString(x)} else ${toString(y)})"
+    case _                                => ???
   }
 
-  property("simple expressions") {
-    parse("10+11") shouldBe BINARY_OP(CONST_LONG(10), SUM_OP, CONST_LONG(11))
-    parse("(10+11)") shouldBe BINARY_OP(CONST_LONG(10), SUM_OP, CONST_LONG(11))
-    parse("(10+11) + 12") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(10), SUM_OP, CONST_LONG(11)), SUM_OP, CONST_LONG(12))
-    parse("10   + 11 + 12") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(10), SUM_OP, CONST_LONG(11)), SUM_OP, CONST_LONG(12))
-    parse("1+2+3+4+5") shouldBe BINARY_OP(
-      BINARY_OP(BINARY_OP(BINARY_OP(CONST_LONG(1), SUM_OP, CONST_LONG(2)), SUM_OP, CONST_LONG(3)), SUM_OP, CONST_LONG(4)),
-      SUM_OP,
-      CONST_LONG(5))
-    parse("1==1") shouldBe BINARY_OP(CONST_LONG(1), EQ_OP, CONST_LONG(1))
-    parse("true && true") shouldBe BINARY_OP(TRUE, AND_OP, TRUE)
-    parse("true || false") shouldBe BINARY_OP(TRUE, OR_OP, FALSE)
-    parse("true || (true && false)") shouldBe BINARY_OP(TRUE, OR_OP, BINARY_OP(TRUE, AND_OP, FALSE))
-    parse("false || false || false") shouldBe BINARY_OP(BINARY_OP(FALSE, OR_OP, FALSE), OR_OP, FALSE)
-    parse("(1>= 0)||(3 >2)") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(1), GE_OP, CONST_LONG(0)), OR_OP, BINARY_OP(CONST_LONG(3), GT_OP, CONST_LONG(2)))
-
-    forAll(CONST_LONGgen) { constLong =>
-      val code = toString(constLong)
-      parse(code) shouldBe constLong
+  def genElementCheck(gen: Gen[EXPR]): Unit = {
+    forAll(gen) { exp =>
+      val code = toString(exp)
+      parse(code) shouldBe exp
     }
+  }
+
+  property("simple: expressions, multiline, if") {
+    genElementCheck(CONST_LONGgen)
+    genElementCheck(BOOLgen(10))
+    genElementCheck(SUMgen(10))
+    genElementCheck(EQ_INTgen(10))
+    genElementCheck(INTGen(10))
+    genElementCheck(GEgen(10))
+    genElementCheck(GTgen(10))
+    genElementCheck(ANDgen(10))
+    genElementCheck(ORgen(10))
   }
 
   property("priority in binary expressions") {
@@ -87,13 +97,6 @@ X > Y
   }
 
   property("multiline") {
-    parse("""
-        |
-        |false
-        |
-        |
-      """.stripMargin) shouldBe FALSE
-
     parse("""let X = 10;
         |
         |true
@@ -114,7 +117,6 @@ X > Y
   }
 
   property("if") {
-    parse("if(true) then 1 else 2") shouldBe IF(TRUE, CONST_LONG(1), CONST_LONG(2))
     parse("if(true) then 1 else if(X==Y) then 2 else 3") shouldBe IF(TRUE,
                                                                      CONST_LONG(1),
                                                                      IF(BINARY_OP(REF("X"), EQ_OP, REF("Y")), CONST_LONG(2), CONST_LONG(3)))
@@ -123,8 +125,6 @@ X > Y
         |else if(X== Y)
         |     then 2
         |       else 3""".stripMargin) shouldBe IF(TRUE, CONST_LONG(1), IF(BINARY_OP(REF("X"), EQ_OP, REF("Y")), CONST_LONG(2), CONST_LONG(3)))
-
-    parse("if (true) then false else false==false") shouldBe IF(TRUE, FALSE, BINARY_OP(FALSE, EQ_OP, FALSE))
 
     parse("""if
         |

@@ -18,4 +18,6 @@ object Environment extends scalajs.js.Object {
   def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any] = platform.native
 
   def resolveAddress(addressOrAlias: Array[Byte]): Either[String, Array[Byte]] = platform.native
+
+  def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = platform.native
 }

@@ -106,8 +106,6 @@ class MatcherUtxPool(underlying: UtxPool, matcherSettings: MatcherSettings, even
           else {
             val accPortfolio = accountPortfolio(addr)
             val combined     = Monoid.combine(portfolio, accPortfolio)
-
-            log.debug(s"\n=== $addr ====\naccPortfolio: $accPortfolio\nportfolio: $portfolio\ncombined: $combined")
             List(addr -> BalanceChanged.Changes(combined, changedAssets))
           }
       }

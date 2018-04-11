@@ -8,6 +8,7 @@ import monix.eval.Coeval
 import monix.execution.UncaughtExceptionReporter
 import org.joda.time.Duration
 import org.joda.time.format.PeriodFormat
+import scorex.account.AddressScheme
 import scorex.transaction.smart.BlockchainContext
 import scorex.utils.ScorexLogging
 
@@ -74,7 +75,7 @@ package object utils extends ScorexLogging {
     }
   }
 
-  val dummyNetworkByte: Byte                                  = 84
-  val dummyContext: Context                                   = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), null)
-  val dummyTypeCheckerContext: TypeChecker.TypeCheckerContext = TypeChecker.TypeCheckerContext.fromContext(dummyContext)
+  lazy val dummyNetworkByte: Byte                                  = AddressScheme.current.chainId
+  lazy val dummyContext: Context                                   = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), null)
+  lazy val dummyTypeCheckerContext: TypeChecker.TypeCheckerContext = TypeChecker.TypeCheckerContext.fromContext(dummyContext)
 }

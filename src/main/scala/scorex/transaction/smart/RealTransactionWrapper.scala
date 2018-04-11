@@ -65,4 +65,54 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
 
   override def timestamp: Long = tx.timestamp
 
+  override def aliasText: Either[String, String] = tx match {
+    case g: CreateAliasTransaction => Right(g.alias.name)
+    case _                         => Left("Transaction doesn't contain alias text")
+  }
+
+  override def reissuable: Either[String, Boolean] = tx match {
+    case g: SmartIssueTransaction => Right(g.reissuable)
+    case g: IssueTransaction      => Right(g.reissuable)
+    case g: ReissueTransaction    => Right(g.reissuable)
+    case _                        => Left("Transaction doesn't contain reissuable")
+  }
+
+  override def decimals: Either[String, Byte] = tx match {
+    case g: SmartIssueTransaction => Right(g.decimals)
+    case g: IssueTransaction      => Right(g.decimals)
+    case _                        => Left("Transaction doesn't contain decimals")
+  }
+
+  override def assetDescription: Either[String, ByteVector] = tx match {
+    case g: SmartIssueTransaction => Right(ByteVector(g.description))
+    case g: IssueTransaction      => Right(ByteVector(g.description))
+    case _                        => Left("Transaction doesn't contain asset description")
+  }
+
+  override def assetName: Either[String, ByteVector] = tx match {
+    case g: SmartIssueTransaction => Right(ByteVector(g.name))
+    case g: IssueTransaction      => Right(ByteVector(g.name))
+    case _                        => Left("Transaction doesn't contain asset name")
+  }
+
+  override def attachment: Either[String, ByteVector] = tx match {
+    case g: VersionedTransferTransaction => Right(ByteVector(g.attachment))
+    case g: MassTransferTransaction      => Right(ByteVector(g.attachment))
+    case g: TransferTransaction          => Right(ByteVector(g.attachment))
+    case _                               => Left("Transaction doesn't contain attachment")
+  }
+
+  override def chainId: Either[String, Byte] = tx match {
+    case g: SetScriptTransaction => Right(g.chainId)
+    case _                       => Left("Transaction doesn't contain chainId")
+  }
+
+  override def version: Either[String, Byte] = tx match {
+    case g: VersionedTransferTransaction => Right(g.version)
+    case g: MassTransferTransaction      => Right(g.version)
+    case g: SetScriptTransaction         => Right(g.version)
+    case g: SmartIssueTransaction        => Right(g.version)
+    case g: DataTransaction              => Right(g.version)
+    case _                               => Left("Transaction doesn't contain version")
+  }
 }
