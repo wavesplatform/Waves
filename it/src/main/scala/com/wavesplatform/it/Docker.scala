@@ -65,13 +65,13 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     close()
   }
 
-  private val configTemplate = parseResources("template.conf")
+  private[it] val configTemplate = parseResources("template.conf")
 
   AddressScheme.current = new AddressScheme {
     override val chainId = configTemplate.as[String]("waves.blockchain.custom.address-scheme-character").charAt(0).toByte
   }
 
-  private val genesisOverride = {
+  private[it] val genesisOverride = {
     val genesisTs          = System.currentTimeMillis()
     val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
          |  timestamp = $genesisTs

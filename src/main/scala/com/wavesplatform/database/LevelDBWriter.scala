@@ -672,6 +672,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
               val address = tx.sender.toAddress
               addressIdCache.get(address).foreach { addressId =>
                 tx.data.foreach { e =>
+                  log.trace(s"Discarding ${e.key} for $address at $currentHeight")
                   rw.delete(k.data(currentHeight, addressId, e.key))
                   rw.filterHistory(k.dataHistory(addressId, e.key), currentHeight)
                 }

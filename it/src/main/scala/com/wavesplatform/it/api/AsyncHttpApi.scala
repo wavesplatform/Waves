@@ -210,14 +210,14 @@ object AsyncHttpApi extends Assertions {
     def scriptInfo(address: String): Future[AddressApiRoute.AddressScriptInfo] =
       get(s"/addresses/scriptInfo/$address").as[AddressApiRoute.AddressScriptInfo]
 
-    def findTransactionInfo(txId: String): Future[Option[Transaction]] = transactionInfo(txId).transform {
+    def findTransactionInfo(txId: String): Future[Option[TransactionInfo]] = transactionInfo(txId).transform {
       case Success(tx)                                       => Success(Some(tx))
       case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
       case Failure(ex)                                       => Failure(ex)
     }
 
-    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[Transaction] =
-      waitFor[Option[Transaction]](s"transaction $txId")(
+    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[TransactionInfo] =
+      waitFor[Option[TransactionInfo]](s"transaction $txId")(
         _.transactionInfo(txId).transform {
           case Success(tx)                                       => Success(Some(tx))
           case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
@@ -235,7 +235,7 @@ object AsyncHttpApi extends Assertions {
 
     def waitForHeight(expectedHeight: Int): Future[Int] = waitFor[Int](s"height >= $expectedHeight")(_.height, h => h >= expectedHeight, 1.second)
 
-    def transactionInfo(txId: String): Future[Transaction] = get(s"/transactions/info/$txId").as[Transaction]
+    def transactionInfo(txId: String): Future[TransactionInfo] = get(s"/transactions/info/$txId").as[TransactionInfo]
 
     def effectiveBalance(address: String): Future[Balance] = get(s"/addresses/effectiveBalance/$address").as[Balance]
 

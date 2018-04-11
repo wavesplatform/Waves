@@ -138,7 +138,7 @@ object SyncHttpApi extends Assertions {
     def createAddress(): String =
       Await.result(async(n).createAddress, RequestAwaitTime)
 
-    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Transaction =
+    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): TransactionInfo =
       Await.result(async(n).waitForTransaction(txId), RequestAwaitTime)
 
     def signAndBroadcast(tx: JsObject): Transaction =

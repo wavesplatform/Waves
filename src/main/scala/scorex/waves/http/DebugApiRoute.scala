@@ -2,7 +2,6 @@ package scorex.waves.http
 
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
-import javax.ws.rs.Path
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
@@ -18,10 +17,12 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
-import monix.eval.Coeval
+import javax.ws.rs.Path
+import monix.eval.{Coeval, Task}
 import play.api.libs.json._
 import scorex.account.Address
 import scorex.api.http._
+import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.transaction._
@@ -29,10 +30,10 @@ import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 import scorex.waves.http.DebugApiRoute._
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
+
 @Path("/debug")
 @Api(value = "/debug")
 case class DebugApiRoute(settings: RestAPISettings,
@@ -41,7 +42,7 @@ case class DebugApiRoute(settings: RestAPISettings,
                          history: History with DebugNgHistory,
                          peerDatabase: PeerDatabase,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo],
-                         blockchainUpdater: BlockchainUpdater,
+                         rollbackTask: ByteStr => Task[Either[ValidationError, Seq[Block]]],
                          allChannels: ChannelGroup,
                          utxStorage: UtxPool,
                          miner: Miner with MinerDebugInfo,
@@ -153,8 +154,10 @@ case class DebugApiRoute(settings: RestAPISettings,
     complete(stateReader.wavesDistribution(height).map { case (a, b) => a.stringRepr -> b })
   }
 
-  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] = Future {
-    blockchainUpdater.removeAfter(blockId) match {
+  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] = {
+    import monix.execution.Scheduler.Implicits.global
+
+    rollbackTask(blockId).asyncBoundary.map {
       case Right(blocks) =>
         allChannels.broadcast(LocalScoreChanged(history.score))
         if (returnTransactionsToUtx) {
@@ -164,8 +167,8 @@ case class DebugApiRoute(settings: RestAPISettings,
         }
         miner.scheduleMining()
         Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
-      case Left(error) => ApiError.fromValidationError(error)
-    }
+      case Left(error) => ApiError.fromValidationError(error): ToResponseMarshallable
+    }.runAsyncLogErr
   }
 
   @Path("/rollback")
