@@ -43,7 +43,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     }
   }
 
-  property("simple expressions") {
+  property("simple: expressions, multiline, if") {
     genElementCheck(CONST_LONGgen)
     genElementCheck(BOOLgen(10))
     genElementCheck(SUMgen(10))
@@ -97,13 +97,6 @@ X > Y
   }
 
   property("multiline") {
-    parse("""
-        |
-        |false
-        |
-        |
-      """.stripMargin) shouldBe FALSE
-
     parse("""let X = 10;
         |
         |true
@@ -124,7 +117,6 @@ X > Y
   }
 
   property("if") {
-    parse("if(true) then 1 else 2") shouldBe IF(TRUE, CONST_LONG(1), CONST_LONG(2))
     parse("if(true) then 1 else if(X==Y) then 2 else 3") shouldBe IF(TRUE,
                                                                      CONST_LONG(1),
                                                                      IF(BINARY_OP(REF("X"), EQ_OP, REF("Y")), CONST_LONG(2), CONST_LONG(3)))
@@ -133,8 +125,6 @@ X > Y
         |else if(X== Y)
         |     then 2
         |       else 3""".stripMargin) shouldBe IF(TRUE, CONST_LONG(1), IF(BINARY_OP(REF("X"), EQ_OP, REF("Y")), CONST_LONG(2), CONST_LONG(3)))
-
-    parse("if (true) then false else false==false") shouldBe IF(TRUE, FALSE, BINARY_OP(FALSE, EQ_OP, FALSE))
 
     parse("""if
         |
