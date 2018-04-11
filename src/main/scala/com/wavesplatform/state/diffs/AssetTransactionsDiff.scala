@@ -3,7 +3,6 @@ package com.wavesplatform.state.diffs
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.reader.SnapshotStateReader
 import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, LeaseBalance, Portfolio}
 import scorex.account.PublicKeyAccount
 import scorex.transaction.ValidationError.GenericError
@@ -36,15 +35,16 @@ object AssetTransactionsDiff {
       ))
   }
 
-  def reissue(state: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, height: Int, blockchain: Blockchain)(
+  def reissue(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(
       tx: ReissueTransaction): Either[ValidationError, Diff] =
-    validateAsset(tx, state, tx.assetId, issuerOnly = true).flatMap { _ =>
-      val oldInfo = state.assetDescription(tx.assetId).get
+    validateAsset(tx, blockchain, tx.assetId, issuerOnly = true).flatMap { _ =>
+      val oldInfo = blockchain.assetDescription(tx.assetId).get
       if (!oldInfo.reissuable && blockTime > settings.allowInvalidReissueInSameBlockUntilTimestamp) {
         Left(
           GenericError(s"Asset is not reissuable and blockTime=$blockTime is greater than " +
             s"settings.allowInvalidReissueInSameBlockUntilTimestamp=${settings.allowInvalidReissueInSameBlockUntilTimestamp}"))
-      } else if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume && blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, state.height)) {
+      } else if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume && blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens,
+                                                                                                      blockchain.height)) {
         Left(GenericError(s"Asset total value overflow"))
       } else {
         Right(
@@ -57,10 +57,10 @@ object AssetTransactionsDiff {
       }
     }
 
-  def burn(state: SnapshotStateReader, blockchain: Blockchain, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] = {
-    val burnAnyTokensEnabled = blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, state.height)
+  def burn(blockchain: Blockchain, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] = {
+    val burnAnyTokensEnabled = blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, blockchain.height)
 
-    validateAsset(tx, state, tx.assetId, !burnAnyTokensEnabled).map(itx => {
+    validateAsset(tx, blockchain, tx.assetId, !burnAnyTokensEnabled).map(itx => {
       Diff(
         height = height,
         tx = tx,
@@ -70,11 +70,8 @@ object AssetTransactionsDiff {
     })
   }
 
-  private def validateAsset(tx: SignedTransaction,
-                            state: SnapshotStateReader,
-                            assetId: AssetId,
-                            issuerOnly: Boolean): Either[ValidationError, Unit] = {
-    state.transactionInfo(assetId) match {
+  private def validateAsset(tx: SignedTransaction, blockchain: Blockchain, assetId: AssetId, issuerOnly: Boolean): Either[ValidationError, Unit] = {
+    blockchain.transactionInfo(assetId) match {
       case Some((_, itx: IssueTransaction)) if !validIssuer(issuerOnly, tx.sender, itx.sender) =>
         Left(GenericError("Asset was issued by other address"))
       case Some((_, sitx: SmartIssueTransaction)) if sitx.script.isEmpty && !validIssuer(issuerOnly, tx.sender, sitx.sender) =>

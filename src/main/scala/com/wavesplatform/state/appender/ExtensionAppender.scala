@@ -5,7 +5,6 @@ import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase, formatBlocks, id}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
-import com.wavesplatform.state.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
@@ -24,7 +23,6 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
   def apply(checkpoint: CheckpointService,
             blockchain: Blockchain,
             blockchainUpdater: BlockchainUpdater,
-            stateReader: SnapshotStateReader,
             utxStorage: UtxPool,
             time: Time,
             settings: WavesSettings,
@@ -46,7 +44,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
               val forkApplicationResultEi = Coeval {
                 extension.view
                   .map { b =>
-                    b -> appendBlock(checkpoint, blockchain, blockchainUpdater, stateReader, utxStorage, time, settings)(b).right.map {
+                    b -> appendBlock(checkpoint, blockchain, blockchainUpdater, utxStorage, time, settings)(b).right.map {
                       _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
                     }
                   }

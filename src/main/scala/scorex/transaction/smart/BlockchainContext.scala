@@ -4,7 +4,6 @@ import com.wavesplatform.lang.TypeChecker.TypeCheckerContext
 import com.wavesplatform.lang.WavesContext
 import com.wavesplatform.lang.traits.{DataType, Transaction => ContractTransaction}
 import com.wavesplatform.state._
-import com.wavesplatform.state.reader.SnapshotStateReader
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 import scorex.account.Address
@@ -14,7 +13,7 @@ import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
-class BlockchainContext(override val networkByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], state: SnapshotStateReader) extends WavesContext {
+class BlockchainContext(override val networkByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], blockchain: Blockchain) extends WavesContext {
 
   import BlockchainContext._
 
@@ -23,14 +22,14 @@ class BlockchainContext(override val networkByte: Byte, tx: Coeval[Transaction],
   override def transaction: ContractTransaction = convert(tx())
 
   override def transactionById(id: Array[Byte]): Option[ContractTransaction] =
-    state
+    blockchain
       .transactionInfo(ByteStr(id))
       .map(_._2)
       .map(convert)
 
   override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any] = {
     val address = Address.fromBytes(addressBytes).explicitGet()
-    val data    = state.accountData(address, key)
+    val data    = blockchain.accountData(address, key)
     data.map((_, dataType)).flatMap {
       case (LongDataEntry(_, value), DataType.Long)        => Some(value)
       case (BooleanDataEntry(_, value), DataType.Boolean)  => Some(value)
@@ -42,7 +41,7 @@ class BlockchainContext(override val networkByte: Byte, tx: Coeval[Transaction],
   override def resolveAddress(addressOrAlias: Array[Byte]): Either[String, Array[Byte]] = {
     (for {
       aoa     <- AddressOrAlias.fromBytes(bytes = addressOrAlias, position = 0)
-      address <- state.resolveAliasEi(aoa._1)
+      address <- blockchain.resolveAliasEi(aoa._1)
     } yield address.bytes.arr).left.map(_.toString)
   }
 }

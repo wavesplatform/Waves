@@ -8,8 +8,7 @@ import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.patch.{CancelAllLeases, CancelInvalidLeaseIn, CancelLeaseOverflow}
-import com.wavesplatform.state.reader.CompositeStateReader.composite
-import com.wavesplatform.state.reader.SnapshotStateReader
+import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.ValidationError.ActivationError
@@ -22,11 +21,10 @@ object BlockDiffer extends ScorexLogging with Instrumented {
 
   def fromBlock(settings: FunctionalitySettings,
                 blockchain: Blockchain,
-                s: SnapshotStateReader,
                 maybePrevBlock: Option[Block],
                 block: Block): Either[ValidationError, Diff] = {
     val blockSigner = block.signerData.generator.toAddress
-    val stateHeight = s.height
+    val stateHeight = blockchain.height
 
     // height switch is next after activation
     val ng4060switchHeight = blockchain.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
@@ -46,18 +44,17 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     val prevBlockTimestamp = maybePrevBlock.map(_.timestamp)
     for {
       _ <- block.signaturesValid()
-      r <- apply(settings, s, blockchain, prevBlockTimestamp)(block.signerData.generator,
-                                                              prevBlockFeeDistr,
-                                                              currentBlockFeeDistr,
-                                                              block.timestamp,
-                                                              block.transactionData,
-                                                              1)
+      r <- apply(settings, blockchain, prevBlockTimestamp)(block.signerData.generator,
+                                                           prevBlockFeeDistr,
+                                                           currentBlockFeeDistr,
+                                                           block.timestamp,
+                                                           block.transactionData,
+                                                           1)
     } yield r
   }
 
   def fromMicroBlock(settings: FunctionalitySettings,
                      blockchain: Blockchain,
-                     s: SnapshotStateReader,
                      prevBlockTimestamp: Option[Long],
                      micro: MicroBlock,
                      timestamp: Long): Either[ValidationError, Diff] = {
@@ -65,18 +62,18 @@ object BlockDiffer extends ScorexLogging with Instrumented {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
       _ <- Either.cond(blockchain.activatedFeatures().contains(BlockchainFeatures.NG.id), (), ActivationError(s"MicroBlocks are not yet activated"))
       _ <- micro.signaturesValid()
-      r <- apply(settings, s, blockchain, prevBlockTimestamp)(micro.sender, None, None, timestamp, micro.transactionData, 0)
+      r <- apply(settings, blockchain, prevBlockTimestamp)(micro.sender, None, None, timestamp, micro.transactionData, 0)
     } yield r
   }
 
-  private def apply(settings: FunctionalitySettings, s: SnapshotStateReader, blockchain: Blockchain, prevBlockTimestamp: Option[Long])(
+  private def apply(settings: FunctionalitySettings, blockchain: Blockchain, prevBlockTimestamp: Option[Long])(
       blockGenerator: Address,
       prevBlockFeeDistr: Option[Diff],
       currentBlockFeeDistr: Option[Diff],
       timestamp: Long,
       txs: Seq[Transaction],
       heightDiff: Int): Either[ValidationError, Diff] = {
-    val currentBlockHeight = s.height + heightDiff
+    val currentBlockHeight = blockchain.height + heightDiff
     val txDiffer           = TransactionDiffer(settings, prevBlockTimestamp, timestamp, currentBlockHeight) _
 
     val txsDiffEi = currentBlockFeeDistr match {
@@ -85,14 +82,14 @@ object BlockDiffer extends ScorexLogging with Instrumented {
           case (ei, tx) =>
             ei.flatMap(
               diff =>
-                txDiffer(composite(s, diff), blockchain, tx)
+                txDiffer(composite(blockchain, diff), tx)
                   .map(newDiff => diff.combine(newDiff)))
         }
       case None =>
         txs.foldLeft(right(prevBlockFeeDistr.orEmpty)) {
           case (ei, tx) =>
             ei.flatMap(diff =>
-              txDiffer(composite(s, diff), blockchain, tx).map { newDiff =>
+              txDiffer(composite(blockchain, diff), tx).map { newDiff =>
                 diff.combine(
                   newDiff.copy(
                     portfolios = newDiff.portfolios.combine(Map(blockGenerator -> tx.feeDiff()).mapValues(_.multiply(Block.CurrentBlockFeePart)))))
@@ -103,17 +100,17 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     txsDiffEi.map { d =>
       val diffWithCancelledLeases =
         if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
-          Monoid.combine(d, CancelAllLeases(composite(s, d)))
+          Monoid.combine(d, CancelAllLeases(composite(blockchain, d)))
         else d
 
       val diffWithLeasePatches =
         if (currentBlockHeight == settings.blockVersion3AfterHeight)
-          Monoid.combine(diffWithCancelledLeases, CancelLeaseOverflow(composite(s, diffWithCancelledLeases)))
+          Monoid.combine(diffWithCancelledLeases, CancelLeaseOverflow(composite(blockchain, diffWithCancelledLeases)))
         else diffWithCancelledLeases
 
       val diffWithCancelledLeaseIns =
         if (blockchain.featureActivationHeight(BlockchainFeatures.DataTransaction.id).contains(currentBlockHeight))
-          Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn.v2(composite(s, diffWithLeasePatches)))
+          Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn.v2(composite(blockchain, diffWithLeasePatches)))
         else diffWithLeasePatches
 
       diffWithCancelledLeaseIns

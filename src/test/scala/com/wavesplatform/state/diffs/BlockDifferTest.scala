@@ -6,15 +6,18 @@ import com.wavesplatform.BlockGen
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.reader.SnapshotStateReader
-import com.wavesplatform.state.{Blockchain, ByteStr, Diff}
+import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.{AccountDataInfo, AssetDescription, BalanceSnapshot, Blockchain, ByteStr, DataEntry, Diff, Portfolio, VolumeAndFee}
 import org.scalatest.{FreeSpecLike, Matchers}
-import scorex.account.PrivateKeyAccount
+import scorex.account.{Address, Alias, PrivateKeyAccount}
 import scorex.block.{Block, BlockHeader}
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{GenesisTransaction, ValidationError}
+import scorex.transaction.Transaction.Type
+import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.smart.Script
+import scorex.transaction.{GenesisTransaction, Transaction, ValidationError}
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with WithState {
 
@@ -114,7 +117,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
 
   //TODO: Use functionality settings and activate NG in preactivated features
 
-  private def assertDiff(blocks: Seq[Block], fs: FunctionalitySettings, ngAtHeight: Int)(assertion: (Diff, SnapshotStateReader) => Unit): Unit = {
+  private def assertDiff(blocks: Seq[Block], fs: FunctionalitySettings, ngAtHeight: Int)(assertion: (Diff, Blockchain) => Unit): Unit = {
     val blockchain = new Blockchain {
       override def height: Int = ???
 
@@ -148,23 +151,61 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       override def featureVotes(height: Int) = ???
 
       override def approvedFeatures() = Map(BlockchainFeatures.NG.id -> 0)
+
+      override def portfolio(a: Address): Portfolio = ???
+
+      override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = ???
+
+      override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = ???
+
+      override def containsTransaction(id: ByteStr): Boolean = ???
+
+      override def assetDescription(id: ByteStr): Option[AssetDescription] = ???
+
+      override def resolveAlias(a: Alias): Option[Address] = ???
+
+      override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = ???
+
+      override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = ???
+
+      /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
+      override def balanceSnapshots(address: Address, from: Int, to: Int): Seq[BalanceSnapshot] = ???
+
+      override def accountScript(address: Address): Option[Script] = ???
+
+      override def accountData(acc: Address): AccountDataInfo = ???
+
+      override def accountData(acc: Address, key: String): Option[DataEntry[_]] = ???
+
+      override def assetDistribution(height: Int, assetId: ByteStr): Map[Address, Long] = ???
+
+      override def wavesDistribution(height: Int): Map[Address, Long] = ???
+
+      override def allActiveLeases: Set[LeaseTransaction] = ???
+
+      /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
+        *
+        * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
+      override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = ???
+      override def append(diff: Diff, block: Block): Unit                                                  = ???
+      override def rollbackTo(targetBlockId: ByteStr): Seq[Block]                                          = ???
     }
     assertDiffEiWithPrev(blocks.init, blocks.last, blockchain, fs)(assertion)
   }
 
   private def assertDiffEiWithPrev(preconditions: Seq[Block], block: Block, blockchain: Blockchain, fs: FunctionalitySettings)(
-      assertion: (Diff, SnapshotStateReader) => Unit): Unit = withStateAndHistory(fs) { state =>
-    def differ(s: SnapshotStateReader, prev: Option[Block], b: Block): Either[ValidationError, Diff] =
-      BlockDiffer.fromBlock(fs, blockchain, s, prev, b)
+      assertion: (Diff, Blockchain) => Unit): Unit = withStateAndHistory(fs) { bc =>
+    def differ(prev: Option[Block], b: Block): Either[ValidationError, Diff] =
+      BlockDiffer.fromBlock(fs, blockchain, prev, b)
 
     zipWithPrev(preconditions).foreach {
       case (prev, b) =>
-        state.append(differ(state, prev, b).explicitGet(), b)
+        bc.append(differ(prev, b).explicitGet(), b)
     }
 
-    val totalDiff1 = differ(state, preconditions.lastOption, block).explicitGet()
-    state.append(totalDiff1, block)
-    assertion(totalDiff1, state)
+    val totalDiff1 = differ(preconditions.lastOption, block).explicitGet()
+    bc.append(totalDiff1, block)
+    assertion(totalDiff1, bc)
   }
 
   private def getTwoMinersBlockChain(from: PrivateKeyAccount, to: PrivateKeyAccount, numPayments: Int): Seq[Block] = {

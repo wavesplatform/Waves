@@ -6,7 +6,6 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.Shutdownable
 import com.wavesplatform.settings.{Constants, RestAPISettings}
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.reader.SnapshotStateReader
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.Json
@@ -15,7 +14,7 @@ import scorex.utils.ScorexLogging
 
 @Path("/node")
 @Api(value = "node")
-case class NodeApiRoute(settings: RestAPISettings, blockchain: Blockchain, state: SnapshotStateReader, application: Shutdownable)
+case class NodeApiRoute(settings: RestAPISettings, blockchain: Blockchain, application: Shutdownable)
     extends ApiRoute
     with CommonApiFunctions
     with ScorexLogging {
@@ -49,7 +48,7 @@ case class NodeApiRoute(settings: RestAPISettings, blockchain: Blockchain, state
     complete(
       Json.obj(
         "blockchainHeight" -> blockchain.height,
-        "stateHeight"      -> state.height,
+        "stateHeight"      -> blockchain.height,
         "updatedTimestamp" -> lastUpdated,
         "updatedDate"      -> Instant.ofEpochMilli(lastUpdated).toString
       ))

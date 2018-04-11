@@ -7,8 +7,7 @@ import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.mining.TwoDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.reader.CompositeStateReader.composite
-import com.wavesplatform.state.reader.SnapshotStateReader
+import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import com.wavesplatform.state.{Blockchain, ByteStr, Diff, Portfolio}
 import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
@@ -25,12 +24,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.util.{Left, Right}
 
-class UtxPoolImpl(time: Time,
-                  stateReader: SnapshotStateReader,
-                  blockchain: Blockchain,
-                  feeCalculator: FeeCalculator,
-                  fs: FunctionalitySettings,
-                  utxSettings: UtxSettings)
+class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculator, fs: FunctionalitySettings, utxSettings: UtxSettings)
     extends ScorexLogging
     with Instrumented
     with AutoCloseable
@@ -45,8 +39,8 @@ class UtxPoolImpl(time: Time,
   private val pessimisticPortfolios = new PessimisticPortfolios
 
   private val removeInvalid = Task {
-    val state                = stateReader
-    val transactionsToRemove = transactions.values.asScala.filter(t => state.containsTransaction(t.id()))
+    val b                    = blockchain
+    val transactionsToRemove = transactions.values.asScala.filter(t => b.containsTransaction(t.id()))
     removeAll(transactionsToRemove)
   }.delayExecution(utxSettings.cleanupInterval)
 
@@ -73,7 +67,7 @@ class UtxPoolImpl(time: Time,
       }
   }
 
-  override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = putIfNew(stateReader, tx)
+  override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = putIfNew(blockchain, tx)
 
   private def checkNotBlacklisted(tx: Transaction): Either[ValidationError, Unit] = {
     if (utxSettings.blacklistSenderAddresses.isEmpty) {
@@ -109,10 +103,10 @@ class UtxPoolImpl(time: Time,
     removeExpired(time.correctedTime())
   }
 
-  override def accountPortfolio(addr: Address): Portfolio = stateReader.portfolio(addr)
+  override def accountPortfolio(addr: Address): Portfolio = blockchain.portfolio(addr)
 
   override def portfolio(addr: Address): Portfolio =
-    Monoid.combine(stateReader.portfolio(addr), pessimisticPortfolios.getAggregated(addr))
+    Monoid.combine(blockchain.portfolio(addr), pessimisticPortfolios.getAggregated(addr))
 
   override def all: Seq[Transaction] = transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
 
@@ -123,14 +117,14 @@ class UtxPoolImpl(time: Time,
   override def packUnconfirmed(rest: TwoDimensionalMiningConstraint, sortInBlock: Boolean): (Seq[Transaction], TwoDimensionalMiningConstraint) = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
-    val s      = stateReader
-    val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, currentTs, s.height) _
+    val b      = blockchain
+    val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, currentTs, b.height) _
     val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = transactions.values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
         case (curr @ (_, _, _, _, skip), _) if skip => curr
         case ((invalid, valid, diff, currRest, _), tx) =>
-          differ(composite(s, diff), blockchain, tx) match {
+          differ(composite(b, diff), tx) match {
             case Right(newDiff) =>
               val updatedRest = currRest.put(tx)
               if (updatedRest.isOverfilled) (invalid, valid, diff, currRest, true)
@@ -148,13 +142,13 @@ class UtxPoolImpl(time: Time,
     (txs, finalConstraint)
   }
 
-  override private[utx] def createBatchOps: UtxBatchOps = new BatchOpsImpl(stateReader)
+  override private[utx] def createBatchOps: UtxBatchOps = new BatchOpsImpl(blockchain)
 
-  private class BatchOpsImpl(s: SnapshotStateReader) extends UtxBatchOps {
-    override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = outer.putIfNew(s, tx)
+  private class BatchOpsImpl(b: Blockchain) extends UtxBatchOps {
+    override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = outer.putIfNew(b, tx)
   }
 
-  private def putIfNew(s: SnapshotStateReader, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
+  private def putIfNew(b: Blockchain, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
     putRequestStats.increment()
     measureSuccessful(
       processingTimeStats, {
@@ -162,7 +156,7 @@ class UtxPoolImpl(time: Time,
           _    <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
           _    <- checkNotBlacklisted(tx)
           _    <- feeCalculator.enoughFee(tx)
-          diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(s, blockchain, tx)
+          diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
         } yield {
           utxPoolSizeStats.increment()
           pessimisticPortfolios.add(tx.id(), diff)

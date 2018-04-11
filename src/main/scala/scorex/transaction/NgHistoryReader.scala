@@ -2,8 +2,13 @@ package scorex.transaction
 
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
+import com.wavesplatform.state.reader.LeaseDetails
+import scorex.account.{Address, Alias}
 import scorex.block.Block.BlockId
 import scorex.block.{Block, BlockHeader, MicroBlock}
+import scorex.transaction.Transaction.Type
+import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.smart.Script
 
 class NgHistoryReader(ngState: () => Option[NgState], inner: Blockchain, fs: FunctionalitySettings) extends NG {
 
@@ -117,4 +122,42 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: Blockchain, fs: Fun
     else
       inner.blockHeaderAndSize(height)
   }
+
+  override def portfolio(a: Address): Portfolio = ???
+
+  override def transactionInfo(id: AssetId): Option[(Int, Transaction)] = ???
+
+  override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = ???
+
+  override def containsTransaction(id: AssetId): Boolean = ???
+
+  override def assetDescription(id: AssetId): Option[AssetDescription] = ???
+
+  override def resolveAlias(a: Alias): Option[Address] = ???
+
+  override def leaseDetails(leaseId: AssetId): Option[LeaseDetails] = ???
+
+  override def filledVolumeAndFee(orderId: AssetId): VolumeAndFee = ???
+
+  /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
+  override def balanceSnapshots(address: Address, from: Int, to: Int): Seq[BalanceSnapshot] = ???
+
+  override def accountScript(address: Address): Option[Script] = ???
+
+  override def accountData(acc: Address): AccountDataInfo = ???
+
+  override def accountData(acc: Address, key: String): Option[DataEntry[_]] = ???
+
+  override def assetDistribution(height: Int, assetId: AssetId): Map[Address, Long] = ???
+
+  override def wavesDistribution(height: Int): Map[Address, Long] = ???
+
+  override def allActiveLeases: Set[LeaseTransaction] = ???
+
+  /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
+    *
+    * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
+  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = ???
+  override def append(diff: Diff, block: Block): Unit                                                  = ???
+  override def rollbackTo(targetBlockId: AssetId): Seq[Block]                                          = ???
 }

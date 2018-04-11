@@ -14,7 +14,6 @@ import com.wavesplatform.matcher.model._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
@@ -31,12 +30,11 @@ import scala.concurrent.duration._
 
 class OrderBookActor(assetPair: AssetPair,
                      val orderHistory: ActorRef,
-                     val storedState: SnapshotStateReader,
+                     val blockchain: Blockchain,
                      val wallet: Wallet,
                      val utx: UtxPool,
                      val allChannels: ChannelGroup,
                      val settings: MatcherSettings,
-                     val blockchain: Blockchain,
                      val functionalitySettings: FunctionalitySettings)
     extends PersistentActor
     with Stash
@@ -335,14 +333,13 @@ class OrderBookActor(assetPair: AssetPair,
 object OrderBookActor {
   def props(assetPair: AssetPair,
             orderHistory: ActorRef,
-            storedState: SnapshotStateReader,
+            blockchain: Blockchain,
             settings: MatcherSettings,
             wallet: Wallet,
             utx: UtxPool,
             allChannels: ChannelGroup,
-            blockchain: Blockchain,
             functionalitySettings: FunctionalitySettings): Props =
-    Props(new OrderBookActor(assetPair, orderHistory, storedState, wallet, utx, allChannels, settings, blockchain, functionalitySettings))
+    Props(new OrderBookActor(assetPair, orderHistory, blockchain, wallet, utx, allChannels, settings, functionalitySettings))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 

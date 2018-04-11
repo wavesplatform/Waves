@@ -23,8 +23,8 @@ class CommonValidationTimeTest extends PropSpec with PropertyChecks with Matcher
         .explicitGet()
     } yield (prevBlockTs, blockTs, height, transfer1)) {
       case (prevBlockTs, blockTs, height, transfer1) =>
-        withStateAndHistory(TestFunctionalitySettings.Enabled) { state =>
-          TransactionDiffer(TestFunctionalitySettings.Enabled, Some(prevBlockTs), blockTs, height)(state, state, transfer1) should produce("too old")
+        withStateAndHistory(TestFunctionalitySettings.Enabled) { blockchain: Blockchain =>
+          TransactionDiffer(TestFunctionalitySettings.Enabled, Some(prevBlockTs), blockTs, height)(blockchain, transfer1) should produce("too old")
         }
     }
   }
@@ -43,8 +43,8 @@ class CommonValidationTimeTest extends PropSpec with PropertyChecks with Matcher
     } yield (prevBlockTs, blockTs, height, transfer1)) {
       case (prevBlockTs, blockTs, height, transfer1) =>
         val functionalitySettings = TestFunctionalitySettings.Enabled.copy(allowTransactionsFromFutureUntil = blockTs - 1)
-        withStateAndHistory(functionalitySettings) { state =>
-          TransactionDiffer(functionalitySettings, Some(prevBlockTs), blockTs, height)(state, state, transfer1) should produce("far future")
+        withStateAndHistory(functionalitySettings) { blockchain: Blockchain =>
+          TransactionDiffer(functionalitySettings, Some(prevBlockTs), blockTs, height)(blockchain, transfer1) should produce("far future")
         }
     }
   }

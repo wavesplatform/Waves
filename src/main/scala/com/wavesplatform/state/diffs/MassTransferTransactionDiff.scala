@@ -2,7 +2,6 @@ package com.wavesplatform.state.diffs
 
 import cats.implicits._
 import com.wavesplatform.state._
-import com.wavesplatform.state.reader.SnapshotStateReader
 import scorex.account.Address
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.{GenericError, Validation}
@@ -11,10 +10,10 @@ import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 
 object MassTransferTransactionDiff {
 
-  def apply(state: SnapshotStateReader, blockTime: Long, height: Int)(tx: MassTransferTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, blockTime: Long, height: Int)(tx: MassTransferTransaction): Either[ValidationError, Diff] = {
     def parseTransfer(xfer: ParsedTransfer): Validation[(Map[Address, Portfolio], Long)] = {
       for {
-        recipientAddr <- state.resolveAliasEi(xfer.address)
+        recipientAddr <- blockchain.resolveAliasEi(xfer.address)
         portfolio = tx.assetId match {
           case None      => Map(recipientAddr -> Portfolio(xfer.amount, LeaseBalance.empty, Map.empty))
           case Some(aid) => Map(recipientAddr -> Portfolio(0, LeaseBalance.empty, Map(aid -> xfer.amount)))
@@ -34,7 +33,7 @@ object MassTransferTransactionDiff {
         case Some(aid) => Map(sender -> Portfolio(0, LeaseBalance.empty, Map(aid -> -totalAmount)))
       })
 
-      val assetIssued = tx.assetId.forall(state.assetDescription(_).isDefined)
+      val assetIssued = tx.assetId.forall(blockchain.assetDescription(_).isDefined)
 
       Either.cond(assetIssued, Diff(height, tx, completePortfolio), GenericError(s"Attempt to transfer a nonexistent asset"))
     }

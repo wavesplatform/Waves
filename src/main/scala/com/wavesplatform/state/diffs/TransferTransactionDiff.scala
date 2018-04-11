@@ -3,7 +3,6 @@ package com.wavesplatform.state.diffs
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.state.reader.SnapshotStateReader
 import scorex.account.Address
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
@@ -12,13 +11,13 @@ import scorex.transaction.assets.TransferTransaction
 import scala.util.Right
 
 object TransferTransactionDiff {
-  def apply(state: SnapshotStateReader, s: FunctionalitySettings, blockTime: Long, height: Int)(
+  def apply(blockchain: Blockchain, s: FunctionalitySettings, blockTime: Long, height: Int)(
       tx: TransferTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender.publicKey)
 
     val isInvalidEi = for {
-      recipient <- state.resolveAliasEi(tx.recipient)
-      _ <- Either.cond((tx.feeAssetId >>= state.assetDescription >>= (_.script)).isEmpty,
+      recipient <- blockchain.resolveAliasEi(tx.recipient)
+      _ <- Either.cond((tx.feeAssetId >>= blockchain.assetDescription >>= (_.script)).isEmpty,
                        (),
                        GenericError("Smart assets can't participate in TransferTransactions as a fee"))
       portfolios = (tx.assetId match {
@@ -37,8 +36,8 @@ object TransferTransactionDiff {
             Map(sender -> Portfolio(0, LeaseBalance.empty, Map(aid -> -tx.fee)))
         }
       )
-      assetIssued    = tx.assetId.forall(state.assetDescription(_).isDefined)
-      feeAssetIssued = tx.feeAssetId.forall(state.assetDescription(_).isDefined)
+      assetIssued    = tx.assetId.forall(blockchain.assetDescription(_).isDefined)
+      feeAssetIssued = tx.feeAssetId.forall(blockchain.assetDescription(_).isDefined)
     } yield (portfolios, blockTime > s.allowUnissuedAssetsUntil && !(assetIssued && feeAssetIssued))
 
     isInvalidEi match {

@@ -3,7 +3,6 @@ package scorex.consensus.nxt.api.http
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.reader.SnapshotStateReader
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.Json
@@ -13,7 +12,7 @@ import scorex.transaction.PoSCalc
 
 @Path("/consensus")
 @Api(value = "/consensus")
-case class NxtConsensusApiRoute(settings: RestAPISettings, state: SnapshotStateReader, blockchain: Blockchain, fs: FunctionalitySettings)
+case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchain, fs: FunctionalitySettings)
     extends ApiRoute
     with CommonApiFunctions {
 
@@ -32,8 +31,8 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, state: SnapshotStateR
     Address.fromString(address) match {
       case Left(_) => complete(InvalidAddress)
       case Right(account) =>
-        val s = state
-        complete(Json.obj("address" -> account.address, "balance" -> PoSCalc.generatingBalance(s, fs, account, s.height)))
+        val b = blockchain
+        complete(Json.obj("address" -> account.address, "balance" -> PoSCalc.generatingBalance(b, fs, account, b.height)))
     }
   }
 

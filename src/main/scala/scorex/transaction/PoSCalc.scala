@@ -5,7 +5,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.reader.SnapshotStateReader
 import scorex.account.{Address, PublicKeyAccount}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -67,18 +66,17 @@ object PoSCalc extends ScorexLogging {
     }
   }
 
-  def generatingBalance(state: SnapshotStateReader, fs: FunctionalitySettings, account: Address, atHeight: Int): Long = {
+  def generatingBalance(blockchain: Blockchain, fs: FunctionalitySettings, account: Address, atHeight: Int): Long = {
     val generatingBalanceDepth = if (atHeight >= fs.generationBalanceDepthFrom50To1000AfterHeight) 1000 else 50
-    state.effectiveBalance(account, atHeight, generatingBalanceDepth)
+    blockchain.effectiveBalance(account, atHeight, generatingBalanceDepth)
   }
 
   def nextBlockGenerationTime(height: Int,
-                              state: SnapshotStateReader,
+                              blockchain: Blockchain,
                               fs: FunctionalitySettings,
                               block: Block,
-                              account: PublicKeyAccount,
-                              blockchain: Blockchain): Either[String, (Long, Long)] = {
-    val balance = generatingBalance(state, fs, account, height)
+                              account: PublicKeyAccount): Either[String, (Long, Long)] = {
+    val balance = generatingBalance(blockchain, fs, account, height)
     Either
       .cond(
         (!blockchain

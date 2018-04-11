@@ -8,7 +8,6 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.appender.{BlockAppender, MicroblockAppender}
-import com.wavesplatform.state.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
@@ -57,7 +56,6 @@ class MinerImpl(allChannels: ChannelGroup,
                 blockchainUpdater: BlockchainUpdater,
                 checkpoint: CheckpointService,
                 ng: NG,
-                stateReader: SnapshotStateReader,
                 settings: WavesSettings,
                 timeService: Time,
                 utx: UtxPool,
@@ -242,10 +240,10 @@ class MinerImpl(allChannels: ChannelGroup,
       val lastBlock = ng.lastBlock.get
       for {
         _ <- checkAge(height, ng.lastBlockTimestamp.get)
-        _ <- Either.cond(stateReader.accountScript(account).isEmpty,
+        _ <- Either.cond(ng.accountScript(account).isEmpty,
                          (),
                          s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
-        balanceAndTs <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account, ng)
+        balanceAndTs <- nextBlockGenerationTime(height, ng, blockchainSettings.functionalitySettings, lastBlock, account)
         (balance, ts) = balanceAndTs
         offset        = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
       } yield (offset, balance)
@@ -255,7 +253,7 @@ class MinerImpl(allChannels: ChannelGroup,
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(account, balance)(offset).flatMap {
           case Right((estimators, block, totalConstraint)) =>
-            BlockAppender(checkpoint, ng, blockchainUpdater, timeService, stateReader, utx, settings, appenderScheduler)(block).map {
+            BlockAppender(checkpoint, ng, blockchainUpdater, timeService, utx, settings, appenderScheduler)(block).map {
               case Left(err) => log.warn("Error mining Block: " + err.toString)
               case Right(Some(score)) =>
                 log.debug(s"Forged and applied $block by ${account.address} with cumulative score $score")
@@ -278,7 +276,7 @@ class MinerImpl(allChannels: ChannelGroup,
 
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()
-    val nonScriptedAccounts = wallet.privateKeyAccounts.filter(acc => stateReader.accountScript(acc).isEmpty)
+    val nonScriptedAccounts = wallet.privateKeyAccounts.filter(acc => ng.accountScript(acc).isEmpty)
     scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map(generateBlockTask).map(_.runAsyncLogErr).toSet)
     microBlockAttempt := SerialCancelable()
     debugState = MinerDebugInfo.MiningBlocks

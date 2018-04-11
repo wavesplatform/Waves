@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.state.reader.SnapshotStateReader
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
 import io.netty.channel.group.ChannelGroup
@@ -26,7 +26,7 @@ class AddressRouteSpec
 
   private val route = AddressApiRoute(restAPISettings,
                                       testWallet,
-                                      mock[SnapshotStateReader],
+                                      mock[Blockchain],
                                       mock[UtxPool],
                                       mock[ChannelGroup],
                                       new TestTime,

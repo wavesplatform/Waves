@@ -4,8 +4,7 @@ import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.Diff
-import com.wavesplatform.state.reader.SnapshotStateReader
+import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{RequestGen, TestTime}
 import io.netty.channel.group.ChannelGroup
@@ -24,7 +23,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
   private val wallet      = stub[Wallet]
   private val utx         = stub[UtxPool]
   private val allChannels = stub[ChannelGroup]
-  private val state       = stub[SnapshotStateReader]
+  private val state       = stub[Blockchain]
 
   private val seed               = "seed".getBytes()
   private val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)

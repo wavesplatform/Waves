@@ -4,7 +4,6 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.state.reader.SnapshotStateReader
 import scorex.account.Address
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
@@ -14,13 +13,13 @@ import scala.util.{Left, Right}
 
 object LeaseTransactionsDiff {
 
-  def lease(s: SnapshotStateReader, height: Int)(tx: LeaseTransaction): Either[ValidationError, Diff] = {
+  def lease(blockchain: Blockchain, height: Int)(tx: LeaseTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender.publicKey)
-    s.resolveAliasEi(tx.recipient).flatMap { recipient =>
+    blockchain.resolveAliasEi(tx.recipient).flatMap { recipient =>
       if (recipient == sender)
         Left(GenericError("Cannot lease to self"))
       else {
-        val ap = s.portfolio(tx.sender)
+        val ap = blockchain.portfolio(tx.sender)
         if (ap.balance - ap.lease.out < tx.amount) {
           Left(GenericError(s"Cannot lease more than own: Balance:${ap.balance}, already leased: ${ap.lease.out}"))
         } else {
@@ -34,15 +33,15 @@ object LeaseTransactionsDiff {
     }
   }
 
-  def leaseCancel(s: SnapshotStateReader, settings: FunctionalitySettings, time: Long, height: Int)(
+  def leaseCancel(blockchain: Blockchain, settings: FunctionalitySettings, time: Long, height: Int)(
       tx: LeaseCancelTransaction): Either[ValidationError, Diff] = {
-    val leaseEi = s.leaseDetails(tx.leaseId) match {
+    val leaseEi = blockchain.leaseDetails(tx.leaseId) match {
       case None    => Left(GenericError(s"Related LeaseTransaction not found"))
       case Some(l) => Right(l)
     }
     for {
       lease     <- leaseEi
-      recipient <- s.resolveAliasEi(lease.recipient)
+      recipient <- blockchain.resolveAliasEi(lease.recipient)
       isLeaseActive = lease.isActive
       _ <- if (!isLeaseActive && time > settings.allowMultipleLeaseCancelTransactionUntilTimestamp)
         Left(GenericError(s"Cannot cancel already cancelled lease"))

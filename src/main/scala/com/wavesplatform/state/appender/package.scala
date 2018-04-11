@@ -5,7 +5,6 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
-import com.wavesplatform.state.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
@@ -64,7 +63,6 @@ package object appender extends ScorexLogging {
   private[appender] def appendBlock(checkpoint: CheckpointService,
                                     blockchain: Blockchain,
                                     blockchainUpdater: BlockchainUpdater,
-                                    stateReader: SnapshotStateReader,
                                     utxStorage: UtxPool,
                                     time: Time,
                                     settings: WavesSettings)(block: Block): Either[ValidationError, Option[Int]] =
@@ -75,12 +73,12 @@ package object appender extends ScorexLogging {
         BlockAppendError(s"Block $block at height ${blockchain.height + 1} is not valid w.r.t. checkpoint", block)
       )
       _ <- Either.cond(
-        stateReader.accountScript(block.sender).isEmpty,
+        blockchain.accountScript(block.sender).isEmpty,
         (),
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
       _ <- blockConsensusValidation(blockchain, settings, time.correctedTime(), block) { height =>
-        val balance = PoSCalc.generatingBalance(stateReader, settings.blockchainSettings.functionalitySettings, block.sender, height)
+        val balance = PoSCalc.generatingBalance(blockchain, settings.blockchainSettings.functionalitySettings, block.sender, height)
         validateEffectiveBalance(blockchain, settings.blockchainSettings.functionalitySettings, block, height)(balance)
       }
       baseHeight = blockchain.height

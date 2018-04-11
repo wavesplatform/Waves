@@ -3,19 +3,20 @@ package com.wavesplatform.state.reader
 import cats.implicits._
 import com.wavesplatform.state._
 import scorex.account.{Address, Alias}
+import scorex.block.{Block, BlockHeader}
 import scorex.transaction.Transaction
 import scorex.transaction.Transaction.Type
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.Script
 
-class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff]) extends SnapshotStateReader {
+class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends Blockchain {
 
   private def diff = maybeDiff.getOrElse(Diff.empty)
 
-  override def portfolio(a: Address) = inner.portfolio(a).combine(diff.portfolios.getOrElse(a, Portfolio.empty))
+  override def portfolio(a: Address): Portfolio = inner.portfolio(a).combine(diff.portfolios.getOrElse(a, Portfolio.empty))
 
-  override def assetDescription(id: ByteStr) =
+  override def assetDescription(id: ByteStr): Option[AssetDescription] =
     inner.assetDescription(id) match {
       case Some(ad) =>
         diff.issuedAssets
@@ -39,7 +40,7 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
           .map(z => diff.issuedAssets.get(id).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = r.script)))
     }
 
-  override def leaseDetails(leaseId: ByteStr) = {
+  override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
       diff.transactions.get(leaseId).collect {
         case (h, lt: LeaseTransaction, _) =>
@@ -73,7 +74,7 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
 
   override def resolveAlias(a: Alias): Option[Address] = diff.aliases.get(a).orElse(inner.resolveAlias(a))
 
-  override def allActiveLeases = {
+  override def allActiveLeases: Set[LeaseTransaction] = {
     val (active, canceled) = diff.leaseState.partition(_._2)
     val fromDiff = active.keys
       .map { id =>
@@ -85,7 +86,7 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
     fromDiff ++ fromInner
   }
 
-  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]) = {
+  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = {
     val b = Map.newBuilder[Address, A]
     for ((a, p) <- diff.portfolios if p.lease != LeaseBalance.empty || p.balance != 0) {
       pf.runWith(b += a -> _)(a -> portfolio(a).copy(assets = Map.empty))
@@ -99,7 +100,7 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
 
-  override def balanceSnapshots(address: Address, from: Int, to: Int) = {
+  override def balanceSnapshots(address: Address, from: Int, to: Int): Seq[BalanceSnapshot] = {
     if (to <= inner.height || maybeDiff.isEmpty) {
       inner.balanceSnapshots(address, from, to)
     } else {
@@ -133,7 +134,7 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
       if pred(p)
     } yield address -> f(address)
 
-  override def assetDistribution(height: Int, assetId: ByteStr) = {
+  override def assetDistribution(height: Int, assetId: ByteStr): Map[Address, Long] = {
     val innerDistribution = inner.assetDistribution(height, assetId)
     if (height < this.height) innerDistribution
     else {
@@ -141,16 +142,51 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
     }
   }
 
-  override def wavesDistribution(height: Int) = {
+  override def wavesDistribution(height: Int): Map[Address, Long] = {
     val innerDistribution = inner.wavesDistribution(height)
     if (height < this.height) innerDistribution
     else {
       innerDistribution ++ changedBalances(_.balance != 0, portfolio(_).balance)
     }
   }
+
+  override def score: BigInt = ???
+
+  override def scoreOf(blockId: ByteStr): Option[BigInt] = ???
+
+  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = ???
+
+  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = ???
+
+  override def lastBlock: Option[Block] = ???
+
+  override def blockBytes(height: Int): Option[Array[Type]] = ???
+
+  override def blockBytes(blockId: ByteStr): Option[Array[Type]] = ???
+
+  override def heightOf(blockId: ByteStr): Option[Int] = ???
+
+  /** Returns the most recent block IDs, starting from the most recent  one */
+  override def lastBlockIds(howMany: Int): Seq[ByteStr] = ???
+
+  /** Returns a chain of blocks starting with the block with the given ID (from oldest to newest) */
+  override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = ???
+
+  override def parent(block: Block, back: Int): Option[Block] = ???
+
+  /** Features related */
+  override def approvedFeatures(): Map[Short, Int] = ???
+
+  override def activatedFeatures(): Map[Short, Int] = ???
+
+  override def featureVotes(height: Int): Map[Short, Int] = ???
+
+  override def append(diff: Diff, block: Block): Unit = ???
+
+  override def rollbackTo(targetBlockId: ByteStr): Seq[Block] = ???
 }
 
-object CompositeStateReader {
-  def composite(inner: SnapshotStateReader, diff: => Option[Diff]): SnapshotStateReader = new CompositeStateReader(inner, diff)
-  def composite(inner: SnapshotStateReader, diff: Diff): SnapshotStateReader            = new CompositeStateReader(inner, Some(diff))
+object CompositeBlockchain {
+  def composite(inner: Blockchain, diff: => Option[Diff]): Blockchain = new CompositeBlockchain(inner, diff)
+  def composite(inner: Blockchain, diff: Diff): Blockchain            = new CompositeBlockchain(inner, Some(diff))
 }

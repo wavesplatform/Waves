@@ -11,7 +11,6 @@ import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, Valida
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, WalletSettings}
-import com.wavesplatform.state.reader.SnapshotStateReader
 import com.wavesplatform.state.{Blockchain, ByteStr, Diff, LeaseBalance, Portfolio}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
@@ -44,10 +43,10 @@ class OrderBookActorSpecification
 
   var eventsProbe = TestProbe()
 
-  val pair                             = AssetPair(Some(ByteStr("BTC".getBytes)), Some(ByteStr("WAVES".getBytes)))
-  val storedState: SnapshotStateReader = stub[SnapshotStateReader]
-  val hugeAmount                       = Long.MaxValue / 2
-  (storedState.portfolio _)
+  val pair                   = AssetPair(Some(ByteStr("BTC".getBytes)), Some(ByteStr("WAVES".getBytes)))
+  val blockchain: Blockchain = stub[Blockchain]
+  val hugeAmount             = Long.MaxValue / 2
+  (blockchain.portfolio _)
     .when(*)
     .returns(
       Portfolio(hugeAmount,
@@ -61,7 +60,7 @@ class OrderBookActorSpecification
     .right
     .get
 
-  (storedState.transactionInfo _).when(*).returns(Some((1, issueTransaction)))
+  (blockchain.transactionInfo _).when(*).returns(Some((1, issueTransaction)))
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
 
@@ -77,15 +76,8 @@ class OrderBookActorSpecification
 
   var actor: ActorRef = system.actorOf(
     Props(
-      new OrderBookActor(pair,
-                         orderHistoryRef,
-                         storedState,
-                         wallet,
-                         stub[UtxPool],
-                         stub[ChannelGroup],
-                         settings,
-                         stub[Blockchain],
-                         FunctionalitySettings.TESTNET) with RestartableActor))
+      new OrderBookActor(pair, orderHistoryRef, blockchain, wallet, stub[UtxPool], stub[ChannelGroup], settings, FunctionalitySettings.TESTNET)
+      with RestartableActor))
 
   private def getOrders(actor: ActorRef) = {
     actor ! GetOrdersRequest
@@ -107,9 +99,7 @@ class OrderBookActorSpecification
     (utx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty)))
     val allChannels = stub[ChannelGroup]
     actor = system.actorOf(
-      Props(
-        new OrderBookActor(pair, orderHistoryRef, storedState, wallet, utx, allChannels, settings, blockchain, functionalitySettings)
-        with RestartableActor))
+      Props(new OrderBookActor(pair, orderHistoryRef, blockchain, wallet, utx, allChannels, settings, functionalitySettings) with RestartableActor))
 
     eventsProbe = TestProbe()
     system.eventStream.subscribe(eventsProbe.ref, classOf[Event])
@@ -295,8 +285,8 @@ class OrderBookActorSpecification
       }
       val allChannels = stub[ChannelGroup]
       actor = system.actorOf(
-        Props(new OrderBookActor(pair, orderHistoryRef, storedState, wallet, pool, allChannels, settings, blockchain, functionalitySettings)
-        with RestartableActor))
+        Props(
+          new OrderBookActor(pair, orderHistoryRef, blockchain, wallet, pool, allChannels, settings, functionalitySettings) with RestartableActor))
 
       actor ! ord1
       expectMsg(OrderAccepted(ord1))

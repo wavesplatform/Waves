@@ -5,26 +5,26 @@ import java.util.concurrent.{Semaphore, TimeUnit}
 
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatureStatus
-import com.wavesplatform.history._
+import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.history
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.produce
 import org.scalatest.words.ShouldVerb
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.block.Block
-import com.wavesplatform.features.FeatureProvider._
 
 class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with ShouldVerb with WithState {
 
   private val ApprovalPeriod = 100
 
-  private val WavesSettings = DefaultWavesSettings.copy(
-    blockchainSettings = DefaultWavesSettings.blockchainSettings.copy(
-      functionalitySettings = DefaultWavesSettings.blockchainSettings.functionalitySettings.copy(
+  private val WavesSettings = history.DefaultWavesSettings.copy(
+    blockchainSettings = history.DefaultWavesSettings.blockchainSettings.copy(
+      functionalitySettings = history.DefaultWavesSettings.blockchainSettings.functionalitySettings.copy(
         featureCheckBlocksPeriod = ApprovalPeriod,
         blocksForFeatureActivation = (ApprovalPeriod * 0.9).toInt
       )
     ),
-    featuresSettings = DefaultWavesSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = true)
+    featuresSettings = history.DefaultWavesSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = true)
   )
 
   private val WavesSettingsWithDoubling = WavesSettings.copy(

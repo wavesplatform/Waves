@@ -32,8 +32,8 @@ object Exporter extends ScorexLogging {
     }
 
     val db               = openDB(settings.dataDirectory, settings.levelDbCacheSize)
-    val (history, _, _)  = StorageFactory(settings, db, NTP)
-    val blockchainHeight = history.height
+    val (ng, _)          = StorageFactory(settings, db, NTP)
+    val blockchainHeight = ng.height
     val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
     log.info(s"Blockchain height is $blockchainHeight exporting to $height")
     val outputFilename = s"$outputFilenamePrefix-$height"
@@ -46,7 +46,7 @@ object Exporter extends ScorexLogging {
         val start         = System.currentTimeMillis()
         exportedBytes += writeHeader(bos, format)
         (2 to height).foreach { h =>
-          exportedBytes += (if (format == "JSON") exportBlockToJson(bos, history, h) else exportBlockToBinary(bos, history, h))
+          exportedBytes += (if (format == "JSON") exportBlockToJson(bos, ng, h) else exportBlockToBinary(bos, ng, h))
           if (h % (height / 10) == 0)
             log.info(s"$h blocks exported, ${humanReadableSize(exportedBytes)} written")
         }

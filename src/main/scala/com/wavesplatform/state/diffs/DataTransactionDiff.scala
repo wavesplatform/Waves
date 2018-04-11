@@ -1,12 +1,11 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.state._
-import com.wavesplatform.state.reader.SnapshotStateReader
 import scorex.transaction.{DataTransaction, ValidationError}
 
 object DataTransactionDiff {
 
-  def apply(state: SnapshotStateReader, height: Int)(tx: DataTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, height: Int)(tx: DataTransaction): Either[ValidationError, Diff] = {
     val sender = tx.sender.toAddress
     Right(
       Diff(

@@ -5,7 +5,6 @@ import com.wavesplatform.lang.{Evaluator, Parser, TypeChecker}
 import com.wavesplatform.lang.ctx.Obj
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{assertDiffAndState, produce, ENOUGH_AMT}
-import com.wavesplatform.state.reader.SnapshotStateReader
 import fastparse.core.Parsed
 import monix.eval.Coeval
 import org.scalacheck.Gen
@@ -33,9 +32,9 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
     transferViaAlias   <- transferGeneratorP(master, AddressOrAlias.fromBytes(alias.bytes.arr, 0).right.get._1, None, None)
   } yield (Seq(genesis1, genesis2), aliasTx, transferViaAddress, transferViaAlias)
 
-  def evalScript(tx: Transaction, state: SnapshotStateReader): Either[com.wavesplatform.lang.ExecutionError, Obj] = {
+  def evalScript(tx: Transaction, blockchain: Blockchain): Either[com.wavesplatform.lang.ExecutionError, Obj] = {
     val context =
-      new BlockchainContext(AddressScheme.current.chainId, Coeval.evalOnce(tx), Coeval.evalOnce(state.height), state)
+      new BlockchainContext(AddressScheme.current.chainId, Coeval.evalOnce(tx), Coeval.evalOnce(blockchain.height), blockchain)
         .build()
 
     val Parsed.Success(expr, _) = Parser("addressFromRecipient(tx.recipient)")

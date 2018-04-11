@@ -4,7 +4,6 @@ import cats._
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.reader.SnapshotStateReader
 import com.wavesplatform.state.{Portfolio, _}
 import scorex.account.Address
 import scorex.transaction.ValidationError.{AlreadyInTheState, GenericError, Mistiming}
@@ -22,7 +21,7 @@ object CommonValidation {
   val MaxTimeTransactionOverBlockDiff: FiniteDuration     = 90.minutes
   val MaxTimePrevBlockOverTransactionDiff: FiniteDuration = 2.hours
 
-  def disallowSendingGreaterThanBalance[T <: Transaction](s: SnapshotStateReader,
+  def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
                                                           settings: FunctionalitySettings,
                                                           blockTime: Long,
                                                           tx: T): Either[ValidationError, T] =
@@ -38,7 +37,7 @@ object CommonValidation {
         }
 
         val spendings       = Monoid.combine(amountDiff, feeDiff)
-        val oldWavesBalance = s.portfolio(sender).balance
+        val oldWavesBalance = blockchain.portfolio(sender).balance
 
         val newWavesBalance = oldWavesBalance + spendings.balance
         if (newWavesBalance < 0) {
@@ -48,7 +47,7 @@ object CommonValidation {
                 s"negative waves balance to (at least) temporary negative state, current balance equals $oldWavesBalance, " +
                 s"spends equals ${spendings.balance}, result is $newWavesBalance"))
         } else if (spendings.assets.nonEmpty) {
-          val oldAssetBalances = s.portfolio(sender).assets
+          val oldAssetBalances = blockchain.portfolio(sender).assets
           val balanceError = spendings.assets.collectFirst {
             case (aid, delta) if oldAssetBalances.getOrElse(aid, 0L) + delta < 0 =>
               val availableBalance = oldAssetBalances.getOrElse(aid, 0L)
@@ -63,23 +62,23 @@ object CommonValidation {
       }
 
       tx match {
-        case ptx: PaymentTransaction if s.portfolio(ptx.sender).balance < (ptx.amount + ptx.fee) =>
+        case ptx: PaymentTransaction if blockchain.portfolio(ptx.sender).balance < (ptx.amount + ptx.fee) =>
           Left(
             GenericError(
               "Attempt to pay unavailable funds: balance " +
-                s"${s.portfolio(ptx.sender).balance} is less than ${ptx.amount + ptx.fee}"))
+                s"${blockchain.portfolio(ptx.sender).balance} is less than ${ptx.amount + ptx.fee}"))
         case ttx: TransferTransaction     => checkTransfer(ttx.sender, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
         case mtx: MassTransferTransaction => checkTransfer(mtx.sender, mtx.assetId, mtx.transfers.map(_.amount).sum, None, mtx.fee)
         case _                            => Right(tx)
       }
     } else Right(tx)
 
-  def disallowDuplicateIds[T <: Transaction](state: SnapshotStateReader,
+  def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain,
                                              settings: FunctionalitySettings,
                                              height: Int,
                                              tx: T): Either[ValidationError, T] = tx match {
     case _: PaymentTransaction => Right(tx)
-    case _                     => if (state.containsTransaction(tx.id())) Left(AlreadyInTheState(tx.id(), 0)) else Right(tx)
+    case _                     => if (blockchain.containsTransaction(tx.id())) Left(AlreadyInTheState(tx.id(), 0)) else Right(tx)
   }
 
   def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, height: Int, tx: T): Either[ValidationError, T] = {

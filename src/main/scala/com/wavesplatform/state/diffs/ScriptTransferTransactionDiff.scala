@@ -2,17 +2,16 @@ package com.wavesplatform.state.diffs
 
 import cats.implicits._
 import com.wavesplatform.state._
-import com.wavesplatform.state.reader.SnapshotStateReader
 import scorex.account.Address
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.VersionedTransferTransaction
 
 object ScriptTransferTransactionDiff {
-  def apply(state: SnapshotStateReader, height: Int)(tx: VersionedTransferTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, height: Int)(tx: VersionedTransferTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender.publicKey)
     for {
-      recipient <- state.resolveAliasEi(tx.recipient)
+      recipient <- blockchain.resolveAliasEi(tx.recipient)
       portfolios = (tx.assetId match {
         case None =>
           Map(sender -> Portfolio(-tx.amount, LeaseBalance.empty, Map.empty)).combine(
@@ -25,7 +24,7 @@ object ScriptTransferTransactionDiff {
       }).combine(Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)))
       assetIssued = tx.assetId match {
         case None      => true
-        case Some(aid) => state.assetDescription(aid).isDefined
+        case Some(aid) => blockchain.assetDescription(aid).isDefined
       }
       _ <- Either.cond(assetIssued, (), GenericError(s"Unissued assets are not allowed"))
     } yield Diff(height, tx, portfolios)

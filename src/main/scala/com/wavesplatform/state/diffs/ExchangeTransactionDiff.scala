@@ -3,7 +3,6 @@ package com.wavesplatform.state.diffs
 import cats._
 import cats.implicits._
 import com.wavesplatform.state._
-import com.wavesplatform.state.reader.SnapshotStateReader
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.{GenericError, OrderValidationError}
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -12,7 +11,7 @@ import scala.util.Right
 
 object ExchangeTransactionDiff {
 
-  def apply(s: SnapshotStateReader, height: Int)(tx: ExchangeTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, height: Int)(tx: ExchangeTransaction): Either[ValidationError, Diff] = {
     val matcher = tx.buyOrder.matcherPublicKey.toAddress
     val buyer   = tx.buyOrder.senderPublicKey.toAddress
     val seller  = tx.sellOrder.senderPublicKey.toAddress
@@ -21,16 +20,16 @@ object ExchangeTransactionDiff {
                      tx.sellOrder.assetPair.amountAsset,
                      tx.sellOrder.assetPair.priceAsset).flatten
     for {
-      _ <- Either.cond(!assets.exists(s.assetDescription(_).flatMap(_.script).isDefined),
+      _ <- Either.cond(!assets.exists(blockchain.assetDescription(_).flatMap(_.script).isDefined),
                        (),
                        GenericError(s"Smart assets can't participate in ExchangeTransactions"))
-      _ <- Either.cond(s.accountScript(buyer).isEmpty,
+      _ <- Either.cond(blockchain.accountScript(buyer).isEmpty,
                        (),
                        GenericError(s"Buyer $buyer can't participate in ExchangeTransaction because it has assigned Script"))
-      _ <- Either.cond(s.accountScript(seller).isEmpty,
+      _ <- Either.cond(blockchain.accountScript(seller).isEmpty,
                        (),
                        GenericError(s"Seller $seller can't participate in ExchangeTransaction because it has assigned Script"))
-      t                     <- enoughVolume(tx, s)
+      t                     <- enoughVolume(tx, blockchain)
       buyPriceAssetChange   <- t.buyOrder.getSpendAmount(t.price, t.amount).liftValidationError(tx).map(-_)
       buyAmountAssetChange  <- t.buyOrder.getReceiveAmount(t.price, t.amount).liftValidationError(tx)
       sellPriceAssetChange  <- t.sellOrder.getReceiveAmount(t.price, t.amount).liftValidationError(tx)
@@ -82,9 +81,9 @@ object ExchangeTransactionDiff {
     }
   }
 
-  private def enoughVolume(exTrans: ExchangeTransaction, s: SnapshotStateReader): Either[ValidationError, ExchangeTransaction] = {
-    val filledBuy  = s.filledVolumeAndFee(ByteStr(exTrans.buyOrder.id()))
-    val filledSell = s.filledVolumeAndFee(ByteStr(exTrans.sellOrder.id()))
+  private def enoughVolume(exTrans: ExchangeTransaction, blockchain: Blockchain): Either[ValidationError, ExchangeTransaction] = {
+    val filledBuy  = blockchain.filledVolumeAndFee(ByteStr(exTrans.buyOrder.id()))
+    val filledSell = blockchain.filledVolumeAndFee(ByteStr(exTrans.sellOrder.id()))
 
     val buyTotal             = filledBuy.volume + exTrans.amount
     val sellTotal            = filledSell.volume + exTrans.amount
