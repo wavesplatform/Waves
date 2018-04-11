@@ -19,6 +19,8 @@ trait SnapshotStateReader {
 
   def transactionInfo(id: ByteStr): Option[(Int, Transaction)]
 
+  def transactionHeight(id: ByteStr): Option[Int]
+
   def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)]
 
   def containsTransaction(id: ByteStr): Boolean

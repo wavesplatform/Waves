@@ -49,5 +49,6 @@ class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], sta
       balance = state.portfolio(address).balanceOf(maybeAssetId.map(ByteStr.apply))
     } yield balance).left.map(_.toString)
   }
-
+  override def transactionHeightById(id: Array[Byte]): Option[Int] =
+    state.transactionHeight(ByteStr(id))
 }

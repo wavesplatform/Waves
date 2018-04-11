@@ -53,6 +53,12 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
       .map(t => (t._1, t._2))
       .orElse(inner.transactionInfo(id))
 
+  override def transactionHeight(id: ByteStr): Option[Int] =
+    diff.transactions
+      .get(id)
+      .map(_._1)
+      .orElse(inner.transactionHeight(id))
+
   override def height: Int = inner.height + (if (maybeDiff.isDefined) 1 else 0)
 
   override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = {
