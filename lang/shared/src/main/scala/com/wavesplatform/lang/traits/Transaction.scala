@@ -14,7 +14,7 @@ trait Transaction {
   def assetId: Either[String, Option[ByteVector]]
   def proofs: Either[String, IndexedSeq[ByteVector]]
   def recipient: Either[String, ByteVector]
-  def alias_text: Either[String, String]
+  def aliasText: Either[String, String]
   def reissuable: Either[String, Boolean]
   def decimals: Either[String, Byte]
   def assetDescription: Either[String, ByteVector]
