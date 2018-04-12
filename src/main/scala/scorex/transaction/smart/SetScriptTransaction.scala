@@ -29,7 +29,7 @@ case class SetScriptTransaction private (version: Byte,
     Bytes.concat(
       Array(builder.typeId, version, chainId),
       sender.publicKey,
-      Deser.serializeOption(script)(s => Deser.serializeArray(s.bytes().arr)),
+      Deser.serializeOption(script)(s => s.bytes().arr),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     ))
@@ -52,7 +52,7 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
       val chainId = bytes(0)
       val sender  = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
       val (scriptOptEi: Option[Either[ValidationError.ScriptParseError, Script]], scriptEnd) =
-        Deser.parseOption(bytes, KeyLength + 1)(str => Script.fromBytes(Deser.parseArraySize(str, 0)._1))
+        Deser.parseOption(bytes, KeyLength + 1)(Script.fromBytes)
       val scriptEiOpt = scriptOptEi match {
         case None            => Right(None)
         case Some(Right(sc)) => Right(Some(sc))

@@ -43,7 +43,7 @@ case class SmartIssueTransaction private (version: Byte,
       Longs.toByteArray(quantity),
       Array(decimals),
       Deser.serializeBoolean(reissuable),
-      Deser.serializeOption(script)(s => Deser.serializeArray(s.bytes().arr)),
+      Deser.serializeOption(script)(s => s.bytes().arr),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     ))
@@ -80,7 +80,7 @@ object SmartIssueTransaction extends TransactionParserFor[SmartIssueTransaction]
       val decimals                      = bytes.slice(quantityStart + 8, quantityStart + 9).head
       val reissuable                    = bytes.slice(quantityStart + 9, quantityStart + 10).head == (1: Byte)
       val (scriptOptEi: Option[Either[ValidationError.ScriptParseError, Script]], scriptEnd) =
-        Deser.parseOption(bytes, quantityStart + 10)(str => Script.fromBytes(Deser.parseArraySize(str, 0)._1))
+        Deser.parseOption(bytes, quantityStart + 10)(Script.fromBytes)
       val scriptEiOpt: Either[ValidationError.ScriptParseError, Option[Script]] = scriptOptEi match {
         case None            => Right(None)
         case Some(Right(sc)) => Right(Some(sc))
