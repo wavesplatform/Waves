@@ -45,8 +45,6 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   def genElementCheck(gen: Gen[EXPR]): Unit = {
     forAll(gen) { exp =>
       val code = toString(exp)
-      println(s"code $code")
-      println(s"exp $exp")
       parse(code) shouldBe exp
     }
   }
