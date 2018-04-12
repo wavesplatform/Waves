@@ -161,7 +161,7 @@ object SyncHttpApi extends Assertions {
     private val TxInBlockchainAwaitTime = 6 * nodes.head.blockDelay
     private val ConditionAwaitTime      = 5.minutes
 
-    def waitForHeightAriseAndTxPresent(transactionId: String): Unit =
+    def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
       Await.result(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
 
     def waitForHeightArise(): Unit =

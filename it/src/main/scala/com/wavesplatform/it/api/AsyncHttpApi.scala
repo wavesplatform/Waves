@@ -526,18 +526,13 @@ object AsyncHttpApi extends Assertions {
 
   }
 
-  implicit class NodesAsyncHttpApi(nodes: Seq[Node]) {
-    // if we first await tx and then height + 1, it could be gone with height + 1
-    // if we first await height + 1 and then tx, it could be gone with height + 2
-    // so we await tx twice
-    def waitForHeightAriseAndTxPresent(transactionId: String): Future[Unit] =
+  implicit class NodesAsyncHttpApi(nodes: Seq[Node]) extends Matchers {
+    def waitForHeightAriseAndTxPresent(transactionId: String)(implicit p: Position): Future[Unit] =
       for {
-        height <- traverse(nodes)(_.height).map(_.max)
-        _      <- waitForSameBlocksAt(2.seconds, height)
-        _      <- traverse(nodes)(_.waitForTransaction(transactionId))
-        _      <- traverse(nodes)(_.waitForHeight(height + 1))
-        _      <- traverse(nodes)(_.waitForTransaction(transactionId))
-      } yield ()
+        allHeights   <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
+        _            <- traverse(nodes)(_.waitForHeight(allHeights.max + 1))
+        finalHeights <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
+      } yield all(finalHeights).shouldBe(finalHeights.head)
 
     def waitForHeightArise(): Future[Unit] =
       for {

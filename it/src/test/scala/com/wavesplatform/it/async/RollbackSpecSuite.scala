@@ -1,6 +1,6 @@
 package com.wavesplatform.it.async
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
@@ -24,12 +24,10 @@ class RollbackSpecSuite
     with TransferSending
     with WaitForHeight2
     with NodesFromDocker {
-  // there are nodes with big and small balances to reduce the number of forks
-  private val nonGeneratingNodesConfig = ConfigFactory.parseString("waves.miner.enable = no")
 
   override protected val nodeConfigs: Seq[Config] = Seq(
-    NodeConfigs.Default.last,
-    nonGeneratingNodesConfig.withFallback(Random.shuffle(NodeConfigs.Default.init).head)
+    Random.shuffle(NodeConfigs.Default.init).head,
+    NodeConfigs.NotMiner
   )
 
   private val nodeAddresses     = nodeConfigs.map(_.getString("address")).toSet
