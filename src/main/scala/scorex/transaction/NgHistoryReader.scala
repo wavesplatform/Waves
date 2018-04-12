@@ -123,41 +123,44 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: Blockchain, fs: Fun
       inner.blockHeaderAndSize(height)
   }
 
-  override def portfolio(a: Address): Portfolio = ???
+  override def portfolio(a: Address): Portfolio = inner.portfolio(a)
 
-  override def transactionInfo(id: AssetId): Option[(Int, Transaction)] = ???
+  override def transactionInfo(id: AssetId): Option[(Int, Transaction)] = inner.transactionInfo(id)
 
-  override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = ???
+  override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] =
+    inner.addressTransactions(address, types, count, from)
 
-  override def containsTransaction(id: AssetId): Boolean = ???
+  override def containsTransaction(id: AssetId): Boolean = inner.containsTransaction(id)
 
-  override def assetDescription(id: AssetId): Option[AssetDescription] = ???
+  override def assetDescription(id: AssetId): Option[AssetDescription] = inner.assetDescription(id)
 
-  override def resolveAlias(a: Alias): Option[Address] = ???
+  override def resolveAlias(a: Alias): Option[Address] = inner.resolveAlias(a)
 
-  override def leaseDetails(leaseId: AssetId): Option[LeaseDetails] = ???
+  override def leaseDetails(leaseId: AssetId): Option[LeaseDetails] = inner.leaseDetails(leaseId)
 
-  override def filledVolumeAndFee(orderId: AssetId): VolumeAndFee = ???
+  override def filledVolumeAndFee(orderId: AssetId): VolumeAndFee = inner.filledVolumeAndFee(orderId)
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  override def balanceSnapshots(address: Address, from: Int, to: Int): Seq[BalanceSnapshot] = ???
+  override def balanceSnapshots(address: Address, from: Int, to: Int): Seq[BalanceSnapshot] = inner.balanceSnapshots(address, from, to)
 
-  override def accountScript(address: Address): Option[Script] = ???
+  override def accountScript(address: Address): Option[Script] = inner.accountScript(address)
 
-  override def accountData(acc: Address): AccountDataInfo = ???
+  override def accountData(acc: Address): AccountDataInfo = inner.accountData(acc)
 
-  override def accountData(acc: Address, key: String): Option[DataEntry[_]] = ???
+  override def accountData(acc: Address, key: String): Option[DataEntry[_]] = inner.accountData(acc, key)
 
-  override def assetDistribution(height: Int, assetId: AssetId): Map[Address, Long] = ???
+  override def assetDistribution(height: Int, assetId: AssetId): Map[Address, Long] = inner.assetDistribution(height, assetId)
 
-  override def wavesDistribution(height: Int): Map[Address, Long] = ???
+  override def wavesDistribution(height: Int): Map[Address, Long] = inner.wavesDistribution(height)
 
-  override def allActiveLeases: Set[LeaseTransaction] = ???
+  override def allActiveLeases: Set[LeaseTransaction] = inner.allActiveLeases
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
-  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = ???
-  override def append(diff: Diff, block: Block): Unit                                                  = ???
-  override def rollbackTo(targetBlockId: AssetId): Seq[Block]                                          = ???
+  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = inner.collectLposPortfolios(pf)
+
+  override def append(diff: Diff, block: Block): Unit = inner.append(diff, block)
+
+  override def rollbackTo(targetBlockId: AssetId): Seq[Block] = inner.rollbackTo(targetBlockId)
 }

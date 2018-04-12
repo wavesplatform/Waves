@@ -150,40 +150,40 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
     }
   }
 
-  override def score: BigInt = ???
+  override def score: BigInt = inner.score
 
-  override def scoreOf(blockId: ByteStr): Option[BigInt] = ???
+  override def scoreOf(blockId: ByteStr): Option[BigInt] = inner.scoreOf(blockId)
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = ???
+  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = inner.blockHeaderAndSize(height)
 
-  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = ???
+  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = inner.blockHeaderAndSize(blockId)
 
-  override def lastBlock: Option[Block] = ???
+  override def lastBlock: Option[Block] = inner.lastBlock
 
-  override def blockBytes(height: Int): Option[Array[Type]] = ???
+  override def blockBytes(height: Int): Option[Array[Type]] = inner.blockBytes(height)
 
-  override def blockBytes(blockId: ByteStr): Option[Array[Type]] = ???
+  override def blockBytes(blockId: ByteStr): Option[Array[Type]] = inner.blockBytes(blockId)
 
-  override def heightOf(blockId: ByteStr): Option[Int] = ???
+  override def heightOf(blockId: ByteStr): Option[Int] = inner.heightOf(blockId)
 
   /** Returns the most recent block IDs, starting from the most recent  one */
-  override def lastBlockIds(howMany: Int): Seq[ByteStr] = ???
+  override def lastBlockIds(howMany: Int): Seq[ByteStr] = inner.lastBlockIds(howMany)
 
   /** Returns a chain of blocks starting with the block with the given ID (from oldest to newest) */
-  override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = ???
+  override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = inner.blockIdsAfter(parentSignature, howMany)
 
-  override def parent(block: Block, back: Int): Option[Block] = ???
+  override def parent(block: Block, back: Int): Option[Block] = inner.parent(block, back)
 
   /** Features related */
-  override def approvedFeatures(): Map[Short, Int] = ???
+  override def approvedFeatures(): Map[Short, Int] = inner.approvedFeatures()
 
-  override def activatedFeatures(): Map[Short, Int] = ???
+  override def activatedFeatures(): Map[Short, Int] = inner.activatedFeatures()
 
-  override def featureVotes(height: Int): Map[Short, Int] = ???
+  override def featureVotes(height: Int): Map[Short, Int] = inner.featureVotes(height)
 
-  override def append(diff: Diff, block: Block): Unit = ???
+  override def append(diff: Diff, block: Block): Unit = inner.append(diff, block)
 
-  override def rollbackTo(targetBlockId: ByteStr): Seq[Block] = ???
+  override def rollbackTo(targetBlockId: ByteStr): Seq[Block] = inner.rollbackTo(targetBlockId)
 }
 
 object CompositeBlockchain {
