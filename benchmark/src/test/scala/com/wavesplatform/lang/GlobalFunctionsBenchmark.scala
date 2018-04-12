@@ -73,12 +73,14 @@ object GlobalFunctionsBenchmark {
   val SeedBytesLength   = 128
 
   private val defaultEnvironment: Environment = new Environment {
-    override def height: Int                                                                   = 1
-    override def networkByte: Byte                                                             = NetworkByte
-    override def transaction: Transaction                                                      = ???
-    override def transactionById(id: Array[Byte]): Option[Transaction]                         = ???
-    override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any] = ???
-    override def resolveAddress(addressOrAlias: Array[Byte]): Either[String, Array[Byte]]      = ???
+    override def height: Int                                                                                       = 1
+    override def networkByte: Byte                                                                                 = NetworkByte
+    override def transaction: Transaction                                                                          = ???
+    override def transactionById(id: Array[Byte]): Option[Transaction]                                             = ???
+    override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any]                     = ???
+    override def resolveAddress(addressOrAlias: Array[Byte]): Either[String, Array[Byte]]                          = ???
+    override def transactionHeightById(id: Array[Byte]): Option[Int]                                               = ???
+    override def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = ???
   }
 
   val environmentFunctions = new EnvironmentFunctions(defaultEnvironment)
