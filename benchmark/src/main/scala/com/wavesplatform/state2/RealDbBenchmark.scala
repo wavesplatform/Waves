@@ -132,9 +132,7 @@ object RealDbBenchmark extends App with ScorexLogging {
     } finally {
       db.close()
       log.info(s"Measuring $label is done")
-
       System.gc()
-      //Thread.sleep(5000)
     }
   }
 
