@@ -29,7 +29,7 @@ case class SetScriptTransaction private (version: Byte,
     Bytes.concat(
       Array(builder.typeId, version, chainId),
       sender.publicKey,
-      Deser.serializeOption(script)(s => Deser.serializeArray(s.bytes().arr)),
+      Deser.serializeOption(script)(s => s.bytes().arr),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     ))

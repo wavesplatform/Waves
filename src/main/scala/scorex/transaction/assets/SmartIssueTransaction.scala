@@ -43,7 +43,7 @@ case class SmartIssueTransaction private (version: Byte,
       Longs.toByteArray(quantity),
       Array(decimals),
       Deser.serializeBoolean(reissuable),
-      Deser.serializeOption(script)(s => Deser.serializeArray(s.bytes().arr)),
+      Deser.serializeOption(script)(s => s.bytes().arr),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     ))
