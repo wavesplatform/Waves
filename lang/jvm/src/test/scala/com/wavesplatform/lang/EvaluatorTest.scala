@@ -1,22 +1,26 @@
 package com.wavesplatform.lang
-import cats.syntax.semigroup._
 import cats.data.EitherT
+import cats.kernel.Monoid
+import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.Terms.Typed._
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.TypeInfo._
-import com.wavesplatform.lang.ctx._
 import com.wavesplatform.lang.ctx.Context._
-import com.wavesplatform.lang.ctx.impl.PureContext
+import com.wavesplatform.lang.ctx._
+import com.wavesplatform.lang.ctx.impl.PureContext._
+import com.wavesplatform.lang.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import com.wavesplatform.lang.ctx.impl.PureContext._
+import scodec.bits.ByteVector
+import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def ev[T: TypeInfo](context: Context = PureContext.instance, expr: EXPR): Either[_, _] = Evaluator[T](context, expr)
-  private def simpleDeclarationAndUsage(i: Int)                                                  = BLOCK(Some(LET("x", CONST_LONG(i))), REF("x", LONG), LONG)
+  private def ev[T: TypeInfo](context: Context = PureContext.instance, expr: EXPR): Either[ExecutionError, T] = Evaluator[T](context, expr)
+  private def simpleDeclarationAndUsage(i: Int)                                                               = BLOCK(Some(LET("x", CONST_LONG(i))), REF("x", LONG), LONG)
 
   property("successful on very deep expressions (stack overflow check)") {
     val term = (1 to 100000).foldLeft[EXPR](CONST_LONG(0))((acc, _) => FUNCTION_CALL(sumLong.header, List(acc, CONST_LONG(1)), LONG))
@@ -279,5 +283,67 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
       ),
       expr = FUNCTION_CALL(multiplierFunction.header, List(Typed.CONST_LONG(3), Typed.CONST_LONG(4)), LONG)
     ) shouldBe Right(12)
+  }
+
+  property("returns an success if sigVerify return a success") {
+    val seed                    = "seed".getBytes()
+    val (privateKey, publicKey) = Curve25519.createKeyPair(seed)
+
+    val bodyBytes = "message".getBytes()
+    val signature = Curve25519.sign(privateKey, bodyBytes)
+
+    val r = sigVerifyTest(bodyBytes, publicKey, signature)
+    r.isRight shouldBe true
+  }
+
+  property("returns an error if sigVerify return an error") {
+    val seed           = "seed".getBytes()
+    val (_, publicKey) = Curve25519.createKeyPair(seed)
+    val bodyBytes      = "message".getBytes()
+
+    val r = sigVerifyTest(bodyBytes, publicKey, Signature("signature".getBytes()))
+    r.isLeft shouldBe false
+  }
+
+  private def sigVerifyTest(bodyBytes: Array[Byte], publicKey: PublicKey, signature: Signature): Either[ExecutionError, Boolean] = {
+    val txType = PredefType(
+      "Transaction",
+      List(
+        "bodyBytes" -> BYTEVECTOR,
+        "senderPk"  -> BYTEVECTOR,
+        "proof0"    -> BYTEVECTOR
+      )
+    )
+
+    val txObj = Obj(
+      Map(
+        "bodyBytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(bodyBytes))),
+        "senderPk"  -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(publicKey))),
+        "proof0"    -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(signature)))
+      ))
+
+    val context = Monoid.combineAll(
+      Seq(
+        PureContext.instance,
+        CryptoContext.build(Global),
+        Context.build(
+          types = Seq(txType),
+          letDefs = Map("tx" -> LazyVal(TYPEREF(txType.name))(EitherT.pure(txObj))),
+          functions = Seq.empty
+        )
+      ))
+
+    ev[Boolean](
+      context = context,
+      expr = FUNCTION_CALL(
+        function = FunctionHeader("sigVerify", List(FunctionHeaderType.BYTEVECTOR, FunctionHeaderType.BYTEVECTOR, FunctionHeaderType.BYTEVECTOR)),
+        args = List(
+          GETTER(REF("tx", TYPEREF(txType.name)), "bodyBytes", BYTEVECTOR),
+          GETTER(REF("tx", TYPEREF(txType.name)), "proof0", BYTEVECTOR),
+          GETTER(REF("tx", TYPEREF(txType.name)), "senderPk", BYTEVECTOR)
+        ),
+        BOOLEAN
+      )
+    )
   }
 }

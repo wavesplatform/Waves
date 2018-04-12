@@ -54,8 +54,7 @@ object WavesContext {
       else pfs(x)
     }))
 
-  private def transactionObject(tx: Transaction): Obj = {
-
+  private def transactionObject(tx: Transaction): Obj =
     Obj(
       Map(
         "type"       -> LazyVal(LONG)(EitherT.pure(tx.transactionType)),
@@ -86,7 +85,6 @@ object WavesContext {
         "proof6"           -> proofBinding(tx, 6),
         "proof7"           -> proofBinding(tx, 7)
       ))
-  }
 
   def build(env: Environment, global: BaseGlobal): Context = {
     def getdataF(name: String, dataType: DataType) =
@@ -144,7 +142,6 @@ object WavesContext {
       PredefFunction("addressFromRecipient", addressType.typeRef, List(("AddressOrAlias", TYPEREF(addressOrAliasType.name)))) {
         case Obj(fields) :: Nil =>
           val bytes = fields("bytes").value.map(_.asInstanceOf[ByteVector]).value()
-
           bytes
             .flatMap(bv => env.resolveAddress(bv.toArray))
             .map(resolved => Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(resolved))))))
