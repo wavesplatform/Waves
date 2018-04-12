@@ -64,6 +64,21 @@ trait ScriptGen {
       f   <- INTGen((gas - 3) / 3)
     } yield IF(cnd, t, f)
 
+  def STRgen: Gen[EXPR] =
+    Gen.identifier.map(CONST_STRING)
+
+  def LETgen(gas: Int): Gen[LET] =
+    for {
+      name  <- Gen.identifier
+      value <- BOOLgen((gas - 3) / 3)
+    } yield LET(name, value)
+
+  def BLOCKgen(gas: Int): Gen[EXPR] =
+    for {
+      let  <- LETgen((gas - 3) / 3) // should be Gen.option(LETgen((gas - 3) / 3)), issue: NODE-696
+      body <- BOOLgen((gas - 3) / 3)
+    } yield BLOCK(Some(let), body)
+
   private val spaceChars: Seq[Char] = Vector('\u0020', '\u0009', '\u000D', '\u000A')
 
   def whitespaceChar: Gen[Char] = Gen.oneOf(spaceChars)
