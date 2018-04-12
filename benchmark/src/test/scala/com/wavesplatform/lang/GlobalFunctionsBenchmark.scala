@@ -6,7 +6,6 @@ import com.wavesplatform.lang.GlobalFunctionsBenchmark._
 import com.wavesplatform.lang.traits.{DataType, Environment, Transaction}
 import org.openjdk.jmh.annotations._
 import scodec.bits.ByteVector
-import scorex.crypto.encode.Base58
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey, Signature}
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -16,6 +15,18 @@ import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey, Signature}
 @Warmup(iterations = 10)
 @Measurement(iterations = 10)
 class GlobalFunctionsBenchmark {
+
+  @Benchmark
+  def random_bytes_500_test(): Array[Byte] = randomBytes(DataBytesLength)
+
+  @Benchmark
+  def base58_decode_full_test(): Either[String, Array[Byte]] = Global.base58Decode(Global.base58Encode(randomBytes(DataBytesLength)))
+
+  @Benchmark
+  def base58_encode_test(): String = hashTest(Global.base58Encode)
+
+  @Benchmark
+  def base58_26_encode_test(): String = hashTest(26, Global.base58Encode) // for addressFromString_full_test
 
   @Benchmark
   def sha256_test(): Array[Byte] = hashTest(Global.sha256)
@@ -33,7 +44,7 @@ class GlobalFunctionsBenchmark {
   def curve25519_generateKeypair_test(): (PrivateKey, PublicKey) = curve25519.generateKeypair
 
   @Benchmark
-  def curve25519_sign_test(): Array[Byte] = {
+  def curve25519_sign_full_test(): Array[Byte] = {
     val (privateKey, _) = curve25519.generateKeypair
     curve25519.sign(privateKey, randomBytes(DataBytesLength))
   }
@@ -50,7 +61,8 @@ class GlobalFunctionsBenchmark {
   def addressFromPublicKey_test(): ByteVector = randomAddress
 
   @Benchmark
-  def addressFromString_full_test(): Either[String, Option[ByteVector]] = environmentFunctions.addressFromString(Base58.encode(randomAddress.toArray))
+  def addressFromString_full_test(): Either[String, Option[ByteVector]] =
+    environmentFunctions.addressFromString(Global.base58Encode(randomAddress.toArray))
 
 }
 
@@ -72,14 +84,15 @@ object GlobalFunctionsBenchmark {
   val environmentFunctions = new EnvironmentFunctions(defaultEnvironment)
 
   def randomBytes(length: Int): Array[Byte] = {
-    val bytes = Array.fill[Byte](DataBytesLength)(0)
+    val bytes = Array.fill[Byte](length)(0)
     ThreadLocalRandom.current().nextBytes(bytes)
     bytes
   }
 
   def randomAddress: ByteVector = environmentFunctions.addressFromPublicKey(ByteVector(randomBytes(Curve25519.KeyLength)))
 
-  def hashTest(f: Array[Byte] => Array[Byte]): Array[Byte] = f(randomBytes(DataBytesLength))
+  def hashTest[T](f: Array[Byte] => T): T           = f(randomBytes(DataBytesLength))
+  def hashTest[T](len: Int, f: Array[Byte] => T): T = f(randomBytes(len))
 
   object curve25519 {
     def generateKeypair: (PrivateKey, PublicKey)                        = Curve25519.createKeyPair(randomBytes(SeedBytesLength))

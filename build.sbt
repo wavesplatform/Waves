@@ -113,7 +113,6 @@ inConfig(Linux)(
     packageDescription := "Waves node"
   ))
 
-
 inConfig(Universal)(
   Seq(
     mappings += (baseDirectory.value / s"waves-${network.value}.conf" -> "doc/waves.conf.sample"),
@@ -198,7 +197,11 @@ lazy val lang =
         _.withModuleKind(ModuleKind.CommonJSModule)
       }
     )
-    .jvmSettings(libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "0.6.22" % "provided")
+    .jvmSettings(
+      libraryDependencies ++= Seq(
+        "org.scala-js"                %% "scalajs-stubs" % "0.6.22" % "provided"
+      ) ++ Dependencies.logging.map(_ % "test") // scrypto logs an error if a signature verification was failed
+    )
 
 lazy val langJS  = lang.js
 lazy val langJVM = lang.jvm
