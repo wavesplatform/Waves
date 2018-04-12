@@ -20,9 +20,10 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   def toString(expr: EXPR): String = expr match {
-    case CONST_LONG(x) => whitespaces.sample.get + s"$x" + whitespaces.sample.get
-    case TRUE          => whitespaces.sample.get + s"true" + whitespaces.sample.get
-    case FALSE         => whitespaces.sample.get + s"false" + whitespaces.sample.get
+    case CONST_LONG(x)   => whitespaces.sample.get + s"$x" + whitespaces.sample.get
+    case CONST_STRING(x) => whitespaces.sample.get + s"""\"$x\"""" + whitespaces.sample.get
+    case TRUE            => whitespaces.sample.get + "true" + whitespaces.sample.get
+    case FALSE           => whitespaces.sample.get + "false" + whitespaces.sample.get
     case BINARY_OP(x: EXPR, op: BINARY_OP_KIND, y: EXPR) =>
       op match {
         case SUM_OP => s"(${toString(x)}+${toString(y)})"
@@ -33,26 +34,36 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         case GE_OP  => s"(${toString(x)}>=${toString(y)})"
       }
     case IF(cond: EXPR, x: EXPR, y: EXPR) => s"(if(${toString(cond)}) then ${toString(x)} else ${toString(y)})"
-    case _                                => ???
+    case BLOCK(let: Option[LET], body: EXPR) =>
+      let match {
+        case Some(let) => s"let ${let.name} = ${toString(let.value)}; ${toString(body)}"
+        case None      => s"${toString(body)}"
+      }
+    case _ => ???
   }
 
   def genElementCheck(gen: Gen[EXPR]): Unit = {
     forAll(gen) { exp =>
       val code = toString(exp)
+      println(s"code $code")
+      println(s"exp $exp")
       parse(code) shouldBe exp
     }
   }
 
-  property("simple: expressions, multiline, if") {
+  property("all types of multiline expressions") {
+    val gas = 50
     genElementCheck(CONST_LONGgen)
-    genElementCheck(BOOLgen(10))
-    genElementCheck(SUMgen(10))
-    genElementCheck(EQ_INTgen(10))
-    genElementCheck(INTGen(10))
-    genElementCheck(GEgen(10))
-    genElementCheck(GTgen(10))
-    genElementCheck(ANDgen(10))
-    genElementCheck(ORgen(10))
+    genElementCheck(STRgen)
+    genElementCheck(BOOLgen(gas))
+    genElementCheck(SUMgen(gas))
+    genElementCheck(EQ_INTgen(gas))
+    genElementCheck(INTGen(gas))
+    genElementCheck(GEgen(gas))
+    genElementCheck(GTgen(gas))
+    genElementCheck(ANDgen(gas))
+    genElementCheck(ORgen(gas))
+    genElementCheck(BLOCKgen(gas))
   }
 
   property("priority in binary expressions") {
@@ -79,41 +90,12 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("let/ref constructs") {
-    parse("""let X = 10;
-        |3 > 2
-      """.stripMargin) shouldBe BLOCK(Some(LET("X", CONST_LONG(10))), BINARY_OP(CONST_LONG(3), GT_OP, CONST_LONG(2)))
-
-    parse("(let X = 10; 3 > 2)") shouldBe BLOCK(Some(LET("X", CONST_LONG(10))), BINARY_OP(CONST_LONG(3), GT_OP, CONST_LONG(2)))
-    parse("(let X = 3 + 2; 3 > 2)") shouldBe BLOCK(Some(LET("X", BINARY_OP(CONST_LONG(3), SUM_OP, CONST_LONG(2)))),
-                                                   BINARY_OP(CONST_LONG(3), GT_OP, CONST_LONG(2)))
-    parse("(let X = if(true) then true else false; false)") shouldBe BLOCK(Some(LET("X", IF(TRUE, TRUE, FALSE))), FALSE)
-
     val expr = parse("""let X = 10;
 let Y = 11;
 X > Y
       """.stripMargin)
 
     expr shouldBe BLOCK(Some(LET("X", CONST_LONG(10))), BLOCK(Some(LET("Y", CONST_LONG(11))), BINARY_OP(REF("X"), GT_OP, REF("Y"))))
-  }
-
-  property("multiline") {
-    parse("""let X = 10;
-        |
-        |true
-      """.stripMargin) shouldBe BLOCK(Some(LET("X", CONST_LONG(10))), TRUE)
-    parse("""let X = 11;
-        |true
-      """.stripMargin) shouldBe BLOCK(Some(LET("X", CONST_LONG(11))), TRUE)
-
-    parse("""
-        |
-        |let X = 12;
-        |
-        |3
-        | +
-        |  2
-        |
-      """.stripMargin) shouldBe BLOCK(Some(LET("X", CONST_LONG(12))), BINARY_OP(CONST_LONG(3), SUM_OP, CONST_LONG(2)))
   }
 
   property("if") {
@@ -137,26 +119,6 @@ X > Y
       IF(BINARY_OP(REF("X"), EQ_OP, REF("Y")), CONST_LONG(2), CONST_LONG(3))
     )
 
-  }
-
-  property("string literal") {
-    forAll { (in: String) =>
-      parse(s"""
-           |
-           | "$in"
-           |
-        """.stripMargin) shouldBe CONST_STRING(in)
-    }
-  }
-
-  property("string literal with \\t and \\n") {
-    val stringWithTabAndLineBreak = "as\ndf"
-
-    parse(s"""
-         |
-         | "$stringWithTabAndLineBreak"
-         |
-      """.stripMargin) shouldBe CONST_STRING(stringWithTabAndLineBreak)
   }
 
   property("string literal with unicode chars") {
