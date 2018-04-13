@@ -4,10 +4,9 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.Serde
-import com.wavesplatform.lang.v1.Terms.Typed
-import scodec.Attempt.{Failure, Successful}
-import scodec.DecodeResult
+import com.wavesplatform.lang.v1.Terms.Typed.EXPR
 import scorex.transaction.ValidationError.ScriptParseError
+import scorex.transaction.smart.script.v1.ScriptV1
 
 object ScriptReader {
 
@@ -24,18 +23,17 @@ object ScriptReader {
       sv <- ScriptVersion
         .fromInt(version)
         .fold[Either[ScriptParseError, ScriptVersion]](Left(ScriptParseError(s"Invalid version: $version")))(v => Right(v))
-      expr <- readExpr(sv, scriptBytes)
-    } yield Script(sv)(expr)
+      script <- sv match {
+        case V1 => readExprV1(scriptBytes).map(ScriptV1.apply)
+      }
+    } yield script
   }
 
-  private def readExpr[V <: ScriptVersion](v: V, bytes: Array[Byte]): Either[ScriptParseError, v.ExprT] = {
-    v match {
-      case V1 =>
-        Serde.codec.decode(scodec.bits.BitVector(bytes)) match {
-          case Successful(value: DecodeResult[Typed.EXPR]) => Right(value.value.asInstanceOf[v.ExprT])
-          case Failure(cause)                              => Left(ScriptParseError(cause.toString))
-        }
-    }
+  private def readExprV1(bytes: Array[Byte]): Either[ScriptParseError, EXPR] = {
+    Serde.codec.decode(scodec.bits.BitVector(bytes))
+      .toEither
+      .map(_.value)
+      .left.map(err => ScriptParseError(err.toString()))
   }
 
 }
