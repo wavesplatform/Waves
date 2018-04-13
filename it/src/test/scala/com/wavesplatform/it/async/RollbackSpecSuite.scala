@@ -103,13 +103,11 @@ class RollbackSpecSuite
 
     val f = for {
       tx1        <- node.putData(node.address, List(entry1), 100000).map(_.id)
+      _          <- nodes.waitForHeightAriseAndTxPresent(tx1)
       tx1heights <- Future.traverse(nodes)(_.waitForTransaction(tx1))
       tx1height = tx1heights.head.height
-      _          <- Future.traverse(nodes)(_.waitForHeight(tx1height + 1))
-      tx2        <- node.putData(node.address, List(entry2, entry3), 100000).map(_.id)
-      tx2heights <- Future.traverse(nodes)(_.waitForTransaction(tx2))
-      tx2height = tx2heights.head.height
-      _     <- Future.traverse(nodes)(_.waitForHeight(tx2height + 1))
+      tx2   <- node.putData(node.address, List(entry2, entry3), 100000).map(_.id)
+      _     <- nodes.waitForHeightAriseAndTxPresent(tx2)
       data2 <- node.getData(node.address)
       _ = assert(data2 == List(entry3, entry2))
 
