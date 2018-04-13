@@ -1,8 +1,8 @@
 package scorex.transaction.smart
 
 import cats.kernel.Monoid
-import com.wavesplatform.lang.ctx.Context
-import com.wavesplatform.lang.ctx.impl.{CryptoContext, PureContext, WavesContext}
+import com.wavesplatform.lang.v1.ctx.Context
+import com.wavesplatform.lang.v1.ctx.impl.{CryptoContext, PureContext, WavesContext}
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Coeval
 import scorex.transaction._

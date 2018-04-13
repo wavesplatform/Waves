@@ -12,7 +12,7 @@ import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
 import scorex.transaction.ValidationError.{GenericError, UnsupportedVersion}
 import scorex.transaction._
-import scorex.transaction.smart.Script
+import scorex.transaction.smart.script.{Script, ScriptReader}
 
 import scala.util.Try
 
@@ -80,7 +80,7 @@ object SmartIssueTransaction extends TransactionParserFor[SmartIssueTransaction]
       val decimals                      = bytes.slice(quantityStart + 8, quantityStart + 9).head
       val reissuable                    = bytes.slice(quantityStart + 9, quantityStart + 10).head == (1: Byte)
       val (scriptOptEi: Option[Either[ValidationError.ScriptParseError, Script]], scriptEnd) =
-        Deser.parseOption(bytes, quantityStart + 10)(Script.fromBytes)
+        Deser.parseOption(bytes, quantityStart + 10)(ScriptReader.fromBytes)
       val scriptEiOpt: Either[ValidationError.ScriptParseError, Option[Script]] = scriptOptEi match {
         case None            => Right(None)
         case Some(Right(sc)) => Right(Some(sc))

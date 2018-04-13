@@ -6,7 +6,7 @@ import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
-case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lang.traits.Transaction {
+case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lang.v1.traits.Transaction {
   override def bodyBytes: Either[String, ByteVector] = tx match {
     case pt: ProvenTransaction => Right(ByteVector(pt.bodyBytes()))
     case _                     => Left("Transaction is not Proven, doesn't contain bodyBytes")

@@ -1,6 +1,6 @@
 package com.wavesplatform.state2.diffs.smart.scenarios
 
-import com.wavesplatform.lang.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.{Parser, TypeChecker}
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
 import com.wavesplatform.state2.diffs.smart._
@@ -17,7 +17,7 @@ class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matche
     val scriptText =
       s"""
          |
-         | if (tx.type == 4 || tx.type == 11) 
+         | if (tx.type == 4 || tx.type == 11)
          |  then sigVerify(tx.bodyBytes,tx.proof0,tx.senderPk)
          |  else false
          |

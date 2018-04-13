@@ -9,7 +9,7 @@ import com.wavesplatform.state2.{AccountDataInfo, AssetDescription, AssetInfo, B
 import scorex.account.{Address, Alias}
 import scorex.block.Block
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
-import scorex.transaction.smart.Script
+import scorex.transaction.smart.script.Script
 import scorex.transaction.{History, Transaction}
 
 import scala.collection.JavaConverters._

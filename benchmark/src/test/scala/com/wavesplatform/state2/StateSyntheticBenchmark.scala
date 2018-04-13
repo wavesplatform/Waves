@@ -2,7 +2,7 @@ package com.wavesplatform.state2
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.lang.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.{Parser, TypeChecker}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.StateSyntheticBenchmark._
 import com.wavesplatform.utils.dummyTypeCheckerContext
@@ -11,7 +11,8 @@ import org.scalacheck.Gen
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.Transaction
 import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
-import scorex.transaction.smart.{Script, SetScriptTransaction}
+import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.smart.script.v1.ScriptV1
 
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -79,7 +80,7 @@ object StateSyntheticBenchmark {
             .selfSigned(
               SetScriptTransaction.supportedVersions.head,
               richAccount,
-              Some(Script(typedScript)),
+              Some(ScriptV1(typedScript)),
               100000,
               System.currentTimeMillis()
             )

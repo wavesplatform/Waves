@@ -1,11 +1,11 @@
 package com.wavesplatform.lang.typechecker
 
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.Terms._
-import com.wavesplatform.lang.TypeChecker
-import com.wavesplatform.lang.TypeChecker.{TypeCheckResult, TypeCheckerContext}
-import com.wavesplatform.lang.ctx.impl.PureContext._
-import com.wavesplatform.lang.testing.ScriptGen
+import com.wavesplatform.lang.v1.Terms._
+import com.wavesplatform.lang.v1.TypeChecker
+import com.wavesplatform.lang.v1.TypeChecker.{TypeCheckResult, TypeCheckerContext}
+import com.wavesplatform.lang.v1.ctx.impl.PureContext._
+import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 

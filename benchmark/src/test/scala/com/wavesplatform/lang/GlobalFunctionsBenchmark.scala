@@ -3,7 +3,8 @@ package com.wavesplatform.lang
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
 import com.wavesplatform.lang.GlobalFunctionsBenchmark._
-import com.wavesplatform.lang.traits.{DataType, Environment, Transaction}
+import com.wavesplatform.lang.v1.EnvironmentFunctions
+import com.wavesplatform.lang.v1.traits.{DataType, Environment, Transaction}
 import org.openjdk.jmh.annotations._
 import scodec.bits.ByteVector
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey, Signature}
