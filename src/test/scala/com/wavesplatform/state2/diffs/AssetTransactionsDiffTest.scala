@@ -11,13 +11,13 @@ import scorex.account.AddressScheme
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets._
-import scorex.transaction.smart.Script
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.smart.smartEnabledFS
 import scorex.settings.TestFunctionalitySettings
 import cats.implicits._
-import com.wavesplatform.lang.v1.{Parser, ScriptExprV1, TypeChecker}
+import com.wavesplatform.lang.v1.{Parser, TypeChecker}
+import scorex.transaction.smart.script.v1.ScriptV1
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
@@ -216,7 +216,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
   private def createScript(code: String) = {
     val Parsed.Success(expr, _) = Parser(code).get
-    Script(ScriptExprV1(TypeChecker(dummyTypeCheckerContext, expr).explicitGet()))
+    ScriptV1(TypeChecker(dummyTypeCheckerContext, expr).explicitGet())
   }
 
   def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], SmartIssueTransaction, TransferTransaction, ReissueTransaction)] =

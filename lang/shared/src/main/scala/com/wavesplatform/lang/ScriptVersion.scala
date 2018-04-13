@@ -7,12 +7,6 @@ sealed trait ScriptVersion { self =>
   type ExprT
   type CtxT
   val value: Int
-
-
-  def unapply(arg: ScriptExpr): Option[ExprT] = {
-    if (arg.version == self) Some(arg.expr.asInstanceOf[ExprT])
-    else None
-  }
 }
 
 object ScriptVersion {

@@ -1,11 +1,12 @@
 package scorex.transaction.smart
 
+import cats.syntax.all._
 import com.wavesplatform.crypto
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.transaction.ValidationError.{GenericError, TransactionNotAllowedByScript}
 import scorex.transaction._
 import scorex.transaction.assets._
-import cats.syntax.all._
+import scorex.transaction.smart.script.{Script, ScriptRunner}
 
 object Verifier {
 
@@ -34,7 +35,7 @@ object Verifier {
     }.getOrElse(Either.right(tx)))
 
   def verify[T <: Transaction](s: SnapshotStateReader, script: Script, height: Int, transaction: T): Either[ValidationError, T] = {
-    ScriptRunner[Boolean, T](height, transaction, s, script.script) match {
+    ScriptRunner[Boolean, T](height, transaction, s, script) match {
       case Left(execError) => Left(GenericError(s"Script execution error: $execError"))
       case Right(false)    => Left(TransactionNotAllowedByScript(transaction))
       case Right(true)     => Right(transaction)

@@ -7,7 +7,7 @@ import scorex.transaction.Transaction
 import scorex.transaction.Transaction.Type
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
 import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.smart.Script
+import scorex.transaction.smart.script.Script
 
 class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff]) extends SnapshotStateReader {
 

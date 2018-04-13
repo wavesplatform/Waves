@@ -2,7 +2,6 @@ package com.wavesplatform.state2.diffs
 
 import cats._
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.v1.ScriptExprV1
 import com.wavesplatform.lang.v1.Terms.Typed.TRUE
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state2._
@@ -17,7 +16,8 @@ import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.ValidationError.AccountBalanceError
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import scorex.transaction.smart.{Script, SetScriptTransaction}
+import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.{GenesisTransaction, ValidationError}
 
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
@@ -64,7 +64,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       ts      <- timestampGen
       gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).right.get
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
-      setScript                = SetScriptTransaction.selfSigned(version, seller, Some(Script(ScriptExprV1(TRUE))), fee, ts).explicitGet()
+      setScript                = SetScriptTransaction.selfSigned(version, seller, Some(ScriptV1(TRUE)), fee, ts).explicitGet()
       issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1)
       issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1)
       maybeAsset1              <- Gen.option(issue1.id())

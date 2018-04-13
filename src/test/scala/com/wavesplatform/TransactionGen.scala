@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.v1.Terms.Typed
-import com.wavesplatform.lang.v1.{ScriptExprV1, TypeChecker}
+import com.wavesplatform.lang.v1.TypeChecker
 import com.wavesplatform.lang.v1.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.settings.Constants
@@ -18,7 +18,9 @@ import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.smart.{Script, SetScriptTransaction, WavesCrypto}
+import scorex.transaction.smart.script.Script
+import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.smart.{SetScriptTransaction, WavesCrypto}
 import scorex.utils.TimeImpl
 
 import scala.util.Random
@@ -109,7 +111,7 @@ trait TransactionGenBase extends ScriptGen {
 
   val scriptGen = BOOLgen(1000).map { expr =>
     val typed = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(PureContext.instance |+| CryptoContext.build(WavesCrypto)), expr).explicitGet()
-    Script(ScriptExprV1(typed))
+    ScriptV1(typed)
   }
 
   val setScriptTransactionGen: Gen[SetScriptTransaction] = for {
@@ -497,7 +499,7 @@ trait TransactionGenBase extends ScriptGen {
       recipient <- accountGen
       ts        <- positiveIntGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      setScript <- selfSignedSetScriptTransactionGenP(master, Script(ScriptExprV1(typed)))
+      setScript <- selfSignedSetScriptTransactionGenP(master, ScriptV1(typed))
       transfer  <- transferGeneratorP(master, recipient.toAddress, None, None)
       lease     <- leaseAndCancelGeneratorP(master, recipient.toAddress, master)
     } yield (genesis, setScript, lease._1, transfer)

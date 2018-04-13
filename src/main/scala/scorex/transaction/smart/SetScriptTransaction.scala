@@ -10,6 +10,7 @@ import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
+import scorex.transaction.smart.script.{Script, ScriptReader}
 
 import scala.util.{Failure, Success, Try}
 
@@ -52,7 +53,7 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
       val chainId = bytes(0)
       val sender  = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
       val (scriptOptEi: Option[Either[ValidationError.ScriptParseError, Script]], scriptEnd) =
-        Deser.parseOption(bytes, KeyLength + 1)(Script.fromBytes)
+        Deser.parseOption(bytes, KeyLength + 1)(ScriptReader.fromBytes)
       val scriptEiOpt = scriptOptEi match {
         case None            => Right(None)
         case Some(Right(sc)) => Right(Some(sc))

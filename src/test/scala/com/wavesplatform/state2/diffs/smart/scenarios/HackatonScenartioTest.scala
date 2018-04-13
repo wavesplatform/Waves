@@ -2,20 +2,20 @@ package com.wavesplatform.state2.diffs.smart.scenarios
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.{NoShrink, TransactionGen}
-import com.wavesplatform.lang.TypeInfo._
-import com.wavesplatform.lang.v1.{EvaluatorV1, Parser, ScriptExprV1, TypeChecker}
 import com.wavesplatform.lang.TypeInfo
+import com.wavesplatform.lang.TypeInfo._
+import com.wavesplatform.lang.v1.{EvaluatorV1, Parser, TypeChecker}
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
 import com.wavesplatform.state2.diffs.smart._
 import com.wavesplatform.utils._
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.account.AddressScheme
 import scorex.transaction.assets.{SmartIssueTransaction, TransferTransaction}
-import scorex.transaction.smart.Script
+import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.{DataTransaction, GenesisTransaction}
 
 class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
@@ -53,7 +53,7 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
         """.stripMargin
 
       untypedScript = Parser(assetScript).get.value
-      typedScript   = Script(ScriptExprV1(TypeChecker(dummyTypeCheckerContext, untypedScript).explicitGet()))
+      typedScript   = ScriptV1(TypeChecker(dummyTypeCheckerContext, untypedScript).explicitGet())
 
       issueTransaction = SmartIssueTransaction
         .selfSigned(

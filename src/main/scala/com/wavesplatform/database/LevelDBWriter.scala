@@ -17,7 +17,8 @@ import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.smart.{Script, SetScriptTransaction}
+import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.smart.script.{Script, ScriptReader}
 import scorex.utils.ScorexLogging
 
 import scala.annotation.tailrec
@@ -315,7 +316,7 @@ object LevelDBWriter {
     def addressScriptHistory(addressId: BigInt): Key[Seq[Int]] = historyKey(27, addressId.toByteArray)
 
     def addressScript(height: Int, addressId: BigInt): Key[Option[Script]] =
-      Key.opt(byteKeyWithH(28, height, addressId.toByteArray), Script.fromBytes(_).right.get, _.bytes().arr)
+      Key.opt(byteKeyWithH(28, height, addressId.toByteArray), ScriptReader.fromBytes(_).right.get, _.bytes().arr)
 
     private def readFeatureMap(data: Array[Byte]): Map[Short, Int] = Option(data).fold(Map.empty[Short, Int]) { _ =>
       val b        = ByteBuffer.wrap(data)

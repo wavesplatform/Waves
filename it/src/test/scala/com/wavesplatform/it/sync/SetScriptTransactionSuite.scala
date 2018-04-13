@@ -4,7 +4,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.v1.{Parser, ScriptExprV1, TypeChecker}
+import com.wavesplatform.lang.v1.{Parser, TypeChecker}
 import com.wavesplatform.state2._
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import org.scalatest.CancelAfterFailure
@@ -12,7 +12,8 @@ import play.api.libs.json.JsNumber
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.Proofs
 import scorex.transaction.assets.VersionedTransferTransaction
-import scorex.transaction.smart.{Script, SetScriptTransaction}
+import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.smart.script.v1.ScriptV1
 
 import scala.util.Random
 
@@ -65,7 +66,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
     }
 
-    val script = Script(ScriptExprV1(scriptText))
+    val script = ScriptV1(scriptText)
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), fee, System.currentTimeMillis())
       .explicitGet()

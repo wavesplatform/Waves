@@ -9,7 +9,8 @@ import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.Json
 import scorex.crypto.encode.Base58
-import scorex.transaction.smart.{Script, ScriptCompiler}
+
+import scorex.transaction.smart.script.ScriptCompiler
 import scorex.utils.Time
 
 @Path("/utils")
@@ -42,7 +43,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     (post & entity(as[String])) { code =>
       complete(
         ScriptCompiler(code)
-          .map(expr => Script(expr).bytes().base58)
+          .map(script => script.bytes().base58)
           .fold(x => Json.obj("error" -> x), x => Json.obj("script" -> x)))
     }
   }
