@@ -88,7 +88,7 @@ object WavesContext {
 
   def build(env: Environment, global: BaseGlobal): Context = {
     def getdataF(name: String, dataType: DataType) =
-      PredefFunction(name, OPTION(dataType.innerType), List(("address", addressType.typeRef), ("key", STRING))) {
+      PredefFunction(name, ???, OPTION(dataType.innerType), List(("address", addressType.typeRef), ("key", STRING))) {
         case (addr: Obj) :: (k: String) :: Nil =>
           val addressBytes  = addr.fields("bytes").value.value.apply().right.get.asInstanceOf[ByteVector].toArray
           val retrievedData = env.data(addressBytes, k, dataType)
@@ -107,7 +107,7 @@ object WavesContext {
 
     def secureHash(a: Array[Byte]) = global.keccak256(global.blake2b256(a))
 
-    val addressFromPublicKeyF: PredefFunction = PredefFunction("addressFromPublicKey", addressType.typeRef, List(("publicKey", BYTEVECTOR))) {
+    val addressFromPublicKeyF: PredefFunction = PredefFunction("addressFromPublicKey", 7500, addressType.typeRef, List(("publicKey", BYTEVECTOR))) {
       case (pk: ByteVector) :: Nil =>
         val publicKeyHash   = secureHash(pk.toArray).take(HashLength)
         val withoutChecksum = AddressVersion +: env.networkByte +: publicKeyHash
@@ -116,7 +116,7 @@ object WavesContext {
       case _ => ???
     }
 
-    val addressFromStringF: PredefFunction = PredefFunction("addressFromString", optionAddress, List(("string", STRING))) {
+    val addressFromStringF: PredefFunction = PredefFunction("addressFromString", 6000, optionAddress, List(("string", STRING))) {
       case (addressString: String) :: Nil =>
         val Prefix: String = "address:"
         val base58String   = if (addressString.startsWith(Prefix)) addressString.drop(Prefix.length) else addressString
@@ -139,7 +139,7 @@ object WavesContext {
     }
 
     val addressFromRecipientF: PredefFunction =
-      PredefFunction("addressFromRecipient", addressType.typeRef, List(("AddressOrAlias", TYPEREF(addressOrAliasType.name)))) {
+      PredefFunction("addressFromRecipient", 14500, addressType.typeRef, List(("AddressOrAlias", TYPEREF(addressOrAliasType.name)))) {
         case Obj(fields) :: Nil =>
           val bytes = fields("bytes").value.map(_.asInstanceOf[ByteVector]).value()
           bytes
@@ -154,7 +154,7 @@ object WavesContext {
 
     val txByIdF = {
       val returnType = OPTION(transactionType.typeRef)
-      PredefFunction("getTransactionById", returnType, List(("id", BYTEVECTOR))) {
+      PredefFunction("getTransactionById", 37000, returnType, List(("id", BYTEVECTOR))) {
         case (id: ByteVector) :: Nil =>
           val maybeDomainTx = env.transactionById(id.toArray).map(transactionObject)
           Right(maybeDomainTx).map(_.asInstanceOf[returnType.Underlying])
@@ -163,7 +163,7 @@ object WavesContext {
     }
 
     val accountBalanceF: PredefFunction =
-      PredefFunction("accountBalance", LONG, List(("addressOrAlias", TYPEREF(addressOrAliasType.name)))) {
+      PredefFunction("accountBalance", 200000, LONG, List(("addressOrAlias", TYPEREF(addressOrAliasType.name)))) {
         case Obj(fields) :: Nil =>
           fields("bytes").value
             .map(_.asInstanceOf[ByteVector].toArray)
@@ -174,7 +174,7 @@ object WavesContext {
       }
 
     val accountAssetBalanceF: PredefFunction =
-      PredefFunction("accountAssetBalance", LONG, List(("addressOrAlias", TYPEREF(addressOrAliasType.name)), ("assetId", BYTEVECTOR))) {
+      PredefFunction("accountAssetBalance", 200000, LONG, List(("addressOrAlias", TYPEREF(addressOrAliasType.name)), ("assetId", BYTEVECTOR))) {
         case Obj(fields) :: (assetId: ByteVector) :: Nil =>
           fields("bytes").value
             .map(_.asInstanceOf[ByteVector].toArray)
@@ -185,7 +185,7 @@ object WavesContext {
       }
 
     val txHeightByIdF =
-      PredefFunction("transactionHeightById", OPTION(LONG), List(("id", BYTEVECTOR))) {
+      PredefFunction("transactionHeightById", 25000, OPTION(LONG), List(("id", BYTEVECTOR))) {
         case (id: ByteVector) :: Nil => Right(env.transactionHeightById(id.toArray))
         case _                       => ???
       }
