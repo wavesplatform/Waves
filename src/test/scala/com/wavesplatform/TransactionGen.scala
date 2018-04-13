@@ -23,8 +23,14 @@ import scorex.utils.TimeImpl
 
 import scala.util.Random
 
-trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
+trait TransactionGen extends BeforeAndAfterAll with TransactionGenBase with ScriptGen {
   _: Suite =>
+  override protected def afterAll(): Unit = {
+    super.close()
+  }
+}
+
+trait TransactionGenBase extends ScriptGen {
 
   def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.containerOfN[Array, Byte](length, Arbitrary.arbitrary[Byte])
 
@@ -45,9 +51,8 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
 
   private val time = new TimeImpl
 
-  override protected def afterAll(): Unit = {
+  def close(): Unit = {
     time.close()
-    super.afterAll()
   }
 
   val ntpTimestampGen: Gen[Long] = Gen.choose(1, 1000).map(time.correctedTime() - _)
@@ -202,6 +207,12 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
     for {
       (_, _, _, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
     } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
+
+  def transferGeneratorP(timestamp: Long, sender: PrivateKeyAccount, recipient: AddressOrAlias, maxAmount: Long): Gen[TransferTransaction] =
+    for {
+      amount                                    <- Gen.choose(1, maxAmount)
+      (_, _, _, _, _, _, feeAmount, attachment) <- transferParamGen
+    } yield TransferTransaction.create(None, sender, recipient, amount, timestamp, None, feeAmount, attachment).right.get
 
   def transferGeneratorP(timestamp: Long,
                          sender: PrivateKeyAccount,
