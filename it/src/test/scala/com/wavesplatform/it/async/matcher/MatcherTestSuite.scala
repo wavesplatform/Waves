@@ -666,5 +666,5 @@ object MatcherTestSuite {
 
   val Configs: Seq[Config] = Seq(matcherConfig.withFallback(Default.head)) ++
     Random.shuffle(Default.tail.init).take(2).map(nonGeneratingPeersConfig.withFallback(_)) ++
-    Seq(Default.last)
+    Random.shuffle(Default.tail.init).headOption
 }

@@ -36,17 +36,8 @@ class VoteForFeatureByDefaultTestSuite
          |      feature-check-blocks-period = $votingInterval
          |      blocks-for-feature-activation = $blocksForActivation
          |    }
-         |    genesis {
-         |      signature: "zXBp6vpEHgtdsPjVHjSEwMeRiQTAu6DdX3qkJaCRKxgYJk26kazS2XguLYRvL9taHKxrZHNNA7X7LMVFavQzWpT"
-         |      transactions = [
-         |        {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},
-         |        {recipient: "3HZxhQhpSU4yEGJdGetncnHaiMnGmUusr9s", amount: 270000000000000},
-         |        {recipient: "3HPG313x548Z9kJa5XY4LVMLnUuF77chcnG", amount: 260000000000000},
-         |        {recipient: "3HVW7RDYVkcN5xFGBNAUnGirb5KaBSnbUyB", amount: 2000000000000}
-         |      ]
-         |    }
          |  }
-         |  waves.features.supported=[$defaultVotingFeatureNum]
+         |  features.supported = [$defaultVotingFeatureNum]
          |  miner.quorum = 3
          |}""".stripMargin
         ))

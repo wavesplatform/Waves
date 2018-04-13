@@ -35,9 +35,11 @@ object BaseTargetChecker {
       case cfg if cfg.as[Boolean]("waves.miner.enable") =>
         val publicKey = PublicKeyAccount(cfg.as[ByteStr]("public-key").arr)
         val address   = publicKey.toAddress
-        val (_, ts)   = PoSCalc.nextBlockGenerationTime(1, state, fs, genesisBlock, publicKey, fp).explicitGet()
+        PoSCalc.nextBlockGenerationTime(1, state, fs, genesisBlock, publicKey, fp) match {
+          case Right((_, ts)) => f"$address: ${(ts - startTs) * 1e-3}%10.3f s"
+          case _              => s"$address: n/a"
+        }
 
-        f"$address: ${(ts - startTs) * 1e-3}%10.3f s"
     }
 
     docker.close()
