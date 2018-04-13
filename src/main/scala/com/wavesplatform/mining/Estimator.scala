@@ -2,8 +2,9 @@ package com.wavesplatform.mining
 
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.MinerSettings
+import scorex.account.PublicKeyAccount
 import scorex.block.Block
-import scorex.transaction.Transaction
+import scorex.transaction.{Authorized, Transaction}
 
 trait Estimator {
   def max: Long
@@ -22,6 +23,18 @@ case class TxNumberEstimator(max: Long) extends Estimator {
 case class SizeEstimator(max: Long) extends Estimator {
   override def estimate(x: Block): Long       = x.transactionData.view.map(estimate).sum
   override def estimate(x: Transaction): Long = x.bytes().length // + headers
+}
+
+case class ComplexityEstimator(max: Long, smartAccountComplexity: PublicKeyAccount => Long) extends Estimator {
+  override def estimate(x: Block): Long = x.transactionData.view.map(estimate).sum
+  override def estimate(x: Transaction): Long = x match {
+    case x: Transaction with Authorized => smartAccountComplexity(x.sender)
+    case _                              => 0
+  }
+}
+
+object ComplexityEstimator {
+  val SmartAccountMaxComplexity = 1000000
 }
 
 case class MiningEstimators(total: Estimator, keyBlock: Estimator, micro: Estimator)

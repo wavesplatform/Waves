@@ -86,6 +86,7 @@ object WavesContext {
         "proof7"           -> proofBinding(tx, 7)
       ))
 
+  // @TODO: CALCULATE COSTS
   def build(env: Environment, global: BaseGlobal): Context = {
     def getdataF(name: String, dataType: DataType) =
       PredefFunction(name, ???, OPTION(dataType.innerType), List(("address", addressType.typeRef), ("key", STRING))) {
