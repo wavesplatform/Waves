@@ -20,11 +20,14 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     case Failure(_, _, _) => false
   }
 
+  def withWhitespaces(expr: String): String = whitespaces.sample.get + expr + whitespaces.sample.get
+
   def toString(expr: EXPR): String = expr match {
-    case CONST_LONG(x)   => whitespaces.sample.get + s"$x" + whitespaces.sample.get
-    case CONST_STRING(x) => whitespaces.sample.get + s"""\"$x\"""" + whitespaces.sample.get
-    case TRUE            => whitespaces.sample.get + "true" + whitespaces.sample.get
-    case FALSE           => whitespaces.sample.get + "false" + whitespaces.sample.get
+    case CONST_LONG(x)   => withWhitespaces(s"$x")
+    case REF(x)          => withWhitespaces(s"$x")
+    case CONST_STRING(x) => withWhitespaces(s"""\"$x\"""")
+    case TRUE            => withWhitespaces("true")
+    case FALSE           => withWhitespaces("false")
     case BINARY_OP(x: EXPR, op: BINARY_OP_KIND, y: EXPR) =>
       op match {
         case SUM_OP => s"(${toString(x)}+${toString(y)})"
@@ -54,6 +57,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     val gas = 50
     genElementCheck(CONST_LONGgen)
     genElementCheck(STRgen)
+    genElementCheck(REFgen)
     genElementCheck(BOOLgen(gas))
     genElementCheck(SUMgen(gas))
     genElementCheck(EQ_INTgen(gas))
@@ -86,38 +90,6 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         )
       )
     )
-  }
-
-  property("let/ref constructs") {
-    val expr = parse("""let X = 10;
-let Y = 11;
-X > Y
-      """.stripMargin)
-
-    expr shouldBe BLOCK(Some(LET("X", CONST_LONG(10))), BLOCK(Some(LET("Y", CONST_LONG(11))), BINARY_OP(REF("X"), GT_OP, REF("Y"))))
-  }
-
-  property("if") {
-    parse("if(true) then 1 else if(X==Y) then 2 else 3") shouldBe IF(TRUE,
-                                                                     CONST_LONG(1),
-                                                                     IF(BINARY_OP(REF("X"), EQ_OP, REF("Y")), CONST_LONG(2), CONST_LONG(3)))
-    parse("""if ( true )
-        |then 1
-        |else if(X== Y)
-        |     then 2
-        |       else 3""".stripMargin) shouldBe IF(TRUE, CONST_LONG(1), IF(BINARY_OP(REF("X"), EQ_OP, REF("Y")), CONST_LONG(2), CONST_LONG(3)))
-
-    parse("""if
-        |
-        |     (true)
-        |then let A = 10;
-        |  1
-        |else if ( X == Y) then 2 else 3""".stripMargin) shouldBe IF(
-      TRUE,
-      BLOCK(Some(LET("A", CONST_LONG(10))), CONST_LONG(1)),
-      IF(BINARY_OP(REF("X"), EQ_OP, REF("Y")), CONST_LONG(2), CONST_LONG(3))
-    )
-
   }
 
   property("string literal with unicode chars") {

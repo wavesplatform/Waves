@@ -9,7 +9,7 @@ trait ScriptGen {
   def CONST_LONGgen: Gen[EXPR] = Gen.choose(Long.MinValue, Long.MaxValue).map(CONST_LONG)
 
   def BOOLgen(gas: Int): Gen[EXPR] =
-    if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1))
+    if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1), REFgen)
     else Gen.const(TRUE)
 
   def SUMgen(gas: Int): Gen[EXPR] =
@@ -73,10 +73,15 @@ trait ScriptGen {
       value <- BOOLgen((gas - 3) / 3)
     } yield LET(name, value)
 
+  def REFgen: Gen[EXPR] =
+    Gen.identifier.map(REF)
+
   def BLOCKgen(gas: Int): Gen[EXPR] =
     for {
-      let  <- LETgen((gas - 3) / 3) // should be Gen.option(LETgen((gas - 3) / 3)), issue: NODE-696
-      body <- BOOLgen((gas - 3) / 3)
+      let  <- LETgen((gas - 3) / 3)                                      // should be Gen.option(LETgen((gas - 3) / 3)), issue: NODE-696
+      body <- Gen.oneOf(BOOLgen((gas - 3) / 3), BLOCKgen((gas - 3) / 3)) // BLOCKGen wasn't add to BOOLGen since issue: NODE-700
+      // ParseError example:
+      //(let xtld = true; true && (true&&true))
     } yield BLOCK(Some(let), body)
 
   private val spaceChars: Seq[Char] = Vector('\u0020', '\u0009', '\u000D', '\u000A')
