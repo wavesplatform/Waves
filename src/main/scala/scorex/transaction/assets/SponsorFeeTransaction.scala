@@ -2,11 +2,11 @@ package scorex.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.crypto
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
+import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
@@ -17,8 +17,8 @@ case class SponsorFeeTransaction private (version: Byte,
                                           minFee: Long,
                                           fee: Long,
                                           timestamp: Long,
-                                          signature: ByteStr)
-    extends SignedTransaction
+                                          proofs: Proofs)
+    extends ProvenTransaction
     with FastHashId {
 
   override val builder: SponsorFeeTransaction.type = SponsorFeeTransaction
@@ -42,7 +42,7 @@ case class SponsorFeeTransaction private (version: Byte,
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte, builder.typeId, version), signature.arr, bodyBytes()))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte, builder.typeId, version), bodyBytes(), proofs.bytes()))
 }
 
 object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction] with TransactionParser.MultipleVersions {
@@ -52,19 +52,22 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
-      val signature = ByteStr(bytes.slice(0, SignatureLength))
-      val txId      = bytes(SignatureLength)
+      val txId = bytes(0)
       require(txId == typeId, s"Signed tx id is not match")
-      val sender      = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
-      val assetId     = ByteStr(bytes.slice(SignatureLength + KeyLength + 1, SignatureLength + KeyLength + AssetIdLength + 1))
-      val minFeeStart = SignatureLength + KeyLength + AssetIdLength + 1
+      val sender      = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
+      val assetId     = ByteStr(bytes.slice(KeyLength + 1, KeyLength + AssetIdLength + 1))
+      val minFeeStart = KeyLength + AssetIdLength + 1
 
       val minFee    = Longs.fromByteArray(bytes.slice(minFeeStart, minFeeStart + 8))
       val fee       = Longs.fromByteArray(bytes.slice(minFeeStart + 8, minFeeStart + 16))
       val timestamp = Longs.fromByteArray(bytes.slice(minFeeStart + 16, minFeeStart + 24))
-      SponsorFeeTransaction
-        .create(version, sender, assetId, minFee, fee, timestamp, signature)
-        .fold(left => Failure(new Exception(left.toString)), right => Success(right))
+      val tx = for {
+        proofs <- Proofs.fromBytes(bytes.drop(minFeeStart + 24))
+        tx     <- SponsorFeeTransaction.create(version, sender, assetId, minFee, fee, timestamp, proofs)
+      } yield {
+        tx
+      }
+      tx.fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
   def create(version: Byte,
@@ -73,7 +76,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
              minFee: Long,
              fee: Long,
              timestamp: Long,
-             signature: ByteStr): Either[ValidationError, TransactionT] =
+             proofs: Proofs): Either[ValidationError, TransactionT] =
     if (!supportedVersions.contains(version)) {
       Left(ValidationError.UnsupportedVersion(version))
     } else if (minFee <= 0) {
@@ -81,7 +84,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {
-      Right(SponsorFeeTransaction(version, sender, assetId, minFee, fee, timestamp, signature))
+      Right(SponsorFeeTransaction(version, sender, assetId, minFee, fee, timestamp, proofs))
     }
 
   def create(version: Byte,
@@ -90,7 +93,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
              minFee: Long,
              fee: Long,
              timestamp: Long): Either[ValidationError, TransactionT] =
-    create(version, sender, assetId, minFee, fee, timestamp, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
+    create(version, sender, assetId, minFee, fee, timestamp, Proofs.empty).right.map { unsigned =>
+      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes())))).explicitGet())
     }
 }

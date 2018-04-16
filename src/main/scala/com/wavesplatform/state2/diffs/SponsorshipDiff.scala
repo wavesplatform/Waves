@@ -7,7 +7,7 @@ import com.wavesplatform.state2.{AssetInfo, Diff, LeaseBalance, Portfolio, Spons
 import scorex.account.PublicKeyAccount
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.{IssueTransaction, SponsorFeeTransaction, CancelFeeSponsorshipTransaction}
-import scorex.transaction.{AssetId, SignedTransaction, ValidationError}
+import scorex.transaction.{AssetId, ProvenTransaction, ValidationError}
 
 import scala.util.{Left, Right}
 
@@ -39,7 +39,7 @@ object SponsorshipTransactionsDiff {
     }
   }
 
-  private def validate(tx: SignedTransaction, state: SnapshotStateReader, assetId: AssetId, fp: FeatureProvider): Either[ValidationError, Unit] = {
+  private def validate(tx: ProvenTransaction, state: SnapshotStateReader, assetId: AssetId, fp: FeatureProvider): Either[ValidationError, Unit] = {
     state.transactionInfo(assetId) match {
       case Some((_, itx: IssueTransaction)) if !validIssuer(true, tx.sender, itx.sender) =>
         Left(GenericError("Asset was issued by other address"))
