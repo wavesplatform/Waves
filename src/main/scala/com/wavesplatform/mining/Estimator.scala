@@ -2,7 +2,7 @@ package com.wavesplatform.mining
 
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.MinerSettings
-import scorex.account.PublicKeyAccount
+import scorex.account.Address
 import scorex.block.Block
 import scorex.transaction.{Authorized, Transaction}
 
@@ -25,7 +25,7 @@ case class SizeEstimator(max: Long) extends Estimator {
   override def estimate(x: Transaction): Long = x.bytes().length // + headers
 }
 
-case class ComplexityEstimator(max: Long, smartAccountComplexity: PublicKeyAccount => Long) extends Estimator {
+case class ComplexityEstimator(max: Long, smartAccountComplexity: Address => Long) extends Estimator {
   override def estimate(x: Block): Long = x.transactionData.view.map(estimate).sum
   override def estimate(x: Transaction): Long = x match {
     case x: Transaction with Authorized => smartAccountComplexity(x.sender)

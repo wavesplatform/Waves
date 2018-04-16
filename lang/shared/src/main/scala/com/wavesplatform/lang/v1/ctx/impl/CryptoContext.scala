@@ -25,7 +25,7 @@ object CryptoContext {
         case _ => ???
       }
 
-    def toBase58StringF: PredefFunction = PredefFunction("toBase58String", ???, STRING, List(("bytes", BYTEVECTOR))) {
+    def toBase58StringF: PredefFunction = PredefFunction("toBase58String", 400000, STRING, List(("bytes", BYTEVECTOR))) {
       case (bytes: ByteVector) :: Nil =>
         Right(global.base58Encode(bytes.toArray))
       case _ => ???
