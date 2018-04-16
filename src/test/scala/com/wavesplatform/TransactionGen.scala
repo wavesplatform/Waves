@@ -359,23 +359,33 @@ trait TransactionGenBase extends ScriptGen {
   val reissueGen: Gen[ReissueTransaction] = issueReissueBurnGen.map(_._2)
   val burnGen: Gen[BurnTransaction]       = issueReissueBurnGen.map(_._3)
 
-  val sponsorFeeCancelSponsorFeeGen: Gen[(IssueTransaction, SponsorFeeTransaction, CancelFeeSponsorshipTransaction)] = for {
-    (sender, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
-    issue = IssueTransaction
-      .create(sender, assetName, description, quantity, decimals, reissuable = false, 1 * Constants.UnitsInWave, timestamp)
-      .right
-      .get
-    minFee                    <- positiveLongGen
-    sender: PrivateKeyAccount <- accountGen
-    assetId = issue.assetId()
-  } yield
-    (issue,
-     SponsorFeeTransaction.create(1, sender, assetId, minFee, 1, timestamp).right.get,
-     CancelFeeSponsorshipTransaction.create(1, sender, assetId, 1, timestamp).right.get,
-    )
+  def sponsorFeeCancelSponsorFeeGen(sender: PrivateKeyAccount): Gen[(IssueTransaction, SponsorFeeTransaction, CancelFeeSponsorshipTransaction)] =
+    for {
+      (sender, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
+      issue = IssueTransaction
+        .create(sender, assetName, description, quantity, decimals, reissuable = reissuable, iFee, timestamp)
+        .right
+        .get
+      minFee <- positiveLongGen
+      assetId = issue.assetId()
+    } yield
+      (issue,
+       SponsorFeeTransaction.create(1, sender, assetId, minFee, 1 * Constants.UnitsInWave, timestamp).right.get,
+       CancelFeeSponsorshipTransaction.create(1, sender, assetId, 1 * Constants.UnitsInWave, timestamp).right.get,
+      )
 
-  val sponsorFeeGen           = sponsorFeeCancelSponsorFeeGen.map(_._2)
-  val cancelFeeSponsorshipGen = sponsorFeeCancelSponsorFeeGen.map(_._3)
+  val sponsorFeeGen = for {
+    sender     <- accountGen
+    (_, tx, _) <- sponsorFeeCancelSponsorFeeGen(sender)
+  } yield {
+    tx
+  }
+  val cancelFeeSponsorshipGen = for {
+    sender     <- accountGen
+    (_, _, tx) <- sponsorFeeCancelSponsorFeeGen(sender)
+  } yield {
+    tx
+  }
 
   val priceGen: Gen[Long]            = Gen.choose(1, 3 * 100000L * 100000000L)
   val matcherAmountGen: Gen[Long]    = Gen.choose(1, 3 * 100000L * 100000000L)

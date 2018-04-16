@@ -16,12 +16,14 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       master <- accountGen
       ts     <- positiveLongGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      (issueTx, sponsorTx, cancelTx) <- sponsorFeeCancelSponsorFeeGen
+      (issueTx, sponsorTx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
     } yield (genesis, issueTx, sponsorTx, cancelTx)
 
     forAll(setup) {
       case (genesis, issue, sponsor, cancel) =>
         val setupBlocks = Seq(block(Seq(genesis)), block(Seq(issue)))
+        println(genesis)
+        println(issue)
         assertDiffEi(setupBlocks, block(Seq(sponsor)), settings) { blockDiffEi =>
           blockDiffEi should produce("SponsorFeeTransaction transaction has not been activated")
         }
