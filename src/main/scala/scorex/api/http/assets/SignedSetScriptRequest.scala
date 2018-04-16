@@ -5,7 +5,8 @@ import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Json, OFormat}
 import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
-import scorex.transaction.smart.{Script, SetScriptTransaction}
+import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.smart.script.Script
 import scorex.transaction.{Proofs, ValidationError}
 
 object SignedSetScriptRequest {

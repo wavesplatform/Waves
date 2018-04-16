@@ -1,13 +1,13 @@
 package scorex.transaction.smart
 
-import com.wavesplatform.lang.traits.{DataType, Environment}
+import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 import scorex.account.{Address, AddressOrAlias}
 import scorex.transaction.Transaction
-import com.wavesplatform.lang.traits.{Transaction => ContractTransaction}
+import com.wavesplatform.lang.v1.traits.{Transaction => ContractTransaction}
 
 class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], state: SnapshotStateReader) extends Environment {
   override def height: Int = h()

@@ -1,9 +1,9 @@
 package com.wavesplatform.lang.typechecker
 
 import com.wavesplatform.lang.Common.{NoShrink, multiplierFunction, produce}
-import com.wavesplatform.lang.Terms.{SUM_OP, Untyped}
-import com.wavesplatform.lang.TypeChecker
-import com.wavesplatform.lang.testing.ScriptGen
+import com.wavesplatform.lang.v1.Terms.{SUM_OP, Untyped}
+import com.wavesplatform.lang.v1.TypeChecker
+import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector

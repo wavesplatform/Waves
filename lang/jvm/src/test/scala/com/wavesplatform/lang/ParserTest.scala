@@ -1,9 +1,10 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.Terms.Untyped._
-import com.wavesplatform.lang.Terms._
-import com.wavesplatform.lang.testing.ScriptGen
+import com.wavesplatform.lang.v1.Parser
+import com.wavesplatform.lang.v1.Terms.Untyped._
+import com.wavesplatform.lang.v1.Terms._
+import com.wavesplatform.lang.v1.testing.ScriptGen
 import fastparse.core.Parsed.{Failure, Success}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks

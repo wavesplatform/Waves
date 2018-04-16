@@ -1,0 +1,86 @@
+package com.wavesplatform.lang.v1.testing
+
+import com.wavesplatform.lang.v1.Terms.Untyped._
+import com.wavesplatform.lang.v1.Terms._
+import org.scalacheck._
+
+trait ScriptGen {
+
+  def CONST_LONGgen: Gen[EXPR] = Gen.choose(Long.MinValue, Long.MaxValue).map(CONST_LONG)
+
+  def BOOLgen(gas: Int): Gen[EXPR] =
+    if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1))
+    else Gen.const(TRUE)
+
+  def SUMgen(gas: Int): Gen[EXPR] =
+    for {
+      i1 <- INTGen((gas - 2) / 2)
+      i2 <- INTGen((gas - 2) / 2)
+    } yield BINARY_OP(i1, SUM_OP, i2)
+
+  def INTGen(gas: Int): Gen[EXPR] = if (gas > 0) Gen.oneOf(CONST_LONGgen, SUMgen(gas - 1), IF_INTgen(gas - 1)) else CONST_LONGgen
+
+  def GEgen(gas: Int): Gen[EXPR] =
+    for {
+      i1 <- INTGen((gas - 2) / 2)
+      i2 <- INTGen((gas - 2) / 2)
+    } yield BINARY_OP(i1, GE_OP, i2)
+
+  def GTgen(gas: Int): Gen[EXPR] =
+    for {
+      i1 <- INTGen((gas - 2) / 2)
+      i2 <- INTGen((gas - 2) / 2)
+    } yield BINARY_OP(i1, GT_OP, i2)
+
+  def EQ_INTgen(gas: Int): Gen[EXPR] =
+    for {
+      i1 <- INTGen((gas - 2) / 2)
+      i2 <- INTGen((gas - 2) / 2)
+    } yield BINARY_OP(i1, EQ_OP, i2)
+
+  def ANDgen(gas: Int): Gen[EXPR] =
+    for {
+      i1 <- BOOLgen((gas - 2) / 2)
+      i2 <- BOOLgen((gas - 2) / 2)
+    } yield BINARY_OP(i1, AND_OP, i2)
+
+  def ORgen(gas: Int): Gen[EXPR] =
+    for {
+      i1 <- BOOLgen((gas - 2) / 2)
+      i2 <- BOOLgen((gas - 2) / 2)
+    } yield BINARY_OP(i1, OR_OP, i2)
+
+  private def IF_BOOLgen(gas: Int): Gen[EXPR] =
+    for {
+      cnd <- BOOLgen((gas - 3) / 3)
+      t   <- BOOLgen((gas - 3) / 3)
+      f   <- BOOLgen((gas - 3) / 3)
+    } yield IF(cnd, t, f)
+
+  private def IF_INTgen(gas: Int): Gen[EXPR] =
+    for {
+      cnd <- BOOLgen((gas - 3) / 3)
+      t   <- INTGen((gas - 3) / 3)
+      f   <- INTGen((gas - 3) / 3)
+    } yield IF(cnd, t, f)
+
+  def STRgen: Gen[EXPR] =
+    Gen.identifier.map(CONST_STRING)
+
+  def LETgen(gas: Int): Gen[LET] =
+    for {
+      name  <- Gen.identifier
+      value <- BOOLgen((gas - 3) / 3)
+    } yield LET(name, value)
+
+  def BLOCKgen(gas: Int): Gen[EXPR] =
+    for {
+      let  <- LETgen((gas - 3) / 3) // should be Gen.option(LETgen((gas - 3) / 3)), issue: NODE-696
+      body <- BOOLgen((gas - 3) / 3)
+    } yield BLOCK(Some(let), body)
+
+  private val spaceChars: Seq[Char] = Vector('\u0020', '\u0009', '\u000D', '\u000A')
+
+  def whitespaceChar: Gen[Char] = Gen.oneOf(spaceChars)
+  val whitespaces: Gen[String]  = Gen.listOf(whitespaceChar).map(_.mkString)
+}

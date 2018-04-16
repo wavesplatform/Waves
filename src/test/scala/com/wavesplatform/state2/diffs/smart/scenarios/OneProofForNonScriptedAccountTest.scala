@@ -1,6 +1,6 @@
 package com.wavesplatform.state2.diffs.smart.scenarios
 
-import com.wavesplatform.lang.Terms.Typed
+import com.wavesplatform.lang.v1.Terms.Typed
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.smart.smartEnabledFS
 import com.wavesplatform.state2.diffs.{ENOUGH_AMT, assertDiffEi, produce}
@@ -9,9 +9,9 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.{GenesisTransaction, Proofs}
 import scorex.transaction.assets.VersionedTransferTransaction
-import scorex.transaction.smart.Script
+import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.{GenesisTransaction, Proofs}
 
 class OneProofForNonScriptedAccountTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -24,7 +24,7 @@ class OneProofForNonScriptedAccountTest extends PropSpec with PropertyChecks wit
       fee       <- smallFeeGen
       ts        <- positiveIntGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      setScript <- selfSignedSetScriptTransactionGenP(master, Script(Typed.TRUE))
+      setScript <- selfSignedSetScriptTransactionGenP(master, ScriptV1(Typed.TRUE))
       transfer = VersionedTransferTransaction.selfSigned(version, None, master, recepient, amt, ts, fee, Array.emptyByteArray).explicitGet()
     } yield (genesis, setScript, transfer)
 

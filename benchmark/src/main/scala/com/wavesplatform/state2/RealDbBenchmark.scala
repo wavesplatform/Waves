@@ -6,7 +6,7 @@ import java.util.concurrent.ThreadLocalRandom
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.LevelDBFactory
-import com.wavesplatform.lang.traits.Environment
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings, loadConfig}
 import monix.eval.Coeval
 import org.iq80.leveldb.{DB, Options}

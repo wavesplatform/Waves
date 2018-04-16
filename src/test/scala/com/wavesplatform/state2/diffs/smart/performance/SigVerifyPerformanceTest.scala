@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs.smart.performance
 
-import com.wavesplatform.lang.Terms.Typed
-import com.wavesplatform.lang.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.Terms.Typed
+import com.wavesplatform.lang.v1.{Parser, TypeChecker}
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state2._
 import com.wavesplatform.utils._
@@ -14,8 +14,8 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.{VersionedTransferTransaction, TransferTransaction}
-import scorex.transaction.smart.Script
+import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
+import scorex.transaction.smart.script.v1.ScriptV1
 
 class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
@@ -42,7 +42,7 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
       amt       <- smallFeeGen
       fee       <- smallFeeGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      setScript <- selfSignedSetScriptTransactionGenP(master, Script(typed))
+      setScript <- selfSignedSetScriptTransactionGenP(master, ScriptV1(typed))
       transfer       = simpleSendGen(master, recipient, ts)
       scriptTransfer = scriptedSendGen(master, recipient, ts)
       transfers       <- Gen.listOfN(AmtOfTxs, transfer)

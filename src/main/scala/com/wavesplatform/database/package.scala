@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.wavesplatform.state2._
-import scorex.transaction.smart.Script
+import scorex.transaction.smart.script.{Script, ScriptReader}
 
 package object database {
   implicit class ByteArrayDataOutputExt(val output: ByteArrayDataOutput) extends AnyVal {
@@ -36,7 +36,7 @@ package object database {
         val len = input.readShort()
         val b   = new Array[Byte](len)
         input.readFully(b)
-        Some(Script.fromBytes(b).explicitGet())
+        Some(ScriptReader.fromBytes(b).explicitGet())
       } else None
     }
   }
