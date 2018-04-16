@@ -1,14 +1,12 @@
 package scorex.transaction.smart
 
+import cats.syntax.all._
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.Evaluator
-import monix.eval.Coeval
-import scorex.account.AddressScheme
+import com.wavesplatform.state._
 import scorex.transaction.ValidationError.{GenericError, TransactionNotAllowedByScript}
 import scorex.transaction._
 import scorex.transaction.assets._
-import cats.syntax.all._
-import com.wavesplatform.state.Blockchain
+import scorex.transaction.smart.script.{Script, ScriptRunner}
 
 object Verifier {
 
@@ -37,8 +35,7 @@ object Verifier {
     }.getOrElse(Either.right(tx)))
 
   def verify[T <: Transaction](blockchain: Blockchain, script: Script, height: Int, transaction: T): Either[ValidationError, T] = {
-    val context = new BlockchainContext(AddressScheme.current.chainId, Coeval.evalOnce(transaction), Coeval.evalOnce(height), blockchain).build()
-    Evaluator[Boolean](context, script.script) match {
+    ScriptRunner[Boolean, T](height, transaction, blockchain, script) match {
       case Left(execError) => Left(GenericError(s"Script execution error: $execError"))
       case Right(false)    => Left(TransactionNotAllowedByScript(transaction))
       case Right(true)     => Right(transaction)

@@ -3,7 +3,6 @@ package com.wavesplatform.state.diffs
 import cats._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
-import com.wavesplatform.lang.{Parser, TypeChecker}
 import fastparse.core.Parsed
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
@@ -12,12 +11,13 @@ import scorex.account.AddressScheme
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets._
-import scorex.transaction.smart.Script
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import scorex.settings.TestFunctionalitySettings
 import cats.implicits._
+import com.wavesplatform.lang.v1.{Parser, TypeChecker}
+import scorex.transaction.smart.script.v1.ScriptV1
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
@@ -118,7 +118,6 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
         }
     }
   }
-
   property("Can not reissue > long.max") {
     val setup = for {
       issuer    <- accountGen
@@ -144,6 +143,32 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       case (issuer, assetId, genesis, issue, reissue) =>
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, issue))), TestBlock.create(Seq(reissue)), fs) { ei =>
           ei should produce("Asset total value overflow")
+        }
+    }
+  }
+
+  property("Can request reissue > long.max before BurnAnyTokens activated") {
+    val setup = for {
+      issuer    <- accountGen
+      timestamp <- timestampGen
+      genesis: GenesisTransaction = GenesisTransaction.create(issuer, ENOUGH_AMT, timestamp).right.get
+      assetName   <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+      description <- genBoundedString(0, IssueTransaction.MaxDescriptionLength)
+      quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
+      fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
+      decimals    <- Gen.choose(1: Byte, 8: Byte)
+      issue   = IssueTransaction.create(issuer, assetName, description, quantity, decimals, true, fee, timestamp).right.get
+      assetId = issue.assetId()
+      reissue = ReissueTransaction.create(issuer, assetId, Long.MaxValue, true, 1, timestamp).right.get
+    } yield (issuer, assetId, genesis, issue, reissue)
+
+    val fs =
+      TestFunctionalitySettings.Enabled
+
+    forAll(setup) {
+      case (issuer, assetId, genesis, issue, reissue) =>
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis, issue))), TestBlock.create(Seq(reissue)), fs) { ei =>
+          ei should produce("negative asset balance")
         }
     }
   }
@@ -191,7 +216,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
   private def createScript(code: String) = {
     val Parsed.Success(expr, _) = Parser(code).get
-    Script(TypeChecker(dummyTypeCheckerContext, expr).explicitGet())
+    ScriptV1(TypeChecker(dummyTypeCheckerContext, expr).explicitGet())
   }
 
   def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], SmartIssueTransaction, TransferTransaction, ReissueTransaction)] =

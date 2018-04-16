@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.lang.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.{Parser, TypeChecker}
 import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{assertDiffAndState, assertDiffEi, produce}
@@ -26,26 +26,28 @@ class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers wit
   private val goodScript =
     """
       |
-      | if (tx.type == 4) then (tx.assetId == None) else false
+      | if (tx.type == 4)
+      |   then isDefined(tx.assetId)==false
+      |   else false
       |
       """.stripMargin
 
   private val badScript =
     """
       |
-      | tx.assetId == None
+      | isDefined(tx.assetId) == false
       |
       """.stripMargin
 
   property("accessing field of transaction without checking its type first results on exception") {
-
     forAll(preconditionsTransferAndLease(goodScript)) {
       case ((genesis, script, lease, transfer)) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(totalDiffEi =>
           totalDiffEi should produce("TransactionNotAllowedByScript"))
     }
-
+  }
+  property("accessing field of transaction with check") {
     forAll(preconditionsTransferAndLease(badScript)) {
       case ((genesis, script, lease, transfer)) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }

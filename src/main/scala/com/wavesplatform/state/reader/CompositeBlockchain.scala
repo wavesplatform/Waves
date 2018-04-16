@@ -8,7 +8,7 @@ import scorex.transaction.Transaction
 import scorex.transaction.Transaction.Type
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
 import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.smart.Script
+import scorex.transaction.smart.script.Script
 
 class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends Blockchain {
 
@@ -53,6 +53,12 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
       .get(id)
       .map(t => (t._1, t._2))
       .orElse(inner.transactionInfo(id))
+
+  override def transactionHeight(id: ByteStr): Option[Int] =
+    diff.transactions
+      .get(id)
+      .map(_._1)
+      .orElse(inner.transactionHeight(id))
 
   override def height: Int = inner.height + (if (maybeDiff.isDefined) 1 else 0)
 

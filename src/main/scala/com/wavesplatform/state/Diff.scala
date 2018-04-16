@@ -3,8 +3,8 @@ package com.wavesplatform.state
 import cats.implicits._
 import cats.kernel.Monoid
 import scorex.account.{Address, Alias, PublicKeyAccount}
+import scorex.transaction.smart.script.Script
 import scorex.transaction.{AssetId, Transaction}
-import scorex.transaction.smart.Script
 
 case class LeaseBalance(in: Long, out: Long)
 

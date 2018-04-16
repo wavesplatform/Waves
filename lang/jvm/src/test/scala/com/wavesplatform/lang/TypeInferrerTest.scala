@@ -1,8 +1,9 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.Terms._
+import com.wavesplatform.lang.v1.Terms._
 import org.scalatest.{FreeSpec, Matchers}
 import Common._
+import com.wavesplatform.lang.v1.TypeInferrer
 
 class TypeInferrerTest extends FreeSpec with Matchers {
 

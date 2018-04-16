@@ -1,19 +1,17 @@
 package com.wavesplatform.lang
 
 import cats.implicits._
-import com.wavesplatform.lang.ctx.Obj
+import com.wavesplatform.lang.v1.ctx.Obj
 import scodec.bits.ByteVector
 
 import scala.reflect.ClassTag
 
-final case class TypeInfo[T](classTag: ClassTag[T],
-                             superClass: Option[TypeInfo[_]],
-                             typeParams: Set[TypeInfo[_]],
-                             interfaces: Set[TypeInfo[_]]) { self =>
-  def <:< (other: TypeInfo[_]) = {
+final case class TypeInfo[T](classTag: ClassTag[T], superClass: Option[TypeInfo[_]], typeParams: Set[TypeInfo[_]], interfaces: Set[TypeInfo[_]]) {
+  self =>
+  def <:<(other: TypeInfo[_]) = {
     def loop(left: Set[TypeInfo[_]], seen: Set[TypeInfo[_]]): Boolean = {
       left.nonEmpty && {
-        val next = left.head
+        val next   = left.head
         val supers = next.interfaces ++ next.superClass
         supers(other) || {
           val xs = left ++ supers filterNot seen
@@ -26,6 +24,8 @@ final case class TypeInfo[T](classTag: ClassTag[T],
       self.typeParams == other.typeParams
     } else loop(Set(self), Set.empty)
   }
+
+  override def toString: ExecutionError = classTag.runtimeClass.getSimpleName + (if (typeParams.isEmpty) "" else s"[${typeParams.mkString(",")}]")
 }
 
 object TypeInfo {

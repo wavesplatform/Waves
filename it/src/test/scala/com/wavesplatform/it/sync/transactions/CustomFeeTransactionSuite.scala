@@ -14,7 +14,7 @@ import scorex.transaction.assets.IssueTransaction
 
 class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  import CustomIssueTransactionTestSuite._
+  import CustomFeeTransactionSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -44,7 +44,7 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
 }
 
-object CustomIssueTransactionTestSuite {
+object CustomFeeTransactionSuite {
   val addressDefaultNode = Default(3).getString("address")
   private val seed       = Default(3).getString("account-seed")
   private val pk         = PrivateKeyAccount.fromSeed(seed).right.get

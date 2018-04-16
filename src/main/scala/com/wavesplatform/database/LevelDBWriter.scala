@@ -17,7 +17,8 @@ import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.smart.{Script, SetScriptTransaction}
+import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.smart.script.{Script, ScriptReader}
 import scorex.utils.ScorexLogging
 
 import scala.annotation.tailrec
@@ -263,6 +264,8 @@ object LevelDBWriter {
     private def readTransactionInfo(data: Array[Byte]) =
       (Ints.fromByteArray(data), TransactionParsers.parseBytes(data.drop(4)).get)
 
+    private def readTransactionHeight(data: Array[Byte]): Int = Ints.fromByteArray(data)
+
     private def writeTransactionInfo(txInfo: (Int, Transaction)) = {
       val (h, tx) = txInfo
       val txBytes = tx.bytes()
@@ -270,6 +273,8 @@ object LevelDBWriter {
     }
 
     def transactionInfo(txId: ByteStr): Key[Option[(Int, Transaction)]] = Key.opt(hash(18, txId), readTransactionInfo, writeTransactionInfo)
+
+    def transactionHeight(txId: ByteStr): Key[Option[Int]] = Key.opt(hash(18, txId), readTransactionHeight, i => Array(i.toByte))
 
     def addressTransactionHistory(addressId: BigInt): Key[Seq[Int]] = historyKey(19, addressId.toByteArray)
 
@@ -311,7 +316,7 @@ object LevelDBWriter {
     def addressScriptHistory(addressId: BigInt): Key[Seq[Int]] = historyKey(27, addressId.toByteArray)
 
     def addressScript(height: Int, addressId: BigInt): Key[Option[Script]] =
-      Key.opt(byteKeyWithH(28, height, addressId.toByteArray), Script.fromBytes(_).right.get, _.bytes().arr)
+      Key.opt(byteKeyWithH(28, height, addressId.toByteArray), ScriptReader.fromBytes(_).right.get, _.bytes().arr)
 
     private def readFeatureMap(data: Array[Byte]): Map[Short, Int] = Option(data).fold(Map.empty[Short, Int]) { _ =>
       val b        = ByteBuffer.wrap(data)
@@ -721,6 +726,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(db => db.get(k.transactionInfo(id)))
+
+  override def transactionHeight(id: ByteStr): Option[Int] = readOnly(db => db.get(k.transactionHeight(id)))
 
   override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = readOnly { db =>
     db.get(k.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { addressId =>

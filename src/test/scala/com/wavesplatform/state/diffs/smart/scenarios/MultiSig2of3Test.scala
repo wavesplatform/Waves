@@ -1,11 +1,11 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.lang.Terms._
-import com.wavesplatform.lang._
-import com.wavesplatform.utils._
+import com.wavesplatform.lang.v1.Terms._
+import com.wavesplatform.lang.v1.{Parser, TypeChecker}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
+import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -14,7 +14,8 @@ import scorex.account.PublicKeyAccount
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction._
 import scorex.transaction.assets.VersionedTransferTransaction
-import scorex.transaction.smart.{Script, SetScriptTransaction}
+import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.smart.script.v1.ScriptV1
 
 class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -46,7 +47,7 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
     recepient <- accountGen
     ts        <- positiveIntGen
     genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    setSctipt <- selfSignedSetScriptTransactionGenP(master, Script(multisigTypedExpr(s0, s1, s2)))
+    setSctipt <- selfSignedSetScriptTransactionGenP(master, ScriptV1(multisigTypedExpr(s0, s1, s2)))
     amount    <- positiveLongGen
     fee       <- smallFeeGen
     timestamp <- timestampGen
