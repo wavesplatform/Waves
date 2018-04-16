@@ -4,13 +4,13 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.TypeChecker.TypeCheckerContext
 import com.wavesplatform.lang.v1.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.{Serde, TypeChecker}
-import com.wavesplatform.lang.v1.testing.ScriptGenTypeChecker
+import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.BitVector
 import scodec.{Attempt, Codec, DecodeResult}
 
-class SerdeTest extends PropSpec with PropertyChecks with Matchers with ScriptGenTypeChecker with NoShrink {
+class SerdeTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   protected def roundtrip[A](codec: Codec[A], value: A): Unit = {
     val encoded = codec.encode(value)

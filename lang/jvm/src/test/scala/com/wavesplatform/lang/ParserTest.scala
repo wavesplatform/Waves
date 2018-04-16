@@ -4,7 +4,7 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.Parser
 import com.wavesplatform.lang.v1.Terms.Untyped._
 import com.wavesplatform.lang.v1.Terms._
-import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang.v1.testing.{ScriptGenParser}
 import fastparse.core.Parsed.{Failure, Success}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -12,7 +12,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 import scorex.crypto.encode.{Base58 => ScorexBase58}
 
-class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
   def parse(x: String): EXPR = Parser(x).get.value
   def isParsed(x: String): Boolean = Parser(x) match {

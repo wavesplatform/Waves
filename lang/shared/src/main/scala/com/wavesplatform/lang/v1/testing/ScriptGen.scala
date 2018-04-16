@@ -9,7 +9,7 @@ trait ScriptGen {
   def CONST_LONGgen: Gen[EXPR] = Gen.choose(Long.MinValue, Long.MaxValue).map(CONST_LONG)
 
   def BOOLgen(gas: Int): Gen[EXPR] =
-    if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1), REFgen)
+    if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1))
     else Gen.const(TRUE)
 
   def SUMgen(gas: Int): Gen[EXPR] =
@@ -18,7 +18,7 @@ trait ScriptGen {
       i2 <- INTGen((gas - 2) / 2)
     } yield BINARY_OP(i1, SUM_OP, i2)
 
-  def INTGen(gas: Int): Gen[EXPR] = if (gas > 0) Gen.oneOf(CONST_LONGgen, SUMgen(gas - 1), IF_INTgen(gas - 1), REFgen) else CONST_LONGgen
+  def INTGen(gas: Int): Gen[EXPR] = if (gas > 0) Gen.oneOf(CONST_LONGgen, SUMgen(gas - 1), IF_INTgen(gas - 1)) else CONST_LONGgen
 
   def GEgen(gas: Int): Gen[EXPR] =
     for {
@@ -90,11 +90,11 @@ trait ScriptGen {
   val whitespaces: Gen[String]  = Gen.listOf(whitespaceChar).map(_.mkString)
 }
 
-trait ScriptGenTypeChecker extends ScriptGen {
+trait ScriptGenParser extends ScriptGen {
   override def BOOLgen(gas: Int): Gen[EXPR] = {
-    if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1))
+    if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1), REFgen)
     else Gen.const(TRUE)
   }
 
-  override def INTGen(gas: Int): Gen[EXPR] = if (gas > 0) Gen.oneOf(CONST_LONGgen, SUMgen(gas - 1), IF_INTgen(gas - 1)) else CONST_LONGgen
+  override def INTGen(gas: Int): Gen[EXPR] = if (gas > 0) Gen.oneOf(CONST_LONGgen, SUMgen(gas - 1), IF_INTgen(gas - 1), REFgen) else CONST_LONGgen
 }
