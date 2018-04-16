@@ -30,10 +30,12 @@ object ScriptReader {
   }
 
   private def readExprV1(bytes: Array[Byte]): Either[ScriptParseError, EXPR] = {
-    Serde.codec.decode(scodec.bits.BitVector(bytes))
+    Serde.codec
+      .decode(scodec.bits.BitVector(bytes))
       .toEither
       .map(_.value)
-      .left.map(err => ScriptParseError(err.toString()))
+      .left
+      .map(err => ScriptParseError(err.toString()))
   }
 
 }
