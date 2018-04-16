@@ -361,7 +361,7 @@ trait TransactionGenBase extends ScriptGen {
 
   def sponsorFeeCancelSponsorFeeGen(sender: PrivateKeyAccount): Gen[(IssueTransaction, SponsorFeeTransaction, CancelFeeSponsorshipTransaction)] =
     for {
-      (sender, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
+      (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
       issue = IssueTransaction
         .create(sender, assetName, description, quantity, decimals, reissuable = reissuable, iFee, timestamp)
         .right
