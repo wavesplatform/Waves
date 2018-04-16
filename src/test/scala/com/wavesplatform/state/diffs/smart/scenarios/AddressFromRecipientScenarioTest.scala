@@ -1,26 +1,21 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.lang.v1.{EvaluatorV1, Parser, TypeChecker}
-import com.wavesplatform.{NoShrink, TransactionGen}
-import com.wavesplatform.lang.{Evaluator, Parser, TypeChecker}
-import com.wavesplatform.lang.ctx.Obj
-import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.{assertDiffAndState, produce, ENOUGH_AMT}
 import com.wavesplatform.lang.v1.ctx.Obj
-import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs.{ENOUGH_AMT, assertDiffAndState, produce}
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.lang.v1.{EvaluatorV1, Parser, TypeChecker}
+import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState, produce}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import fastparse.core.Parsed
 import monix.eval.Coeval
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.smart.BlockchainContext
+import scorex.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
 
 class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 

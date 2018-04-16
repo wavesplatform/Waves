@@ -8,7 +8,7 @@ import scorex.block.Block.BlockId
 import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.transaction.Transaction.Type
 import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.smart.Script
+import scorex.transaction.smart.script.Script
 
 class NgHistoryReader(ngState: () => Option[NgState], inner: Blockchain, fs: FunctionalitySettings) extends NG {
 
@@ -163,4 +163,10 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: Blockchain, fs: Fun
   override def append(diff: Diff, block: Block): Unit = inner.append(diff, block)
 
   override def rollbackTo(targetBlockId: AssetId): Seq[Block] = inner.rollbackTo(targetBlockId)
+
+  override def transactionHeight(id: AssetId): Option[Int] = ???
+//    diff.transactions
+//      .get(id)
+//      .map(_._1)
+//      .orElse(inner.transactionHeight(id))
 }

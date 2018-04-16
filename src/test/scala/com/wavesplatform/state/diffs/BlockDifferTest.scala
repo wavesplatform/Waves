@@ -16,7 +16,7 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.Transaction.Type
 import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.smart.Script
+import scorex.transaction.smart.script.Script
 import scorex.transaction.{GenesisTransaction, Transaction, ValidationError}
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with WithState {
@@ -189,6 +189,8 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = ???
       override def append(diff: Diff, block: Block): Unit                                                  = ???
       override def rollbackTo(targetBlockId: ByteStr): Seq[Block]                                          = ???
+
+      override def transactionHeight(id: ByteStr): Option[Int] = ???
     }
     assertDiffEiWithPrev(blocks.init, blocks.last, blockchain, fs)(assertion)
   }

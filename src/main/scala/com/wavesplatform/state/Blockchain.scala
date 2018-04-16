@@ -5,7 +5,7 @@ import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}
 import scorex.transaction.Transaction
 import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.smart.Script
+import scorex.transaction.smart.script.Script
 
 trait Blockchain {
   def height: Int
@@ -37,6 +37,7 @@ trait Blockchain {
   def portfolio(a: Address): Portfolio
 
   def transactionInfo(id: ByteStr): Option[(Int, Transaction)]
+  def transactionHeight(id: ByteStr): Option[Int]
 
   def addressTransactions(address: Address, types: Set[Transaction.Type], count: Int, from: Int): Seq[(Int, Transaction)]
 

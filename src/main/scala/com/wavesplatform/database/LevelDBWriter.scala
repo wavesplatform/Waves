@@ -191,7 +191,11 @@ object LevelDBWriter {
     def blockBytes(height: Int) = Key.opt[Array[Byte]](blockAtHeight(height), identity, identity)
 
     def blockHeader(height: Int) =
-      Key.opt[(BlockHeader, Int)](blockAtHeight(height), b => (BlockHeader.parseBytes(b).get._1, b.length), _ => Array.empty) // this dummy encoder is never used: we only store blocks, not block headers
+      Key.opt[(BlockHeader, Int)](
+        blockAtHeight(height),
+        b => (BlockHeader.parseBytes(b).get._1, b.length),
+        _ =>
+          throw new UnsupportedOperationException("Can't write block headers")) // this dummy encoder is never used: we only store blocks, not block headers
 
     def heightOf(blockId: ByteStr) = Key.opt[Int](hash(4, blockId), Ints.fromByteArray, Ints.toByteArray)
 
@@ -274,7 +278,8 @@ object LevelDBWriter {
 
     def transactionInfo(txId: ByteStr): Key[Option[(Int, Transaction)]] = Key.opt(hash(18, txId), readTransactionInfo, writeTransactionInfo)
 
-    def transactionHeight(txId: ByteStr): Key[Option[Int]] = Key.opt(hash(18, txId), readTransactionHeight, i => Array(i.toByte))
+    def transactionHeight(txId: ByteStr): Key[Option[Int]] =
+      Key.opt(hash(18, txId), readTransactionHeight, _ => throw new UnsupportedOperationException("Can't write transaction height only"))
 
     def addressTransactionHistory(addressId: BigInt): Key[Seq[Int]] = historyKey(19, addressId.toByteArray)
 

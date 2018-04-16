@@ -9,7 +9,7 @@ import scorex.account.{Address, Alias}
 import scorex.block.Block
 import scorex.transaction.Transaction
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
-import scorex.transaction.smart.Script
+import scorex.transaction.smart.script.Script
 
 import scala.collection.JavaConverters._
 
