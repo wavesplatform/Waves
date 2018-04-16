@@ -9,7 +9,8 @@ import scorex.transaction._
 
 object BlockchainContext {
 
+  private val baseContext = Monoid.combine(PureContext.instance, CryptoContext.build(WavesCrypto))
+
   def build(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], state: SnapshotStateReader): Context =
-    Monoid.combineAll(
-      Seq(PureContext.instance, CryptoContext.build(WavesCrypto), WavesContext.build(new WavesEnvironment(nByte, tx, h, state), WavesCrypto)))
+    Monoid.combine(baseContext, WavesContext.build(new WavesEnvironment(nByte, tx, h, state)))
 }

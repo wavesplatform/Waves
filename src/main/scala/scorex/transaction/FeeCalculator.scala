@@ -1,11 +1,22 @@
 package scorex.transaction
 
+import com.wavesplatform.lang.v1.{ScriptComplexityCalculator, FunctionHeader}
+import com.wavesplatform.lang.v1.ctx.Context
 import com.wavesplatform.settings.FeesSettings
-import com.wavesplatform.state2.ByteStr
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state2.{AccountDataInfo, AssetDescription, BalanceSnapshot, ByteStr, DataEntry, Portfolio, VolumeAndFee}
+import com.wavesplatform.state2.reader.{LeaseDetails, SnapshotStateReader}
+import monix.eval.Coeval
+import scorex.account.{Address, Alias}
 import scorex.transaction.FeeCalculator._
+import scorex.transaction.Transaction.Type
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
+import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.smart.BlockchainContext
+import scorex.transaction.smart.script.Script
+import scorex.transaction.smart.script.v1.ScriptV1
+
+import scala.util.Failure
 
 /**
   * Class to check, that transaction contains enough fee to put it to UTX pool
@@ -24,6 +35,32 @@ class FeeCalculator(settings: FeesSettings, state: SnapshotStateReader) {
         TransactionAssetFee(transactionType, maybeAsset).key -> fee
       }
     }
+  }
+
+  private val functionCosts: Map[FunctionHeader, Long] = {
+    val error = new IllegalStateException("This context has no data")
+    val fail  = Coeval.fromTry(Failure(error))
+    val emptyStateReader = new SnapshotStateReader {
+      override def height: Int                                                                                             = throw error
+      override def portfolio(a: Address): Portfolio                                                                        = throw error
+      override def transactionInfo(id: AssetId): Option[(Int, Transaction)]                                                = throw error
+      override def transactionHeight(id: AssetId): Option[Int]                                                             = throw error
+      override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = throw error
+      override def containsTransaction(id: AssetId): Boolean                                                               = throw error
+      override def assetDescription(id: AssetId): Option[AssetDescription]                                                 = throw error
+      override def resolveAlias(a: Alias): Option[Address]                                                                 = throw error
+      override def leaseDetails(leaseId: AssetId): Option[LeaseDetails]                                                    = throw error
+      override def filledVolumeAndFee(orderId: AssetId): VolumeAndFee                                                      = throw error
+      override def balanceSnapshots(address: Address, from: Int, to: Int): Seq[BalanceSnapshot]                            = throw error
+      override def accountScript(address: Address): Option[Script]                                                         = throw error
+      override def accountData(acc: Address): AccountDataInfo                                                              = throw error
+      override def accountData(acc: Address, key: String): Option[DataEntry[_]]                                            = throw error
+      override def assetDistribution(height: Int, assetId: AssetId): Map[Address, Long]                                    = throw error
+      override def wavesDistribution(height: Int): Map[Address, Long]                                                      = throw error
+      override def allActiveLeases: Set[LeaseTransaction]                                                                  = throw error
+      override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]                 = throw error
+    }
+    Context.functionCosts(BlockchainContext.build(nByte = 0, fail, fail, emptyStateReader).functions.values)
   }
 
   def enoughFee[T <: Transaction](tx: T): Either[ValidationError, Unit] = {
@@ -56,7 +93,13 @@ class FeeCalculator(settings: FeesSettings, state: SnapshotStateReader) {
           s"Fee in ${txFeeAssetId.fold("WAVES")(_.toString)} for ${tx.builder.classTag} transaction does not exceed minimal value of $minTxFee"
         }
       )
-      totalRequiredFee = minTxFee + script.fold(0L)(_.extraFee(settings.smartAccountExtraChargePerOp, state))
+
+      scriptComplexity <- script.fold[Either[ValidationError, Long]](Right(0L)) {
+        case s: ScriptV1 => ScriptComplexityCalculator(s.expr, functionCosts).left.map(ValidationError.GenericError(_))
+        case _           => Right(0L)
+      }
+
+      totalRequiredFee = minTxFee + (scriptComplexity * settings.smartAccountExtraChargePerOp).toLong
       _ <- Either.cond(
         txFeeValue >= totalRequiredFee,
         (),
