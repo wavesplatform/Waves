@@ -17,6 +17,8 @@ object ValidationError {
 
   case class NegativeAmount(amount: Long, of: String) extends ValidationError
 
+  case class NegativeMinFee(minFee: Long, of: String) extends ValidationError
+
   case object InsufficientFee extends ValidationError
 
   case object TooBigArray extends ValidationError

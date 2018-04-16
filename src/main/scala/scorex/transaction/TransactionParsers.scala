@@ -36,7 +36,9 @@ object TransactionParsers {
     DataTransaction,
     VersionedTransferTransaction,
     SetScriptTransaction,
-    SmartIssueTransaction
+    SmartIssueTransaction,
+    SponsorFeeTransaction,
+    CancelFeeSponsorshipTransaction
   ).flatMap { x =>
     x.supportedVersions.map { version =>
       ((x.typeId, version), x)
