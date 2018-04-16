@@ -45,13 +45,7 @@ object SponsorshipTransactionsDiff {
         Left(GenericError("Asset was issued by other address"))
       case None =>
         Left(GenericError("Referenced assetId not found"))
-      case Some(_) =>
-        val sponsoredFeeEnabled = fp.isFeatureActivated(BlockchainFeatures.SponsoredFee, state.height)
-        if (sponsoredFeeEnabled) {
-          Right({})
-        } else {
-          Left(GenericError("Sponsored Fee not support yet"))
-        }
+      case Some(_) => Right(())
     }
   }
 
