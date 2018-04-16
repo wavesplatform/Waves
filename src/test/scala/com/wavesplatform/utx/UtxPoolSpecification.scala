@@ -4,7 +4,15 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.mining._
-import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings, WavesSettings}
+import com.wavesplatform.settings.{
+  BlockchainSettings,
+  FeeSettings,
+  FeesSettings,
+  FunctionalitySettings,
+  SmartAccountSettings,
+  UtxSettings,
+  WavesSettings
+}
 import com.wavesplatform.state2.diffs._
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.{NoShrink, TestHelpers, TestTime, TransactionGen, WithDB}
@@ -25,13 +33,15 @@ import scala.concurrent.duration._
 
 class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen with NoShrink with WithDB {
 
-  private val calculatorSettings = FeesSettings(1,
-                                                Seq(
-                                                  GenesisTransaction,
-                                                  IssueTransaction,
-                                                  TransferTransaction,
-                                                  MassTransferTransaction
-                                                ).map(_.typeId.toInt -> List(FeeSettings("", 0))).toMap)
+  private val calculatorSettings = FeesSettings(
+    SmartAccountSettings(1, 0.1),
+    Seq(
+      GenesisTransaction,
+      IssueTransaction,
+      TransferTransaction,
+      MassTransferTransaction
+    ).map(_.typeId.toInt -> List(FeeSettings("", 0))).toMap
+  )
 
   private def mkState(senderAccount: Address, senderBalance: Long) = {
     val config          = ConfigFactory.load()

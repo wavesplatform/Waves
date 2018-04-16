@@ -94,12 +94,17 @@ class FeeCalculator(settings: FeesSettings, state: SnapshotStateReader) {
         }
       )
 
-      scriptComplexity <- script.fold[Either[ValidationError, Long]](Right(0L)) {
-        case s: ScriptV1 => ScriptComplexityCalculator(s.expr, functionCosts).left.map(ValidationError.GenericError(_))
-        case _           => Right(0L)
+      scriptComplexity <- script match {
+        case Some(s: ScriptV1) =>
+          ScriptComplexityCalculator(s.expr, functionCosts) match {
+            case Right(x) => Right(settings.smartAccount.baseExtraCharge + x)
+            case Left(e)  => Left(ValidationError.GenericError(e))
+          }
+        case Some(x) => throw new IllegalStateException(s"Doesn't know how to calculate complexity for a script of ${x.version} version")
+        case None    => Right(0L)
       }
 
-      totalRequiredFee = minTxFee + (scriptComplexity * settings.smartAccountExtraChargePerOp).toLong
+      totalRequiredFee = minTxFee + (scriptComplexity * settings.smartAccount.extraChargePerOp).toLong
       _ <- Either.cond(
         txFeeValue >= totalRequiredFee,
         (),
