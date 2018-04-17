@@ -359,30 +359,33 @@ trait TransactionGenBase extends ScriptGen {
   val reissueGen: Gen[ReissueTransaction] = issueReissueBurnGen.map(_._2)
   val burnGen: Gen[BurnTransaction]       = issueReissueBurnGen.map(_._3)
 
-  def sponsorFeeCancelSponsorFeeGen(sender: PrivateKeyAccount): Gen[(IssueTransaction, SponsorFeeTransaction, CancelFeeSponsorshipTransaction)] =
+  def sponsorFeeCancelSponsorFeeGen(
+      sender: PrivateKeyAccount): Gen[(IssueTransaction, SponsorFeeTransaction, SponsorFeeTransaction, CancelFeeSponsorshipTransaction)] =
     for {
       (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
       issue = IssueTransaction
         .create(sender, assetName, description, quantity, decimals, reissuable = reissuable, iFee, timestamp)
         .right
         .get
-      minFee <- positiveLongGen
+      minFee  <- positiveLongGen
+      minFee1 <- positiveLongGen
       assetId = issue.assetId()
     } yield
       (issue,
        SponsorFeeTransaction.create(1, sender, assetId, minFee, 1 * Constants.UnitsInWave, timestamp).right.get,
+       SponsorFeeTransaction.create(1, sender, assetId, minFee1, 1 * Constants.UnitsInWave, timestamp).right.get,
        CancelFeeSponsorshipTransaction.create(1, sender, assetId, 1 * Constants.UnitsInWave, timestamp).right.get,
       )
 
   val sponsorFeeGen = for {
-    sender     <- accountGen
-    (_, tx, _) <- sponsorFeeCancelSponsorFeeGen(sender)
+    sender        <- accountGen
+    (_, tx, _, _) <- sponsorFeeCancelSponsorFeeGen(sender)
   } yield {
     tx
   }
   val cancelFeeSponsorshipGen = for {
-    sender     <- accountGen
-    (_, _, tx) <- sponsorFeeCancelSponsorFeeGen(sender)
+    sender        <- accountGen
+    (_, _, _, tx) <- sponsorFeeCancelSponsorFeeGen(sender)
   } yield {
     tx
   }

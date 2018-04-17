@@ -1,14 +1,15 @@
 package com.wavesplatform.state2.diffs
 
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.features.BlockchainFeatures
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock.{create => block}
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
+import com.wavesplatform.state2._
 
-class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
+class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("work") {
     val settings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SponsoredFee.id -> 0))
@@ -16,20 +17,28 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       master <- accountGen
       ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      (issueTx, sponsorTx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
-    } yield (genesis, issueTx, sponsorTx, cancelTx)
+      (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
+    } yield (genesis, issueTx, sponsorTx, sponsor1Tx, cancelTx)
 
     forAll(setup) {
-      case (genesis, issue, sponsor, cancel) =>
+      case (genesis, issue, sponsor, sponsor1, cancel) =>
         val setupBlocks = Seq(block(Seq(genesis, issue)))
         assertDiffAndState(setupBlocks, block(Seq(sponsor)), settings) {
           case (diff, state) =>
-            println(diff)
+            diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(sponsor.minFee))
+            //println(diff.sponsorship)
             println(state)
         }
-        assertDiffAndState(setupBlocks, block(Seq(cancel)), settings) {
+        assertDiffAndState(setupBlocks, block(Seq(sponsor, sponsor1)), settings) {
           case (diff, state) =>
-            println(diff)
+            diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(sponsor1.minFee))
+            //println(diff.sponsorship)
+            println(state)
+        }
+        assertDiffAndState(setupBlocks, block(Seq(sponsor, sponsor1, cancel)), settings) {
+          case (diff, state) =>
+            diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(0))
+            //println(diff.sponsorship)
             println(state)
         }
     }
@@ -41,7 +50,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       master <- accountGen
       ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      (_, sponsorTx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
+      (_, sponsorTx, _, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
     } yield (genesis, sponsorTx, cancelTx)
 
     forAll(setup) {
@@ -62,7 +71,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       master <- accountGen
       ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      (issueTx, sponsorTx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
+      (issueTx, sponsorTx, _, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
     } yield (genesis, issueTx, sponsorTx, cancelTx)
 
     forAll(setup) {
