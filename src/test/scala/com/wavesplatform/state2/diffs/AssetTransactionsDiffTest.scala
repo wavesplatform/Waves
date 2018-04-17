@@ -261,7 +261,14 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
         assertDiffAndState(Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(issue)), smartEnabledFS) {
           case (blockDiff, newState) =>
             newState.assetDescription(issue.id()) shouldBe Some(
-              AssetDescription(issue.sender, issue.name, issue.description, issue.decimals, issue.reissuable, BigInt(issue.quantity), issue.script))
+              AssetDescription(issue.sender,
+                               issue.name,
+                               issue.description,
+                               issue.decimals,
+                               issue.reissuable,
+                               BigInt(issue.quantity),
+                               issue.script,
+                               0L))
             blockDiff.transactions.get(issue.id()).isDefined shouldBe true
             newState.transactionInfo(issue.id()).isDefined shouldBe true
             newState.transactionInfo(issue.id()).isDefined shouldEqual true

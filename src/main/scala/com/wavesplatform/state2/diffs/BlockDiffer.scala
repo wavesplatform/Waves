@@ -52,12 +52,12 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     lazy val prevBlockFeeDistr: Option[Diff] =
       if (stateHeight > ng4060switchHeight)
         maybePrevBlock.map { prevBlock =>
-          val portfolio = if (stateHeight > sponsoredFeeHeight)
-            clearSponsorship(prevBlock.prevBlockFeePart(), blockSigner, s)
-          else prevBlock.prevBlockFeePart()
+          val portfolio =
+            if (stateHeight > sponsoredFeeHeight)
+              clearSponsorship(prevBlock.prevBlockFeePart(), blockSigner, s)
+            else prevBlock.prevBlockFeePart()
           Diff.empty.copy(portfolios = Map(blockSigner -> portfolio))
-        }
-      else None
+        } else None
 
     lazy val currentBlockFeeDistr =
       if (stateHeight < ng4060switchHeight)
@@ -116,7 +116,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
             ei.flatMap { diff =>
               txDiffer(composite(s, diff), fp, tx).map { newDiff =>
                 val feePortfolio = clearSponsorship(tx.feeDiff().multiply(Block.CurrentBlockFeePart), blockGenerator, s)
-                val feeDiff = Diff.empty.copy(portfolios = Map(blockGenerator -> feePortfolio))
+                val feeDiff      = Diff.empty.copy(portfolios = Map(blockGenerator -> feePortfolio))
                 diff.combine(newDiff).combine(feeDiff)
               }
             }

@@ -163,4 +163,20 @@ object TransactionFactory {
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
       tx <- DataTransaction.selfSigned(request.version, pk, request.data, request.fee, timestamp)
     } yield tx
+
+  def sponsor(request: SponsorFeeRequest, wallet: Wallet, time: Time): Either[ValidationError, SponsorFeeTransaction] =
+    for {
+      pk <- wallet.findWallet(request.sender)
+      assetId   = ByteStr.decodeBase58(request.assetId).get
+      timestamp = request.timestamp.getOrElse(time.getTimestamp())
+      tx <- SponsorFeeTransaction.create(request.version, pk, assetId, request.baseFee, request.fee, timestamp)
+    } yield tx
+
+  def cancelSponsorship(request: CancelFeeSponsorshipRequest, wallet: Wallet, time: Time): Either[ValidationError, CancelFeeSponsorshipTransaction] =
+    for {
+      pk <- wallet.findWallet(request.sender)
+      assetId   = ByteStr.decodeBase58(request.assetId).get
+      timestamp = request.timestamp.getOrElse(time.getTimestamp())
+      tx <- CancelFeeSponsorshipTransaction.create(request.version, pk, assetId, request.fee, timestamp)
+    } yield tx
 }
