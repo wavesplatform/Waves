@@ -68,10 +68,10 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
         longAttachmentEi shouldBe Left(ValidationError.TooBigArray)
 
         val noFeeEi = create(version, assetId, sender, feeOverflow, timestamp, 0, attachment, proofs)
-        noFeeEi shouldBe Left(ValidationError.InsufficientFee)
+        noFeeEi shouldBe Left(ValidationError.InsufficientFee())
 
         val negativeFeeEi = create(version, assetId, sender, feeOverflow, timestamp, -100, attachment, proofs)
-        negativeFeeEi shouldBe Left(ValidationError.InsufficientFee)
+        negativeFeeEi shouldBe Left(ValidationError.InsufficientFee())
     }
   }
 }

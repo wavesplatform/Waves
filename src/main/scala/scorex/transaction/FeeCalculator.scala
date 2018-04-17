@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import com.wavesplatform.lang.v1.{ScriptComplexityCalculator, FunctionHeader}
+import com.wavesplatform.lang.v1.{FunctionHeader, ScriptComplexityCalculator}
 import com.wavesplatform.lang.v1.ctx.Context
 import com.wavesplatform.settings.FeesSettings
 import com.wavesplatform.state2.{AccountDataInfo, AssetDescription, BalanceSnapshot, ByteStr, DataEntry, Portfolio, VolumeAndFee}
@@ -9,7 +9,7 @@ import monix.eval.Coeval
 import scorex.account.{Address, Alias}
 import scorex.transaction.FeeCalculator._
 import scorex.transaction.Transaction.Type
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.ValidationError.{GenericError, InsufficientFee}
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.BlockchainContext
@@ -108,7 +108,7 @@ class FeeCalculator(settings: FeesSettings, state: SnapshotStateReader) {
       _ <- Either.cond(
         txFeeValue >= totalRequiredFee,
         (),
-        GenericError(s"Scripted account requires $totalRequiredFee fee for this transaction, but given: $txFeeValue")
+        InsufficientFee(s"Scripted account requires $totalRequiredFee fee for this transaction, but given: $txFeeValue")
       )
     } yield ()
   }

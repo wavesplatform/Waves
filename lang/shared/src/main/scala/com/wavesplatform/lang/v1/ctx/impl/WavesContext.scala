@@ -86,7 +86,6 @@ object WavesContext {
         "proof7"           -> proofBinding(tx, 7)
       ))
 
-  // @TODO: CALCULATE COSTS
   def build(env: Environment): Context = {
     val environmentFunctions = new EnvironmentFunctions(env)
 

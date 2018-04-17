@@ -68,7 +68,7 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
     if (amount <= 0) {
       Left(ValidationError.NegativeAmount(amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
+      Left(ValidationError.InsufficientFee()) //CHECK IF FEE IS POSITIVE
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
       Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else {
