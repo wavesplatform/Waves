@@ -1,35 +1,37 @@
 package com.wavesplatform.lang.v1
 
+import cats.data.EitherT
 import com.wavesplatform.lang.v1.Terms._
+import monix.eval.Coeval
 
 object ScriptComplexityCalculator {
-  val MaxCost = 1000
+  def apply(t: Typed.EXPR, functionCosts: Map[FunctionHeader, Long]): Either[String, Long] = {
+    type Result[T] = EitherT[Coeval, String, T]
 
-  type Result[T] = Either[String, T]
+    def aux(t: Result[Typed.EXPR]): Result[Long] = t.flatMap {
+      case _: Typed.CONST_LONG | _: Typed.CONST_BYTEVECTOR | _: Typed.CONST_STRING | Typed.TRUE | Typed.FALSE => EitherT.pure(1)
 
-  def apply(t: Typed.EXPR, functionCosts: Map[FunctionHeader, Long]): Result[Long] = {
-    def aux(t: Typed.EXPR): Result[Long] = t match {
-      case _: Typed.CONST_LONG | _: Typed.CONST_BYTEVECTOR | _: Typed.CONST_STRING | Typed.TRUE | Typed.FALSE => Right(1)
-
-      case t: Typed.GETTER => aux(t.ref).map(_ + 2)
-      case t: Typed.BLOCK  => aux(t.body).map(_ + t.let.fold(0L)(_ => 5L))
+      case t: Typed.GETTER => aux(EitherT.pure(t.ref)).map(_ + 2)
+      case t: Typed.BLOCK  => aux(EitherT.pure(t.body)).map(_ + t.let.fold(0L)(_ => 5L))
       case t: Typed.IF =>
         for {
-          cond  <- aux(t.cond)
-          right <- aux(t.ifTrue)
-          left  <- aux(t.ifFalse)
+          cond  <- aux(EitherT.pure(t.cond))
+          right <- aux(EitherT.pure(t.ifTrue))
+          left  <- aux(EitherT.pure(t.ifFalse))
         } yield 1 + cond + math.max(right, left)
 
-      case _: Typed.REF => Right(2)
+      case _: Typed.REF => EitherT.pure(2)
       case t: Typed.FUNCTION_CALL =>
-        import cats.instances.either._
         import cats.instances.list._
         import cats.syntax.traverse._
 
-        val callCost = functionCosts.get(t.function).fold[Result[Long]](Left(s"Unknown function ${t.function}"))(Right(_))
-        (callCost :: t.args.map(aux)).sequence[Result, Long].map(_.sum)
+        val callCost = functionCosts.get(t.function).fold[Either[String, Long]](Left(s"Unknown function ${t.function}"))(Right(_))
+        for {
+          callCost <- EitherT.fromEither[Coeval](callCost)
+          args     <- t.args.map(x => aux(EitherT.pure[Coeval, String](x))).sequence[Result, Long]
+        } yield callCost + args.sum
     }
 
-    aux(t)
+    aux(EitherT.pure(t)).value()
   }
 }

@@ -3,8 +3,8 @@ package com.wavesplatform.utx
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
-import com.wavesplatform.lang.v1.{CompilerV1, ScriptComplexityCalculator}
 import com.wavesplatform.lang.v1.TypeChecker.TypeCheckerContext
+import com.wavesplatform.lang.v1.{CompilerV1, ScriptComplexityCalculator}
 import com.wavesplatform.mining._
 import com.wavesplatform.settings.{
   BlockchainSettings,
@@ -54,22 +54,22 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
   private def mkState(senderAccount: Address, senderBalance: Long) = {
     val config          = ConfigFactory.load()
     val genesisSettings = TestHelpers.genesisSettings(Map(senderAccount -> senderBalance))
-    val settings = WavesSettings
-      .fromConfig(config)
-      .copy(
-        blockchainSettings = BlockchainSettings(
-          'T',
-          5,
-          5,
-          FunctionalitySettings.TESTNET.copy(
-            preActivatedFeatures = Map(
-              BlockchainFeatures.MassTransfer.id  -> 0,
-              BlockchainFeatures.SmartAccounts.id -> 0
-            )),
-          genesisSettings
-        ),
-        feesSettings = calculatorSettings
-      )
+    val origSettings    = WavesSettings.fromConfig(config)
+    val settings = origSettings.copy(
+      blockchainSettings = BlockchainSettings(
+        'T',
+        5,
+        5,
+        FunctionalitySettings.TESTNET.copy(
+          preActivatedFeatures = Map(
+            BlockchainFeatures.MassTransfer.id  -> 0,
+            BlockchainFeatures.SmartAccounts.id -> 0
+          )),
+        genesisSettings
+      ),
+      feesSettings = calculatorSettings,
+      featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
+    )
 
     val (_, _, bcu) = StorageFactory(settings, db, new TestTime())
     bcu.processBlock(Block.genesis(genesisSettings).explicitGet()).explicitGet()
@@ -218,7 +218,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
       offset <- chooseNum(5000L, 10000L)
       tx2    <- listOfN(count1, transfer(sender, senderBalance / 2, new TestTime(ts + offset + 1000)))
     } yield {
-      import bcu.{stateReader, historyReader}
+      import bcu.{historyReader, stateReader}
       val time = new TestTime()
       val utx = new UtxPoolImpl(
         time,
@@ -232,9 +232,10 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     }
 
   private val script: ScriptV1 = {
-    val code = """let x = 1
-                 |let y = 2
-                 |true""".stripMargin
+    val code =
+      """let x = 1
+          |let y = 2
+          |true""".stripMargin
 
     val compiler = new CompilerV1(TypeCheckerContext.empty)
     ScriptV1(compiler.compile(code, List.empty).explicitGet())
