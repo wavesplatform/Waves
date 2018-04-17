@@ -1,10 +1,10 @@
 package scorex.transaction
 
-import com.wavesplatform.lang.v1.{FunctionHeader, ScriptComplexityCalculator}
 import com.wavesplatform.lang.v1.ctx.Context
+import com.wavesplatform.lang.v1.{FunctionHeader, ScriptComplexityCalculator}
 import com.wavesplatform.settings.FeesSettings
-import com.wavesplatform.state2.{AccountDataInfo, AssetDescription, BalanceSnapshot, ByteStr, DataEntry, Portfolio, VolumeAndFee}
 import com.wavesplatform.state2.reader.{LeaseDetails, SnapshotStateReader}
+import com.wavesplatform.state2.{AccountDataInfo, AssetDescription, BalanceSnapshot, ByteStr, DataEntry, Portfolio, VolumeAndFee}
 import monix.eval.Coeval
 import scorex.account.{Address, Alias}
 import scorex.transaction.FeeCalculator._
@@ -24,18 +24,6 @@ import scala.util.Failure
 class FeeCalculator(settings: FeesSettings, state: SnapshotStateReader) {
 
   private val Kb = 1024
-
-  private val map: Map[String, Long] = {
-    settings.fees.flatMap { fs =>
-      val transactionType = fs._1
-      fs._2.map { v =>
-        val maybeAsset = if (v.asset.toUpperCase == "WAVES") None else ByteStr.decodeBase58(v.asset).toOption
-        val fee        = v.fee
-
-        TransactionAssetFee(transactionType, maybeAsset).key -> fee
-      }
-    }
-  }
 
   private val functionCosts: Map[FunctionHeader, Long] = {
     val error = new IllegalStateException("This context has no data")
@@ -63,20 +51,19 @@ class FeeCalculator(settings: FeesSettings, state: SnapshotStateReader) {
     Context.functionCosts(BlockchainContext.build(nByte = 0, fail, fail, emptyStateReader).functions.values)
   }
 
-  def enoughFee[T <: Transaction](tx: T): Either[ValidationError, Unit] = {
-    def minFeeFor(tx: T, txFeeAssetId: Option[AssetId], txMinBaseFee: Long): Long = tx match {
-      case tx: DataTransaction =>
-        val sizeInKb = 1 + (tx.bytes().length - 1) / Kb
-        txMinBaseFee * sizeInKb
-      case tx: MassTransferTransaction =>
-        val transferFeeSpec = map.getOrElse(
-          TransactionAssetFee(TransferTransaction.typeId, txFeeAssetId).key,
-          throw new IllegalStateException("Can't find spec for TransferTransaction")
-        )
-        transferFeeSpec + txMinBaseFee * tx.transfers.size
-      case _ => txMinBaseFee
-    }
+  private val map: Map[String, Long] = {
+    settings.fees.flatMap { fs =>
+      val transactionType = fs._1
+      fs._2.map { v =>
+        val maybeAsset = if (v.asset.toUpperCase == "WAVES") None else ByteStr.decodeBase58(v.asset).toOption
+        val fee        = v.fee
 
+        TransactionAssetFee(transactionType, maybeAsset).key -> fee
+      }
+    }
+  }
+
+  def enoughFee(tx: Transaction): Either[ValidationError, Unit] = {
     val (txFeeAssetId, txFeeValue) = tx.assetFee
     val txAssetFeeKey              = TransactionAssetFee(tx.builder.typeId, txFeeAssetId).key
     for {
@@ -111,6 +98,19 @@ class FeeCalculator(settings: FeesSettings, state: SnapshotStateReader) {
         InsufficientFee(s"Scripted account requires $totalRequiredFee fee for this transaction, but given: $txFeeValue")
       )
     } yield ()
+  }
+
+  private def minFeeFor(tx: Transaction, txFeeAssetId: Option[AssetId], txMinBaseFee: Long): Long = tx match {
+    case tx: DataTransaction =>
+      val sizeInKb = 1 + (tx.bytes().length - 1) / Kb
+      txMinBaseFee * sizeInKb
+    case tx: MassTransferTransaction =>
+      val transferFeeSpec = map.getOrElse(
+        TransactionAssetFee(TransferTransaction.typeId, txFeeAssetId).key,
+        throw new IllegalStateException("Can't find spec for TransferTransaction")
+      )
+      transferFeeSpec + txMinBaseFee * tx.transfers.size
+    case _ => txMinBaseFee
   }
 }
 
