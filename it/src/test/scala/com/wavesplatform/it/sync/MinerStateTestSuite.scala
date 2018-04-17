@@ -53,7 +53,7 @@ object MinerStateTestSuite {
     |        generation-balance-depth-from-50-to-1000-after-height = 100
     |        }
     |        genesis {
-    |           average-block-delay = 6s
+    |           average-block-delay = 10s
     |           signature: "zXBp6vpEHgtdsPjVHjSEwMeRiQTAu6DdX3qkJaCRKxgYJk26kazS2XguLYRvL9taHKxrZHNNA7X7LMVFavQzWpT"
     |           transactions = [
     |             {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},
@@ -79,7 +79,7 @@ object MinerStateTestSuite {
     |        generation-balance-depth-from-50-to-1000-after-height = 100
     |        }
     |        genesis {
-    |           average-block-delay = 6s
+    |           average-block-delay = 10s
     |           signature: "zXBp6vpEHgtdsPjVHjSEwMeRiQTAu6DdX3qkJaCRKxgYJk26kazS2XguLYRvL9taHKxrZHNNA7X7LMVFavQzWpT"
     |           transactions = [
     |              {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},

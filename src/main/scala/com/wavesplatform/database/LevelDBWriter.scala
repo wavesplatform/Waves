@@ -55,7 +55,8 @@ object LevelDBWriter {
 
   object Key {
     def apply[V](key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[V] = new Key[V] {
-      override def keyBytes: Array[Byte]     = key
+      override def keyBytes: Array[Byte] = key
+
       override def parse(bytes: Array[Byte]) = parser(bytes)
 
       override def encode(v: V) = encoder(v)
@@ -90,7 +91,8 @@ object LevelDBWriter {
       ndo.toByteArray
     }
 
-    private def addr(prefix: Int, address: BigInt)    = byteKey(prefix, address.toByteArray)
+    private def addr(prefix: Int, address: BigInt) = byteKey(prefix, address.toByteArray)
+
     private def hash(prefix: Int, hashBytes: ByteStr) = byteKey(prefix, hashBytes.arr)
 
     private def addressWithH(prefix: Int, height: Int, addressId: BigInt): Array[Byte] = {
@@ -204,7 +206,8 @@ object LevelDBWriter {
     def wavesBalance(height: Int, addressId: BigInt) =
       Key[Long](addressWithH(6, height, addressId), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
-    def assetList(addressId: BigInt)                             = Key[Set[ByteStr]](addr(7, addressId), readTxIds(_).toSet, assets => writeTxIds(assets.toSeq))
+    def assetList(addressId: BigInt) = Key[Set[ByteStr]](addr(7, addressId), readTxIds(_).toSet, assets => writeTxIds(assets.toSeq))
+
     def assetBalanceHistory(addressId: BigInt, assetId: ByteStr) = historyKey(8, addressId.toByteArray ++ assetId.arr)
 
     def assetBalance(height: Int, addressId: BigInt, assetId: ByteStr) =
@@ -223,7 +226,8 @@ object LevelDBWriter {
       ndo.toByteArray
     }
 
-    def assetInfoHistory(assetId: ByteStr): Key[Seq[Int]]        = historyKey(10, assetId.arr)
+    def assetInfoHistory(assetId: ByteStr): Key[Seq[Int]] = historyKey(10, assetId.arr)
+
     def assetInfo(height: Int, assetId: ByteStr): Key[AssetInfo] = Key(byteKeyWithH(11, height, assetId.arr), readAssetInfo, writeAssetInfo)
 
     private def writeLeaseBalance(lb: LeaseBalance): Array[Byte] = {
@@ -308,12 +312,14 @@ object LevelDBWriter {
     def addressTransactionIds(height: Int, addressId: BigInt): Key[Seq[(Int, ByteStr)]] =
       Key(byteKeyWithH(20, height, addressId.toByteArray), readTransactionIds, writeTransactionIds)
 
-    def changedAddresses(height: Int): Key[Seq[BigInt]]        = Key(h(21, height), readBigIntSeq, writeBigIntSeq)
+    def changedAddresses(height: Int): Key[Seq[BigInt]] = Key(h(21, height), readBigIntSeq, writeBigIntSeq)
+
     def transactionIdsAtHeight(height: Int): Key[Seq[ByteStr]] = Key(h(22, height), readTxIds, writeTxIds)
 
     def addressIdOfAlias(alias: Alias): Key[Option[BigInt]] = Key.opt(byteKey(23, alias.bytes.arr), BigInt(_), _.toByteArray)
 
-    val lastAddressId: Key[Option[BigInt]]               = Key.opt(Array[Byte](0, 24), BigInt(_), _.toByteArray)
+    val lastAddressId: Key[Option[BigInt]] = Key.opt(Array[Byte](0, 24), BigInt(_), _.toByteArray)
+
     def addressId(address: Address): Key[Option[BigInt]] = Key.opt(byteKey(25, address.bytes.arr), BigInt(_), _.toByteArray)
 
     def idToAddress(id: BigInt): Key[Address] = Key(byteKey(26, id.toByteArray), Address.fromBytes(_).explicitGet(), _.bytes.arr)
@@ -341,11 +347,14 @@ object LevelDBWriter {
       b.array()
     }
 
-    def approvedFeatures: Key[Map[Short, Int]]  = Key(Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
+    def approvedFeatures: Key[Map[Short, Int]] = Key(Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
+
     def activatedFeatures: Key[Map[Short, Int]] = Key(Array[Byte](0, 30), readFeatureMap, writeFeatureMap)
 
-    def dataKeyList(addressId: BigInt)                             = Key[Set[String]](addr(31, addressId), readStrings(_).toSet, keys => writeStrings(keys.toSeq))
+    def dataKeyList(addressId: BigInt) = Key[Set[String]](addr(31, addressId), readStrings(_).toSet, keys => writeStrings(keys.toSeq))
+
     def dataHistory(addressId: BigInt, key: String): Key[Seq[Int]] = historyKey(32, addressId.toByteArray ++ key.getBytes(UTF8))
+
     def data(height: Int, addressId: BigInt, key: String): Key[Option[DataEntry[_]]] =
       Key.opt(byteKeyWithH(33, height, addressId.toByteArray ++ key.getBytes(UTF8)), DataEntry.parseValue(key, _, 0)._1, _.valueBytes)
   }
@@ -372,6 +381,7 @@ object LevelDBWriter {
   }
 
   /** {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 12), (3, 5)]}}}
+    *
     * @param wbh WAVES balance history
     * @param lbh Lease balance history
     */
