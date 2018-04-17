@@ -4,7 +4,7 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.Parser
 import com.wavesplatform.lang.v1.Terms.Untyped._
 import com.wavesplatform.lang.v1.Terms._
-import com.wavesplatform.lang.v1.testing.{ScriptGenParser}
+import com.wavesplatform.lang.v1.testing.ScriptGenParser
 import fastparse.core.Parsed.{Failure, Success}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -20,36 +20,49 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     case Failure(_, _, _) => false
   }
 
-  def withWhitespaces(expr: String): String = whitespaces.sample.get + expr + whitespaces.sample.get
+  def withWhitespaces(expr: String): Gen[String] =
+    for {
+      pred <- whitespaces
+      post <- whitespaces
+    } yield pred + expr + post
 
-  def toString(expr: EXPR): String = expr match {
+  def toString(expr: EXPR): Gen[String] = expr match {
     case CONST_LONG(x)   => withWhitespaces(s"$x")
     case REF(x)          => withWhitespaces(s"$x")
     case CONST_STRING(x) => withWhitespaces(s"""\"$x\"""")
     case TRUE            => withWhitespaces("true")
     case FALSE           => withWhitespaces("false")
     case BINARY_OP(x: EXPR, op: BINARY_OP_KIND, y: EXPR) =>
-      op match {
-        case SUM_OP => s"(${toString(x)}+${toString(y)})"
-        case GT_OP  => s"(${toString(x)}>${toString(y)})"
-        case AND_OP => s"(${toString(x)}&&${toString(y)})"
-        case OR_OP  => s"(${toString(x)}||${toString(y)})"
-        case EQ_OP  => s"(${toString(x)}==${toString(y)})"
-        case GE_OP  => s"(${toString(x)}>=${toString(y)})"
-      }
-    case IF(cond: EXPR, x: EXPR, y: EXPR) => s"(if(${toString(cond)}) then ${toString(x)} else ${toString(y)})"
+      for {
+        arg1 <- toString(x)
+        arg2 <- toString(y)
+      } yield s"($arg1${opsToFunctions(op)}$arg2)"
+    case IF(cond: EXPR, x: EXPR, y: EXPR) =>
+      for {
+        c <- toString(cond)
+        t <- toString(x)
+        f <- toString(y)
+      } yield s"(if($c) then $t else $f)"
     case BLOCK(let: Option[LET], body: EXPR) =>
       let match {
-        case Some(let) => s"let ${let.name} = ${toString(let.value)}; ${toString(body)}"
-        case None      => s"${toString(body)}"
+        case Some(l) =>
+          for {
+            letstr  <- toString(l.value)
+            bodyStr <- toString(body)
+          } yield s"let ${l.name} = $letstr; $bodyStr"
+        case None => toString(body)
       }
     case _ => ???
   }
 
   def genElementCheck(gen: Gen[EXPR]): Unit = {
-    forAll(gen) { exp =>
-      val code = toString(exp)
-      parse(code) shouldBe exp
+
+    forAll(for {
+      expr <- gen
+      str  <- toString(expr)
+    } yield (expr, str)) {
+      case ((expr, str)) =>
+        parse(str) shouldBe expr
     }
   }
 
