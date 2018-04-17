@@ -78,7 +78,9 @@ case class SponsorshipValue(minFee: Long) extends Sponsorship
 case object SponsorshipNoInfo             extends Sponsorship
 
 object Sponsorship {
-  implicit val accountDataInfoMonoid: Monoid[Sponsorship] = new Monoid[Sponsorship] {
+  val FeeUnit = 50000
+
+  implicit val sponsorshipMonoid: Monoid[Sponsorship] = new Monoid[Sponsorship] {
     override def empty: Sponsorship = SponsorshipNoInfo
 
     override def combine(x: Sponsorship, y: Sponsorship): Sponsorship = y match {

@@ -34,7 +34,16 @@ object TransferTransactionDiff {
         tx.feeAssetId match {
           case None => Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))
           case Some(aid) =>
-            Map(sender -> Portfolio(0, LeaseBalance.empty, Map(aid -> -tx.fee)))
+            val senderPf = Map(sender -> Portfolio(0, LeaseBalance.empty, Map(aid -> -tx.fee)))
+            val sponsorPf = state
+              .assetDescription(aid)
+              .collect {
+                case desc if desc.sponsorship > 0 =>
+                  val feeInWaves = tx.fee * Sponsorship.FeeUnit / desc.sponsorship ///safe mul
+                  Map(desc.issuer.toAddress -> Portfolio(-feeInWaves, LeaseBalance.empty, Map(aid -> tx.fee)))
+              }
+              .getOrElse(Map.empty)
+            senderPf ++ sponsorPf
         }
       )
       assetIssued    = tx.assetId.forall(state.assetDescription(_).isDefined)
