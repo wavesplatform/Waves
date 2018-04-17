@@ -4,7 +4,7 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.Parser
 import com.wavesplatform.lang.v1.Terms.Untyped._
 import com.wavesplatform.lang.v1.Terms._
-import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang.v1.testing.ScriptGenParser
 import fastparse.core.Parsed.{Failure, Success}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -12,7 +12,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 import scorex.crypto.encode.{Base58 => ScorexBase58}
 
-class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
   def parse(x: String): EXPR = Parser(x).get.value
   def isParsed(x: String): Boolean = Parser(x) match {
@@ -20,33 +20,49 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     case Failure(_, _, _) => false
   }
 
-  def toString(expr: EXPR): String = expr match {
-    case CONST_LONG(x)   => whitespaces.sample.get + s"$x" + whitespaces.sample.get
-    case CONST_STRING(x) => whitespaces.sample.get + s"""\"$x\"""" + whitespaces.sample.get
-    case TRUE            => whitespaces.sample.get + "true" + whitespaces.sample.get
-    case FALSE           => whitespaces.sample.get + "false" + whitespaces.sample.get
+  def withWhitespaces(expr: String): Gen[String] =
+    for {
+      pred <- whitespaces
+      post <- whitespaces
+    } yield pred + expr + post
+
+  def toString(expr: EXPR): Gen[String] = expr match {
+    case CONST_LONG(x)   => withWhitespaces(s"$x")
+    case REF(x)          => withWhitespaces(s"$x")
+    case CONST_STRING(x) => withWhitespaces(s"""\"$x\"""")
+    case TRUE            => withWhitespaces("true")
+    case FALSE           => withWhitespaces("false")
     case BINARY_OP(x: EXPR, op: BINARY_OP_KIND, y: EXPR) =>
-      op match {
-        case SUM_OP => s"(${toString(x)}+${toString(y)})"
-        case GT_OP  => s"(${toString(x)}>${toString(y)})"
-        case AND_OP => s"(${toString(x)}&&${toString(y)})"
-        case OR_OP  => s"(${toString(x)}||${toString(y)})"
-        case EQ_OP  => s"(${toString(x)}==${toString(y)})"
-        case GE_OP  => s"(${toString(x)}>=${toString(y)})"
-      }
-    case IF(cond: EXPR, x: EXPR, y: EXPR) => s"(if(${toString(cond)}) then ${toString(x)} else ${toString(y)})"
+      for {
+        arg1 <- toString(x)
+        arg2 <- toString(y)
+      } yield s"($arg1${opsToFunctions(op)}$arg2)"
+    case IF(cond: EXPR, x: EXPR, y: EXPR) =>
+      for {
+        c <- toString(cond)
+        t <- toString(x)
+        f <- toString(y)
+      } yield s"(if($c) then $t else $f)"
     case BLOCK(let: Option[LET], body: EXPR) =>
       let match {
-        case Some(let) => s"let ${let.name} = ${toString(let.value)}; ${toString(body)}"
-        case None      => s"${toString(body)}"
+        case Some(l) =>
+          for {
+            letstr  <- toString(l.value)
+            bodyStr <- toString(body)
+          } yield s"let ${l.name} = $letstr; $bodyStr"
+        case None => toString(body)
       }
     case _ => ???
   }
 
   def genElementCheck(gen: Gen[EXPR]): Unit = {
-    forAll(gen) { exp =>
-      val code = toString(exp)
-      parse(code) shouldBe exp
+
+    forAll(for {
+      expr <- gen
+      str  <- toString(expr)
+    } yield (expr, str)) {
+      case ((expr, str)) =>
+        parse(str) shouldBe expr
     }
   }
 
@@ -54,6 +70,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     val gas = 50
     genElementCheck(CONST_LONGgen)
     genElementCheck(STRgen)
+    genElementCheck(REFgen)
     genElementCheck(BOOLgen(gas))
     genElementCheck(SUMgen(gas))
     genElementCheck(EQ_INTgen(gas))
@@ -86,38 +103,6 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         )
       )
     )
-  }
-
-  property("let/ref constructs") {
-    val expr = parse("""let X = 10;
-let Y = 11;
-X > Y
-      """.stripMargin)
-
-    expr shouldBe BLOCK(Some(LET("X", CONST_LONG(10))), BLOCK(Some(LET("Y", CONST_LONG(11))), BINARY_OP(REF("X"), GT_OP, REF("Y"))))
-  }
-
-  property("if") {
-    parse("if(true) then 1 else if(X==Y) then 2 else 3") shouldBe IF(TRUE,
-                                                                     CONST_LONG(1),
-                                                                     IF(BINARY_OP(REF("X"), EQ_OP, REF("Y")), CONST_LONG(2), CONST_LONG(3)))
-    parse("""if ( true )
-        |then 1
-        |else if(X== Y)
-        |     then 2
-        |       else 3""".stripMargin) shouldBe IF(TRUE, CONST_LONG(1), IF(BINARY_OP(REF("X"), EQ_OP, REF("Y")), CONST_LONG(2), CONST_LONG(3)))
-
-    parse("""if
-        |
-        |     (true)
-        |then let A = 10;
-        |  1
-        |else if ( X == Y) then 2 else 3""".stripMargin) shouldBe IF(
-      TRUE,
-      BLOCK(Some(LET("A", CONST_LONG(10))), CONST_LONG(1)),
-      IF(BINARY_OP(REF("X"), EQ_OP, REF("Y")), CONST_LONG(2), CONST_LONG(3))
-    )
-
   }
 
   property("string literal with unicode chars") {
