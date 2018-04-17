@@ -10,7 +10,7 @@ import scorex.transaction.Transaction.Type
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.script.Script
 
-class NgHistoryReader(ngState: () => Option[NgState], inner: Blockchain, fs: FunctionalitySettings) extends NG {
+class NgReader(ngState: () => Option[NgState], inner: Blockchain, fs: FunctionalitySettings) extends NG {
 
   private def newlyApprovedFeatures = ngState().fold(Map.empty[Short, Int])(_.approvedFeatures.map(_ -> height).toMap)
 

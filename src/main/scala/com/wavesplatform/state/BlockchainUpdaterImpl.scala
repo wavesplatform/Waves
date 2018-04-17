@@ -39,7 +39,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     lastBlock + maxBlockReadinessAge > time.correctedTime()
   }
 
-  def historyReader: NG = new NgHistoryReader(() => ngState, blockchain, functionalitySettings)
+  def historyReader: NG = new NgReader(() => ngState, blockchain, functionalitySettings)
 
   // Store last block information in a cache
   historyReader.lastBlockId.foreach { id =>
@@ -208,8 +208,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
             for {
               _ <- microBlock.signaturesValid()
               diff <- BlockDiffer.fromMicroBlock(functionalitySettings,
-                                                 historyReader,
-                                                 //TODO: composite(blockchain, ng.bestLiquidDiff),
+                                                 composite(historyReader, ng.bestLiquidDiff),
                                                  blockchain.lastBlockTimestamp,
                                                  microBlock,
                                                  ng.base.timestamp)
