@@ -20,8 +20,8 @@ object SponsorshipTransactionsDiff {
         Diff(
           height = height,
           tx = tx,
-          portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)) /*,
-          sponsorship = Map(tx.assetId         -> SponsorshipValue(tx.minFee))*/
+          portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
+          sponsorship = Map(tx.assetId         -> SponsorshipValue(tx.minFee))
         ))
     }
   }
@@ -33,8 +33,8 @@ object SponsorshipTransactionsDiff {
         Diff(
           height = height,
           tx = tx,
-          portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)) /*,
-          sponsorship = Map(tx.assetId         -> SponsorshipValue(0))*/
+          portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
+          sponsorship = Map(tx.assetId         -> SponsorshipValue(0))
         ))
     }
   }
