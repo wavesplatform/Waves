@@ -475,10 +475,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
     db.get(k.transactionInfo(assetId)) match {
       case Some((_, i: IssueTransaction)) =>
         val ai = LevelDBWriter.loadAssetInfo(db, assetId).getOrElse(AssetInfo(false, 0, None))
-        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, ai.script))
+        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, ai.script, 0))
       case Some((_, i: SmartIssueTransaction)) =>
         val ai = LevelDBWriter.loadAssetInfo(db, assetId).getOrElse(AssetInfo(false, 0, None))
-        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, ai.script))
+        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, ai.script, 0))
       case _ => None
     }
   }

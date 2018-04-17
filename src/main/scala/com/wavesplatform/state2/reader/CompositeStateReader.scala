@@ -28,13 +28,33 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
             )
           }
           .orElse(Some(ad))
+          .map { ad =>
+            diff.sponsorship.get(id).fold(ad) {
+              case SponsorshipValue(sponsorship) =>
+                println(s"Update to SponsorshipValue($sponsorship)")
+                ad.copy(sponsorship = sponsorship)
+              case SponsorshipNoInfo =>
+                println("No need to update")
+                ad
+            }
+          }
       case None =>
+        println(s"Sponsorhip: ${diff.sponsorship}")
+        val sponsorship = diff.sponsorship.get(id).fold(0L) {
+          case SponsorshipValue(sponsorship) =>
+            println(s"Set to SponsorshipValue($sponsorship)")
+            sponsorship
+          case SponsorshipNoInfo =>
+            println("Clean to SponsorshipValue")
+            0L
+        }
         diff.transactions
           .get(id)
           .collectFirst {
-            case (_, it: IssueTransaction, _) => AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, None)
+            case (_, it: IssueTransaction, _) =>
+              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, None, sponsorship)
             case (_, it: SmartIssueTransaction, _) =>
-              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, it.script)
+              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, it.script, sponsorship)
           }
           .map(z => diff.issuedAssets.get(id).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = r.script)))
     }

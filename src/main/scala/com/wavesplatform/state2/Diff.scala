@@ -47,7 +47,8 @@ case class AssetDescription(issuer: PublicKeyAccount,
                             decimals: Int,
                             reissuable: Boolean,
                             totalVolume: BigInt,
-                            script: Option[Script]) {
+                            script: Option[Script],
+                            sponsorship: Long) {
   override def equals(obj: scala.Any) = obj match {
     case o: AssetDescription =>
       o.issuer == this.issuer &&
@@ -56,7 +57,8 @@ case class AssetDescription(issuer: PublicKeyAccount,
         o.decimals == decimals &&
         o.reissuable == reissuable &&
         o.totalVolume == totalVolume &&
-        o.script == script
+        o.script == script &&
+        o.sponsorship == sponsorship
     case _ => false
   }
 }

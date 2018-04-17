@@ -11,7 +11,7 @@ import scorex.transaction.{AssetId, ProvenTransaction, ValidationError}
 
 import scala.util.{Left, Right}
 
-object SponsorshipTransactionsDiff {
+object SponsorshipDiff {
 
   def sponsor(state: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, height: Int, fp: FeatureProvider)(
       tx: SponsorFeeTransaction): Either[ValidationError, Diff] = {

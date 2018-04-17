@@ -27,19 +27,19 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
           case (diff, state) =>
             diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(sponsor.minFee))
             //println(diff.sponsorship)
-            println(state)
+            println(state.assetDescription(sponsor.assetId))
         }
         assertDiffAndState(setupBlocks, block(Seq(sponsor, sponsor1)), settings) {
           case (diff, state) =>
             diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(sponsor1.minFee))
             //println(diff.sponsorship)
-            println(state)
+            println(state.assetDescription(sponsor.assetId))
         }
         assertDiffAndState(setupBlocks, block(Seq(sponsor, sponsor1, cancel)), settings) {
           case (diff, state) =>
             diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(0))
             //println(diff.sponsorship)
-            println(state)
+            println(state.assetDescription(sponsor.assetId))
         }
     }
   }

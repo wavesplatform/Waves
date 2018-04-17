@@ -42,9 +42,9 @@ object TransactionDiffer {
         case dtx: DataTransaction               => DataTransactionDiff(s, currentBlockHeight)(dtx)
         case sstx: SetScriptTransaction         => SetScriptTransactionDiff(currentBlockHeight)(sstx)
         case sttx: VersionedTransferTransaction => ScriptTransferTransactionDiff(s, currentBlockHeight)(sttx)
-        case stx: SponsorFeeTransaction         => SponsorshipTransactionsDiff.sponsor(s, settings, currentBlockTimestamp, currentBlockHeight, fp)(stx)
+        case stx: SponsorFeeTransaction         => SponsorshipDiff.sponsor(s, settings, currentBlockTimestamp, currentBlockHeight, fp)(stx)
         case ctx: CancelFeeSponsorshipTransaction =>
-          SponsorshipTransactionsDiff.cancel(s, settings, currentBlockTimestamp, currentBlockHeight, fp)(ctx)
+          SponsorshipDiff.cancel(s, settings, currentBlockTimestamp, currentBlockHeight, fp)(ctx)
         case _ => Left(UnsupportedTransactionType)
       }
       positiveDiff <- BalanceDiffValidation(s, currentBlockHeight, settings)(diff)

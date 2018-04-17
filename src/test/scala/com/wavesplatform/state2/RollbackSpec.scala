@@ -153,7 +153,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
 
           val blockIdWithIssue = d.lastBlockId
 
-          d.state.assetDescription(issueTransaction.id()) should contain(AssetDescription(sender, name, description, 8, true, BigInt(2000), None))
+          d.state.assetDescription(issueTransaction.id()) should contain(AssetDescription(sender, name, description, 8, true, BigInt(2000), None, 0))
 
           d.appendBlock(
             TestBlock.create(nextTs,
@@ -162,10 +162,10 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
                                ReissueTransaction.create(sender, issueTransaction.id(), 2000, false, 1, nextTs).explicitGet()
                              )))
 
-          d.state.assetDescription(issueTransaction.id()) should contain(AssetDescription(sender, name, description, 8, false, BigInt(4000), None))
+          d.state.assetDescription(issueTransaction.id()) should contain(AssetDescription(sender, name, description, 8, false, BigInt(4000), None, 0))
 
           d.removeAfter(blockIdWithIssue)
-          d.state.assetDescription(issueTransaction.id()) should contain(AssetDescription(sender, name, description, 8, true, BigInt(2000), None))
+          d.state.assetDescription(issueTransaction.id()) should contain(AssetDescription(sender, name, description, 8, true, BigInt(2000), None, 0))
 
           d.removeAfter(genesisBlockId)
           d.state.assetDescription(issueTransaction.id()) shouldBe 'empty
