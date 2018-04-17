@@ -1,13 +1,11 @@
 package com.wavesplatform.settings
 
-import com.typesafe.config.{Config, ConfigException, ConfigValueType}
+import com.typesafe.config.Config
 import com.wavesplatform.state2.ByteStr
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.EnumerationReader._
-import net.ceedubs.ficus.readers.ValueReader
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
@@ -154,23 +152,6 @@ object BlockchainSettings {
       case BlockchainType.MAINNET =>
         ('W', FunctionalitySettings.MAINNET, GenesisSettings.MAINNET)
       case BlockchainType.CUSTOM =>
-        implicit val preactivatedFeaturesReader: ValueReader[Map[Short, Int]] = (config: Config, path: String) =>
-          if (config.getIsNull(path)) Map.empty
-          else {
-            config.getValue(path).valueType() match {
-              case ConfigValueType.OBJECT =>
-                val paf = config.getConfig(path)
-                (for {
-                  featureId <- paf.root().keySet().asScala
-                } yield featureId.toShort -> paf.getInt(featureId)).toMap
-              case ConfigValueType.STRING if config.getString(path).isEmpty =>
-                Map.empty
-              case other =>
-                throw new ConfigException.WrongType(config.getValue(path).origin(), path, ConfigValueType.OBJECT.name(), other.name())
-            }
-
-        }
-
         val addressSchemeCharacter = config.as[String](s"$configPath.custom.address-scheme-character").charAt(0)
         val functionalitySettings  = config.as[FunctionalitySettings]("waves.blockchain.custom.functionality")
         val genesisSettings        = config.as[GenesisSettings]("waves.blockchain.custom.genesis")
