@@ -43,20 +43,11 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         t <- toString(x)
         f <- toString(y)
       } yield s"(if($c) then $t else $f)"
-    case BLOCK(let: Option[LET], body: EXPR) =>
-      let match {
-        case Some(l) =>
-          for {
-            letstr  <- toString(l.value)
-            bodyStr <- toString(body)
-          } yield s"let ${l.name} = $letstr; $bodyStr"
-        case None => toString(body)
-      }
-    case _ => ???
+    case BLOCK(let, body) => s"let ${let.name} = ${toString(let.value)}\n${toString(body)}"
+    case _                => ???
   }
 
   def genElementCheck(gen: Gen[EXPR]): Unit = {
-
     forAll(for {
       expr <- gen
       str  <- toString(expr)
@@ -211,6 +202,6 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         | }.zzz
         |
       """.stripMargin
-    ) shouldBe GETTER(BLOCK(Some(LET("yyy", FUNCTION_CALL("aaa", List(REF("bbb"))))), FUNCTION_CALL("xxx", List(REF("yyy")))), "zzz")
+    ) shouldBe GETTER(BLOCK(LET("yyy", FUNCTION_CALL("aaa", List(REF("bbb")))), FUNCTION_CALL("xxx", List(REF("yyy")))), "zzz")
   }
 }

@@ -59,7 +59,7 @@ object Terms {
     case class CONST_BYTEVECTOR(value: ByteVector)                   extends EXPR
     case class CONST_STRING(value: String)                           extends EXPR
     case class BINARY_OP(a: EXPR, kind: BINARY_OP_KIND, b: EXPR)     extends EXPR
-    case class BLOCK(let: Option[LET], body: EXPR)                   extends EXPR
+    case class BLOCK(let: LET, body: EXPR)                           extends EXPR
     case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)           extends EXPR
     case class REF(key: String)                                      extends EXPR
     case object TRUE                                                 extends EXPR
@@ -74,7 +74,7 @@ object Terms {
     case class GETTER(ref: EXPR, field: String, override val tpe: TYPE)                          extends EXPR(tpe)
     case class CONST_BYTEVECTOR(bs: ByteVector)                                                  extends EXPR(BYTEVECTOR)
     case class CONST_STRING(s: String)                                                           extends EXPR(STRING)
-    case class BLOCK(let: Option[LET], body: EXPR, override val tpe: TYPE)                       extends EXPR(tpe)
+    case class BLOCK(let: LET, body: EXPR, override val tpe: TYPE)                               extends EXPR(tpe)
     case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, override val tpe: TYPE)               extends EXPR(tpe)
     case class REF(key: String, override val tpe: TYPE)                                          extends EXPR(tpe)
     case object TRUE                                                                             extends EXPR(BOOLEAN)
@@ -82,9 +82,7 @@ object Terms {
     case class FUNCTION_CALL(function: FunctionHeader, args: List[EXPR], override val tpe: TYPE) extends EXPR(tpe)
   }
 
-  def findCommonType(t1: TYPE, t2: TYPE): Option[TYPE] = findCommonType(t1, t2, biDirectional = true)
-  def isSubtype(tpe: TYPE, subType: TYPE): Boolean     = ???
-
+  def findCommonType(t1: TYPE, t2: TYPE): Option[TYPE]      = findCommonType(t1, t2, biDirectional = true)
   def matchType(required: TYPE, actual: TYPE): Option[TYPE] = findCommonType(required, actual, biDirectional = false)
 
   private def findCommonType(required: TYPE, actual: TYPE, biDirectional: Boolean): Option[TYPE] =
