@@ -343,6 +343,23 @@ object LevelDBWriter {
     def dataHistory(addressId: BigInt, key: String): Key[Seq[Int]] = historyKey(32, addressId.toByteArray ++ key.getBytes(UTF8))
     def data(height: Int, addressId: BigInt, key: String): Key[Option[DataEntry[_]]] =
       Key.opt(byteKeyWithH(33, height, addressId.toByteArray ++ key.getBytes(UTF8)), DataEntry.parseValue(key, _, 0)._1, _.valueBytes)
+
+    private def readSponsorship(data: Array[Byte]) = {
+      val ndi = newDataInput(data)
+      SponsorshipValue(ndi.readLong())
+    }
+    private def writeSponsorship(ai: SponsorshipValue): Array[Byte] = {
+      val ndo = newDataOutput()
+      ndo.writeBigInt(ai.minFee)
+      ndo.toByteArray
+    }
+    def sponsorship(height: Int, assetId: ByteStr): Key[SponsorshipValue] =
+      Key(byteKeyWithH(33, height, assetId.arr), readSponsorship, writeSponsorship)
+    def sponsorshipHistory(assetId: ByteStr): Key[Seq[Int]] = historyKey(34, assetId.arr)
+  }
+
+  private def loadSponsorship(db: ReadOnlyDB, assetId: ByteStr) = {
+    db.get(k.sponsorshipHistory(assetId)).headOption.map(h => db.get(k.sponsorship(h, assetId)))
   }
 
   private def loadAssetInfo(db: ReadOnlyDB, assetId: ByteStr) = {
@@ -471,14 +488,19 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
   override protected def loadAssetInfo(assetId: ByteStr): Option[AssetInfo] =
     readOnly(LevelDBWriter.loadAssetInfo(_, assetId))
 
+  override protected def loadSponsorship(assetId: ByteStr): Option[Sponsorship] =
+    readOnly(LevelDBWriter.loadSponsorship(_, assetId))
+
   override protected def loadAssetDescription(assetId: ByteStr): Option[AssetDescription] = readOnly { db =>
     db.get(k.transactionInfo(assetId)) match {
       case Some((_, i: IssueTransaction)) =>
-        val ai = LevelDBWriter.loadAssetInfo(db, assetId).getOrElse(AssetInfo(false, 0, None))
-        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, ai.script, 0))
+        val ai          = LevelDBWriter.loadAssetInfo(db, assetId).getOrElse(AssetInfo(false, 0, None))
+        val sponsorship = LevelDBWriter.loadSponsorship(db, assetId).fold(0L)(_.minFee)
+        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, ai.script, sponsorship))
       case Some((_, i: SmartIssueTransaction)) =>
-        val ai = LevelDBWriter.loadAssetInfo(db, assetId).getOrElse(AssetInfo(false, 0, None))
-        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, ai.script, 0))
+        val ai          = LevelDBWriter.loadAssetInfo(db, assetId).getOrElse(AssetInfo(false, 0, None))
+        val sponsorship = LevelDBWriter.loadSponsorship(db, assetId).fold(0L)(_.minFee)
+        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, ai.script, sponsorship))
       case _ => None
     }
   }
@@ -508,7 +530,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
                                   filledQuantity: Map[ByteStr, VolumeAndFee],
                                   scripts: Map[BigInt, Option[Script]],
                                   data: Map[BigInt, AccountDataInfo],
-                                  aliases: Map[Alias, BigInt]): Unit = readWrite { rw =>
+                                  aliases: Map[Alias, BigInt],
+                                  sponsorship: Map[AssetId, Sponsorship]): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
     rw.put(k.height, height)
@@ -610,6 +633,11 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
         activatedFeaturesCache = featuresToSave ++ fs.preActivatedFeatures
         rw.put(k.activatedFeatures, featuresToSave)
       }
+    }
+
+    for ((assetId, sp: SponsorshipValue) <- sponsorship) {
+      rw.put(k.sponsorship(height, assetId), sp)
+      expiredKeys ++= updateHistory(rw, k.sponsorshipHistory(assetId), threshold, k.sponsorship(_, assetId))
     }
 
     rw.put(k.transactionIdsAtHeight(height), transactions.keys.toSeq)
