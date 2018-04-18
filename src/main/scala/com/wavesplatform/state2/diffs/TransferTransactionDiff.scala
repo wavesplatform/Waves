@@ -43,7 +43,7 @@ object TransferTransactionDiff {
                   Map(desc.issuer.toAddress -> Portfolio(-feeInWaves.toLongExact, LeaseBalance.empty, Map(aid -> tx.fee)))
               }
               .getOrElse(Map.empty)
-            senderPf ++ sponsorPf
+            senderPf.combine(sponsorPf)
         }
       )
       assetIssued    = tx.assetId.forall(state.assetDescription(_).isDefined)

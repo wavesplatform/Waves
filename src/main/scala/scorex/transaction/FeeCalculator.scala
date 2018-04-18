@@ -66,8 +66,8 @@ class FeeCalculator(settings: FeesSettings) {
       feeInUnits <- tx match {
         case gtx: GenesisTransaction              => Right(0)
         case ptx: PaymentTransaction              => Right(1)
-        case itx: IssueTransaction                => Right(10)
-        case sitx: SmartIssueTransaction          => Right(10)
+        case itx: IssueTransaction                => Right(1000)
+        case sitx: SmartIssueTransaction          => Right(1000)
         case rtx: ReissueTransaction              => Right(1)
         case btx: BurnTransaction                 => Right(1)
         case ttx: TransferTransaction             => Right(1)
@@ -79,8 +79,8 @@ class FeeCalculator(settings: FeesSettings) {
         case dtx: DataTransaction                 => Right(1 + (dtx.bytes().length - 1) / 1024)
         case sstx: SetScriptTransaction           => Right(1)
         case sttx: VersionedTransferTransaction   => Right(1)
-        case stx: SponsorFeeTransaction           => Right(10)
-        case ctx: CancelFeeSponsorshipTransaction => Right(10)
+        case stx: SponsorFeeTransaction           => Right(1000)
+        case ctx: CancelFeeSponsorshipTransaction => Right(1000)
         case _                                    => Left(UnsupportedTransactionType)
       }
       wavesFee <- tx.assetFee._1 match {
