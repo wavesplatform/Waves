@@ -72,8 +72,9 @@ object AsyncHttpApi extends Assertions {
 
     def matcherGet(path: String,
                    f: RequestBuilder => RequestBuilder = identity,
-                   statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[Response] =
-      retrying(f(_get(s"${n.matcherApiEndpoint}$path")).build(), statusCode = statusCode)
+                   statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200,
+                   waitForStatus: Boolean = false): Future[Response] =
+      retrying(f(_get(s"${n.matcherApiEndpoint}$path")).build(), statusCode = statusCode, waitForStatus = waitForStatus)
 
     def matcherGetWithSignature(path: String, ts: Long, signature: ByteStr, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
       retrying {
@@ -90,7 +91,7 @@ object AsyncHttpApi extends Assertions {
       post(s"${n.matcherApiEndpoint}$path", (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
 
     def getOrderStatus(asset: String, orderId: String): Future[MatcherStatusResponse] =
-      matcherGet(s"/matcher/orderbook/$asset/WAVES/$orderId").as[MatcherStatusResponse]
+      matcherGet(s"/matcher/orderbook/$asset/WAVES/$orderId", waitForStatus = true).as[MatcherStatusResponse]
 
     def getOrderBook(asset: String): Future[OrderBookResponse] =
       matcherGet(s"/matcher/orderbook/$asset/WAVES").as[OrderBookResponse]
@@ -443,7 +444,10 @@ object AsyncHttpApi extends Assertions {
     def cancelOrder(amountAsset: String, priceAsset: String, request: CancelOrderRequest): Future[MatcherStatusResponse] =
       matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", request.json).as[MatcherStatusResponse]
 
-    def retrying(r: Request, interval: FiniteDuration = 1.second, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[Response] = {
+    def retrying(r: Request,
+                 interval: FiniteDuration = 1.second,
+                 statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200,
+                 waitForStatus: Boolean = false): Future[Response] = {
       def executeRequest: Future[Response] = {
         n.log.trace(s"Executing request '$r'")
         if (r.getStringData != null) n.log.debug(s"Request's body '${r.getStringData}'")
@@ -465,6 +469,9 @@ object AsyncHttpApi extends Assertions {
           .toCompletableFuture
           .toScala
           .recoverWith {
+            case e: UnexpectedStatusCodeException if waitForStatus =>
+              n.log.debug(s"Failed to execute request '$r' with error: ${e.getMessage}")
+              timer.schedule(executeRequest, interval)
             case e @ (_: IOException | _: TimeoutException) =>
               n.log.debug(s"Failed to execute request '$r' with error: ${e.getMessage}")
               timer.schedule(executeRequest, interval)
