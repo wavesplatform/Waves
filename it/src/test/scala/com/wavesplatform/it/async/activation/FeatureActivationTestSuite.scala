@@ -3,12 +3,10 @@ package com.wavesplatform.it.async.activation
 import com.typesafe.config.Config
 import com.wavesplatform.features.api.NodeFeatureStatus
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
-import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
-import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
@@ -44,21 +42,14 @@ class FeatureActivationTestSuite
 
   "supported blocks increased when voting starts" in {
     val checkHeight = votingInterval * 2 / 3
-
-    val activationStatusWhileVoting = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
-    activationStatusWhileVoting.description shouldBe featureDescr
-
-    val generatedBlocks  = Await.result(nodes.head.blockSeq(1, checkHeight), waitCompletion)
-    val featuresInBlocks = generatedBlocks.flatMap(_.features.getOrElse(Seq.empty)).groupBy(identity)
-    val votesForFeature1 = featuresInBlocks.getOrElse(featureNum, Seq.empty).length
-
-    assertVotingStatus(activationStatusWhileVoting, votesForFeature1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
+    val status      = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
+    status.description shouldBe featureDescr
+    assertVotingStatus(status, status.supportingBlocks.get, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
   }
 
   "supported blocks counter resets on the next voting interval" in {
     val checkHeight = votingInterval * 2 - blocksForActivation / 2
     val info        = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
-    info.supportingBlocks.get shouldBe blocksForActivation / 2
     info.blockchainStatus shouldBe BlockchainFeatureStatus.Undefined
   }
 
@@ -76,5 +67,4 @@ class FeatureActivationTestSuite
     statusInfo.description shouldBe featureDescr
     assertActivatedStatus(statusInfo, checkHeight, NodeFeatureStatus.Voted)
   }
-
 }

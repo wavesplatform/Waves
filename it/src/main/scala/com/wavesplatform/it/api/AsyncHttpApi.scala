@@ -285,13 +285,13 @@ object AsyncHttpApi extends Assertions {
       postJson("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
     def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Future[Transaction] = {
-      implicit val w = Json.writes[MassTransferRequest]
+      implicit val w: Writes[MassTransferRequest] = Json.writes[MassTransferRequest]
       postJson("/assets/masstransfer", MassTransferRequest(MassTransferTransaction.version, assetId, sourceAddress, transfers, fee, None))
         .as[Transaction]
     }
 
     def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Future[Transaction] = {
-      implicit val w = Json.writes[DataRequest]
+      implicit val w: Writes[DataRequest] = Json.writes[DataRequest]
       postJson("/addresses/data", DataRequest(1, sourceAddress, data, fee)).as[Transaction]
     }
 
@@ -540,7 +540,7 @@ object AsyncHttpApi extends Assertions {
         _      <- traverse(nodes)(_.waitForHeight(height + 1))
       } yield ()
 
-    def waitForSameBlocksAt(retryInterval: FiniteDuration, height: Int): Future[Boolean] = {
+    def waitForSameBlocksAt(height: Int, retryInterval: FiniteDuration = 5.seconds): Future[Boolean] = {
 
       def waitHeight = waitFor[Int](s"all heights >= $height")(retryInterval)(_.height, _.forall(_ >= height))
 

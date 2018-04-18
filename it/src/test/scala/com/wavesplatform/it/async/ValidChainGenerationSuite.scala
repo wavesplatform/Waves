@@ -34,7 +34,7 @@ class ValidChainGenerationSuite extends FreeSpec with WaitForHeight2 with Transf
 
           rollbackNodes = Random.shuffle(nodes).take(n)
           _ <- traverse(rollbackNodes)(_.rollback(1))
-          _ <- nodes.waitForSameBlocksAt(5.seconds, baseHeight)
+          _ <- nodes.waitForSameBlocksAt(baseHeight)
         } yield (),
         7.minutes
       )

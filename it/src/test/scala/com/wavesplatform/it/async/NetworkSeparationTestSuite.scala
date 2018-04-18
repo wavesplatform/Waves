@@ -27,7 +27,7 @@ class NetworkSeparationTestSuite
       .buildNonConflicting()
 
   "node should grow up to 10 blocks together and sync" in Await.result(
-    Await.ready(nodes.waitForSameBlocksAt(5.seconds, 10), 3.minutes),
+    Await.ready(nodes.waitForSameBlocksAt(10), 3.minutes),
     5.minutes
   )
 
@@ -47,7 +47,7 @@ class NetworkSeparationTestSuite
     for {
       maxHeight <- traverse(nodes)(_.height).map(_.max)
       _ = log.debug(s"Max height is $maxHeight")
-      _ <- nodes.waitForSameBlocksAt(5.seconds, maxHeight + 5)
+      _ <- nodes.waitForSameBlocksAt(maxHeight + 5)
     } yield (),
     6.minutes
   )
