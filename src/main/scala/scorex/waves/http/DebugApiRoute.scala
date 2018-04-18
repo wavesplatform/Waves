@@ -10,7 +10,7 @@ import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.crypto
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
-import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{ByteStr, LeaseBalance, Portfolio}
 import com.wavesplatform.utx.UtxPool
@@ -36,7 +36,7 @@ import scala.util.{Failure, Success}
 
 @Path("/debug")
 @Api(value = "/debug")
-case class DebugApiRoute(settings: RestAPISettings,
+case class DebugApiRoute(ws: WavesSettings,
                          wallet: Wallet,
                          stateReader: SnapshotStateReader,
                          history: History with DebugNgHistory,
@@ -58,6 +58,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   private lazy val fullConfig: JsValue   = Json.parse(configStr)
   private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
 
+  override val settings = ws.restAPISettings
   override lazy val route: Route = pathPrefix("debug") {
     blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print
   }
@@ -226,7 +227,11 @@ case class DebugApiRoute(settings: RestAPISettings,
   def minerInfo: Route = (path("minerInfo") & get & withAuth) {
     complete(miner.collectNextBlockGenerationTimes.map {
       case (a, t) =>
-        AccountMiningInfo(a.stringRepr, stateReader.effectiveBalance(a, stateReader.height, 1000), t)
+        AccountMiningInfo(
+          a.stringRepr,
+          stateReader.effectiveBalance(a, stateReader.height, ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(stateReader.height)),
+          t
+        )
     })
   }
 

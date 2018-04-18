@@ -43,6 +43,9 @@ case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
 
   def blocksForFeatureActivation(height: Int): Int =
     blocksForFeatureActivation * (if (height <= doubleFeaturesPeriodsAfterHeight) 1 else 2)
+
+  def generatingBalanceDepth(height: Int): Int =
+    if (height >= generationBalanceDepthFrom50To1000AfterHeight) 1000 else 50
 }
 
 object FunctionalitySettings {

@@ -50,7 +50,7 @@ class VoteForFeatureByDefaultTestSuite
   }
 
   "blockchain status is APPROVED in second voting interval, one node votes against, three by default" in {
-    val checkHeight: Int = votingInterval * 2 - blocksForActivation / 2
+    val checkHeight: Int             = votingInterval * 2 - blocksForActivation / 2
     val supportingNodeActivationInfo = activationStatus(supportingNodes, checkHeight, defaultVotingFeatureNum, 3.minute)
     assertApprovedStatus(supportingNodeActivationInfo, votingInterval * 2, NodeFeatureStatus.Voted)
   }

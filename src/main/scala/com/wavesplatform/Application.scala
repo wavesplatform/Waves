@@ -249,7 +249,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
         AddressApiRoute(settings.restAPISettings, wallet, state, utxStorage, allChannels, time, settings.blockchainSettings.functionalitySettings),
         DebugApiRoute(
-          settings.restAPISettings,
+          settings,
           wallet,
           state,
           history,
