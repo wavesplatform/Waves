@@ -39,8 +39,8 @@ object TransferTransactionDiff {
               .assetDescription(aid)
               .collect {
                 case desc if desc.sponsorship > 0 =>
-                  val feeInWaves = tx.fee * Sponsorship.FeeUnit / desc.sponsorship ///safe mul
-                  Map(desc.issuer.toAddress -> Portfolio(-feeInWaves, LeaseBalance.empty, Map(aid -> tx.fee)))
+                  val feeInWaves = BigDecimal(tx.fee) * BigDecimal(Sponsorship.FeeUnit) / BigDecimal(desc.sponsorship) ///safe mul
+                  Map(desc.issuer.toAddress -> Portfolio(-feeInWaves.toLongExact, LeaseBalance.empty, Map(aid -> tx.fee)))
               }
               .getOrElse(Map.empty)
             senderPf ++ sponsorPf
