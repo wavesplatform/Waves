@@ -33,8 +33,10 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ sponsorRoute ~ cancelSponsorshipRoute ~
-        transfer ~ massTransfer ~ signOrder ~ balanceDistribution ~ details
+      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistribution ~ details ~
+        pathPrefix("sponsorship") {
+          sponsorRoute ~ cancelSponsorshipRoute
+        }
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -192,38 +194,6 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
   def burnRoute: Route =
     processRequest("burn", (b: BurnRequest) => doBroadcast(TransactionFactory.burnAsset(b, wallet, time)))
 
-  @Path("/sponsor")
-  @ApiOperation(value = "Sponsor an Asset", httpMethod = "POST", produces = "application/json", consumes = "application/json")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(
-        name = "body",
-        value = "Json with data",
-        required = true,
-        paramType = "body",
-        dataType = "scorex.api.http.assets.SponsorFeeRequest",
-        defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"baseFee\":100000000,\"fee\":100000}"
-      )
-    ))
-  def sponsorRoute: Route =
-    processRequest("sponsor", (req: SponsorFeeRequest) => doBroadcast(TransactionFactory.sponsor(req, wallet, time)))
-
-  @Path("/sponsor/cancel")
-  @ApiOperation(value = "Cancel Asset Fee Sponsorship", httpMethod = "POST", produces = "application/json", consumes = "application/json")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(
-        name = "body",
-        value = "Json with data",
-        required = true,
-        paramType = "body",
-        dataType = "scorex.api.http.assets.CancelFeeSponsorshipRequest",
-        defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"fee\":100000}"
-      )
-    ))
-  def cancelSponsorshipRoute: Route =
-    processRequest("sponsor/cancel", (req: CancelFeeSponsorshipRequest) => doBroadcast(TransactionFactory.cancelSponsorship(req, wallet, time)))
-
   @Path("/order")
   @ApiOperation(value = "Sign Order",
                 notes = "Create order signed by address from wallet",
@@ -310,4 +280,35 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       )
     }).left.map(m => CustomValidationError(m))
 
+  @Path("/sponsor")
+  @ApiOperation(value = "Sponsor an Asset", httpMethod = "POST", produces = "application/json", consumes = "application/json")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "body",
+        value = "Json with data",
+        required = true,
+        paramType = "body",
+        dataType = "scorex.api.http.assets.SponsorFeeRequest",
+        defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"baseFee\":100000000,\"fee\":100000}"
+      )
+    ))
+  def sponsorRoute: Route =
+    processRequest("sponsor", (req: SponsorFeeRequest) => doBroadcast(TransactionFactory.sponsor(req, wallet, time)))
+
+  @Path("/cancel")
+  @ApiOperation(value = "Cancel Asset Fee Sponsorship", httpMethod = "POST", produces = "application/json", consumes = "application/json")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "body",
+        value = "Json with data",
+        required = true,
+        paramType = "body",
+        dataType = "scorex.api.http.assets.CancelFeeSponsorshipRequest",
+        defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"fee\":100000}"
+      )
+    ))
+  def cancelSponsorshipRoute: Route =
+    processRequest("cancel", (req: CancelFeeSponsorshipRequest) => doBroadcast(TransactionFactory.cancelSponsorship(req, wallet, time)))
 }
