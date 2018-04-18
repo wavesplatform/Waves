@@ -20,12 +20,40 @@ import com.wavesplatform.lang.v1.ctx.impl.PureContext._
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def ev[T: TypeInfo](context: Context = PureContext.instance, expr: EXPR): Either[ExecutionError, T] = EvaluatorV1[T](context, expr)
-  private def simpleDeclarationAndUsage(i: Int)                                                               = BLOCK(Some(LET("x", CONST_LONG(i))), REF("x", LONG), LONG)
+  private def ev[T: TypeInfo](context: Context = PureContext.instance, expr: EXPR): Either[(Context, ExecutionLog, ExecutionError), T] =
+    EvaluatorV1[T](context, expr)
+  private def simpleDeclarationAndUsage(i: Int) = BLOCK(Some(LET("x", CONST_LONG(i))), REF("x", LONG), LONG)
 
   property("successful on very deep expressions (stack overflow check)") {
     val term = (1 to 100000).foldLeft[EXPR](CONST_LONG(0))((acc, _) => FUNCTION_CALL(sumLong.header, List(acc, CONST_LONG(1)), LONG))
     ev[Long](expr = term) shouldBe Right(100000)
+  }
+
+  property("return log and context of failed evaluation") {
+    val Left((ctx, log, err)) = ev[Long](
+      expr = BLOCK(
+        Some(LET("x", CONST_LONG(3))),
+        BLOCK(
+          Some(LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)), LONG))),
+          FUNCTION_CALL(eqLong.header, List(REF("x", LONG), CONST_LONG(1)), LONG),
+          LONG
+        ),
+        LONG
+      )
+    )
+
+    val expectedLog =
+      "Evaluating BLOCK\n" ++
+        "LET: Some(LET(x,CONST_LONG(3))); TYPE: LONG\n" ++
+        "Evaluating BLOCK\n" ++
+        "LET: Some(LET(x,FUNCTION_CALL(FunctionHeader(+,List(LONG, LONG)),List(CONST_LONG(3), CONST_LONG(0)),LONG))); TYPE: LONG"
+
+    val expectedError =
+      "Value 'x' already defined in the scope"
+
+    log shouldBe expectedLog
+    err shouldBe expectedError
+    ctx.letDefs.contains("x") shouldBe true
   }
 
   property("successful on unused let") {
@@ -306,7 +334,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     r.isLeft shouldBe false
   }
 
-  private def sigVerifyTest(bodyBytes: Array[Byte], publicKey: PublicKey, signature: Signature): Either[ExecutionError, Boolean] = {
+  private def sigVerifyTest(bodyBytes: Array[Byte],
+                            publicKey: PublicKey,
+                            signature: Signature): Either[(Context, ExecutionLog, ExecutionError), Boolean] = {
     val txType = PredefType(
       "Transaction",
       List(
