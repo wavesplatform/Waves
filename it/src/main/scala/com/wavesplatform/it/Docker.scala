@@ -1,6 +1,6 @@
 package com.wavesplatform.it
 
-import java.io.{File, FileOutputStream, IOException}
+import java.io.{FileOutputStream, IOException}
 import java.net.{InetAddress, InetSocketAddress, URL}
 import java.nio.file.{Files, Path, Paths}
 import java.util.Collections._
@@ -36,7 +36,6 @@ import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, blocking}
-import scala.sys.process.Process
 import scala.util.control.NonFatal
 import scala.util.{Random, Try}
 
@@ -97,17 +96,6 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
     Files.createDirectories(r)
     r
-  }
-
-  private val profilerController: Coeval[Option[File]] = Coeval.evalOnce {
-    if (enableProfiling) {
-      val controller = new File(s"$ContainerRoot/yjp-controller-api-redist.jar")
-      if (controller.isFile) Some(controller)
-      else {
-        log.warn(s"Can't enable profiling, because '$controller' is not a file")
-        None
-      }
-    } else None
   }
 
   private def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
@@ -253,7 +241,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
         var config = s"$javaOptions ${renderProperties(asProperties(overrides))} " +
           s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dwaves.network.declared-address=$ip:$networkPort "
 
-        if (profilerController().isDefined) {
+        if (enableProfiling) {
           config += s"-agentpath:$ContainerRoot/libyjpagent.so=listen=0.0.0.0:$ProfilerPort," +
             s"sampling,monitors,sessionname=WavesNode,dir=$ContainerRoot/profiler,logdir=$ContainerRoot "
         }
@@ -385,22 +373,29 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     }
   }
 
-  private def takeProfileSnapshot(node: DockerNode): Unit = profilerController().foreach { controller =>
-    val containerInfo = inspectContainer(node.containerId)
-    Option(containerInfo.networkSettings().ports()).foreach { ports =>
-      Process(
-        Seq(
-          "java",
-          "-jar",
-          controller.toString,
-          "127.0.0.1",
-          extractHostPort(ports, ProfilerPort).toString,
-          "capture-performance-snapshot"
-        )).!!
+  private def takeProfileSnapshot(node: DockerNode): Unit = if (enableProfiling) {
+    val task = client.execCreate(
+      node.containerId,
+      Array(
+        "java",
+        "-jar",
+        ProfilerController.toString,
+        "127.0.0.1",
+        ProfilerPort.toString,
+        "capture-performance-snapshot"
+      ),
+      DockerClient.ExecCreateParam.attachStdout(),
+      DockerClient.ExecCreateParam.attachStderr()
+    )
+    Option(task.warnings()).toSeq.flatMap(_.asScala).foreach(log.warn(_))
+    client.execStart(task.id())
+    while (client.execInspect(task.id()).running()) {
+      log.trace(s"Snapshot of ${node.name} has not been took yet, wait...")
+      blocking(Thread.sleep(1000))
     }
   }
 
-  private def saveProfile(node: DockerNode): Unit = profilerController().foreach { _ =>
+  private def saveProfile(node: DockerNode): Unit = if (enableProfiling) {
     try {
       val profilerDirStream = client.archiveContainer(node.containerId, ContainerRoot.resolve("profiler").toString)
 
@@ -485,10 +480,11 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 }
 
 object Docker {
-  private val ProfilerPort  = 10001
-  private val ContainerRoot = Paths.get("/opt/waves")
-  private val jsonMapper    = new ObjectMapper
-  private val propsMapper   = new JavaPropsMapper
+  private val ContainerRoot      = Paths.get("/opt/waves")
+  private val ProfilerController = ContainerRoot.resolve("yjp-controller-api-redist.jar")
+  private val ProfilerPort       = 10001
+  private val jsonMapper         = new ObjectMapper
+  private val propsMapper        = new JavaPropsMapper
 
   def apply(owner: Class[_]): Docker = new Docker(tag = owner.getSimpleName)
 
