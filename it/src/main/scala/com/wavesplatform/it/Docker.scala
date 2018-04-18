@@ -101,17 +101,11 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
   private val profilerController: Coeval[Option[File]] = Coeval.evalOnce {
     if (enableProfiling) {
-      Option(System.getProperty("waves.profiling.yourKitDir")) match {
-        case None =>
-          throw new IllegalStateException("Can't enable profiling, because there is no property 'waves.profiling.yourKitDir'!")
-
-        case Some(yourKitDir) =>
-          val controller = Paths.get(yourKitDir, "yjp-controller-api-redist.jar").toFile
-          if (controller.isFile) Some(controller)
-          else {
-            log.warn(s"Can't enable profiling, because '$controller' is not a file")
-            None
-          }
+      val controller = new File(s"$ContainerRoot/yjp-controller-api-redist.jar")
+      if (controller.isFile) Some(controller)
+      else {
+        log.warn(s"Can't enable profiling, because '$controller' is not a file")
+        None
       }
     } else None
   }
