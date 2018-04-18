@@ -31,21 +31,16 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
           .map { ad =>
             diff.sponsorship.get(id).fold(ad) {
               case SponsorshipValue(sponsorship) =>
-                println(s"Update to SponsorshipValue($sponsorship)")
                 ad.copy(sponsorship = sponsorship)
               case SponsorshipNoInfo =>
-                println("No need to update")
                 ad
             }
           }
       case None =>
-        println(s"Sponsorhip: ${diff.sponsorship}")
         val sponsorship = diff.sponsorship.get(id).fold(0L) {
           case SponsorshipValue(sponsorship) =>
-            println(s"Set to SponsorshipValue($sponsorship)")
             sponsorship
           case SponsorshipNoInfo =>
-            println("Clean to SponsorshipValue")
             0L
         }
         diff.transactions
