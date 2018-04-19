@@ -2,7 +2,6 @@ package scorex.waves.http
 
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
-import javax.ws.rs.Path
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
@@ -11,17 +10,19 @@ import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.crypto
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
-import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{ByteStr, LeaseBalance, Portfolio}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
-import monix.eval.Coeval
+import javax.ws.rs.Path
+import monix.eval.{Coeval, Task}
 import play.api.libs.json._
 import scorex.account.Address
 import scorex.api.http._
+import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.transaction._
@@ -29,19 +30,19 @@ import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 import scorex.waves.http.DebugApiRoute._
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
+
 @Path("/debug")
 @Api(value = "/debug")
-case class DebugApiRoute(settings: RestAPISettings,
+case class DebugApiRoute(ws: WavesSettings,
                          wallet: Wallet,
                          stateReader: SnapshotStateReader,
                          history: History with DebugNgHistory,
                          peerDatabase: PeerDatabase,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo],
-                         blockchainUpdater: BlockchainUpdater,
+                         rollbackTask: ByteStr => Task[Either[ValidationError, Seq[Block]]],
                          allChannels: ChannelGroup,
                          utxStorage: UtxPool,
                          miner: Miner with MinerDebugInfo,
@@ -57,6 +58,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   private lazy val fullConfig: JsValue   = Json.parse(configStr)
   private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
 
+  override val settings = ws.restAPISettings
   override lazy val route: Route = pathPrefix("debug") {
     blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print
   }
@@ -153,8 +155,10 @@ case class DebugApiRoute(settings: RestAPISettings,
     complete(stateReader.wavesDistribution(height).map { case (a, b) => a.stringRepr -> b })
   }
 
-  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] = Future {
-    blockchainUpdater.removeAfter(blockId) match {
+  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] = {
+    import monix.execution.Scheduler.Implicits.global
+
+    rollbackTask(blockId).asyncBoundary.map {
       case Right(blocks) =>
         allChannels.broadcast(LocalScoreChanged(history.score))
         if (returnTransactionsToUtx) {
@@ -164,8 +168,8 @@ case class DebugApiRoute(settings: RestAPISettings,
         }
         miner.scheduleMining()
         Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
-      case Left(error) => ApiError.fromValidationError(error)
-    }
+      case Left(error) => ApiError.fromValidationError(error): ToResponseMarshallable
+    }.runAsyncLogErr
   }
 
   @Path("/rollback")
@@ -223,7 +227,11 @@ case class DebugApiRoute(settings: RestAPISettings,
   def minerInfo: Route = (path("minerInfo") & get & withAuth) {
     complete(miner.collectNextBlockGenerationTimes.map {
       case (a, t) =>
-        AccountMiningInfo(a.stringRepr, stateReader.effectiveBalance(a, stateReader.height, 1000), t)
+        AccountMiningInfo(
+          a.stringRepr,
+          stateReader.effectiveBalance(a, stateReader.height, ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(stateReader.height)),
+          t
+        )
     })
   }
 

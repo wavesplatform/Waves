@@ -31,7 +31,7 @@ class DebugPortfoliosSuite extends BaseTransactionSuite {
   test("prepare for next test - wait all previous transactions are processed") {
     val f = for {
       height <- Future.traverse(nodes)(_.height).map(_.max)
-      _      <- nodes.waitForSameBlocksAt(5.seconds, height + 1)
+      _      <- nodes.waitForSameBlocksAt(height + 1)
     } yield ()
 
     Await.result(f, waitCompletion)

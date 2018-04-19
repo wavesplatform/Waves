@@ -210,14 +210,14 @@ object AsyncHttpApi extends Assertions {
     def scriptInfo(address: String): Future[AddressApiRoute.AddressScriptInfo] =
       get(s"/addresses/scriptInfo/$address").as[AddressApiRoute.AddressScriptInfo]
 
-    def findTransactionInfo(txId: String): Future[Option[Transaction]] = transactionInfo(txId).transform {
+    def findTransactionInfo(txId: String): Future[Option[TransactionInfo]] = transactionInfo(txId).transform {
       case Success(tx)                                       => Success(Some(tx))
       case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
       case Failure(ex)                                       => Failure(ex)
     }
 
-    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[Transaction] =
-      waitFor[Option[Transaction]](s"transaction $txId")(
+    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[TransactionInfo] =
+      waitFor[Option[TransactionInfo]](s"transaction $txId")(
         _.transactionInfo(txId).transform {
           case Success(tx)                                       => Success(Some(tx))
           case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
@@ -235,7 +235,7 @@ object AsyncHttpApi extends Assertions {
 
     def waitForHeight(expectedHeight: Int): Future[Int] = waitFor[Int](s"height >= $expectedHeight")(_.height, h => h >= expectedHeight, 1.second)
 
-    def transactionInfo(txId: String): Future[Transaction] = get(s"/transactions/info/$txId").as[Transaction]
+    def transactionInfo(txId: String): Future[TransactionInfo] = get(s"/transactions/info/$txId").as[TransactionInfo]
 
     def effectiveBalance(address: String): Future[Balance] = get(s"/addresses/effectiveBalance/$address").as[Balance]
 
@@ -285,13 +285,13 @@ object AsyncHttpApi extends Assertions {
       postJson("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
     def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Future[Transaction] = {
-      implicit val w = Json.writes[MassTransferRequest]
+      implicit val w: Writes[MassTransferRequest] = Json.writes[MassTransferRequest]
       postJson("/assets/masstransfer", MassTransferRequest(MassTransferTransaction.version, assetId, sourceAddress, transfers, fee, None))
         .as[Transaction]
     }
 
     def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Future[Transaction] = {
-      implicit val w = Json.writes[DataRequest]
+      implicit val w: Writes[DataRequest] = Json.writes[DataRequest]
       postJson("/addresses/data", DataRequest(1, sourceAddress, data, fee)).as[Transaction]
     }
 
@@ -526,18 +526,13 @@ object AsyncHttpApi extends Assertions {
 
   }
 
-  implicit class NodesAsyncHttpApi(nodes: Seq[Node]) {
-    // if we first await tx and then height + 1, it could be gone with height + 1
-    // if we first await height + 1 and then tx, it could be gone with height + 2
-    // so we await tx twice
-    def waitForHeightAriseAndTxPresent(transactionId: String): Future[Unit] =
+  implicit class NodesAsyncHttpApi(nodes: Seq[Node]) extends Matchers {
+    def waitForHeightAriseAndTxPresent(transactionId: String)(implicit p: Position): Future[Unit] =
       for {
-        height <- traverse(nodes)(_.height).map(_.max)
-        _      <- waitForSameBlocksAt(2.seconds, height)
-        _      <- traverse(nodes)(_.waitForTransaction(transactionId))
-        _      <- traverse(nodes)(_.waitForHeight(height + 1))
-        _      <- traverse(nodes)(_.waitForTransaction(transactionId))
-      } yield ()
+        allHeights   <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
+        _            <- traverse(nodes)(_.waitForHeight(allHeights.max + 2))
+        finalHeights <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
+      } yield all(finalHeights).shouldBe(finalHeights.head)
 
     def waitForHeightArise(): Future[Unit] =
       for {
@@ -545,7 +540,7 @@ object AsyncHttpApi extends Assertions {
         _      <- traverse(nodes)(_.waitForHeight(height + 1))
       } yield ()
 
-    def waitForSameBlocksAt(retryInterval: FiniteDuration, height: Int): Future[Boolean] = {
+    def waitForSameBlocksAt(height: Int, retryInterval: FiniteDuration = 5.seconds): Future[Boolean] = {
 
       def waitHeight = waitFor[Int](s"all heights >= $height")(retryInterval)(_.height, _.forall(_ >= height))
 

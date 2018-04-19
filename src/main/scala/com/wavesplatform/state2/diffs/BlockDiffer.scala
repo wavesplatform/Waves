@@ -112,7 +112,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
 
       val diffWithCancelledLeaseIns =
         if (fp.featureActivationHeight(BlockchainFeatures.DataTransaction.id).contains(currentBlockHeight))
-          Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn.v2(composite(s, diffWithLeasePatches)))
+          Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn(composite(s, diffWithLeasePatches)))
         else diffWithLeasePatches
 
       diffWithCancelledLeaseIns
