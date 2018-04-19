@@ -63,7 +63,10 @@ object CustomFeeTransactionSuite {
 
   val assetId = assetTx.id()
 
-  private val acceptAssetsFee = ConfigFactory.parseString(s"waves.fees.transfer.$assetId = 100000")
+  private val acceptAssetsFee = ConfigFactory.parseString(s"""
+    | waves.fees.transfer.$assetId = 100000
+    | waves.blockchain.custom.functionality.pre-activated-features = { 7 = 100 }
+    """.stripMargin)
 
   private val notMinerConfig = ConfigFactory.parseString("waves.miner.enable=no").withFallback(acceptAssetsFee)
 

@@ -1,12 +1,12 @@
 package com.wavesplatform.state2.diffs
 
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{AssetInfo, Diff, LeaseBalance, Portfolio, SponsorshipValue}
+import com.wavesplatform.state2.{Diff, LeaseBalance, Portfolio, SponsorshipValue}
 import scorex.account.PublicKeyAccount
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.{IssueTransaction, SponsorFeeTransaction, CancelFeeSponsorshipTransaction}
+import scorex.transaction.assets.{CancelFeeSponsorshipTransaction, IssueTransaction, SponsorFeeTransaction}
 import scorex.transaction.{AssetId, ProvenTransaction, ValidationError}
 
 import scala.util.{Left, Right}

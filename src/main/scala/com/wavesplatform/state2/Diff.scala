@@ -78,7 +78,7 @@ case class SponsorshipValue(minFee: Long) extends Sponsorship
 case object SponsorshipNoInfo             extends Sponsorship
 
 object Sponsorship {
-  val FeeUnit = 100000 /// move somewhere
+  val FeeUnit = 100000
 
   implicit val sponsorshipMonoid: Monoid[Sponsorship] = new Monoid[Sponsorship] {
     override def empty: Sponsorship = SponsorshipNoInfo
@@ -88,6 +88,9 @@ object Sponsorship {
       case _                 => y
     }
   }
+
+  def toWaves(assetFee: Long, sponsorship: Long): Long =
+    (BigDecimal(assetFee) * BigDecimal(Sponsorship.FeeUnit) / BigDecimal(sponsorship)).toLongExact
 }
 
 case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],

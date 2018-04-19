@@ -487,7 +487,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
   override protected def loadAssetInfo(assetId: ByteStr): Option[AssetInfo] =
     readOnly(LevelDBWriter.loadAssetInfo(_, assetId))
 
-  override protected def loadSponsorship(assetId: ByteStr): Option[Sponsorship] =
+  override protected def loadSponsorship(assetId: ByteStr): Option[SponsorshipValue] =
     readOnly(LevelDBWriter.loadSponsorship(_, assetId))
 
   override protected def loadAssetDescription(assetId: ByteStr): Option[AssetDescription] = readOnly { db =>

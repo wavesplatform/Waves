@@ -90,7 +90,7 @@ class FeeCalculator(settings: FeesSettings) {
             assetInfo <- s.assetDescription(assetId).toRight(GenericError(s"Asset $assetId does not exist, cannot be used to pay fees"))
             wavesFee <- Either.cond(
               assetInfo.sponsorship > 0,
-              tx.assetFee._2 * Sponsorship.FeeUnit / assetInfo.sponsorship, /// safe mul
+              Sponsorship.toWaves(tx.assetFee._2, assetInfo.sponsorship),
               GenericError(s"Asset $assetId is not sponsored, cannot be used to pay fees")
             )
           } yield wavesFee
