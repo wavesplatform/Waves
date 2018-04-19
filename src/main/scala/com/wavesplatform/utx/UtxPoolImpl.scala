@@ -161,7 +161,7 @@ class UtxPoolImpl(time: Time,
         for {
           _    <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
           _    <- checkNotBlacklisted(tx)
-          _    <- feeCalculator.enoughFee(tx, s, history)
+          _    <- feeCalculator.enoughFee(tx, s, history, fs)
           diff <- TransactionDiffer(fs, history.lastBlockTimestamp, time.correctedTime(), history.height)(s, history, tx)
         } yield {
           utxPoolSizeStats.increment()

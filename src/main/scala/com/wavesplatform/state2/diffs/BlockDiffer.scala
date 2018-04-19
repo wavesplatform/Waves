@@ -46,13 +46,13 @@ object BlockDiffer extends ScorexLogging with Instrumented {
 
     // height switch is next after activation
     val ng4060switchHeight = fp.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
-    val sponsoredFeeHeight = fp.featureActivationHeight(BlockchainFeatures.SponsoredFee.id).getOrElse(Int.MaxValue)
+    val sponsoredFeeHeight = Sponsorship.sponsoredFeesSwitchHeight(fp, settings)
 
     lazy val prevBlockFeeDistr: Option[Diff] =
       if (stateHeight > ng4060switchHeight)
         maybePrevBlock.map { prevBlock =>
           val portfolio =
-            if (stateHeight > sponsoredFeeHeight)
+            if (stateHeight >= sponsoredFeeHeight)
               clearSponsorship(prevBlock.prevBlockFeePart(), blockSigner, s)
             else prevBlock.prevBlockFeePart()
           Diff.empty.copy(portfolios = Map(blockSigner -> portfolio))

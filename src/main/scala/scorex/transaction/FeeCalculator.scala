@@ -1,7 +1,6 @@
 package scorex.transaction
 
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.settings.FeesSettings
+import com.wavesplatform.settings.{FeesSettings, FunctionalitySettings}
 import com.wavesplatform.state2.{ByteStr, Sponsorship}
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.transaction.ValidationError.{GenericError, UnsupportedTransactionType}
@@ -29,13 +28,11 @@ class FeeCalculator(settings: FeesSettings) {
     }
   }
 
-  def enoughFee[T <: Transaction](tx: T, s: SnapshotStateReader, history: History): Either[ValidationError, T] = {
-    if (history.isFeatureActivated(BlockchainFeatures.SponsoredFee, history.height))
-      enoughFee(tx, s)
-    else
-      enoughFee(tx)
-  }
+  def enoughFee[T <: Transaction](tx: T, s: SnapshotStateReader, history: History, fs: FunctionalitySettings): Either[ValidationError, T] =
+    if (history.height >= Sponsorship.sponsoredFeesSwitchHeight(history, fs)) enoughFee(tx, s)
+    else enoughFee(tx)
 
+  // this method will be unused once FeeSponsorship is activated
   def enoughFee[T <: Transaction](tx: T): Either[ValidationError, T] = {
     val feeSpec = map.get(TransactionAssetFee(tx.builder.typeId, tx.assetFee._1).key)
     val feeValue = tx match {
@@ -68,7 +65,7 @@ class FeeCalculator(settings: FeesSettings) {
         case ptx: PaymentTransaction              => Right(1)
         case itx: IssueTransaction                => Right(1000)
         case sitx: SmartIssueTransaction          => Right(1000)
-        case rtx: ReissueTransaction              => Right(1)
+        case rtx: ReissueTransaction              => Right(1000)
         case btx: BurnTransaction                 => Right(1)
         case ttx: TransferTransaction             => Right(1)
         case mtx: MassTransferTransaction         => Right(1 + (mtx.transfers.size + 1) / 2)

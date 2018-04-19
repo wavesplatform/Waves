@@ -12,7 +12,7 @@ import com.wavesplatform.state2._
 class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("work") {
-    val settings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SponsoredFee.id -> 0))
+    val settings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.FeeSponsorship.id -> 0))
     val setup = for {
       master <- accountGen
       ts     <- timestampGen
@@ -42,7 +42,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
   }
 
   property("validation fails if asset don't exist") {
-    val settings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SponsoredFee.id -> 0))
+    val settings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.FeeSponsorship.id -> 0))
     val setup = for {
       master <- accountGen
       ts     <- timestampGen
@@ -63,7 +63,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
   }
 
   property("validation fails prior to feature activation") {
-    val settings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SponsoredFee.id -> 100))
+    val settings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.FeeSponsorship.id -> 100))
     val setup = for {
       master <- accountGen
       ts     <- timestampGen

@@ -1,6 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import cats.implicits._
+import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
@@ -12,7 +13,7 @@ import scorex.transaction.assets.TransferTransaction
 import scala.util.Right
 
 object TransferTransactionDiff {
-  def apply(state: SnapshotStateReader, s: FunctionalitySettings, blockTime: Long, height: Int)(
+  def apply(state: SnapshotStateReader, fp: FeatureProvider, s: FunctionalitySettings, blockTime: Long, height: Int)(
       tx: TransferTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender.publicKey)
 
@@ -35,15 +36,17 @@ object TransferTransactionDiff {
           case None => Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))
           case Some(aid) =>
             val senderPf = Map(sender -> Portfolio(0, LeaseBalance.empty, Map(aid -> -tx.fee)))
-            val sponsorPf = state
-              .assetDescription(aid)
-              .collect {
-                case desc if desc.sponsorship > 0 =>
-                  val feeInWaves = Sponsorship.toWaves(tx.fee, desc.sponsorship)
-                  Map(desc.issuer.toAddress -> Portfolio(-feeInWaves, LeaseBalance.empty, Map(aid -> tx.fee)))
-              }
-              .getOrElse(Map.empty)
-            senderPf.combine(sponsorPf)
+            if (height >= Sponsorship.sponsoredFeesSwitchHeight(fp, s)) {
+              val sponsorPf = state
+                .assetDescription(aid)
+                .collect {
+                  case desc if desc.sponsorship > 0 =>
+                    val feeInWaves = Sponsorship.toWaves(tx.fee, desc.sponsorship)
+                    Map(desc.issuer.toAddress -> Portfolio(-feeInWaves, LeaseBalance.empty, Map(aid -> tx.fee)))
+                }
+                .getOrElse(Map.empty)
+              senderPf.combine(sponsorPf)
+            } else senderPf
         }
       )
       assetIssued    = tx.assetId.forall(state.assetDescription(_).isDefined)
