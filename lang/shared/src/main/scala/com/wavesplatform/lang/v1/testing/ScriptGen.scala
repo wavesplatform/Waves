@@ -82,10 +82,13 @@ trait ScriptGen {
       body <- Gen.oneOf(BOOLgen((gas - 3) / 3), BLOCKgen((gas - 3) / 3)) // BLOCKGen wasn't add to BOOLGen since issue: NODE-700
     } yield BLOCK(let, body)
 
-  private val spaceChars: Seq[Char] = Vector('\u0020', '\u0009', '\u000D', '\u000A')
+  private val spaceChars: Seq[Char] = " \t\n\r"
 
-  def whitespaceChar: Gen[Char] = Gen.oneOf(spaceChars)
-  val whitespaces: Gen[String]  = Gen.listOf(whitespaceChar).map(_.mkString)
+  val whitespaceChar: Gen[Char] = Gen.oneOf(spaceChars)
+  val whitespaces: Gen[String] = for {
+    n  <- Gen.choose(1, 5)
+    xs <- Gen.listOfN(n, whitespaceChar)
+  } yield xs.mkString
 }
 
 trait ScriptGenParser extends ScriptGen {
