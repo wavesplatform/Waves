@@ -37,21 +37,29 @@ object TestBlock {
   def create(signer: PrivateKeyAccount, txs: Seq[Transaction]): Block =
     create(time = Try(txs.map(_.timestamp).max).getOrElse(0), txs = txs, signer = signer)
 
+  def create(signer: PrivateKeyAccount, txs: Seq[Transaction], features: Set[Short]): Block =
+    create(time = Try(txs.map(_.timestamp).max).getOrElse(0), ref = randomSignature(), txs = txs, signer = signer, version = 3, features = features)
+
   def create(time: Long, txs: Seq[Transaction]): Block = create(time, randomSignature(), txs, defaultSigner)
 
   def create(time: Long, txs: Seq[Transaction], signer: PrivateKeyAccount): Block = create(time, randomSignature(), txs, signer)
 
-  def create(time: Long, ref: ByteStr, txs: Seq[Transaction], signer: PrivateKeyAccount = defaultSigner): Block =
+  def create(time: Long,
+             ref: ByteStr,
+             txs: Seq[Transaction],
+             signer: PrivateKeyAccount = defaultSigner,
+             version: Byte = 2,
+             features: Set[Short] = Set.empty[Short]): Block =
     sign(
       signer,
       Block(
         timestamp = time,
-        version = 2,
+        version = version,
         reference = ref,
         signerData = SignerData(signer, ByteStr.empty),
         consensusData = NxtLikeConsensusBlockData(2L, ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))),
         transactionData = txs,
-        featureVotes = Set.empty
+        featureVotes = features
       )
     )
 

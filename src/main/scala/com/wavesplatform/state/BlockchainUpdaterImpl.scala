@@ -7,7 +7,7 @@ import com.wavesplatform.metrics.{Instrumented, TxsInBlockchainStats}
 import com.wavesplatform.mining.MiningEstimators
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.utils.{UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import monix.reactive.Observable
@@ -152,7 +152,10 @@ class BlockchainUpdaterImpl(val blockchain: Blockchain, settings: WavesSettings,
                     }
 
                     val diff = BlockDiffer
-                      .fromBlock(functionalitySettings, this, Some(referencedForgedBlock), block)
+                      .fromBlock(functionalitySettings,
+                                 CompositeBlockchain.composite(blockchain, referencedLiquidDiff),
+                                 Some(referencedForgedBlock),
+                                 block)
 
                     diff.map { hardenedDiff =>
                       blockchain.append(referencedLiquidDiff, referencedForgedBlock)
