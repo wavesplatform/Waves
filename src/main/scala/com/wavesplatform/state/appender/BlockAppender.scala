@@ -29,6 +29,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
             settings: WavesSettings,
             scheduler: Scheduler)(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
+      log.debug(s"Appending $newBlock")
       measureSuccessful(
         blockProcessingTimeStats, {
           if (blockchain.contains(newBlock)) Right(None)

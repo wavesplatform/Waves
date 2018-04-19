@@ -25,22 +25,6 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.collection.mutable.ArrayBuffer
 
-/** The following namespaces are used:
-  *
-  * address -> waves balance history[]
-  * (H, address) -> waves balance
-  * address -> lease balance history[]
-  * (H, address) -> lease balance
-  * address -> asset ids[]
-  * (address, asset id) -> asset balance history[]
-  * (H, address, asset ID) -> asset balance
-  * tx id -> (height, tx bytes)
-  * H -> changed addresses[]
-  * H -> (address, asset id)[]
-  * H -> block
-  * H -> txs[]
-  *
-  */
 object LevelDBWriter {
 
   trait Key[V] {
@@ -645,23 +629,18 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
 
           for (assetId <- rw.get(k.assetList(addressId))) {
             rw.delete(k.assetBalance(currentHeight, addressId, assetId))
-            val kabh = k.assetBalanceHistory(addressId, assetId)
-            rw.put(kabh, rw.get(kabh).filterNot(_ == currentHeight))
+            rw.filterHistory(k.assetBalanceHistory(addressId, assetId), currentHeight)
           }
 
           rw.delete(k.wavesBalance(currentHeight, addressId))
-          val kwbh = k.wavesBalanceHistory(addressId)
-          val ints = rw.get(kwbh).filterNot(_ == currentHeight)
-          rw.put(kwbh, ints)
+          rw.filterHistory(k.wavesBalanceHistory(addressId), currentHeight)
 
           rw.delete(k.leaseBalance(currentHeight, addressId))
-          val klbh = k.leaseBalanceHistory(addressId)
-          rw.put(klbh, rw.get(klbh).filterNot(_ == currentHeight))
+          rw.filterHistory(k.leaseBalanceHistory(addressId), currentHeight)
 
           log.trace(s"Discarding portfolio for $address")
 
           portfolioCache.invalidate(address)
-
         }
 
         val txIdsAtHeight = k.transactionIdsAtHeight(currentHeight)
@@ -678,25 +657,24 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
             case _: IssueTransaction        => rollbackAssetInfo(rw, tx.id(), currentHeight)
             case tx: ReissueTransaction     => rollbackAssetInfo(rw, tx.assetId, currentHeight)
             case tx: BurnTransaction        => rollbackAssetInfo(rw, tx.assetId, currentHeight)
-            case _: LeaseTransaction        => rw.delete(k.leaseStatus(currentHeight, tx.id()))
-            case tx: LeaseCancelTransaction => rw.delete(k.leaseStatus(currentHeight, tx.leaseId))
+            case _: LeaseTransaction        => rollbackLeaseStatus(rw, tx.id(), currentHeight)
+            case tx: LeaseCancelTransaction => rollbackLeaseStatus(rw, tx.leaseId, currentHeight)
 
             case tx: SetScriptTransaction =>
               val address = tx.sender.toAddress
               scriptCache.invalidate(address)
               addressIdCache.get(address).foreach { addressId =>
                 rw.delete(k.addressScript(currentHeight, addressId))
-                val kash = k.addressScriptHistory(addressId)
-                rw.put(kash, rw.get(kash).filter(_ != currentHeight))
+                rw.filterHistory(k.addressScriptHistory(addressId), currentHeight)
               }
 
             case tx: DataTransaction =>
               val address = tx.sender.toAddress
               addressIdCache.get(address).foreach { addressId =>
                 tx.data.foreach { e =>
+                  log.trace(s"Discarding ${e.key} for $address at $currentHeight")
                   rw.delete(k.data(currentHeight, addressId, e.key))
-                  val kdh = k.dataHistory(addressId, e.key)
-                  rw.put(kdh, rw.get(kdh).filter(_ != currentHeight))
+                  rw.filterHistory(k.dataHistory(addressId, e.key), currentHeight)
                 }
               }
 
@@ -727,17 +705,20 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
 
   private def rollbackAssetInfo(rw: RW, assetId: ByteStr, currentHeight: Int): Unit = {
     rw.delete(k.assetInfo(currentHeight, assetId))
-    val kaih = k.assetInfoHistory(assetId)
-    rw.put(kaih, rw.get(kaih).filter(_ != currentHeight))
+    rw.filterHistory(k.assetInfoHistory(assetId), currentHeight)
     assetInfoCache.invalidate(assetId)
     assetDescriptionCache.invalidate(assetId)
   }
 
   private def rollbackOrderFill(rw: RW, orderId: ByteStr, currentHeight: Int): Unit = {
     rw.delete(k.filledVolumeAndFee(currentHeight, orderId))
-    val kfvh = k.filledVolumeAndFeeHistory(orderId)
-    rw.put(kfvh, rw.get(kfvh).filter(_ != currentHeight))
+    rw.filterHistory(k.filledVolumeAndFeeHistory(orderId), currentHeight)
     volumeAndFeeCache.invalidate(orderId)
+  }
+
+  private def rollbackLeaseStatus(rw: RW, leaseId: ByteStr, currentHeight: Int): Unit = {
+    rw.delete(k.leaseStatus(currentHeight, leaseId))
+    rw.filterHistory(k.leaseStatusHistory(leaseId), currentHeight)
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(db => db.get(k.transactionInfo(id)))

@@ -28,7 +28,7 @@ import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
-import monix.eval.Coeval
+import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler._
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
@@ -252,12 +252,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
                         time,
                         settings.blockchainSettings.functionalitySettings),
         DebugApiRoute(
-          settings.restAPISettings,
+          settings,
           wallet,
           blockchainUpdater,
           peerDatabase,
           establishedConnections,
-          blockchainUpdater,
+          blockId => Task(blockchainUpdater.removeAfter(blockId)).executeOn(appenderScheduler),
           allChannels,
           utxStorage,
           miner,

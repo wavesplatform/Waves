@@ -67,7 +67,7 @@ object PoSCalc extends ScorexLogging {
   }
 
   def generatingBalance(blockchain: Blockchain, fs: FunctionalitySettings, account: Address, atHeight: Int): Long = {
-    val generatingBalanceDepth = if (atHeight >= fs.generationBalanceDepthFrom50To1000AfterHeight) 1000 else 50
+    val generatingBalanceDepth = fs.generatingBalanceDepth(atHeight)
     blockchain.effectiveBalance(account, atHeight, generatingBalanceDepth)
   }
 

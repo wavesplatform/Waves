@@ -4,30 +4,7 @@ import com.wavesplatform.state.{Diff, _}
 import scorex.utils.ScorexLogging
 
 object CancelInvalidLeaseIn extends ScorexLogging {
-  def v1(blockchain: Blockchain): Diff = {
-    log.info("Collecting lease in overflows")
-
-    val nonZeroLeaseIns = blockchain.collectLposPortfolios {
-      case (_, p) if p.lease.in > 0 => p.lease.in
-    }
-
-    log.info(s"Collected ${nonZeroLeaseIns.size} lease recipients")
-
-    val diff = for {
-      (address, storedLeaseIn) <- nonZeroLeaseIns
-      actualLeaseIn = blockchain
-        .activeLeases(address)
-        .collect { case (_, lt) if blockchain.resolveAliasEi(lt.recipient).contains(address) => lt.amount }
-        .sum
-      if actualLeaseIn != storedLeaseIn
-    } yield address -> Portfolio(0, LeaseBalance(actualLeaseIn - storedLeaseIn, 0), Map.empty)
-
-    log.info(s"Done collecting lease in overflows:\n${diff.mkString("\n")}")
-
-    Diff.empty.copy(portfolios = diff)
-  }
-
-  def v2(blockchain: Blockchain): Diff = {
+  def apply(blockchain: Blockchain): Diff = {
     log.info("Collecting lease in overflows")
 
     val allActiveLeases = blockchain.allActiveLeases
