@@ -126,7 +126,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         |
       """.stripMargin
 
-    List("if", "then", "else", "true", "false").foreach(kv => isParsed(script(kv)) shouldBe false)
+    List("if", "then", "else", "true", "false", "let").foreach(kv => isParsed(script(kv)) shouldBe false)
   }
 
   property("multisig sample") {
@@ -212,5 +212,25 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         |
       """.stripMargin
     ) shouldBe GETTER(BLOCK(Some(LET("yyy", FUNCTION_CALL("aaa", List(REF("bbb"))))), FUNCTION_CALL("xxx", List(REF("yyy")))), "zzz")
+  }
+
+  property("crypto functions") {
+    val hashFunctions = Vector("sha256", "blake2b256", "keccak256")
+    val text          = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD=test message"
+    val encodedText   = ScorexBase58.encode(text.getBytes)
+
+    for (f <- hashFunctions) {
+      parse(
+        s"""
+           |
+           |$f(base58'$encodedText')
+           |
+       """.stripMargin
+      ) shouldBe
+        FUNCTION_CALL(
+          f,
+          List(CONST_BYTEVECTOR(ByteVector(text.getBytes)))
+        )
+    }
   }
 }
