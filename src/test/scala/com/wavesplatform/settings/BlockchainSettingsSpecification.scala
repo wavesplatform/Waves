@@ -35,6 +35,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |          20 = 200
         |        }
         |        double-features-periods-after-height = 21
+        |        sponsored-fees-delay = 100
         |      }
         |      genesis {
         |        timestamp = 1460678400000
