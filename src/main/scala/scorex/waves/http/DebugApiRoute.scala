@@ -227,7 +227,7 @@ case class DebugApiRoute(ws: WavesSettings,
       case (a, t) =>
         AccountMiningInfo(
           a.stringRepr,
-          ng.effectiveBalance(a, ng.height, ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(stateReader.height)),
+          ng.effectiveBalance(a, ng.height, ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height)),
           t
         )
     })

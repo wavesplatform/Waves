@@ -13,6 +13,6 @@ package object wavesplatform extends ScorexLogging {
       log.error(value.toString)
       forceStopApplication()
     }
-    log.info(s"Genesis block ${history.blockHeaderAndSize(1).get._1} has been added to the state")
+    log.info(s"Genesis block ${blockchainUpdater.blockHeaderAndSize(1).get._1} has been added to the state")
   }
 }
