@@ -47,11 +47,11 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
                              FunctionalitySettings.TESTNET.copy(preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 0)),
                              genesisSettings))
 
-    val (history, bcu) = StorageFactory(settings, db, NTP)
+    val bcu = StorageFactory(settings, db, NTP)
 
     bcu.processBlock(Block.genesis(genesisSettings).right.get)
 
-    bcu.historyReader
+    bcu
   }
 
   private def transfer(sender: PrivateKeyAccount, maxAmount: Long, time: Time) =

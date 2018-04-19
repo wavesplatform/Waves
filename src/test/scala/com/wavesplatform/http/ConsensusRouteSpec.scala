@@ -22,9 +22,9 @@ class ConsensusRouteSpec
   def routeTest(f: (Blockchain, Route) => Any) = withDomain() { d =>
     d.blockchainUpdater.processBlock(genesisBlock)
     1 to 10 foreach { _ =>
-      d.blockchainUpdater.processBlock(getNextTestBlock(d.blockchain))
+      d.blockchainUpdater.processBlock(getNextTestBlock(d.blockchainUpdater))
     }
-    f(d.blockchain, NxtConsensusApiRoute(restAPISettings, d.blockchain, FunctionalitySettings.TESTNET).route)
+    f(d.blockchainUpdater, NxtConsensusApiRoute(restAPISettings, d.blockchainUpdater, FunctionalitySettings.TESTNET).route)
   }
 
   routePath("/generationsignature") - {

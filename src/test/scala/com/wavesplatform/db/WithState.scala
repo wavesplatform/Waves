@@ -44,7 +44,7 @@ trait WithState extends ScorexLogging {
 
     try withState(settings.blockchainSettings.functionalitySettings) { blockchain =>
       val bcu = new BlockchainUpdaterImpl(blockchain, settings, time)
-      try test(Domain(bcu.historyReader, bcu))
+      try test(Domain(bcu))
       finally bcu.shutdown()
     } finally {
       time.close()

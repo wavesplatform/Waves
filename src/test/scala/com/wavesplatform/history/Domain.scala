@@ -5,10 +5,10 @@ import scorex.account.Address
 import scorex.block.Block
 import scorex.transaction.BlockchainUpdater
 
-case class Domain(blockchain: Blockchain, blockchainUpdater: BlockchainUpdater) {
-  def effBalance(a: Address): Long  = blockchain.effectiveBalance(a, blockchain.height, 1000)
+case class Domain(blockchainUpdater: BlockchainUpdater with NG) {
+  def effBalance(a: Address): Long  = blockchainUpdater.effectiveBalance(a, blockchainUpdater.height, 1000)
   def appendBlock(b: Block)         = blockchainUpdater.processBlock(b).explicitGet()
   def removeAfter(blockId: ByteStr) = blockchainUpdater.removeAfter(blockId).explicitGet()
-  def lastBlockId                   = blockchain.lastBlockId.get
-  def portfolio(address: Address)   = blockchain.portfolio(address)
+  def lastBlockId                   = blockchainUpdater.lastBlockId.get
+  def portfolio(address: Address)   = blockchainUpdater.portfolio(address)
 }

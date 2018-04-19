@@ -55,17 +55,17 @@ object Importer extends ScorexLogging {
 
         createInputStream(filename) match {
           case Success(inputStream) =>
-            val db                      = openDB(settings.dataDirectory, settings.levelDbCacheSize)
-            val (ng, blockchainUpdater) = StorageFactory(settings, db, NTP)
-            val checkpoint              = new CheckpointServiceImpl(db, settings.checkpointsSettings)
-            val extAppender             = BlockAppender(checkpoint, ng, blockchainUpdater, NTP, utxPoolStub, settings, scheduler) _
-            checkGenesis(ng, settings, blockchainUpdater)
+            val db                = openDB(settings.dataDirectory, settings.levelDbCacheSize)
+            val blockchainUpdater = StorageFactory(settings, db, NTP)
+            val checkpoint        = new CheckpointServiceImpl(db, settings.checkpointsSettings)
+            val extAppender       = BlockAppender(checkpoint, blockchainUpdater, blockchainUpdater, NTP, utxPoolStub, settings, scheduler) _
+            checkGenesis(settings, blockchainUpdater)
             val bis          = new BufferedInputStream(inputStream)
             var quit         = false
             val lenBytes     = new Array[Byte](Ints.BYTES)
             val start        = System.currentTimeMillis()
             var counter      = 0
-            var blocksToSkip = ng.height - 1
+            var blocksToSkip = blockchainUpdater.height - 1
 
             println(s"Skipping $blocksToSkip blocks(s)")
 
@@ -80,7 +80,7 @@ object Importer extends ScorexLogging {
                     blocksToSkip -= 1
                   } else {
                     val block = Block.parseBytes(buffer).get
-                    if (ng.lastBlockId.contains(block.reference)) {
+                    if (blockchainUpdater.lastBlockId.contains(block.reference)) {
                       Await.result(extAppender.apply(block).runAsync, Duration.Inf) match {
                         case Left(ve) =>
                           log.error(s"Error appending block: $ve")
