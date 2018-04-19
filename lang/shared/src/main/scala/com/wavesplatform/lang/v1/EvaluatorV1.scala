@@ -38,10 +38,10 @@ object EvaluatorV1 extends ExprEvaluator {
       .value
   }
 
-  private def evalBlock(maybeLet: LET, inner: EXPR, tpe: TYPE) = {
-    import maybeLet.{name, value}
+  private def evalBlock(let: LET, inner: EXPR, tpe: TYPE): FF[Any] = {
+    import let.{name, value}
     for {
-      _   <- writeLog(s"LET: $maybeLet; TYPE: $tpe")
+      _   <- writeLog(s"LET: $let; TYPE: $tpe")
       ctx <- getContext
       result <- {
         if (lets.get(ctx).get(name).isDefined) liftL(s"Value '$name' already defined in the scope")
@@ -87,7 +87,7 @@ object EvaluatorV1 extends ExprEvaluator {
     } yield result
   }
 
-  private def evalFunctionCall(header: FunctionHeader, args: List[EXPR]) = {
+  private def evalFunctionCall(header: FunctionHeader, args: List[EXPR]): FF[Any] = {
     for {
       _   <- writeLog(s"FUNCTION HEADER: $header")
       ctx <- getContext
@@ -98,7 +98,7 @@ object EvaluatorV1 extends ExprEvaluator {
           args
             .traverse[FF, Any](a => evalExpr(a)(a.tpe.typeInfo).map(_.asInstanceOf[Any]))
             .map(func.eval)
-            .flatMap(r => liftCE(r.value))
+            .flatMap(r => liftCE[Any](r.value))
         }
     } yield result
   }

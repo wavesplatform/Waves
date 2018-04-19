@@ -44,9 +44,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val expectedLog =
       "Evaluating BLOCK\n" ++
-        "LET: Some(LET(x,CONST_LONG(3))); TYPE: LONG\n" ++
+        "LET: LET(x,CONST_LONG(3)); TYPE: LONG\n" ++
         "Evaluating BLOCK\n" ++
-        "LET: Some(LET(x,FUNCTION_CALL(FunctionHeader(+,List(LONG, LONG)),List(CONST_LONG(3), CONST_LONG(0)),LONG))); TYPE: LONG"
+        "LET: LET(x,FUNCTION_CALL(FunctionHeader(+,List(LONG, LONG)),List(CONST_LONG(3), CONST_LONG(0)),LONG)); TYPE: LONG"
 
     val expectedError =
       "Value 'x' already defined in the scope"
