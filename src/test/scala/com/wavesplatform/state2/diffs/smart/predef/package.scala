@@ -12,6 +12,6 @@ package object predef {
   def runScript[T: TypeInfo](script: String, tx: Transaction = null): Either[String, T] = {
     val Success(expr, _) = Parser(script)
     val Right(typedExpr) = TypeChecker(dummyTypeCheckerContext, expr)
-    EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr)
+    EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr).left.map(_._3)
   }
 }

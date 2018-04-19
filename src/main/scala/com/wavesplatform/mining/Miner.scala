@@ -61,7 +61,7 @@ class MinerImpl(allChannels: ChannelGroup,
                 timeService: Time,
                 utx: UtxPool,
                 wallet: Wallet,
-                val scheduler: SchedulerService,
+                val minerScheduler: SchedulerService,
                 val appenderScheduler: SchedulerService)
     extends Miner
     with MinerDebugInfo
@@ -70,7 +70,7 @@ class MinerImpl(allChannels: ChannelGroup,
 
   import Miner._
 
-  private implicit val s: SchedulerService = scheduler
+  private implicit val s: SchedulerService = minerScheduler
 
   private lazy val minerSettings              = settings.minerSettings
   private lazy val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
@@ -218,21 +218,25 @@ class MinerImpl(allChannels: ChannelGroup,
                                          microEstimator: Estimator,
                                          restTotalConstraint: MiningConstraint): Task[Unit] = {
     debugState = MinerDebugInfo.MiningMicroblocks
-    generateOneMicroBlockTask(account, accumulatedBlock, microEstimator, restTotalConstraint).delayExecution(delay).flatMap {
-      case Error(e) =>
-        Task {
-          debugState = MinerDebugInfo.Error(e.toString)
-          log.warn("Error mining MicroBlock: " + e.toString)
-        }
-      case Success(newTotal, updatedTotalConstraint) =>
-        generateMicroBlockSequence(account, newTotal, minerSettings.microBlockInterval, microEstimator, updatedTotalConstraint)
-      case Retry => generateMicroBlockSequence(account, accumulatedBlock, minerSettings.microBlockInterval, microEstimator, restTotalConstraint)
-      case Stop =>
-        Task {
-          debugState = MinerDebugInfo.MiningBlocks
-          log.debug("MicroBlock mining completed, block is full")
-        }
-    }
+    log.info(s"Generate MicroBlock sequence, delay = $delay")
+    generateOneMicroBlockTask(account, accumulatedBlock, microEstimator, restTotalConstraint)
+      .asyncBoundary(minerScheduler)
+      .delayExecution(delay)
+      .flatMap {
+        case Error(e) =>
+          Task {
+            debugState = MinerDebugInfo.Error(e.toString)
+            log.warn("Error mining MicroBlock: " + e.toString)
+          }
+        case Success(newTotal, updatedTotalConstraint) =>
+          generateMicroBlockSequence(account, newTotal, minerSettings.microBlockInterval, microEstimator, updatedTotalConstraint)
+        case Retry => generateMicroBlockSequence(account, accumulatedBlock, minerSettings.microBlockInterval, microEstimator, restTotalConstraint)
+        case Stop =>
+          Task {
+            debugState = MinerDebugInfo.MiningBlocks
+            log.debug("MicroBlock mining completed, block is full")
+          }
+      }
   }
 
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = {
@@ -254,20 +258,23 @@ class MinerImpl(allChannels: ChannelGroup,
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(account, balance)(offset).flatMap {
           case Right((estimators, block, totalConstraint)) =>
-            BlockAppender(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, settings, history, appenderScheduler)(block).map {
-              case Left(err) => log.warn("Error mining Block: " + err.toString)
-              case Right(Some(score)) =>
-                log.debug(s"Forged and applied $block by ${account.address} with cumulative score $score")
-                BlockStats.mined(block, history.height)
-                allChannels.broadcast(BlockForged(block))
-                scheduleMining()
-                if (ngEnabled && !totalConstraint.isEmpty) startMicroBlockMining(account, block, estimators.micro, totalConstraint)
-              case Right(None) => log.warn("Newly created block has already been appended, should not happen")
-            }
+            BlockAppender(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, settings, history, appenderScheduler)(block)
+              .asyncBoundary(minerScheduler)
+              .map {
+                case Left(err) => log.warn("Error mining Block: " + err.toString)
+                case Right(Some(score)) =>
+                  log.debug(s"Forged and applied $block by ${account.address} with cumulative score $score")
+                  BlockStats.mined(block, history.height)
+                  allChannels.broadcast(BlockForged(block))
+                  scheduleMining()
+                  if (ngEnabled && !totalConstraint.isEmpty) startMicroBlockMining(account, block, estimators.micro, totalConstraint)
+                case Right(None) => log.warn("Newly created block has already been appended, should not happen")
+              }
           case Left(err) =>
             log.debug(s"No block generated because $err, retrying")
             generateBlockTask(account)
         }
+
       case Left(err) =>
         log.debug(s"Not scheduling block mining because $err")
         debugState = MinerDebugInfo.Error(err)
@@ -287,6 +294,7 @@ class MinerImpl(allChannels: ChannelGroup,
                                     lastBlock: Block,
                                     microEstimator: Estimator,
                                     restTotalConstraint: MiningConstraint): Unit = {
+    log.info(s"Start mining microblocks")
     Miner.microMiningStarted.increment()
     microBlockAttempt := generateMicroBlockSequence(account, lastBlock, Duration.Zero, microEstimator, restTotalConstraint).runAsyncLogErr
     log.trace(s"MicroBlock mining scheduled for $account")

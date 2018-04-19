@@ -8,6 +8,7 @@ import scorex.account.AddressScheme
 import scorex.transaction.Transaction
 import scorex.transaction.smart.BlockchainContext
 import scorex.transaction.smart.script.v1.ScriptV1
+import cats.implicits._
 
 object ScriptRunner {
 
@@ -20,10 +21,10 @@ object ScriptRunner {
           Coeval.evalOnce(height),
           state
         )
-        EvaluatorV1[A](ctx, expr)
+        EvaluatorV1[A](ctx, expr).left.map(_._3)
       }
 
-      case _ => Left("Unsupported script version")
+      case _ => "Unsupported script version".asLeft[A]
     }
 
 }

@@ -15,15 +15,21 @@ import com.google.common.primitives.Ints._
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
-import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
+import com.typesafe.config.ConfigFactory._
+import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings._
+import com.wavesplatform.state2.EitherExt2
 import monix.eval.Coeval
+import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.io.IOUtils
 import org.asynchttpclient.Dsl._
+import scorex.account.AddressScheme
+import scorex.block.Block
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
@@ -34,7 +40,7 @@ import scala.sys.process.Process
 import scala.util.control.NonFatal
 import scala.util.{Random, Try}
 
-class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "", enableProfiling: Boolean = false) extends AutoCloseable with ScorexLogging {
+class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boolean = false) extends AutoCloseable with ScorexLogging {
 
   import Docker._
 
@@ -57,6 +63,26 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "", enable
   sys.addShutdownHook {
     log.debug("Shutdown hook")
     close()
+  }
+
+  private[it] val configTemplate = parseResources("template.conf")
+
+  AddressScheme.current = new AddressScheme {
+    override val chainId = configTemplate.as[String]("waves.blockchain.custom.address-scheme-character").charAt(0).toByte
+  }
+
+  private[it] val genesisOverride = {
+    val genesisTs          = System.currentTimeMillis()
+    val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
+         |  timestamp = $genesisTs
+         |  block-timestamp = $genesisTs
+         |}""".stripMargin)
+
+    val genesisConfig    = configTemplate.withFallback(timestampOverrides)
+    val gs               = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
+    val genesisSignature = Block.genesis(gs).explicitGet().uniqueId
+
+    timestampOverrides.withFallback(parseString(s"waves.blockchain.custom.genesis.signature = $genesisSignature"))
   }
 
   // a random network in 10.x.x.x range
@@ -198,11 +224,14 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "", enable
 
   private def startNodeInternal(nodeConfig: Config): DockerNode =
     try {
-      val actualConfig = nodeConfig
+      val overrides = nodeConfig
         .withFallback(suiteConfig)
-        .withFallback(NodeConfigs.DefaultConfigTemplate)
-        .withFallback(ConfigFactory.defaultApplication())
-        .withFallback(ConfigFactory.defaultReference())
+        .withFallback(genesisOverride)
+
+      val actualConfig = overrides
+        .withFallback(configTemplate)
+        .withFallback(defaultApplication())
+        .withFallback(defaultReference())
         .resolve()
 
       val restApiPort    = actualConfig.getString("waves.rest-api.port")
@@ -227,7 +256,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "", enable
 
       val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
       val configOverrides: String = {
-        var config = s"$javaOptions ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))} " +
+        var config = s"$javaOptions ${renderProperties(asProperties(overrides))} " +
           s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dwaves.network.declared-address=$ip:$networkPort "
 
         if (profilerController().isDefined) {

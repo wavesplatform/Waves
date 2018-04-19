@@ -389,7 +389,10 @@ object OrderBookActor {
 
   case class GetOrderStatusResponse(status: LimitOrder.OrderStatus) extends MatcherResponse {
     val json = status.json
-    val code = StatusCodes.OK
+    val code = status match {
+      case LimitOrder.NotFound => StatusCodes.NotFound
+      case _                   => StatusCodes.OK
+    }
   }
 
   case class GetOrderBookResponse(pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends MatcherResponse {
