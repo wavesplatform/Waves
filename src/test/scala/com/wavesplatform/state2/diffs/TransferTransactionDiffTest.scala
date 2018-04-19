@@ -11,6 +11,7 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction, TransferTransaction}
+import com.wavesplatform.features.FeatureProvider
 
 class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -63,9 +64,16 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(transferWithSmartAssetFee) {
       case (genesis, issue, fee, transfer) =>
+        val fp = new FeatureProvider {
+          override def activatedFeatures() = Map( /*BlockchainFeatures.SponsorFee.id -> 0*/ )
+
+          override def featureVotes(height: Int) = ???
+
+          override def approvedFeatures() = Map( /*BlockchainFeatures.SponsorFee.id -> 0*/ )
+        }
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(issue, fee)), smartEnabledFS) {
           case (_, state) => {
-            val diffOrError = TransferTransactionDiff(state, smartEnabledFS, System.currentTimeMillis(), state.height)(transfer)
+            val diffOrError = TransferTransactionDiff(state, fp, smartEnabledFS, System.currentTimeMillis(), state.height)(transfer)
             diffOrError shouldBe Left(GenericError("Smart assets can't participate in TransferTransactions as a fee"))
           }
         }
