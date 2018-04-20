@@ -7,6 +7,7 @@ import com.wavesplatform.lang.v1.Terms._
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
 import fastparse.core.Parsed.{Failure, Success}
 import org.scalacheck.Gen
+import org.scalatest.exceptions.TestFailedException
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
@@ -14,7 +15,15 @@ import scorex.crypto.encode.{Base58 => ScorexBase58}
 
 class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
-  def parse(x: String): EXPR = Parser(x).get.value
+  def parse(x: String): EXPR = Parser(x) match {
+    case Success(r, _) => r
+    case e @ Failure(_, i, _) =>
+      println(
+        s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${e.extra.traced.fullStack
+          .mkString("\n")}")
+      throw new TestFailedException("Test failed", 0)
+  }
+
   def isParsed(x: String): Boolean = Parser(x) match {
     case Success(_, _)    => true
     case Failure(_, _, _) => false
@@ -32,35 +41,32 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     case CONST_STRING(x) => withWhitespaces(s"""\"$x\"""")
     case TRUE            => withWhitespaces("true")
     case FALSE           => withWhitespaces("false")
-    case BINARY_OP(x: EXPR, op: BINARY_OP_KIND, y: EXPR) =>
+    case BINARY_OP(x, op: BINARY_OP_KIND, y) =>
       for {
         arg1 <- toString(x)
         arg2 <- toString(y)
       } yield s"($arg1${opsToFunctions(op)}$arg2)"
-    case IF(cond: EXPR, x: EXPR, y: EXPR) =>
+    case IF(cond, x, y) =>
       for {
         c <- toString(cond)
         t <- toString(x)
         f <- toString(y)
-      } yield s"(if($c) then $t else $f)"
-    case BLOCK(let: Option[LET], body: EXPR) =>
-      let match {
-        case Some(l) =>
-          for {
-            letstr  <- toString(l.value)
-            bodyStr <- toString(body)
-          } yield s"let ${l.name} = $letstr; $bodyStr"
-        case None => toString(body)
-      }
+      } yield s"(if ($c) then $t else $f)"
+    case BLOCK(let, body) =>
+      for {
+        v <- toString(let.value)
+        b <- toString(body)
+      } yield s"let ${let.name} = $v$b\n"
     case _ => ???
   }
 
   def genElementCheck(gen: Gen[EXPR]): Unit = {
-
-    forAll(for {
+    val testGen: Gen[(EXPR, String)] = for {
       expr <- gen
       str  <- toString(expr)
-    } yield (expr, str)) {
+    } yield (expr, str)
+
+    forAll(testGen) {
       case ((expr, str)) =>
         parse(str) shouldBe expr
     }
@@ -211,7 +217,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         | }.zzz
         |
       """.stripMargin
-    ) shouldBe GETTER(BLOCK(Some(LET("yyy", FUNCTION_CALL("aaa", List(REF("bbb"))))), FUNCTION_CALL("xxx", List(REF("yyy")))), "zzz")
+    ) shouldBe GETTER(BLOCK(LET("yyy", FUNCTION_CALL("aaa", List(REF("bbb")))), FUNCTION_CALL("xxx", List(REF("yyy")))), "zzz")
   }
 
   property("crypto functions") {

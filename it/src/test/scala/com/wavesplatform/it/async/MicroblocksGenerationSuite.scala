@@ -23,20 +23,13 @@ class MicroblocksGenerationSuite extends FreeSpec with Matchers with TransferSen
          |
          |  miner {
          |    quorum = 0
-         |    minimal-block-generation-offset = 60000ms
+         |    minimal-block-generation-offset = 1m
          |    micro-block-interval = 3s
          |    max-transactions-in-key-block = 0
          |    max-transactions-in-micro-block = $txsInMicroBlock
          |  }
          |
-         |  blockchain.custom {
-         |    functionality.pre-activated-features {
-         |      2: 0
-         |    }
-         |
-         |    store-transactions-in-state = false
-         |  }
-         |
+         |  blockchain.custom.functionality.pre-activated-features.2 = 0
          |  features.supported = [2]
          |}""".stripMargin
       ))

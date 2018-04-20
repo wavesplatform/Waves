@@ -33,6 +33,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
             featureProvider: FeatureProvider,
             scheduler: Scheduler)(newBlock: Block): Task[Either[ValidationError, Option[BlockchainScore]]] =
     Task {
+      log.debug(s"Appending $newBlock")
       measureSuccessful(
         blockProcessingTimeStats, {
           if (history.contains(newBlock)) Right(None)

@@ -66,7 +66,7 @@ object PoSCalc extends ScorexLogging {
   }
 
   def generatingBalance(state: SnapshotStateReader, fs: FunctionalitySettings, account: Address, atHeight: Int): Long = {
-    val generatingBalanceDepth = if (atHeight >= fs.generationBalanceDepthFrom50To1000AfterHeight) 1000 else 50
+    val generatingBalanceDepth = fs.generatingBalanceDepth(atHeight)
     state.effectiveBalance(account, atHeight, generatingBalanceDepth)
   }
 

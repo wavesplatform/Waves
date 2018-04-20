@@ -7,11 +7,10 @@ import scala.util.Random
 
 object NodeConfigs {
 
-  private val NonConflictingNodes = Set(1, 4, 6, 7) //Set(1, 7, 10, 2)
-
-  val DefaultConfigTemplate: Config = ConfigFactory.parseResources("template.conf")
+  private val NonConflictingNodes = Set(1, 4, 6, 7)
 
   val Default: Seq[Config] = ConfigFactory.parseResources("nodes.conf").getConfigList("nodes").asScala
+  val NotMiner             = Default.last
 
   def newBuilder: Builder = Builder(Default, Default.size, Seq.empty)
 

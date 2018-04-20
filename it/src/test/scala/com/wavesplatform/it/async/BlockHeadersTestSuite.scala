@@ -99,7 +99,7 @@ class BlockHeadersTestSuite
     val f = for {
       baseHeight   <- traverse(nodes)(_.height).map(_.max)
       _            <- txRequestsGen(30, 2.waves)
-      _            <- nodes.waitForSameBlocksAt(3.seconds, baseHeight + 3)
+      _            <- nodes.waitForSameBlocksAt(baseHeight + 3)
       blocks       <- nodes.head.blockSeq(baseHeight + 1, baseHeight + 3)
       blockHeaders <- nodes.head.blockHeadersSeq(baseHeight + 1, baseHeight + 3)
     } yield {

@@ -13,11 +13,11 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
   import Untyped._
 
   errorTests(
-    "can't define LET with the same name as already defined in scope" -> "already defined in the scope" -> BLOCK(Some(LET("X", CONST_LONG(1))),
-                                                                                                                 BLOCK(Some(LET("X", CONST_LONG(2))),
+    "can't define LET with the same name as already defined in scope" -> "already defined in the scope" -> BLOCK(LET("X", CONST_LONG(1)),
+                                                                                                                 BLOCK(LET("X", CONST_LONG(2)),
                                                                                                                        TRUE)),
-    "can't define LET with the same name as predefined constant" -> "already defined in the scope" -> BLOCK(Some(LET("None", CONST_LONG(2))), TRUE),
-    "can't define LET with the same name as predefined function" -> "function with such name is predefined" -> BLOCK(Some(LET("Some", CONST_LONG(2))),
+    "can't define LET with the same name as predefined constant" -> "already defined in the scope" -> BLOCK(LET("None", CONST_LONG(2)), TRUE),
+    "can't define LET with the same name as predefined function" -> "function with such name is predefined" -> BLOCK(LET("Some", CONST_LONG(2)),
                                                                                                                      TRUE),
     "BINARY_OP with wrong types"                   -> "Typecheck failed: Can't find a function '+'" -> BINARY_OP(TRUE, SUM_OP, CONST_LONG(1)),
     "IF can't find common"                         -> "Can't find common type" -> IF(TRUE, TRUE, CONST_LONG(0)),

@@ -28,7 +28,7 @@ import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
-import monix.eval.Coeval
+import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler._
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
@@ -98,7 +98,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     if (wallet.privateKeyAccounts.isEmpty)
       wallet.generateNewAccounts(1)
 
-    val feeCalculator          = new FeeCalculator(settings.feesSettings)
+    val feeCalculator          = new FeeCalculator(settings.feesSettings, state)
     val time: Time             = NTP
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
@@ -249,13 +249,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
         AddressApiRoute(settings.restAPISettings, wallet, state, utxStorage, allChannels, time, settings.blockchainSettings.functionalitySettings),
         DebugApiRoute(
-          settings.restAPISettings,
+          settings,
           wallet,
           state,
           history,
           peerDatabase,
           establishedConnections,
-          blockchainUpdater,
+          blockId => Task(blockchainUpdater.removeAfter(blockId)).executeOn(appenderScheduler),
           allChannels,
           utxStorage,
           miner,
