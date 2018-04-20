@@ -59,7 +59,7 @@ object Parser {
       }
 
   private val stringP: P[CONST_STRING] =
-    P("\"" ~ (CharsWhile(!"\"\\".contains(_: Char)) | escapedUnicodeSymbolP).rep.! ~ "\"").map(CONST_STRING)
+    P("\"" ~~ (CharsWhile(!"\"\\".contains(_: Char)) | escapedUnicodeSymbolP).rep.! ~~ "\"").map(CONST_STRING)
 
   private val block: P[EXPR] = P(letP ~ expr).map(Function.tupled(BLOCK.apply))
 

@@ -117,6 +117,10 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     isParsed("base58' bQbp'\n") shouldBe false
   }
 
+  property("string is consumed fully") {
+    parse(""" "   fooo    bar" """) shouldBe CONST_STRING("   fooo    bar")
+  }
+
   property("string literal with unicode chars") {
     val stringWithUnicodeChars = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD"
 
