@@ -31,8 +31,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
       }
     val unsponsoredPf = portfolio.copy(assets = portfolio.assets -- sponsoredAssets.map(_._1))
     val sponsoredWaves = sponsoredAssets.map {
-      case (_, totalFee, baseFee) =>
-        totalFee * Sponsorship.FeeUnit / baseFee ///safe mul
+      case (_, totalFee, baseFee) => Sponsorship.toWaves(totalFee, baseFee)
     }.sum
     unsponsoredPf.copy(balance = unsponsoredPf.balance + sponsoredWaves)
   }
@@ -47,13 +46,13 @@ object BlockDiffer extends ScorexLogging with Instrumented {
 
     // height switch is next after activation
     val ng4060switchHeight = fp.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
-    val sponsoredFeeHeight = fp.featureActivationHeight(BlockchainFeatures.SponsoredFee.id).getOrElse(Int.MaxValue)
+    val sponsoredFeeHeight = Sponsorship.sponsoredFeesSwitchHeight(fp, settings)
 
     lazy val prevBlockFeeDistr: Option[Diff] =
       if (stateHeight > ng4060switchHeight)
         maybePrevBlock.map { prevBlock =>
           val portfolio =
-            if (stateHeight > sponsoredFeeHeight)
+            if (stateHeight >= sponsoredFeeHeight)
               clearSponsorship(prevBlock.prevBlockFeePart(), blockSigner, s)
             else prevBlock.prevBlockFeePart()
           Diff.empty.copy(portfolios = Map(blockSigner -> portfolio))
@@ -136,7 +135,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
 
       val diffWithCancelledLeaseIns =
         if (fp.featureActivationHeight(BlockchainFeatures.DataTransaction.id).contains(currentBlockHeight))
-          Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn.v2(composite(s, diffWithLeasePatches)))
+          Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn(composite(s, diffWithLeasePatches)))
         else diffWithLeasePatches
 
       diffWithCancelledLeaseIns

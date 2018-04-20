@@ -8,7 +8,6 @@ import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{
   Sponsorship,
   SponsorshipValue,
-  SponsorshipNoInfo,
   AccountDataInfo,
   AssetDescription,
   AssetInfo,
@@ -91,8 +90,8 @@ trait Caches extends SnapshotStateReader with History with StateWriter {
   protected def loadActivatedFeatures(): Map[Short, Int]
   override def activatedFeatures(): Map[Short, Int] = activatedFeaturesCache
 
-  protected val sponsorshipCache: LoadingCache[ByteStr, Option[Sponsorship]] = cache(MaxSize, loadSponsorship)
-  protected def loadSponsorship(assetId: ByteStr): Option[Sponsorship]
+  protected val sponsorshipCache: LoadingCache[ByteStr, Option[SponsorshipValue]] = cache(MaxSize, loadSponsorship)
+  protected def loadSponsorship(assetId: ByteStr): Option[SponsorshipValue]
 
   protected def doAppend(block: Block,
                          addresses: Map[Address, BigInt],

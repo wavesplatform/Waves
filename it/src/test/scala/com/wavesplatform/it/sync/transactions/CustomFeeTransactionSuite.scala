@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -63,19 +62,13 @@ object CustomFeeTransactionSuite {
     .get
 
   val assetId = assetTx.id()
-  import NodeConfigs.Default
 
   private val acceptAssetsFee = ConfigFactory.parseString(s"""
-       |waves.fees.transfer {
-       |  $assetId = 100000
-       |
-       |}
-      """.stripMargin)
+    | waves.fees.transfer.$assetId = 100000
+    | waves.blockchain.custom.functionality.pre-activated-features = { 7 = 100 }
+    """.stripMargin)
 
-  private val notMinerConfig = ConfigFactory.parseString(s"""
-       |waves.miner.enable=no
-       |
-      """.stripMargin).withFallback(acceptAssetsFee)
+  private val notMinerConfig = ConfigFactory.parseString("waves.miner.enable=no").withFallback(acceptAssetsFee)
 
   val Configs: Seq[Config] = Seq(
     acceptAssetsFee.withFallback(Default.head),

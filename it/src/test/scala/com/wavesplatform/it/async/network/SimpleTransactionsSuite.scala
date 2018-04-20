@@ -37,10 +37,10 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
       .right
       .get
     val f = for {
-      _  <- node.sendByNetwork(RawBytes.from(tx))
-      tx <- node.waitForTransaction(tx.id().base58)
+      _          <- node.sendByNetwork(RawBytes.from(tx))
+      txFromNode <- node.waitForTransaction(tx.id().base58)
     } yield {
-      tx shouldBe Transaction(tx.`type`, tx.id, tx.fee, tx.timestamp, Some(node.address))
+      txFromNode.id shouldBe tx.id().toString
     }
     Await.result(f, waitCompletion)
   }

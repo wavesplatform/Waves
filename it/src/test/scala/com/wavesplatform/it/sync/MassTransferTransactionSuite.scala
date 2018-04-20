@@ -24,7 +24,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   private val massTransferFeePerTransfer = notMiner.settings.feesSettings.fees(MassTransferTransaction.typeId)(0).fee
 
   private def calcFee(numberOfRecipients: Int): Long = {
-    transferFee + numberOfRecipients * massTransferFeePerTransfer
+    transferFee + massTransferFeePerTransfer * (numberOfRecipients + 1)
   }
 
   private def fakeSignature = Base58.encode(Array.fill(64)(Random.nextInt.toByte))

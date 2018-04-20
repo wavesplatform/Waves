@@ -54,7 +54,7 @@ val logDirectory = Def.task {
 }
 
 lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
-  testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-fW", (logDirectory.value / "summary.log").toString),
+  testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-fFW", (logDirectory.value / "summary.log").toString),
   testGrouping := {
     // ffs, sbt!
     // https://github.com/sbt/sbt/issues/3266
