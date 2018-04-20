@@ -17,6 +17,7 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
+import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
@@ -374,6 +375,32 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
           GETTER(REF("tx", TYPEREF(txType.name)), "senderPk", BYTEVECTOR)
         ),
         BOOLEAN
+      )
+    )
+  }
+
+  property("checking a hash of some message by crypto function invoking") {
+    val bodyText      = "some text for test"
+    val bodyBytes     = bodyText.getBytes()
+    val hashFunctions = Map("sha256" -> Sha256, "blake2b256" -> Blake2b256, "keccak256" -> Keccak256)
+
+    for ((funcName, funcClass) <- hashFunctions) hashFuncTest(bodyBytes, funcName) shouldBe Right(ByteVector(funcClass.hash(bodyText)))
+  }
+
+  private def hashFuncTest(bodyBytes: Array[Byte], funcName: String): Either[(Context, ExecutionLog, ExecutionError), ByteVector] = {
+    val context = Monoid.combineAll(
+      Seq(
+        PureContext.instance,
+        CryptoContext.build(Global)
+      )
+    )
+
+    ev[ByteVector](
+      context = context,
+      expr = FUNCTION_CALL(
+        function = FunctionHeader(funcName, List(FunctionHeaderType.BYTEVECTOR)),
+        args = List(Typed.CONST_BYTEVECTOR(ByteVector(bodyBytes))),
+        BYTEVECTOR
       )
     )
   }
