@@ -98,10 +98,11 @@ object Sponsorship {
 
   def toWaves(assetFee: Long, sponsorship: Long): Long = {
     val waves = (BigDecimal(assetFee) * BigDecimal(Sponsorship.FeeUnit)) / BigDecimal(sponsorship)
-    if (waves > Long.MaxValue) {
+    val fix   = if (waves.isValidLong) { 0L } else { 1L }
+    if (waves > Long.MaxValue - 1) {
       throw new java.lang.ArithmeticException("Overflow")
     }
-    waves.toLong
+    waves.toLong + fix
   }
 }
 
