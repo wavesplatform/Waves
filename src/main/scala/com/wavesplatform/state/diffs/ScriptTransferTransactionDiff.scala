@@ -5,7 +5,7 @@ import com.wavesplatform.state._
 import scorex.account.Address
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.VersionedTransferTransaction
+import scorex.transaction.versioned.assets.VersionedTransferTransaction
 
 object ScriptTransferTransactionDiff {
   def apply(blockchain: Blockchain, height: Int)(tx: VersionedTransferTransaction): Either[ValidationError, Diff] = {

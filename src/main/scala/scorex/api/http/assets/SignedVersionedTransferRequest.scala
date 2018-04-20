@@ -5,7 +5,8 @@ import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Json, OFormat}
 import scorex.account.{AddressOrAlias, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
-import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
+import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.versioned.assets.VersionedTransferTransaction
 import scorex.transaction.{AssetIdStringLength, Proofs, ValidationError}
 
 object SignedVersionedTransferRequest {

@@ -12,6 +12,7 @@ import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
+import scorex.transaction.versioned.assets.VersionedTransferTransaction
 import scorex.utils.Time
 import scorex.wallet.Wallet
 

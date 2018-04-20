@@ -9,7 +9,8 @@ import play.api.libs.functional.syntax._
 import scorex.account.{AddressOrAlias, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.{AssetId, Proofs}
-import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
+import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.versioned.assets.VersionedTransferTransaction
 import shapeless.{:+:, CNil, Coproduct}
 
 import scala.reflect.ClassTag

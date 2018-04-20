@@ -1,7 +1,11 @@
 package scorex.transaction
 
+import com.google.common.primitives.Longs
+import com.wavesplatform.state2.ByteStr
+import scorex.account.{Alias, PublicKeyAccount}
+
 import scala.reflect.ClassTag
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 trait TransactionParser {
   type TransactionT <: Transaction
@@ -62,6 +66,42 @@ object TransactionParser {
         throw new IllegalArgumentException(s"Expected version of transaction ${supportedVersions.mkString(", ")}, but got '$parsedVersion'")
 
       (parsedVersion, 3)
+    }
+
+    def parseSenderAndTimestamp(bytes: Array[Byte]): Try[(PublicKeyAccount, Long)] = {
+      val (pkStart, pkEnd) = (0, 32)
+      val (tsStart, tsEnd) = (32, 8)
+
+      for {
+        pk <- Try(PublicKeyAccount(bytes.slice(pkStart, pkEnd)))
+        ts <- parseLong(bytes.slice(tsStart, tsEnd))
+      } yield (pk, ts)
+    }
+
+    def parseAlias(bytes: Array[Byte]): Try[Alias] = {
+      Alias
+        .fromBytes(bytes)
+        .fold(
+          ve => Failure(new Exception(ve.toString)),
+          a => Success(a)
+        )
+    }
+
+    def parseByteStr(bytes: Array[Byte]): Try[ByteStr] = Try {
+      ByteStr(bytes)
+    }
+
+    def parseLong(bytes: Array[Byte]): Try[Long] = Try {
+      Longs.fromByteArray(bytes)
+    }
+
+    def parseProofs(bytes: Array[Byte]): Try[Proofs] = {
+      Proofs
+        .fromBytes(bytes)
+        .fold(
+          ve => Failure(new Exception(ve.toString)),
+          ps => Success(ps)
+        )
     }
   }
 

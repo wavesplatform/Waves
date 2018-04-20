@@ -1,4 +1,4 @@
-package scorex.transaction.assets
+package scorex.transaction.versioned.assets
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.crypto
@@ -10,6 +10,7 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
 import scorex.transaction._
+import scorex.transaction.assets.TransferTransaction
 
 import scala.util.{Failure, Success, Try}
 

@@ -18,7 +18,8 @@ import scorex.api.http._
 import scorex.api.http.assets._
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
+import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.versioned.assets.VersionedTransferTransaction
 import scorex.transaction.{Proofs, Transaction, ValidationError}
 import scorex.wallet.Wallet
 import shapeless.Coproduct

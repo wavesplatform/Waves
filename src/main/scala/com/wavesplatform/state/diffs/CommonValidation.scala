@@ -12,6 +12,7 @@ import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.versioned.assets.VersionedTransferTransaction
 
 import scala.concurrent.duration._
 import scala.util.{Left, Right}

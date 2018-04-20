@@ -5,6 +5,7 @@ import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.versioned.assets.VersionedTransferTransaction
 
 case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lang.v1.traits.Transaction {
   override def bodyBytes: Either[String, ByteVector] = tx match {

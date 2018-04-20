@@ -19,6 +19,7 @@ import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.{Script, ScriptReader}
+import scorex.transaction.versioned.assets.VersionedTransferTransaction
 import scorex.utils.ScorexLogging
 
 import scala.annotation.tailrec
