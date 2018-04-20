@@ -49,7 +49,7 @@ object Parser {
   }
 
   private val byteVectorP: P[CONST_BYTEVECTOR] =
-    P("base58'" ~ CharsWhileIn(Base58Chars, 0).! ~ "'")
+    P("base58'" ~~ CharsWhileIn(Base58Chars, 0).! ~~ "'")
       .map { x =>
         if (x.isEmpty) Right(Array.emptyByteArray) else Global.base58Decode(x)
       }

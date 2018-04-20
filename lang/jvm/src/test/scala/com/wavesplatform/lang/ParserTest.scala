@@ -111,6 +111,12 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     )
   }
 
+  property("base58") {
+    parse("base58'bQbp'") shouldBe CONST_BYTEVECTOR(ByteVector("foo".getBytes))
+    parse("base58''") shouldBe CONST_BYTEVECTOR(ByteVector.empty)
+    isParsed("base58' bQbp'\n") shouldBe false
+  }
+
   property("string literal with unicode chars") {
     val stringWithUnicodeChars = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD"
 
