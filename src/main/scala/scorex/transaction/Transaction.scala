@@ -1,11 +1,8 @@
 package scorex.transaction
 
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Coeval
 import scorex.serialization.{BytesSerializable, JsonSerializable}
-import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.smart.script.Script
 
 trait Transaction extends BytesSerializable with JsonSerializable {
   val id: Coeval[ByteStr]
@@ -33,12 +30,6 @@ object Transaction {
       case (Some(asset), fee) =>
         Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> fee))
       case (None, fee) => Portfolio(balance = fee, lease = LeaseBalance.empty, assets = Map.empty)
-    }
-
-    def processingScript(state: SnapshotStateReader): Option[Script] = tx match {
-      case _: ExchangeTransaction          => None
-      case tx: Transaction with Authorized => state.accountScript(tx.sender)
-      case _                               => None
     }
   }
 

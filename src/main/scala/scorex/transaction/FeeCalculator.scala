@@ -68,7 +68,10 @@ class FeeCalculator(settings: FeesSettings, state: SnapshotStateReader) {
     val txAssetFeeKey              = TransactionAssetFee(tx.builder.typeId, txFeeAssetId).key
     for {
       txMinBaseFee <- Either.cond(map.contains(txAssetFeeKey), map(txAssetFeeKey), GenericError(s"Minimum fee is not defined for $txAssetFeeKey"))
-      script       <- Right(tx.processingScript(state))
+      script <- Right(tx match {
+        case tx: Transaction with Authorized => state.accountScript(tx.sender)
+        case _                               => None
+      })
       _ <- Either.cond(script.isEmpty || txFeeAssetId.isEmpty,
                        (),
                        ValidationError.GenericError("Scripted accounts can accept transactions with Waves as fee only"))

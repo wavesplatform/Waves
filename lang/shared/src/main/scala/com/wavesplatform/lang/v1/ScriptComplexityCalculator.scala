@@ -12,7 +12,7 @@ object ScriptComplexityCalculator {
       case _: Typed.CONST_LONG | _: Typed.CONST_BYTEVECTOR | _: Typed.CONST_STRING | Typed.TRUE | Typed.FALSE => EitherT.pure(1)
 
       case t: Typed.GETTER => aux(EitherT.pure(t.ref)).map(_ + 2)
-      case t: Typed.BLOCK  => aux(EitherT.pure(t.body)).map(_ + t.let.fold(0L)(_ => 5L))
+      case t: Typed.BLOCK  => aux(EitherT.pure(t.body)).map(_ + 5)
       case t: Typed.IF =>
         for {
           cond  <- aux(EitherT.pure(t.cond))
