@@ -12,16 +12,16 @@ package object typechecker {
 
   val pointType = PredefType("Point", List("x" -> LONG, "y" -> LONG))
 
-  val idT = PredefFunction("idT", TYPEPARAM('T'), List("p1" -> TYPEPARAM('T')))(Right(_))
-  val extract = PredefFunction("extract", TYPEPARAM('T'), List("p1" -> OPTIONTYPEPARAM(TYPEPARAM('T')))) {
+  val idT = PredefFunction("idT", 1, TYPEPARAM('T'), List("p1" -> TYPEPARAM('T')))(Right(_))
+  val extract = PredefFunction("extract", 1, TYPEPARAM('T'), List("p1" -> OPTIONTYPEPARAM(TYPEPARAM('T')))) {
     case Some(vl) :: Nil => Right(vl)
     case _               => Left("extracting from empty option")
   }
-  val undefinedOptionLong = PredefFunction("undefinedOptionLong", OPTION(LONG), List.empty)(_ => ???)
-  val idOptionLong        = PredefFunction("idOptionLong", UNIT, List("opt" -> OPTION(OPTION(LONG))))(_ => Right(()))
-  val unitOnNone          = PredefFunction("unitOnNone", UNIT, List("opt" -> OPTION(NOTHING)))(_ => Right(()))
+  val undefinedOptionLong = PredefFunction("undefinedOptionLong", 1, OPTION(LONG), List.empty)(_ => ???)
+  val idOptionLong        = PredefFunction("idOptionLong", 1, UNIT, List("opt" -> OPTION(OPTION(LONG))))(_ => Right(()))
+  val unitOnNone          = PredefFunction("unitOnNone", 1, UNIT, List("opt" -> OPTION(NOTHING)))(_ => Right(()))
   val functionWithTwoPrarmsOfTheSameType =
-    PredefFunction("functionWithTwoPrarmsOfTheSameType", TYPEPARAM('T'), List("p1" -> TYPEPARAM('T'), "p2" -> TYPEPARAM('T')))(Right(_))
+    PredefFunction("functionWithTwoPrarmsOfTheSameType", 1, TYPEPARAM('T'), List("p1" -> TYPEPARAM('T'), "p2" -> TYPEPARAM('T')))(Right(_))
 
   val ctx = Monoid.combine(
     PureContext.instance,

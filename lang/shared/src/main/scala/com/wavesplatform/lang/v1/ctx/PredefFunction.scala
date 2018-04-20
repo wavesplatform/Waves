@@ -9,14 +9,17 @@ import monix.eval.Coeval
 sealed trait PredefFunction {
   val name: String
   val args: List[(String, TYPEPLACEHOLDER)]
+  val cost: Long
   val resultType: TYPEPLACEHOLDER
   def eval(args: List[Any]): TrampolinedExecResult[Any]
   val signature: FunctionTypeSignature
   val header: FunctionHeader
 }
+
 object PredefFunction {
 
   case class PredefFunctionImpl(name: String,
+                                cost: Long,
                                 resultType: TYPEPLACEHOLDER,
                                 args: List[(String, TYPEPLACEHOLDER)],
                                 ev: List[Any] => Either[String, Any])
@@ -28,7 +31,8 @@ object PredefFunction {
     override lazy val header: FunctionHeader = FunctionHeader(name, args.map(_._2).map(FunctionHeader.FunctionHeaderType.fromTypePlaceholder))
   }
 
-  def apply(name: String, resultType: TYPEPLACEHOLDER, args: List[(String, TYPEPLACEHOLDER)])(ev: List[Any] => Either[String, Any]): PredefFunction =
-    PredefFunctionImpl(name, resultType, args, ev)
+  def apply(name: String, cost: Long, resultType: TYPEPLACEHOLDER, args: List[(String, TYPEPLACEHOLDER)])(
+      ev: List[Any] => Either[String, Any]): PredefFunction =
+    PredefFunctionImpl(name, cost, resultType, args, ev)
 
 }

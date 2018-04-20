@@ -34,6 +34,8 @@ trait TransactionGen extends BeforeAndAfterAll with TransactionGenBase with Scri
 
 trait TransactionGenBase extends ScriptGen {
 
+  protected def waves(n: Float): Long = (n * 100000000L).toLong
+
   def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.containerOfN[Array, Byte](length, Arbitrary.arbitrary[Byte])
 
   val bytes32gen: Gen[Array[Byte]] = byteArrayGen(32)

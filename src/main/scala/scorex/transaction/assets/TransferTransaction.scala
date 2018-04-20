@@ -114,7 +114,7 @@ object TransferTransaction extends TransactionParserFor[TransferTransaction] wit
     } else if (Try(Math.addExact(amount, feeAmount)).isFailure) {
       Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else if (feeAmount <= 0) {
-      Left(ValidationError.InsufficientFee)
+      Left(ValidationError.InsufficientFee())
     } else {
       Right(TransferTransaction(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, signature))
     }

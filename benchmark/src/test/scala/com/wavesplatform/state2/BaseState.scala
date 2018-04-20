@@ -64,8 +64,6 @@ trait BaseState extends TransactionGenBase {
     state.append(preconditionDiff, next)
   }
 
-  protected def waves(n: Float): Long = (n * 100000000L).toLong
-
   def applyBlock(b: Block): Unit = {
     append(Some(lastBlock), b)
     _lastBlock = b

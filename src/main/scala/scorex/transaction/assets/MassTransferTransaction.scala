@@ -131,7 +131,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
         } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
           Left(ValidationError.TooBigArray)
         } else if (feeAmount <= 0) {
-          Left(ValidationError.InsufficientFee)
+          Left(ValidationError.InsufficientFee())
         } else {
           Right(MassTransferTransaction(version, assetId, sender, transfers, timestamp, feeAmount, attachment, proofs))
       }

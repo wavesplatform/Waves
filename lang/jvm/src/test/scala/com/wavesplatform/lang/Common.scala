@@ -28,7 +28,7 @@ object Common {
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
-  val multiplierFunction: PredefFunction = PredefFunction("MULTIPLY", Terms.LONG, List(("x1", Terms.LONG), ("x2", Terms.LONG))) {
+  val multiplierFunction: PredefFunction = PredefFunction("MULTIPLY", 1, Terms.LONG, List(("x1", Terms.LONG), ("x2", Terms.LONG))) {
     case (x1: Long) :: (x2: Long) :: Nil => Try(x1 * x2).toEither.left.map(_.toString)
     case _                               => ??? // suppress pattern match warning
   }

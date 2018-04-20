@@ -52,7 +52,7 @@ object LeaseCancelTransaction extends TransactionParserFor[LeaseCancelTransactio
     if (leaseId.arr.length != crypto.DigestSize) {
       Left(ValidationError.GenericError("Lease transaction id is invalid"))
     } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee)
+      Left(ValidationError.InsufficientFee())
     } else {
       Right(LeaseCancelTransaction(sender, leaseId, fee, timestamp, signature))
     }
