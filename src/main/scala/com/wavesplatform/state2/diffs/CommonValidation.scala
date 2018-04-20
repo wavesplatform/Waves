@@ -6,7 +6,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{Portfolio, _}
 import scorex.account.Address
-import scorex.transaction.ValidationError.{AlreadyInTheState, GenericError, Mistiming}
+import scorex.transaction.ValidationError.{AlreadyInTheState, GenericError, Mistiming, UnsupportedTransactionType}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -125,4 +125,54 @@ object CommonValidation {
         Left(Mistiming(s"Transaction ts ${tx.timestamp} is too old. Previous block time: $prevBlockTime"))
       case _ => Right(tx)
     }
+
+  def checkTxFee[T <: Transaction](tx: T,
+                                   state: SnapshotStateReader,
+                                   height: Int,
+                                   fp: FeatureProvider,
+                                   fs: FunctionalitySettings): Either[ValidationError, T] = {
+    if (height < Sponsorship.sponsoredFeesSwitchHeight(fp, fs)) Right(tx)
+    else
+      for {
+        feeInUnits <- tx match {
+          case gtx: GenesisTransaction              => Right(0)
+          case ptx: PaymentTransaction              => Right(1)
+          case itx: IssueTransaction                => Right(1000)
+          case sitx: SmartIssueTransaction          => Right(1000)
+          case rtx: ReissueTransaction              => Right(1000)
+          case btx: BurnTransaction                 => Right(1)
+          case ttx: TransferTransaction             => Right(1)
+          case mtx: MassTransferTransaction         => Right(1 + (mtx.transfers.size + 1) / 2)
+          case ltx: LeaseTransaction                => Right(1)
+          case ltx: LeaseCancelTransaction          => Right(1)
+          case etx: ExchangeTransaction             => Right(3)
+          case atx: CreateAliasTransaction          => Right(1)
+          case dtx: DataTransaction                 => Right(1 + (dtx.bytes().length - 1) / 1024)
+          case sstx: SetScriptTransaction           => Right(1)
+          case sttx: VersionedTransferTransaction   => Right(1)
+          case stx: SponsorFeeTransaction           => Right(1000)
+          case ctx: CancelFeeSponsorshipTransaction => Right(1000)
+          case _                                    => Left(UnsupportedTransactionType)
+        }
+        wavesFee <- tx.assetFee._1 match {
+          case None => Right(tx.assetFee._2)
+          case Some(assetId) =>
+            for {
+              assetInfo <- state.assetDescription(assetId).toRight(GenericError(s"Asset $assetId does not exist, cannot be used to pay fees"))
+              wavesFee <- Either.cond(
+                assetInfo.sponsorship > 0,
+                Sponsorship.toWaves(tx.assetFee._2, assetInfo.sponsorship),
+                GenericError(s"Asset $assetId is not sponsored, cannot be used to pay fees")
+              )
+            } yield wavesFee
+        }
+        minimumFee = feeInUnits * Sponsorship.FeeUnit
+        result <- Either.cond(
+          wavesFee >= minimumFee,
+          tx,
+          GenericError(
+            s"Fee in ${tx.assetFee._1.fold("WAVES")(_.toString)} for ${tx.builder.classTag} does not exceed minimal value of $minimumFee WAVES")
+        )
+      } yield result
+  }
 }

@@ -2,7 +2,7 @@ package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.settings.{BlockchainSettings, Constants, WavesSettings}
+import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
 import org.scalacheck.Gen
@@ -55,11 +55,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
                                            PrivateKeyAccount(Array.fill(KeyLength)(1)),
                                            3: Byte,
                                            sponsor.timestamp + 1)
-        val block2 = customBuildBlockOfTxs(microBlocks.last.totalResBlockSig,
-                                           Seq.empty,
-                                           PrivateKeyAccount(Array.fill(KeyLength)(1)),
-                                           3: Byte,
-                                           sponsor.timestamp + 1)
+        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq.empty, PrivateKeyAccount(Array.fill(KeyLength)(1)), 3: Byte, sponsor.timestamp + 1)
         val block3 = buildBlockOfTxs(block2.uniqueId, Seq(aliceToMaster))
 
         domain.blockchainUpdater.processBlock(block0).explicitGet()

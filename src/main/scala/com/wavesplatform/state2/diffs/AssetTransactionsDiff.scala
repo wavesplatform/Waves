@@ -82,7 +82,7 @@ object AssetTransactionsDiff {
     }
   }
 
-  def cancel(state: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(
+  def cancelSponsorship(state: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(
       tx: CancelFeeSponsorshipTransaction): Either[ValidationError, Diff] = {
     validateAsset(tx, state, tx.assetId, true).flatMap { _ =>
       Right(
