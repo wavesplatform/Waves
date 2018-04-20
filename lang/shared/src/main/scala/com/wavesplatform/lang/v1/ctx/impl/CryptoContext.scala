@@ -24,12 +24,6 @@ object CryptoContext {
           Right(global.curve25519verify(m.toArray, s.toArray, p.toArray))
         case _ => ???
       }
-
-    def toBase58StringF: PredefFunction = PredefFunction("toBase58String", 400000, STRING, List(("bytes", BYTEVECTOR))) {
-      case (bytes: ByteVector) :: Nil =>
-        Right(global.base58Encode(bytes.toArray))
-      case _ => ???
-    }
-    Context.build(Seq.empty, Map.empty, Seq(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF))
+    Context.build(Seq.empty, Map.empty, Seq(keccak256F, blake2b256F, sha256F, sigVerifyF))
   }
 }
