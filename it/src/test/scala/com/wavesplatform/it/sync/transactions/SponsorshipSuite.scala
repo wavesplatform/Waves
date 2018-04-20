@@ -18,6 +18,7 @@ class SponsorshipSuite extends BaseTransactionSuite {
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
+      .overrideBase(_.raw("waves.blockchain.custom.functionality.blocks-for-feature-activation=1"))
       .withDefault(1)
       .withSpecial(_.nonMiner)
       .buildNonConflicting()

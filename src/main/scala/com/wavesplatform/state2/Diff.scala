@@ -93,7 +93,7 @@ object Sponsorship {
 
   def sponsoredFeesSwitchHeight(fp: FeatureProvider, fs: FunctionalitySettings): Int =
     fp.featureActivationHeight(BlockchainFeatures.FeeSponsorship.id)
-      .map(_ + fs.sponsoredFeesDelay)
+      .map(h => h + fs.blocksForFeatureActivation(h))
       .getOrElse(Int.MaxValue)
 
   def toWaves(assetFee: Long, sponsorship: Long): Long = {
