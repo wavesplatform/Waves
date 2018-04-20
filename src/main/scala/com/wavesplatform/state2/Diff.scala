@@ -96,8 +96,13 @@ object Sponsorship {
       .map(_ + fs.sponsoredFeesDelay)
       .getOrElse(Int.MaxValue)
 
-  def toWaves(assetFee: Long, sponsorship: Long): Long =
-    (BigDecimal(assetFee) * BigDecimal(Sponsorship.FeeUnit) / BigDecimal(sponsorship)).toLongExact
+  def toWaves(assetFee: Long, sponsorship: Long): Long = {
+    val waves = (BigDecimal(assetFee) * BigDecimal(Sponsorship.FeeUnit)) / BigDecimal(sponsorship)
+    if (waves > Long.MaxValue) {
+      throw new java.lang.ArithmeticException("Overflow")
+    }
+    waves.toLong
+  }
 }
 
 case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
