@@ -180,6 +180,9 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("getter") {
+    isParsed("xxx   .yyy") shouldBe false
+    isParsed("xxx.  yyy") shouldBe false
+
     parse("xxx.yyy") shouldBe GETTER(REF("xxx"), "yyy")
     parse(
       """

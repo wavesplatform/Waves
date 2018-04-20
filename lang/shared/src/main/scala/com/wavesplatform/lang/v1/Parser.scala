@@ -44,7 +44,7 @@ object Parser {
 
   private val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | functionCallP | refP)
 
-  private val maybeGetterP: P[EXPR] = P(extractableAtom ~ ("." ~ varName).?).map {
+  private val maybeGetterP: P[EXPR] = P(extractableAtom ~~ ("." ~~ varName).?).map {
     case (e, f) => f.fold(e)(GETTER(e, _))
   }
 
