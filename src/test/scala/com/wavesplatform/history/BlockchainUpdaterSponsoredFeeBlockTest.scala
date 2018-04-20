@@ -35,7 +35,16 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       .right
       .get
     aliceToMaster: TransferTransaction = TransferTransaction
-      .create(Some(feeAsset.id()), alice, master, 100, ts + 100, Some(feeAsset.id()), fee, Array.emptyByteArray)
+      .create(
+        Some(feeAsset.id()),
+        alice,
+        master,
+        100,
+        ts + 100,
+        Some(feeAsset.id()),
+        sponsorTx.minFee,
+        Array.emptyByteArray
+      )
       .right
       .get
   } yield (genesis, masterToAlice, feeAsset, sponsorTx, aliceToMaster)
