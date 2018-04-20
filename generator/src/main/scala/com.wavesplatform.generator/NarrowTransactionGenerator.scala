@@ -4,14 +4,14 @@ import java.util.concurrent.ThreadLocalRandom
 
 import cats.Show
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
-import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, ByteStr, LongDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, LongDataEntry}
 import org.slf4j.LoggerFactory
 import scorex.account.{Alias, PrivateKeyAccount}
+import scorex.transaction._
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction._
 import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration._
@@ -170,8 +170,6 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
                                                      Array.fill(r.nextInt(100))(r.nextInt().toByte)))
             }
           case DataTransaction =>
-            import com.wavesplatform.state2.DataEntry._
-
             val sender = randomFrom(accounts).get
             val count  = r.nextInt(10)
 

@@ -1,10 +1,10 @@
-package com.wavesplatform.state2
+package com.wavesplatform.state
 
 import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.lang.v1.{Parser, TypeChecker}
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.StateSyntheticBenchmark._
+import com.wavesplatform.state.StateSyntheticBenchmark._
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import org.openjdk.jmh.annotations._
 import org.scalacheck.Gen

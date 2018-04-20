@@ -1,4 +1,4 @@
-package com.wavesplatform.state2
+package com.wavesplatform.state
 
 import java.io.File
 import java.nio.file.Files
@@ -7,7 +7,7 @@ import com.wavesplatform.TransactionGenBase
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.LevelDBFactory
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.diffs.BlockDiffer
+import com.wavesplatform.state.diffs.BlockDiffer
 import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations.{Setup, TearDown}
 import org.scalacheck.Gen

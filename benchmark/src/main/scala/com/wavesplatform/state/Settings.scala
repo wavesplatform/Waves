@@ -9,6 +9,6 @@ case class Settings(dbPath: String, aliasesFile: String, restTxsFile: String, ac
 object Settings {
   def fromConfig(config: Config): Settings = {
     implicit val _ = net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
-    config.as[Settings]("waves.benchmark.state2")
+    config.as[Settings]("waves.benchmark.state")
   }
 }
