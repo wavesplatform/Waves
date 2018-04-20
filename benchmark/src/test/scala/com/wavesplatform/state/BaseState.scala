@@ -60,7 +60,7 @@ trait BaseState extends TransactionGenBase {
   )
 
   private def append(prev: Option[Block], next: Block): Unit = {
-    val preconditionDiff = BlockDiffer.fromBlock(fs, state, state, prev, next).explicitGet()
+    val preconditionDiff = BlockDiffer.fromBlock(fs, state, prev, next).explicitGet()
     state.append(preconditionDiff, next)
   }
 
