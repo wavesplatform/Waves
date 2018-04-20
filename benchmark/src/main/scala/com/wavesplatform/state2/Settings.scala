@@ -4,7 +4,17 @@ import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
-case class Settings(dbPath: String, aliasesFile: String, restTxsFile: String, accountsFile: String, assetsFile: String, dataFile: String)
+case class Settings(dbPath: String,
+                    aliasesFile: String,
+                    aliasesFromHeight: Int,
+                    restTxsFile: String,
+                    restTxsFromHeight: Int,
+                    accountsFile: String,
+                    accountsFromHeight: Int,
+                    assetsFile: String,
+                    assetsFromHeight: Int,
+                    dataFile: String,
+                    dataFromHeight: Int)
 
 object Settings {
   def fromConfig(config: Config): Settings = {

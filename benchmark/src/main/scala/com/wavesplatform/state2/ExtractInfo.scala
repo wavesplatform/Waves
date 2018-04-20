@@ -62,15 +62,17 @@ object ExtractInfo extends App with ScorexLogging {
       nonEmptyBlockHeights(from)
         .flatMap(state.blockAt(_))
 
-    val (aliasTxs, restTxs) = nonEmptyBlocks(100000)
+    val aliasTxs = nonEmptyBlocks(settings.aliasesFromHeight)
       .flatMap(_.transactionData)
-      .partition {
+      .collect {
         case _: CreateAliasTransaction => true
-        case _                         => false
       }
 
+    val restTxs = nonEmptyBlocks(settings.restTxsFromHeight)
+      .flatMap(_.transactionData)
+
     val accounts = for {
-      b <- nonEmptyBlocks(100000)
+      b <- nonEmptyBlocks(settings.accountsFromHeight)
       sender <- b.transactionData
         .collect {
           case tx: Transaction with Authorized => tx.sender
@@ -85,7 +87,7 @@ object ExtractInfo extends App with ScorexLogging {
     val restTxIds = restTxs.map(_.id().base58)
     write("rest transactions", settings.restTxsFile, restTxIds.take(10000))
 
-    val assets = nonEmptyBlocks(1)
+    val assets = nonEmptyBlocks(settings.assetsFromHeight)
       .flatMap { b =>
         b.transactionData.collect {
           case tx: IssueTransaction => tx.assetId()
@@ -96,7 +98,7 @@ object ExtractInfo extends App with ScorexLogging {
     write("assets", settings.assetsFile, takeUniq(300, assets))
 
     val data = for {
-      b <- nonEmptyBlocks(332550)
+      b <- nonEmptyBlocks(settings.dataFromHeight)
       test <- b.transactionData
         .collect {
           case tx: DataTransaction =>
