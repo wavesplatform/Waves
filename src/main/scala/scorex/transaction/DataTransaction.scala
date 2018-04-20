@@ -79,7 +79,7 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
     } else if (data.lengthCompare(MaxEntryCount) > 0 || data.exists(!_.valid)) {
       Left(ValidationError.TooBigArray)
     } else if (feeAmount <= 0) {
-      Left(ValidationError.InsufficientFee)
+      Left(ValidationError.InsufficientFee())
     } else {
       Right(DataTransaction(version, sender, data, feeAmount, timestamp, proofs))
     }

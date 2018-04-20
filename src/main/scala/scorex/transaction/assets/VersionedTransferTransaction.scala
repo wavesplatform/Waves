@@ -107,7 +107,7 @@ object VersionedTransferTransaction extends TransactionParserFor[VersionedTransf
     } else if (Try(Math.addExact(amount, feeAmount)).isFailure) {
       Left(ValidationError.OverflowError)
     } else if (feeAmount <= 0) {
-      Left(ValidationError.InsufficientFee)
+      Left(ValidationError.InsufficientFee())
     } else {
       Right(VersionedTransferTransaction(version, sender, recipient, assetId, amount, timestamp, feeAmount, attachment, proofs))
     }

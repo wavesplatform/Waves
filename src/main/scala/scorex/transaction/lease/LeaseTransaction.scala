@@ -78,7 +78,7 @@ object LeaseTransaction extends TransactionParserFor[LeaseTransaction] with Tran
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
       Left(ValidationError.OverflowError)
     } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee)
+      Left(ValidationError.InsufficientFee())
     } else if (recipient.isInstanceOf[Address] && sender.stringRepr == recipient.stringRepr) {
       Left(ValidationError.ToSelf)
     } else {

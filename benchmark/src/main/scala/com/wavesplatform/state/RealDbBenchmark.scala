@@ -137,7 +137,6 @@ object RealDbBenchmark extends App with ScorexLogging {
   }
 
   def logStats(label: String, timing: mutable.ArrayBuffer[FiniteDuration]): Unit = {
-    println(s"size: ${timing.size}")
     val total = timing.foldLeft(0.millis)(_ + _)
     val avg   = total / timing.size.toDouble
     val dev = timing.view.map { x =>

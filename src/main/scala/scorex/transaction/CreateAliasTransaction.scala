@@ -52,7 +52,7 @@ object CreateAliasTransaction extends TransactionParserFor[CreateAliasTransactio
 
   def create(sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, TransactionT] =
     if (fee <= 0) {
-      Left(ValidationError.InsufficientFee)
+      Left(ValidationError.InsufficientFee())
     } else {
       Right(CreateAliasTransaction(sender, alias, fee, timestamp, signature))
     }

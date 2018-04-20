@@ -78,7 +78,7 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
              proofs: Proofs): Either[ValidationError, TransactionT] =
     for {
       _ <- Either.cond(supportedVersions.contains(version), (), ValidationError.UnsupportedVersion(version))
-      _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee)
+      _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: $fee"))
     } yield new SetScriptTransaction(version, networkByte, sender, script, fee, timestamp, proofs)
 
   def selfSigned(version: Byte,

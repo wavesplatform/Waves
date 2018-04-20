@@ -24,7 +24,7 @@ object ApiError {
   def fromValidationError(e: ValidationError): ApiError = e match {
     case ValidationError.InvalidAddress(_)               => InvalidAddress
     case ValidationError.NegativeAmount(x, of)           => NegativeAmount(s"$x of $of")
-    case ValidationError.InsufficientFee                 => InsufficientFee
+    case ValidationError.InsufficientFee(x)              => InsufficientFee(x)
     case ValidationError.InvalidName                     => InvalidName
     case ValidationError.InvalidSignature(_, _)          => InvalidSignature
     case ValidationError.InvalidRequestSignature         => InvalidSignature

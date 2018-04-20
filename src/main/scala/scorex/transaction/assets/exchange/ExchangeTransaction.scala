@@ -83,7 +83,7 @@ object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] wit
     lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
 
     if (fee <= 0) {
-      Left(ValidationError.InsufficientFee)
+      Left(ValidationError.InsufficientFee())
     } else if (amount <= 0) {
       Left(ValidationError.NegativeAmount(amount, "assets"))
     } else if (price <= 0) {

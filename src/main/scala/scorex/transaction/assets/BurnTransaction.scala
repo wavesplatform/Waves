@@ -62,7 +62,7 @@ object BurnTransaction extends TransactionParserFor[BurnTransaction] with Transa
     if (quantity < 0) {
       Left(ValidationError.NegativeAmount(quantity, "assets"))
     } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee)
+      Left(ValidationError.InsufficientFee())
     } else {
       Right(BurnTransaction(sender, assetId, quantity, fee, timestamp, signature))
     }

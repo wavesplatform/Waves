@@ -124,10 +124,10 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         valueTooLongEi shouldBe Left(ValidationError.TooBigArray)
 
         val noFeeEi = DataTransaction.create(version, sender, data, 0, timestamp, proofs)
-        noFeeEi shouldBe Left(ValidationError.InsufficientFee)
+        noFeeEi shouldBe Left(ValidationError.InsufficientFee())
 
         val negativeFeeEi = DataTransaction.create(version, sender, data, -100, timestamp, proofs)
-        negativeFeeEi shouldBe Left(ValidationError.InsufficientFee)
+        negativeFeeEi shouldBe Left(ValidationError.InsufficientFee())
     }
   }
 }
