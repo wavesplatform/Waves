@@ -17,8 +17,7 @@ object TestFunctionalitySettings {
     resetEffectiveBalancesAtHeight = 0,
     blockVersion3AfterHeight = 0,
     preActivatedFeatures = Map.empty,
-    doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-    sponsoredFeesDelay = 100
+    doubleFeaturesPeriodsAfterHeight = Int.MaxValue
   )
 
   val Stub: FunctionalitySettings = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)

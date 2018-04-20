@@ -19,21 +19,27 @@ object BlockDiffer extends ScorexLogging with Instrumented {
 
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
-  private def clearSponsorship(portfolio: Portfolio, blockSigner: Address, state: SnapshotStateReader): Portfolio = {
-    val sponsoredAssets = portfolio.assets
-      .map {
-        case (assetId, totalFee) =>
-          (assetId, totalFee, state.assetDescription(assetId))
-      }
-      .collect {
-        case (assetId, totalFee, Some(desc)) if desc.sponsorship > 0 =>
-          (assetId, totalFee, desc.sponsorship)
-      }
-    val unsponsoredPf = portfolio.copy(assets = portfolio.assets -- sponsoredAssets.map(_._1))
-    val sponsoredWaves = sponsoredAssets.map {
-      case (_, totalFee, baseFee) => Sponsorship.toWaves(totalFee, baseFee)
-    }.sum
-    unsponsoredPf.copy(balance = unsponsoredPf.balance + sponsoredWaves)
+  private def clearSponsorship(portfolio: Portfolio,
+                               state: SnapshotStateReader,
+                               height: Int,
+                               fp: FeatureProvider,
+                               fs: FunctionalitySettings): Portfolio = {
+    if (height >= Sponsorship.sponsoredFeesSwitchHeight(fp, fs)) {
+      val sponsoredAssets = portfolio.assets
+        .map {
+          case (assetId, totalFee) =>
+            (assetId, totalFee, state.assetDescription(assetId))
+        }
+        .collect {
+          case (assetId, totalFee, Some(desc)) if desc.sponsorship > 0 =>
+            (assetId, totalFee, desc.sponsorship)
+        }
+      val unsponsoredPf = portfolio.copy(assets = portfolio.assets -- sponsoredAssets.map(_._1))
+      val sponsoredWaves = sponsoredAssets.map {
+        case (_, totalFee, baseFee) => Sponsorship.toWaves(totalFee, baseFee)
+      }.sum
+      unsponsoredPf.copy(balance = unsponsoredPf.balance + sponsoredWaves)
+    } else portfolio
   }
 
   def fromBlock(settings: FunctionalitySettings,
@@ -46,17 +52,14 @@ object BlockDiffer extends ScorexLogging with Instrumented {
 
     // height switch is next after activation
     val ng4060switchHeight = fp.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
-    val sponsoredFeeHeight = Sponsorship.sponsoredFeesSwitchHeight(fp, settings)
 
     lazy val prevBlockFeeDistr: Option[Diff] =
       if (stateHeight > ng4060switchHeight)
-        maybePrevBlock.map { prevBlock =>
-          val portfolio =
-            if (stateHeight >= sponsoredFeeHeight)
-              clearSponsorship(prevBlock.prevBlockFeePart(), blockSigner, s)
-            else prevBlock.prevBlockFeePart()
-          Diff.empty.copy(portfolios = Map(blockSigner -> portfolio))
-        } else None
+        maybePrevBlock.map(
+          prevBlock =>
+            Diff.empty.copy(portfolios = Map(blockSigner ->
+              clearSponsorship(prevBlock.prevBlockFeePart(), s, stateHeight, fp, settings))))
+      else None
 
     lazy val currentBlockFeeDistr =
       if (stateHeight < ng4060switchHeight)
@@ -114,9 +117,9 @@ object BlockDiffer extends ScorexLogging with Instrumented {
           case (ei, tx) =>
             ei.flatMap { diff =>
               txDiffer(composite(s, diff), fp, tx).map { newDiff =>
-                val feePortfolio = clearSponsorship(tx.feeDiff().multiply(Block.CurrentBlockFeePart), blockGenerator, s)
-                val feeDiff      = Diff.empty.copy(portfolios = Map(blockGenerator -> feePortfolio))
-                diff.combine(newDiff).combine(feeDiff)
+                diff.combine(
+                  newDiff.copy(portfolios = newDiff.portfolios.combine(Map(blockGenerator ->
+                    clearSponsorship(tx.feeDiff().multiply(Block.CurrentBlockFeePart), s, currentBlockHeight, fp, settings)))))
               }
             }
         }
