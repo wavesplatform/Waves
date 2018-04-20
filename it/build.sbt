@@ -33,11 +33,10 @@ inTask(docker)(
 
       new Dockerfile {
         from("anapsix/alpine-java:8_server-jre")
-        add((assembly in LocalProject("node")).value, "/opt/waves/waves.jar")
-        add(Seq(configTemplate, startWaves), "/opt/waves/")
 
         // Install yourkit
-        runRaw(s"""apk update && \\
+        runRaw(s"""mkdir -p /opt/waves/ && \\
+                  |apk update && \\
                   |apk add --no-cache ca-certificates openssl && \\
                   |update-ca-certificates && \\
                   |wget https://www.yourkit.com/download/$yourKitArchive -P /tmp/ && \\
@@ -46,6 +45,9 @@ inTask(docker)(
                   |rm /tmp/$yourKitArchive""".stripMargin)
 
         if (withAspectJ) run("wget", "--quiet", aspectjAgentUrl, "-O", "/opt/waves/aspectjweaver.jar")
+
+        add((assembly in LocalProject("node")).value, "/opt/waves/waves.jar")
+        add(Seq(configTemplate, startWaves), "/opt/waves/")
         run("chmod", "+x", "/opt/waves/start-waves.sh")
         entryPoint("/opt/waves/start-waves.sh")
         expose(10001)
