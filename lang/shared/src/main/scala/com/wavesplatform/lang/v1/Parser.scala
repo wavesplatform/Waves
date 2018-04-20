@@ -27,7 +27,7 @@ object Parser {
   private val escapedUnicodeSymbolP = P("\\" ~ (CharIn("\"\\bfnrt") | unicodeSymbolP))
   private val varName               = (char.repX(min = 1, max = 1) ~~ (digit | char).repX()).!.filter(!keywords.contains(_))
 
-  private val numberP: P[CONST_LONG] = P(CharIn("+-").rep(max = 1) ~ digit.rep(min = 1)).!.map(t => CONST_LONG(t.toLong))
+  private val numberP: P[CONST_LONG] = P(CharIn("+-").rep(max = 1) ~ digit.repX(min = 1)).!.map(t => CONST_LONG(t.toLong))
   private val trueP: P[TRUE.type]    = P("true").map(_ => TRUE)
   private val falseP: P[FALSE.type]  = P("false").map(_ => FALSE)
   private val bracesP: P[EXPR]       = P("(" ~ expr ~ ")")

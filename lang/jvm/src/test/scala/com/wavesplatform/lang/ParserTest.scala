@@ -239,4 +239,11 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         )
     }
   }
+
+  property("multiple expressions going one after another are denied") {
+    isParsed(
+      """1 + 1
+        |2 + 2""".stripMargin
+    ) shouldBe false
+  }
 }
