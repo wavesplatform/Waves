@@ -37,7 +37,7 @@ class ErasureTest extends PropSpec with PropertyChecks with Matchers with Script
 //      "GT"               -> BINARY_OP(CONST_LONG(0), GT_OP, CONST_LONG(1), BOOLEAN),
 //      "GE"               -> BINARY_OP(CONST_LONG(0), GE_OP, CONST_LONG(1), BOOLEAN),
       "BLOCK" -> BLOCK(
-        let = None,
+        let = LET("x", TRUE),
         body = CONST_LONG(0),
         tpe = LONG
       )
@@ -57,17 +57,10 @@ class ErasureTest extends PropSpec with PropertyChecks with Matchers with Script
         case getter: Typed.GETTER      => aux(getter.ref).map(Untyped.GETTER(_, getter.field))
 //        case binaryOp: Typed.BINARY_OP => (aux(binaryOp.a), aux(binaryOp.b)).mapN(Untyped.BINARY_OP(_, binaryOp.kind, _))
         case block: Typed.BLOCK =>
-          aux(block.body).flatMap { t =>
-            val x = Untyped.BLOCK(let = None, body = t)
-            block.let match {
-              case None => Coeval(x)
-              case Some(let) =>
-                aux(let.value).map {
-                  case let: Untyped.LET => x.copy(let = Some(let))
-                  case _                => throw new IllegalStateException()
-                }
-            }
-          }
+          for {
+            b <- aux(block.body)
+            l <- aux(block.let.value)
+          } yield Untyped.BLOCK(let = Untyped.LET(block.let.name, l), body = b)
         case ifExpr: Typed.IF => (aux(ifExpr.cond), aux(ifExpr.ifTrue), aux(ifExpr.ifFalse)).mapN(Untyped.IF)
         case ref: Typed.REF   => Coeval(Untyped.REF(ref.key))
         case f: Typed.FUNCTION_CALL =>

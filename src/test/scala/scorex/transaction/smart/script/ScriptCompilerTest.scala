@@ -35,7 +35,7 @@ class ScriptCompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   private val expectedExpr = {
     BLOCK(
-      LET("x", CONST_LONG(10)).some,
+      LET("x", CONST_LONG(10)),
       FUNCTION_CALL(
         FunctionHeader("+", List(FT_LONG, FT_LONG)),
         List(REF("x", LONG), REF("x", LONG)),
