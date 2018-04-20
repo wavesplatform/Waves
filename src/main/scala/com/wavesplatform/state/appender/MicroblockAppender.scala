@@ -20,24 +20,23 @@ import scala.util.{Left, Right}
 
 object MicroblockAppender extends ScorexLogging with Instrumented {
 
-  def apply(checkpoint: CheckpointService, blockchain: Blockchain, blockchainUpdater: BlockchainUpdater, utxStorage: UtxPool, scheduler: Scheduler)(
+  def apply(checkpoint: CheckpointService, blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPool, scheduler: Scheduler)(
       microBlock: MicroBlock): Task[Either[ValidationError, Unit]] =
     Task(
       measureSuccessful(
         microblockProcessingTimeStats,
         for {
           _ <- Either.cond(
-            checkpoint.isBlockValid(microBlock.totalResBlockSig, blockchain.height + 1),
+            checkpoint.isBlockValid(microBlock.totalResBlockSig, blockchainUpdater.height + 1),
             (),
-            MicroBlockAppendError(s"[h = ${blockchain.height + 1}] is not valid with respect to checkpoint", microBlock)
+            MicroBlockAppendError(s"[h = ${blockchainUpdater.height + 1}] is not valid with respect to checkpoint", microBlock)
           )
           _ <- blockchainUpdater.processMicroBlock(microBlock)
         } yield utxStorage.removeAll(microBlock.transactionData)
       )).executeOn(scheduler)
 
   def apply(checkpoint: CheckpointService,
-            blockchain: Blockchain,
-            blockchainUpdater: BlockchainUpdater,
+            blockchainUpdater: BlockchainUpdater with Blockchain,
             utxStorage: UtxPool,
             allChannels: ChannelGroup,
             peerDatabase: PeerDatabase,
@@ -46,7 +45,7 @@ object MicroblockAppender extends ScorexLogging with Instrumented {
     val microblockTotalResBlockSig = microBlock.totalResBlockSig
     (for {
       _                <- EitherT(Task.now(microBlock.signaturesValid()))
-      validApplication <- EitherT(apply(checkpoint, blockchain, blockchainUpdater, utxStorage, scheduler)(microBlock))
+      validApplication <- EitherT(apply(checkpoint, blockchainUpdater, utxStorage, scheduler)(microBlock))
     } yield validApplication).value.map {
       case Right(()) =>
         md.invOpt match {

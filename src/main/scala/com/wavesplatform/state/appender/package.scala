@@ -61,27 +61,26 @@ package object appender extends ScorexLogging {
     )
 
   private[appender] def appendBlock(checkpoint: CheckpointService,
-                                    blockchain: Blockchain,
-                                    blockchainUpdater: BlockchainUpdater,
+                                    blockchainUpdater: BlockchainUpdater with Blockchain,
                                     utxStorage: UtxPool,
                                     time: Time,
                                     settings: WavesSettings)(block: Block): Either[ValidationError, Option[Int]] =
     for {
       _ <- Either.cond(
-        checkpoint.isBlockValid(block.signerData.signature, blockchain.height + 1),
+        checkpoint.isBlockValid(block.signerData.signature, blockchainUpdater.height + 1),
         (),
-        BlockAppendError(s"Block $block at height ${blockchain.height + 1} is not valid w.r.t. checkpoint", block)
+        BlockAppendError(s"Block $block at height ${blockchainUpdater.height + 1} is not valid w.r.t. checkpoint", block)
       )
       _ <- Either.cond(
-        blockchain.accountScript(block.sender).isEmpty,
+        blockchainUpdater.accountScript(block.sender).isEmpty,
         (),
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
-      _ <- blockConsensusValidation(blockchain, settings, time.correctedTime(), block) { height =>
-        val balance = PoSCalc.generatingBalance(blockchain, settings.blockchainSettings.functionalitySettings, block.sender, height)
-        validateEffectiveBalance(blockchain, settings.blockchainSettings.functionalitySettings, block, height)(balance)
+      _ <- blockConsensusValidation(blockchainUpdater, settings, time.correctedTime(), block) { height =>
+        val balance = PoSCalc.generatingBalance(blockchainUpdater, settings.blockchainSettings.functionalitySettings, block.sender, height)
+        validateEffectiveBalance(blockchainUpdater, settings.blockchainSettings.functionalitySettings, block, height)(balance)
       }
-      baseHeight = blockchain.height
+      baseHeight = blockchainUpdater.height
       maybeDiscardedTxs <- blockchainUpdater.processBlock(block)
     } yield {
       utxStorage.removeAll(block.transactionData)

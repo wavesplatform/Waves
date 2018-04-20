@@ -22,8 +22,7 @@ import scala.util.Right
 object BlockAppender extends ScorexLogging with Instrumented {
 
   def apply(checkpoint: CheckpointService,
-            blockchain: Blockchain,
-            blockchainUpdater: BlockchainUpdater,
+            blockchainUpdater: BlockchainUpdater with Blockchain,
             time: Time,
             utxStorage: UtxPool,
             settings: WavesSettings,
@@ -32,21 +31,20 @@ object BlockAppender extends ScorexLogging with Instrumented {
       log.debug(s"Appending $newBlock")
       measureSuccessful(
         blockProcessingTimeStats, {
-          if (blockchain.contains(newBlock)) Right(None)
+          if (blockchainUpdater.contains(newBlock)) Right(None)
           else
             for {
-              _ <- Either.cond(blockchain.heightOf(newBlock.reference).exists(_ >= blockchain.height - 1),
+              _ <- Either.cond(blockchainUpdater.heightOf(newBlock.reference).exists(_ >= blockchainUpdater.height - 1),
                                (),
                                BlockAppendError("Irrelevant block", newBlock))
-              maybeBaseHeight <- appendBlock(checkpoint, blockchain, blockchainUpdater, utxStorage, time, settings)(newBlock)
-            } yield maybeBaseHeight map (_ => blockchain.score)
+              maybeBaseHeight <- appendBlock(checkpoint, blockchainUpdater, utxStorage, time, settings)(newBlock)
+            } yield maybeBaseHeight map (_ => blockchainUpdater.score)
         }
       )
     }.executeOn(scheduler)
 
   def apply(checkpoint: CheckpointService,
-            blockchain: Blockchain,
-            blockchainUpdater: BlockchainUpdater,
+            blockchainUpdater: BlockchainUpdater with Blockchain,
             time: Time,
             utxStorage: UtxPool,
             settings: WavesSettings,
@@ -58,12 +56,12 @@ object BlockAppender extends ScorexLogging with Instrumented {
     blockReceivingLag.safeRecord(System.currentTimeMillis() - newBlock.timestamp)
     (for {
       _                <- EitherT(Task.now(newBlock.signaturesValid()))
-      validApplication <- EitherT(apply(checkpoint, blockchain, blockchainUpdater, time, utxStorage, settings, scheduler)(newBlock))
+      validApplication <- EitherT(apply(checkpoint, blockchainUpdater, time, utxStorage, settings, scheduler)(newBlock))
     } yield validApplication).value.map {
       case Right(None) =>
         log.trace(s"${id(ch)} $newBlock already appended")
       case Right(Some(_)) =>
-        BlockStats.applied(newBlock, BlockStats.Source.Broadcast, blockchain.height)
+        BlockStats.applied(newBlock, BlockStats.Source.Broadcast, blockchainUpdater.height)
         log.debug(s"${id(ch)} Appended $newBlock")
         if (newBlock.transactionData.isEmpty)
           allChannels.broadcast(BlockForged(newBlock), Some(ch))

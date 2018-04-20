@@ -21,8 +21,7 @@ import scala.util.{Left, Right}
 object ExtensionAppender extends ScorexLogging with Instrumented {
 
   def apply(checkpoint: CheckpointService,
-            blockchain: Blockchain,
-            blockchainUpdater: BlockchainUpdater,
+            blockchainUpdater: BlockchainUpdater with Blockchain,
             utxStorage: UtxPool,
             time: Time,
             settings: WavesSettings,
@@ -34,7 +33,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
     def p(blocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] =
       Task(Signed.validateOrdered(blocks).flatMap { newBlocks =>
         {
-          val extension = newBlocks.dropWhile(blockchain.contains)
+          val extension = newBlocks.dropWhile(blockchainUpdater.contains)
 
           extension.headOption.map(_.reference) match {
             case Some(lastCommonBlockId) =>
@@ -44,7 +43,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
               val forkApplicationResultEi = Coeval {
                 extension.view
                   .map { b =>
-                    b -> appendBlock(checkpoint, blockchain, blockchainUpdater, utxStorage, time, settings)(b).right.map {
+                    b -> appendBlock(checkpoint, blockchainUpdater, utxStorage, time, settings)(b).right.map {
                       _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
                     }
                   }
@@ -69,10 +68,10 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
                   }
               }
 
-              val initalHeight = blockchain.height
+              val initalHeight = blockchainUpdater.height
 
               val droppedBlocksEi = for {
-                commonBlockHeight <- blockchain.heightOf(lastCommonBlockId).toRight(GenericError("Fork contains no common parent"))
+                commonBlockHeight <- blockchainUpdater.heightOf(lastCommonBlockId).toRight(GenericError("Fork contains no common parent"))
                 _ <- Either.cond(isForkValidWithCheckpoint(commonBlockHeight),
                                  (),
                                  GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
@@ -98,7 +97,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
                         )
                       }
                       droppedBlocks.flatMap(_.transactionData).foreach(utxStorage.putIfNew)
-                      Right(Some(blockchain.score))
+                      Right(Some(blockchainUpdater.score))
                   }
               }
 

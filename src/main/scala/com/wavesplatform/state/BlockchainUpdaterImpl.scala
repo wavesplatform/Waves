@@ -23,7 +23,7 @@ import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.script.Script
 import scorex.utils.{ScorexLogging, Time}
 
-class BlockchainUpdaterImpl(val blockchain: Blockchain, settings: WavesSettings, time: Time)
+class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, time: Time)
     extends BlockchainUpdater
     with NG
     with ScorexLogging
@@ -347,7 +347,12 @@ class BlockchainUpdaterImpl(val blockchain: Blockchain, settings: WavesSettings,
   }
 
   override def transactionInfo(id: AssetId): Option[(Int, Transaction)] =
-    ngState.fold(blockchain.transactionInfo(id))(_.bestLiquidDiff.transactions.get(id).map(t => (t._1, t._2)))
+    ngState
+      .fold(Diff.empty)(_.bestLiquidDiff)
+      .transactions
+      .get(id)
+      .map(t => (t._1, t._2))
+      .orElse(blockchain.transactionInfo(id))
 
   override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] =
     ngState.fold(blockchain.addressTransactions(address, types, count, from)) { ng =>

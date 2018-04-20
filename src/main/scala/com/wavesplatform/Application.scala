@@ -125,34 +125,15 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
     val miner =
       if (settings.minerSettings.enable)
-        new MinerImpl(allChannels,
-                      blockchainUpdater,
-                      checkpointService,
-                      blockchainUpdater,
-                      settings,
-                      time,
-                      utxStorage,
-                      wallet,
-                      minerScheduler,
-                      appenderScheduler)
+        new MinerImpl(allChannels, blockchainUpdater, checkpointService, settings, time, utxStorage, wallet, minerScheduler, appenderScheduler)
       else Miner.Disabled
 
     val processBlock =
-      BlockAppender(checkpointService,
-                    blockchainUpdater,
-                    blockchainUpdater,
-                    time,
-                    utxStorage,
-                    settings,
-                    allChannels,
-                    peerDatabase,
-                    miner,
-                    appenderScheduler) _
+      BlockAppender(checkpointService, blockchainUpdater, time, utxStorage, settings, allChannels, peerDatabase, miner, appenderScheduler) _
     val processCheckpoint =
       CheckpointAppender(checkpointService, blockchainUpdater, blockchainUpdater, peerDatabase, miner, allChannels, appenderScheduler) _
     val processFork = ExtensionAppender(
       checkpointService,
-      blockchainUpdater,
       blockchainUpdater,
       utxStorage,
       time,
@@ -164,7 +145,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       appenderScheduler
     ) _
     val processMicroBlock =
-      MicroblockAppender(checkpointService, blockchainUpdater, blockchainUpdater, utxStorage, allChannels, peerDatabase, appenderScheduler) _
+      MicroblockAppender(checkpointService, blockchainUpdater, utxStorage, allChannels, peerDatabase, appenderScheduler) _
 
     import blockchainUpdater.lastBlockInfo
 

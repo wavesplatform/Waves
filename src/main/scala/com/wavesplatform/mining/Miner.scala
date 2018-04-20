@@ -53,9 +53,8 @@ object MinerDebugInfo {
 }
 
 class MinerImpl(allChannels: ChannelGroup,
-                blockchainUpdater: BlockchainUpdater,
+                blockchainUpdater: BlockchainUpdater with NG,
                 checkpoint: CheckpointService,
-                ng: NG,
                 settings: WavesSettings,
                 timeService: Time,
                 utx: UtxPool,
@@ -98,17 +97,17 @@ class MinerImpl(allChannels: ChannelGroup,
           s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
       ))
 
-  private def ngEnabled: Boolean = ng.featureActivationHeight(BlockchainFeatures.NG.id).exists(ng.height > _ + 1)
+  private def ngEnabled: Boolean = blockchainUpdater.featureActivationHeight(BlockchainFeatures.NG.id).exists(blockchainUpdater.height > _ + 1)
 
   private def generateOneBlockTask(account: PrivateKeyAccount, balance: Long)(
       delay: FiniteDuration): Task[Either[String, (MiningEstimators, Block, MiningConstraint)]] =
     Task {
       // should take last block right at the time of mining since microblocks might have been added
-      val height                    = ng.height
+      val height                    = blockchainUpdater.height
       val version                   = if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion else NgBlockVersion
-      val lastBlock                 = ng.lastBlock.get
-      val greatGrandParentTimestamp = ng.parent(lastBlock, 2).map(_.timestamp)
-      val referencedBlockInfo       = ng.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
+      val lastBlock                 = blockchainUpdater.lastBlock.get
+      val greatGrandParentTimestamp = blockchainUpdater.parent(lastBlock, 2).map(_.timestamp)
+      val referencedBlockInfo       = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
       val pc                        = allChannels.size()
       lazy val currentTime          = timeService.correctedTime()
       lazy val h                    = calcHit(referencedBlockInfo.consensus, account)
@@ -132,9 +131,9 @@ class MinerImpl(allChannels: ChannelGroup,
                                      currentTime)
             val gs            = calcGeneratorSignature(referencedBlockInfo.consensus, account)
             val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
-            val sortInBlock   = ng.height <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
+            val sortInBlock   = blockchainUpdater.height <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
 
-            val estimators                         = MiningEstimators(minerSettings, ng, height)
+            val estimators                         = MiningEstimators(minerSettings, blockchainUpdater, height)
             val mdConstraint                       = TwoDimensionalMiningConstraint.full(estimators.total, estimators.keyBlock)
             val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint, sortInBlock)
 
@@ -142,7 +141,7 @@ class MinerImpl(allChannels: ChannelGroup,
               if (version <= 2) Set.empty[Short]
               else
                 settings.featuresSettings.supported
-                  .filterNot(ng.approvedFeatures().keySet)
+                  .filterNot(blockchainUpdater.approvedFeatures().keySet)
                   .filter(BlockchainFeatures.implemented)
                   .toSet
 
@@ -198,7 +197,7 @@ class MinerImpl(allChannels: ChannelGroup,
           microBlock <- EitherT.fromEither[Task](
             MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature))
           _ = microBlockBuildTimeStats.safeRecord(System.currentTimeMillis() - start)
-          _ <- EitherT(MicroblockAppender(checkpoint, ng, blockchainUpdater, utx, appenderScheduler)(microBlock))
+          _ <- EitherT(MicroblockAppender(checkpoint, blockchainUpdater, utx, appenderScheduler)(microBlock))
         } yield (microBlock, signedBlock)).value map {
           case Left(err) => Error(err)
           case Right((microBlock, signedBlock)) =>
@@ -240,14 +239,14 @@ class MinerImpl(allChannels: ChannelGroup,
 
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = {
     {
-      val height    = ng.height
-      val lastBlock = ng.lastBlock.get
+      val height    = blockchainUpdater.height
+      val lastBlock = blockchainUpdater.lastBlock.get
       for {
-        _ <- checkAge(height, ng.lastBlockTimestamp.get)
-        _ <- Either.cond(ng.accountScript(account).isEmpty,
+        _ <- checkAge(height, blockchainUpdater.lastBlockTimestamp.get)
+        _ <- Either.cond(blockchainUpdater.accountScript(account).isEmpty,
                          (),
                          s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
-        balanceAndTs <- nextBlockGenerationTime(height, ng, blockchainSettings.functionalitySettings, lastBlock, account)
+        balanceAndTs <- nextBlockGenerationTime(height, blockchainUpdater, blockchainSettings.functionalitySettings, lastBlock, account)
         (balance, ts) = balanceAndTs
         offset        = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
       } yield (offset, balance)
@@ -257,13 +256,13 @@ class MinerImpl(allChannels: ChannelGroup,
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(account, balance)(offset).flatMap {
           case Right((estimators, block, totalConstraint)) =>
-            BlockAppender(checkpoint, ng, blockchainUpdater, timeService, utx, settings, appenderScheduler)(block)
+            BlockAppender(checkpoint, blockchainUpdater, timeService, utx, settings, appenderScheduler)(block)
               .asyncBoundary(minerScheduler)
               .map {
                 case Left(err) => log.warn("Error mining Block: " + err.toString)
                 case Right(Some(score)) =>
                   log.debug(s"Forged and applied $block by ${account.address} with cumulative score $score")
-                  BlockStats.mined(block, ng.height)
+                  BlockStats.mined(block, blockchainUpdater.height)
                   allChannels.broadcast(BlockForged(block))
                   scheduleMining()
                   if (ngEnabled && !totalConstraint.isEmpty) startMicroBlockMining(account, block, estimators.micro, totalConstraint)
@@ -283,7 +282,7 @@ class MinerImpl(allChannels: ChannelGroup,
 
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()
-    val nonScriptedAccounts = wallet.privateKeyAccounts.filter(acc => ng.accountScript(acc).isEmpty)
+    val nonScriptedAccounts = wallet.privateKeyAccounts.filter(acc => blockchainUpdater.accountScript(acc).isEmpty)
     scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map(generateBlockTask).map(_.runAsyncLogErr).toSet)
     microBlockAttempt := SerialCancelable()
     debugState = MinerDebugInfo.MiningBlocks
