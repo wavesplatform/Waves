@@ -4,6 +4,7 @@ import java.util.concurrent.ThreadLocalRandom
 
 import cats.Show
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
+import com.wavesplatform.state.DataEntry.{MaxValueSize, Type}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, LongDataEntry}
 import org.slf4j.LoggerFactory
 import scorex.account.{Alias, PrivateKeyAccount}
