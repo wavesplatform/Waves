@@ -36,7 +36,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
 
   val SponsoredFeeActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(
-      preActivatedFeatures = Map(BlockchainFeatures.SponsoredFee.id -> 0, BlockchainFeatures.NG.id -> 0)))
+      preActivatedFeatures = Map(BlockchainFeatures.FeeSponsorship.id -> 0, BlockchainFeatures.NG.id -> 0)))
 
   val SponsoredActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = SponsoredFeeActivatedAt0BlockchainSettings)
 
