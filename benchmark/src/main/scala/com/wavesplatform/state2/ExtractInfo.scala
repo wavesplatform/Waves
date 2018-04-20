@@ -6,12 +6,15 @@ import java.util.concurrent.ThreadLocalRandom
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.LevelDBFactory
+import com.wavesplatform.lang.v1.traits.DataType
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings, loadConfig}
+import com.wavesplatform.state2.bench.DataTestData
 import org.iq80.leveldb.{DB, Options}
+import scodec.bits.{BitVector, ByteVector}
 import scorex.account.AddressScheme
 import scorex.block.Block
 import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.{Authorized, CreateAliasTransaction, Transaction}
+import scorex.transaction.{Authorized, CreateAliasTransaction, DataTransaction, Transaction}
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
@@ -48,16 +51,18 @@ object ExtractInfo extends App with ScorexLogging {
   try {
     val state = new LevelDBWriter(db, fs)
 
-    val nonEmptyBlockHeights: Iterator[Integer] = for {
-      height     <- randomInts(2, state.height)
-      (block, _) <- state.blockHeaderAndSize(height)
-      if block.transactionCount > 0
-    } yield height
+    def nonEmptyBlockHeights(from: Int): Iterator[Integer] =
+      for {
+        height     <- randomInts(from, state.height)
+        (block, _) <- state.blockHeaderAndSize(height)
+        if block.transactionCount > 0
+      } yield height
 
-    val nonEmptyBlocks: Iterator[Block] = nonEmptyBlockHeights
-      .flatMap(state.blockAt(_))
+    def nonEmptyBlocks(from: Int): Iterator[Block] =
+      nonEmptyBlockHeights(from)
+        .flatMap(state.blockAt(_))
 
-    val (aliasTxs, restTxs) = nonEmptyBlocks
+    val (aliasTxs, restTxs) = nonEmptyBlocks(100000)
       .flatMap(_.transactionData)
       .partition {
         case _: CreateAliasTransaction => true
@@ -65,14 +70,14 @@ object ExtractInfo extends App with ScorexLogging {
       }
 
     val accounts = for {
-      b <- nonEmptyBlocks
+      b <- nonEmptyBlocks(100000)
       sender <- b.transactionData
         .collect {
           case tx: Transaction with Authorized => tx.sender
         }
         .take(100)
     } yield sender.toAddress.stringRepr
-    write("accounts", settings.accountsFile, takeUniq(5000, accounts))
+    write("accounts", settings.accountsFile, takeUniq(1000, accounts))
 
     val aliasTxIds = aliasTxs.map(_.asInstanceOf[CreateAliasTransaction].alias.stringRepr)
     write("aliases", settings.aliasesFile, aliasTxIds.take(1000))
@@ -80,14 +85,35 @@ object ExtractInfo extends App with ScorexLogging {
     val restTxIds = restTxs.map(_.id().base58)
     write("rest transactions", settings.restTxsFile, restTxIds.take(10000))
 
-    val assets = nonEmptyBlocks
+    val assets = nonEmptyBlocks(1)
       .flatMap { b =>
         b.transactionData.collect {
           case tx: IssueTransaction => tx.assetId()
         }
       }
       .map(_.base58)
+
     write("assets", settings.assetsFile, takeUniq(300, assets))
+
+    val data = for {
+      b <- nonEmptyBlocks(332550)
+      test <- b.transactionData
+        .collect {
+          case tx: DataTransaction =>
+            val addr = ByteVector(tx.sender.toAddress.bytes.arr)
+            tx.data.collectFirst {
+              case x: LongDataEntry    => DataTestData(addr, x.key, DataType.Long)
+              case x: BooleanDataEntry => DataTestData(addr, x.key, DataType.Boolean)
+              case x: BinaryDataEntry  => DataTestData(addr, x.key, DataType.ByteArray)
+            }
+        }
+        .take(50)
+      r <- test
+    } yield {
+      val x: BitVector = DataTestData.codec.encode(r).require
+      x.toBase64
+    }
+    write("data", settings.dataFile, data.take(400))
   } catch {
     case NonFatal(e) => log.error(e.getMessage, e)
   } finally {

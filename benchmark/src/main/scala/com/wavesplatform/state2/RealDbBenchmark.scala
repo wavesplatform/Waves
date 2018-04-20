@@ -8,8 +8,10 @@ import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.LevelDBFactory
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings, loadConfig}
+import com.wavesplatform.state2.bench.DataTestData
 import monix.eval.Coeval
 import org.iq80.leveldb.{DB, Options}
+import scodec.bits.BitVector
 import scorex.account.{AddressOrAlias, AddressScheme, Alias}
 import scorex.crypto.encode.Base58
 import scorex.transaction.smart.WavesEnvironment
@@ -73,7 +75,7 @@ object RealDbBenchmark extends App with ScorexLogging {
   }
 
   val accounts = load("accounts", settings.accountsFile)(x => AddressOrAlias.fromString(x).explicitGet())
-  measure("accounts (WavesContext.accountBalance)", accounts) { (environment, account) =>
+  measure("accountBalance (WavesContext.accountBalance)", accounts) { (environment, account) =>
     assert(environment.accountBalanceOf(account.bytes.arr, None).isRight)
   }
 
@@ -88,6 +90,15 @@ object RealDbBenchmark extends App with ScorexLogging {
   measure("accountBalanceOf (WavesContext.accountAssetBalance)", assetsTestInput) {
     case (environment, (asset, account)) =>
       assert(environment.accountBalanceOf(account.bytes.arr, Some(asset)).isRight)
+  }
+
+  {
+    val data = load("data", settings.dataFile) { line =>
+      DataTestData.codec.decode(BitVector.fromBase64(line).get).require.value
+    }
+    measure("data (WavesContext.getData)", data) { (environment, x) =>
+      assert(environment.data(x.addr.toArray, x.key, x.dataType).isDefined)
+    }
   }
 
   log.info("Done")
@@ -122,9 +133,13 @@ object RealDbBenchmark extends App with ScorexLogging {
       log.info(s"Measuring $label...")
       val stats = new mutable.ArrayBuffer[FiniteDuration]
       input.foreach { x =>
-        val start = System.currentTimeMillis()
-        f(environment, x)
-        stats += (System.currentTimeMillis() - start).millis
+        val start = System.nanoTime()
+        try {
+          f(environment, x)
+        } catch {
+          case _: Throwable =>
+        }
+        stats += (System.nanoTime() - start).nanos
       }
       logStats(label, stats)
     } catch {
@@ -137,17 +152,10 @@ object RealDbBenchmark extends App with ScorexLogging {
   }
 
   def logStats(label: String, timing: mutable.ArrayBuffer[FiniteDuration]): Unit = {
-    val total = timing.foldLeft(0.millis)(_ + _)
-    val avg   = total / timing.size.toDouble
-    val dev = timing.view.map { x =>
-      math.pow(2, (x - avg).toMillis)
-    }.sum
-    val variance = dev / (timing.size - 1)
+    val avg = timing.view.foldLeft(BigDecimal(0))((r, x) => r + BigDecimal(x.toNanos) / timing.size)
     log.info(
       f"""$label:
-         |total:    ${total.toMillis}%5d ms = ${total.toNanos}%14d ns
-         |average:  ${avg.toMillis}%5d ms = ${avg.toNanos}%14d ns
-         |variance: $variance%3.5f""".stripMargin
+         |average:  ${(avg / BigDecimal(10).pow(6)).toLong}%5d ms = ${avg.toLong}%14d ns""".stripMargin
     )
   }
 
