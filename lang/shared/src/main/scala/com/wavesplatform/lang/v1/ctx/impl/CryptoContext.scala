@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.ctx.impl
 
-import com.wavesplatform.lang.v1.Terms.{BOOLEAN, BYTEVECTOR, STRING}
 import com.wavesplatform.lang.v1.BaseGlobal
+import com.wavesplatform.lang.v1.Terms.{BOOLEAN, BYTEVECTOR}
 import com.wavesplatform.lang.v1.ctx.{Context, PredefFunction}
 import scodec.bits.ByteVector
 
