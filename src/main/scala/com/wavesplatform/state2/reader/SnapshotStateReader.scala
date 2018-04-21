@@ -17,6 +17,8 @@ trait SnapshotStateReader {
 
   def portfolio(a: Address): Portfolio
 
+  def balance(address: Address, assetId: Option[AssetId]): Long
+
   def transactionInfo(id: ByteStr): Option[(Int, Transaction)]
 
   def transactionHeight(id: ByteStr): Option[Int]

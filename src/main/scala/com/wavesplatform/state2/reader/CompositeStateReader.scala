@@ -3,7 +3,7 @@ package com.wavesplatform.state2.reader
 import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Address, Alias}
-import scorex.transaction.Transaction
+import scorex.transaction.{AssetId, Transaction}
 import scorex.transaction.Transaction.Type
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
 import scorex.transaction.lease.LeaseTransaction
@@ -14,6 +14,9 @@ class CompositeStateReader(inner: SnapshotStateReader, maybeDiff: => Option[Diff
   private def diff = maybeDiff.getOrElse(Diff.empty)
 
   override def portfolio(a: Address) = inner.portfolio(a).combine(diff.portfolios.getOrElse(a, Portfolio.empty))
+
+  override def balance(address: Address, assetId: Option[AssetId]): Long =
+    inner.balance(address, assetId) + diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
 
   override def assetDescription(id: ByteStr) =
     inner.assetDescription(id) match {
