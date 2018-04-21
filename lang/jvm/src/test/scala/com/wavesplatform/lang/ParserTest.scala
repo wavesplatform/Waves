@@ -111,6 +111,16 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     )
   }
 
+  property("base58") {
+    parse("base58'bQbp'") shouldBe CONST_BYTEVECTOR(ByteVector("foo".getBytes))
+    parse("base58''") shouldBe CONST_BYTEVECTOR(ByteVector.empty)
+    isParsed("base58' bQbp'\n") shouldBe false
+  }
+
+  property("string is consumed fully") {
+    parse(""" "   fooo    bar" """) shouldBe CONST_STRING("   fooo    bar")
+  }
+
   property("string literal with unicode chars") {
     val stringWithUnicodeChars = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD"
 
@@ -170,6 +180,9 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("getter") {
+    isParsed("xxx   .yyy") shouldBe false
+    isParsed("xxx.  yyy") shouldBe false
+
     parse("xxx.yyy") shouldBe GETTER(REF("xxx"), "yyy")
     parse(
       """
@@ -238,5 +251,12 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
           List(CONST_BYTEVECTOR(ByteVector(text.getBytes)))
         )
     }
+  }
+
+  property("multiple expressions going one after another are denied") {
+    isParsed(
+      """1 + 1
+        |2 + 2""".stripMargin
+    ) shouldBe false
   }
 }
