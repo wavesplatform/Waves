@@ -7,7 +7,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.LevelDBFactory
 import com.wavesplatform.lang.v1.traits.DataType
-import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings, loadConfig}
+import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state2.bench.DataTestData
 import org.iq80.leveldb.{DB, Options}
 import scodec.bits.{BitVector, ByteVector}
@@ -32,24 +32,24 @@ object ExtractInfo extends App with ScorexLogging {
     System.exit(1)
   }
 
-  val config = loadConfig(ConfigFactory.parseFile(new File(args.head)))
-  val fs: FunctionalitySettings = {
-    val settings = WavesSettings.fromConfig(config)
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
-    }
-    settings.blockchainSettings.functionalitySettings
+  val benchSettings = Settings.fromConfig(ConfigFactory.load())
+  val wavesSettings = {
+    val config = loadConfig(ConfigFactory.parseFile(new File(args.head)))
+    WavesSettings.fromConfig(config)
   }
 
-  val settings = Settings.fromConfig(config)
+  AddressScheme.current = new AddressScheme {
+    override val chainId: Byte = wavesSettings.blockchainSettings.addressSchemeCharacter.toByte
+  }
+
   val db: DB = {
-    val dir = new File(settings.dbPath)
-    if (!dir.isDirectory) throw new IllegalArgumentException(s"Can't find directory at '${settings.dbPath}'")
+    val dir = new File(wavesSettings.dataDirectory)
+    if (!dir.isDirectory) throw new IllegalArgumentException(s"Can't find directory at '${wavesSettings.dataDirectory}'")
     LevelDBFactory.factory.open(dir, new Options)
   }
 
   try {
-    val state = new LevelDBWriter(db, fs)
+    val state = new LevelDBWriter(db, wavesSettings.blockchainSettings.functionalitySettings)
 
     def nonEmptyBlockHeights(from: Int): Iterator[Integer] =
       for {
@@ -62,32 +62,32 @@ object ExtractInfo extends App with ScorexLogging {
       nonEmptyBlockHeights(from)
         .flatMap(state.blockAt(_))
 
-    val aliasTxs = nonEmptyBlocks(settings.aliasesFromHeight)
+    val aliasTxs = nonEmptyBlocks(benchSettings.aliasesFromHeight)
       .flatMap(_.transactionData)
       .collect {
         case _: CreateAliasTransaction => true
       }
 
-    val restTxs = nonEmptyBlocks(settings.restTxsFromHeight)
+    val restTxs = nonEmptyBlocks(benchSettings.restTxsFromHeight)
       .flatMap(_.transactionData)
 
     val accounts = for {
-      b <- nonEmptyBlocks(settings.accountsFromHeight)
+      b <- nonEmptyBlocks(benchSettings.accountsFromHeight)
       sender <- b.transactionData
         .collect {
           case tx: Transaction with Authorized => tx.sender
         }
         .take(100)
     } yield sender.toAddress.stringRepr
-    write("accounts", settings.accountsFile, takeUniq(1000, accounts))
+    write("accounts", benchSettings.accountsFile, takeUniq(1000, accounts))
 
     val aliasTxIds = aliasTxs.map(_.asInstanceOf[CreateAliasTransaction].alias.stringRepr)
-    write("aliases", settings.aliasesFile, aliasTxIds.take(1000))
+    write("aliases", benchSettings.aliasesFile, aliasTxIds.take(1000))
 
     val restTxIds = restTxs.map(_.id().base58)
-    write("rest transactions", settings.restTxsFile, restTxIds.take(10000))
+    write("rest transactions", benchSettings.restTxsFile, restTxIds.take(10000))
 
-    val assets = nonEmptyBlocks(settings.assetsFromHeight)
+    val assets = nonEmptyBlocks(benchSettings.assetsFromHeight)
       .flatMap { b =>
         b.transactionData.collect {
           case tx: IssueTransaction => tx.assetId()
@@ -95,10 +95,10 @@ object ExtractInfo extends App with ScorexLogging {
       }
       .map(_.base58)
 
-    write("assets", settings.assetsFile, takeUniq(300, assets))
+    write("assets", benchSettings.assetsFile, takeUniq(300, assets))
 
     val data = for {
-      b <- nonEmptyBlocks(settings.dataFromHeight)
+      b <- nonEmptyBlocks(benchSettings.dataFromHeight)
       test <- b.transactionData
         .collect {
           case tx: DataTransaction =>
@@ -115,7 +115,7 @@ object ExtractInfo extends App with ScorexLogging {
       val x: BitVector = DataTestData.codec.encode(r).require
       x.toBase64
     }
-    write("data", settings.dataFile, data.take(400))
+    write("data", benchSettings.dataFile, data.take(400))
   } catch {
     case NonFatal(e) => log.error(e.getMessage, e)
   } finally {
