@@ -155,7 +155,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
         for {
           _    <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
           _    <- checkNotBlacklisted(tx)
-          _    <- feeCalculator.enoughFee(tx, s, history, fs)
+          _    <- feeCalculator.enoughFee(tx, blockchain, fs)
           diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
         } yield {
           utxPoolSizeStats.increment()

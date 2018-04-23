@@ -2,7 +2,8 @@ package com.wavesplatform.state
 
 import cats.implicits._
 import cats.kernel.Monoid
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
 import scorex.account.{Address, Alias, PublicKeyAccount}
 import scorex.transaction.smart.script.Script
@@ -92,8 +93,8 @@ object Sponsorship {
   }
 
   def sponsoredFeesSwitchHeight(blockchain: Blockchain, fs: FunctionalitySettings): Int =
-    blockchain.activatedFeatures
-      .get(BlockchainFeatures.FeeSponsorship.id)
+    blockchain
+      .featureActivationHeight(BlockchainFeatures.FeeSponsorship.id)
       .map(h => h + fs.blocksForFeatureActivation(h))
       .getOrElse(Int.MaxValue)
 

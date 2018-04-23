@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs
 
 import cats.implicits._
-import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import scorex.account.Address
@@ -35,8 +34,8 @@ object TransferTransactionDiff {
           case None => Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))
           case Some(aid) =>
             val senderPf = Map(sender -> Portfolio(0, LeaseBalance.empty, Map(aid -> -tx.fee)))
-            if (height >= Sponsorship.sponsoredFeesSwitchHeight(fp, s)) {
-              val sponsorPf = state
+            if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, s)) {
+              val sponsorPf = blockchain
                 .assetDescription(aid)
                 .collect {
                   case desc if desc.sponsorship > 0 =>
