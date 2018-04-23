@@ -73,7 +73,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         domain.blockchainUpdater.processMicroBlock(microBlocks(2)).explicitGet()
         domain.blockchainUpdater.processBlock(block1).explicitGet()
         domain.blockchainUpdater.processBlock(block2).explicitGet()
-        domain.blockchainUpdater.processBlock(block3) should produce("unavailable funds")
+        domain.blockchainUpdater.processBlock(block3) should produce("negative waves balance" /*"unavailable funds"*/ )
 
     }
   }
