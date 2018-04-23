@@ -4,8 +4,8 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.utils.base58Length
 import scorex.crypto.encode.Base58
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.InvalidAddress
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.validation.ValidationError.InvalidAddress
 import scorex.utils.ScorexLogging
 
 sealed trait Address extends AddressOrAlias {

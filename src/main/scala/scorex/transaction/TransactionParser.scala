@@ -3,6 +3,9 @@ package scorex.transaction
 import com.google.common.primitives.Longs
 import com.wavesplatform.state2.ByteStr
 import scorex.account.{Alias, PublicKeyAccount}
+import scorex.crypto.signatures.Curve25519.KeyLength
+import scorex.transaction.modern.{TxData, TxHeader}
+import scorex.transaction.validation._
 
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
@@ -27,6 +30,7 @@ trait TransactionParser {
 }
 
 object TransactionParser {
+  type Aux[T <: Transaction] = TransactionParser { type TransactionT = T }
   trait HardcodedVersion1 extends TransactionParser {
     override val supportedVersions: Set[Byte] = Set(1)
 
@@ -68,14 +72,92 @@ object TransactionParser {
       (parsedVersion, 3)
     }
 
+    def parsePK(bytes: Array[Byte]): Try[PublicKeyAccount] = {
+      Try(PublicKeyAccount(bytes))
+    }
+
     def parseSenderAndTimestamp(bytes: Array[Byte]): Try[(PublicKeyAccount, Long)] = {
-      val (pkStart, pkEnd) = (0, 32)
-      val (tsStart, tsEnd) = (32, 8)
+      val (pkStart, pkEnd) = (0, KeyLength)
+      val (tsStart, tsEnd) = (KeyLength, KeyLength + 8)
 
       for {
         pk <- Try(PublicKeyAccount(bytes.slice(pkStart, pkEnd)))
         ts <- parseLong(bytes.slice(tsStart, tsEnd))
       } yield (pk, ts)
+    }
+
+    def parseAlias(bytes: Array[Byte]): Try[Alias] = {
+      Alias
+        .fromBytes(bytes)
+        .fold(
+          ve => Failure(new Exception(ve.toString)),
+          a => Success(a)
+        )
+    }
+
+    def parseByteStr(bytes: Array[Byte]): Try[ByteStr] = Try {
+      ByteStr(bytes)
+    }
+
+    def parseLong(bytes: Array[Byte]): Try[Long] = Try {
+      Longs.fromByteArray(bytes)
+    }
+
+    def parseProofs(bytes: Array[Byte]): Try[Proofs] = {
+      Proofs
+        .fromBytes(bytes)
+        .fold(
+          ve => Failure(new Exception(ve.toString)),
+          ps => Success(ps)
+        )
+    }
+  }
+
+  abstract class Modern[T <: Transaction, D <: TxData](implicit override val classTag: ClassTag[T]) extends TransactionParser {
+
+    override type TransactionT = T
+
+    def create(header: TxHeader, data: D, proofs: Proofs): Try[TransactionT]
+
+    override protected def parseHeader(bytes: Array[Byte]): Try[(Byte, Int)] =
+      (for {
+        _ <- Either.cond(bytes.length < 3,
+                        (),
+                        new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements"))
+        Array(parsedMark, parsedTypeId, parsedVersion) = bytes.take(3)
+        _ <- Either.cond(parsedMark != 0,
+                        (),
+                        new IllegalArgumentException(s"Expected the '0' byte, but got '$parsedMark'"))
+        _ <- Either.cond(parsedTypeId != typeId,
+                        (),
+                        new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'"))
+      } yield (parsedVersion, 3)).toTry
+
+    def parseTxData(version: Byte, bytes: Array[Byte]): Try[(D, Int)]
+
+    override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] = {
+      val (pkStart, pkEnd) = (0, KeyLength)
+      val (tsStart, tsEnd) = (KeyLength, KeyLength + 8)
+      val (feeStart, feeEnd) = (tsEnd, tsEnd + 8)
+
+      for {
+        sender <- parsePK(bytes.slice(pkStart, pkEnd))
+        timestamp <- parseLong(bytes.slice(tsStart, tsEnd))
+        fee <- parseLong(bytes.slice(feeStart, feeEnd))
+        header <- ValidateModern
+          .header(supportedVersions)(typeId, version, sender, fee, timestamp)
+            .fold(
+              errs => Failure(new Exception(errs.toString)),
+              succ => Success(succ)
+            )
+        (data, offset) <- parseTxData(version, bytes.drop(feeEnd))
+        proofs <- parseProofs(bytes.drop(feeEnd + offset))
+        tx <- create(header, data, proofs)
+      } yield tx
+    }
+
+    def parsePK(bytes: Array[Byte]): Try[PublicKeyAccount] = {
+      Try(PublicKeyAccount(bytes))
     }
 
     def parseAlias(bytes: Array[Byte]): Try[Alias] = {

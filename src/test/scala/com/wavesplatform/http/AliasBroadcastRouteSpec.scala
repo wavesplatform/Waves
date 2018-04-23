@@ -13,7 +13,7 @@ import play.api.libs.json.Json._
 import play.api.libs.json._
 import scorex.api.http._
 import scorex.api.http.alias.AliasBroadcastApiRoute
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.validation.ValidationError.GenericError
 import scorex.transaction.Transaction
 
 class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {

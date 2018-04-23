@@ -30,6 +30,7 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.ValidationError.SenderIsBlacklisted
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
+import scorex.transaction.validation.ValidationError.SenderIsBlacklisted
 import scorex.transaction.assets.{IssueTransaction, MassTransferTransaction, TransferTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script

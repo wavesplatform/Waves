@@ -9,7 +9,8 @@ import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromE
 import akka.util.ByteString
 import play.api.libs.json._
 import scorex.api.http.ApiError
-import scorex.transaction.{Transaction, ValidationError}
+import scorex.transaction.Transaction
+import scorex.transaction.validation.ValidationError
 
 case class PlayJsonException(cause: Option[Throwable] = None, errors: Seq[(JsPath, Seq[JsonValidationError])] = Seq.empty)
     extends IllegalArgumentException

@@ -11,6 +11,7 @@ import play.api.libs.json.{Format, Json}
 import scorex.api.http.SignedDataRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.DataTransaction.MaxEntryCount
+import scorex.transaction.validation.ValidationError
 
 class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 

@@ -28,7 +28,7 @@ case class SmartIssueTransaction private (version: Byte,
                                           fee: Long,
                                           timestamp: Long,
                                           proofs: Proofs)
-    extends ProvenTransaction
+  extends ProvenTransaction
     with FastHashId
     with ChainSpecific {
 

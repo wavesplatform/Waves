@@ -13,12 +13,13 @@ import org.scalatest.{Inside, Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.ValidationError.AccountBalanceError
+import scorex.transaction.validation.ValidationError.AccountBalanceError
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.{GenesisTransaction, ValidationError}
+import scorex.transaction.GenesisTransaction
+import scorex.transaction.validation.ValidationError
 
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
 

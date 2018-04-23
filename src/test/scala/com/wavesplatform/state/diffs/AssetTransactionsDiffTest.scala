@@ -10,7 +10,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.account.AddressScheme
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets._
+import scorex.transaction.assets.{SmartIssueTransaction, _}
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS

@@ -5,7 +5,7 @@ import com.wavesplatform.state._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.transaction.versioned.assets.VersionedTransferTransaction
+import scorex.transaction.assets.VersionedTransferTransaction
 
 class VersionedTransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 

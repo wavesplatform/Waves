@@ -10,6 +10,7 @@ import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.serialization.Deser
 import scorex.transaction._
+import scorex.transaction.validation.ValidationError
 
 import scala.util.{Failure, Success, Try}
 

@@ -10,7 +10,7 @@ import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
-import scorex.transaction.ValidationError.Validation
+import scorex.transaction.validation.ValidationError.Validation
 import scorex.transaction._
 import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, toJson}
 
@@ -24,7 +24,7 @@ case class MassTransferTransaction private (version: Byte,
                                             fee: Long,
                                             attachment: Array[Byte],
                                             proofs: Proofs)
-    extends ProvenTransaction
+  extends ProvenTransaction
     with FastHashId {
   override val builder: MassTransferTransaction.type = MassTransferTransaction
 
@@ -134,7 +134,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
           Left(ValidationError.InsufficientFee())
         } else {
           Right(MassTransferTransaction(version, assetId, sender, transfers, timestamp, feeAmount, attachment, proofs))
-      }
+        }
     )
   }
 

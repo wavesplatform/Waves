@@ -16,7 +16,7 @@ import scorex.account.PublicKeyAccount._
 import scorex.account._
 import scorex.transaction._
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
-import scorex.transaction.assets._
+import scorex.transaction.assets.{MassTransferTransaction, VersionedTransferTransaction, _}
 import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.script.Script

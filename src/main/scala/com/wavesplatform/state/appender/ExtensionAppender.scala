@@ -12,8 +12,9 @@ import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
 import org.influxdb.dto.Point
 import scorex.block.Block
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.validation.ValidationError.GenericError
 import scorex.transaction._
+import scorex.transaction.validation.ValidationError
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.util.{Left, Right}

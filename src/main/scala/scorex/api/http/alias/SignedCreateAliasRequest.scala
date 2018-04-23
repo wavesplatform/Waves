@@ -5,7 +5,8 @@ import play.api.libs.json.{Format, Json}
 import scorex.account.{Alias, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParsers.SignatureStringLength
-import scorex.transaction.{CreateAliasTransaction, ValidationError}
+import scorex.transaction.CreateAliasTransaction
+import scorex.transaction.validation.ValidationError
 
 case class SignedCreateAliasRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                                     senderPublicKey: String,

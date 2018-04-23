@@ -6,8 +6,8 @@ import play.api.libs.json._
 import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParsers.SignatureStringLength
-import scorex.transaction.ValidationError
 import scorex.transaction.lease.LeaseCancelTransaction
+import scorex.transaction.validation.ValidationError
 
 case class SignedLeaseCancelRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                                     senderPublicKey: String,

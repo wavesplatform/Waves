@@ -5,7 +5,8 @@ import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.validation.ValidationError.GenericError
 
 import scala.util.Try
 

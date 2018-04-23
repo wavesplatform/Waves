@@ -3,10 +3,10 @@ package com.wavesplatform.state.diffs
 import cats.implicits._
 import com.wavesplatform.state._
 import scorex.account.Address
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.{GenericError, Validation}
 import scorex.transaction.assets.MassTransferTransaction
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
+import scorex.transaction.validation.ValidationError.{GenericError, Validation}
+import scorex.transaction.validation.ValidationError
 
 object MassTransferTransactionDiff {
 

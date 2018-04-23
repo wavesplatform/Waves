@@ -7,7 +7,7 @@ import com.wavesplatform.matcher.model.Events.OrderAdded
 import com.wavesplatform.utx.UtxPool
 import scorex.account.PublicKeyAccount
 import scorex.transaction.AssetAcc
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.validation.ValidationError.GenericError
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
 import scorex.utils.NTP

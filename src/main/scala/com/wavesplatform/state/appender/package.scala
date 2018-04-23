@@ -12,8 +12,9 @@ import monix.eval.Task
 import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.PoSCalc._
-import scorex.transaction.ValidationError.{BlockAppendError, BlockFromFuture, GenericError}
+import scorex.transaction.validation.ValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import scorex.transaction._
+import scorex.transaction.validation.ValidationError
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.util.{Left, Right}

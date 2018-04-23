@@ -3,7 +3,7 @@ package scorex.transaction
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
-import scorex.transaction.ValidationError.InvalidSignature
+import scorex.transaction.validation.ValidationError.InvalidSignature
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration

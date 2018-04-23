@@ -14,9 +14,8 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
 import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.versioned.assets.VersionedTransferTransaction
 
 class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 

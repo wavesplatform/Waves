@@ -3,7 +3,7 @@ package scorex.transaction.smart
 import cats.syntax.all._
 import com.wavesplatform.crypto
 import com.wavesplatform.state._
-import scorex.transaction.ValidationError.{GenericError, TransactionNotAllowedByScript}
+import scorex.transaction.validation.ValidationError.{GenericError, TransactionNotAllowedByScript}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.smart.script.{Script, ScriptRunner}

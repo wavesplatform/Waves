@@ -6,6 +6,8 @@ import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.modern.CreateAliasTx
+import scorex.transaction.modern.assets.{BurnTx, ReissueTx}
 
 import scala.util.{Failure, Success, Try}
 

@@ -4,9 +4,11 @@ import com.wavesplatform.TransactionGen
 import org.scalacheck.Arbitrary
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
+import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
+import scorex.transaction.validation.ValidationError.GenericError
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
+import scorex.transaction.assets.MassTransferTransaction.MaxTransferCount
+import scorex.transaction.validation.ValidationError
 
 class MassTransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 

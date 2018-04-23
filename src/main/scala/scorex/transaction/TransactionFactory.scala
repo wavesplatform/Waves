@@ -8,11 +8,11 @@ import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets._
+import scorex.transaction.assets.{MassTransferTransaction, VersionedTransferTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
-import scorex.transaction.versioned.assets.VersionedTransferTransaction
+import scorex.transaction.validation.ValidationError
 import scorex.utils.Time
 import scorex.wallet.Wallet
 

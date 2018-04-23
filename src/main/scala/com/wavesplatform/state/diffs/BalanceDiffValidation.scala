@@ -6,7 +6,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, ByteStr, Diff, LeaseBalance, Portfolio}
 import scorex.account.Address
 import scorex.transaction.Transaction
-import scorex.transaction.ValidationError.AccountBalanceError
+import scorex.transaction.validation.ValidationError.AccountBalanceError
 import scorex.utils.ScorexLogging
 
 import scala.util.{Left, Right}

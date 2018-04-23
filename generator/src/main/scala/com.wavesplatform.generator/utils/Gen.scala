@@ -6,7 +6,7 @@ import com.wavesplatform.generator.utils.Implicits._
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
-import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
+import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{Proofs, Transaction}
 
 object Gen {

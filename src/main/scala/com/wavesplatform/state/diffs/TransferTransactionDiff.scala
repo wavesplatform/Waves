@@ -4,9 +4,9 @@ import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import scorex.account.Address
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.validation.ValidationError.GenericError
 import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.validation.ValidationError
 
 import scala.util.Right
 

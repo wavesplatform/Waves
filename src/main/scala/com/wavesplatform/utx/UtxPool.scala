@@ -4,6 +4,7 @@ import com.wavesplatform.mining.TwoDimensionalMiningConstraint
 import com.wavesplatform.state.{ByteStr, Diff, Portfolio}
 import scorex.account.Address
 import scorex.transaction._
+import scorex.transaction.validation.ValidationError
 
 trait UtxPool extends AutoCloseable {
   self =>

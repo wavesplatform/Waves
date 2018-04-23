@@ -19,7 +19,7 @@ import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
+import scorex.transaction.validation.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
 import scorex.transaction.assets.exchange._
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet

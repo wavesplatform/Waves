@@ -7,7 +7,8 @@ import org.scalatest.Matchers
 import scorex.block.Block
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.{TestFunctionalitySettings => TFS}
-import scorex.transaction.{Transaction, ValidationError}
+import scorex.transaction.Transaction
+import scorex.transaction.validation.ValidationError
 
 package object diffs extends WithState with Matchers {
   val ENOUGH_AMT: Long = Long.MaxValue / 3

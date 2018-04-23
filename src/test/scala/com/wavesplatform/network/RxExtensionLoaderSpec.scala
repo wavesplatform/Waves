@@ -12,8 +12,8 @@ import monix.reactive.Observable
 import monix.reactive.subjects.{PublishSubject => PS}
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.block.Block
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.validation.ValidationError.GenericError
+import scorex.transaction.validation.ValidationError
 
 import scala.concurrent.duration._
 

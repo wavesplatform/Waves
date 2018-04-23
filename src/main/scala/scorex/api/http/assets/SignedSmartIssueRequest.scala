@@ -6,9 +6,10 @@ import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Format, Json}
 import scorex.account.{AddressScheme, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
-import scorex.transaction.{Proofs, ValidationError}
+import scorex.transaction.Proofs
 import scorex.transaction.assets.SmartIssueTransaction
 import scorex.transaction.smart.script.Script
+import scorex.transaction.validation.ValidationError
 
 object SignedSmartIssueRequest {
   implicit val signedExchangeRequestFormat: Format[SignedSmartIssueRequest] = Json.format

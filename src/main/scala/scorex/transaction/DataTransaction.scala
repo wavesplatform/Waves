@@ -7,6 +7,7 @@ import monix.eval.Coeval
 import play.api.libs.json._
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.signatures.Curve25519.KeyLength
+import scorex.transaction.validation.ValidationError
 
 import scala.util.{Failure, Success, Try}
 

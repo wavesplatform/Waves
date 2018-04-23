@@ -6,13 +6,13 @@ import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Portfolio, _}
 import scorex.account.Address
-import scorex.transaction.ValidationError.{AlreadyInTheState, GenericError, Mistiming, UnsupportedTransactionType}
+import scorex.transaction.validation.ValidationError.{AlreadyInTheState, GenericError, Mistiming, UnsupportedTransactionType}
 import scorex.transaction._
-import scorex.transaction.assets._
+import scorex.transaction.assets.{MassTransferTransaction, VersionedTransferTransaction, _}
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.versioned.assets.VersionedTransferTransaction
+import scorex.transaction.validation.ValidationError
 
 import scala.concurrent.duration._
 import scala.util.{Left, Right}

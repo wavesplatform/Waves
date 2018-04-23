@@ -19,12 +19,11 @@ import scorex.api.http.assets._
 import scorex.api.http.assets.CancelFeeSponsorshipRequest._
 import scorex.api.http.assets.SponsorFeeRequest._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.validation.ValidationError.GenericError
 import scorex.transaction._
-import scorex.transaction.assets._
+import scorex.transaction.assets.{MassTransferTransaction, VersionedTransferTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.versioned.assets.VersionedTransferTransaction
 import scorex.utils.Time
 import scorex.wallet.Wallet
 

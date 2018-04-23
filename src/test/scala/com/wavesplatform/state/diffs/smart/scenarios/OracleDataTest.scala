@@ -10,9 +10,9 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
+import scorex.transaction.assets.VersionedTransferTransaction
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.versioned.assets.VersionedTransferTransaction
 import scorex.transaction.{DataTransaction, GenesisTransaction, Proofs}
 
 class OracleDataTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {

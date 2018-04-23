@@ -17,10 +17,10 @@ import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import scorex.api.http._
 import scorex.api.http.assets._
 import scorex.crypto.encode.Base58
-import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.TransferTransaction
-import scorex.transaction.versioned.assets.VersionedTransferTransaction
-import scorex.transaction.{Proofs, Transaction, ValidationError}
+import scorex.transaction.validation.ValidationError.GenericError
+import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.{Proofs, Transaction}
 import scorex.wallet.Wallet
 import shapeless.Coproduct
 
@@ -182,14 +182,14 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     val versionedTransferRequest = createSignedVersionedTransferRequest(
       VersionedTransferTransaction
         .create(
+          version = 2,
           assetId = None,
           sender = senderPrivateKey,
           recipient = receiverPrivateKey.toAddress,
           amount = 1 * Waves,
           timestamp = System.currentTimeMillis(),
-          feeAmount = Waves / 3,
+          fee = Waves / 3,
           attachment = Array.emptyByteArray,
-          version = 2,
           proofs = Proofs(Seq.empty)
         )
         .right

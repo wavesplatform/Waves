@@ -13,9 +13,9 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.account.PublicKeyAccount
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction._
+import scorex.transaction.assets.VersionedTransferTransaction
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.versioned.assets.VersionedTransferTransaction
 
 class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 

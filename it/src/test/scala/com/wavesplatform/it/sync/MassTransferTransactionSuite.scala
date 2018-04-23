@@ -8,7 +8,7 @@ import play.api.libs.json.{JsNumber, JsObject, Json}
 import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.MassTransferTransaction.{MaxTransferCount, Transfer}
-import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
+import scorex.transaction.assets.TransferTransaction
 
 import scala.concurrent.duration._
 import scala.util.Random

@@ -7,7 +7,8 @@ import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
-import scorex.transaction.{AssetIdStringLength, Proofs, ValidationError}
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.{AssetIdStringLength, Proofs}
 
 object SignedMassTransferRequest {
   implicit val reads = Json.reads[SignedMassTransferRequest]

@@ -8,8 +8,9 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.signatures.Curve25519.SignatureLength
-import scorex.transaction.ValidationError.{GenericError, OrderValidationError}
+import scorex.transaction.validation.ValidationError.{GenericError, OrderValidationError}
 import scorex.transaction._
+import scorex.transaction.validation.ValidationError
 
 import scala.util.{Failure, Success, Try}
 

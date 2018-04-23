@@ -2,7 +2,7 @@ package scorex.account
 
 import com.wavesplatform.crypto
 import scorex.crypto.encode.Base58
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.validation.ValidationError.GenericError
 
 import scala.util.{Failure, Success}
 

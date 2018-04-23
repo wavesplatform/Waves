@@ -11,8 +11,9 @@ import com.wavesplatform.state.patch.{CancelAllLeases, CancelInvalidLeaseIn, Can
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
-import scorex.transaction.ValidationError.ActivationError
-import scorex.transaction.{Transaction, ValidationError}
+import scorex.transaction.validation.ValidationError.ActivationError
+import scorex.transaction.Transaction
+import scorex.transaction.validation.ValidationError
 import scorex.utils.ScorexLogging
 
 object BlockDiffer extends ScorexLogging with Instrumented {

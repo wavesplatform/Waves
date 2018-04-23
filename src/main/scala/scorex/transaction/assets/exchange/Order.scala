@@ -10,9 +10,10 @@ import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
-import scorex.transaction.ValidationError.{GenericError, InvalidSignature}
+import scorex.transaction.validation.ValidationError.{GenericError, InvalidSignature}
 import scorex.transaction._
 import scorex.transaction.assets.exchange.Validation.booleanOperators
+import scorex.transaction.validation.ValidationError
 
 import scala.util.Try
 

@@ -10,7 +10,8 @@ import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
 import scorex.api.http._
-import scorex.transaction.{Transaction, ValidationError}
+import scorex.transaction.Transaction
+import scorex.transaction.validation.ValidationError
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future

@@ -14,7 +14,7 @@ import org.iq80.leveldb.DB
 import play.api.libs.json._
 import scorex.account.Address
 import scorex.transaction.{AssetAcc, AssetId}
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.validation.ValidationError.GenericError
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.NTP
 import scorex.wallet.Wallet

@@ -13,8 +13,9 @@ import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.fields.FeaturesBlockField
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.validation.ValidationError.GenericError
 import scorex.transaction._
+import scorex.transaction.validation.ValidationError
 import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Try}

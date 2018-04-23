@@ -12,8 +12,8 @@ import monix.reactive.subjects.{ConcurrentSubject, Subject}
 import monix.reactive.{Observable, Observer}
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.validation.ValidationError.GenericError
+import scorex.transaction.validation.ValidationError
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
