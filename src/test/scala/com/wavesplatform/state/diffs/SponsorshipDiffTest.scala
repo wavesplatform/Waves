@@ -94,7 +94,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
     val setup = for {
       master <- accountGen
       ts     <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, 300000000, ts).right.get
+      genesis: GenesisTransaction = GenesisTransaction.create(master, 400000000, ts).right.get
       (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
       recipient                  <- accountGen
       assetId = issueTx.id()
@@ -106,9 +106,9 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         .create(None, master, recipient.toAddress, 1000000, ts + 2, Some(assetId), sponsorTx.minFee - 1, Array.emptyByteArray)
         .right
         .get
-      fee = 2000 * sponsorTx.minFee
+      fee = 3000 * sponsorTx.minFee
       wavesOverspend = TransferTransaction
-        .create(None, master, recipient.toAddress, 1000000, ts + 4, Some(assetId), fee, Array.emptyByteArray)
+        .create(None, master, recipient.toAddress, 1000000, ts + 3, Some(assetId), fee, Array.emptyByteArray)
         .right
         .get
     } yield (genesis, issueTx, sponsorTx, assetOverspend, insufficientFee, wavesOverspend)
