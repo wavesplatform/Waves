@@ -77,7 +77,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
         log.warn("OTHERWISE THE NODE WILL BE STOPPED OR FORKED UPON FEATURE ACTIVATION")
       }
 
-      val activatedFeatures = blockchain.activatedFeatures(height)
+      val activatedFeatures: Set[Short] = blockchain.activatedFeaturesAt(height)
 
       val unimplementedActivated = activatedFeatures.diff(BlockchainFeatures.implemented)
       if (unimplementedActivated.nonEmpty) {
@@ -97,8 +97,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
   }
 
   override def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]] = {
-    val height                 = blockchain.height
-    val notImplementedFeatures = blockchain.activatedFeatures(height).diff(BlockchainFeatures.implemented)
+    val height                             = blockchain.height
+    val notImplementedFeatures: Set[Short] = blockchain.activatedFeaturesAt(height).diff(BlockchainFeatures.implemented)
 
     Either
       .cond(
@@ -232,10 +232,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
 
   private def newlyApprovedFeatures = ngState.fold(Map.empty[Short, Int])(_.approvedFeatures.map(_ -> height).toMap)
 
-  override def approvedFeatures(): Map[Short, Int] = newlyApprovedFeatures ++ blockchain.approvedFeatures()
+  override def approvedFeatures: Map[Short, Int] = newlyApprovedFeatures ++ blockchain.approvedFeatures
 
-  override def activatedFeatures(): Map[Short, Int] =
-    newlyApprovedFeatures.mapValues(_ + functionalitySettings.activationWindowSize(height)) ++ blockchain.activatedFeatures()
+  override def activatedFeatures: Map[Short, Int] =
+    newlyApprovedFeatures.mapValues(_ + functionalitySettings.activationWindowSize(height)) ++ blockchain.activatedFeatures
 
   override def featureVotes(height: Int): Map[Short, Int] = {
     val innerVotes = blockchain.featureVotes(height)
@@ -297,7 +297,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     blockchain.lastBlockIds(count)
   }
 
-  override def microblockIds(): Seq[BlockId] = ngState.fold(Seq.empty[BlockId])(_.microBlockIds)
+  override def microblockIds: Seq[BlockId] = ngState.fold(Seq.empty[BlockId])(_.microBlockIds)
 
   override def bestLastBlockInfo(maxTimestamp: Long): Option[BlockMinerInfo] = {
     ngState

@@ -31,7 +31,7 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
     .newBuilder()
     .maximumSize(historyReplierSettings.maxBlockCacheSize)
     .build(new CacheLoader[ByteStr, Array[Byte]] {
-      override def load(key: ByteStr) = ng.heightOf(key).flatMap(ng.blockBytes).get
+      override def load(key: ByteStr) = ng.blockBytes(key).get
     })
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {

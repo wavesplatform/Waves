@@ -30,8 +30,8 @@ trait Blockchain {
   def parent(block: Block, back: Int = 1): Option[Block]
 
   /** Features related */
-  def approvedFeatures(): Map[Short, Int]
-  def activatedFeatures(): Map[Short, Int]
+  def approvedFeatures: Map[Short, Int]
+  def activatedFeatures: Map[Short, Int]
   def featureVotes(height: Int): Map[Short, Int]
 
   def portfolio(a: Address): Portfolio

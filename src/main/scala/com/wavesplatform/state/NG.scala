@@ -10,5 +10,5 @@ trait NG extends Blockchain {
 
   def lastPersistedBlockIds(count: Int): Seq[BlockId]
 
-  def microblockIds(): Seq[BlockId]
+  def microblockIds: Seq[BlockId]
 }

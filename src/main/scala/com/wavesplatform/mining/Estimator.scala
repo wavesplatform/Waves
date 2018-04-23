@@ -33,7 +33,7 @@ object MiningEstimators {
   private val MaxTxsSizeInBytes         = 1 * 1024 * 1024 // 1 megabyte
 
   def apply(minerSettings: MinerSettings, blockchain: Blockchain, height: Int): MiningEstimators = {
-    val activatedFeatures     = blockchain.activatedFeatures(height)
+    val activatedFeatures     = blockchain.activatedFeaturesAt(height)
     val isNgEnabled           = activatedFeatures.contains(BlockchainFeatures.NG.id)
     val isMassTransferEnabled = activatedFeatures.contains(BlockchainFeatures.MassTransfer.id)
 

@@ -60,8 +60,8 @@ class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
       override def lastBlockIds(howMany: Int): Seq[AssetId]                                                                = throw error
       override def blockIdsAfter(parentSignature: AssetId, howMany: Int): Option[Seq[AssetId]]                             = throw error
       override def parent(block: Block, back: Int): Option[Block]                                                          = throw error
-      override def approvedFeatures(): Map[Short, Int]                                                                     = throw error
-      override def activatedFeatures(): Map[Short, Int]                                                                    = throw error
+      override def approvedFeatures: Map[Short, Int]                                                                       = throw error
+      override def activatedFeatures: Map[Short, Int]                                                                      = throw error
       override def featureVotes(height: Int): Map[Short, Int]                                                              = throw error
       override def append(diff: Diff, block: Block): Unit                                                                  = throw error
       override def rollbackTo(targetBlockId: AssetId): Seq[Block]                                                          = throw error

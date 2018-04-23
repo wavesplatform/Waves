@@ -184,9 +184,9 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
   override def parent(block: Block, back: Int): Option[Block] = inner.parent(block, back)
 
   /** Features related */
-  override def approvedFeatures(): Map[Short, Int] = inner.approvedFeatures()
+  override def approvedFeatures: Map[Short, Int] = inner.approvedFeatures
 
-  override def activatedFeatures(): Map[Short, Int] = inner.activatedFeatures()
+  override def activatedFeatures: Map[Short, Int] = inner.activatedFeatures
 
   override def featureVotes(height: Int): Map[Short, Int] = inner.featureVotes(height)
 

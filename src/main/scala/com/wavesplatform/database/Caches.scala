@@ -65,12 +65,12 @@ trait Caches extends Blockchain {
   @volatile
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
   protected def loadApprovedFeatures(): Map[Short, Int]
-  override def approvedFeatures(): Map[Short, Int] = approvedFeaturesCache
+  override def approvedFeatures: Map[Short, Int] = approvedFeaturesCache
 
   @volatile
   protected var activatedFeaturesCache: Map[Short, Int] = loadActivatedFeatures()
   protected def loadActivatedFeatures(): Map[Short, Int]
-  override def activatedFeatures(): Map[Short, Int] = activatedFeaturesCache
+  override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   protected def doAppend(block: Block,
                          addresses: Map[Address, BigInt],
