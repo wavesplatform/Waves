@@ -119,6 +119,6 @@ object IssueTransaction extends TransactionParserFor[IssueTransaction] with Tran
       _ <- Either.cond(description.length <= MaxDescriptionLength, (), ValidationError.TooBigArray)
       _ <- Either.cond(name.length >= MinAssetNameLength && name.length <= MaxAssetNameLength, (), ValidationError.InvalidName)
       _ <- Either.cond(decimals >= 0 && decimals <= MaxDecimals, (), ValidationError.TooBigArray)
-      _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee)
+      _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee())
     } yield ()
 }

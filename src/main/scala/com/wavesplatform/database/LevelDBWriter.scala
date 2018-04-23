@@ -462,6 +462,15 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
     }
   }
 
+  override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = readOnly { db =>
+    addressIdCache.get(address).fold(0L) { addressId =>
+      mayBeAssetId match {
+        case Some(assetId) => loadFromHistory(db, addressId, k.assetBalanceHistory(_, assetId), k.assetBalance(_, _, assetId)).getOrElse(0L)
+        case None          => loadFromHistory(db, addressId, k.wavesBalanceHistory, k.wavesBalance).getOrElse(0L)
+      }
+    }
+  }
+
   private def loadFromHistory[A](db: ReadOnlyDB, addressId: BigInt, key: BigInt => Key[Seq[Int]], v: (Int, BigInt) => Key[A]) =
     for {
       lastChange <- db.get(key(addressId)).headOption

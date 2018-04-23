@@ -78,16 +78,17 @@ trait ScriptGen {
 
   def BLOCKgen(gas: Int): Gen[EXPR] =
     for {
-      let  <- LETgen((gas - 3) / 3)                                      // should be Gen.option(LETgen((gas - 3) / 3)), issue: NODE-696
+      let  <- LETgen((gas - 3) / 3)
       body <- Gen.oneOf(BOOLgen((gas - 3) / 3), BLOCKgen((gas - 3) / 3)) // BLOCKGen wasn't add to BOOLGen since issue: NODE-700
-      // ParseError example:
-      //(let xtld = true; true && (true&&true))
-    } yield BLOCK(Some(let), body)
+    } yield BLOCK(let, body)
 
-  private val spaceChars: Seq[Char] = Vector('\u0020', '\u0009', '\u000D', '\u000A')
+  private val spaceChars: Seq[Char] = " \t\n\r"
 
-  def whitespaceChar: Gen[Char] = Gen.oneOf(spaceChars)
-  val whitespaces: Gen[String]  = Gen.listOf(whitespaceChar).map(_.mkString)
+  val whitespaceChar: Gen[Char] = Gen.oneOf(spaceChars)
+  val whitespaces: Gen[String] = for {
+    n  <- Gen.choose(1, 5)
+    xs <- Gen.listOfN(n, whitespaceChar)
+  } yield xs.mkString
 }
 
 trait ScriptGenParser extends ScriptGen {

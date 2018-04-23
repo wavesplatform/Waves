@@ -7,6 +7,7 @@ import com.wavesplatform.lang.v1.Terms._
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
 import fastparse.core.Parsed.{Failure, Success}
 import org.scalacheck.Gen
+import org.scalatest.exceptions.TestFailedException
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
@@ -14,7 +15,15 @@ import scorex.crypto.encode.{Base58 => ScorexBase58}
 
 class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
-  def parse(x: String): EXPR = Parser(x).get.value
+  def parse(x: String): EXPR = Parser(x) match {
+    case Success(r, _) => r
+    case e @ Failure(_, i, _) =>
+      println(
+        s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${e.extra.traced.fullStack
+          .mkString("\n")}")
+      throw new TestFailedException("Test failed", 0)
+  }
+
   def isParsed(x: String): Boolean = Parser(x) match {
     case Success(_, _)    => true
     case Failure(_, _, _) => false
@@ -32,35 +41,32 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     case CONST_STRING(x) => withWhitespaces(s"""\"$x\"""")
     case TRUE            => withWhitespaces("true")
     case FALSE           => withWhitespaces("false")
-    case BINARY_OP(x: EXPR, op: BINARY_OP_KIND, y: EXPR) =>
+    case BINARY_OP(x, op: BINARY_OP_KIND, y) =>
       for {
         arg1 <- toString(x)
         arg2 <- toString(y)
       } yield s"($arg1${opsToFunctions(op)}$arg2)"
-    case IF(cond: EXPR, x: EXPR, y: EXPR) =>
+    case IF(cond, x, y) =>
       for {
         c <- toString(cond)
         t <- toString(x)
         f <- toString(y)
-      } yield s"(if($c) then $t else $f)"
-    case BLOCK(let: Option[LET], body: EXPR) =>
-      let match {
-        case Some(l) =>
-          for {
-            letstr  <- toString(l.value)
-            bodyStr <- toString(body)
-          } yield s"let ${l.name} = $letstr; $bodyStr"
-        case None => toString(body)
-      }
+      } yield s"(if ($c) then $t else $f)"
+    case BLOCK(let, body) =>
+      for {
+        v <- toString(let.value)
+        b <- toString(body)
+      } yield s"let ${let.name} = $v$b\n"
     case _ => ???
   }
 
   def genElementCheck(gen: Gen[EXPR]): Unit = {
-
-    forAll(for {
+    val testGen: Gen[(EXPR, String)] = for {
       expr <- gen
       str  <- toString(expr)
-    } yield (expr, str)) {
+    } yield (expr, str)
+
+    forAll(testGen) {
       case ((expr, str)) =>
         parse(str) shouldBe expr
     }
@@ -105,6 +111,16 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     )
   }
 
+  property("base58") {
+    parse("base58'bQbp'") shouldBe CONST_BYTEVECTOR(ByteVector("foo".getBytes))
+    parse("base58''") shouldBe CONST_BYTEVECTOR(ByteVector.empty)
+    isParsed("base58' bQbp'\n") shouldBe false
+  }
+
+  property("string is consumed fully") {
+    parse(""" "   fooo    bar" """) shouldBe CONST_STRING("   fooo    bar")
+  }
+
   property("string literal with unicode chars") {
     val stringWithUnicodeChars = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD"
 
@@ -126,7 +142,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         |
       """.stripMargin
 
-    List("if", "then", "else", "true", "false").foreach(kv => isParsed(script(kv)) shouldBe false)
+    List("if", "then", "else", "true", "false", "let").foreach(kv => isParsed(script(kv)) shouldBe false)
   }
 
   property("multisig sample") {
@@ -164,6 +180,9 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("getter") {
+    isParsed("xxx   .yyy") shouldBe false
+    isParsed("xxx.  yyy") shouldBe false
+
     parse("xxx.yyy") shouldBe GETTER(REF("xxx"), "yyy")
     parse(
       """
@@ -211,6 +230,33 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         | }.zzz
         |
       """.stripMargin
-    ) shouldBe GETTER(BLOCK(Some(LET("yyy", FUNCTION_CALL("aaa", List(REF("bbb"))))), FUNCTION_CALL("xxx", List(REF("yyy")))), "zzz")
+    ) shouldBe GETTER(BLOCK(LET("yyy", FUNCTION_CALL("aaa", List(REF("bbb")))), FUNCTION_CALL("xxx", List(REF("yyy")))), "zzz")
+  }
+
+  property("crypto functions") {
+    val hashFunctions = Vector("sha256", "blake2b256", "keccak256")
+    val text          = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD=test message"
+    val encodedText   = ScorexBase58.encode(text.getBytes)
+
+    for (f <- hashFunctions) {
+      parse(
+        s"""
+           |
+           |$f(base58'$encodedText')
+           |
+       """.stripMargin
+      ) shouldBe
+        FUNCTION_CALL(
+          f,
+          List(CONST_BYTEVECTOR(ByteVector(text.getBytes)))
+        )
+    }
+  }
+
+  property("multiple expressions going one after another are denied") {
+    isParsed(
+      """1 + 1
+        |2 + 2""".stripMargin
+    ) shouldBe false
   }
 }

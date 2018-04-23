@@ -52,7 +52,7 @@ object TransactionParsers {
       }
   } ++ modern
 
-  private val byName: Map[String, TransactionParser] = (old ++ modern).map {
+  val byName: Map[String, TransactionParser] = (old ++ modern).map {
     case (_, builder) => builder.classTag.runtimeClass.getSimpleName -> builder
   }
 

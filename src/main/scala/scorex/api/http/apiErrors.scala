@@ -61,9 +61,8 @@ case object NegativeFee extends ApiError {
   override val code: StatusCode = StatusCodes.BadRequest
 }
 
-case object InsufficientFee extends ApiError {
+case class InsufficientFee(override val message: String = "insufficient fee") extends ApiError {
   override val id: Int          = 112
-  override val message: String  = "insufficient fee"
   override val code: StatusCode = StatusCodes.BadRequest
 }
 
