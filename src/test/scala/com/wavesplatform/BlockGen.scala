@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import org.scalacheck.Gen
 import org.scalatest.Suite
 import scorex.account.PrivateKeyAccount

@@ -5,7 +5,7 @@ import scorex.block.{Block, MicroBlock}
 
 package object transaction {
 
-  type AssetId = com.wavesplatform.state2.ByteStr
+  type AssetId = com.wavesplatform.state.ByteStr
   val AssetIdLength: Int       = com.wavesplatform.crypto.DigestSize
   val AssetIdStringLength: Int = base58Length(AssetIdLength)
   type DiscardedTransactions = Seq[Transaction]

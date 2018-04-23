@@ -5,12 +5,11 @@ import com.wavesplatform.BlockGen
 import com.wavesplatform.db.WithState
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.JsObject
 import scorex.api.http.BlockDoesNotExist
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
-import scorex.transaction.History
 
 class ConsensusRouteSpec
     extends RouteSpec("/consensus")
@@ -20,12 +19,12 @@ class ConsensusRouteSpec
     with HistoryTest
     with WithState {
 
-  def routeTest(f: (History, Route) => Any) = withDomain() { d =>
+  def routeTest(f: (Blockchain, Route) => Any) = withDomain() { d =>
     d.blockchainUpdater.processBlock(genesisBlock)
     1 to 10 foreach { _ =>
-      d.blockchainUpdater.processBlock(getNextTestBlock(d.history))
+      d.blockchainUpdater.processBlock(getNextTestBlock(d.blockchainUpdater))
     }
-    f(d.history, NxtConsensusApiRoute(restAPISettings, d.state, d.history, FunctionalitySettings.TESTNET).route)
+    f(d.blockchainUpdater, NxtConsensusApiRoute(restAPISettings, d.blockchainUpdater, FunctionalitySettings.TESTNET).route)
   }
 
   routePath("/generationsignature") - {

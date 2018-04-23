@@ -21,7 +21,7 @@ import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
-import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
+import com.wavesplatform.state.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.utils.{SystemInformationReporter, forceStopApplication}
 import com.wavesplatform.utx.{MatcherUtxPool, UtxPool, UtxPoolImpl}
 import io.netty.channel.Channel
@@ -59,7 +59,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val LocalScoreBroadcastDebounce = 1.second
 
-  private val (history, state, blockchainUpdater) = StorageFactory(settings, db, NTP)
+  private val blockchainUpdater = StorageFactory(settings, db, NTP)
 
   private val checkpointService = new CheckpointServiceImpl(db, settings.checkpointsSettings)
   private lazy val upnp         = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
@@ -93,25 +93,24 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   }
 
   def run(): Unit = {
-    checkGenesis(history, settings, blockchainUpdater)
+    checkGenesis(settings, blockchainUpdater)
 
     if (wallet.privateKeyAccounts.isEmpty)
       wallet.generateNewAccounts(1)
 
-    val feeCalculator          = new FeeCalculator(settings.feesSettings)
+    val feeCalculator          = new FeeCalculator(settings.feesSettings, blockchainUpdater)
     val time: Time             = NTP
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val innerUtxStorage =
-      new UtxPoolImpl(time, state, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+      new UtxPoolImpl(time, blockchainUpdater, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
 
     matcher = if (settings.matcherSettings.enable) {
       val m = new Matcher(actorSystem,
                           wallet,
                           innerUtxStorage,
                           allChannels,
-                          state,
-                          history,
+                          blockchainUpdater,
                           settings.blockchainSettings,
                           settings.restAPISettings,
                           settings.matcherSettings)
@@ -126,41 +125,19 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
     val miner =
       if (settings.minerSettings.enable)
-        new MinerImpl(allChannels,
-                      blockchainUpdater,
-                      checkpointService,
-                      history,
-                      state,
-                      settings,
-                      time,
-                      utxStorage,
-                      wallet,
-                      minerScheduler,
-                      appenderScheduler)
+        new MinerImpl(allChannels, blockchainUpdater, checkpointService, settings, time, utxStorage, wallet, minerScheduler, appenderScheduler)
       else Miner.Disabled
 
-    val processBlock = BlockAppender(checkpointService,
-                                     history,
-                                     blockchainUpdater,
-                                     time,
-                                     state,
-                                     utxStorage,
-                                     settings,
-                                     history,
-                                     allChannels,
-                                     peerDatabase,
-                                     miner,
-                                     appenderScheduler) _
-    val processCheckpoint = CheckpointAppender(checkpointService, history, blockchainUpdater, peerDatabase, miner, allChannels, appenderScheduler) _
+    val processBlock =
+      BlockAppender(checkpointService, blockchainUpdater, time, utxStorage, settings, allChannels, peerDatabase, miner, appenderScheduler) _
+    val processCheckpoint =
+      CheckpointAppender(checkpointService, blockchainUpdater, blockchainUpdater, peerDatabase, miner, allChannels, appenderScheduler) _
     val processFork = ExtensionAppender(
       checkpointService,
-      history,
       blockchainUpdater,
-      state,
       utxStorage,
       time,
       settings,
-      history,
       knownInvalidBlocks,
       peerDatabase,
       miner,
@@ -168,7 +145,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       appenderScheduler
     ) _
     val processMicroBlock =
-      MicroblockAppender(checkpointService, history, blockchainUpdater, utxStorage, allChannels, peerDatabase, appenderScheduler) _
+      MicroblockAppender(checkpointService, blockchainUpdater, utxStorage, allChannels, peerDatabase, appenderScheduler) _
 
     import blockchainUpdater.lastBlockInfo
 
@@ -183,8 +160,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         allChannels.broadcast(LocalScoreChanged(x))
       }(scheduler)
 
-    val historyReplier = new HistoryReplier(history, settings.synchronizationSettings, historyRepliesScheduler)
-    val network        = NetworkServer(settings, lastBlockInfo, history, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
+    val historyReplier = new HistoryReplier(blockchainUpdater, settings.synchronizationSettings, historyRepliesScheduler)
+    val network =
+      NetworkServer(settings, lastBlockInfo, blockchainUpdater, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
     maybeNetwork = Some(network)
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses, transactions) = network.messages
 
@@ -193,7 +171,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val (syncWithChannelClosed, scoreStatsReporter) = RxScoreObserver(
       settings.synchronizationSettings.scoreTTL,
       1.second,
-      history.score,
+      blockchainUpdater.score,
       lastScore,
       blockchainScores,
       network.closedChannels,
@@ -210,7 +188,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     )
     val (newBlocks, extLoaderState, sh) = RxExtensionLoader(
       settings.synchronizationSettings.synchronizationTimeout,
-      Coeval(history.lastBlockIds(settings.synchronizationSettings.maxRollback)),
+      Coeval(blockchainUpdater.lastBlockIds(settings.synchronizationSettings.maxRollback)),
       peerDatabase,
       knownInvalidBlocks,
       blocks,
@@ -239,20 +217,25 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
-        NodeApiRoute(settings.restAPISettings, history, state, () => apiShutdown()),
-        BlocksApiRoute(settings.restAPISettings, history, blockchainUpdater, allChannels, c => processCheckpoint(None, c)),
-        TransactionsApiRoute(settings.restAPISettings, wallet, state, history, utxStorage, allChannels, time),
-        NxtConsensusApiRoute(settings.restAPISettings, state, history, settings.blockchainSettings.functionalitySettings),
+        NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
+        BlocksApiRoute(settings.restAPISettings, blockchainUpdater, blockchainUpdater, allChannels, c => processCheckpoint(None, c)),
+        TransactionsApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, allChannels, time),
+        NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater, settings.blockchainSettings.functionalitySettings),
         WalletApiRoute(settings.restAPISettings, wallet),
         PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
         UtilsApiRoute(time, settings.restAPISettings),
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
-        AddressApiRoute(settings.restAPISettings, wallet, state, utxStorage, allChannels, time, settings.blockchainSettings.functionalitySettings),
+        AddressApiRoute(settings.restAPISettings,
+                        wallet,
+                        blockchainUpdater,
+                        utxStorage,
+                        allChannels,
+                        time,
+                        settings.blockchainSettings.functionalitySettings),
         DebugApiRoute(
           settings,
           wallet,
-          state,
-          history,
+          blockchainUpdater,
           peerDatabase,
           establishedConnections,
           blockId => Task(blockchainUpdater.removeAfter(blockId)).executeOn(appenderScheduler),
@@ -266,12 +249,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           configRoot
         ),
         WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
-        AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, state, time),
-        ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, history, history),
+        AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, blockchainUpdater, time),
+        ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, blockchainUpdater),
         AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-        LeaseApiRoute(settings.restAPISettings, wallet, state, utxStorage, allChannels, time),
+        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, allChannels, time),
         LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-        AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, state),
+        AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, blockchainUpdater),
         AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
       )
 

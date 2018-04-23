@@ -2,7 +2,7 @@ package scorex.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.crypto
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
@@ -62,7 +62,7 @@ object BurnTransaction extends TransactionParserFor[BurnTransaction] with Transa
     if (quantity < 0) {
       Left(ValidationError.NegativeAmount(quantity, "assets"))
     } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee)
+      Left(ValidationError.InsufficientFee())
     } else {
       Right(BurnTransaction(sender, assetId, quantity, fee, timestamp, signature))
     }

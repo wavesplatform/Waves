@@ -1,7 +1,7 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import org.scalacheck.Gen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.prop.PropertyChecks

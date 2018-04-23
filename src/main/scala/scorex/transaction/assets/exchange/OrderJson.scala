@@ -1,6 +1,6 @@
 package scorex.transaction.assets.exchange
 
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import play.api.libs.json._
 import scorex.account.PublicKeyAccount
 import scorex.crypto.encode.Base58

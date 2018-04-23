@@ -27,27 +27,29 @@ object Parser {
   private val escapedUnicodeSymbolP = P("\\" ~ (CharIn("\"\\bfnrt") | unicodeSymbolP))
   private val varName               = (char.repX(min = 1, max = 1) ~~ (digit | char).repX()).!.filter(!keywords.contains(_))
 
-  private def numberP: P[CONST_LONG] = P((CharIn(Seq('+', '-')).rep(max = 1) ~ digit.rep(min = 1)).!.map(t => CONST_LONG(t.toLong)))
-  private def trueP: P[TRUE.type]    = P("true").map(_ => TRUE)
-  private def falseP: P[FALSE.type]  = P("false").map(_ => FALSE)
-  private def bracesP: P[EXPR]       = P("(" ~ block ~ ")")
-  private def curlyBracesP: P[EXPR]  = P("{" ~ block ~ "}")
-  private def letP: P[LET]           = P("let " ~ varName ~ "=" ~ block).map { case ((x, y)) => LET(x, y) }
-  private def refP: P[REF]           = P(varName).map(x => REF(x))
-  private def ifP: P[IF]             = P("if" ~ "(" ~ block ~ ")" ~ "then" ~ block ~ "else" ~ block).map { case (x, y, z) => IF(x, y, z) }
+  private val numberP: P[CONST_LONG] = P(CharIn("+-").rep(max = 1) ~ digit.repX(min = 1)).!.map(t => CONST_LONG(t.toLong))
+  private val trueP: P[TRUE.type]    = P("true").map(_ => TRUE)
+  private val falseP: P[FALSE.type]  = P("false").map(_ => FALSE)
+  private val bracesP: P[EXPR]       = P("(" ~ expr ~ ")")
+  private val curlyBracesP: P[EXPR]  = P("{" ~ expr ~ "}")
+  private val letP: P[LET]           = P("let" ~ varName ~ "=" ~ expr).map { case ((x, y)) => LET(x, y) }
+  private val refP: P[REF]           = P(varName).map(x => REF(x))
+  private val ifP: P[IF]             = P("if" ~ bracesP ~ "then" ~ expr ~ "else" ~ expr).map { case (x, y, z) => IF(x, y, z) }
 
-  private def functionCallArgs: P[Seq[EXPR]] = expr.rep(min = 0, sep = ",")
+  private val functionCallArgs: P[Seq[EXPR]] = expr.rep(sep = ",")
 
-  private def functionCallP: P[FUNCTION_CALL] = P(varName ~ "(" ~ functionCallArgs ~ ")").map {
+  private val functionCallP: P[FUNCTION_CALL] = P(varName ~~ "(" ~ functionCallArgs ~ ")").map {
     case (functionName, args) => FUNCTION_CALL(functionName, args.toList)
   }
 
-  private def extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | functionCallP | refP)
+  private val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | functionCallP | refP)
 
-  private def getterP: P[GETTER] = P(extractableAtom ~ "." ~ varName).map { case (e, f) => GETTER(e, f) }
+  private val maybeGetterP: P[EXPR] = P(extractableAtom ~~ ("." ~~ varName).?).map {
+    case (e, f) => f.fold(e)(GETTER(e, _))
+  }
 
-  private def byteVectorP: P[CONST_BYTEVECTOR] =
-    P("base58'" ~ CharsWhileIn(Base58Chars, 0).! ~ "'")
+  private val byteVectorP: P[CONST_BYTEVECTOR] =
+    P("base58'" ~~ CharsWhileIn(Base58Chars, 0).! ~~ "'")
       .map { x =>
         if (x.isEmpty) Right(Array.emptyByteArray) else Global.base58Decode(x)
       }
@@ -56,13 +58,13 @@ object Parser {
         case Right(xs) => PassWith(CONST_BYTEVECTOR(ByteVector(xs)))
       }
 
-  private def stringP: P[CONST_STRING] =
-    P("\"" ~ (CharsWhile(!"\"\\".contains(_: Char)) | escapedUnicodeSymbolP).rep.! ~ "\"").map(CONST_STRING)
+  private val stringP: P[CONST_STRING] =
+    P("\"" ~~ (CharsWhile(!"\"\\".contains(_: Char)) | escapedUnicodeSymbolP).rep.! ~~ "\"").map(CONST_STRING)
 
-  private def block: P[EXPR] = P("\n".rep ~ letP.rep ~ expr ~ ";".rep).map {
-    case ((Nil, y)) => y
-    case ((all, y)) => all.foldRight(y) { case (r, curr) => BLOCK(Some(r), curr) }
-  }
+  private val block: P[EXPR] = P(letP ~ expr).map(Function.tupled(BLOCK.apply))
+
+  private val atom      = P(ifP | byteVectorP | stringP | numberP | trueP | falseP | block | maybeGetterP)
+  private lazy val expr = P(binaryOp(opsByPriority) | atom)
 
   private def binaryOp(rest: List[(String, BINARY_OP_KIND)]): P[EXPR] = rest match {
     case Nil => atom
@@ -74,10 +76,5 @@ object Parser {
       }
   }
 
-  private def expr = P(binaryOp(opsByPriority) | atom)
-
-  private def atom =
-    P(ifP | byteVectorP | stringP | numberP | trueP | falseP | getterP | bracesP | curlyBracesP | functionCallP | refP)
-
-  def apply(str: String): core.Parsed[EXPR, Char, String] = P(block ~ End).parse(str)
+  def apply(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ expr ~ End).parse(str)
 }

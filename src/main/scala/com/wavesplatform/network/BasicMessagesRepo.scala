@@ -5,13 +5,13 @@ import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import scorex.account.PublicKeyAccount
 import scorex.block.{Block, MicroBlock}
 import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.network.message.Message._
 import scorex.network.message._
-import scorex.transaction.{History, Transaction, TransactionParsers}
+import scorex.transaction.{Transaction, TransactionParsers}
 
 import scala.util.Try
 
@@ -140,19 +140,19 @@ object BlockSpec extends MessageSpec[Block] {
   override def deserializeData(bytes: Array[Byte]): Try[Block] = Block.parseBytes(bytes)
 }
 
-object ScoreSpec extends MessageSpec[History.BlockchainScore] {
+object ScoreSpec extends MessageSpec[BigInt] {
   override val messageCode: MessageCode = 24: Byte
 
   override val maxLength: Int = 64 // allows representing scores as high as 6.6E153
 
-  override def serializeData(score: History.BlockchainScore): Array[Byte] = {
+  override def serializeData(score: BigInt): Array[Byte] = {
     val scoreBytes = score.toByteArray
     val bb         = java.nio.ByteBuffer.allocate(scoreBytes.length)
     bb.put(scoreBytes)
     bb.array()
   }
 
-  override def deserializeData(bytes: Array[Byte]): Try[History.BlockchainScore] = Try {
+  override def deserializeData(bytes: Array[Byte]): Try[BigInt] = Try {
     BigInt(1, bytes)
   }
 }

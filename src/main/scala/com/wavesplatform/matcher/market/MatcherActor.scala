@@ -10,15 +10,15 @@ import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.account.Address
 import scorex.crypto.encode.Base58
+import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
-import scorex.transaction.{AssetId, History}
 import scorex.utils._
 import scorex.wallet.Wallet
 
@@ -26,12 +26,11 @@ import scala.collection.{immutable, mutable}
 import scala.language.reflectiveCalls
 
 class MatcherActor(orderHistory: ActorRef,
-                   storedState: SnapshotStateReader,
                    wallet: Wallet,
                    utx: UtxPool,
                    allChannels: ChannelGroup,
                    settings: MatcherSettings,
-                   history: History,
+                   blockchain: Blockchain,
                    functionalitySettings: FunctionalitySettings)
     extends PersistentActor
     with ScorexLogging {
@@ -43,7 +42,7 @@ class MatcherActor(orderHistory: ActorRef,
   def getAssetName(asset: Option[AssetId]): String =
     asset.fold(AssetPair.WavesName) { aid =>
       // fixme: the following line will throw an exception when asset name bytes are not a valid UTF-8
-      storedState.assetDescription(aid).fold("Unknown")(d => new String(d.name, Charsets.UTF_8))
+      blockchain.assetDescription(aid).fold("Unknown")(d => new String(d.name, Charsets.UTF_8))
     }
 
   def createOrderBook(pair: AssetPair): ActorRef = {
@@ -52,17 +51,17 @@ class MatcherActor(orderHistory: ActorRef,
       getAssetName(pair.amountAsset),
       getAssetName(pair.priceAsset),
       NTP.correctedTime(),
-      pair.amountAsset.flatMap(storedState.assetDescription).map(t => AssetInfo(t.decimals)),
-      pair.priceAsset.flatMap(storedState.assetDescription).map(t => AssetInfo(t.decimals))
+      pair.amountAsset.flatMap(blockchain.assetDescription).map(t => AssetInfo(t.decimals)),
+      pair.priceAsset.flatMap(blockchain.assetDescription).map(t => AssetInfo(t.decimals))
     )
     tradedPairs += pair -> md
 
-    context.actorOf(OrderBookActor.props(pair, orderHistory, storedState, settings, wallet, utx, allChannels, history, functionalitySettings),
+    context.actorOf(OrderBookActor.props(pair, orderHistory, blockchain, settings, wallet, utx, allChannels, functionalitySettings),
                     OrderBookActor.name(pair))
   }
 
   def basicValidation(msg: { def assetPair: AssetPair }): Validation = {
-    val s = storedState
+    val s = blockchain
     def isAssetsExist: Validation = {
       msg.assetPair.priceAsset.forall(s.assetDescription(_).isDefined) :|
         s"Unknown Asset ID: ${msg.assetPair.priceAssetStr}" &&
@@ -225,14 +224,13 @@ object MatcherActor {
   def name = "matcher"
 
   def props(orderHistoryActor: ActorRef,
-            storedState: SnapshotStateReader,
             wallet: Wallet,
             utx: UtxPool,
             allChannels: ChannelGroup,
             settings: MatcherSettings,
-            history: History,
+            blockchain: Blockchain,
             functionalitySettings: FunctionalitySettings): Props =
-    Props(new MatcherActor(orderHistoryActor, storedState, wallet, utx, allChannels, settings, history, functionalitySettings))
+    Props(new MatcherActor(orderHistoryActor, wallet, utx, allChannels, settings, blockchain, functionalitySettings))
 
   case class OrderBookCreated(pair: AssetPair)
 

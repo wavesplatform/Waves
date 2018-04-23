@@ -2,7 +2,7 @@ package scorex.transaction.assets.exchange
 
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.crypto
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
@@ -83,7 +83,7 @@ object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] wit
     lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
 
     if (fee <= 0) {
-      Left(ValidationError.InsufficientFee)
+      Left(ValidationError.InsufficientFee())
     } else if (amount <= 0) {
       Left(ValidationError.NegativeAmount(amount, "assets"))
     } else if (price <= 0) {

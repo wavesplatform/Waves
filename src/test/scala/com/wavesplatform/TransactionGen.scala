@@ -1,13 +1,14 @@
 package com.wavesplatform
 
 import cats.syntax.semigroup._
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.Terms.Typed
 import com.wavesplatform.lang.v1.TypeChecker
 import com.wavesplatform.lang.v1.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs.ENOUGH_AMT
+import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.ENOUGH_AMT
 import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{BeforeAndAfterAll, Suite}
@@ -20,7 +21,7 @@ import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.smart.{SetScriptTransaction, WavesCrypto}
+import scorex.transaction.smart.{SetScriptTransaction}
 import scorex.utils.TimeImpl
 
 import scala.util.Random
@@ -33,6 +34,8 @@ trait TransactionGen extends BeforeAndAfterAll with TransactionGenBase with Scri
 }
 
 trait TransactionGenBase extends ScriptGen {
+
+  protected def waves(n: Float): Long = (n * 100000000L).toLong
 
   def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.containerOfN[Array, Byte](length, Arbitrary.arbitrary[Byte])
 
@@ -110,7 +113,7 @@ trait TransactionGenBase extends ScriptGen {
   } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
 
   val scriptGen = BOOLgen(1000).map { expr =>
-    val typed = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(PureContext.instance |+| CryptoContext.build(WavesCrypto)), expr).explicitGet()
+    val typed = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(PureContext.instance |+| CryptoContext.build(Global)), expr).explicitGet()
     ScriptV1(typed)
   }
 

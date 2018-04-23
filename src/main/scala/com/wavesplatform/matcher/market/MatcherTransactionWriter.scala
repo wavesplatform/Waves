@@ -6,7 +6,7 @@ import com.wavesplatform.db.{OrderToTxIdsCodec, SubStorage}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.MatcherResponse
 import com.wavesplatform.matcher.model.Events._
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import org.iq80.leveldb.DB
 import play.api.libs.json.JsArray
 import scorex.transaction.assets.exchange.ExchangeTransaction

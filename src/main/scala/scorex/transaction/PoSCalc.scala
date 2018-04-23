@@ -1,9 +1,10 @@
 package scorex.transaction
 
 import com.wavesplatform.crypto
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.Blockchain
 import scorex.account.{Address, PublicKeyAccount}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -65,23 +66,22 @@ object PoSCalc extends ScorexLogging {
     }
   }
 
-  def generatingBalance(state: SnapshotStateReader, fs: FunctionalitySettings, account: Address, atHeight: Int): Long = {
+  def generatingBalance(blockchain: Blockchain, fs: FunctionalitySettings, account: Address, atHeight: Int): Long = {
     val generatingBalanceDepth = fs.generatingBalanceDepth(atHeight)
-    state.effectiveBalance(account, atHeight, generatingBalanceDepth)
+    blockchain.effectiveBalance(account, atHeight, generatingBalanceDepth)
   }
 
   def nextBlockGenerationTime(height: Int,
-                              state: SnapshotStateReader,
+                              blockchain: Blockchain,
                               fs: FunctionalitySettings,
                               block: Block,
-                              account: PublicKeyAccount,
-                              featureProvider: FeatureProvider): Either[String, (Long, Long)] = {
-    val balance = generatingBalance(state, fs, account, height)
+                              account: PublicKeyAccount): Either[String, (Long, Long)] = {
+    val balance = generatingBalance(blockchain, fs, account, height)
     Either
       .cond(
-        (!featureProvider
+        (!blockchain
           .isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance, height) && balance >= MinimalEffectiveBalanceForGenerator1) ||
-          (featureProvider
+          (blockchain
             .isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance, height) && balance >= MinimalEffectiveBalanceForGenerator2),
         balance,
         s"Balance $balance of ${account.address} is lower than required for generation"

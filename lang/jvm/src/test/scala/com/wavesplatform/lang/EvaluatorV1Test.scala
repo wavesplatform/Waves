@@ -3,26 +3,27 @@ import cats.data.EitherT
 import cats.kernel.Monoid
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.v1.Terms.Typed._
-import com.wavesplatform.lang.v1.Terms._
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
-import com.wavesplatform.lang.v1.{EvaluatorV1, FunctionHeader}
-import com.wavesplatform.lang.v1.ctx._
+import com.wavesplatform.lang.v1.Terms.Typed._
+import com.wavesplatform.lang.v1.Terms._
 import com.wavesplatform.lang.v1.ctx.Context._
+import com.wavesplatform.lang.v1.ctx._
+import com.wavesplatform.lang.v1.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang.v1.{EvaluatorV1, FunctionHeader}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
-import com.wavesplatform.lang.v1.ctx.impl.PureContext._
+import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   private def ev[T: TypeInfo](context: Context = PureContext.instance, expr: EXPR): Either[(Context, ExecutionLog, ExecutionError), T] =
     EvaluatorV1[T](context, expr)
-  private def simpleDeclarationAndUsage(i: Int) = BLOCK(Some(LET("x", CONST_LONG(i))), REF("x", LONG), LONG)
+  private def simpleDeclarationAndUsage(i: Int) = BLOCK(LET("x", CONST_LONG(i)), REF("x", LONG), LONG)
 
   property("successful on very deep expressions (stack overflow check)") {
     val term = (1 to 100000).foldLeft[EXPR](CONST_LONG(0))((acc, _) => FUNCTION_CALL(sumLong.header, List(acc, CONST_LONG(1)), LONG))
@@ -32,9 +33,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("return log and context of failed evaluation") {
     val Left((ctx, log, err)) = ev[Long](
       expr = BLOCK(
-        Some(LET("x", CONST_LONG(3))),
+        LET("x", CONST_LONG(3)),
         BLOCK(
-          Some(LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)), LONG))),
+          LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)), LONG)),
           FUNCTION_CALL(eqLong.header, List(REF("x", LONG), CONST_LONG(1)), LONG),
           LONG
         ),
@@ -44,9 +45,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val expectedLog =
       "Evaluating BLOCK\n" ++
-        "LET: Some(LET(x,CONST_LONG(3))); TYPE: LONG\n" ++
+        "LET: LET(x,CONST_LONG(3)); TYPE: LONG\n" ++
         "Evaluating BLOCK\n" ++
-        "LET: Some(LET(x,FUNCTION_CALL(FunctionHeader(+,List(LONG, LONG)),List(CONST_LONG(3), CONST_LONG(0)),LONG))); TYPE: LONG"
+        "LET: LET(x,FUNCTION_CALL(FunctionHeader(+,List(LONG, LONG)),List(CONST_LONG(3), CONST_LONG(0)),LONG)); TYPE: LONG"
 
     val expectedError =
       "Value 'x' already defined in the scope"
@@ -59,7 +60,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("successful on unused let") {
     ev[Long](
       expr = BLOCK(
-        Some(LET("x", CONST_LONG(3))),
+        LET("x", CONST_LONG(3)),
         CONST_LONG(3),
         LONG
       )) shouldBe Right(3)
@@ -67,9 +68,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on x = y") {
     ev[Long](
-      expr = BLOCK(Some(LET("x", CONST_LONG(3))),
+      expr = BLOCK(LET("x", CONST_LONG(3)),
                    BLOCK(
-                     Some(LET("y", REF("x", LONG))),
+                     LET("y", REF("x", LONG)),
                      FUNCTION_CALL(sumLong.header, List(REF("x", LONG), REF("y", LONG)), LONG),
                      LONG
                    ),
@@ -83,7 +84,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("successful on get used further in expr") {
     ev[Boolean](
       expr = BLOCK(
-        Some(LET("x", CONST_LONG(3))),
+        LET("x", CONST_LONG(3)),
         FUNCTION_CALL(eqLong.header, List(REF("x", LONG), CONST_LONG(2)), BOOLEAN),
         BOOLEAN
       )) shouldBe Right(false)
@@ -92,8 +93,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("successful on multiple lets") {
     ev[Boolean](
       expr = BLOCK(
-        Some(LET("x", CONST_LONG(3))),
-        BLOCK(Some(LET("y", CONST_LONG(3))), FUNCTION_CALL(eqLong.header, List(REF("x", LONG), REF("y", LONG)), BOOLEAN), BOOLEAN),
+        LET("x", CONST_LONG(3)),
+        BLOCK(LET("y", CONST_LONG(3)), FUNCTION_CALL(eqLong.header, List(REF("x", LONG), REF("y", LONG)), BOOLEAN), BOOLEAN),
         BOOLEAN
       )) shouldBe Right(true)
   }
@@ -101,9 +102,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("successful on multiple lets with expression") {
     ev[Boolean](
       expr = BLOCK(
-        Some(LET("x", CONST_LONG(3))),
+        LET("x", CONST_LONG(3)),
         BLOCK(
-          Some(LET("y", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)), LONG))),
+          LET("y", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)), LONG)),
           FUNCTION_CALL(eqLong.header, List(REF("x", LONG), REF("y", LONG)), BOOLEAN),
           BOOLEAN
         ),
@@ -125,9 +126,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("fails if override") {
     ev[Long](
       expr = BLOCK(
-        Some(LET("x", CONST_LONG(3))),
+        LET("x", CONST_LONG(3)),
         BLOCK(
-          Some(LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)), LONG))),
+          LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)), LONG)),
           FUNCTION_CALL(eqLong.header, List(REF("x", LONG), CONST_LONG(1)), LONG),
           LONG
         ),
@@ -162,7 +163,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     )
     ev[Long](
       context = context,
-      expr = BLOCK(Some(LET("Z", REF("badVal", LONG))),
+      expr = BLOCK(LET("Z", REF("badVal", LONG)),
                    FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", TYPEREF("Point")), "X", LONG), CONST_LONG(2)), LONG),
                    LONG)
     ) shouldBe Right(5)
@@ -202,7 +203,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("let is evaluated maximum once") {
     var functionEvaluated = 0
 
-    val f = PredefFunction("F", LONG, List(("_", LONG))) { _ =>
+    val f = PredefFunction("F", 1, LONG, List(("_", LONG))) { _ =>
       functionEvaluated = functionEvaluated + 1
       Right(1L)
     }
@@ -214,7 +215,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     )
     ev[Long](
       context = context,
-      expr = BLOCK(Some(LET("X", FUNCTION_CALL(f.header, List(CONST_LONG(1000)), LONG))),
+      expr = BLOCK(LET("X", FUNCTION_CALL(f.header, List(CONST_LONG(1000)), LONG)),
                    FUNCTION_CALL(sumLong.header, List(REF("X", LONG), REF("X", LONG)), LONG),
                    LONG)
     ) shouldBe Right(2L)
@@ -242,7 +243,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on function call getter evaluation") {
     val fooType = PredefType("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = PredefFunction("createFoo", fooType.typeRef, List.empty) { _ =>
+    val fooCtor = PredefFunction("createFoo", 1, fooType.typeRef, List.empty) { _ =>
       Right(
         Obj(
           Map(
@@ -266,7 +267,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on block getter evaluation") {
     val fooType = PredefType("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = PredefFunction("createFoo", fooType.typeRef, List.empty) { _ =>
+    val fooCtor = PredefFunction("createFoo", 1, fooType.typeRef, List.empty) { _ =>
       Right(
         Obj(
           Map(
@@ -276,7 +277,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         )
       )
     }
-    val fooTransform = PredefFunction("transformFoo", fooType.typeRef, List(("foo", fooType.typeRef))) {
+    val fooTransform = PredefFunction("transformFoo", 1, fooType.typeRef, List(("foo", fooType.typeRef))) {
       case (fooObj: Obj) :: Nil => Right(fooObj.copy(fooObj.fields.updated("bar", LazyVal(STRING)(EitherT.pure("TRANSFORMED_BAR")))))
       case _                    => ???
     }
@@ -292,7 +293,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val expr = GETTER(
       BLOCK(
-        Some(LET("fooInstance", FUNCTION_CALL(fooCtor.header, List.empty, fooType.typeRef))),
+        LET("fooInstance", FUNCTION_CALL(fooCtor.header, List.empty, fooType.typeRef)),
         FUNCTION_CALL(fooTransform.header, List(REF("fooInstance", fooType.typeRef)), fooType.typeRef),
         fooType.typeRef
       ),
@@ -374,6 +375,32 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
           GETTER(REF("tx", TYPEREF(txType.name)), "senderPk", BYTEVECTOR)
         ),
         BOOLEAN
+      )
+    )
+  }
+
+  property("checking a hash of some message by crypto function invoking") {
+    val bodyText      = "some text for test"
+    val bodyBytes     = bodyText.getBytes()
+    val hashFunctions = Map("sha256" -> Sha256, "blake2b256" -> Blake2b256, "keccak256" -> Keccak256)
+
+    for ((funcName, funcClass) <- hashFunctions) hashFuncTest(bodyBytes, funcName) shouldBe Right(ByteVector(funcClass.hash(bodyText)))
+  }
+
+  private def hashFuncTest(bodyBytes: Array[Byte], funcName: String): Either[(Context, ExecutionLog, ExecutionError), ByteVector] = {
+    val context = Monoid.combineAll(
+      Seq(
+        PureContext.instance,
+        CryptoContext.build(Global)
+      )
+    )
+
+    ev[ByteVector](
+      context = context,
+      expr = FUNCTION_CALL(
+        function = FunctionHeader(funcName, List(FunctionHeaderType.BYTEVECTOR)),
+        args = List(Typed.CONST_BYTEVECTOR(ByteVector(bodyBytes))),
+        BYTEVECTOR
       )
     )
   }

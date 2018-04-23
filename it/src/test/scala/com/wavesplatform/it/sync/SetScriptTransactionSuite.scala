@@ -5,7 +5,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.{Parser, TypeChecker}
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.JsNumber
@@ -14,7 +14,6 @@ import scorex.transaction.Proofs
 import scorex.transaction.assets.VersionedTransferTransaction
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
-
 import scala.util.Random
 
 class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -37,7 +36,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           assetId = None,
           sender = sender.privateKey,
           recipient = acc0,
-          amount = 3 * transferAmount,
+          amount = 3 * transferAmount + 3 * (0.00001.waves + 0.00002.waves), // Script fee
           timestamp = System.currentTimeMillis(),
           feeAmount = fee,
           attachment = Array.emptyByteArray
@@ -93,7 +92,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           recipient = acc3,
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
-          feeAmount = fee,
+          feeAmount = fee + 0.00001.waves + 0.00002.waves,
           attachment = Array.emptyByteArray
         )
         .explicitGet()
@@ -101,7 +100,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   }
 
   test("can send from acc0 using multisig of acc1 and acc2") {
-
     val unsigned =
       VersionedTransferTransaction
         .create(
@@ -111,7 +109,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           recipient = acc3,
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
-          feeAmount = fee,
+          feeAmount = fee + 0.00001.waves + 0.00002.waves,
           attachment = Array.emptyByteArray,
           proofs = Proofs.empty
         )
@@ -133,7 +131,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
         version = SetScriptTransaction.supportedVersions.head,
         sender = acc0,
         script = None,
-        fee = fee,
+        fee = fee + 0.00001.waves + 0.00002.waves,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs.empty
       )
@@ -147,7 +145,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       .id
 
     nodes.waitForHeightAriseAndTxPresent(clearScriptId)
-
   }
 
   test("can send using old pk of acc0") {
@@ -160,7 +157,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           recipient = acc3,
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
-          feeAmount = fee,
+          feeAmount = fee + 0.00001.waves + 0.00002.waves,
           attachment = Array.emptyByteArray
         )
         .explicitGet()
