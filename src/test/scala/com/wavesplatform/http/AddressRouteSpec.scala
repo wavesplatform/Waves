@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.settings.{FeesSettings, SmartAccountSettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
@@ -24,13 +25,16 @@ class AddressRouteSpec
   private val allAccounts  = testWallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.address)
 
-  private val route = AddressApiRoute(restAPISettings,
-                                      testWallet,
-                                      mock[Blockchain],
-                                      mock[UtxPool],
-                                      mock[ChannelGroup],
-                                      new TestTime,
-                                      TestFunctionalitySettings.Stub).route
+  private val route = AddressApiRoute(
+    restAPISettings,
+    testWallet,
+    mock[Blockchain],
+    mock[UtxPool],
+    mock[ChannelGroup],
+    new TestTime,
+    TestFunctionalitySettings.Stub,
+    FeesSettings(SmartAccountSettings(10000, 1), Map.empty)
+  ).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")

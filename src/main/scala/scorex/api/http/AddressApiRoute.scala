@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.crypto
-import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
+import com.wavesplatform.settings.{FeesSettings, FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
@@ -15,7 +15,9 @@ import play.api.libs.json._
 import scorex.BroadcastRoute
 import scorex.account.{Address, PublicKeyAccount}
 import scorex.crypto.encode.Base58
-import scorex.transaction.{PoSCalc, TransactionFactory}
+import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.smart.script.ScriptCompiler
+import scorex.transaction.{PoSCalc, TransactionFactory, ValidationError}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
@@ -29,7 +31,8 @@ case class AddressApiRoute(settings: RestAPISettings,
                            utx: UtxPool,
                            allChannels: ChannelGroup,
                            time: Time,
-                           functionalitySettings: FunctionalitySettings)
+                           functionalitySettings: FunctionalitySettings,
+                           feesSettings: FeesSettings)
     extends ApiRoute
     with BroadcastRoute {
 
@@ -53,11 +56,9 @@ case class AddressApiRoute(settings: RestAPISettings,
     complete(
       Address
         .fromString(address)
-        .right
-        .map(acc => {
-          ToResponseMarshallable(addressScriptInfoJson(acc))
-        })
-        .getOrElse(InvalidAddress))
+        .flatMap(addressScriptInfoJson)
+        .map(ToResponseMarshallable(_))
+    )
   }
   @Path("/{address}")
   @ApiOperation(value = "Delete", notes = "Remove the account with address {address} from the wallet", httpMethod = "DELETE")
@@ -363,10 +364,19 @@ case class AddressApiRoute(settings: RestAPISettings,
     )
   }
 
-  private def addressScriptInfoJson(account: Address): AddressScriptInfo = {
-    val script = blockchain.accountScript(account)
-    AddressScriptInfo(address = account.address, script = script.map(_.bytes().base58), scriptText = script.map(_.text))
-  }
+  private def addressScriptInfoJson(account: Address): Either[ValidationError, AddressScriptInfo] =
+    for {
+      script     <- Right(blockchain.accountScript(account))
+      complexity <- script.fold[Either[ValidationError, Long]](Right(0))(x => ScriptCompiler.estimate(x).left.map(GenericError(_)))
+    } yield
+      AddressScriptInfo(
+        address = account.address,
+        script = script.map(_.bytes().base58),
+        scriptText = script.map(_.text),
+        complexity = complexity,
+        extraFee =
+          if (complexity == 0) 0 else (feesSettings.smartAccount.baseExtraCharge + complexity * feesSettings.smartAccount.extraChargePerOp).toLong
+      )
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
     Address
@@ -463,7 +473,7 @@ object AddressApiRoute {
 
   implicit val validityFormat: Format[Validity] = Json.format
 
-  case class AddressScriptInfo(address: String, script: Option[String], scriptText: Option[String])
+  case class AddressScriptInfo(address: String, script: Option[String], scriptText: Option[String], complexity: Long, extraFee: Long)
 
   implicit val accountScriptInfoFormat: Format[AddressScriptInfo] = Json.format
 }

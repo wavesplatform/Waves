@@ -16,8 +16,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       def correctedTime(): Long = System.currentTimeMillis()
       def getTimestamp(): Long  = System.currentTimeMillis()
     },
-    FeesSettings(SmartAccountSettings(1000, 1), Map.empty),
-    restAPISettings
+    restAPISettings,
+    FeesSettings(SmartAccountSettings(1000, 1), Map.empty)
   ).route
 
   routePath("/seed") in {

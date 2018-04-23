@@ -14,7 +14,7 @@ import scorex.utils.Time
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
-case class UtilsApiRoute(timeService: Time, feesSettings: FeesSettings, settings: RestAPISettings) extends ApiRoute {
+case class UtilsApiRoute(timeService: Time, settings: RestAPISettings, feesSettings: FeesSettings) extends ApiRoute {
 
   import UtilsApiRoute._
 
@@ -44,7 +44,7 @@ case class UtilsApiRoute(timeService: Time, feesSettings: FeesSettings, settings
         ScriptCompiler(code).fold(
           e => Json.obj("error" -> e), {
             case (script, complexity) =>
-              val extraFee = feesSettings.smartAccount.baseExtraCharge + feesSettings.smartAccount.extraChargePerOp * complexity
+              val extraFee = (feesSettings.smartAccount.baseExtraCharge + feesSettings.smartAccount.extraChargePerOp * complexity).toLong
               Json.obj(
                 "script"     -> script.bytes().base58,
                 "complexity" -> complexity,
@@ -78,6 +78,7 @@ case class UtilsApiRoute(timeService: Time, feesSettings: FeesSettings, settings
             e => Json.obj("error" -> e), { complexity =>
               val extraFee = feesSettings.smartAccount.baseExtraCharge + feesSettings.smartAccount.extraChargePerOp * complexity
               Json.obj(
+                "script"     -> code,
                 "complexity" -> complexity,
                 "extraFee"   -> extraFee
               )
