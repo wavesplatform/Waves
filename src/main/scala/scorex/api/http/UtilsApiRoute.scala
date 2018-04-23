@@ -4,18 +4,17 @@ import java.security.SecureRandom
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.crypto
-import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.settings.{FeesSettings, RestAPISettings}
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.Json
 import scorex.crypto.encode.Base58
-
 import scorex.transaction.smart.script.ScriptCompiler
 import scorex.utils.Time
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
-case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends ApiRoute {
+case class UtilsApiRoute(timeService: Time, feesSettings: FeesSettings, settings: RestAPISettings) extends ApiRoute {
 
   import UtilsApiRoute._
 
@@ -42,9 +41,18 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   def compile: Route = path("script" / "compile") {
     (post & entity(as[String])) { code =>
       complete(
-        ScriptCompiler(code)
-          .map(script => script.bytes().base58)
-          .fold(x => Json.obj("error" -> x), x => Json.obj("script" -> x)))
+        ScriptCompiler(code).fold(
+          x => Json.obj("error" -> x), {
+            case (script, complexity) =>
+              val extraFee = feesSettings.smartAccount.baseExtraCharge + feesSettings.smartAccount.extraChargePerOp * complexity
+              Json.obj(
+                "script"     -> script.bytes().base58,
+                "complexity" -> complexity,
+                "extraFee"   -> extraFee
+              )
+          }
+        )
+      )
     }
   }
 

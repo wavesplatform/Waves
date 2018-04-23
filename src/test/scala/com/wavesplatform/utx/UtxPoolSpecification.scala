@@ -239,7 +239,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
   }
 
   private val scriptExtraFee: Long = (
-    calculatorSettings.smartAccount.baseExtraCharge + ScriptComplexityCalculator(script.expr, Map.empty)
+    calculatorSettings.smartAccount.baseExtraCharge + ScriptComplexityCalculator(Map.empty, script.expr)
       .explicitGet() * calculatorSettings.smartAccount.extraChargePerOp
   ).toLong
 

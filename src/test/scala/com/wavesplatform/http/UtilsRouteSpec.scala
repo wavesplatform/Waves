@@ -2,6 +2,7 @@ package com.wavesplatform.http
 
 import com.wavesplatform.crypto
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.settings.{FeesSettings, SmartAccountSettings}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue}
@@ -10,10 +11,14 @@ import scorex.crypto.encode.Base58
 import scorex.utils.Time
 
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks {
-  private val route = UtilsApiRoute(new Time {
-    def correctedTime(): Long = System.currentTimeMillis()
-    def getTimestamp(): Long  = System.currentTimeMillis()
-  }, restAPISettings).route
+  private val route = UtilsApiRoute(
+    new Time {
+      def correctedTime(): Long = System.currentTimeMillis()
+      def getTimestamp(): Long  = System.currentTimeMillis()
+    },
+    FeesSettings(SmartAccountSettings(1000, 1), Map.empty),
+    restAPISettings
+  ).route
 
   routePath("/seed") in {
     Get(routePath("/seed")) ~> route ~> check {
