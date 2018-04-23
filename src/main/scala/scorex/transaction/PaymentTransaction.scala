@@ -4,10 +4,11 @@ import java.util
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.crypto
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import scorex.crypto.signatures.Curve25519.SignatureLength
 import scorex.transaction.TransactionParsers._
 
 import scala.util.{Failure, Success, Try}
@@ -67,7 +68,7 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
     if (amount <= 0) {
       Left(ValidationError.NegativeAmount(amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
+      Left(ValidationError.InsufficientFee()) //CHECK IF FEE IS POSITIVE
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
       Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else {

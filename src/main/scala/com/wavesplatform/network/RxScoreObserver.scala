@@ -9,7 +9,6 @@ import io.netty.channel._
 import monix.eval.Coeval
 import monix.execution.Scheduler
 import monix.reactive.Observable
-import scorex.transaction.History.BlockchainScore
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
@@ -17,7 +16,7 @@ import scala.concurrent.duration.FiniteDuration
 
 object RxScoreObserver extends ScorexLogging {
 
-  case class BestChannel(channel: Channel, score: BlockchainScore) {
+  case class BestChannel(channel: Channel, score: BigInt) {
     override def toString: String = s"BestChannel(${id(channel)},score: $score)"
   }
 
@@ -33,9 +32,7 @@ object RxScoreObserver extends ScorexLogging {
     x.closed == y.closed && x.syncWith == y.syncWith
   }
 
-  private def calcSyncWith(bestChannel: Option[Channel],
-                           localScore: BlockchainScore,
-                           scoreMap: scala.collection.Map[Channel, BlockchainScore]): SyncWith = {
+  private def calcSyncWith(bestChannel: Option[Channel], localScore: BigInt, scoreMap: scala.collection.Map[Channel, BigInt]): SyncWith = {
     val (bestScore, bestScoreChannels) = scoreMap.foldLeft(BigInt(0) -> List.empty[Channel]) {
       case (r @ (maxScore, maxScoreChannels), (currScoreChannel, currScore)) =>
         if (currScore > maxScore) currScore -> List(currScoreChannel)
@@ -55,18 +52,18 @@ object RxScoreObserver extends ScorexLogging {
   def apply(scoreTtl: FiniteDuration,
             remoteScoreDebounce: FiniteDuration,
             initalLocalScore: BigInt,
-            localScores: Observable[BlockchainScore],
-            remoteScores: ChannelObservable[BlockchainScore],
+            localScores: Observable[BigInt],
+            remoteScores: ChannelObservable[BigInt],
             channelClosed: Observable[Channel],
             channelTimeout: Observable[Channel],
             scheduler: Scheduler): (Observable[ChannelClosedAndSyncWith], Coeval[Stats]) = {
 
-    var localScore: BlockchainScore         = initalLocalScore
+    var localScore: BigInt                  = initalLocalScore
     var currentBestChannel: Option[Channel] = None
     val scores = CacheBuilder
       .newBuilder()
       .expireAfterWrite(scoreTtl.toMillis, TimeUnit.MILLISECONDS)
-      .build[Channel, BlockchainScore]()
+      .build[Channel, BigInt]()
     val statsReporter = Coeval.eval {
       Stats(localScore, currentBestChannel.toString, scores.size())
     }
@@ -123,6 +120,6 @@ object RxScoreObserver extends ScorexLogging {
     (observable, statsReporter)
   }
 
-  case class Stats(localScore: BlockchainScore, currentBestChannel: String, scoresCacheSize: Long)
+  case class Stats(localScore: BigInt, currentBestChannel: String, scoresCacheSize: Long)
 
 }

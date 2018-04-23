@@ -1,8 +1,8 @@
 package com.wavesplatform.consensus
 
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.Blockchain
 import scorex.account.Address
 
 object GeneratingBalanceProvider {
@@ -14,12 +14,28 @@ object GeneratingBalanceProvider {
   def validateTime(fs: FunctionalitySettings, timestamp: Long, balance: Long): Boolean =
     timestamp < fs.minimalGeneratingBalanceAfter || (timestamp >= fs.minimalGeneratingBalanceAfter && balance >= MinimalEffectiveBalanceForGenerator1)
 
-  def validateHeight(fp: FeatureProvider, height: Int, balance: Long): Boolean =
-    fp.featureActivationHeight(BlockchainFeatures.SmallerMinimalGeneratingBalance.id)
+  def validateHeight(blockchain: Blockchain, height: Int, balance: Long): Boolean =
+    blockchain.activatedFeatures
+      .get(BlockchainFeatures.SmallerMinimalGeneratingBalance.id)
       .exists(height >= _) && balance >= MinimalEffectiveBalanceForGenerator2
 
-  def balance(state: SnapshotStateReader, fs: FunctionalitySettings, height: Int, account: Address): Long = {
+  def balance(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, account: Address): Long = {
     val depth = if (height >= fs.generationBalanceDepthFrom50To1000AfterHeight) SecondDepth else FirstDepth
-    state.effectiveBalance(account, height, depth)
+    blockchain.effectiveBalance(account, height, depth)
   }
 }
+
+/*
+ *
+    private def validateEffectiveBalance(blockchain: Blockchain, fs: FunctionalitySettings, block: Block, baseHeight: Int)(
+      effectiveBalance: Long): Either[String, Long] =
+    Either.cond(
+      block.timestamp < fs.minimalGeneratingBalanceAfter ||
+        (block.timestamp >= fs.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
+        blockchain.featureActivationHeight(BlockchainFeatures.SmallerMinimalGeneratingBalance.id).exists(baseHeight >= _)
+          && effectiveBalance >= MinimalEffectiveBalanceForGenerator2,
+      effectiveBalance,
+      s"generator's effective balance $effectiveBalance is less that required for generation"
+    )
+
+ */

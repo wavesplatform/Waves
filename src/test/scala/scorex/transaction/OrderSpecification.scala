@@ -2,8 +2,8 @@ package scorex.transaction
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.matcher.ValidationMatcher
-import com.wavesplatform.state2.ByteStr
-import com.wavesplatform.state2.diffs.produce
+import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.diffs.produce
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}

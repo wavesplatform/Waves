@@ -2,12 +2,12 @@ package scorex.transaction
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.crypto
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account._
+import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.serialization.Deser
-import scorex.transaction.TransactionParsers._
 
 import scala.util.{Failure, Success, Try}
 
@@ -52,7 +52,7 @@ object CreateAliasTransaction extends TransactionParserFor[CreateAliasTransactio
 
   def create(sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, TransactionT] =
     if (fee <= 0) {
-      Left(ValidationError.InsufficientFee)
+      Left(ValidationError.InsufficientFee())
     } else {
       Right(CreateAliasTransaction(sender, alias, fee, timestamp, signature))
     }

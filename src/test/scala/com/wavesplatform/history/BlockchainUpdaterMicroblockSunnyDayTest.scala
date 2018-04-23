@@ -1,12 +1,13 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs._
+import com.wavesplatform.state._
+import com.wavesplatform.state.diffs._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{Address, AddressOrAlias, PrivateKeyAccount}
+import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.transaction._
 import scorex.transaction.assets.TransferTransaction
 
@@ -51,7 +52,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
         domain.blockchainUpdater.processMicroBlock(microBlocks(0)).explicitGet()
         domain.blockchainUpdater.processMicroBlock(microBlocks(1)).explicitGet()
         domain.blockchainUpdater.processMicroBlock(microBlocks(2)) should produce("unavailable funds")
-        domain.history.lastBlock.get.transactionData shouldBe Seq(genesis, masterToAlice, aliceToBob)
+        domain.blockchainUpdater.lastBlock.get.transactionData shouldBe Seq(genesis, masterToAlice, aliceToBob)
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
         effBalance(masterToAlice.recipient, domain) > 0 shouldBe true
@@ -129,7 +130,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
       case (domain, (genesis, masterToAlice, aliceToBob, aliceToBob2)) =>
         val block0                 = buildBlockOfTxs(randomSig, Seq(genesis))
         val (block1, microBlocks1) = chainBaseAndMicro(block0.uniqueId, masterToAlice, Seq(Seq(aliceToBob)))
-        val otherSigner            = PrivateKeyAccount(Array.fill(TransactionParsers.KeyLength)(1))
+        val otherSigner            = PrivateKeyAccount(Array.fill(KeyLength)(1))
         val block2                 = customBuildBlockOfTxs(block0.uniqueId, Seq(masterToAlice, aliceToBob2), otherSigner, 1, 0L, DefaultBaseTarget / 2)
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processBlock(block1).explicitGet()

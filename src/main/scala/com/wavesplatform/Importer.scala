@@ -9,8 +9,8 @@ import com.wavesplatform.db.openDB
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
 import com.wavesplatform.mining.TwoDimensionalMiningConstraint
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state2.ByteStr
-import com.wavesplatform.state2.appender.BlockAppender
+import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.UtxPool
 import monix.execution.Scheduler
@@ -56,18 +56,18 @@ object Importer extends ScorexLogging {
 
         createInputStream(filename) match {
           case Success(inputStream) =>
-            val db                                  = openDB(settings.dataDirectory, settings.levelDbCacheSize)
-            val (history, state, blockchainUpdater) = StorageFactory(settings, db, NTP)
-            val pos                                 = new PoSSelector(history)
-            val checkpoint                          = new CheckpointServiceImpl(db, settings.checkpointsSettings)
-            val extAppender                         = BlockAppender(checkpoint, history, blockchainUpdater, NTP, state, utxPoolStub, pos, settings, history, scheduler) _
-            checkGenesis(history, settings, blockchainUpdater)
+            val db                = openDB(settings.dataDirectory, settings.levelDbCacheSize)
+            val blockchainUpdater = StorageFactory(settings, db, NTP)
+            val pos               = new PoSSelector(blockchainUpdater)
+            val checkpoint        = new CheckpointServiceImpl(db, settings.checkpointsSettings)
+            val extAppender       = BlockAppender(checkpoint, blockchainUpdater, NTP, utxPoolStub, pos, settings, scheduler) _
+            checkGenesis(settings, blockchainUpdater)
             val bis          = new BufferedInputStream(inputStream)
             var quit         = false
             val lenBytes     = new Array[Byte](Ints.BYTES)
             val start        = System.currentTimeMillis()
             var counter      = 0
-            var blocksToSkip = history.height - 1
+            var blocksToSkip = blockchainUpdater.height - 1
 
             println(s"Skipping $blocksToSkip blocks(s)")
 
@@ -82,7 +82,7 @@ object Importer extends ScorexLogging {
                     blocksToSkip -= 1
                   } else {
                     val block = Block.parseBytes(buffer).get
-                    if (history.lastBlockId.contains(block.reference)) {
+                    if (blockchainUpdater.lastBlockId.contains(block.reference)) {
                       Await.result(extAppender.apply(block).runAsync, Duration.Inf) match {
                         case Left(ve) =>
                           log.error(s"Error appending block: $ve")

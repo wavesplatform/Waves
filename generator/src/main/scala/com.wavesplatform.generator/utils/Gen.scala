@@ -4,9 +4,10 @@ import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.generator.utils.Implicits._
 import scorex.account.{Address, PrivateKeyAccount}
+import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
-import scorex.transaction.{Proofs, Transaction, TransactionParsers}
+import scorex.transaction.{Proofs, Transaction}
 
 object Gen {
   private def random = ThreadLocalRandom.current
@@ -15,8 +16,6 @@ object Gen {
     val senderGen = Iterator.randomContinually(senderAccounts)
     val feeGen    = Iterator.continually(minFee + random.nextLong(maxFee - minFee))
     transfers(senderGen, recipientGen, feeGen)
-      .zip(massTransfers(senderGen, recipientGen, feeGen))
-      .flatMap { case (tt, mtt) => Iterator(mtt, tt) }
   }
 
   def transfers(senderGen: Iterator[PrivateKeyAccount], recipientGen: Iterator[Address], feeGen: Iterator[Long]): Iterator[Transaction] = {
@@ -44,7 +43,7 @@ object Gen {
   }
 
   val address: Iterator[Address] = Iterator.continually {
-    val pk = Array.fill[Byte](TransactionParsers.KeyLength)(random.nextInt(Byte.MaxValue).toByte)
+    val pk = Array.fill[Byte](KeyLength)(random.nextInt(Byte.MaxValue).toByte)
     Address.fromPublicKey(pk)
   }
 

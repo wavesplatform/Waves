@@ -4,13 +4,15 @@ import java.util.concurrent.ThreadLocalRandom
 
 import cats.Show
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
+import com.wavesplatform.state.DataEntry.{MaxValueSize, Type}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, LongDataEntry}
 import org.slf4j.LoggerFactory
 import scorex.account.{Alias, PrivateKeyAccount}
+import scorex.transaction._
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction._
 import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration._
@@ -165,10 +167,33 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
                                                      sender,
                                                      transfers.toList,
                                                      ts,
-                                                     moreThatStandartFee,
+                                                     100000 + 50000 * transferCount,
                                                      Array.fill(r.nextInt(100))(r.nextInt().toByte)))
             }
+          case DataTransaction =>
+            val sender = randomFrom(accounts).get
+            val count  = r.nextInt(10)
+
+            val data = for {
+              _ <- 0 until count
+              keyLen = r.nextInt(10)
+              key    = Random.nextString(keyLen)
+              etype  = r.nextInt(Type.maxId)
+            } yield
+              etype match {
+                case t if t == Type.Integer.id => LongDataEntry(key, r.nextLong)
+                case t if t == Type.Boolean.id => BooleanDataEntry(key, r.nextBoolean)
+                case t if t == Type.Binary.id =>
+                  val size = r.nextInt(MaxValueSize + 1)
+                  val b    = new Array[Byte](size)
+                  r.nextBytes(b)
+                  BinaryDataEntry(key, ByteStr(b))
+              }
+            val size = 128 + data.map(_.toBytes.length).sum
+            val fee  = 100000 * (size / 1024 + 1)
+            logOption(DataTransaction.selfSigned(1, sender, data.toList, fee, ts))
         }
+
         (tx.map(tx => allTxsWithValid :+ tx).getOrElse(allTxsWithValid), tx match {
           case Some(tx: IssueTransaction) => validIssueTxs :+ tx
           case _                          => validIssueTxs

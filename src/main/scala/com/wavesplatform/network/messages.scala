@@ -3,11 +3,11 @@ package com.wavesplatform.network
 import java.net.InetSocketAddress
 
 import com.wavesplatform.crypto
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, MicroBlock}
-import scorex.transaction.{History, Signed, Transaction}
+import scorex.transaction.{Signed, Transaction}
 
 sealed trait Message
 
@@ -25,7 +25,7 @@ case class Signatures(signatures: Seq[ByteStr]) extends Message {
 
 case class GetBlock(signature: ByteStr) extends Message
 
-case class LocalScoreChanged(newLocalScore: History.BlockchainScore) extends Message
+case class LocalScoreChanged(newLocalScore: BigInt) extends Message
 
 case class RawBytes(code: Byte, data: Array[Byte]) extends Message
 

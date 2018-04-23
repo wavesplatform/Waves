@@ -3,17 +3,16 @@ package scorex.consensus.nxt.api.http
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.Blockchain
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.Json
 import scorex.account.Address
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress}
-import scorex.transaction.History
 
 @Path("/consensus")
 @Api(value = "/consensus")
-case class NxtConsensusApiRoute(settings: RestAPISettings, state: SnapshotStateReader, history: History, fs: FunctionalitySettings)
+case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchain, fs: FunctionalitySettings)
     extends ApiRoute
     with CommonApiFunctions {
 
@@ -32,8 +31,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, state: SnapshotStateR
     Address.fromString(address) match {
       case Left(_) => complete(InvalidAddress)
       case Right(account) =>
-        val s = state
-        complete(Json.obj("address" -> account.address, "balance" -> GeneratingBalanceProvider.balance(s, fs, s.height, account)))
+        complete(Json.obj("address" -> account.address, "balance" -> GeneratingBalanceProvider.balance(blockchain, fs, blockchain.height, account)))
     }
   }
 
@@ -44,7 +42,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, state: SnapshotStateR
       new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "string", paramType = "path")
     ))
   def generationSignatureId: Route = (path("generationsignature" / Segment) & get) { encodedSignature =>
-    withBlock(history, encodedSignature) { block =>
+    withBlock(blockchain, encodedSignature) { block =>
       complete(Json.obj("generationSignature" -> block.consensusData.generationSignature.base58))
     }
   }
@@ -52,7 +50,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, state: SnapshotStateR
   @Path("/generationsignature")
   @ApiOperation(value = "Generation signature last", notes = "Generation signature of a last block", httpMethod = "GET")
   def generationSignature: Route = (path("generationsignature") & get) {
-    complete(Json.obj("generationSignature" -> history.lastBlock.get.consensusData.generationSignature.base58))
+    complete(Json.obj("generationSignature" -> blockchain.lastBlock.get.consensusData.generationSignature.base58))
   }
 
   @Path("/basetarget/{blockId}")
@@ -62,7 +60,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, state: SnapshotStateR
       new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "string", paramType = "path")
     ))
   def baseTargetId: Route = (path("basetarget" / Segment) & get) { encodedSignature =>
-    withBlock(history, encodedSignature) { block =>
+    withBlock(blockchain, encodedSignature) { block =>
       complete(Json.obj("baseTarget" -> block.consensusData.baseTarget))
     }
   }
@@ -72,8 +70,8 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, state: SnapshotStateR
   def basetarget: Route = (path("basetarget") & get) {
     complete(
       Json.obj(
-        "baseTarget" -> history.lastBlock.get.consensusData.baseTarget,
-        "score"      -> history.score.toString()
+        "baseTarget" -> blockchain.lastBlock.get.consensusData.baseTarget,
+        "score"      -> blockchain.score.toString()
       ))
   }
 

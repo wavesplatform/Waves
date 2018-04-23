@@ -57,4 +57,11 @@ object Instrumented {
     val t1   = System.currentTimeMillis()
     (r, t1 - t0)
   }
+
+  def measure[R](h: Histogram)(f: => R): R = {
+    val (r, time) = withTime(f)
+    h.record(time)
+    r
+  }
+
 }

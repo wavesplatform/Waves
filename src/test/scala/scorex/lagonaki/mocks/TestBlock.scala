@@ -1,16 +1,16 @@
 package scorex.lagonaki.mocks
 
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import scorex.account.PrivateKeyAccount
 import scorex.block._
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.transaction.TransactionParsers._
-import scorex.transaction.{Transaction, TransactionParsers}
+import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
+import scorex.transaction.Transaction
 
 import scala.util.{Random, Try}
 
 object TestBlock {
-  val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParsers.KeyLength)(0))
+  val defaultSigner = PrivateKeyAccount(Array.fill(KeyLength)(0))
 
   val random: Random = new Random()
 
@@ -37,21 +37,29 @@ object TestBlock {
   def create(signer: PrivateKeyAccount, txs: Seq[Transaction]): Block =
     create(time = Try(txs.map(_.timestamp).max).getOrElse(0), txs = txs, signer = signer)
 
+  def create(signer: PrivateKeyAccount, txs: Seq[Transaction], features: Set[Short]): Block =
+    create(time = Try(txs.map(_.timestamp).max).getOrElse(0), ref = randomSignature(), txs = txs, signer = signer, version = 3, features = features)
+
   def create(time: Long, txs: Seq[Transaction]): Block = create(time, randomSignature(), txs, defaultSigner)
 
   def create(time: Long, txs: Seq[Transaction], signer: PrivateKeyAccount): Block = create(time, randomSignature(), txs, signer)
 
-  def create(time: Long, ref: ByteStr, txs: Seq[Transaction], signer: PrivateKeyAccount = defaultSigner): Block =
+  def create(time: Long,
+             ref: ByteStr,
+             txs: Seq[Transaction],
+             signer: PrivateKeyAccount = defaultSigner,
+             version: Byte = 2,
+             features: Set[Short] = Set.empty[Short]): Block =
     sign(
       signer,
       Block(
         timestamp = time,
-        version = 2,
+        version = version,
         reference = ref,
         signerData = SignerData(signer, ByteStr.empty),
         consensusData = NxtLikeConsensusBlockData(2L, ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))),
         transactionData = txs,
-        featureVotes = Set.empty
+        featureVotes = features
       )
     )
 

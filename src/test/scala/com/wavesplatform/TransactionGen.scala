@@ -1,11 +1,14 @@
 package com.wavesplatform
 
-import com.wavesplatform.lang.Terms.Typed
-import com.wavesplatform.lang.TypeChecker
-import com.wavesplatform.lang.testing.ScriptGen
+import cats.syntax.semigroup._
+import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.v1.Terms.Typed
+import com.wavesplatform.lang.v1.TypeChecker
+import com.wavesplatform.lang.v1.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs.ENOUGH_AMT
+import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.ENOUGH_AMT
 import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{BeforeAndAfterAll, Suite}
@@ -16,13 +19,23 @@ import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.smart.{Script, SetScriptTransaction}
+import scorex.transaction.smart.script.Script
+import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.smart.{SetScriptTransaction}
 import scorex.utils.TimeImpl
 
 import scala.util.Random
 
-trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
+trait TransactionGen extends BeforeAndAfterAll with TransactionGenBase with ScriptGen {
   _: Suite =>
+  override protected def afterAll(): Unit = {
+    super.close()
+  }
+}
+
+trait TransactionGenBase extends ScriptGen {
+
+  protected def waves(n: Float): Long = (n * 100000000L).toLong
 
   def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.containerOfN[Array, Byte](length, Arbitrary.arbitrary[Byte])
 
@@ -43,9 +56,8 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
 
   private val time = new TimeImpl
 
-  override protected def afterAll(): Unit = {
+  def close(): Unit = {
     time.close()
-    super.afterAll()
   }
 
   val ntpTimestampGen: Gen[Long] = Gen.choose(1, 1000).map(time.correctedTime() - _)
@@ -101,8 +113,8 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
   } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
 
   val scriptGen = BOOLgen(1000).map { expr =>
-    val typed = TypeChecker(TypeChecker.TypeCheckerContext.empty, expr).right.get
-    Script(typed)
+    val typed = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(PureContext.instance |+| CryptoContext.build(Global)), expr).explicitGet()
+    ScriptV1(typed)
   }
 
   val setScriptTransactionGen: Gen[SetScriptTransaction] = for {
@@ -200,6 +212,12 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
     for {
       (_, _, _, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
     } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
+
+  def transferGeneratorP(timestamp: Long, sender: PrivateKeyAccount, recipient: AddressOrAlias, maxAmount: Long): Gen[TransferTransaction] =
+    for {
+      amount                                    <- Gen.choose(1, maxAmount)
+      (_, _, _, _, _, _, feeAmount, attachment) <- transferParamGen
+    } yield TransferTransaction.create(None, sender, recipient, amount, timestamp, None, feeAmount, attachment).right.get
 
   def transferGeneratorP(timestamp: Long,
                          sender: PrivateKeyAccount,
@@ -484,7 +502,7 @@ trait TransactionGen extends BeforeAndAfterAll with ScriptGen {
       recipient <- accountGen
       ts        <- positiveIntGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      setScript <- selfSignedSetScriptTransactionGenP(master, Script(typed))
+      setScript <- selfSignedSetScriptTransactionGenP(master, ScriptV1(typed))
       transfer  <- transferGeneratorP(master, recipient.toAddress, None, None)
       lease     <- leaseAndCancelGeneratorP(master, recipient.toAddress, master)
     } yield (genesis, setScript, lease._1, transfer)

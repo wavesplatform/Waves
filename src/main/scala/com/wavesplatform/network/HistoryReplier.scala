@@ -4,18 +4,15 @@ import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.wavesplatform.network.HistoryReplier._
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroBlockSignature
 import com.wavesplatform.settings.SynchronizationSettings
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.{ByteStr, NG}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
-import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
 @Sharable
-class HistoryReplier(history: NgHistory, settings: SynchronizationSettings, scheduler: SchedulerService)
-    extends ChannelInboundHandlerAdapter
-    with ScorexLogging {
+class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: SchedulerService) extends ChannelInboundHandlerAdapter with ScorexLogging {
   private lazy val historyReplierSettings = settings.historyReplierSettings
 
   private implicit val s: SchedulerService = scheduler
@@ -25,8 +22,7 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings, sche
     .maximumSize(historyReplierSettings.maxMicroBlockCacheSize)
     .build(new CacheLoader[MicroBlockSignature, Array[Byte]] {
       override def load(key: MicroBlockSignature) =
-        history
-          .microBlock(key)
+        ng.microBlock(key)
           .map(m => MicroBlockResponseSpec.serializeData(MicroBlockResponse(m)))
           .get
     })
@@ -35,14 +31,14 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings, sche
     .newBuilder()
     .maximumSize(historyReplierSettings.maxBlockCacheSize)
     .build(new CacheLoader[ByteStr, Array[Byte]] {
-      override def load(key: ByteStr) = history.heightOf(key).flatMap(history.blockBytes).get
+      override def load(key: ByteStr) = ng.blockBytes(key).get
     })
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case GetSignatures(otherSigs) =>
       Task {
         val nextIds = otherSigs.view
-          .map(id => id -> history.blockIdsAfter(id, settings.maxChainLength))
+          .map(id => id -> ng.blockIdsAfter(id, settings.maxChainLength))
           .collectFirst { case (parent, Some(ids)) => parent +: ids }
 
         nextIds match {
@@ -70,7 +66,7 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings, sche
     case _: Handshake =>
       Task {
         if (ctx.channel().isOpen)
-          ctx.writeAndFlush(LocalScoreChanged(history.score))
+          ctx.writeAndFlush(LocalScoreChanged(ng.score))
       }.runAsyncLogErr
 
     case _ => super.channelRead(ctx, msg)

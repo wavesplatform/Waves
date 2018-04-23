@@ -1,7 +1,9 @@
 package com.wavesplatform.consensus
 
 import com.wavesplatform.crypto
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.state.Blockchain
 
 trait PoSCalculator {
   protected val HitSize: Int              = 8
@@ -68,7 +70,7 @@ trait PoSCalculator {
 
 }
 
-class PoSSelector(val fp: FeatureProvider) extends PoSCalculator {
+class PoSSelector(val blockchain: Blockchain) extends PoSCalculator {
   override def hit(generatorSignature: Array[Byte]): BigInt = throw new NotImplementedError()
 
   override def time(hit: BigInt, bt: Long, balance: Long): Long = throw new NotImplementedError()
@@ -79,7 +81,7 @@ class PoSSelector(val fp: FeatureProvider) extends PoSCalculator {
   def time(height: Int, hit: BigInt, bt: Long, balance: Long): Long =
     if (fair(height)) FairPoSCalculator.time(hit, bt, balance) else NxtPoSCalculator.time(hit, bt, balance)
 
-  private def fair(height: Int): Boolean = fp.isFeatureActivated(BlockchainFeatures.FairPOS, height)
+  private def fair(height: Int): Boolean = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.FairPOS.id)
 }
 
 object NxtPoSCalculator extends PoSCalculator

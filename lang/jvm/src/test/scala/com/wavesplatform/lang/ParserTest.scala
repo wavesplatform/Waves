@@ -1,39 +1,91 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.Terms.Untyped._
-import com.wavesplatform.lang.Terms._
-import com.wavesplatform.lang.testing.ScriptGen
+import com.wavesplatform.lang.v1.Parser
+import com.wavesplatform.lang.v1.Terms.Untyped._
+import com.wavesplatform.lang.v1.Terms._
+import com.wavesplatform.lang.v1.testing.ScriptGenParser
 import fastparse.core.Parsed.{Failure, Success}
+import org.scalacheck.Gen
+import org.scalatest.exceptions.TestFailedException
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 import scorex.crypto.encode.{Base58 => ScorexBase58}
 
-class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
-  def parse(x: String): EXPR = Parser(x).get.value
+  def parse(x: String): EXPR = Parser(x) match {
+    case Success(r, _) => r
+    case e @ Failure(_, i, _) =>
+      println(
+        s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${e.extra.traced.fullStack
+          .mkString("\n")}")
+      throw new TestFailedException("Test failed", 0)
+  }
+
   def isParsed(x: String): Boolean = Parser(x) match {
     case Success(_, _)    => true
     case Failure(_, _, _) => false
   }
 
-  property("simple expressions") {
-    parse("10") shouldBe CONST_LONG(10)
-    parse("10+11") shouldBe BINARY_OP(CONST_LONG(10), SUM_OP, CONST_LONG(11))
-    parse("(10+11)") shouldBe BINARY_OP(CONST_LONG(10), SUM_OP, CONST_LONG(11))
-    parse("(10+11) + 12") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(10), SUM_OP, CONST_LONG(11)), SUM_OP, CONST_LONG(12))
-    parse("10   + 11 + 12") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(10), SUM_OP, CONST_LONG(11)), SUM_OP, CONST_LONG(12))
-    parse("1+2+3+4+5") shouldBe BINARY_OP(
-      BINARY_OP(BINARY_OP(BINARY_OP(CONST_LONG(1), SUM_OP, CONST_LONG(2)), SUM_OP, CONST_LONG(3)), SUM_OP, CONST_LONG(4)),
-      SUM_OP,
-      CONST_LONG(5))
-    parse("1==1") shouldBe BINARY_OP(CONST_LONG(1), EQ_OP, CONST_LONG(1))
-    parse("true && true") shouldBe BINARY_OP(TRUE, AND_OP, TRUE)
-    parse("true || false") shouldBe BINARY_OP(TRUE, OR_OP, FALSE)
-    parse("true || (true && false)") shouldBe BINARY_OP(TRUE, OR_OP, BINARY_OP(TRUE, AND_OP, FALSE))
-    parse("false || false || false") shouldBe BINARY_OP(BINARY_OP(FALSE, OR_OP, FALSE), OR_OP, FALSE)
-    parse("(1>= 0)||(3 >2)") shouldBe BINARY_OP(BINARY_OP(CONST_LONG(1), GE_OP, CONST_LONG(0)), OR_OP, BINARY_OP(CONST_LONG(3), GT_OP, CONST_LONG(2)))
+  def withWhitespaces(expr: String): Gen[String] =
+    for {
+      pred <- whitespaces
+      post <- whitespaces
+    } yield pred + expr + post
+
+  def toString(expr: EXPR): Gen[String] = expr match {
+    case CONST_LONG(x)   => withWhitespaces(s"$x")
+    case REF(x)          => withWhitespaces(s"$x")
+    case CONST_STRING(x) => withWhitespaces(s"""\"$x\"""")
+    case TRUE            => withWhitespaces("true")
+    case FALSE           => withWhitespaces("false")
+    case BINARY_OP(x, op: BINARY_OP_KIND, y) =>
+      for {
+        arg1 <- toString(x)
+        arg2 <- toString(y)
+      } yield s"($arg1${opsToFunctions(op)}$arg2)"
+    case IF(cond, x, y) =>
+      for {
+        c <- toString(cond)
+        t <- toString(x)
+        f <- toString(y)
+      } yield s"(if ($c) then $t else $f)"
+    case BLOCK(let, body) =>
+      for {
+        v <- toString(let.value)
+        b <- toString(body)
+      } yield s"let ${let.name} = $v$b\n"
+    case _ => ???
+  }
+
+  def genElementCheck(gen: Gen[EXPR]): Unit = {
+    val testGen: Gen[(EXPR, String)] = for {
+      expr <- gen
+      str  <- toString(expr)
+    } yield (expr, str)
+
+    forAll(testGen) {
+      case ((expr, str)) =>
+        parse(str) shouldBe expr
+    }
+  }
+
+  property("all types of multiline expressions") {
+    val gas = 50
+    genElementCheck(CONST_LONGgen)
+    genElementCheck(STRgen)
+    genElementCheck(REFgen)
+    genElementCheck(BOOLgen(gas))
+    genElementCheck(SUMgen(gas))
+    genElementCheck(EQ_INTgen(gas))
+    genElementCheck(INTGen(gas))
+    genElementCheck(GEgen(gas))
+    genElementCheck(GTgen(gas))
+    genElementCheck(ANDgen(gas))
+    genElementCheck(ORgen(gas))
+    genElementCheck(BLOCKgen(gas))
   }
 
   property("priority in binary expressions") {
@@ -59,91 +111,26 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     )
   }
 
-  property("let/ref constructs") {
-    parse("""let X = 10;
-        |3 > 2
-      """.stripMargin) shouldBe BLOCK(Some(LET("X", CONST_LONG(10))), BINARY_OP(CONST_LONG(3), GT_OP, CONST_LONG(2)))
-
-    parse("(let X = 10; 3 > 2)") shouldBe BLOCK(Some(LET("X", CONST_LONG(10))), BINARY_OP(CONST_LONG(3), GT_OP, CONST_LONG(2)))
-    parse("(let X = 3 + 2; 3 > 2)") shouldBe BLOCK(Some(LET("X", BINARY_OP(CONST_LONG(3), SUM_OP, CONST_LONG(2)))),
-                                                   BINARY_OP(CONST_LONG(3), GT_OP, CONST_LONG(2)))
-    parse("(let X = if(true) then true else false; false)") shouldBe BLOCK(Some(LET("X", IF(TRUE, TRUE, FALSE))), FALSE)
-
-    val expr = parse("""let X = 10;
-let Y = 11;
-X > Y
-      """.stripMargin)
-
-    expr shouldBe BLOCK(Some(LET("X", CONST_LONG(10))), BLOCK(Some(LET("Y", CONST_LONG(11))), BINARY_OP(REF("X"), GT_OP, REF("Y"))))
+  property("base58") {
+    parse("base58'bQbp'") shouldBe CONST_BYTEVECTOR(ByteVector("foo".getBytes))
+    parse("base58''") shouldBe CONST_BYTEVECTOR(ByteVector.empty)
+    isParsed("base58' bQbp'\n") shouldBe false
   }
 
-  property("multiline") {
-    parse("""
-        |
-        |false
-        |
-        |
-      """.stripMargin) shouldBe FALSE
-
-    parse("""let X = 10;
-        |
-        |true
-      """.stripMargin) shouldBe BLOCK(Some(LET("X", CONST_LONG(10))), TRUE)
-    parse("""let X = 11;
-        |true
-      """.stripMargin) shouldBe BLOCK(Some(LET("X", CONST_LONG(11))), TRUE)
-
-    parse("""
-        |
-        |let X = 12;
-        |
-        |3
-        | +
-        |  2
-        |
-      """.stripMargin) shouldBe BLOCK(Some(LET("X", CONST_LONG(12))), BINARY_OP(CONST_LONG(3), SUM_OP, CONST_LONG(2)))
+  property("string is consumed fully") {
+    parse(""" "   fooo    bar" """) shouldBe CONST_STRING("   fooo    bar")
   }
 
-  property("if") {
-    parse("if(true) then 1 else 2") shouldBe IF(TRUE, CONST_LONG(1), CONST_LONG(2))
-    parse("if(true) then 1 else if(X==Y) then 2 else 3") shouldBe IF(TRUE,
-                                                                     CONST_LONG(1),
-                                                                     IF(BINARY_OP(REF("X"), EQ_OP, REF("Y")), CONST_LONG(2), CONST_LONG(3)))
-    parse("""if ( true )
-        |then 1
-        |else if(X== Y)
-        |     then 2
-        |       else 3""".stripMargin) shouldBe IF(TRUE, CONST_LONG(1), IF(BINARY_OP(REF("X"), EQ_OP, REF("Y")), CONST_LONG(2), CONST_LONG(3)))
+  property("string literal with unicode chars") {
+    val stringWithUnicodeChars = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD"
 
-    parse("if (true) then false else false==false") shouldBe IF(TRUE, FALSE, BINARY_OP(FALSE, EQ_OP, FALSE))
-
-    parse("""if
-        |
-        |     (true)
-        |then let A = 10;
-        |  1
-        |else if ( X == Y) then 2 else 3""".stripMargin) shouldBe IF(
-      TRUE,
-      BLOCK(Some(LET("A", CONST_LONG(10))), CONST_LONG(1)),
-      IF(BINARY_OP(REF("X"), EQ_OP, REF("Y")), CONST_LONG(2), CONST_LONG(3))
-    )
-
-  }
-  property("get field of ref") {
-    parse("XXX.YYY") shouldBe GETTER(REF("XXX"), "YYY")
-    parse("""
-        |
-        | X.Y
-        |
-      """.stripMargin) shouldBe GETTER(REF("X"), "Y")
-  }
-
-  property("string literal") {
-    parse("""
-            |
-            | "asdf"
-            |
-      """.stripMargin) shouldBe CONST_STRING("asdf")
+    parse(
+      s"""
+         |
+         | "$stringWithUnicodeChars"
+         |
+       """.stripMargin
+    ) shouldBe CONST_STRING(stringWithUnicodeChars)
   }
 
   property("reserved keywords are invalid variable names") {
@@ -155,7 +142,7 @@ X > Y
         |
       """.stripMargin
 
-    List("if", "then", "else", "true", "false").foreach(kv => isParsed(script(kv)) shouldBe false)
+    List("if", "then", "else", "true", "false", "let").foreach(kv => isParsed(script(kv)) shouldBe false)
   }
 
   property("multisig sample") {
@@ -192,4 +179,84 @@ X > Y
                                                                  REF("Y"))
   }
 
+  property("getter") {
+    isParsed("xxx   .yyy") shouldBe false
+    isParsed("xxx.  yyy") shouldBe false
+
+    parse("xxx.yyy") shouldBe GETTER(REF("xxx"), "yyy")
+    parse(
+      """
+        |
+        | xxx.yyy
+        |
+      """.stripMargin
+    ) shouldBe GETTER(REF("xxx"), "yyy")
+
+    parse("xxx(yyy).zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parse(
+      """
+        |
+        | xxx(yyy).zzz
+        |
+      """.stripMargin
+    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+
+    parse("(xxx(yyy)).zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parse(
+      """
+        |
+        | (xxx(yyy)).zzz
+        |
+      """.stripMargin
+    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+
+    parse("{xxx(yyy)}.zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parse(
+      """
+        |
+        | {
+        |   xxx(yyy)
+        | }.zzz
+        |
+      """.stripMargin
+    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+
+    parse(
+      """
+        |
+        | {
+        |   let yyy = aaa(bbb)
+        |   xxx(yyy)
+        | }.zzz
+        |
+      """.stripMargin
+    ) shouldBe GETTER(BLOCK(LET("yyy", FUNCTION_CALL("aaa", List(REF("bbb")))), FUNCTION_CALL("xxx", List(REF("yyy")))), "zzz")
+  }
+
+  property("crypto functions") {
+    val hashFunctions = Vector("sha256", "blake2b256", "keccak256")
+    val text          = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD=test message"
+    val encodedText   = ScorexBase58.encode(text.getBytes)
+
+    for (f <- hashFunctions) {
+      parse(
+        s"""
+           |
+           |$f(base58'$encodedText')
+           |
+       """.stripMargin
+      ) shouldBe
+        FUNCTION_CALL(
+          f,
+          List(CONST_BYTEVECTOR(ByteVector(text.getBytes)))
+        )
+    }
+  }
+
+  property("multiple expressions going one after another are denied") {
+    isParsed(
+      """1 + 1
+        |2 + 2""".stripMargin
+    ) shouldBe false
+  }
 }

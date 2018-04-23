@@ -4,7 +4,8 @@ import org.iq80.leveldb.DBFactory
 import scorex.utils.ScorexLogging
 
 object LevelDBFactory extends ScorexLogging {
-  private val factory_names = "org.fusesource.leveldbjni.JniDBFactory, org.iq80.leveldb.impl.Iq80DBFactory"
+  private val nativeFactory = "org.fusesource.leveldbjni.JniDBFactory"
+  private val javaFactory   = "org.iq80.leveldb.impl.Iq80DBFactory"
 
   lazy val factory: DBFactory = load
 
@@ -13,12 +14,12 @@ object LevelDBFactory extends ScorexLogging {
     val loaders = Seq(ClassLoader.getSystemClassLoader, this.getClass.getClassLoader)
 
     val names =
-      if (testing.isDefined) Seq("org.iq80.leveldb.impl.Iq80DBFactory")
-      else Seq("org.fusesource.leveldbjni.JniDBFactory", "org.iq80.leveldb.impl.Iq80DBFactory")
+      if (testing.isDefined) Seq(javaFactory)
+      else Seq(nativeFactory, javaFactory)
 
     val pairs = names.flatMap(x => loaders.map(y => (x, y)))
 
-    val f = pairs
+    val f = pairs.view
       .flatMap {
         case (name, loader) =>
           try {
@@ -31,9 +32,9 @@ object LevelDBFactory extends ScorexLogging {
           }
       }
       .headOption
-      .getOrElse(throw new Exception(s"Could not load any of the factory classes: $factory_names"))
+      .getOrElse(throw new Exception(s"Could not load any of the factory classes: $nativeFactory, $javaFactory"))
 
-    if (f.getClass.getName == "org.iq80.leveldb.impl.Iq80DBFactory") {
+    if (f.getClass.getName == javaFactory) {
       log.warn("Using the pure java LevelDB implementation which is still experimental")
     }
     f

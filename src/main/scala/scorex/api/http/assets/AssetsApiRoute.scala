@@ -3,8 +3,7 @@ package scorex.api.http.assets
 import akka.http.scaladsl.server.Route
 import com.google.common.base.Charsets
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.ByteStr
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
@@ -26,7 +25,7 @@ import scala.util.{Failure, Success}
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, state: SnapshotStateReader, time: Time)
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, blockchain: Blockchain, time: Time)
     extends ApiRoute
     with BroadcastRoute {
   val MaxAddressesPerRequest = 1000
@@ -58,8 +57,9 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     (get & path(Segment / "distribution")) { assetId =>
       complete {
         Success(assetId).filter(_.length <= AssetIdStringLength).flatMap(Base58.decode) match {
-          case Success(byteArray) => Json.toJson(state.assetDistribution(state.height, ByteStr(byteArray)).map { case (a, b) => a.stringRepr -> b })
-          case Failure(_)         => ApiError.fromValidationError(scorex.transaction.ValidationError.GenericError("Must be base58-encoded assetId"))
+          case Success(byteArray) =>
+            Json.toJson(blockchain.assetDistribution(blockchain.height, ByteStr(byteArray)).map { case (a, b) => a.stringRepr -> b })
+          case Failure(_) => ApiError.fromValidationError(scorex.transaction.ValidationError.GenericError("Must be base58-encoded assetId"))
         }
       }
     }
@@ -220,7 +220,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         } yield
           Json.obj("address" -> acc.address,
                    "assetId" -> assetIdStr,
-                   "balance" -> JsNumber(BigDecimal(state.portfolio(acc).assets.getOrElse(assetId, 0L))))).left.map(ApiError.fromValidationError)
+                   "balance" -> JsNumber(BigDecimal(blockchain.portfolio(acc).assets.getOrElse(assetId, 0L))))).left.map(ApiError.fromValidationError)
       case _ => Left(InvalidAddress)
     }
   }
@@ -233,10 +233,10 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         "address" -> acc.address,
         "balances" -> JsArray(
           (for {
-            (assetId, balance) <- state.portfolio(acc).assets
+            (assetId, balance) <- blockchain.portfolio(acc).assets
             if balance > 0
-            assetInfo        <- state.assetDescription(assetId)
-            issueTransaction <- state.transactionInfo(assetId)
+            assetInfo        <- blockchain.assetDescription(assetId)
+            issueTransaction <- blockchain.transactionInfo(assetId)
           } yield
             Json.obj(
               "assetId"          -> assetId.base58,
@@ -251,13 +251,13 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
   private def assetDetails(assetId: String): Either[ApiError, JsObject] =
     (for {
       id <- ByteStr.decodeBase58(assetId).toOption.toRight("Incorrect asset ID")
-      tt <- state.transactionInfo(id).toRight("Failed to find issue transaction by ID")
+      tt <- blockchain.transactionInfo(id).toRight("Failed to find issue transaction by ID")
       (h, mtx) = tt
       tx <- (mtx match {
         case t: IssueTransaction => Some(t)
         case _                   => None
       }).toRight("No issue transaction found with given asset ID")
-      description <- state.assetDescription(id).toRight("Failed to get description of the asset")
+      description <- blockchain.assetDescription(id).toRight("Failed to get description of the asset")
     } yield {
       JsObject(
         Seq(

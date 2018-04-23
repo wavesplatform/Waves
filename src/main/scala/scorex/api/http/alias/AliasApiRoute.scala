@@ -1,13 +1,12 @@
 package scorex.api.http.alias
 
-import javax.ws.rs.Path
-
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
+import javax.ws.rs.Path
 import play.api.libs.json.{Format, Json}
 import scorex.BroadcastRoute
 import scorex.account.Alias
@@ -18,7 +17,7 @@ import scorex.wallet.Wallet
 
 @Path("/alias")
 @Api(value = "/alias")
-case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time, state: SnapshotStateReader)
+case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time, blockchain: Blockchain)
     extends ApiRoute
     with BroadcastRoute {
 
@@ -54,7 +53,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
   def addressOfAlias: Route = (get & path("by-alias" / Segment)) { aliasName =>
     val result = Alias.buildWithCurrentNetworkByte(aliasName) match {
       case Right(alias) =>
-        state.resolveAlias(alias) match {
+        blockchain.resolveAlias(alias) match {
           case Some(addr) => Right(Address(addr.stringRepr))
           case None       => Left(AliasDoesNotExist(alias))
         }
@@ -72,7 +71,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
   def aliasOfAddress: Route = (get & path("by-address" / Segment)) { addressString =>
     val result: Either[ApiError, Seq[String]] = scorex.account.Address
       .fromString(addressString)
-      .map(acc => state.aliasesOfAddress(acc).map(_.stringRepr))
+      .map(acc => blockchain.aliasesOfAddress(acc).map(_.stringRepr))
       .left
       .map(ApiError.fromValidationError)
     complete(result)

@@ -2,7 +2,7 @@ package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.it.Node
-import com.wavesplatform.state2.DataEntry
+import com.wavesplatform.state.DataEntry
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, Matchers}
@@ -138,7 +138,7 @@ object SyncHttpApi extends Assertions {
     def createAddress(): String =
       Await.result(async(n).createAddress, RequestAwaitTime)
 
-    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Transaction =
+    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): TransactionInfo =
       Await.result(async(n).waitForTransaction(txId), RequestAwaitTime)
 
     def signAndBroadcast(tx: JsObject): Transaction =
@@ -161,14 +161,14 @@ object SyncHttpApi extends Assertions {
     private val TxInBlockchainAwaitTime = 6 * nodes.head.blockDelay
     private val ConditionAwaitTime      = 5.minutes
 
-    def waitForHeightAriseAndTxPresent(transactionId: String): Unit =
+    def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
       Await.result(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
 
     def waitForHeightArise(): Unit =
       Await.result(async(nodes).waitForHeightArise(), TxInBlockchainAwaitTime)
 
-    def waitForSameBlocksAt(retryInterval: FiniteDuration, height: Int): Boolean =
-      Await.result(async(nodes).waitForSameBlocksAt(retryInterval, height), ConditionAwaitTime)
+    def waitForSameBlocksAt(height: Int, retryInterval: FiniteDuration = 5.seconds): Boolean =
+      Await.result(async(nodes).waitForSameBlocksAt(height, retryInterval), ConditionAwaitTime)
 
     def waitFor[A](desc: String)(retryInterval: FiniteDuration)(request: Node => A, cond: Iterable[A] => Boolean): Boolean =
       Await.result(

@@ -3,13 +3,13 @@ package scorex.transaction.assets
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.crypto
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import monix.eval.Coeval
 import play.api.libs.json.{Format, JsObject, JsValue, Json}
 import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
+import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
-import scorex.transaction.TransactionParsers._
 import scorex.transaction.ValidationError.Validation
 import scorex.transaction._
 import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, toJson}
@@ -131,7 +131,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
         } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
           Left(ValidationError.TooBigArray)
         } else if (feeAmount <= 0) {
-          Left(ValidationError.InsufficientFee)
+          Left(ValidationError.InsufficientFee())
         } else {
           Right(MassTransferTransaction(version, assetId, sender, transfers, timestamp, feeAmount, attachment, proofs))
       }

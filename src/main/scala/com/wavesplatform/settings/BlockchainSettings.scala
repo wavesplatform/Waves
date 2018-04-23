@@ -1,7 +1,7 @@
 package com.wavesplatform.settings
 
 import com.typesafe.config.Config
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.EnumerationReader._
@@ -43,6 +43,9 @@ case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
 
   def blocksForFeatureActivation(height: Int): Int =
     blocksForFeatureActivation * (if (height <= doubleFeaturesPeriodsAfterHeight) 1 else 2)
+
+  def generatingBalanceDepth(height: Int): Int =
+    if (height >= generationBalanceDepthFrom50To1000AfterHeight) 1000 else 50
 }
 
 object FunctionalitySettings {

@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.utils.base58Length
+import scorex.crypto.signatures.Curve25519
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -13,10 +14,7 @@ object TransactionParsers {
   val TimestampLength            = 8
   val AmountLength               = 8
   val TypeLength                 = 1
-  val SignatureLength            = 64
-  val SignatureStringLength: Int = base58Length(SignatureLength)
-  val KeyLength                  = 32
-  val KeyStringLength: Int       = base58Length(KeyLength)
+  val SignatureStringLength: Int = base58Length(Curve25519.SignatureLength)
 
   private val old: Map[Byte, TransactionParser] = Seq[TransactionParser](
     GenesisTransaction,
@@ -52,7 +50,7 @@ object TransactionParsers {
       }
   } ++ modern
 
-  private val byName: Map[String, TransactionParser] = (old ++ modern).map {
+  val byName: Map[String, TransactionParser] = (old ++ modern).map {
     case (_, builder) => builder.classTag.runtimeClass.getSimpleName -> builder
   }
 

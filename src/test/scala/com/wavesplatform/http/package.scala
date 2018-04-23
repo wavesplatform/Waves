@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import org.scalatest.matchers.{HavePropertyMatchResult, HavePropertyMatcher}
 import play.api.libs.json._
 import play.api.libs.functional.syntax._

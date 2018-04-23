@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -14,7 +13,7 @@ import scorex.transaction.assets.IssueTransaction
 
 class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  import CustomIssueTransactionTestSuite._
+  import CustomFeeTransactionSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -44,7 +43,7 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
 }
 
-object CustomIssueTransactionTestSuite {
+object CustomFeeTransactionSuite {
   val addressDefaultNode = Default(3).getString("address")
   private val seed       = Default(3).getString("account-seed")
   private val pk         = PrivateKeyAccount.fromSeed(seed).right.get
@@ -63,19 +62,10 @@ object CustomIssueTransactionTestSuite {
     .get
 
   val assetId = assetTx.id()
-  import NodeConfigs.Default
 
-  private val acceptAssetsFee = ConfigFactory.parseString(s"""
-       |waves.fees.transfer {
-       |  $assetId = 100000
-       |
-       |}
-      """.stripMargin)
+  private val acceptAssetsFee = ConfigFactory.parseString(s"waves.fees.transfer.$assetId = 100000")
 
-  private val notMinerConfig = ConfigFactory.parseString(s"""
-       |waves.miner.enable=no
-       |
-      """.stripMargin).withFallback(acceptAssetsFee)
+  private val notMinerConfig = ConfigFactory.parseString("waves.miner.enable=no").withFallback(acceptAssetsFee)
 
   val Configs: Seq[Config] = Seq(
     acceptAssetsFee.withFallback(Default.head),

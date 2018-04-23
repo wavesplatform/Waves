@@ -4,7 +4,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.RequestGen
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import org.scalacheck.Gen.posNum
@@ -64,7 +64,7 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
         posting(lease.copy(recipient = a)) should produce(InvalidAddress)
       }
       forAll(nonPositiveLong) { fee =>
-        posting(lease.copy(fee = fee)) should produce(InsufficientFee)
+        posting(lease.copy(fee = fee)) should produce(InsufficientFee())
       }
       forAll(posNum[Long]) { quantity =>
         posting(lease.copy(amount = quantity, fee = Long.MaxValue)) should produce(OverflowError)
@@ -81,7 +81,7 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
         posting(cancel.copy(senderPublicKey = pk)) should produce(InvalidAddress)
       }
       forAll(nonPositiveLong) { fee =>
-        posting(cancel.copy(fee = fee)) should produce(InsufficientFee)
+        posting(cancel.copy(fee = fee)) should produce(InsufficientFee())
       }
     }
   }

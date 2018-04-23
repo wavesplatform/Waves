@@ -2,7 +2,6 @@ package scorex.waves.http
 
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
-import javax.ws.rs.Path
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
@@ -11,17 +10,18 @@ import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.crypto
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
-import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{ByteStr, LeaseBalance, Portfolio}
+import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.{ByteStr, LeaseBalance, NG, Portfolio}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
-import monix.eval.Coeval
+import javax.ws.rs.Path
+import monix.eval.{Coeval, Task}
 import play.api.libs.json._
 import scorex.account.Address
 import scorex.api.http._
+import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.transaction._
@@ -29,19 +29,18 @@ import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 import scorex.waves.http.DebugApiRoute._
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
+
 @Path("/debug")
 @Api(value = "/debug")
-case class DebugApiRoute(settings: RestAPISettings,
+case class DebugApiRoute(ws: WavesSettings,
                          wallet: Wallet,
-                         stateReader: SnapshotStateReader,
-                         history: History with DebugNgHistory,
+                         ng: NG,
                          peerDatabase: PeerDatabase,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo],
-                         blockchainUpdater: BlockchainUpdater,
+                         rollbackTask: ByteStr => Task[Either[ValidationError, Seq[Block]]],
                          allChannels: ChannelGroup,
                          utxStorage: UtxPool,
                          miner: Miner with MinerDebugInfo,
@@ -57,6 +56,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   private lazy val fullConfig: JsValue   = Json.parse(configStr)
   private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
 
+  override val settings = ws.restAPISettings
   override lazy val route: Route = pathPrefix("debug") {
     blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print
   }
@@ -69,7 +69,7 @@ case class DebugApiRoute(settings: RestAPISettings,
     ))
   def blocks: Route = {
     (path("blocks" / IntNumber) & get & withAuth) { howMany =>
-      complete(JsArray(history.lastBlocks(howMany).map { block =>
+      complete(JsArray(ng.lastBlocks(howMany).map { block =>
         val bytes = block.bytes()
         Json.obj(bytes.length.toString -> Base58.encode(crypto.fastHash(bytes)))
       }))
@@ -130,7 +130,7 @@ case class DebugApiRoute(settings: RestAPISettings,
       Address.fromString(rawAddress) match {
         case Left(_) => complete(InvalidAddress)
         case Right(address) =>
-          val portfolio = if (considerUnspent) utxStorage.portfolio(address) else stateReader.portfolio(address)
+          val portfolio = if (considerUnspent) utxStorage.portfolio(address) else ng.portfolio(address)
           complete(Json.toJson(portfolio))
       }
     }
@@ -140,7 +140,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET")
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json state")))
   def state: Route = (path("state") & get & withAuth) {
-    complete(stateReader.wavesDistribution(stateReader.height).map { case (a, b) => a.stringRepr -> b })
+    complete(ng.wavesDistribution(ng.height).map { case (a, b) => a.stringRepr -> b })
   }
 
   @Path("/stateWaves/{height}")
@@ -150,13 +150,15 @@ case class DebugApiRoute(settings: RestAPISettings,
       new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
     ))
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get & withAuth) { height =>
-    complete(stateReader.wavesDistribution(height).map { case (a, b) => a.stringRepr -> b })
+    complete(ng.wavesDistribution(height).map { case (a, b) => a.stringRepr -> b })
   }
 
-  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] = Future {
-    blockchainUpdater.removeAfter(blockId) match {
+  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] = {
+    import monix.execution.Scheduler.Implicits.global
+
+    rollbackTask(blockId).asyncBoundary.map {
       case Right(blocks) =>
-        allChannels.broadcast(LocalScoreChanged(history.score))
+        allChannels.broadcast(LocalScoreChanged(ng.score))
         if (returnTransactionsToUtx) {
           utxStorage.batched { ops =>
             blocks.flatMap(_.transactionData).foreach(ops.putIfNew)
@@ -164,8 +166,8 @@ case class DebugApiRoute(settings: RestAPISettings,
         }
         miner.scheduleMining()
         Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
-      case Left(error) => ApiError.fromValidationError(error)
-    }
+      case Left(error) => ApiError.fromValidationError(error): ToResponseMarshallable
+    }.runAsyncLogErr
   }
 
   @Path("/rollback")
@@ -187,7 +189,7 @@ case class DebugApiRoute(settings: RestAPISettings,
     ))
   def rollback: Route = (path("rollback") & post & withAuth) {
     json[RollbackParams] { params =>
-      history.blockAt(params.rollbackTo) match {
+      ng.blockAt(params.rollbackTo) match {
         case Some(block) =>
           rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
         case None =>
@@ -205,7 +207,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   def info: Route = (path("info") & get & withAuth) {
     complete(
       Json.obj(
-        "stateHeight"                      -> stateReader.height,
+        "stateHeight"                      -> ng.height,
         "extensionLoaderState"             -> extLoaderStateReporter().toString,
         "historyReplierCacheSizes"         -> Json.toJson(historyReplier.cacheSizes),
         "microBlockSynchronizerCacheSizes" -> Json.toJson(mbsCacheSizesReporter()),
@@ -223,7 +225,11 @@ case class DebugApiRoute(settings: RestAPISettings,
   def minerInfo: Route = (path("minerInfo") & get & withAuth) {
     complete(miner.collectNextBlockGenerationTimes.map {
       case (a, t) =>
-        AccountMiningInfo(a.stringRepr, stateReader.effectiveBalance(a, stateReader.height, 1000), t)
+        AccountMiningInfo(
+          a.stringRepr,
+          ng.effectiveBalance(a, ng.height, ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height)),
+          t
+        )
     })
   }
 
@@ -234,8 +240,8 @@ case class DebugApiRoute(settings: RestAPISettings,
       new ApiResponse(code = 200, message = "Json state")
     ))
   def historyInfo: Route = (path("historyInfo") & get & withAuth) {
-    val a = history.lastPersistedBlockIds(10)
-    val b = history.microblockIds()
+    val a = ng.lastPersistedBlockIds(10)
+    val b = ng.microblockIds
     complete(HistoryInfo(a, b))
 
   }

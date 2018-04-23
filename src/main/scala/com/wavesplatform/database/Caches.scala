@@ -4,18 +4,19 @@ import java.util
 
 import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
-import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{AccountDataInfo, AssetDescription, AssetInfo, ByteStr, Diff, LeaseBalance, Portfolio, StateWriter, VolumeAndFee}
+import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetInfo, Blockchain, ByteStr, Diff, LeaseBalance, Portfolio, VolumeAndFee}
 import scorex.account.{Address, Alias}
 import scorex.block.Block
+import scorex.transaction.Transaction
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
-import scorex.transaction.smart.Script
-import scorex.transaction.{History, Transaction}
+import scorex.transaction.smart.script.Script
 
 import scala.collection.JavaConverters._
 
-trait Caches extends SnapshotStateReader with History with StateWriter {
+trait Caches extends Blockchain {
   import Caches._
+
+  private val MaxSize = 100000
 
   @volatile
   private var heightCache = loadHeight()
@@ -36,40 +37,40 @@ trait Caches extends SnapshotStateReader with History with StateWriter {
   protected def forgetTransaction(id: ByteStr): Unit     = transactionIds.remove(id)
   override def containsTransaction(id: ByteStr): Boolean = transactionIds.containsKey(id)
 
-  protected val portfolioCache: LoadingCache[Address, Portfolio] = cache(100000, loadPortfolio)
+  protected val portfolioCache: LoadingCache[Address, Portfolio] = cache(MaxSize, loadPortfolio)
   protected def loadPortfolio(address: Address): Portfolio
   override def portfolio(a: Address): Portfolio = portfolioCache.get(a)
 
-  protected val assetInfoCache: LoadingCache[ByteStr, Option[AssetInfo]] = cache(100000, loadAssetInfo)
+  protected val assetInfoCache: LoadingCache[ByteStr, Option[AssetInfo]] = cache(MaxSize, loadAssetInfo)
   protected def loadAssetInfo(assetId: ByteStr): Option[AssetInfo]
 
-  protected val assetDescriptionCache: LoadingCache[ByteStr, Option[AssetDescription]] = cache(100000, loadAssetDescription)
+  protected val assetDescriptionCache: LoadingCache[ByteStr, Option[AssetDescription]] = cache(MaxSize, loadAssetDescription)
   protected def loadAssetDescription(assetId: ByteStr): Option[AssetDescription]
   override def assetDescription(assetId: ByteStr): Option[AssetDescription] = assetDescriptionCache.get(assetId)
 
-  protected val volumeAndFeeCache: LoadingCache[ByteStr, VolumeAndFee] = cache(100000, loadVolumeAndFee)
+  protected val volumeAndFeeCache: LoadingCache[ByteStr, VolumeAndFee] = cache(MaxSize, loadVolumeAndFee)
   protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = volumeAndFeeCache.get(orderId)
 
-  protected val scriptCache: LoadingCache[Address, Option[Script]] = cache(100000, loadScript)
+  protected val scriptCache: LoadingCache[Address, Option[Script]] = cache(MaxSize, loadScript)
   protected def loadScript(address: Address): Option[Script]
   override def accountScript(address: Address): Option[Script] = scriptCache.get(address)
 
   private var lastAddressId = loadMaxAddressId()
   protected def loadMaxAddressId(): BigInt
 
-  protected val addressIdCache: LoadingCache[Address, Option[BigInt]] = cache(100000, loadAddressId)
+  protected val addressIdCache: LoadingCache[Address, Option[BigInt]] = cache(MaxSize, loadAddressId)
   protected def loadAddressId(address: Address): Option[BigInt]
 
   @volatile
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
   protected def loadApprovedFeatures(): Map[Short, Int]
-  override def approvedFeatures(): Map[Short, Int] = approvedFeaturesCache
+  override def approvedFeatures: Map[Short, Int] = approvedFeaturesCache
 
   @volatile
   protected var activatedFeaturesCache: Map[Short, Int] = loadActivatedFeatures()
   protected def loadActivatedFeatures(): Map[Short, Int]
-  override def activatedFeatures(): Map[Short, Int] = activatedFeaturesCache
+  override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   protected def doAppend(block: Block,
                          addresses: Map[Address, BigInt],

@@ -7,7 +7,7 @@ import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.OrderbookHistory
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
@@ -147,46 +147,27 @@ class MatcherMassOrdersTestSuite
 }
 
 object MatcherMassOrdersTestSuite {
-  val ForbiddenAssetId = "FdbnAsset"
-  val orderLimit       = 20
+  private val ForbiddenAssetId    = "FdbnAsset"
+  private val orderLimit          = 20
+  private val AssetQuantity: Long = 1000000000
 
+  import ConfigFactory._
   import NodeConfigs.Default
 
   private val matcherConfig = ConfigFactory.parseString(s"""
        |waves.matcher {
-       |  enable=yes
-       |  account="3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC"
-       |  bind-address="0.0.0.0"
+       |  enable = yes
+       |  account = 3HmFkAoQRs4Y3PE2uR6ohN7wS4VqPBGKv7k
+       |  bind-address = "0.0.0.0"
        |  order-match-tx-fee = 300000
        |  blacklisted-assets = [$ForbiddenAssetId]
        |  order-cleanup-interval = 20s
        |  rest-order-limit=$orderLimit
-       |}
-       |waves.rest-api {
-       |    enable = yes
-       |    api-key-hash = 7L6GpLHhA5KyJTAVc8WFHwEcyTY8fC8rRbyMCiFnM4i
-       |}
-       |waves.miner.enable=no
-      """.stripMargin)
+       |}""".stripMargin)
 
-  private val nonGeneratingPeersConfig = ConfigFactory.parseString(
-    """
-      |waves.matcher {
-      | order-cleanup-interval = 30s
-      |}
-      |waves.miner.enable=no
-    """.stripMargin
-  )
+  private val minerDisabled = parseString("waves.miner.enable = no")
 
-  val AssetQuantity: Long = 1000000000
-
-  val MatcherFee: Long     = 300000
-  val TransactionFee: Long = 300000
-
-  val Waves: Long = 100000000L
-
-  val Configs: Seq[Config] = Seq(matcherConfig.withFallback(Default.head)) ++
-    Random.shuffle(Default.tail.init).take(2).map(nonGeneratingPeersConfig.withFallback(_)) ++
-    Seq(Default.last)
-
+  private val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
+    .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))
+    .map { case (n, o) => o.withFallback(n) }
 }

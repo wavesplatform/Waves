@@ -2,11 +2,11 @@ package scorex.transaction.lease
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.crypto
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.transaction.TransactionParsers._
+import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
@@ -52,7 +52,7 @@ object LeaseCancelTransaction extends TransactionParserFor[LeaseCancelTransactio
     if (leaseId.arr.length != crypto.DigestSize) {
       Left(ValidationError.GenericError("Lease transaction id is invalid"))
     } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee)
+      Left(ValidationError.InsufficientFee())
     } else {
       Right(LeaseCancelTransaction(sender, leaseId, fee, timestamp, signature))
     }

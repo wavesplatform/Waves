@@ -13,14 +13,14 @@ import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
+import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
 import scorex.transaction.assets.exchange._
-import scorex.transaction.{History, ValidationError}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
@@ -30,12 +30,11 @@ import scala.concurrent.duration._
 
 class OrderBookActor(assetPair: AssetPair,
                      val orderHistory: ActorRef,
-                     val storedState: SnapshotStateReader,
+                     val blockchain: Blockchain,
                      val wallet: Wallet,
                      val utx: UtxPool,
                      val allChannels: ChannelGroup,
                      val settings: MatcherSettings,
-                     val history: History,
                      val functionalitySettings: FunctionalitySettings)
     extends PersistentActor
     with Stash
@@ -334,14 +333,13 @@ class OrderBookActor(assetPair: AssetPair,
 object OrderBookActor {
   def props(assetPair: AssetPair,
             orderHistory: ActorRef,
-            storedState: SnapshotStateReader,
+            blockchain: Blockchain,
             settings: MatcherSettings,
             wallet: Wallet,
             utx: UtxPool,
             allChannels: ChannelGroup,
-            history: History,
             functionalitySettings: FunctionalitySettings): Props =
-    Props(new OrderBookActor(assetPair, orderHistory, storedState, wallet, utx, allChannels, settings, history, functionalitySettings))
+    Props(new OrderBookActor(assetPair, orderHistory, blockchain, wallet, utx, allChannels, settings, functionalitySettings))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
@@ -389,7 +387,10 @@ object OrderBookActor {
 
   case class GetOrderStatusResponse(status: LimitOrder.OrderStatus) extends MatcherResponse {
     val json = status.json
-    val code = StatusCodes.OK
+    val code = status match {
+      case LimitOrder.NotFound => StatusCodes.NotFound
+      case _                   => StatusCodes.OK
+    }
   }
 
   case class GetOrderBookResponse(pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends MatcherResponse {

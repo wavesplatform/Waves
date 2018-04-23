@@ -3,13 +3,13 @@ package scorex.transaction.assets
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.crypto
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.serialization.Deser
-import scorex.transaction.TransactionParsers._
-import scorex.transaction.{ValidationError, _}
+import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
@@ -119,6 +119,6 @@ object IssueTransaction extends TransactionParserFor[IssueTransaction] with Tran
       _ <- Either.cond(description.length <= MaxDescriptionLength, (), ValidationError.TooBigArray)
       _ <- Either.cond(name.length >= MinAssetNameLength && name.length <= MaxAssetNameLength, (), ValidationError.InvalidName)
       _ <- Either.cond(decimals >= 0 && decimals <= MaxDecimals, (), ValidationError.TooBigArray)
-      _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee)
+      _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee())
     } yield ()
 }

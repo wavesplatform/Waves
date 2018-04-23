@@ -2,8 +2,8 @@ package scorex.transaction
 
 import com.google.common.primitives.Shorts
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.state2.DataEntry._
-import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, LongDataEntry}
+import com.wavesplatform.state.DataEntry._
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, LongDataEntry}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -124,10 +124,10 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         valueTooLongEi shouldBe Left(ValidationError.TooBigArray)
 
         val noFeeEi = DataTransaction.create(version, sender, data, 0, timestamp, proofs)
-        noFeeEi shouldBe Left(ValidationError.InsufficientFee)
+        noFeeEi shouldBe Left(ValidationError.InsufficientFee())
 
         val negativeFeeEi = DataTransaction.create(version, sender, data, -100, timestamp, proofs)
-        negativeFeeEi shouldBe Left(ValidationError.InsufficientFee)
+        negativeFeeEi shouldBe Left(ValidationError.InsufficientFee())
     }
   }
 }

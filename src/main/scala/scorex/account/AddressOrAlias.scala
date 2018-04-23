@@ -1,6 +1,6 @@
 package scorex.account
 
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import scorex.serialization.Deser
 import scorex.transaction.ValidationError
 

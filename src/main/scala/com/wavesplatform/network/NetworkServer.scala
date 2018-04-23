@@ -8,6 +8,7 @@ import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network.MessageObserver.Messages
 import com.wavesplatform.settings._
 import com.wavesplatform.Version
+import com.wavesplatform.state.NG
 import com.wavesplatform.utx.UtxPool
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
@@ -39,7 +40,7 @@ object NetworkServer extends ScorexLogging {
 
   def apply(settings: WavesSettings,
             lastBlockInfos: Observable[LastBlockInfo],
-            history: NgHistory,
+            ng: NG,
             historyReplier: HistoryReplier,
             utxPool: UtxPool,
             peerDatabase: PeerDatabase,

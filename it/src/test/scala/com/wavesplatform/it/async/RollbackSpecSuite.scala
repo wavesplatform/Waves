@@ -1,11 +1,11 @@
 package com.wavesplatform.it.async
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
-import com.wavesplatform.state2.{BooleanDataEntry, LongDataEntry}
 import com.wavesplatform.it.{NodeConfigs, TransferSending, WaitForHeight2}
+import com.wavesplatform.state.{BooleanDataEntry, LongDataEntry}
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.{FreeSpec, Matchers}
 
@@ -24,12 +24,10 @@ class RollbackSpecSuite
     with TransferSending
     with WaitForHeight2
     with NodesFromDocker {
-  // there are nodes with big and small balances to reduce the number of forks
-  private val nonGeneratingNodesConfig = ConfigFactory.parseString("waves.miner.enable = no")
 
   override protected val nodeConfigs: Seq[Config] = Seq(
-    NodeConfigs.Default.last,
-    nonGeneratingNodesConfig.withFallback(Random.shuffle(NodeConfigs.Default.init).head)
+    Random.shuffle(NodeConfigs.Default.init).head,
+    NodeConfigs.NotMiner
   )
 
   private val nodeAddresses     = nodeConfigs.map(_.getString("address")).toSet
@@ -84,12 +82,12 @@ class RollbackSpecSuite
     val alias = "test_alias4"
 
     val f = for {
-      startHeight     <- Future.traverse(nodes)(_.height).map(_.max)
-      aliasTxId       <- nodes.head.createAlias(nodes.head.address, alias, 1.waves).map(_.id)
-      _               <- Future.traverse(nodes)(_.waitForTransaction(aliasTxId))
-      _               <- Future.traverse(nodes)(_.waitForHeight(startHeight + 1))
-      _               <- Future.traverse(nodes)(_.rollback(startHeight - 1, returnToUTX = false))
-      _               <- Future.traverse(nodes)(_.waitForHeight(startHeight + 1))
+      aliasTxId <- nodes.head.createAlias(nodes.head.address, alias, 1.waves).map(_.id)
+      txHeights <- Future.traverse(nodes)(_.waitForTransaction(aliasTxId).map(_.height))
+      txHeight = txHeights.head
+      _               <- Future.traverse(nodes)(_.waitForHeight(txHeight + 1))
+      _               <- Future.traverse(nodes)(_.rollback(txHeight - 1, returnToUTX = false))
+      _               <- Future.traverse(nodes)(_.waitForHeight(txHeight + 1))
       secondAliasTxId <- nodes.head.createAlias(nodes.head.address, alias, 1.waves).map(_.id)
       _               <- Future.traverse(nodes)(_.waitForTransaction(secondAliasTxId))
     } yield succeed
@@ -104,23 +102,22 @@ class RollbackSpecSuite
     val entry3 = LongDataEntry("1", 1)
 
     val f = for {
-      startHeight <- Future.traverse(nodes)(_.height).map(_.max)
-      tx1         <- node.putData(node.address, List(entry1), 100000).map(_.id)
-      _           <- Future.traverse(nodes)(_.waitForTransaction(tx1))
-      _           <- Future.traverse(nodes)(_.waitForHeight(startHeight + 1))
-      tx2         <- node.putData(node.address, List(entry2, entry3), 100000).map(_.id)
-      _           <- Future.traverse(nodes)(_.waitForTransaction(tx2))
-      _           <- Future.traverse(nodes)(_.waitForHeight(startHeight + 2))
-      data2       <- node.getData(node.address)
+      tx1        <- node.putData(node.address, List(entry1), 100000).map(_.id)
+      _          <- nodes.waitForHeightAriseAndTxPresent(tx1)
+      tx1heights <- Future.traverse(nodes)(_.waitForTransaction(tx1))
+      tx1height = tx1heights.head.height
+      tx2   <- node.putData(node.address, List(entry2, entry3), 100000).map(_.id)
+      _     <- nodes.waitForHeightAriseAndTxPresent(tx2)
+      data2 <- node.getData(node.address)
       _ = assert(data2 == List(entry3, entry2))
 
-      _     <- Future.traverse(nodes)(_.rollback(startHeight + 1, returnToUTX = false))
-      _     <- Future.traverse(nodes)(_.waitForHeight(startHeight + 1))
+      _     <- Future.traverse(nodes)(_.rollback(tx1height, returnToUTX = false))
+      _     <- Future.traverse(nodes)(_.waitForHeight(tx1height))
       data1 <- node.getData(node.address)
       _ = assert(data1 == List(entry1))
 
-      _     <- Future.traverse(nodes)(_.rollback(startHeight, returnToUTX = false))
-      _     <- Future.traverse(nodes)(_.waitForHeight(startHeight))
+      _     <- Future.traverse(nodes)(_.rollback(tx1height - 1, returnToUTX = false))
+      _     <- Future.traverse(nodes)(_.waitForHeight(tx1height - 1))
       data0 <- node.getData(node.address)
       _ = assert(data0 == List.empty)
     } yield succeed

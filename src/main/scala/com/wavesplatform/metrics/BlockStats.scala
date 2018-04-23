@@ -1,7 +1,7 @@
 package com.wavesplatform.metrics
 
 import com.wavesplatform.network.{HandshakeHandler, MicroBlockInv}
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import io.netty.channel.Channel
 import org.influxdb.dto.Point
 import scorex.block.{Block, MicroBlock}

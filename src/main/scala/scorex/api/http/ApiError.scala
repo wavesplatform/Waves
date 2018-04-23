@@ -1,7 +1,7 @@
 package scorex.api.http
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import play.api.libs.json._
 import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.transaction.{Transaction, ValidationError}
@@ -24,7 +24,7 @@ object ApiError {
   def fromValidationError(e: ValidationError): ApiError = e match {
     case ValidationError.InvalidAddress(_)               => InvalidAddress
     case ValidationError.NegativeAmount(x, of)           => NegativeAmount(s"$x of $of")
-    case ValidationError.InsufficientFee                 => InsufficientFee
+    case ValidationError.InsufficientFee(x)              => InsufficientFee(x)
     case ValidationError.InvalidName                     => InvalidName
     case ValidationError.InvalidSignature(_, _)          => InvalidSignature
     case ValidationError.InvalidRequestSignature         => InvalidSignature
@@ -35,7 +35,7 @@ object ApiError {
     case ValidationError.GenericError(ge)                => CustomValidationError(ge)
     case ValidationError.AlreadyInTheState(tx, txHeight) => CustomValidationError(s"Transaction $tx is already in the state on a height of $txHeight")
     case ValidationError.AccountBalanceError(errs)       => CustomValidationError(errs.values.mkString(", "))
-    case ValidationError.AliasNotExists(tx)              => AliasDoesNotExist(tx)
+    case ValidationError.AliasDoesNotExist(tx)           => AliasDoesNotExist(tx)
     case ValidationError.OrderValidationError(_, m)      => CustomValidationError(m)
     case ValidationError.UnsupportedTransactionType      => CustomValidationError("UnsupportedTransactionType")
     case ValidationError.Mistiming(err)                  => Mistiming(err)

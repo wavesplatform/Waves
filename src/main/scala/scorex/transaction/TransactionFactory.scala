@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.google.common.base.Charsets
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import scorex.account._
 import scorex.api.http.DataRequest
 import scorex.api.http.alias.CreateAliasRequest
@@ -10,7 +10,8 @@ import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.smart.{Script, SetScriptTransaction}
+import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.smart.script.Script
 import scorex.utils.Time
 import scorex.wallet.Wallet
 

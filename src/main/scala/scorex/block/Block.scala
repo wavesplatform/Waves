@@ -6,13 +6,13 @@ import cats._
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.GenesisSettings
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.fields.FeaturesBlockField
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
-import scorex.transaction.TransactionParsers._
+import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.utils.ScorexLogging
@@ -197,7 +197,7 @@ object Block extends ScorexLogging {
   val BaseTargetLength: Int                = 8
   val GeneratorSignatureLength: Int        = 32
 
-  val BlockIdLength = SignatureLength
+  val BlockIdLength: Int = SignatureLength
 
   val TransactionSizeLength = 4
 
@@ -274,8 +274,8 @@ object Block extends ScorexLogging {
 
   def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
     gs.transactions.map { ts =>
-      val acc = Address.fromString(ts.recipient).right.get
-      GenesisTransaction.create(acc, ts.amount, gs.timestamp).right.get
+      val acc = Address.fromString(ts.recipient).explicitGet()
+      GenesisTransaction.create(acc, ts.amount, gs.timestamp).explicitGet()
     }
   }
 

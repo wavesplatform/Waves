@@ -1,8 +1,8 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs._
+import com.wavesplatform.state._
+import com.wavesplatform.state.diffs._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -38,15 +38,13 @@ class BlockchainUpdaterInMemoryDiffTest
         val mastersBalanceAfterPayment1 = domain.portfolio(genesis.recipient).balance
         mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee)
 
-        domain.history.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
-        domain.state.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
+        domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
 
         domain.blockchainUpdater.processBlock(blockTriggersCompaction).explicitGet()
 
-        domain.history.height shouldBe MaxTransactionsPerBlockDiff * 2 + 2
-        domain.state.height shouldBe MaxTransactionsPerBlockDiff * 2 + 2
+        domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 2
 
-        val mastersBalanceAfterPayment1AndPayment2 = domain.state.portfolio(genesis.recipient).balance
+        val mastersBalanceAfterPayment1AndPayment2 = domain.blockchainUpdater.portfolio(genesis.recipient).balance
         mastersBalanceAfterPayment1AndPayment2 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee - payment2.amount - payment2.fee)
     }
   }
@@ -61,17 +59,16 @@ class BlockchainUpdaterInMemoryDiffTest
         firstBlocks.foreach(b => domain.blockchainUpdater.processBlock(b).explicitGet())
         domain.blockchainUpdater.processBlock(payment1Block).explicitGet()
         domain.blockchainUpdater.processBlock(emptyBlock).explicitGet()
-        val mastersBalanceAfterPayment1 = domain.state.portfolio(genesis.recipient).balance
+        val mastersBalanceAfterPayment1 = domain.blockchainUpdater.portfolio(genesis.recipient).balance
         mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee)
 
         // discard liquid block
         domain.blockchainUpdater.removeAfter(payment1Block.uniqueId)
         domain.blockchainUpdater.processBlock(blockTriggersCompaction).explicitGet()
 
-        domain.history.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
-        domain.state.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
+        domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
 
-        val mastersBalanceAfterPayment1AndPayment2 = domain.state.portfolio(genesis.recipient).balance
+        val mastersBalanceAfterPayment1AndPayment2 = domain.blockchainUpdater.portfolio(genesis.recipient).balance
         mastersBalanceAfterPayment1AndPayment2 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee - payment2.amount - payment2.fee)
     }
   }
