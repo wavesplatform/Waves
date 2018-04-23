@@ -5,7 +5,7 @@ import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.state2.Sponsorship
+import com.wavesplatform.state.Sponsorship
 import org.scalatest.CancelAfterFailure
 import scorex.account.PrivateKeyAccount
 import scorex.api.http.assets.SignedIssueRequest
