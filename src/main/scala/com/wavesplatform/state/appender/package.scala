@@ -1,6 +1,6 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
+import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSCalculator}
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
@@ -50,7 +50,7 @@ package object appender extends ScorexLogging {
   private[appender] def appendBlock(checkpoint: CheckpointService,
                                     blockchainUpdater: BlockchainUpdater with Blockchain,
                                     utxStorage: UtxPool,
-                                    pos: PoSSelector,
+                                    pos: PoSCalculator,
                                     time: Time,
                                     settings: WavesSettings)(block: Block): Either[ValidationError, Option[Int]] =
     for {
@@ -83,7 +83,7 @@ package object appender extends ScorexLogging {
       maybeDiscardedTxs.map(_ => baseHeight)
     }
 
-  private def blockConsensusValidation(blockchain: Blockchain, settings: WavesSettings, pos: PoSSelector, currentTs: Long, block: Block)(
+  private def blockConsensusValidation(blockchain: Blockchain, settings: WavesSettings, pos: PoSCalculator, currentTs: Long, block: Block)(
       genBalance: Int => Either[String, Long]): Either[ValidationError, Unit] = {
 
     val bcs       = settings.blockchainSettings
@@ -133,7 +133,7 @@ package object appender extends ScorexLogging {
           s"declared generation signature ${blockData.generationSignature.base58} does not match calculated generation signature ${ByteStr(calcGs).base58}")
       )
       effectiveBalance <- genBalance(height).left.map(GenericError(_))
-      hit    = pos.hit(height, blockGs)
+      hit    = pos.hit(blockGs)
       target = pos.target(parent.timestamp, parent.consensusData.baseTarget, blockTime, effectiveBalance)
       _ <- Either.cond(
         hit < target || (height == height1 && block.uniqueId == correctBlockId1) || (height == height2 && block.uniqueId == correctBlockId2),

@@ -125,12 +125,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
 
+    val pos = new PoSSelector(blockchainUpdater)
+
     val miner =
       if (settings.minerSettings.enable)
-        new MinerImpl(allChannels, blockchainUpdater, checkpointService, settings, time, utxStorage, wallet, minerScheduler, appenderScheduler)
+        new MinerImpl(allChannels, blockchainUpdater, checkpointService, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler)
       else Miner.Disabled
-
-    val pos = new PoSSelector(blockchainUpdater)
 
     val processBlock =
       BlockAppender(checkpointService, blockchainUpdater, time, utxStorage, pos, settings, allChannels, peerDatabase, miner, appenderScheduler) _

@@ -71,15 +71,11 @@ trait PoSCalculator {
 }
 
 class PoSSelector(val blockchain: Blockchain) extends PoSCalculator {
-  override def hit(generatorSignature: Array[Byte]): BigInt = throw new NotImplementedError()
+  override def hit(generatorSignature: Array[Byte]): BigInt =
+    if (fair(blockchain.height)) FairPoSCalculator.hit(generatorSignature) else NxtPoSCalculator.hit(generatorSignature)
 
-  override def time(hit: BigInt, bt: Long, balance: Long): Long = throw new NotImplementedError()
-
-  def hit(height: Int, generatorSignature: Array[Byte]): BigInt =
-    if (fair(height)) FairPoSCalculator.hit(generatorSignature) else NxtPoSCalculator.hit(generatorSignature)
-
-  def time(height: Int, hit: BigInt, bt: Long, balance: Long): Long =
-    if (fair(height)) FairPoSCalculator.time(hit, bt, balance) else NxtPoSCalculator.time(hit, bt, balance)
+  override def time(hit: BigInt, bt: Long, balance: Long): Long =
+    if (fair(blockchain.height)) FairPoSCalculator.time(hit, bt, balance) else NxtPoSCalculator.time(hit, bt, balance)
 
   private def fair(height: Int): Boolean = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.FairPOS.id)
 }

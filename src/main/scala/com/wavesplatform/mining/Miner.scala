@@ -1,7 +1,7 @@
 package com.wavesplatform.mining
 
 import cats.data.EitherT
-import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
+import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSCalculator}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{BlockStats, HistogramExt, Instrumented}
@@ -59,6 +59,7 @@ class MinerImpl(allChannels: ChannelGroup,
                 timeService: Time,
                 utx: UtxPool,
                 wallet: Wallet,
+                pos: PoSCalculator,
                 val minerScheduler: SchedulerService,
                 val appenderScheduler: SchedulerService)
     extends Miner
@@ -81,8 +82,6 @@ class MinerImpl(allChannels: ChannelGroup,
   private val microBlockBuildTimeStats = Kamon.metrics.histogram("forge-microblock-time", instrument.Time.Milliseconds)
 
   private val nextBlockGenerationTimes: MMap[Address, Long] = MMap.empty
-
-  private val pos = new PoSSelector(blockchainUpdater)
 
   @volatile private var debugState: MinerDebugInfo.State = MinerDebugInfo.Disabled
 
@@ -112,7 +111,7 @@ class MinerImpl(allChannels: ChannelGroup,
       val referencedBlockInfo       = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
       val pc                        = allChannels.size()
       lazy val currentTime          = timeService.correctedTime()
-      lazy val h                    = pos.hit(height, pos.generatorSignature(referencedBlockInfo.consensus.generationSignature.arr, account.publicKey))
+      lazy val h                    = pos.hit(pos.generatorSignature(referencedBlockInfo.consensus.generationSignature.arr, account.publicKey))
       lazy val t                    = pos.target(referencedBlockInfo.timestamp, referencedBlockInfo.consensus.baseTarget, currentTime, balance)
       measureSuccessful(
         blockBuildTimeStats,
@@ -247,9 +246,9 @@ class MinerImpl(allChannels: ChannelGroup,
     if (GeneratingBalanceProvider.validateHeight(blockchainUpdater, height, b)) {
       val cData        = block.consensusData
       val s            = pos.generatorSignature(cData.generationSignature.arr, account.publicKey)
-      val h            = pos.hit(height, s)
+      val h            = pos.hit(s)
       val t            = cData.baseTarget
-      val calculatedTs = pos.time(height, h, t, b) + block.timestamp
+      val calculatedTs = pos.time(h, t, b) + block.timestamp
       if (0 < calculatedTs && calculatedTs < Long.MaxValue) {
         Right((b, calculatedTs))
       } else
