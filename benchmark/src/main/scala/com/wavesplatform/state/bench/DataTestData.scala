@@ -1,4 +1,4 @@
-package com.wavesplatform.state2.bench
+package com.wavesplatform.state.bench
 
 import java.nio.charset.StandardCharsets
 

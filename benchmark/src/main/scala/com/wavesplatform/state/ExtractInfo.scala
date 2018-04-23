@@ -8,7 +8,7 @@ import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.LevelDBFactory
 import com.wavesplatform.lang.v1.traits.DataType
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state2.bench.DataTestData
+import com.wavesplatform.state.bench.DataTestData
 import org.iq80.leveldb.{DB, Options}
 import scodec.bits.{BitVector, ByteVector}
 import scorex.account.AddressScheme

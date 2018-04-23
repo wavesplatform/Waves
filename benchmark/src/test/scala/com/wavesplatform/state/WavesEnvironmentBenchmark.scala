@@ -1,4 +1,4 @@
-package com.wavesplatform.state2
+package com.wavesplatform.state
 
 import java.io.File
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
@@ -8,8 +8,8 @@ import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.LevelDBFactory
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state2.WavesEnvironmentBenchmark._
-import com.wavesplatform.state2.bench.DataTestData
+import com.wavesplatform.state.WavesEnvironmentBenchmark._
+import com.wavesplatform.state.bench.DataTestData
 import monix.eval.Coeval
 import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations._
