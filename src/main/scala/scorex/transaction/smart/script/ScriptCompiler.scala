@@ -38,6 +38,10 @@ object ScriptCompiler {
       }
   }
 
+  def estimate(script: Script): Either[String, Long] = script match {
+    case ScriptV1(expr) => ScriptComplexityCalculator(functionCosts, expr)
+  }
+
   private def extractVersion(directives: List[Directive]): Either[String, ScriptVersion] = {
     directives
       .find(_.key == DirectiveKey.LANGUAGE_VERSION)

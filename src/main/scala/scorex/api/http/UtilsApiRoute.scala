@@ -9,7 +9,7 @@ import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.Json
 import scorex.crypto.encode.Base58
-import scorex.transaction.smart.script.ScriptCompiler
+import scorex.transaction.smart.script.{Script, ScriptCompiler}
 import scorex.utils.Time
 
 @Path("/utils")
@@ -42,7 +42,7 @@ case class UtilsApiRoute(timeService: Time, feesSettings: FeesSettings, settings
     (post & entity(as[String])) { code =>
       complete(
         ScriptCompiler(code).fold(
-          x => Json.obj("error" -> x), {
+          e => Json.obj("error" -> e), {
             case (script, complexity) =>
               val extraFee = feesSettings.smartAccount.baseExtraCharge + feesSettings.smartAccount.extraChargePerOp * complexity
               Json.obj(
@@ -52,6 +52,37 @@ case class UtilsApiRoute(timeService: Time, feesSettings: FeesSettings, settings
               )
           }
         )
+      )
+    }
+  }
+
+  @Path("/script/estimate")
+  @ApiOperation(value = "Compile", notes = "Compiles string code to base58 script representation", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "code", required = true, dataType = "string", paramType = "body", value = "A compiled Base58 code")
+    ))
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "base58 or error")
+    ))
+  def estimate: Route = path("script" / "estimate") {
+    (post & entity(as[String])) { code =>
+      complete(
+        Script
+          .fromBase58String(code)
+          .left
+          .map(_.m)
+          .flatMap(ScriptCompiler.estimate)
+          .fold(
+            e => Json.obj("error" -> e), { complexity =>
+              val extraFee = feesSettings.smartAccount.baseExtraCharge + feesSettings.smartAccount.extraChargePerOp * complexity
+              Json.obj(
+                "complexity" -> complexity,
+                "extraFee"   -> extraFee
+              )
+            }
+          )
       )
     }
   }
