@@ -1,8 +1,8 @@
-package com.wavesplatform.state2.diffs
+package com.wavesplatform.state.diffs
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.encode.Base58
