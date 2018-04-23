@@ -44,6 +44,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/estimate"), "ENDztao2K4J3jX4YPmCkBynkAeuK7ZXgDLF22c9FPhC74jDE3DQKMfT") ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "script").as[String] shouldBe "ENDztao2K4J3jX4YPmCkBynkAeuK7ZXgDLF22c9FPhC74jDE3DQKMfT"
+      (json \ "scriptText").as[String] shouldBe "FUNCTION_CALL(FunctionHeader(==,List(LONG, LONG)),List(CONST_LONG(1), CONST_LONG(2)),BOOLEAN)"
       (json \ "complexity").as[Long] shouldBe 3
       (json \ "extraFee").as[Long] shouldBe 1006
     }

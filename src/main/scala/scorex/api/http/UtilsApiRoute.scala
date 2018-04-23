@@ -73,15 +73,19 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings, feesSetti
           .fromBase58String(code)
           .left
           .map(_.m)
-          .flatMap(ScriptCompiler.estimate)
+          .flatMap { script =>
+            ScriptCompiler.estimate(script).map((script, _))
+          }
           .fold(
-            e => Json.obj("error" -> e), { complexity =>
-              val extraFee = feesSettings.smartAccount.baseExtraCharge + feesSettings.smartAccount.extraChargePerOp * complexity
-              Json.obj(
-                "script"     -> code,
-                "complexity" -> complexity,
-                "extraFee"   -> extraFee.toLong
-              )
+            e => Json.obj("error" -> e), {
+              case (script, complexity) =>
+                val extraFee = feesSettings.smartAccount.baseExtraCharge + feesSettings.smartAccount.extraChargePerOp * complexity
+                Json.obj(
+                  "script"     -> code,
+                  "scriptText" -> script.text,
+                  "complexity" -> complexity,
+                  "extraFee"   -> extraFee.toLong
+                )
             }
           )
       )
