@@ -3,8 +3,8 @@ package com.wavesplatform.history
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
-import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs._
+import com.wavesplatform.state._
+import com.wavesplatform.state.diffs._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
