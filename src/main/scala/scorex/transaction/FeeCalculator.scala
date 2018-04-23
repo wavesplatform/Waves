@@ -32,6 +32,7 @@ class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
     val emptyBlockchain = new Blockchain {
       override def height: Int                                                                                             = throw error
       override def portfolio(a: Address): Portfolio                                                                        = throw error
+      override def balance(address: Address, assetId: Option[AssetId]): Long                                               = throw error
       override def transactionInfo(id: AssetId): Option[(Int, Transaction)]                                                = throw error
       override def transactionHeight(id: AssetId): Option[Int]                                                             = throw error
       override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = throw error

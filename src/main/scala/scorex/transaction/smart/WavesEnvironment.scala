@@ -45,7 +45,7 @@ class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], blo
     (for {
       aoa     <- AddressOrAlias.fromBytes(bytes = addressOrAlias, position = 0)
       address <- blockchain.resolveAliasEi(aoa._1)
-      balance = blockchain.portfolio(address).balanceOf(maybeAssetId.map(ByteStr.apply))
+      balance = blockchain.balance(address, maybeAssetId.map(ByteStr(_)))
     } yield balance).left.map(_.toString)
   }
   override def transactionHeightById(id: Array[Byte]): Option[Int] =

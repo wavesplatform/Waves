@@ -506,6 +506,13 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     case Some(ng) => ng.bestLiquidDiff.transactions.get(id).map(_._1)
     case None     => blockchain.transactionHeight(id)
   }
+
+  override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = ngState match {
+    case Some(ng) =>
+      blockchain.balance(address, mayBeAssetId) + ng.bestLiquidDiff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(mayBeAssetId)
+    case None =>
+      blockchain.balance(address, mayBeAssetId)
+  }
 }
 
 object BlockchainUpdaterImpl extends ScorexLogging {

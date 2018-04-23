@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.state._
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}
-import scorex.transaction.Transaction
+import scorex.transaction.{AssetId, Transaction}
 import scorex.transaction.Transaction.Type
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
 import scorex.transaction.lease.LeaseTransaction
@@ -15,6 +15,9 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
   private def diff = maybeDiff.getOrElse(Diff.empty)
 
   override def portfolio(a: Address): Portfolio = inner.portfolio(a).combine(diff.portfolios.getOrElse(a, Portfolio.empty))
+
+  override def balance(address: Address, assetId: Option[AssetId]): Long =
+    inner.balance(address, assetId) + diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
 
   override def assetDescription(id: ByteStr): Option[AssetDescription] =
     inner.assetDescription(id) match {

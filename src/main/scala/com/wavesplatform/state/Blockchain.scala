@@ -3,9 +3,9 @@ package com.wavesplatform.state
 import com.wavesplatform.state.reader.LeaseDetails
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}
-import scorex.transaction.Transaction
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.script.Script
+import scorex.transaction.{AssetId, Transaction}
 
 trait Blockchain {
   def height: Int
@@ -58,6 +58,8 @@ trait Blockchain {
 
   def accountData(acc: Address): AccountDataInfo
   def accountData(acc: Address, key: String): Option[DataEntry[_]]
+
+  def balance(address: Address, mayBeAssetId: Option[AssetId]): Long
 
   def assetDistribution(height: Int, assetId: ByteStr): Map[Address, Long]
   def wavesDistribution(height: Int): Map[Address, Long]

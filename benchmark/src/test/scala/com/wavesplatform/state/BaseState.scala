@@ -19,16 +19,21 @@ import scorex.transaction.{GenesisTransaction, Transaction}
 trait BaseState extends TransactionGenBase {
   import BaseState._
 
-  private val fs: FunctionalitySettings = updateFunctionalitySettings(FunctionalitySettings.TESTNET)
-  private var db: DB                    = _
+  private val fsSettings: FunctionalitySettings = updateFunctionalitySettings(FunctionalitySettings.TESTNET)
+  private val db: DB = {
+    val dir     = Files.createTempDirectory("state-synthetic").toAbsolutePath.toString
+    val options = new Options()
+    options.createIfMissing(true)
+    LevelDBFactory.factory.open(new File(dir), options)
+  }
 
-  private var _state: LevelDBWriter           = _
+  val state: LevelDBWriter = new LevelDBWriter(db, fsSettings)
+
   private var _richAccount: PrivateKeyAccount = _
-  private var _lastBlock: Block               = _
+  def richAccount: PrivateKeyAccount          = _richAccount
 
-  def state: LevelDBWriter           = _state
-  def richAccount: PrivateKeyAccount = _richAccount
-  def lastBlock: Block               = _lastBlock
+  private var _lastBlock: Block = _
+  def lastBlock: Block          = _lastBlock
 
   protected def updateFunctionalitySettings(base: FunctionalitySettings): FunctionalitySettings = base
 
@@ -60,7 +65,7 @@ trait BaseState extends TransactionGenBase {
   )
 
   private def append(prev: Option[Block], next: Block): Unit = {
-    val preconditionDiff = BlockDiffer.fromBlock(fs, state, prev, next).explicitGet()
+    val preconditionDiff = BlockDiffer.fromBlock(fsSettings, state, prev, next).explicitGet()
     state.append(preconditionDiff, next)
   }
 
@@ -76,15 +81,9 @@ trait BaseState extends TransactionGenBase {
 
   @Setup
   def init(): Unit = {
-    val dir     = Files.createTempDirectory("state-synthetic").toAbsolutePath.toString
-    val options = new Options()
-    options.createIfMissing(true)
-    db = LevelDBFactory.factory.open(new File(dir), options)
-
     val (richAccount, genesisBlock) = initGen.sample.get
     _richAccount = richAccount
 
-    _state = new LevelDBWriter(db, fs)
     append(None, genesisBlock)
     _lastBlock = genesisBlock
   }

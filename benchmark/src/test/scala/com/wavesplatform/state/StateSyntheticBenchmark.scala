@@ -32,7 +32,7 @@ class StateSyntheticBenchmark {
 
 object StateSyntheticBenchmark {
 
-  @State(Scope.Thread)
+  @State(Scope.Benchmark)
   class St extends BaseState {
     protected override def txGenP(sender: PrivateKeyAccount, ts: Long): Gen[Transaction] =
       for {
@@ -41,7 +41,7 @@ object StateSyntheticBenchmark {
       } yield TransferTransaction.create(None, sender, recipient, amount, ts, None, 100000, Array.emptyByteArray).right.get
   }
 
-  @State(Scope.Thread)
+  @State(Scope.Benchmark)
   class SmartSt extends BaseState {
 
     override protected def updateFunctionalitySettings(base: FunctionalitySettings): FunctionalitySettings = {
