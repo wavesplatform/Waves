@@ -25,7 +25,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings, feesSetti
   }
 
   override val route: Route = pathPrefix("utils") {
-    compile ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign
+    compile ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign
   }
 
   @Path("/script/compile")
@@ -44,11 +44,11 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings, feesSetti
         ScriptCompiler(code).fold(
           e => Json.obj("error" -> e), {
             case (script, complexity) =>
-              val extraFee = (feesSettings.smartAccount.baseExtraCharge + feesSettings.smartAccount.extraChargePerOp * complexity).toLong
+              val extraFee = feesSettings.smartAccount.baseExtraCharge + feesSettings.smartAccount.extraChargePerOp * complexity
               Json.obj(
                 "script"     -> script.bytes().base58,
                 "complexity" -> complexity,
-                "extraFee"   -> extraFee
+                "extraFee"   -> extraFee.toLong
               )
           }
         )
@@ -57,7 +57,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings, feesSetti
   }
 
   @Path("/script/estimate")
-  @ApiOperation(value = "Compile", notes = "Compiles string code to base58 script representation", httpMethod = "POST")
+  @ApiOperation(value = "Estimate", notes = "Estimates compiled code in Base58 representation", httpMethod = "POST")
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "code", required = true, dataType = "string", paramType = "body", value = "A compiled Base58 code")
@@ -80,7 +80,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings, feesSetti
               Json.obj(
                 "script"     -> code,
                 "complexity" -> complexity,
-                "extraFee"   -> extraFee
+                "extraFee"   -> extraFee.toLong
               )
             }
           )

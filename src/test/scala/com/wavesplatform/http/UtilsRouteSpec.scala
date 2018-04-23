@@ -40,6 +40,15 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
   }
 
+  routePath("/script/estimate") in {
+    Post(routePath("/script/estimate"), "ENDztao2K4J3jX4YPmCkBynkAeuK7ZXgDLF22c9FPhC74jDE3DQKMfT") ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "script").as[String] shouldBe "ENDztao2K4J3jX4YPmCkBynkAeuK7ZXgDLF22c9FPhC74jDE3DQKMfT"
+      (json \ "complexity").as[Long] shouldBe 3
+      (json \ "extraFee").as[Long] shouldBe 1006
+    }
+  }
+
   routePath("/seed") in {
     Get(routePath("/seed")) ~> route ~> check {
       val seed = Base58.decode((responseAs[JsValue] \ "seed").as[String])
