@@ -1,6 +1,6 @@
 package scorex.transaction.assets.exchange
 
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{JsObject, Json}
 import scorex.transaction._

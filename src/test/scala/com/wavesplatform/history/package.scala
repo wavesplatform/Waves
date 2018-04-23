@@ -3,7 +3,7 @@ package com.wavesplatform
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData

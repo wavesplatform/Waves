@@ -5,7 +5,7 @@ import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{NodeConfigs, TransferSending, WaitForHeight2}
-import com.wavesplatform.state2.{BooleanDataEntry, LongDataEntry}
+import com.wavesplatform.state.{BooleanDataEntry, LongDataEntry}
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.{FreeSpec, Matchers}
 

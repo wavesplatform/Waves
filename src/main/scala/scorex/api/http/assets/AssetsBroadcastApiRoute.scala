@@ -4,7 +4,7 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.network._
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._

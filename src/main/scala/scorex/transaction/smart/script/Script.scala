@@ -1,7 +1,7 @@
 package scorex.transaction.smart.script
 
 import com.wavesplatform.lang.Versioned
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.ScriptParseError

@@ -3,10 +3,11 @@ package scorex.transaction
 import com.wavesplatform.lang.v1.ctx.Context
 import com.wavesplatform.lang.v1.{FunctionHeader, ScriptComplexityCalculator}
 import com.wavesplatform.settings.FeesSettings
-import com.wavesplatform.state2.reader.{LeaseDetails, SnapshotStateReader}
-import com.wavesplatform.state2.{AccountDataInfo, AssetDescription, BalanceSnapshot, ByteStr, DataEntry, Portfolio, VolumeAndFee}
+import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.{AccountDataInfo, AssetDescription, BalanceSnapshot, ByteStr, DataEntry, Portfolio, VolumeAndFee, _}
 import monix.eval.Coeval
 import scorex.account.{Address, Alias}
+import scorex.block.{Block, BlockHeader}
 import scorex.transaction.FeeCalculator._
 import scorex.transaction.Transaction.Type
 import scorex.transaction.ValidationError.{GenericError, InsufficientFee}
@@ -21,14 +22,14 @@ import scala.util.Failure
 /**
   * Class to check, that transaction contains enough fee to put it to UTX pool
   */
-class FeeCalculator(settings: FeesSettings, state: SnapshotStateReader) {
+class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
 
   private val Kb = 1024
 
   private val functionCosts: Map[FunctionHeader, Long] = {
     val error = new IllegalStateException("This context has no data")
     val fail  = Coeval.fromTry(Failure(error))
-    val emptyStateReader = new SnapshotStateReader {
+    val emptyBlockchain = new Blockchain {
       override def height: Int                                                                                             = throw error
       override def portfolio(a: Address): Portfolio                                                                        = throw error
       override def balance(address: Address, assetId: Option[AssetId]): Long                                               = throw error
@@ -48,8 +49,24 @@ class FeeCalculator(settings: FeesSettings, state: SnapshotStateReader) {
       override def wavesDistribution(height: Int): Map[Address, Long]                                                      = throw error
       override def allActiveLeases: Set[LeaseTransaction]                                                                  = throw error
       override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]                 = throw error
+      override def score: BigInt                                                                                           = throw error
+      override def scoreOf(blockId: AssetId): Option[BigInt]                                                               = throw error
+      override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)]                                             = throw error
+      override def blockHeaderAndSize(blockId: AssetId): Option[(BlockHeader, Int)]                                        = throw error
+      override def lastBlock: Option[Block]                                                                                = throw error
+      override def blockBytes(height: Int): Option[Array[Type]]                                                            = throw error
+      override def blockBytes(blockId: AssetId): Option[Array[Type]]                                                       = throw error
+      override def heightOf(blockId: AssetId): Option[Int]                                                                 = throw error
+      override def lastBlockIds(howMany: Int): Seq[AssetId]                                                                = throw error
+      override def blockIdsAfter(parentSignature: AssetId, howMany: Int): Option[Seq[AssetId]]                             = throw error
+      override def parent(block: Block, back: Int): Option[Block]                                                          = throw error
+      override def approvedFeatures: Map[Short, Int]                                                                       = throw error
+      override def activatedFeatures: Map[Short, Int]                                                                      = throw error
+      override def featureVotes(height: Int): Map[Short, Int]                                                              = throw error
+      override def append(diff: Diff, block: Block): Unit                                                                  = throw error
+      override def rollbackTo(targetBlockId: AssetId): Seq[Block]                                                          = throw error
     }
-    Context.functionCosts(BlockchainContext.build(nByte = 0, fail, fail, emptyStateReader).functions.values)
+    Context.functionCosts(BlockchainContext.build(nByte = 0, fail, fail, emptyBlockchain).functions.values)
   }
 
   private val map: Map[String, Long] = {
@@ -70,7 +87,7 @@ class FeeCalculator(settings: FeesSettings, state: SnapshotStateReader) {
     for {
       txMinBaseFee <- Either.cond(map.contains(txAssetFeeKey), map(txAssetFeeKey), GenericError(s"Minimum fee is not defined for $txAssetFeeKey"))
       script <- Right(tx match {
-        case tx: Transaction with Authorized => state.accountScript(tx.sender)
+        case tx: Transaction with Authorized => blockchain.accountScript(tx.sender)
         case _                               => None
       })
       _ <- Either.cond(script.isEmpty || txFeeAssetId.isEmpty,
@@ -119,7 +136,9 @@ class FeeCalculator(settings: FeesSettings, state: SnapshotStateReader) {
 }
 
 object FeeCalculator {
+
   private case class TransactionAssetFee(txType: Int, assetId: Option[AssetId]) {
     val key = s"TransactionAssetFee($txType, ${assetId.map(_.base58)})"
   }
+
 }

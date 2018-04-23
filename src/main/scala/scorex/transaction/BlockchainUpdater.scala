@@ -1,10 +1,9 @@
 package scorex.transaction
 
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import monix.reactive.Observable
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
-import scorex.transaction.History.BlockchainScore
 
 trait BlockchainUpdater {
   def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]]
@@ -18,4 +17,4 @@ trait BlockchainUpdater {
   def shutdown(): Unit
 }
 
-case class LastBlockInfo(id: BlockId, height: Int, score: BlockchainScore, ready: Boolean)
+case class LastBlockInfo(id: BlockId, height: Int, score: BigInt, ready: Boolean)

@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.google.common.base.Charsets
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import scorex.account._
 import scorex.api.http.DataRequest
 import scorex.api.http.alias.CreateAliasRequest

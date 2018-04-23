@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
 import scorex.transaction.ValidationError
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -11,7 +11,7 @@ import scorex.wallet.Wallet
 
 trait ExchangeTransactionCreator extends ScorexLogging {
   val functionalitySettings: FunctionalitySettings
-  val storedState: SnapshotStateReader
+  val blockchain: Blockchain
   val wallet: Wallet
   val settings: MatcherSettings
   val utx: UtxPool

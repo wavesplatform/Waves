@@ -6,7 +6,7 @@ import com.typesafe.config.ConfigFactory.{defaultApplication, defaultReference}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.settings._
-import com.wavesplatform.state2.{ByteStr, EitherExt2}
+import com.wavesplatform.state.{ByteStr, EitherExt2}
 import net.ceedubs.ficus.Ficus._
 import scorex.account.PublicKeyAccount
 import scorex.block.Block
@@ -22,11 +22,11 @@ object BaseTargetChecker {
       .withFallback(defaultApplication())
       .withFallback(defaultReference())
       .resolve()
-    val settings        = WavesSettings.fromConfig(sharedConfig)
-    val fs              = settings.blockchainSettings.functionalitySettings
-    val genesisBlock    = Block.genesis(settings.blockchainSettings.genesisSettings).explicitGet()
-    val db              = openDB("/tmp/tmp-db", 1024)
-    val (fp, state, bu) = StorageFactory(settings, db, NTP)
+    val settings     = WavesSettings.fromConfig(sharedConfig)
+    val fs           = settings.blockchainSettings.functionalitySettings
+    val genesisBlock = Block.genesis(settings.blockchainSettings.genesisSettings).explicitGet()
+    val db           = openDB("/tmp/tmp-db", 1024)
+    val bu           = StorageFactory(settings, db, NTP)
     bu.processBlock(genesisBlock)
 
     println(s"Genesis TS = ${Instant.ofEpochMilli(genesisBlock.timestamp)}")
@@ -35,7 +35,7 @@ object BaseTargetChecker {
       case cfg if cfg.as[Boolean]("waves.miner.enable") =>
         val publicKey = PublicKeyAccount(cfg.as[ByteStr]("public-key").arr)
         val address   = publicKey.toAddress
-        PoSCalc.nextBlockGenerationTime(1, state, fs, genesisBlock, publicKey, fp) match {
+        PoSCalc.nextBlockGenerationTime(1, bu, fs, genesisBlock, publicKey) match {
           case Right((_, ts)) => f"$address: ${(ts - startTs) * 1e-3}%10.3f s"
           case _              => s"$address: n/a"
         }

@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import monix.eval.Coeval
 import scorex.serialization.{BytesSerializable, JsonSerializable}
 

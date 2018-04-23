@@ -20,7 +20,7 @@ import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.settings._
-import com.wavesplatform.state2.EitherExt2
+import com.wavesplatform.state.EitherExt2
 import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._

@@ -1,7 +1,7 @@
 package scorex.api.http
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import play.api.libs.json._
 import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.transaction.{Transaction, ValidationError}

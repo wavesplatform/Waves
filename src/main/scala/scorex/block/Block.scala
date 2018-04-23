@@ -6,7 +6,7 @@ import cats._
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.GenesisSettings
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}

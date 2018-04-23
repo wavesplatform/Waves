@@ -8,13 +8,11 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings, loadConfig}
-import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{BlockchainUpdaterImpl, StateWriter}
-import scorex.transaction.History
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl}
 import scorex.utils.{ScorexLogging, TimeImpl}
 
 trait WithState extends ScorexLogging {
-  private def withState[A](fs: FunctionalitySettings)(f: (SnapshotStateReader with History with StateWriter) => A): A = {
+  private def withState[A](fs: FunctionalitySettings)(f: Blockchain => A): A = {
     val path = Files.createTempDirectory("leveldb-test")
     val db   = openDB(path.toAbsolutePath.toString, 2048000)
     try f(new LevelDBWriter(db, fs))
@@ -39,14 +37,14 @@ trait WithState extends ScorexLogging {
     }
   }
 
-  def withStateAndHistory(fs: FunctionalitySettings)(test: StateWriter with SnapshotStateReader with History => Any): Unit = withState(fs)(test)
+  def withStateAndHistory(fs: FunctionalitySettings)(test: Blockchain => Any): Unit = withState(fs)(test)
 
   def withDomain[A](settings: WavesSettings = WavesSettings.fromConfig(loadConfig(ConfigFactory.load())))(test: Domain => A): A = {
     val time = new TimeImpl
 
-    try withState(settings.blockchainSettings.functionalitySettings) { stateWriter =>
-      val bcu = new BlockchainUpdaterImpl(stateWriter, settings, time, stateWriter)
-      try test(Domain(bcu.historyReader, bcu.stateReader, bcu))
+    try withState(settings.blockchainSettings.functionalitySettings) { blockchain =>
+      val bcu = new BlockchainUpdaterImpl(blockchain, settings, time)
+      try test(Domain(bcu))
       finally bcu.shutdown()
     } finally {
       time.close()

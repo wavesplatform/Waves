@@ -2,7 +2,7 @@ package scorex.transaction.assets.exchange
 
 import com.google.common.primitives.Longs
 import com.wavesplatform.crypto
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.{Coeval, Task}
 import play.api.libs.json.{JsObject, Json}

@@ -1,7 +1,7 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs.ENOUGH_AMT
+import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform._
 import org.scalacheck.Gen
 import org.scalatest._

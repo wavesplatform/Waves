@@ -1,7 +1,7 @@
 package scorex.transaction.assets.exchange
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json._

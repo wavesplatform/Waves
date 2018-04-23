@@ -2,8 +2,8 @@ package scorex.transaction
 
 import com.wavesplatform.history._
 import com.wavesplatform.mining.TxNumberEstimator
-import com.wavesplatform.state2.diffs._
-import com.wavesplatform.state2.{Diff, NgState}
+import com.wavesplatform.state.diffs._
+import com.wavesplatform.state.{Diff, NgState}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks

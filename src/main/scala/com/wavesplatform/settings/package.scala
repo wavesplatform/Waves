@@ -3,7 +3,7 @@ package com.wavesplatform
 import java.io.File
 
 import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigValueType}
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 
