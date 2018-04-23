@@ -4,7 +4,6 @@ import java.util
 
 import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
-import com.wavesplatform.state.reader.SnapshotStateReader
 import com.wavesplatform.state.{
   Sponsorship,
   SponsorshipValue,
@@ -23,7 +22,7 @@ import scorex.block.Block
 import scorex.transaction.Transaction
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
 import scorex.transaction.smart.script.Script
-import scorex.transaction.{AssetId, History, Transaction}
+import scorex.transaction.{AssetId, Transaction}
 
 import scala.collection.JavaConverters._
 

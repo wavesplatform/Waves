@@ -376,6 +376,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
   }
 
   override def assetDescription(id: AssetId): Option[AssetDescription] = ngState.fold(blockchain.assetDescription(id)) { ng =>
+    val diff = ng.bestLiquidDiff
     blockchain.assetDescription(id) match {
       case Some(ad) =>
         ng.bestLiquidDiff.issuedAssets
@@ -388,13 +389,28 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
             )
           }
           .orElse(Some(ad))
+          .map { ad =>
+            diff.sponsorship.get(id).fold(ad) {
+              case SponsorshipValue(sponsorship) =>
+                ad.copy(sponsorship = sponsorship)
+              case SponsorshipNoInfo =>
+                ad
+            }
+          }
       case None =>
+        val sponsorship = diff.sponsorship.get(id).fold(0L) {
+          case SponsorshipValue(sponsorship) =>
+            sponsorship
+          case SponsorshipNoInfo =>
+            0L
+        }
         ng.bestLiquidDiff.transactions
           .get(id)
           .collectFirst {
-            case (_, it: IssueTransaction, _) => AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, None)
+            case (_, it: IssueTransaction, _) =>
+              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, None, sponsorship)
             case (_, it: SmartIssueTransaction, _) =>
-              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, it.script)
+              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, it.script, sponsorship)
           }
           .map(z =>
             ng.bestLiquidDiff.issuedAssets.get(id).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = r.script)))
