@@ -16,11 +16,12 @@ import scorex.account.{Address, Alias}
 import scorex.block.Block.BlockId
 import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.transaction.Transaction.Type
-import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import scorex.transaction._
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.script.Script
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.validation.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import scorex.utils.{ScorexLogging, Time}
 
 class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, time: Time)

@@ -10,6 +10,7 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
 import scorex.transaction._
+import scorex.transaction.validation.ValidationError
 
 import scala.util.{Failure, Success, Try}
 
@@ -22,7 +23,7 @@ case class VersionedTransferTransaction private (version: Byte,
                                                  fee: Long,
                                                  attachment: Array[Byte],
                                                  proofs: Proofs)
-  extends ProvenTransaction
+    extends ProvenTransaction
     with FastHashId {
 
   override val builder: TransactionParser        = VersionedTransferTransaction
@@ -78,14 +79,14 @@ object VersionedTransferTransaction extends TransactionParserFor[VersionedTransf
         (attachment, attachEnd)   = Deser.parseArraySize(bytes, recipientEnd)
         proofs <- Proofs.fromBytes(bytes.drop(attachEnd))
         tt <- VersionedTransferTransaction.create(version,
-          assetIdOpt.map(ByteStr(_)),
-          sender,
-          recipient,
-          amount,
-          timestamp,
-          feeAmount,
-          attachment,
-          proofs)
+                                                  assetIdOpt.map(ByteStr(_)),
+                                                  sender,
+                                                  recipient,
+                                                  amount,
+                                                  timestamp,
+                                                  feeAmount,
+                                                  attachment,
+                                                  proofs)
       } yield tt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 

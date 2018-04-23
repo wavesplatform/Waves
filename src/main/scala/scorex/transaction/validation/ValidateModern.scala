@@ -1,7 +1,7 @@
 package scorex.transaction.validation
 
 import cats.implicits._
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import scorex.account.{AddressOrAlias, PublicKeyAccount}
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets.{MassTransferTransaction, SmartIssueTransaction, VersionedTransferTransaction}
@@ -76,11 +76,12 @@ object ValidateModern {
                      attachment: Array[Byte],
                      proofs: Proofs): Validated[MassTransferTransaction] = {
     (validateVersion(MassTransferTransaction.supportedVersions, version),
-      validateTransfers(transfers),
-      validateTimestamp(timestamp),
-      validateFee(feeAmount),
-      validateAttachment(attachment))
-      .mapN { case (ver, trs, ts, fee, att) =>
+     validateTransfers(transfers),
+     validateTimestamp(timestamp),
+     validateFee(feeAmount),
+     validateAttachment(attachment))
+      .mapN {
+        case (ver, trs, ts, fee, att) =>
           MassTransferTransaction(ver, assetId, sender, trs, ts, fee, att, proofs)
       }
   }
@@ -146,15 +147,8 @@ object ValidateModern {
 //      }
 //  }
 
-  def header(supportedVersions: Set[Byte])
-            (`type`: Byte,
-             version: Byte,
-             sender: PublicKeyAccount,
-             fee: Long,
-             timestamp: Long): Validated[TxHeader] = {
-    (validateVersion(supportedVersions, version),
-      validateFee(fee),
-      validateTimestamp(timestamp))
+  def header(supportedVersions: Set[Byte])(`type`: Byte, version: Byte, sender: PublicKeyAccount, fee: Long, timestamp: Long): Validated[TxHeader] = {
+    (validateVersion(supportedVersions, version), validateFee(fee), validateTimestamp(timestamp))
       .mapN {
         case (ver, f, ts) => TxHeader(`type`, ver, sender, f, ts)
       }
@@ -177,11 +171,9 @@ object ValidateModern {
               decimals: Byte,
               reissuable: Boolean,
               script: Option[Script]): Validated[IssuePayload] = {
-    (validateName(name),
-      validateDescription(description),
-      validateAmount(quantity, name.toString),
-      validateDecimals(decimals))
-      .mapN { case (n, d, a, dec) =>
+    (validateName(name), validateDescription(description), validateAmount(quantity, name.toString), validateDecimals(decimals))
+      .mapN {
+        case (n, d, a, dec) =>
           IssuePayload(chainId, n, d, a, dec, reissuable, script)
       }
   }
@@ -197,13 +189,14 @@ object ValidateModern {
 
   def transferPL(recipient: AddressOrAlias,
                  assetId: Option[AssetId],
+                 feeAssetId: Option[AssetId],
                  amount: Long,
                  attachment: Array[Byte]): Validated[TransferPayload] = {
     val assetName = assetId.map(_.base58).getOrElse("waves")
-    (validateAmount(amount, assetName),
-      validateAttachment(attachment))
-      .mapN { case (am, at) =>
-          TransferPayload(recipient, assetId, am, at)
+    (validateAmount(amount, assetName), validateAttachment(attachment))
+      .mapN {
+        case (am, at) =>
+          TransferPayload(recipient, assetId, feeAssetId, am, at)
       }
   }
 }

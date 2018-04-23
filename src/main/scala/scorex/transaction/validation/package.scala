@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
-import scorex.transaction.validation.ValidationError.GenericError
+import scorex.transaction.validation.ValidationError._
 import cats.implicits._
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 
@@ -33,7 +33,7 @@ package object validation {
       .condNel(
         fee > 0,
         fee,
-        ValidationError.InsufficientFee
+        ValidationError.InsufficientFee()
       )
   }
 

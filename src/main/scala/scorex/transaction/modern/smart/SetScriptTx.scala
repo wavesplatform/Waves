@@ -12,8 +12,7 @@ import scorex.transaction.{AssetId, Proofs, TransactionParser}
 
 import scala.util.{Failure, Success, Try}
 
-final case class SetScriptPayload(chainId: Byte,
-                                  script: Option[Script]) extends TxData {
+final case class SetScriptPayload(chainId: Byte, script: Option[Script]) extends TxData {
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     Bytes.concat(
       Array(chainId),
@@ -25,9 +24,7 @@ final case class SetScriptPayload(chainId: Byte,
   }
 }
 
-final case class SetScriptTx(header: TxHeader,
-                  payload: SetScriptPayload,
-                  proofs: Proofs) extends ModernTransaction(SetScriptTx) {
+final case class SetScriptTx(header: TxHeader, payload: SetScriptPayload, proofs: Proofs) extends ModernTransaction(SetScriptTx) {
   override def assetFee: (Option[AssetId], Long) = (None, header.fee)
 }
 

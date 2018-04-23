@@ -1,7 +1,7 @@
 package scorex.transaction.modern.lease
 
 import com.wavesplatform.crypto
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.transaction._
@@ -17,9 +17,7 @@ final case class LeaseCancelPayload(leaseId: ByteStr) extends TxData {
     Coeval.evalOnce(Json.obj("leaseId" -> leaseId.base58))
 }
 
-final case class LeaseCancelTx(header: TxHeader,
-                               payload: LeaseCancelPayload,
-                               proofs: Proofs) extends ModernTransaction(LeaseCancelTx) {
+final case class LeaseCancelTx(header: TxHeader, payload: LeaseCancelPayload, proofs: Proofs) extends ModernTransaction(LeaseCancelTx) {
   override val assetFee: (Option[AssetId], Long) = (None, header.fee)
 }
 

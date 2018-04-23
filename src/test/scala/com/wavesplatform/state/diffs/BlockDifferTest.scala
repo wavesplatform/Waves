@@ -11,7 +11,8 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.{GenesisTransaction, ValidationError}
+import scorex.transaction.GenesisTransaction
+import scorex.transaction.validation.ValidationError
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with WithState {
 

@@ -10,9 +10,10 @@ import play.api.libs.json.Json
 import scorex.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
-import scorex.transaction.ValidationError.{GenericError, UnsupportedVersion}
 import scorex.transaction._
 import scorex.transaction.smart.script.{Script, ScriptReader}
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.validation.ValidationError.{GenericError, UnsupportedVersion}
 
 import scala.util.Try
 
@@ -28,7 +29,7 @@ case class SmartIssueTransaction private (version: Byte,
                                           fee: Long,
                                           timestamp: Long,
                                           proofs: Proofs)
-  extends ProvenTransaction
+    extends ProvenTransaction
     with FastHashId
     with ChainSpecific {
 

@@ -188,7 +188,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
           recipient = receiverPrivateKey.toAddress,
           amount = 1 * Waves,
           timestamp = System.currentTimeMillis(),
-          fee = Waves / 3,
+          feeAmount = Waves / 3,
           attachment = Array.emptyByteArray,
           proofs = Proofs(Seq.empty)
         )

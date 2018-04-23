@@ -5,15 +5,13 @@ import java.nio.charset.StandardCharsets
 import com.google.common.primitives.{Bytes, Longs}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.PublicKeyAccount
-import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
-import scorex.transaction.{AssetId, Proofs, TransactionParser}
 import scorex.transaction.modern.{ModernTransaction, TxData, TxHeader}
 import scorex.transaction.smart.script.{Script, ScriptReader}
 import scorex.transaction.validation._
+import scorex.transaction.{AssetId, Proofs, TransactionParser}
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 final case class IssuePayload(chainId: Byte,
                               name: Array[Byte],
@@ -21,7 +19,8 @@ final case class IssuePayload(chainId: Byte,
                               quantity: Long,
                               decimals: Byte,
                               reissuable: Boolean,
-                              script: Option[Script]) extends TxData {
+                              script: Option[Script])
+    extends TxData {
 
   override def bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     Bytes.concat(
@@ -47,10 +46,10 @@ final case class IssuePayload(chainId: Byte,
   }
 }
 
-final case class IssueTx(header: TxHeader,
-                         payload: IssuePayload,
-                         proofs: Proofs) extends ModernTransaction(IssueTx) {
+final case class IssueTx(header: TxHeader, payload: IssuePayload, proofs: Proofs) extends ModernTransaction(IssueTx) {
   override def assetFee: (Option[AssetId], Long) = (None, header.fee)
+
+  val assetId: Coeval[AssetId] = id
 }
 
 object IssueTx extends TransactionParser.Modern[IssueTx, IssuePayload] {

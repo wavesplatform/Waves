@@ -1,7 +1,7 @@
 package scorex.transaction.modern.assets
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.transaction._
@@ -25,14 +25,12 @@ final case class BurnPayload(assetId: ByteStr, amount: Long) extends TxData {
   }
 }
 
-final case class BurnTx(header: TxHeader,
-                        payload: BurnPayload,
-                        proofs: Proofs) extends ModernTransaction(BurnTx) {
+final case class BurnTx(header: TxHeader, payload: BurnPayload, proofs: Proofs) extends ModernTransaction(BurnTx) {
   override def assetFee: (Option[AssetId], Long) = (None, header.fee)
 }
 
 object BurnTx extends TransactionParser.Modern[BurnTx, BurnPayload] {
-  override val typeId: Byte = 12
+  override val typeId: Byte = 6
 
   override def supportedVersions: Set[Byte] = Set(2)
 

@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import scorex.account.{Alias, PublicKeyAccount}
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.transaction.modern.{TxData, TxHeader}
@@ -121,38 +121,32 @@ object TransactionParser {
 
     override protected def parseHeader(bytes: Array[Byte]): Try[(Byte, Int)] =
       (for {
-        _ <- Either.cond(bytes.length < 3,
-                        (),
-                        new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements"))
+        _ <- Either.cond(bytes.length < 3, (), new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements"))
         Array(parsedMark, parsedTypeId, parsedVersion) = bytes.take(3)
-        _ <- Either.cond(parsedMark != 0,
-                        (),
-                        new IllegalArgumentException(s"Expected the '0' byte, but got '$parsedMark'"))
-        _ <- Either.cond(parsedTypeId != typeId,
-                        (),
-                        new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'"))
+        _ <- Either.cond(parsedMark != 0, (), new IllegalArgumentException(s"Expected the '0' byte, but got '$parsedMark'"))
+        _ <- Either.cond(parsedTypeId != typeId, (), new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'"))
       } yield (parsedVersion, 3)).toTry
 
     def parseTxData(version: Byte, bytes: Array[Byte]): Try[(D, Int)]
 
     override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] = {
-      val (pkStart, pkEnd) = (0, KeyLength)
-      val (tsStart, tsEnd) = (KeyLength, KeyLength + 8)
+      val (pkStart, pkEnd)   = (0, KeyLength)
+      val (tsStart, tsEnd)   = (KeyLength, KeyLength + 8)
       val (feeStart, feeEnd) = (tsEnd, tsEnd + 8)
 
       for {
-        sender <- parsePK(bytes.slice(pkStart, pkEnd))
+        sender    <- parsePK(bytes.slice(pkStart, pkEnd))
         timestamp <- parseLong(bytes.slice(tsStart, tsEnd))
-        fee <- parseLong(bytes.slice(feeStart, feeEnd))
+        fee       <- parseLong(bytes.slice(feeStart, feeEnd))
         header <- ValidateModern
           .header(supportedVersions)(typeId, version, sender, fee, timestamp)
-            .fold(
-              errs => Failure(new Exception(errs.toString)),
-              succ => Success(succ)
-            )
+          .fold(
+            errs => Failure(new Exception(errs.toString)),
+            succ => Success(succ)
+          )
         (data, offset) <- parseTxData(version, bytes.drop(feeEnd))
-        proofs <- parseProofs(bytes.drop(feeEnd + offset))
-        tx <- create(header, data, proofs)
+        proofs         <- parseProofs(bytes.drop(feeEnd + offset))
+        tx             <- create(header, data, proofs)
       } yield tx
     }
 

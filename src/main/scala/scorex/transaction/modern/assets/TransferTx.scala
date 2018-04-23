@@ -1,30 +1,34 @@
 package scorex.transaction.modern.assets
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{AddressOrAlias, PublicKeyAccount}
+import scorex.account.AddressOrAlias
 import scorex.crypto.encode.Base58
-import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
-import scorex.transaction.{AssetId, AssetIdLength, Proofs, TransactionParser}
 import scorex.transaction.modern.{ModernTransaction, TxData, TxHeader}
 import scorex.transaction.validation.ValidateModern
+import scorex.transaction.{AssetId, AssetIdLength, Proofs, TransactionParser}
 
 import scala.util.{Failure, Success, Try}
 
 final case class TransferPayload(recipient: AddressOrAlias,
                                  assetId: Option[AssetId],
+                                 feeAssetId: Option[AssetId],
                                  amount: Long,
-                                 attachment: Array[Byte]) extends TxData {
+                                 attachment: Array[Byte])
+    extends TxData {
+
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
-    val assetIdBytes   = assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
-    val amountBytes    = Longs.toByteArray(amount)
+    val assetIdBytes    = assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
+    val feeAssetIdBytes = feeAssetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
+    val amountBytes     = Longs.toByteArray(amount)
 
     Bytes.concat(
       recipient.bytes.arr,
       assetIdBytes,
+      feeAssetIdBytes,
       amountBytes,
       Deser.serializeArray(attachment)
     )
@@ -40,9 +44,7 @@ final case class TransferPayload(recipient: AddressOrAlias,
   }
 }
 
-final case class TransferTx(header: TxHeader,
-                            payload: TransferPayload,
-                            proofs: Proofs) extends ModernTransaction(TransferTx) {
+final case class TransferTx(header: TxHeader, payload: TransferPayload, proofs: Proofs) extends ModernTransaction(TransferTx) {
   override def assetFee: (Option[AssetId], Long) = (None, header.fee)
 }
 
@@ -57,8 +59,9 @@ object TransferTx extends TransactionParser.Modern[TransferTx, TransferPayload] 
 
   override def parseTxData(version: Byte, bytes: Array[Byte]): Try[(TransferPayload, Int)] = {
     Try {
-      val (assetIdOpt, s0) = Deser.parseByteArrayOption(bytes, 0, AssetIdLength)
-      val amount           = Longs.fromByteArray(bytes.slice(s0 + 8, s0 + 16))
+      val (assetIdOpt, assetIdEnd)       = Deser.parseByteArrayOption(bytes, 0, AssetIdLength)
+      val (feeAssetIdOpt, feeAssetIdEnd) = Deser.parseByteArrayOption(bytes, assetIdEnd, AssetIdLength)
+      val amount                         = Longs.fromByteArray(bytes.slice(feeAssetIdEnd, feeAssetIdEnd + 8))
 
       (for {
         recRes <- AddressOrAlias.fromBytes(bytes, 24)
@@ -66,8 +69,8 @@ object TransferTx extends TransactionParser.Modern[TransferTx, TransferPayload] 
         (attachment, attachEnd)   = Deser.parseArraySize(bytes, recipientEnd)
         proofs <- Proofs.fromBytes(bytes.drop(attachEnd))
         pl <- ValidateModern
-            .transferPL(recipient, assetIdOpt.map(ByteStr.apply), amount, attachment)
-            .toEither
+          .transferPL(recipient, assetIdOpt.map(ByteStr.apply), feeAssetIdOpt.map(ByteStr.apply), amount, attachment)
+          .toEither
       } yield (pl, attachEnd)).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
   }

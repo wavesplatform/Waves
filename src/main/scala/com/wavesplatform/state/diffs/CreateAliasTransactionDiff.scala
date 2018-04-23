@@ -1,7 +1,8 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.state.{Diff, LeaseBalance, Portfolio}
-import scorex.transaction.{CreateAliasTransaction, ValidationError}
+import scorex.transaction.CreateAliasTransaction
+import scorex.transaction.validation.ValidationError
 
 import scala.util.Right
 

@@ -25,7 +25,6 @@ abstract class ModernTransaction(val builder: TransactionParser) extends ProvenT
 
   override val bodyBytes: Coeval[Array[Byte]] = payload.bytes
 
-
   override val bytes: Coeval[Array[Byte]] =
     (headerBytes, payload.bytes, proofs.bytes)
       .mapN { case (h, p, pr) => h ++ p ++ pr }

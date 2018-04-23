@@ -1,6 +1,7 @@
 package scorex.transaction.modern.lease
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.AddressOrAlias
@@ -10,8 +11,7 @@ import scorex.transaction.modern.{ModernTransaction, TxData, TxHeader}
 
 import scala.util.{Failure, Success, Try}
 
-final case class LeasePayload(amount: Long,
-                              recipient: AddressOrAlias) extends TxData {
+final case class LeasePayload(amount: Long, recipient: AddressOrAlias) extends TxData {
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     Bytes.concat(
       recipient.bytes.arr,
@@ -29,6 +29,7 @@ final case class LeasePayload(amount: Long,
 
 final case class LeaseTx(header: TxHeader, payload: LeasePayload, proofs: Proofs) extends ModernTransaction(LeaseTx) {
   override val assetFee: (Option[AssetId], Long) = (None, header.fee)
+  val leaseId: Coeval[ByteStr]                   = id
 }
 
 object LeaseTx extends TransactionParser.Modern[LeaseTx, LeasePayload] {
@@ -46,6 +47,6 @@ object LeaseTx extends TransactionParser.Modern[LeaseTx, LeasePayload] {
         .fold(ve => Failure(new Exception(ve.toString)), Success.apply)
       (recipient, recipientEnd) = recRes
       amountStart               = recipientEnd
-      amount    <- parseLong(bytes.slice(amountStart, amountStart + 8))
+      amount <- parseLong(bytes.slice(amountStart, amountStart + 8))
     } yield (LeasePayload(amount, recipient), amountStart + 8)
 }

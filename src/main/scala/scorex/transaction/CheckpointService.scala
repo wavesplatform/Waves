@@ -2,6 +2,7 @@ package scorex.transaction
 
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.state.ByteStr
+import scorex.transaction.validation.ValidationError
 
 trait CheckpointService {
 

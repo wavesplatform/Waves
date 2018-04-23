@@ -2,9 +2,10 @@ package com.wavesplatform
 
 import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.block.Block
-import scorex.transaction.ValidationError.{AliasDoesNotExist, GenericError}
 import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.{AssetId, CreateAliasTransaction, Transaction, ValidationError}
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.validation.ValidationError.{AliasDoesNotExist, GenericError}
+import scorex.transaction.{AssetId, CreateAliasTransaction, Transaction}
 
 import scala.reflect.ClassTag
 import scala.util.{Left, Right, Try}

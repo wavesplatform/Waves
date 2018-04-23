@@ -16,20 +16,16 @@ final case class CreateAliasPayload(alias: Alias) extends TxData {
     Coeval.evalOnce(Json.obj("alias" -> alias.name))
 }
 
-final case class CreateAliasTx(header: TxHeader,
-                               payload: CreateAliasPayload,
-                               proofs: Proofs) extends ModernTransaction(CreateAliasTx) {
+final case class CreateAliasTx(header: TxHeader, payload: CreateAliasPayload, proofs: Proofs) extends ModernTransaction(CreateAliasTx) {
   override val assetFee: (Option[AssetId], Long) = (None, header.fee)
 }
 
 object CreateAliasTx extends TransactionParser.Modern[CreateAliasTx, CreateAliasPayload] {
-  override val typeId: Byte = 14
+  override val typeId: Byte = 10
 
   override val supportedVersions: Set[Byte] = Set(2)
 
-  override def create(header: TxHeader,
-                      data: CreateAliasPayload,
-                      proofs: Proofs): Try[CreateAliasTx] = {
+  override def create(header: TxHeader, data: CreateAliasPayload, proofs: Proofs): Try[CreateAliasTx] = {
     Success(CreateAliasTx(header, data, proofs))
   }
 
