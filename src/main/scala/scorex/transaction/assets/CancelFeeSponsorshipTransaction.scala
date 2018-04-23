@@ -75,7 +75,7 @@ object CancelFeeSponsorshipTransaction extends TransactionParserFor[CancelFeeSpo
     if (!supportedVersions.contains(version)) {
       Left(ValidationError.UnsupportedVersion(version))
     } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee)
+      Left(ValidationError.InsufficientFee())
     } else {
       Right(CancelFeeSponsorshipTransaction(version, sender, assetId, fee, timestamp, proofs))
     }

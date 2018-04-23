@@ -82,7 +82,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
     } else if (minFee <= 0) {
       Left(ValidationError.NegativeMinFee(minFee, "asset"))
     } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee)
+      Left(ValidationError.InsufficientFee())
     } else {
       Right(SponsorFeeTransaction(version, sender, assetId, minFee, fee, timestamp, proofs))
     }
