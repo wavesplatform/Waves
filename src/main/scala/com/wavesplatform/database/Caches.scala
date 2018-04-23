@@ -4,29 +4,30 @@ import java.util
 
 import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
-import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{
+import com.wavesplatform.state.reader.SnapshotStateReader
+import com.wavesplatform.state.{
   Sponsorship,
   SponsorshipValue,
   AccountDataInfo,
   AssetDescription,
   AssetInfo,
+  Blockchain,
   ByteStr,
   Diff,
   LeaseBalance,
   Portfolio,
-  StateWriter,
   VolumeAndFee
 }
 import scorex.account.{Address, Alias}
 import scorex.block.Block
+import scorex.transaction.Transaction
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
 import scorex.transaction.smart.script.Script
 import scorex.transaction.{AssetId, History, Transaction}
 
 import scala.collection.JavaConverters._
 
-trait Caches extends SnapshotStateReader with History with StateWriter {
+trait Caches extends Blockchain {
   import Caches._
 
   private val MaxSize = 100000
@@ -83,12 +84,12 @@ trait Caches extends SnapshotStateReader with History with StateWriter {
   @volatile
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
   protected def loadApprovedFeatures(): Map[Short, Int]
-  override def approvedFeatures(): Map[Short, Int] = approvedFeaturesCache
+  override def approvedFeatures: Map[Short, Int] = approvedFeaturesCache
 
   @volatile
   protected var activatedFeaturesCache: Map[Short, Int] = loadActivatedFeatures()
   protected def loadActivatedFeatures(): Map[Short, Int]
-  override def activatedFeatures(): Map[Short, Int] = activatedFeaturesCache
+  override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   protected val sponsorshipCache: LoadingCache[ByteStr, Option[SponsorshipValue]] = cache(MaxSize, loadSponsorship)
   protected def loadSponsorship(assetId: ByteStr): Option[SponsorshipValue]

@@ -1,7 +1,7 @@
 package scorex.account
 
 import com.wavesplatform.crypto
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import com.wavesplatform.utils.base58Length
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError

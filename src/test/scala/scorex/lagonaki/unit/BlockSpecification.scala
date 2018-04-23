@@ -1,8 +1,8 @@
 package scorex.lagonaki.unit
 
 import com.wavesplatform.metrics.Instrumented
-import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs.produce
+import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen

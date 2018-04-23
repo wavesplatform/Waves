@@ -1,6 +1,6 @@
 package scorex.consensus.nxt
 
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import org.scalatest.{Assertions, Matchers, PropSpec}
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.consensus.TransactionsOrdering

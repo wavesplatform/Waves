@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks

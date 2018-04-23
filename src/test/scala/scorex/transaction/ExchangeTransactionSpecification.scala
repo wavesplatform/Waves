@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount

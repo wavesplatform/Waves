@@ -3,7 +3,7 @@ package com.wavesplatform.db
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import scorex.transaction.AssetId
 
 import scala.collection.generic.CanBuildFrom

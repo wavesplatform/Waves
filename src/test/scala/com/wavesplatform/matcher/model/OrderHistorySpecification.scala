@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.model
 import com.wavesplatform.WithDB
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount

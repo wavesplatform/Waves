@@ -1,7 +1,7 @@
 package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import org.scalatest.{FlatSpec, Matchers}
 
 class CheckpointsSettingsSpecification extends FlatSpec with Matchers {

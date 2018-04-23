@@ -5,7 +5,7 @@ import akka.testkit.{ImplicitSender, TestKit}
 import com.wavesplatform.matcher.market.OrderHistoryActor.GetOrderHistory
 import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
 import com.wavesplatform.settings.WalletSettings
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import com.wavesplatform.WithDB
 import com.wavesplatform.utx.UtxPool
 import org.scalamock.scalatest.PathMockFactory

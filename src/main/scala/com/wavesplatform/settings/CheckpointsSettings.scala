@@ -1,7 +1,7 @@
 package com.wavesplatform.settings
 
 import com.typesafe.config.Config
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import net.ceedubs.ficus.Ficus._
 
 case class CheckpointsSettings(publicKey: ByteStr)

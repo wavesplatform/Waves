@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.google.common.base.Throwables
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.assets.exchange.Order

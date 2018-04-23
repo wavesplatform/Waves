@@ -5,8 +5,7 @@ import java.util.NoSuchElementException
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.ByteStr
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
@@ -21,9 +20,9 @@ import scorex.api.http.assets.CancelFeeSponsorshipRequest._
 import scorex.api.http.assets.SponsorFeeRequest._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.transaction.ValidationError.GenericError
+import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction._
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.utils.Time
 import scorex.wallet.Wallet
@@ -35,8 +34,7 @@ import scala.util.control.Exception
 @Api(value = "/transactions")
 case class TransactionsApiRoute(settings: RestAPISettings,
                                 wallet: Wallet,
-                                state: SnapshotStateReader,
-                                history: History,
+                                blockchain: Blockchain,
                                 utx: UtxPool,
                                 allChannels: ChannelGroup,
                                 time: Time)
@@ -77,7 +75,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               path(Segment) { limitStr =>
                 Exception.allCatch.opt(limitStr.toInt) match {
                   case Some(limit) if limit > 0 && limit <= MaxTransactionsPerRequest =>
-                    complete(Json.arr(JsArray(state.addressTransactions(a, Set.empty, limit, 0).map {
+                    complete(Json.arr(JsArray(blockchain.addressTransactions(a, Set.empty, limit, 0).map {
                       case (h, tx) =>
                         txToCompactJson(a, tx) + ("height" -> JsNumber(h))
                     })))
@@ -105,7 +103,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       path(Segment) { encoded =>
         ByteStr.decodeBase58(encoded) match {
           case Success(id) =>
-            state.transactionInfo(id) match {
+            blockchain.transactionInfo(id) match {
               case Some((h, tx)) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
               case None          => complete(StatusCodes.NotFound             -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
             }
@@ -242,9 +240,9 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     tx match {
       case lease: LeaseTransaction =>
         import LeaseTransaction.Status._
-        lease.json() ++ Json.obj("status" -> (if (state.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
+        lease.json() ++ Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
       case leaseCancel: LeaseCancelTransaction =>
-        leaseCancel.json() ++ Json.obj("lease" -> state.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
+        leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
       case t => t.json()
     }
   }

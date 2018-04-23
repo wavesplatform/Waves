@@ -1,8 +1,8 @@
 package scorex.lagonaki.unit
 
 import com.wavesplatform.mining.Miner
-import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs.produce
+import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.produce
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.words.ShouldVerb
 import org.scalatest.{FunSuite, Matchers}

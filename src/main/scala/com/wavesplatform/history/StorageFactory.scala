@@ -2,17 +2,14 @@ package com.wavesplatform.history
 
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state2.BlockchainUpdaterImpl
-import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.state.{BlockchainUpdaterImpl, NG}
 import org.iq80.leveldb.DB
-import scorex.transaction._
+import scorex.transaction.BlockchainUpdater
 import scorex.utils.Time
 
 object StorageFactory {
-
-  def apply(settings: WavesSettings, db: DB, time: Time): (NgHistory with DebugNgHistory, SnapshotStateReader, BlockchainUpdaterImpl) = {
-    val stateWriter = new LevelDBWriter(db, settings.blockchainSettings.functionalitySettings)
-    val bcu         = new BlockchainUpdaterImpl(stateWriter, settings, time, stateWriter)
-    (bcu.historyReader, bcu.stateReader, bcu)
+  def apply(settings: WavesSettings, db: DB, time: Time): BlockchainUpdater with NG = {
+    val levelDBWriter = new LevelDBWriter(db, settings.blockchainSettings.functionalitySettings)
+    new BlockchainUpdaterImpl(levelDBWriter, settings, time)
   }
 }

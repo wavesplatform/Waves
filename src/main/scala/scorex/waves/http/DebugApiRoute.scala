@@ -11,8 +11,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{ByteStr, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{ByteStr, LeaseBalance, NG, Portfolio}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
@@ -38,8 +37,7 @@ import scala.util.{Failure, Success}
 @Api(value = "/debug")
 case class DebugApiRoute(ws: WavesSettings,
                          wallet: Wallet,
-                         stateReader: SnapshotStateReader,
-                         history: History with DebugNgHistory,
+                         ng: NG,
                          peerDatabase: PeerDatabase,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo],
                          rollbackTask: ByteStr => Task[Either[ValidationError, Seq[Block]]],
@@ -71,7 +69,7 @@ case class DebugApiRoute(ws: WavesSettings,
     ))
   def blocks: Route = {
     (path("blocks" / IntNumber) & get & withAuth) { howMany =>
-      complete(JsArray(history.lastBlocks(howMany).map { block =>
+      complete(JsArray(ng.lastBlocks(howMany).map { block =>
         val bytes = block.bytes()
         Json.obj(bytes.length.toString -> Base58.encode(crypto.fastHash(bytes)))
       }))
@@ -132,7 +130,7 @@ case class DebugApiRoute(ws: WavesSettings,
       Address.fromString(rawAddress) match {
         case Left(_) => complete(InvalidAddress)
         case Right(address) =>
-          val portfolio = if (considerUnspent) utxStorage.portfolio(address) else stateReader.portfolio(address)
+          val portfolio = if (considerUnspent) utxStorage.portfolio(address) else ng.portfolio(address)
           complete(Json.toJson(portfolio))
       }
     }
@@ -142,7 +140,7 @@ case class DebugApiRoute(ws: WavesSettings,
   @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET")
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json state")))
   def state: Route = (path("state") & get & withAuth) {
-    complete(stateReader.wavesDistribution(stateReader.height).map { case (a, b) => a.stringRepr -> b })
+    complete(ng.wavesDistribution(ng.height).map { case (a, b) => a.stringRepr -> b })
   }
 
   @Path("/stateWaves/{height}")
@@ -152,7 +150,7 @@ case class DebugApiRoute(ws: WavesSettings,
       new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
     ))
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get & withAuth) { height =>
-    complete(stateReader.wavesDistribution(height).map { case (a, b) => a.stringRepr -> b })
+    complete(ng.wavesDistribution(height).map { case (a, b) => a.stringRepr -> b })
   }
 
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] = {
@@ -160,7 +158,7 @@ case class DebugApiRoute(ws: WavesSettings,
 
     rollbackTask(blockId).asyncBoundary.map {
       case Right(blocks) =>
-        allChannels.broadcast(LocalScoreChanged(history.score))
+        allChannels.broadcast(LocalScoreChanged(ng.score))
         if (returnTransactionsToUtx) {
           utxStorage.batched { ops =>
             blocks.flatMap(_.transactionData).foreach(ops.putIfNew)
@@ -191,7 +189,7 @@ case class DebugApiRoute(ws: WavesSettings,
     ))
   def rollback: Route = (path("rollback") & post & withAuth) {
     json[RollbackParams] { params =>
-      history.blockAt(params.rollbackTo) match {
+      ng.blockAt(params.rollbackTo) match {
         case Some(block) =>
           rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
         case None =>
@@ -209,7 +207,7 @@ case class DebugApiRoute(ws: WavesSettings,
   def info: Route = (path("info") & get & withAuth) {
     complete(
       Json.obj(
-        "stateHeight"                      -> stateReader.height,
+        "stateHeight"                      -> ng.height,
         "extensionLoaderState"             -> extLoaderStateReporter().toString,
         "historyReplierCacheSizes"         -> Json.toJson(historyReplier.cacheSizes),
         "microBlockSynchronizerCacheSizes" -> Json.toJson(mbsCacheSizesReporter()),
@@ -229,7 +227,7 @@ case class DebugApiRoute(ws: WavesSettings,
       case (a, t) =>
         AccountMiningInfo(
           a.stringRepr,
-          stateReader.effectiveBalance(a, stateReader.height, ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(stateReader.height)),
+          ng.effectiveBalance(a, ng.height, ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height)),
           t
         )
     })
@@ -242,8 +240,8 @@ case class DebugApiRoute(ws: WavesSettings,
       new ApiResponse(code = 200, message = "Json state")
     ))
   def historyInfo: Route = (path("historyInfo") & get & withAuth) {
-    val a = history.lastPersistedBlockIds(10)
-    val b = history.microblockIds()
+    val a = ng.lastPersistedBlockIds(10)
+    val b = ng.microblockIds
     complete(HistoryInfo(a, b))
 
   }

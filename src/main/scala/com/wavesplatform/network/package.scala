@@ -4,7 +4,7 @@ import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
 import cats.Eq
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
 import io.netty.channel.local.LocalAddress
 import io.netty.channel.socket.nio.NioSocketChannel

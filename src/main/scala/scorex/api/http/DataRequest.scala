@@ -1,7 +1,7 @@
 package scorex.api.http
 
 import cats.implicits._
-import com.wavesplatform.state2.DataEntry
+import com.wavesplatform.state.DataEntry
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount

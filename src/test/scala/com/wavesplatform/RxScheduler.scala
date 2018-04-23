@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observer

@@ -11,7 +11,7 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.state2.{ByteStr, DataEntry, Portfolio}
+import com.wavesplatform.state.{ByteStr, DataEntry, Portfolio}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants

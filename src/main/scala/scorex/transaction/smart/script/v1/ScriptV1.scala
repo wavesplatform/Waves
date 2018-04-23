@@ -5,7 +5,7 @@ import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.Terms.Typed
 import com.wavesplatform.lang.v1.Terms.Typed.EXPR
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import scorex.transaction.smart.script.Script
 
