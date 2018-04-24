@@ -89,6 +89,37 @@ trait ScriptGen {
     n  <- Gen.choose(1, 5)
     xs <- Gen.listOfN(n, whitespaceChar)
   } yield xs.mkString
+
+  def withWhitespaces(expr: String): Gen[String] =
+    for {
+      pred <- whitespaces
+      post <- whitespaces
+    } yield pred + expr + post
+
+  def toString(expr: EXPR): Gen[String] = expr match {
+    case CONST_LONG(x)   => withWhitespaces(s"$x")
+    case REF(x)          => withWhitespaces(s"$x")
+    case CONST_STRING(x) => withWhitespaces(s"""\"$x\"""")
+    case TRUE            => withWhitespaces("true")
+    case FALSE           => withWhitespaces("false")
+    case BINARY_OP(x, op: BINARY_OP_KIND, y) =>
+      for {
+        arg1 <- toString(x)
+        arg2 <- toString(y)
+      } yield s"($arg1${opsToFunctions(op)}$arg2)"
+    case IF(cond, x, y) =>
+      for {
+        c <- toString(cond)
+        t <- toString(x)
+        f <- toString(y)
+      } yield s"(if ($c) then $t else $f)"
+    case BLOCK(let, body) =>
+      for {
+        v <- toString(let.value)
+        b <- toString(body)
+      } yield s"let ${let.name} = $v$b\n"
+    case _ => ???
+  }
 }
 
 trait ScriptGenParser extends ScriptGen {

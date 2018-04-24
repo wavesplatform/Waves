@@ -14,13 +14,13 @@ class ScriptCompilerTest extends PropSpec with PropertyChecks with Matchers {
   property("compile script with specified version") {
     val script = scriptWithVersion("1".some)
 
-    ScriptCompiler(script) shouldBe Right(ScriptV1(expectedExpr))
+    ScriptCompiler(script) shouldBe Right((ScriptV1(expectedExpr), 10))
   }
 
   property("use version 1 if not specified") {
     val script = scriptWithVersion(none)
 
-    ScriptCompiler(script) shouldBe Right(ScriptV1(expectedExpr))
+    ScriptCompiler(script) shouldBe Right((ScriptV1(expectedExpr), 10))
   }
 
   property("fails on unsupported version") {
