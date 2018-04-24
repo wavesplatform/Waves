@@ -126,7 +126,7 @@ object CommonValidation {
       case _ => Right(tx)
     }
 
-  def checkTxFee[T <: Transaction](blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = {
+  def checkFee[T <: Transaction](blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = {
     if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) Right(tx)
     else
       for {

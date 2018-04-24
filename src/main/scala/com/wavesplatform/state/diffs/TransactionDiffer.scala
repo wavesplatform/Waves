@@ -23,7 +23,7 @@ object TransactionDiffer {
       _ <- CommonValidation.disallowBeforeActivationTime(blockchain, currentBlockHeight, tx)
       _ <- CommonValidation.disallowDuplicateIds(blockchain, settings, currentBlockHeight, tx)
       _ <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, settings, currentBlockTimestamp, tx)
-      _ <- CommonValidation.checkTxFee(blockchain, settings, currentBlockHeight, tx)
+      _ <- CommonValidation.checkFee(blockchain, settings, currentBlockHeight, tx)
       diff <- tx match {
         case gtx: GenesisTransaction     => GenesisTransactionDiff(currentBlockHeight)(gtx)
         case ptx: PaymentTransaction     => PaymentTransactionDiff(blockchain, currentBlockHeight, settings, currentBlockTimestamp)(ptx)
