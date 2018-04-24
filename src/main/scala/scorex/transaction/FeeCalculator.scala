@@ -2,11 +2,11 @@ package scorex.transaction
 
 import com.wavesplatform.lang.v1.ctx.Context
 import com.wavesplatform.lang.v1.{FunctionHeader, ScriptComplexityCalculator}
-import com.wavesplatform.settings.FeesSettings
+import com.wavesplatform.settings.{FeesSettings, FunctionalitySettings}
 import com.wavesplatform.state._
 import scorex.transaction.FeeCalculator._
 import scorex.transaction.ValidationError.{GenericError, InsufficientFee}
-import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
+import scorex.transaction.assets._
 import scorex.transaction.smart.script.Script
 
 /**
@@ -30,7 +30,11 @@ class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
     }
   }
 
-  def enoughFee(tx: Transaction): Either[ValidationError, Unit] = {
+  def enoughFee[T <: Transaction](tx: T, blockchain: Blockchain, fs: FunctionalitySettings): Either[ValidationError, T] =
+    if (blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) Right(tx)
+    else enoughFee(tx)
+
+  def enoughFee[T <: Transaction](tx: T): Either[ValidationError, T] = {
     val (txFeeAssetId, txFeeValue) = tx.assetFee
     val txAssetFeeKey              = TransactionAssetFee(tx.builder.typeId, txFeeAssetId).key
     for {
@@ -67,7 +71,7 @@ class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
         (),
         InsufficientFee(s"Scripted account requires $totalRequiredFee fee for this transaction, but given: $txFeeValue")
       )
-    } yield ()
+    } yield tx
   }
 
   private def minFeeFor(tx: Transaction, txFeeAssetId: Option[AssetId], txMinBaseFee: Long): Long = tx match {

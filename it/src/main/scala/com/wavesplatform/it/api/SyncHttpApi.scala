@@ -85,6 +85,12 @@ object SyncHttpApi extends Assertions {
     def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Transaction =
       Await.result(async(n).burn(sourceAddress, assetId, quantity, fee), RequestAwaitTime)
 
+    def sponsorAsset(sourceAddress: String, assetId: String, baseFee: Long, fee: Long): Transaction =
+      Await.result(async(n).sponsorAsset(sourceAddress, assetId, baseFee, fee), RequestAwaitTime)
+
+    def cancelSponsorship(sourceAddress: String, assetId: String, fee: Long): Transaction =
+      Await.result(async(n).cancelSponsorship(sourceAddress, assetId, fee), RequestAwaitTime)
+
     def sign(jsObject: JsObject): JsObject =
       Await.result(async(n).sign(jsObject), RequestAwaitTime)
 
