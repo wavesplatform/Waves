@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import kamon.metric.instrument.Histogram
+import kamon.metric.Histogram
 
 package object metrics {
   final implicit class HistogramExt(val h: Histogram) extends AnyVal {

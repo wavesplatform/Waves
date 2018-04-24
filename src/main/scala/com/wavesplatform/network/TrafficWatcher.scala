@@ -3,7 +3,7 @@ package com.wavesplatform.network
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelDuplexHandler, ChannelHandlerContext, ChannelPromise}
 import kamon.Kamon
-import kamon.metric.instrument.{Histogram, Memory}
+import kamon.metric.{Histogram, MeasurementUnit}
 import scorex.network.message.{Message => ScorexMessage}
 
 @Sharable
@@ -21,13 +21,13 @@ class TrafficWatcher extends ChannelDuplexHandler {
       code -> createHistogram("incoming", spec)
   }
 
-  private def createHistogram(dir: String, spec: BasicMessagesRepo.Spec) =
-    Kamon.metrics.histogram("traffic",
-                            Map(
-                              "type" -> spec.messageName,
-                              "dir"  -> dir
-                            ),
-                            Memory.Bytes)
+  private def createHistogram(dir: String, spec: BasicMessagesRepo.Spec): Histogram =
+    Kamon
+      .histogram("traffic", MeasurementUnit.information.bytes)
+      .refine(
+        "type" -> spec.messageName,
+        "dir"  -> dir
+      )
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = {
     msg match {
