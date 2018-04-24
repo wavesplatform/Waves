@@ -80,7 +80,7 @@ object StateSyntheticBenchmark {
             .selfSigned(
               SetScriptTransaction.supportedVersions.head,
               richAccount,
-              Some(ScriptV1(typedScript)),
+              Some(ScriptV1(typedScript).explicitGet()),
               100000,
               System.currentTimeMillis()
             )

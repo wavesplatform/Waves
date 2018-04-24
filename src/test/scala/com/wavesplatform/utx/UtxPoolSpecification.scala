@@ -3,6 +3,7 @@ package com.wavesplatform.utx
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
+import com.wavesplatform.lang.v1.Terms.Typed
 import com.wavesplatform.lang.v1.TypeChecker.TypeCheckerContext
 import com.wavesplatform.lang.v1.{CompilerV1, ScriptComplexityCalculator}
 import com.wavesplatform.mining._
@@ -16,8 +17,7 @@ import com.wavesplatform.settings.{
   WavesSettings
 }
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.state._
-import com.wavesplatform.state.{ByteStr, EitherExt2}
+import com.wavesplatform.state.{ByteStr, EitherExt2, _}
 import com.wavesplatform.{NoShrink, TestHelpers, TestTime, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
@@ -32,6 +32,7 @@ import scorex.transaction.ValidationError.SenderIsBlacklisted
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets.{IssueTransaction, MassTransferTransaction, TransferTransaction}
 import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.{FeeCalculator, GenesisTransaction, Transaction}
 import scorex.utils.Time
@@ -228,18 +229,20 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
       (utx, time, tx1, (offset + 1000).millis, tx2)
     }
 
-  private val script: ScriptV1 = {
+  private val expr: Typed.EXPR = {
     val code =
       """let x = 1
-          |let y = 2
-          |true""".stripMargin
+        |let y = 2
+        |true""".stripMargin
 
     val compiler = new CompilerV1(TypeCheckerContext.empty)
-    ScriptV1(compiler.compile(code, List.empty).explicitGet())
+    compiler.compile(code, List.empty).explicitGet()
   }
 
+  private val script: Script = ScriptV1(expr).explicitGet()
+
   private val scriptExtraFee: Long = (
-    calculatorSettings.smartAccount.baseExtraCharge + ScriptComplexityCalculator(Map.empty, script.expr)
+    calculatorSettings.smartAccount.baseExtraCharge + ScriptComplexityCalculator(Map.empty, expr)
       .explicitGet() * calculatorSettings.smartAccount.extraChargePerOp
   ).toLong
 
