@@ -104,10 +104,11 @@ lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
   }
 )
 
-inConfig(Test)(
+inConfig(Test) {
+  val commonFlags = "-XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap"
   Seq(
     test := (test dependsOn docker).value,
-    envVars in test += "CONTAINER_JAVA_OPTS"     -> "-Xmx1500m",
-    envVars in testOnly += "CONTAINER_JAVA_OPTS" -> "-Xmx512m"
+    envVars in test += "CONTAINER_JAVA_OPTS"     -> s"-Xmx1500m $commonFlags",
+    envVars in testOnly += "CONTAINER_JAVA_OPTS" -> s"-Xmx512m $commonFlags"
   ) ++ inTask(test)(itTestsCommonSettings) ++ inTask(testOnly)(itTestsCommonSettings)
-)
+}
