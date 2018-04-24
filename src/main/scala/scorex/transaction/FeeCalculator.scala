@@ -3,17 +3,10 @@ package scorex.transaction
 import com.wavesplatform.lang.v1.ctx.Context
 import com.wavesplatform.lang.v1.{FunctionHeader, ScriptComplexityCalculator}
 import com.wavesplatform.settings.{FeesSettings, FunctionalitySettings}
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state._
-import monix.eval.Coeval
-import scorex.account.{Address, Alias}
-import scorex.block.{Block, BlockHeader}
 import scorex.transaction.FeeCalculator._
 import scorex.transaction.ValidationError.{GenericError, InsufficientFee}
 import scorex.transaction.assets._
-import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.smart.BlockchainContext
-import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
 
 /**
