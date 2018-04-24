@@ -10,7 +10,7 @@ import org.openjdk.jmh.annotations._
 import org.scalacheck.Gen
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.Transaction
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
 

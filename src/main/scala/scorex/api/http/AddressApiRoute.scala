@@ -15,9 +15,10 @@ import play.api.libs.json._
 import scorex.BroadcastRoute
 import scorex.account.{Address, PublicKeyAccount}
 import scorex.crypto.encode.Base58
-import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.smart.script.ScriptCompiler
-import scorex.transaction.{PoSCalc, TransactionFactory, ValidationError}
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.validation.ValidationError.GenericError
+import scorex.transaction.{PoSCalc, TransactionFactory}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 

@@ -24,7 +24,6 @@ import scorex.api.http._
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
-import scorex.transaction._
 import scorex.transaction.validation.ValidationError
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet

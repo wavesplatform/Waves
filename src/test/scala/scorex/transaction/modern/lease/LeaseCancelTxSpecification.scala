@@ -1,6 +1,5 @@
 package scorex.transaction.modern.lease
 
-import com.wavesplatform.TransactionGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.transaction.{ModernTransactionGen, TransactionParsers}
