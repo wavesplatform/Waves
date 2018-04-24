@@ -14,7 +14,7 @@ object ScriptRunner {
 
   def apply[A: TypeInfo, T <: Transaction](height: Int, tx: T, blockchain: Blockchain, script: Script): Either[ExecutionError, A] =
     script match {
-      case ScriptV1(expr) => {
+      case ScriptV1(expr) =>
         val ctx = BlockchainContext.build(
           AddressScheme.current.chainId,
           Coeval.evalOnce(tx),
@@ -22,7 +22,6 @@ object ScriptRunner {
           blockchain
         )
         EvaluatorV1[A](ctx, expr).left.map(_._3)
-      }
 
       case _ => "Unsupported script version".asLeft[A]
     }

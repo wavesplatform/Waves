@@ -1,6 +1,8 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.lang.v1.Terms.Typed
+import com.wavesplatform.settings.{FeesSettings, SmartAccountSettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
@@ -9,9 +11,11 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
+import scorex.account.Address
 import scorex.api.http.{AddressApiRoute, ApiKeyNotValid, InvalidMessage}
 import scorex.crypto.encode.Base58
 import scorex.settings.TestFunctionalitySettings
+import scorex.transaction.smart.script.v1.ScriptV1
 
 class AddressRouteSpec
     extends RouteSpec("/addresses")
@@ -23,14 +27,18 @@ class AddressRouteSpec
 
   private val allAccounts  = testWallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.address)
+  private val blockchain   = stub[Blockchain]
 
-  private val route = AddressApiRoute(restAPISettings,
-                                      testWallet,
-                                      mock[Blockchain],
-                                      mock[UtxPool],
-                                      mock[ChannelGroup],
-                                      new TestTime,
-                                      TestFunctionalitySettings.Stub).route
+  private val route = AddressApiRoute(
+    restAPISettings,
+    testWallet,
+    blockchain,
+    mock[UtxPool],
+    mock[ChannelGroup],
+    new TestTime,
+    TestFunctionalitySettings.Stub,
+    FeesSettings(SmartAccountSettings(10000, 1), Map.empty)
+  ).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")
@@ -135,6 +143,28 @@ class AddressRouteSpec
   routePath("/{address}") in {
     Delete(routePath(s"/${allAddresses.head}")) ~> api_key(apiKey) ~> route ~> check {
       (responseAs[JsObject] \ "deleted").as[Boolean] shouldBe true
+    }
+  }
+
+  routePath(s"/scriptInfo/${allAddresses(1)}") in {
+    (blockchain.accountScript _).when(allAccounts(1).toAddress).onCall((_: Address) => Some(ScriptV1(Typed.TRUE)))
+    Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      (response \ "address").as[String] shouldBe allAddresses(1)
+      (response \ "script").as[String] shouldBe "WpgBYoY"
+      (response \ "scriptText").as[String] shouldBe "TRUE"
+      (response \ "complexity").as[Long] shouldBe 1
+      (response \ "extraFee").as[Long] shouldBe 10001
+    }
+
+    (blockchain.accountScript _).when(allAccounts(2).toAddress).onCall((_: Address) => None)
+    Get(routePath(s"/scriptInfo/${allAddresses(2)}")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      (response \ "address").as[String] shouldBe allAddresses(2)
+      (response \ "script").asOpt[String] shouldBe None
+      (response \ "scriptText").asOpt[String] shouldBe None
+      (response \ "complexity").as[Long] shouldBe 0
+      (response \ "extraFee").as[Long] shouldBe 0
     }
   }
 }

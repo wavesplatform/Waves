@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.Terms._
 import monix.eval.Coeval
 
 object ScriptComplexityCalculator {
-  def apply(t: Typed.EXPR, functionCosts: Map[FunctionHeader, Long]): Either[String, Long] = {
+  def apply(functionCosts: Map[FunctionHeader, Long], t: Typed.EXPR): Either[String, Long] = {
     type Result[T] = EitherT[Coeval, String, T]
 
     def aux(t: Result[Typed.EXPR]): Result[Long] = t.flatMap {

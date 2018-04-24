@@ -15,7 +15,7 @@ class ScriptComplexityCalculatorTest extends PropSpec with PropertyChecks with M
       Typed.FUNCTION_CALL(sumHeader, List(Typed.CONST_LONG(1), acc), Terms.LONG)
     }
 
-    ScriptComplexityCalculator(expr, Map(sumHeader -> 1L)) shouldBe 'right
+    ScriptComplexityCalculator(Map(sumHeader -> 1L), expr) shouldBe 'right
   }
 
 }
