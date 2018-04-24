@@ -2,12 +2,12 @@ package scorex.transaction
 
 import com.wavesplatform.lang.v1.ctx.Context
 import com.wavesplatform.lang.v1.{FunctionHeader, ScriptComplexityCalculator}
-import com.wavesplatform.settings.FeesSettings
+import com.wavesplatform.settings.{FeesSettings, FunctionalitySettings}
 import com.wavesplatform.state._
 import scorex.transaction.FeeCalculator._
 import scorex.transaction.ValidationError.{GenericError, InsufficientFee}
-import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
-import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.assets._
+import scorex.transaction.smart.script.Script
 
 /**
   * Class to check, that transaction contains enough fee to put it to UTX pool
@@ -30,7 +30,11 @@ class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
     }
   }
 
-  def enoughFee(tx: Transaction): Either[ValidationError, Unit] = {
+  def enoughFee[T <: Transaction](tx: T, blockchain: Blockchain, fs: FunctionalitySettings): Either[ValidationError, T] =
+    if (blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) Right(tx)
+    else enoughFee(tx)
+
+  def enoughFee[T <: Transaction](tx: T): Either[ValidationError, T] = {
     val (txFeeAssetId, txFeeValue) = tx.assetFee
     val txAssetFeeKey              = TransactionAssetFee(tx.builder.typeId, txFeeAssetId).key
     for {
@@ -52,8 +56,8 @@ class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
       )
 
       scriptComplexity <- script match {
-        case Some(s: ScriptV1) =>
-          ScriptComplexityCalculator(functionCosts, s.expr) match {
+        case Some(Script.Expr(expr)) =>
+          ScriptComplexityCalculator(functionCosts, expr) match {
             case Right(x) => Right(settings.smartAccount.baseExtraCharge + x)
             case Left(e)  => Left(ValidationError.GenericError(e))
           }
@@ -67,7 +71,7 @@ class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
         (),
         InsufficientFee(s"Scripted account requires $totalRequiredFee fee for this transaction, but given: $txFeeValue")
       )
-    } yield ()
+    } yield tx
   }
 
   private def minFeeFor(tx: Transaction, txFeeAssetId: Option[AssetId], txMinBaseFee: Long): Long = tx match {

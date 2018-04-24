@@ -190,7 +190,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
 
     val transfers = List(Transfer(firstAddress, 5.waves), Transfer(secondAddress, 2.waves), Transfer(thirdAddress, 3.waves))
     val f = for {
-      txId <- sender.massTransfer(firstAddress, transfers, 250000).map(_.id)
+      txId <- sender.massTransfer(firstAddress, transfers, 300000).map(_.id)
       _    <- nodes.waitForHeightAriseAndTxPresent(txId)
 
       // /transactions/txInfo should return complete list of transfers

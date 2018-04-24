@@ -3,11 +3,11 @@ package com.wavesplatform.state.diffs
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
 import scorex.account.PublicKeyAccount
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SmartIssueTransaction}
-import scorex.transaction.{AssetId, SignedTransaction, ValidationError}
+import scorex.transaction.assets._
+import scorex.transaction.{AssetId, ProvenTransaction, ValidationError}
 
 import scala.util.{Left, Right}
 
@@ -70,7 +70,33 @@ object AssetTransactionsDiff {
     })
   }
 
-  private def validateAsset(tx: SignedTransaction, blockchain: Blockchain, assetId: AssetId, issuerOnly: Boolean): Either[ValidationError, Unit] = {
+  def sponsor(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(
+      tx: SponsorFeeTransaction): Either[ValidationError, Diff] = {
+    validateAsset(tx, blockchain, tx.assetId, true).flatMap { _ =>
+      Right(
+        Diff(
+          height = height,
+          tx = tx,
+          portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
+          sponsorship = Map(tx.assetId         -> SponsorshipValue(tx.minFee))
+        ))
+    }
+  }
+
+  def cancelSponsorship(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(
+      tx: CancelFeeSponsorshipTransaction): Either[ValidationError, Diff] = {
+    validateAsset(tx, blockchain, tx.assetId, true).flatMap { _ =>
+      Right(
+        Diff(
+          height = height,
+          tx = tx,
+          portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
+          sponsorship = Map(tx.assetId         -> SponsorshipValue(0))
+        ))
+    }
+  }
+
+  private def validateAsset(tx: ProvenTransaction, blockchain: Blockchain, assetId: AssetId, issuerOnly: Boolean): Either[ValidationError, Unit] = {
     blockchain.transactionInfo(assetId) match {
       case Some((_, itx: IssueTransaction)) if !validIssuer(issuerOnly, tx.sender, itx.sender) =>
         Left(GenericError("Asset was issued by other address"))

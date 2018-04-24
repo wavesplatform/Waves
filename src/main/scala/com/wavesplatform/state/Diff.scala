@@ -2,6 +2,9 @@ package com.wavesplatform.state
 
 import cats.implicits._
 import cats.kernel.Monoid
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.settings.FunctionalitySettings
 import scorex.account.{Address, Alias, PublicKeyAccount}
 import scorex.transaction.smart.script.Script
 import scorex.transaction.{AssetId, Transaction}
@@ -47,7 +50,8 @@ case class AssetDescription(issuer: PublicKeyAccount,
                             decimals: Int,
                             reissuable: Boolean,
                             totalVolume: BigInt,
-                            script: Option[Script]) {
+                            script: Option[Script],
+                            sponsorship: Long) {
   override def equals(obj: scala.Any) = obj match {
     case o: AssetDescription =>
       o.issuer == this.issuer &&
@@ -56,7 +60,8 @@ case class AssetDescription(issuer: PublicKeyAccount,
         o.decimals == decimals &&
         o.reissuable == reissuable &&
         o.totalVolume == totalVolume &&
-        o.script == script
+        o.script == script &&
+        o.sponsorship == sponsorship
     case _ => false
   }
 }
@@ -71,6 +76,37 @@ object AccountDataInfo {
   }
 }
 
+sealed abstract class Sponsorship
+case class SponsorshipValue(minFee: Long) extends Sponsorship
+case object SponsorshipNoInfo             extends Sponsorship
+
+object Sponsorship {
+  val FeeUnit = 100000
+
+  implicit val sponsorshipMonoid: Monoid[Sponsorship] = new Monoid[Sponsorship] {
+    override def empty: Sponsorship = SponsorshipNoInfo
+
+    override def combine(x: Sponsorship, y: Sponsorship): Sponsorship = y match {
+      case SponsorshipNoInfo => x
+      case _                 => y
+    }
+  }
+
+  def sponsoredFeesSwitchHeight(blockchain: Blockchain, fs: FunctionalitySettings): Int =
+    blockchain
+      .featureActivationHeight(BlockchainFeatures.FeeSponsorship.id)
+      .map(h => h + fs.blocksForFeatureActivation(h))
+      .getOrElse(Int.MaxValue)
+
+  def toWaves(assetFee: Long, sponsorship: Long): Long = {
+    val waves = (BigDecimal(assetFee) * BigDecimal(Sponsorship.FeeUnit)) / BigDecimal(sponsorship)
+    if (waves > Long.MaxValue) {
+      throw new java.lang.ArithmeticException("Overflow")
+    }
+    waves.toLong
+  }
+}
+
 case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 portfolios: Map[Address, Portfolio],
                 issuedAssets: Map[AssetId, AssetInfo],
@@ -78,7 +114,8 @@ case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 orderFills: Map[ByteStr, VolumeAndFee],
                 leaseState: Map[ByteStr, Boolean],
                 scripts: Map[Address, Option[Script]],
-                accountData: Map[Address, AccountDataInfo]) {
+                accountData: Map[Address, AccountDataInfo],
+                sponsorship: Map[AssetId, Sponsorship]) {
 
   lazy val accountTransactionIds: Map[Address, List[ByteStr]] = {
     val map: List[(Address, Set[(Int, Long, ByteStr)])] = transactions.toList
@@ -102,7 +139,8 @@ object Diff {
             orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
             leaseState: Map[ByteStr, Boolean] = Map.empty,
             scripts: Map[Address, Option[Script]] = Map.empty,
-            accountData: Map[Address, AccountDataInfo] = Map.empty): Diff =
+            accountData: Map[Address, AccountDataInfo] = Map.empty,
+            sponsorship: Map[AssetId, Sponsorship] = Map.empty): Diff =
     Diff(
       transactions = Map((tx.id(), (height, tx, portfolios.keys.toSet))),
       portfolios = portfolios,
@@ -111,10 +149,11 @@ object Diff {
       orderFills = orderFills,
       leaseState = leaseState,
       scripts = scripts,
-      accountData = accountData
+      accountData = accountData,
+      sponsorship = sponsorship
     )
 
-  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
+  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
 
   implicit val diffMonoid = new Monoid[Diff] {
     override def empty: Diff = Diff.empty
@@ -128,7 +167,8 @@ object Diff {
         orderFills = older.orderFills.combine(newer.orderFills),
         leaseState = older.leaseState ++ newer.leaseState,
         scripts = older.scripts ++ newer.scripts,
-        accountData = older.accountData.combine(newer.accountData)
+        accountData = older.accountData.combine(newer.accountData),
+        sponsorship = older.sponsorship.combine(newer.sponsorship)
       )
   }
 }

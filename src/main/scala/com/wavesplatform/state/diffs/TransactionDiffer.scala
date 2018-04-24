@@ -23,6 +23,7 @@ object TransactionDiffer {
       _ <- CommonValidation.disallowBeforeActivationTime(blockchain, currentBlockHeight, tx)
       _ <- CommonValidation.disallowDuplicateIds(blockchain, settings, currentBlockHeight, tx)
       _ <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, settings, currentBlockTimestamp, tx)
+      _ <- CommonValidation.checkFee(blockchain, settings, currentBlockHeight, tx)
       diff <- tx match {
         case gtx: GenesisTransaction     => GenesisTransactionDiff(currentBlockHeight)(gtx)
         case ptx: PaymentTransaction     => PaymentTransactionDiff(blockchain, currentBlockHeight, settings, currentBlockTimestamp)(ptx)
@@ -40,7 +41,10 @@ object TransactionDiffer {
         case dtx: DataTransaction               => DataTransactionDiff(blockchain, currentBlockHeight)(dtx)
         case sstx: SetScriptTransaction         => SetScriptTransactionDiff(currentBlockHeight)(sstx)
         case sttx: VersionedTransferTransaction => ScriptTransferTransactionDiff(blockchain, currentBlockHeight)(sttx)
-        case _                                  => Left(UnsupportedTransactionType)
+        case stx: SponsorFeeTransaction         => AssetTransactionsDiff.sponsor(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(stx)
+        case ctx: CancelFeeSponsorshipTransaction =>
+          AssetTransactionsDiff.cancelSponsorship(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(ctx)
+        case _ => Left(UnsupportedTransactionType)
       }
       positiveDiff <- BalanceDiffValidation(blockchain, currentBlockHeight, settings)(diff)
     } yield positiveDiff

@@ -5,6 +5,7 @@ import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.Terms.{BOOLEAN, Typed}
 import com.wavesplatform.settings.{FeesSettings, SmartAccountSettings}
+import com.wavesplatform.state.EitherExt2
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue}
@@ -32,7 +33,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
           function = FunctionHeader("==", List(FunctionHeader.FunctionHeaderType.LONG, FunctionHeader.FunctionHeaderType.LONG)),
           args = List(Typed.CONST_LONG(1), Typed.CONST_LONG(2)),
           tpe = BOOLEAN
-        ))
+        )).explicitGet()
 
       Script.fromBase58String((json \ "script").as[String]) shouldBe Right(expectedScript)
       (json \ "complexity").as[Long] shouldBe 3
