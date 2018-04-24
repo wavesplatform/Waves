@@ -13,17 +13,6 @@ import scorex.transaction.{AssetId, Proofs}
 
 object ValidateModern {
 
-//  def burnTx(sender: PublicKeyAccount,
-//             version: Byte,
-//             assetId: ByteStr,
-//             quantity: Long,
-//             fee: Long,
-//             timestamp: Long,
-//             proofs: Proofs): Validated[BurnTx] = {
-//    (validateVersion(BurnTx.supportedVersions, version), validateAmount(quantity, "assets"), validateTimestamp(timestamp), validateFee(fee))
-//      .mapN { case (v, q, ts, f) => VBurnTransaction(sender, v, assetId, q, f, ts, proofs) }
-//  }
-
   def issueTx(version: Byte,
               chainId: Byte,
               sender: PublicKeyAccount,
@@ -48,24 +37,6 @@ object ValidateModern {
           SmartIssueTransaction(ver, chainId, sender, n, desc, am, dec, reissuable, script, f, ts, proofs)
       }
   }
-
-//  def reissueTx(sender: PublicKeyAccount,
-//                version: Byte,
-//                assetId: ByteStr,
-//                quantity: Long,
-//                reissuable: Boolean,
-//                fee: Long,
-//                timestamp: Long,
-//                proofs: Proofs): Validated[ReissueTx] = {
-//    (validateVersion(ReissueTx.supportedVersions, version),
-//     validateAmount(quantity, "assets"),
-//     validateTimestamp(timestamp),
-//     validateFee(fee))
-//      .mapN {
-//        case (ver, am, ts, f) =>
-//          ReissueTx(sender, ver, assetId, am, reissuable, f, ts, proofs)
-//      }
-//  }
 
   def massTransferTx(version: Byte,
                      assetId: Option[AssetId],
@@ -106,46 +77,6 @@ object ValidateModern {
           VersionedTransferTransaction(ver, sender, recipient, assetId, am, f, ts, att, proofs)
       }
   }
-//
-//  def createAliasTx(sender: PublicKeyAccount,
-//                    version: Byte,
-//                    alias: Alias,
-//                    fee: Long,
-//                    timestamp: Long,
-//                    proofs: Proofs): Validated[VCreateAliasTransaction] = {
-//    (validateVersion(VCreateAliasTransaction.supportedVersions, version), validateFee(fee), validateTimestamp(timestamp))
-//      .mapN {
-//        case (ver, f, ts) =>
-//          VCreateAliasTransaction(ver, sender, alias, f, ts, proofs)
-//      }
-//  }
-//
-//  def leaseTx(sender: PublicKeyAccount,
-//              version: Byte,
-//              amount: Long,
-//              fee: Long,
-//              timestamp: Long,
-//              recipient: AddressOrAlias,
-//              proofs: Proofs): Validated[LeaseTx] = {
-//    (validateVersion(LeaseTx.supportedVersions, version), validateAmount(amount, "waves"), validateFee(fee), validateTimestamp(timestamp))
-//      .mapN {
-//        case (ver, am, f, ts) =>
-//          VLeaseTransaction(ver, sender, am, f, ts, recipient, proofs)
-//      }
-//  }
-//
-//  def leaseCancelTx(version: Byte,
-//                    sender: PublicKeyAccount,
-//                    leaseId: ByteStr,
-//                    fee: Long,
-//                    timestamp: Long,
-//                    proofs: Proofs): Validated[LeaseCancelTx] = {
-//    (validateVersion(LeaseCancelTx.supportedVersions, version), validateFee(fee), validateTimestamp(timestamp))
-//      .mapN {
-//        case (ver, f, ts) =>
-//          VLeaseCancelTransaction(version, sender, leaseId, f, ts, proofs)
-//      }
-//  }
 
   def header(supportedVersions: Set[Byte])(`type`: Byte, version: Byte, sender: PublicKeyAccount, fee: Long, timestamp: Long): Validated[TxHeader] = {
     (validateVersion(supportedVersions, version), validateFee(fee), validateTimestamp(timestamp))

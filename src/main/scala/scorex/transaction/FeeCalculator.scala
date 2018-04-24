@@ -7,7 +7,7 @@ import com.wavesplatform.state._
 import scorex.transaction.FeeCalculator._
 import scorex.transaction.validation.ValidationError.{GenericError, InsufficientFee}
 import scorex.transaction.assets._
-import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.smart.script.Script
 import scorex.transaction.validation.ValidationError
 
 /**
