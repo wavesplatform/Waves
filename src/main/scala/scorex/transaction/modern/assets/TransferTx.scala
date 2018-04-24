@@ -51,7 +51,7 @@ final case class TransferTx(header: TxHeader, payload: TransferPayload, proofs: 
 object TransferTx extends TransactionParser.Modern[TransferTx, TransferPayload] {
   override val typeId: Byte = 4
 
-  override val supportedVersions: Set[Byte] = Set(2)
+  override val supportedVersions: Set[Byte] = Set(3)
 
   override def create(header: TxHeader, data: TransferPayload, proofs: Proofs): Try[TransferTx] = {
     Try(TransferTx(header, data, proofs))
@@ -59,14 +59,13 @@ object TransferTx extends TransactionParser.Modern[TransferTx, TransferPayload] 
 
   override def parseTxData(version: Byte, bytes: Array[Byte]): Try[(TransferPayload, Int)] = {
     Try {
-      val (assetIdOpt, assetIdEnd)       = Deser.parseByteArrayOption(bytes, 0, AssetIdLength)
-      val (feeAssetIdOpt, feeAssetIdEnd) = Deser.parseByteArrayOption(bytes, assetIdEnd, AssetIdLength)
-      val amount                         = Longs.fromByteArray(bytes.slice(feeAssetIdEnd, feeAssetIdEnd + 8))
-
       (for {
-        recRes <- AddressOrAlias.fromBytes(bytes, 24)
+        recRes <- AddressOrAlias.fromBytes(bytes, 0)
         (recipient, recipientEnd) = recRes
-        (attachment, attachEnd)   = Deser.parseArraySize(bytes, recipientEnd)
+        (assetIdOpt, assetIdEnd)       = Deser.parseByteArrayOption(bytes, recipientEnd, AssetIdLength)
+        (feeAssetIdOpt, feeAssetIdEnd) = Deser.parseByteArrayOption(bytes, assetIdEnd, AssetIdLength)
+        amount                         = Longs.fromByteArray(bytes.slice(feeAssetIdEnd, feeAssetIdEnd + 8))
+        (attachment, attachEnd)   = Deser.parseArraySize(bytes, feeAssetIdEnd + 8)
         proofs <- Proofs.fromBytes(bytes.drop(attachEnd))
         pl <- ValidateModern
           .transferPL(recipient, assetIdOpt.map(ByteStr.apply), feeAssetIdOpt.map(ByteStr.apply), amount, attachment)

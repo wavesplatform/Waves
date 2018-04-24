@@ -30,7 +30,6 @@ trait TransactionParser {
 }
 
 object TransactionParser {
-  type Aux[T <: Transaction] = TransactionParser { type TransactionT = T }
   trait HardcodedVersion1 extends TransactionParser {
     override val supportedVersions: Set[Byte] = Set(1)
 
@@ -119,23 +118,22 @@ object TransactionParser {
 
     def create(header: TxHeader, data: D, proofs: Proofs): Try[TransactionT]
 
-    override protected def parseHeader(bytes: Array[Byte]): Try[(Byte, Int)] =
+    override def parseHeader(bytes: Array[Byte]): Try[(Byte, Int)] = {
       (for {
-        _ <- Either.cond(bytes.length < 3, (), new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements"))
+        _ <- Either.cond(bytes.length > 3, (), new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements"))
         Array(parsedMark, parsedTypeId, parsedVersion) = bytes.take(3)
-        _ <- Either.cond(parsedMark != 0, (), new IllegalArgumentException(s"Expected the '0' byte, but got '$parsedMark'"))
-        _ <- Either.cond(parsedTypeId != typeId, (), new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'"))
+        _ <- Either.cond(parsedMark == 0, (), new IllegalArgumentException(s"Expected the '0' byte, but got '$parsedMark'"))
+        _ <- Either.cond(parsedTypeId == typeId, (), new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'"))
       } yield (parsedVersion, 3)).toTry
-
+    }
     def parseTxData(version: Byte, bytes: Array[Byte]): Try[(D, Int)]
 
-    override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] = {
-      val (pkStart, pkEnd)   = (0, KeyLength)
+    override def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] = {
       val (tsStart, tsEnd)   = (KeyLength, KeyLength + 8)
       val (feeStart, feeEnd) = (tsEnd, tsEnd + 8)
 
       for {
-        sender    <- parsePK(bytes.slice(pkStart, pkEnd))
+        sender    <- parsePK(bytes.take(KeyLength))
         timestamp <- parseLong(bytes.slice(tsStart, tsEnd))
         fee       <- parseLong(bytes.slice(feeStart, feeEnd))
         header <- ValidateModern

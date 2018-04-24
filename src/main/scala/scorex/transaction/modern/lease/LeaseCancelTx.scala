@@ -24,9 +24,10 @@ final case class LeaseCancelTx(header: TxHeader, payload: LeaseCancelPayload, pr
 object LeaseCancelTx extends TransactionParser.Modern[LeaseCancelTx, LeaseCancelPayload] {
   override val typeId: Byte = 9
 
-  override val supportedVersions: Set[Byte] = Set(2)
+  override val supportedVersions: Set[Byte] = Set(3)
 
-  override def create(header: TxHeader, data: LeaseCancelPayload, proofs: Proofs): Try[LeaseCancelTx] = ???
+  override def create(header: TxHeader, data: LeaseCancelPayload, proofs: Proofs): Try[LeaseCancelTx] =
+    Try(LeaseCancelTx(header, data, proofs))
 
   override def parseTxData(version: Byte, bytes: Array[Byte]): Try[(LeaseCancelPayload, Int)] = {
     parseByteStr(bytes.take(crypto.DigestSize))

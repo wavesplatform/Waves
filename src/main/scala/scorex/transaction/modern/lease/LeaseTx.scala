@@ -35,7 +35,7 @@ final case class LeaseTx(header: TxHeader, payload: LeasePayload, proofs: Proofs
 object LeaseTx extends TransactionParser.Modern[LeaseTx, LeasePayload] {
   override val typeId: Byte = 8
 
-  override val supportedVersions: Set[Byte] = Set(2)
+  override val supportedVersions: Set[Byte] = Set(3)
 
   override def create(header: TxHeader, data: LeasePayload, proofs: Proofs): Try[LeaseTx] =
     Try(LeaseTx(header, data, proofs))
@@ -43,7 +43,7 @@ object LeaseTx extends TransactionParser.Modern[LeaseTx, LeasePayload] {
   override def parseTxData(version: Byte, bytes: Array[Byte]): Try[(LeasePayload, Int)] =
     for {
       recRes <- AddressOrAlias
-        .fromBytes(bytes, KeyLength)
+        .fromBytes(bytes, 0)
         .fold(ve => Failure(new Exception(ve.toString)), Success.apply)
       (recipient, recipientEnd) = recRes
       amountStart               = recipientEnd

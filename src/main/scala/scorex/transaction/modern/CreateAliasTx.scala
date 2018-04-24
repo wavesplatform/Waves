@@ -11,7 +11,7 @@ import scala.util.{Failure, Success, Try}
 
 final case class CreateAliasPayload(alias: Alias) extends TxData {
   override def bytes: Coeval[Array[Byte]] =
-    Coeval.evalOnce(alias.bytes.arr)
+    Coeval.evalOnce(Deser.serializeArray(alias.bytes.arr))
   override def json: Coeval[JsObject] =
     Coeval.evalOnce(Json.obj("alias" -> alias.name))
 }
@@ -30,8 +30,8 @@ object CreateAliasTx extends TransactionParser.Modern[CreateAliasTx, CreateAlias
   }
 
   override def parseTxData(version: Byte, bytes: Array[Byte]): Try[(CreateAliasPayload, Int)] = {
-    val (aliasBytes, aliasEnd) = Deser.parseArraySize(bytes, KeyLength)
     for {
+      (aliasBytes, aliasEnd) <- Try(Deser.parseArraySize(bytes, 0))
       alias <- Alias
         .fromBytes(aliasBytes)
         .fold(ve => Failure(new Exception(ve.toString)), Success.apply)

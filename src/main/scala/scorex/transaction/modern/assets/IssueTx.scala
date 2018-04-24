@@ -55,7 +55,7 @@ final case class IssueTx(header: TxHeader, payload: IssuePayload, proofs: Proofs
 object IssueTx extends TransactionParser.Modern[IssueTx, IssuePayload] {
   override val typeId: Byte = 3
 
-  override val supportedVersions: Set[Byte] = Set(2)
+  override val supportedVersions: Set[Byte] = Set(3)
 
   override def parseTxData(version: Byte, bytes: Array[Byte]): Try[(IssuePayload, Int)] = Try {
     val chainId                       = bytes(0)

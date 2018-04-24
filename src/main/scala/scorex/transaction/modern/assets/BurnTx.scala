@@ -32,7 +32,7 @@ final case class BurnTx(header: TxHeader, payload: BurnPayload, proofs: Proofs) 
 object BurnTx extends TransactionParser.Modern[BurnTx, BurnPayload] {
   override val typeId: Byte = 6
 
-  override def supportedVersions: Set[Byte] = Set(2)
+  override def supportedVersions: Set[Byte] = Set(3)
 
   override def create(header: TxHeader, data: BurnPayload, proofs: Proofs): Try[BurnTx] =
     Try(BurnTx(header, data, proofs))

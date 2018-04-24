@@ -31,7 +31,7 @@ final case class SetScriptTx(header: TxHeader, payload: SetScriptPayload, proofs
 object SetScriptTx extends TransactionParser.Modern[SetScriptTx, SetScriptPayload] {
   override val typeId: Byte = 13
 
-  override val supportedVersions: Set[Byte] = Set(2)
+  override val supportedVersions: Set[Byte] = Set(3)
 
   override def create(header: TxHeader, data: SetScriptPayload, proofs: Proofs): Try[SetScriptTx] =
     Try(SetScriptTx(header, data, proofs))
@@ -40,7 +40,7 @@ object SetScriptTx extends TransactionParser.Modern[SetScriptTx, SetScriptPayloa
     Try {
       val chainId = bytes(0)
       val (scriptOptEi: Option[Either[ValidationError.ScriptParseError, Script]], scriptEnd) =
-        Deser.parseOption(bytes, KeyLength + 1)(ScriptReader.fromBytes)
+        Deser.parseOption(bytes, 1)(ScriptReader.fromBytes)
       val scriptEiOpt = scriptOptEi match {
         case None            => Right(None)
         case Some(Right(sc)) => Right(Some(sc))

@@ -36,7 +36,7 @@ object ReissueTx extends TransactionParser.Modern[ReissueTx, ReissuePayload] {
 
   override val typeId: Byte = 5
 
-  override val supportedVersions: Set[Byte] = Set(2)
+  override val supportedVersions: Set[Byte] = Set(3)
 
   override def create(header: TxHeader, data: ReissuePayload, proofs: Proofs): Try[ReissueTx] = {
     Try(ReissueTx(header, data, proofs))
@@ -45,13 +45,8 @@ object ReissueTx extends TransactionParser.Modern[ReissueTx, ReissuePayload] {
   override def parseTxData(version: Byte, bytes: Array[Byte]): Try[(ReissuePayload, Int)] = {
     for {
       assetId <- parseByteStr(bytes.take(AssetIdLength))
-      (quantityBytes, quantityEnd) = Deser.parseArraySize(bytes, AssetIdLength)
-      quantity <- parseLong(quantityBytes)
-      reissuable <- bytes
-        .slice(quantityEnd + 1, quantityEnd + 2)
-        .headOption
-        .map(_ == (1: Byte))
-        .fold[Try[Boolean]](Failure(new Exception("Cannot parse reissuable flag")))(r => Success(r))
-    } yield (ReissuePayload(assetId, quantity, reissuable), quantityEnd + 2)
+      quantity <- parseLong(bytes.slice(AssetIdLength, AssetIdLength + 8))
+      reissuable = bytes.slice(AssetIdLength + 8, AssetIdLength + 9).head == (1: Byte)
+    } yield (ReissuePayload(assetId, quantity, reissuable), AssetIdLength + 9)
   }
 }
