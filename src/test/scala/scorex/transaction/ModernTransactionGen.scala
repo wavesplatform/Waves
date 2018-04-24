@@ -3,7 +3,7 @@ package scorex.transaction
 import com.wavesplatform.TransactionGenBase
 import org.scalacheck.Gen
 import scorex.account.{AddressScheme, PublicKeyAccount}
-import scorex.transaction.modern.{CreateAliasPayload, CreateAliasTx, TxHeader}
+import scorex.transaction.modern._
 import scorex.transaction.modern.assets._
 import scorex.transaction.modern.lease.{LeaseCancelPayload, LeaseCancelTx, LeasePayload, LeaseTx}
 import scorex.transaction.modern.smart.{SetScriptPayload, SetScriptTx}
@@ -89,6 +89,18 @@ trait ModernTransactionGen extends TransactionGenBase {
       payload <- scriptGen.map(s => SetScriptPayload(AddressScheme.current.chainId, Some(s)))
       proofs  <- proofsGen
     } yield SetScriptTx(header, payload, proofs)
+  }
+
+  def dataTxGen: Gen[DataTx] = {
+    for {
+      version <- Gen.oneOf(DataTx.supportedVersions.toSeq)
+      header  <- txHeaderGen(DataTx.typeId, version)
+      payload <- for {
+        size <- Gen.choose(0, validation.MaxEntryCount)
+        data <- Gen.listOfN(size, dataEntryGen)
+      } yield DataPayload(data)
+      proofs <- proofsGen
+    } yield DataTx(header, payload, proofs)
   }
 
   def txHeaderGen(txType: Byte, version: Byte): Gen[TxHeader] =

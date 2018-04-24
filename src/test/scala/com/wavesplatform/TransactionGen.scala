@@ -1,6 +1,7 @@
 package com.wavesplatform
 
 import cats.syntax.semigroup._
+import cats.syntax.semigroup._
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.Terms.Typed
 import com.wavesplatform.lang.v1.TypeChecker

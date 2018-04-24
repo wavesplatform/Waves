@@ -14,6 +14,7 @@ package object validation {
   val MinAssetNameLength   = 4
   val MaxDecimals          = 8
   val MaxTransferCount     = 100
+  val MaxEntryCount = 100
 
   def mkGeneric(errNel: NonEmptyList[ValidationError]): ValidationError = GenericError(errNel.toString)
 
