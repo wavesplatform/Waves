@@ -114,7 +114,7 @@ trait TransactionGenBase extends ScriptGen {
 
   val scriptGen = BOOLgen(1000).map { expr =>
     val typed = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(PureContext.instance |+| CryptoContext.build(Global)), expr).explicitGet()
-    ScriptV1(typed)
+    ScriptV1(typed).explicitGet()
   }
 
   val setScriptTransactionGen: Gen[SetScriptTransaction] = for {
@@ -502,7 +502,7 @@ trait TransactionGenBase extends ScriptGen {
       recipient <- accountGen
       ts        <- positiveIntGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      setScript <- selfSignedSetScriptTransactionGenP(master, ScriptV1(typed))
+      setScript <- selfSignedSetScriptTransactionGenP(master, ScriptV1(typed).right.get)
       transfer  <- transferGeneratorP(master, recipient.toAddress, None, None)
       lease     <- leaseAndCancelGeneratorP(master, recipient.toAddress, master)
     } yield (genesis, setScript, lease._1, transfer)

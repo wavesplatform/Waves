@@ -24,22 +24,18 @@ object ScriptCompiler {
         .filter(str => !str.contains("{-#"))
         .mkString("\n")
 
-    extractVersion(directives)
-      .flatMap {
-        case V1 =>
-          v1Compiler
-            .compile(scriptWithoutDirectives, directives)
-            .flatMap { expr =>
-              val script = ScriptV1(expr)
-              ScriptComplexityCalculator(functionCosts, expr).map { complexity =>
-                (script, complexity)
-              }
-            }
+    for {
+      v <- extractVersion(directives)
+      expr <- v match {
+        case V1 => v1Compiler.compile(scriptWithoutDirectives, directives)
       }
+      script     <- ScriptV1(expr)
+      complexity <- ScriptComplexityCalculator(functionCosts, expr)
+    } yield (script, complexity)
   }
 
   def estimate(script: Script): Either[String, Long] = script match {
-    case ScriptV1(expr) => ScriptComplexityCalculator(functionCosts, expr)
+    case Script.Expr(expr) => ScriptComplexityCalculator(functionCosts, expr)
   }
 
   private def extractVersion(directives: List[Directive]): Either[String, ScriptVersion] = {

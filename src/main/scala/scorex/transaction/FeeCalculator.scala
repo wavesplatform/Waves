@@ -7,7 +7,7 @@ import com.wavesplatform.state._
 import scorex.transaction.FeeCalculator._
 import scorex.transaction.ValidationError.{GenericError, InsufficientFee}
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
-import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.smart.script.Script
 
 /**
   * Class to check, that transaction contains enough fee to put it to UTX pool
@@ -52,8 +52,8 @@ class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
       )
 
       scriptComplexity <- script match {
-        case Some(s: ScriptV1) =>
-          ScriptComplexityCalculator(functionCosts, s.expr) match {
+        case Some(Script.Expr(expr)) =>
+          ScriptComplexityCalculator(functionCosts, expr) match {
             case Right(x) => Right(settings.smartAccount.baseExtraCharge + x)
             case Left(e)  => Left(ValidationError.GenericError(e))
           }
