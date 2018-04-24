@@ -65,7 +65,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
     }
 
-    val script = ScriptV1(scriptText)
+    val script = ScriptV1(scriptText).explicitGet()
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), fee, System.currentTimeMillis())
       .explicitGet()

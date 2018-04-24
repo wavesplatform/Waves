@@ -41,7 +41,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
         """.stripMargin
       untypedAllFieldsRequiredScript = Parser(allFieldsRequiredScript).get.value
       typedAllFieldsRequiredScript   = TypeChecker(dummyTypeCheckerContext, untypedAllFieldsRequiredScript).explicitGet()
-      setScript            <- selfSignedSetScriptTransactionGenP(master, ScriptV1(typedAllFieldsRequiredScript))
+      setScript            <- selfSignedSetScriptTransactionGenP(master, ScriptV1(typedAllFieldsRequiredScript).explicitGet())
       transferFromScripted <- versionedTransferGenP(master, alice, Proofs.empty)
 
     } yield (genesis, genesis2, setScript, dataTransaction, transferFromScripted)

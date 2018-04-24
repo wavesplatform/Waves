@@ -3,7 +3,7 @@ package com.wavesplatform.http
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.v1.Terms.Typed
 import com.wavesplatform.settings.{FeesSettings, SmartAccountSettings}
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, EitherExt2}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
 import io.netty.channel.group.ChannelGroup
@@ -147,7 +147,7 @@ class AddressRouteSpec
   }
 
   routePath(s"/scriptInfo/${allAddresses(1)}") in {
-    (blockchain.accountScript _).when(allAccounts(1).toAddress).onCall((_: Address) => Some(ScriptV1(Typed.TRUE)))
+    (blockchain.accountScript _).when(allAccounts(1).toAddress).onCall((_: Address) => Some(ScriptV1(Typed.TRUE).explicitGet()))
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1)
