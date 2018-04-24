@@ -1,12 +1,12 @@
-package com.wavesplatform.state.diffs
+package com.wavesplatform.state.diffs.legacy
 
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import scorex.account.Address
-import scorex.transaction.validation.ValidationError.GenericError
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.validation.ValidationError
+import scorex.transaction.validation.ValidationError.GenericError
 
 import scala.util.Right
 

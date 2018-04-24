@@ -5,8 +5,7 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.transaction.{ModernTransactionGen, TransactionParsers}
 
-
-class LeaseCancelTxSpecification extends PropSpec with PropertyChecks with Matchers with ModernTransactionGen  {
+class LeaseCancelTxSpecification extends PropSpec with PropertyChecks with Matchers with ModernTransactionGen {
 
   property("LeaseCancelTx serialization roudtrip") {
     forAll(leaseCancelTxGen) { tx =>

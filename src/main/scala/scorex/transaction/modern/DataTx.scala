@@ -17,13 +17,11 @@ final case class DataPayload(entries: List[DataEntry[_]]) extends TxData {
   }
 
   override val json: Coeval[JsObject] = Coeval.evalOnce {
-    Json.obj("data"    -> Json.toJson(entries))
+    Json.obj("data" -> Json.toJson(entries))
   }
 }
 
-final case class DataTx(header: TxHeader,
-                        payload: DataPayload,
-                        proofs: Proofs) extends ModernTransaction(DataTx) {
+final case class DataTx(header: TxHeader, payload: DataPayload, proofs: Proofs) extends ModernTransaction(DataTx) {
   override def assetFee: (Option[AssetId], Long) = (None, header.fee)
 }
 

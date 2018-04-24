@@ -1,11 +1,11 @@
-package com.wavesplatform.state.diffs
+package com.wavesplatform.state.diffs.legacy
 
 import cats.implicits._
 import com.wavesplatform.state._
 import scorex.account.Address
 import scorex.transaction.assets.VersionedTransferTransaction
-import scorex.transaction.validation.ValidationError.GenericError
 import scorex.transaction.validation.ValidationError
+import scorex.transaction.validation.ValidationError.GenericError
 
 object ScriptTransferTransactionDiff {
   def apply(blockchain: Blockchain, height: Int)(tx: VersionedTransferTransaction): Either[ValidationError, Diff] = {

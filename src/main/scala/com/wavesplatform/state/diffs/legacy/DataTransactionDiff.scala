@@ -1,4 +1,4 @@
-package com.wavesplatform.state.diffs
+package com.wavesplatform.state.diffs.legacy
 
 import com.wavesplatform.state._
 import scorex.transaction.DataTransaction

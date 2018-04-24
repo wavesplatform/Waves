@@ -5,7 +5,6 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.Alias
 import scorex.serialization.Deser
 import scorex.transaction._
-import scorex.crypto.signatures.Curve25519.KeyLength
 
 import scala.util.{Failure, Success, Try}
 

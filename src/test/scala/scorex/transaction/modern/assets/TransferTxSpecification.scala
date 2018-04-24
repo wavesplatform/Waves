@@ -4,7 +4,7 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.transaction.{ModernTransactionGen, TransactionParsers}
 
-class TransferTxSpecification extends PropSpec with PropertyChecks with Matchers with ModernTransactionGen  {
+class TransferTxSpecification extends PropSpec with PropertyChecks with Matchers with ModernTransactionGen {
 
   property("TransferTx serialization roudtrip") {
     forAll(transferTxGen) { tx =>

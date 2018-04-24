@@ -61,11 +61,11 @@ object TransferTx extends TransactionParser.Modern[TransferTx, TransferPayload] 
     Try {
       (for {
         recRes <- AddressOrAlias.fromBytes(bytes, 0)
-        (recipient, recipientEnd) = recRes
+        (recipient, recipientEnd)      = recRes
         (assetIdOpt, assetIdEnd)       = Deser.parseByteArrayOption(bytes, recipientEnd, AssetIdLength)
         (feeAssetIdOpt, feeAssetIdEnd) = Deser.parseByteArrayOption(bytes, assetIdEnd, AssetIdLength)
         amount                         = Longs.fromByteArray(bytes.slice(feeAssetIdEnd, feeAssetIdEnd + 8))
-        (attachment, attachEnd)   = Deser.parseArraySize(bytes, feeAssetIdEnd + 8)
+        (attachment, attachEnd)        = Deser.parseArraySize(bytes, feeAssetIdEnd + 8)
         proofs <- Proofs.fromBytes(bytes.drop(attachEnd))
         pl <- ValidateModern
           .transferPL(recipient, assetIdOpt.map(ByteStr.apply), feeAssetIdOpt.map(ByteStr.apply), amount, attachment)

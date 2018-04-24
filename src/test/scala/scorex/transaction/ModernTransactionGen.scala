@@ -44,17 +44,17 @@ trait ModernTransactionGen extends TransactionGenBase {
   def modernLeaseCancelLeaseGen: Gen[(LeaseTx, LeaseCancelTx)] = {
     for {
       (sender, amount, _, _, recipient) <- leaseParamGen
-      leaseVersion                                <- Gen.oneOf(LeaseTx.supportedVersions.toSeq)
-      leaseCancelVersion                               <- Gen.oneOf(LeaseCancelTx.supportedVersions.toSeq)
-      leaseHeader                                <- txHeaderGen(sender, LeaseTx.typeId, leaseVersion)
-      leaseCancelHeader                               <- txHeaderGen(sender, LeaseCancelTx.typeId, leaseCancelVersion)
+      leaseVersion                      <- Gen.oneOf(LeaseTx.supportedVersions.toSeq)
+      leaseCancelVersion                <- Gen.oneOf(LeaseCancelTx.supportedVersions.toSeq)
+      leaseHeader                       <- txHeaderGen(sender, LeaseTx.typeId, leaseVersion)
+      leaseCancelHeader                 <- txHeaderGen(sender, LeaseCancelTx.typeId, leaseCancelVersion)
       proofs                            <- proofsGen
     } yield {
-      val leasePayload     = LeasePayload(amount, recipient)
-      val leaseTx = LeaseTx(leaseHeader, leasePayload, proofs)
+      val leasePayload = LeasePayload(amount, recipient)
+      val leaseTx      = LeaseTx(leaseHeader, leasePayload, proofs)
 
-      val leaseCancelPayload          = LeaseCancelPayload(leaseTx.leaseId())
-      val leaseCancelTx = LeaseCancelTx(leaseCancelHeader, leaseCancelPayload, proofs)
+      val leaseCancelPayload = LeaseCancelPayload(leaseTx.leaseId())
+      val leaseCancelTx      = LeaseCancelTx(leaseCancelHeader, leaseCancelPayload, proofs)
 
       (leaseTx, leaseCancelTx)
     }

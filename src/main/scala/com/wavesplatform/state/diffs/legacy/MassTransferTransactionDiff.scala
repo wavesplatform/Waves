@@ -1,12 +1,12 @@
-package com.wavesplatform.state.diffs
+package com.wavesplatform.state.diffs.legacy
 
 import cats.implicits._
 import com.wavesplatform.state._
 import scorex.account.Address
 import scorex.transaction.assets.MassTransferTransaction
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
-import scorex.transaction.validation.ValidationError.{GenericError, Validation}
 import scorex.transaction.validation.ValidationError
+import scorex.transaction.validation.ValidationError.{GenericError, Validation}
 
 object MassTransferTransactionDiff {
 

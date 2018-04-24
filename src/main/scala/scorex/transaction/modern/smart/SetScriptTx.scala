@@ -3,7 +3,6 @@ package scorex.transaction.modern.smart
 import com.google.common.primitives.Bytes
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
 import scorex.transaction.modern.{ModernTransaction, TxData, TxHeader}
 import scorex.transaction.smart.script.{Script, ScriptReader}

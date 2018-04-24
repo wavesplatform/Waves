@@ -5,7 +5,6 @@ import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.AddressOrAlias
-import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.transaction._
 import scorex.transaction.modern.{ModernTransaction, TxData, TxHeader}
 

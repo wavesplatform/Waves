@@ -1,12 +1,12 @@
-package com.wavesplatform.state.diffs
+package com.wavesplatform.state.diffs.legacy
 
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
 import scorex.account.Address
-import scorex.transaction.validation.ValidationError.GenericError
 import scorex.transaction.PaymentTransaction
 import scorex.transaction.validation.ValidationError
+import scorex.transaction.validation.ValidationError.GenericError
 
 import scala.util.{Left, Right}
 

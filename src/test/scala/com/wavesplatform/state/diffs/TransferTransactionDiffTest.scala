@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.implicits._
+import com.wavesplatform.state.diffs.legacy.TransferTransactionDiff
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen

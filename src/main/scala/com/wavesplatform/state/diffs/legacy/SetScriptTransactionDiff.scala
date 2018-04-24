@@ -1,4 +1,4 @@
-package com.wavesplatform.state.diffs
+package com.wavesplatform.state.diffs.legacy
 
 import com.wavesplatform.state.{Diff, LeaseBalance, Portfolio}
 import scorex.transaction.smart.SetScriptTransaction
