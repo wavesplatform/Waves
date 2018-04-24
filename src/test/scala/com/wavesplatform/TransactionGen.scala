@@ -370,8 +370,8 @@ trait TransactionGenBase extends ScriptGen {
         .create(sender, assetName, description, quantity, decimals, reissuable = reissuable, iFee, timestamp)
         .right
         .get
-      minFee  <- positiveLongGen
-      minFee1 <- positiveLongGen
+      minFee  <- smallFeeGen
+      minFee1 <- smallFeeGen
       assetId = issue.assetId()
     } yield
       (issue,
