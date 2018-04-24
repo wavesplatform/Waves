@@ -26,7 +26,7 @@ object GenesisBlockGenerator extends App {
                       initialBalance: Long,
                       baseTarget: Long,
                       averageBlockDelay: FiniteDuration,
-                      timestamp: Long,
+                      timestamp: Option[Long],
                       distributions: Map[SeedText, Share]) {
     private val distributionsSum = distributions.values.sum
 
@@ -78,9 +78,11 @@ object GenesisBlockGenerator extends App {
     settings.distributions.map { case (seedText, part) => toFullAddressInfo(seedText) -> part }
   }
 
+  val timestamp = settings.timestamp.getOrElse(System.currentTimeMillis())
+
   val genesisTxs: Seq[GenesisTransaction] = shares.map {
     case (addrInfo, part) =>
-      GenesisTransaction(addrInfo.accountAddress, part, settings.timestamp, ByteStr.empty)
+      GenesisTransaction(addrInfo.accountAddress, part, timestamp, ByteStr.empty)
   }.toSeq
 
   val genesisBlock: Block = {
@@ -90,7 +92,7 @@ object GenesisBlockGenerator extends App {
     Block
       .buildAndSign(
         version = 1,
-        timestamp = settings.timestamp,
+        timestamp = timestamp,
         reference = reference,
         consensusData = NxtLikeConsensusBlockData(settings.baseTarget, ByteStr(Array.fill(crypto.DigestSize)(0: Byte))),
         transactionData = genesisTxs,
@@ -105,7 +107,7 @@ object GenesisBlockGenerator extends App {
   report(
     addrInfos = shares.keysIterator,
     settings = GenesisSettings(
-      settings.timestamp,
+      timestamp,
       genesisBlock.timestamp,
       settings.initialBalance,
       Some(signature),
