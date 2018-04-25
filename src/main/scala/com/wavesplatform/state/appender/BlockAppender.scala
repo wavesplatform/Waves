@@ -30,7 +30,6 @@ object BlockAppender extends ScorexLogging with Instrumented {
             settings: WavesSettings,
             scheduler: Scheduler)(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
-      log.debug(s"Appending $newBlock")
       measureSuccessful(
         blockProcessingTimeStats, {
           if (blockchainUpdater.contains(newBlock)) Right(None)
@@ -39,6 +38,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
               _ <- Either.cond(blockchainUpdater.heightOf(newBlock.reference).exists(_ >= blockchainUpdater.height - 1),
                                (),
                                BlockAppendError("Irrelevant block", newBlock))
+              _ = log.debug(s"Appending $newBlock")
               maybeBaseHeight <- appendBlock(checkpoint, blockchainUpdater, utxStorage, pos, time, settings)(newBlock)
             } yield maybeBaseHeight map (_ => blockchainUpdater.score)
         }
@@ -61,8 +61,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
       _                <- EitherT(Task.now(newBlock.signaturesValid()))
       validApplication <- EitherT(apply(checkpoint, blockchainUpdater, time, utxStorage, pos, settings, scheduler)(newBlock))
     } yield validApplication).value.map {
-      case Right(None) =>
-        log.trace(s"${id(ch)} $newBlock already appended")
+      case Right(None) => // block already appended
       case Right(Some(_)) =>
         BlockStats.applied(newBlock, BlockStats.Source.Broadcast, blockchainUpdater.height)
         log.debug(s"${id(ch)} Appended $newBlock")
