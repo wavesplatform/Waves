@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.modern._
 import com.wavesplatform.state.{Blockchain, Diff}
-import scorex.transaction.modern.assets.{BurnTx, IssueTx, ReissueTx, TransferTx}
+import scorex.transaction.modern.assets._
 import scorex.transaction.modern.lease.{LeaseCancelTx, LeaseTx}
 import scorex.transaction.modern.smart.SetScriptTx
 import scorex.transaction.modern.{CreateAliasTx, DataTx, ModernTransaction}
@@ -24,6 +24,8 @@ object ModernTransactionDiff {
       case sstx: SetScriptTx   => SetScriptDiff(currentBlockHeight)(sstx)
       case ttx: TransferTx     => AssetTxDiff.transfer(blockchain, currentBlockHeight)(ttx)
       case itx: IssueTx        => AssetTxDiff.issue(currentBlockHeight)(itx)
+      case sftx: SponsorFeeTx  => AssetTxDiff.sponsor(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(sftx)
+      case cstx: CancelFeeSponsorshipTx => AssetTxDiff.cancelSponsorship(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(cstx)
       case _                   => Left(UnsupportedTransactionType)
     }
   }

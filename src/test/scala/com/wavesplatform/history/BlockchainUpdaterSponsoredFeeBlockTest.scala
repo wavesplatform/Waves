@@ -10,20 +10,21 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.signatures.Curve25519.KeyLength
-import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.{IssueTransaction, SponsorFeeTransaction, TransferTransaction}
+import scorex.transaction.{GenesisTransaction, ModernTransactionGen}
+import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
+import scorex.transaction.modern.assets.SponsorFeeTx
 
 class BlockchainUpdaterSponsoredFeeBlockTest
     extends PropSpec
     with PropertyChecks
     with DomainScenarioDrivenPropertyCheck
     with Matchers
-    with TransactionGen {
+    with ModernTransactionGen {
 
   private val amtTx = 100000
 
   type Setup =
-    (GenesisTransaction, TransferTransaction, IssueTransaction, SponsorFeeTransaction, TransferTransaction, TransferTransaction, TransferTransaction)
+    (GenesisTransaction, TransferTransaction, IssueTransaction, SponsorFeeTx, TransferTransaction, TransferTransaction, TransferTransaction)
 
   val sponsorPreconditions: Gen[Setup] = for {
 
@@ -40,7 +41,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       .create(None,
               master,
               alice,
-              feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee,
+              feeAsset.fee + sponsorTx.header.fee + transferAssetWavesFee + wavesFee,
               ts + 1,
               None,
               transferAssetWavesFee,

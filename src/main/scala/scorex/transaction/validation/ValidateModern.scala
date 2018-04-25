@@ -6,11 +6,11 @@ import com.wavesplatform.state.{ByteStr, DataEntry}
 import scorex.account.{AddressOrAlias, PublicKeyAccount}
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets.{MassTransferTransaction, SmartIssueTransaction, VersionedTransferTransaction}
-import scorex.transaction.modern.{DataPayload, TxHeader}
 import scorex.transaction.modern.assets._
 import scorex.transaction.modern.lease.{LeaseCancelPayload, LeasePayload}
+import scorex.transaction.modern.{DataPayload, TxHeader}
 import scorex.transaction.smart.script.Script
-import scorex.transaction.{AssetId, Proofs, modern}
+import scorex.transaction.{AssetId, Proofs}
 
 object ValidateModern {
 
@@ -139,5 +139,10 @@ object ValidateModern {
         DataPayload(entries),
         ValidationError.TooBigArray
       )
+  }
+
+  def sponsorFellPL(assetId: AssetId, minFee: Long): Validated[SponsorFeePayload] = {
+    validateMinFee(minFee, assetId.base58)
+      .map(f => SponsorFeePayload(assetId, f))
   }
 }

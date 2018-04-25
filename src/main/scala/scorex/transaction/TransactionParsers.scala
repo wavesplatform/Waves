@@ -7,7 +7,7 @@ import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.modern.{CreateAliasTx, DataTx}
-import scorex.transaction.modern.assets.{BurnTx, IssueTx, ReissueTx, TransferTx}
+import scorex.transaction.modern.assets._
 import scorex.transaction.modern.lease.{LeaseCancelTx, LeaseTx}
 import scorex.transaction.modern.smart.SetScriptTx
 
@@ -41,8 +41,6 @@ object TransactionParsers {
     VersionedTransferTransaction,
     SetScriptTransaction,
     SmartIssueTransaction,
-    SponsorFeeTransaction,
-    CancelFeeSponsorshipTransaction
     SmartIssueTransaction,
     VersionedTransferTransaction,
     SetScriptTransaction,
@@ -61,7 +59,9 @@ object TransactionParsers {
     LeaseTx,
     LeaseCancelTx,
     SetScriptTx,
-    DataTx
+    DataTx,
+    SponsorFeeTx,
+    CancelFeeSponsorshipTx
   ).flatMap { x =>
     x.supportedVersions.map { version =>
       ((x.typeId, version), x)

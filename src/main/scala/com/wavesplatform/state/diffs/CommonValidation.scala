@@ -11,6 +11,7 @@ import scorex.transaction._
 import scorex.transaction.assets.{MassTransferTransaction, VersionedTransferTransaction, _}
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.modern.assets.{CancelFeeSponsorshipTx, SponsorFeeTx}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.validation.ValidationError
 
@@ -107,8 +108,8 @@ object CommonValidation {
       case _: SetScriptTransaction            => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: VersionedTransferTransaction    => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: SmartIssueTransaction           => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: SponsorFeeTransaction           => activationBarrier(BlockchainFeatures.FeeSponsorship)
-      case _: CancelFeeSponsorshipTransaction => activationBarrier(BlockchainFeatures.FeeSponsorship)
+      case _: SponsorFeeTx           => activationBarrier(BlockchainFeatures.FeeSponsorship)
+      case _: CancelFeeSponsorshipTx => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _                                  => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }
@@ -147,8 +148,8 @@ object CommonValidation {
           case dtx: DataTransaction                 => Right(1 + (dtx.bytes().length - 1) / 1024)
           case sstx: SetScriptTransaction           => Right(1)
           case sttx: VersionedTransferTransaction   => Right(1)
-          case stx: SponsorFeeTransaction           => Right(1000)
-          case ctx: CancelFeeSponsorshipTransaction => Right(1000)
+          case stx: SponsorFeeTx           => Right(1000)
+          case ctx: CancelFeeSponsorshipTx => Right(1000)
           case _                                    => Left(UnsupportedTransactionType)
         }
         wavesFee <- tx.assetFee._1 match {

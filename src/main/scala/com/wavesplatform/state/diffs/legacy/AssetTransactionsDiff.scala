@@ -5,10 +5,11 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
 import scorex.account.PublicKeyAccount
-import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SmartIssueTransaction}
+import scorex.transaction.assets._
+import scorex.transaction.modern.assets.{CancelFeeSponsorshipTx, SponsorFeeTx}
 import scorex.transaction.validation.ValidationError
 import scorex.transaction.validation.ValidationError.GenericError
-import scorex.transaction.{AssetId, SignedTransaction}
+import scorex.transaction.{AssetId, ProvenTransaction}
 
 import scala.util.{Left, Right}
 
@@ -69,32 +70,6 @@ object AssetTransactionsDiff {
         assetInfos = Map(tx.assetId          -> AssetInfo(isReissuable = true, volume = -tx.amount, None))
       )
     })
-  }
-
-  def sponsor(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(
-      tx: SponsorFeeTransaction): Either[ValidationError, Diff] = {
-    validateAsset(tx, blockchain, tx.assetId, true).flatMap { _ =>
-      Right(
-        Diff(
-          height = height,
-          tx = tx,
-          portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-          sponsorship = Map(tx.assetId         -> SponsorshipValue(tx.minFee))
-        ))
-    }
-  }
-
-  def cancelSponsorship(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(
-      tx: CancelFeeSponsorshipTransaction): Either[ValidationError, Diff] = {
-    validateAsset(tx, blockchain, tx.assetId, true).flatMap { _ =>
-      Right(
-        Diff(
-          height = height,
-          tx = tx,
-          portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-          sponsorship = Map(tx.assetId         -> SponsorshipValue(0))
-        ))
-    }
   }
 
   private def validateAsset(tx: ProvenTransaction, blockchain: Blockchain, assetId: AssetId, issuerOnly: Boolean): Either[ValidationError, Unit] = {

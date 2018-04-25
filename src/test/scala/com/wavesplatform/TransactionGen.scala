@@ -20,6 +20,8 @@ import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets.exchange._
 import scorex.transaction.assets.{MassTransferTransaction, VersionedTransferTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.modern.TxHeader
+import scorex.transaction.modern.assets.{CancelFeeSponsorshipPayload, CancelFeeSponsorshipTx, SponsorFeePayload, SponsorFeeTx}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
@@ -364,8 +366,7 @@ trait TransactionGenBase extends ScriptGen {
   val reissueGen: Gen[ReissueTransaction] = issueReissueBurnGen.map(_._2)
   val burnGen: Gen[BurnTransaction]       = issueReissueBurnGen.map(_._3)
 
-  def sponsorFeeCancelSponsorFeeGen(
-      sender: PrivateKeyAccount): Gen[(IssueTransaction, SponsorFeeTransaction, SponsorFeeTransaction, CancelFeeSponsorshipTransaction)] =
+  def sponsorFeeCancelSponsorFeeGen(sender: PrivateKeyAccount): Gen[(IssueTransaction, SponsorFeeTx, SponsorFeeTx, CancelFeeSponsorshipTx)] =
     for {
       (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
       issue = IssueTransaction
@@ -375,12 +376,18 @@ trait TransactionGenBase extends ScriptGen {
       minFee  <- smallFeeGen
       minFee1 <- smallFeeGen
       assetId = issue.assetId()
-    } yield
-      (issue,
-       SponsorFeeTransaction.create(1, sender, assetId, minFee, 1 * Constants.UnitsInWave, timestamp).right.get,
-       SponsorFeeTransaction.create(1, sender, assetId, minFee1, 1 * Constants.UnitsInWave, timestamp).right.get,
-       CancelFeeSponsorshipTransaction.create(1, sender, assetId, 1 * Constants.UnitsInWave, timestamp).right.get,
-      )
+      proofs <- proofsGen
+    } yield {
+      val sponsorFeeheader =
+        TxHeader(SponsorFeeTx.typeId, 1, sender, 1 * Constants.UnitsInWave, timestamp)
+      val cancelSponsorshipHeader =
+        TxHeader(CancelFeeSponsorshipTx.typeId, 1, sender, 1 * Constants.UnitsInWave, timestamp)
+      val tx1 = SponsorFeeTx.create(sponsorFeeheader, SponsorFeePayload(assetId, minFee), proofs)
+      val tx2 = SponsorFeeTx.create(sponsorFeeheader, SponsorFeePayload(assetId, minFee1), proofs)
+      val tx3 = CancelFeeSponsorshipTx.create(cancelSponsorshipHeader, CancelFeeSponsorshipPayload(assetId), proofs)
+
+      (issue, tx1.get, tx2.get, tx3.get)
+    }
 
   val sponsorFeeGen = for {
     sender        <- accountGen

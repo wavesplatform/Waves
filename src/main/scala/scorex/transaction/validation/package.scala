@@ -38,6 +38,15 @@ package object validation {
       )
   }
 
+  def validateMinFee(fee: Long, of: String): Validated[Long] = {
+    Validated
+      .condNel(
+        fee > 0,
+        fee,
+        ValidationError.NegativeMinFee(fee, of)
+      )
+  }
+
   def validateAmount(amount: Long, of: String): Validated[Long] = {
     Validated
       .condNel(

@@ -23,6 +23,7 @@ import scorex.transaction.validation.ValidationError.GenericError
 import scorex.transaction._
 import scorex.transaction.assets.{MassTransferTransaction, VersionedTransferTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.modern.assets.{CancelFeeSponsorshipTx, SponsorFeeTx}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.utils.Time
 import scorex.wallet.Wallet
@@ -182,8 +183,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case DataTransaction                 => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
               case SmartIssueTransaction           => TransactionFactory.smartIssue(jsv.as[SmartIssueRequest], wallet, time)
               case SetScriptTransaction            => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
-              case SponsorFeeTransaction           => TransactionFactory.sponsor(jsv.as[SponsorFeeRequest], wallet, time)
-              case CancelFeeSponsorshipTransaction => TransactionFactory.cancelSponsorship(jsv.as[CancelFeeSponsorshipRequest], wallet, time)
+              case SponsorFeeTx           => TransactionFactory.sponsor(jsv.as[SponsorFeeRequest], wallet, time)
+              case CancelFeeSponsorshipTx => TransactionFactory.cancelSponsorship(jsv.as[CancelFeeSponsorshipRequest], wallet, time)
             }
         }
         r match {
@@ -226,8 +227,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case DataTransaction                 => jsv.as[SignedDataRequest].toTx
               case SmartIssueTransaction           => jsv.as[SignedSmartIssueRequest].toTx
               case SetScriptTransaction            => jsv.as[SignedSetScriptRequest].toTx
-              case SponsorFeeTransaction           => jsv.as[SignedSponsorFeeRequest].toTx
-              case CancelFeeSponsorshipTransaction => jsv.as[SignedCancelFeeSponsorshipRequest].toTx
+              case SponsorFeeTx           => jsv.as[SignedSponsorFeeRequest].toTx
+              case CancelFeeSponsorshipTx => jsv.as[SignedCancelFeeSponsorshipRequest].toTx
             }
         }
         doBroadcast(r)

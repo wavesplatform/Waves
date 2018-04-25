@@ -40,7 +40,7 @@ object DataTx extends TransactionParser.Modern[DataTx, DataPayload] {
 
   override def parseTxData(version: Byte, bytes: Array[Byte]): Try[(DataPayload, Int)] = {
     for {
-      entryCount <- parseShorts(bytes)
+      entryCount <- Try(Shorts.fromByteArray(bytes))
       parsed <- Try(List.iterate(DataEntry.parse(bytes, 2), entryCount){ case (e, p) => DataEntry.parse(bytes, p) })
       entries = parsed.map(_._1)
       offset = parsed.lastOption.map(_._2) getOrElse 2

@@ -1,10 +1,12 @@
 package scorex.transaction
 
 import com.google.common.primitives.{Longs, Shorts}
+import com.wavesplatform.crypto
+import com.wavesplatform.state._
 import com.wavesplatform.state.ByteStr
-import scorex.account.{Alias, PublicKeyAccount}
+import scorex.account.{Alias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.signatures.Curve25519.KeyLength
-import scorex.transaction.modern.{TxData, TxHeader}
+import scorex.transaction.modern.{ModernTransaction, TxData, TxHeader}
 import scorex.transaction.validation._
 
 import scala.reflect.ClassTag
@@ -20,6 +22,46 @@ trait TransactionParser {
   def parseBytes(bytes: Array[Byte]): Try[TransactionT] = parseHeader(bytes).flatMap {
     case (version, offset) =>
       parseTail(version, bytes.drop(offset))
+  }
+
+  def parsePK(bytes: Array[Byte]): Try[PublicKeyAccount] = {
+    Try(PublicKeyAccount(bytes))
+  }
+
+  def parseSenderAndTimestamp(bytes: Array[Byte]): Try[(PublicKeyAccount, Long)] = {
+    val (pkStart, pkEnd) = (0, KeyLength)
+    val (tsStart, tsEnd) = (KeyLength, KeyLength + 8)
+
+    for {
+      pk <- Try(PublicKeyAccount(bytes.slice(pkStart, pkEnd)))
+      ts <- parseLong(bytes.slice(tsStart, tsEnd))
+    } yield (pk, ts)
+  }
+
+  def parseAlias(bytes: Array[Byte]): Try[Alias] = {
+    Alias
+      .fromBytes(bytes)
+      .fold(
+        ve => Failure(new Exception(ve.toString)),
+        a => Success(a)
+      )
+  }
+
+  def parseByteStr(bytes: Array[Byte]): Try[ByteStr] = Try {
+    ByteStr(bytes)
+  }
+
+  def parseLong(bytes: Array[Byte]): Try[Long] = Try {
+    Longs.fromByteArray(bytes)
+  }
+
+  def parseProofs(bytes: Array[Byte]): Try[Proofs] = {
+    Proofs
+      .fromBytes(bytes)
+      .fold(
+        ve => Failure(new Exception(ve.toString)),
+        ps => Success(ps)
+      )
   }
 
   /**
@@ -70,53 +112,25 @@ object TransactionParser {
 
       (parsedVersion, 3)
     }
-
-    def parsePK(bytes: Array[Byte]): Try[PublicKeyAccount] = {
-      Try(PublicKeyAccount(bytes))
-    }
-
-    def parseSenderAndTimestamp(bytes: Array[Byte]): Try[(PublicKeyAccount, Long)] = {
-      val (pkStart, pkEnd) = (0, KeyLength)
-      val (tsStart, tsEnd) = (KeyLength, KeyLength + 8)
-
-      for {
-        pk <- Try(PublicKeyAccount(bytes.slice(pkStart, pkEnd)))
-        ts <- parseLong(bytes.slice(tsStart, tsEnd))
-      } yield (pk, ts)
-    }
-
-    def parseAlias(bytes: Array[Byte]): Try[Alias] = {
-      Alias
-        .fromBytes(bytes)
-        .fold(
-          ve => Failure(new Exception(ve.toString)),
-          a => Success(a)
-        )
-    }
-
-    def parseByteStr(bytes: Array[Byte]): Try[ByteStr] = Try {
-      ByteStr(bytes)
-    }
-
-    def parseLong(bytes: Array[Byte]): Try[Long] = Try {
-      Longs.fromByteArray(bytes)
-    }
-
-    def parseProofs(bytes: Array[Byte]): Try[Proofs] = {
-      Proofs
-        .fromBytes(bytes)
-        .fold(
-          ve => Failure(new Exception(ve.toString)),
-          ps => Success(ps)
-        )
-    }
   }
 
-  abstract class Modern[T <: Transaction, D <: TxData](implicit override val classTag: ClassTag[T]) extends TransactionParser {
+  abstract class Modern[T <: ModernTransaction, D <: TxData](implicit override val classTag: ClassTag[T]) extends TransactionParser {
 
     override type TransactionT = T
 
     def create(header: TxHeader, data: D, proofs: Proofs): Try[TransactionT]
+
+    def selfSigned(header: TxHeader, data: D): Try[TransactionT] = {
+      header.sender match {
+        case pk: PrivateKeyAccount =>
+          for {
+            us <- create(header, data, Proofs.empty)
+            tx <- create(header, data, Proofs.create(Seq(ByteStr(crypto.sign(pk, us.bodyBytes())))).explicitGet())
+          } yield tx
+        case _ =>
+          Failure(new Exception("Can prove with public key, only private allowed"))
+      }
+    }
 
     override def parseHeader(bytes: Array[Byte]): Try[(Byte, Int)] = {
       (for {
@@ -146,40 +160,6 @@ object TransactionParser {
         proofs         <- parseProofs(bytes.drop(feeEnd + offset))
         tx             <- create(header, data, proofs)
       } yield tx
-    }
-
-    def parsePK(bytes: Array[Byte]): Try[PublicKeyAccount] = {
-      Try(PublicKeyAccount(bytes))
-    }
-
-    def parseAlias(bytes: Array[Byte]): Try[Alias] = {
-      Alias
-        .fromBytes(bytes)
-        .fold(
-          ve => Failure(new Exception(ve.toString)),
-          a => Success(a)
-        )
-    }
-
-    def parseByteStr(bytes: Array[Byte]): Try[ByteStr] = Try {
-      ByteStr(bytes)
-    }
-
-    def parseLong(bytes: Array[Byte]): Try[Long] = Try {
-      Longs.fromByteArray(bytes)
-    }
-
-    def parseShorts(bytes: Array[Byte]): Try[Short] = Try {
-      Shorts.fromByteArray(bytes)
-    }
-
-    def parseProofs(bytes: Array[Byte]): Try[Proofs] = {
-      Proofs
-        .fromBytes(bytes)
-        .fold(
-          ve => Failure(new Exception(ve.toString)),
-          ps => Success(ps)
-        )
     }
   }
 

@@ -2,15 +2,17 @@ package com.wavesplatform.state.diffs.modern
 
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
 import scorex.account.{Address, PublicKeyAccount}
 import scorex.transaction.AssetId
 import scorex.transaction.modern.ModernTransaction
-import scorex.transaction.modern.assets.{BurnTx, IssueTx, ReissueTx, TransferTx}
+import scorex.transaction.modern.assets._
 import scorex.transaction.validation.ValidationError
 import scorex.transaction.validation.ValidationError.GenericError
 import com.wavesplatform.features.FeatureProvider._
 import cats.implicits._
+import com.wavesplatform.state.diffs.legacy.AssetTransactionsDiff.validateAsset
+
 import scala.util.{Left, Right}
 
 object AssetTxDiff {
@@ -86,6 +88,33 @@ object AssetTxDiff {
       }
       _ <- Either.cond(assetIssued, (), GenericError(s"Unissued assets are not allowed"))
     } yield Diff(height, tx, portfolios)
+  }
+
+
+  def sponsor(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(
+    tx: SponsorFeeTx): Either[ValidationError, Diff] = {
+    validateAsset(tx, blockchain, tx.assetId, true).flatMap { _ =>
+      Right(
+        Diff(
+          height = height,
+          tx = tx,
+          portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.header.fee, lease = LeaseBalance.empty, assets = Map.empty)),
+          sponsorship = Map(tx.assetId         -> SponsorshipValue(tx.minFee))
+        ))
+    }
+  }
+
+  def cancelSponsorship(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(
+    tx: CancelFeeSponsorshipTx): Either[ValidationError, Diff] = {
+    validateAsset(tx, blockchain, tx.assetId, true).flatMap { _ =>
+      Right(
+        Diff(
+          height = height,
+          tx = tx,
+          portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.header.fee, lease = LeaseBalance.empty, assets = Map.empty)),
+          sponsorship = Map(tx.assetId         -> SponsorshipValue(0))
+        ))
+    }
   }
 
   private def validateAsset(tx: ModernTransaction, blockchain: Blockchain, assetId: AssetId, issuerOnly: Boolean): Either[ValidationError, Unit] = {
