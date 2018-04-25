@@ -6,7 +6,7 @@ import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Portfolio, _}
 import scorex.account.Address
-import scorex.transaction.ValidationError.{AlreadyInTheState, GenericError, Mistiming, UnsupportedTransactionType}
+import scorex.transaction.ValidationError._
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -148,7 +148,7 @@ object CommonValidation {
           case stx: SponsorFeeTransaction         => Right(1000)
           case _                                  => Left(UnsupportedTransactionType)
         }
-        wavesFee <- tx.assetFee._1 match {
+        txWavesFee <- tx.assetFee._1 match {
           case None => Right(tx.assetFee._2)
           case Some(assetId) =>
             for {
@@ -162,10 +162,20 @@ object CommonValidation {
         }
         minimumFee = feeInUnits * Sponsorship.FeeUnit
         _ <- Either.cond(
-          wavesFee >= minimumFee,
+          txWavesFee >= minimumFee,
           (),
           GenericError(
             s"Fee in ${tx.assetFee._1.fold("WAVES")(_.toString)} for ${tx.builder.classTag} does not exceed minimal value of $minimumFee WAVES")
+        )
+        script <- Right(tx match {
+          case tx: Transaction with Authorized => blockchain.accountScript(tx.sender)
+          case _                               => None
+        })
+        totalRequiredFee = minimumFee + script.fold(0L)(_ => 400000L)
+        _ <- Either.cond(
+          txWavesFee >= totalRequiredFee,
+          (),
+          InsufficientFee(s"Scripted account requires $totalRequiredFee fee for this transaction, but given: $txWavesFee")
         )
       } yield ()
   }

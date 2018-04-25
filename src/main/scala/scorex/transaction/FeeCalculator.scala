@@ -59,7 +59,7 @@ class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
       //        case Some(x)                 => throw new IllegalStateException(s"Doesn't know how to calculate complexity for a script of ${x.version} version")
       //      }
 
-      totalRequiredFee = minTxFee + settings.smartAccount.extraFee
+      totalRequiredFee = minTxFee + script.fold(0L)(_ => settings.smartAccount.extraFee)
       _ <- Either.cond(
         txFeeValue >= totalRequiredFee,
         (),
