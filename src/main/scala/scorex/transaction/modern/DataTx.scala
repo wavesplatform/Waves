@@ -4,6 +4,7 @@ import com.google.common.primitives.{Bytes, Shorts}
 import com.wavesplatform.state.DataEntry
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
+import scorex.transaction.base.DataTxBase
 import scorex.transaction.validation.ValidateModern
 import scorex.transaction.{AssetId, Proofs, TransactionParser}
 
@@ -22,8 +23,11 @@ final case class DataPayload(entries: List[DataEntry[_]]) extends TxData {
   }
 }
 
-final case class DataTx(header: TxHeader, payload: DataPayload, proofs: Proofs) extends ModernTransaction(DataTx) {
+final case class DataTx(header: TxHeader, payload: DataPayload, proofs: Proofs)
+  extends ModernTransaction(DataTx)
+    with DataTxBase {
   override def assetFee: (Option[AssetId], Long) = (None, header.fee)
+  override val data: List[DataEntry[_]] = payload.entries
 }
 
 object DataTx extends TransactionParser.Modern[DataTx, DataPayload] {

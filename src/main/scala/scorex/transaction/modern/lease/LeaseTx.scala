@@ -6,6 +6,7 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.AddressOrAlias
 import scorex.transaction._
+import scorex.transaction.base.LeaseTxBase
 import scorex.transaction.modern.{ModernTransaction, TxData, TxHeader}
 import scorex.transaction.validation.ValidateModern
 
@@ -27,9 +28,14 @@ final case class LeasePayload(amount: Long, recipient: AddressOrAlias) extends T
   }
 }
 
-final case class LeaseTx(header: TxHeader, payload: LeasePayload, proofs: Proofs) extends ModernTransaction(LeaseTx) {
+final case class LeaseTx(header: TxHeader, payload: LeasePayload, proofs: Proofs)
+  extends ModernTransaction(LeaseTx)
+    with LeaseTxBase {
   override val assetFee: (Option[AssetId], Long) = (None, header.fee)
   val leaseId: Coeval[ByteStr]                   = id
+
+  override val amount: Long = payload.amount
+  override val recipient: AddressOrAlias = payload.recipient
 }
 
 object LeaseTx extends TransactionParser.Modern[LeaseTx, LeasePayload] {

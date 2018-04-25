@@ -6,10 +6,11 @@ import com.google.common.primitives.{Bytes, Longs}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.serialization.Deser
+import scorex.transaction.base.IssueTxBase
 import scorex.transaction.modern.{ModernTransaction, TxData, TxHeader}
 import scorex.transaction.smart.script.{Script, ScriptReader}
 import scorex.transaction.validation._
-import scorex.transaction.{AssetId, Proofs, TransactionParser}
+import scorex.transaction.{AssetId, ChainSpecific, Proofs, TransactionParser}
 
 import scala.util.Try
 
@@ -46,8 +47,19 @@ final case class IssuePayload(chainId: Byte,
   }
 }
 
-final case class IssueTx(header: TxHeader, payload: IssuePayload, proofs: Proofs) extends ModernTransaction(IssueTx) {
+final case class IssueTx(header: TxHeader, payload: IssuePayload, proofs: Proofs)
+  extends ModernTransaction(IssueTx)
+    with IssueTxBase
+    with ChainSpecific {
   override def assetFee: (Option[AssetId], Long) = (None, header.fee)
+
+  override val chainId: Byte = payload.chainId
+  override val name: Array[Byte] = payload.name
+  override val description: Array[Byte] = payload.description
+  override val quantity: Long = payload.quantity
+  override val decimals: Byte = payload.decimals
+  override val reissuable: Boolean = payload.reissuable
+  override val script: Option[Script] = payload.script
 
   val assetId: Coeval[AssetId] = id
 }

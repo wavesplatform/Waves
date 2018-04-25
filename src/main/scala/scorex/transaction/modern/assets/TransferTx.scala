@@ -7,6 +7,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.AddressOrAlias
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
+import scorex.transaction.base.TransferTxBase
 import scorex.transaction.modern.{ModernTransaction, TxData, TxHeader}
 import scorex.transaction.validation.ValidateModern
 import scorex.transaction.{AssetId, AssetIdLength, Proofs, TransactionParser}
@@ -44,8 +45,16 @@ final case class TransferPayload(recipient: AddressOrAlias,
   }
 }
 
-final case class TransferTx(header: TxHeader, payload: TransferPayload, proofs: Proofs) extends ModernTransaction(TransferTx) {
+final case class TransferTx(header: TxHeader, payload: TransferPayload, proofs: Proofs)
+  extends ModernTransaction(TransferTx)
+    with TransferTxBase {
   override def assetFee: (Option[AssetId], Long) = (None, header.fee)
+
+  override val recipient: AddressOrAlias = payload.recipient
+  override val assetId: Option[AssetId] = payload.assetId
+  override val feeAssetId: Option[AssetId] = payload.feeAssetId
+  override val amount: Long = payload.amount
+  override val attachment: Array[Byte] = payload.attachment
 }
 
 object TransferTx extends TransactionParser.Modern[TransferTx, TransferPayload] {

@@ -11,6 +11,7 @@ import scorex.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
 import scorex.transaction._
+import scorex.transaction.base.IssueTxBase
 import scorex.transaction.smart.script.{Script, ScriptReader}
 import scorex.transaction.validation.ValidationError
 import scorex.transaction.validation.ValidationError.{GenericError, UnsupportedVersion}
@@ -30,6 +31,7 @@ case class SmartIssueTransaction private (version: Byte,
                                           timestamp: Long,
                                           proofs: Proofs)
     extends ProvenTransaction
+    with IssueTxBase
     with FastHashId
     with ChainSpecific {
 

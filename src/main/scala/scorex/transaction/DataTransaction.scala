@@ -7,12 +7,14 @@ import monix.eval.Coeval
 import play.api.libs.json._
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.signatures.Curve25519.KeyLength
+import scorex.transaction.base.DataTxBase
 import scorex.transaction.validation.ValidationError
 
 import scala.util.{Failure, Success, Try}
 
 case class DataTransaction private (version: Byte, sender: PublicKeyAccount, data: List[DataEntry[_]], fee: Long, timestamp: Long, proofs: Proofs)
     extends ProvenTransaction
+    with DataTxBase
     with FastHashId {
 
   override val builder: TransactionParser        = DataTransaction

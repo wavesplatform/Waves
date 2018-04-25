@@ -5,6 +5,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.Alias
 import scorex.serialization.Deser
 import scorex.transaction._
+import scorex.transaction.base.CreateAliasTxBase
 
 import scala.util.{Failure, Success, Try}
 
@@ -15,8 +16,12 @@ final case class CreateAliasPayload(alias: Alias) extends TxData {
     Coeval.evalOnce(Json.obj("alias" -> alias.name))
 }
 
-final case class CreateAliasTx(header: TxHeader, payload: CreateAliasPayload, proofs: Proofs) extends ModernTransaction(CreateAliasTx) {
+final case class CreateAliasTx(header: TxHeader, payload: CreateAliasPayload, proofs: Proofs)
+  extends ModernTransaction(CreateAliasTx)
+    with CreateAliasTxBase {
   override val assetFee: (Option[AssetId], Long) = (None, header.fee)
+
+  override val alias: Alias = payload.alias
 }
 
 object CreateAliasTx extends TransactionParser.Modern[CreateAliasTx, CreateAliasPayload] {

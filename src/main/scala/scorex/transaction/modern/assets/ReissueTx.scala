@@ -6,6 +6,7 @@ import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.transaction._
+import scorex.transaction.base.ReissueTxBase
 import scorex.transaction.modern.{ModernTransaction, TxData, TxHeader}
 import scorex.transaction.validation.ValidateModern
 
@@ -29,8 +30,14 @@ final case class ReissuePayload(assetId: ByteStr, quantity: Long, reissuable: Bo
   }
 }
 
-final case class ReissueTx(header: TxHeader, payload: ReissuePayload, proofs: Proofs) extends ModernTransaction(ReissueTx) {
+final case class ReissueTx(header: TxHeader, payload: ReissuePayload, proofs: Proofs)
+  extends ModernTransaction(ReissueTx)
+    with ReissueTxBase {
   override val assetFee: (Option[AssetId], Long) = (None, header.fee)
+
+  override val assetId: AssetId = payload.assetId
+  override val quantity: Long = payload.quantity
+  override val reissuable: Boolean = payload.reissuable
 }
 
 object ReissueTx extends TransactionParser.Modern[ReissueTx, ReissuePayload] {

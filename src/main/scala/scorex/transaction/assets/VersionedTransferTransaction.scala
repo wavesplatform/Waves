@@ -10,6 +10,7 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
 import scorex.transaction._
+import scorex.transaction.base.TransferTxBase
 import scorex.transaction.validation.ValidationError
 
 import scala.util.{Failure, Success, Try}
@@ -24,10 +25,13 @@ case class VersionedTransferTransaction private (version: Byte,
                                                  attachment: Array[Byte],
                                                  proofs: Proofs)
     extends ProvenTransaction
+    with TransferTxBase
     with FastHashId {
 
   override val builder: TransactionParser        = VersionedTransferTransaction
   override val assetFee: (Option[AssetId], Long) = (None, fee)
+
+  override def feeAssetId: Option[AssetId] = None
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val timestampBytes = Longs.toByteArray(timestamp)

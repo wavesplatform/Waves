@@ -8,6 +8,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Address, AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.transaction._
+import scorex.transaction.base.LeaseTxBase
 import scorex.transaction.validation.ValidationError
 
 import scala.util.{Failure, Success, Try}
@@ -19,6 +20,7 @@ case class LeaseTransaction private (sender: PublicKeyAccount,
                                      recipient: AddressOrAlias,
                                      signature: ByteStr)
     extends SignedTransaction
+    with LeaseTxBase
     with FastHashId {
 
   override val builder: TransactionParser = LeaseTransaction

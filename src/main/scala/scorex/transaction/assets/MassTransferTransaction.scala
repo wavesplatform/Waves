@@ -13,6 +13,7 @@ import scorex.serialization.Deser
 import scorex.transaction.validation.ValidationError.Validation
 import scorex.transaction._
 import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, toJson}
+import scorex.transaction.base.MassTransferTxBase
 import scorex.transaction.validation.ValidationError
 
 import scala.util.{Either, Failure, Success, Try}
@@ -26,6 +27,7 @@ case class MassTransferTransaction private (version: Byte,
                                             attachment: Array[Byte],
                                             proofs: Proofs)
     extends ProvenTransaction
+    with MassTransferTxBase
     with FastHashId {
   override val builder: MassTransferTransaction.type = MassTransferTransaction
 

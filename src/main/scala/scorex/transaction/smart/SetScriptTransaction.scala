@@ -9,6 +9,7 @@ import scorex.account._
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
 import scorex.transaction._
+import scorex.transaction.base.SetScriptTxBase
 import scorex.transaction.smart.script.{Script, ScriptReader}
 import scorex.transaction.validation.ValidationError
 import scorex.transaction.validation.ValidationError.GenericError
@@ -23,6 +24,7 @@ case class SetScriptTransaction private (version: Byte,
                                          timestamp: Long,
                                          proofs: Proofs)
     extends ProvenTransaction
+    with SetScriptTxBase
     with FastHashId {
 
   override val builder: TransactionParser = SetScriptTransaction

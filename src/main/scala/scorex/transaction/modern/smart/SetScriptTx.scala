@@ -4,10 +4,11 @@ import com.google.common.primitives.Bytes
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.serialization.Deser
+import scorex.transaction.base.SetScriptTxBase
 import scorex.transaction.modern.{ModernTransaction, TxData, TxHeader}
 import scorex.transaction.smart.script.{Script, ScriptReader}
 import scorex.transaction.validation.ValidationError
-import scorex.transaction.{AssetId, Proofs, TransactionParser}
+import scorex.transaction.{AssetId, ChainSpecific, Proofs, TransactionParser}
 
 import scala.util.{Failure, Success, Try}
 
@@ -23,8 +24,14 @@ final case class SetScriptPayload(chainId: Byte, script: Option[Script]) extends
   }
 }
 
-final case class SetScriptTx(header: TxHeader, payload: SetScriptPayload, proofs: Proofs) extends ModernTransaction(SetScriptTx) {
+final case class SetScriptTx(header: TxHeader, payload: SetScriptPayload, proofs: Proofs)
+  extends ModernTransaction(SetScriptTx)
+    with SetScriptTxBase
+    with ChainSpecific {
   override def assetFee: (Option[AssetId], Long) = (None, header.fee)
+
+  override val script: Option[Script] = payload.script
+  override val chainId: Byte = payload.chainId
 }
 
 object SetScriptTx extends TransactionParser.Modern[SetScriptTx, SetScriptPayload] {

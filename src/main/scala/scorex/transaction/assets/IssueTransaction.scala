@@ -10,6 +10,8 @@ import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.serialization.Deser
 import scorex.transaction._
+import scorex.transaction.base.IssueTxBase
+import scorex.transaction.smart.script.Script
 import scorex.transaction.validation.ValidationError
 
 import scala.util.{Failure, Success, Try}
@@ -24,12 +26,15 @@ case class IssueTransaction private (sender: PublicKeyAccount,
                                      timestamp: Long,
                                      signature: ByteStr)
     extends SignedTransaction
+    with IssueTxBase
     with FastHashId {
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val builder: IssueTransaction.type    = IssueTransaction
 
   val assetId = id
+
+  override def script: Option[Script] = None
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(
