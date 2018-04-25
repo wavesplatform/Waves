@@ -77,7 +77,7 @@ class PoSSelector(val blockchain: Blockchain) extends PoSCalculator {
   override def time(hit: BigInt, bt: Long, balance: Long): Long =
     if (fair(blockchain.height)) FairPoSCalculator.time(hit, bt, balance) else NxtPoSCalculator.time(hit, bt, balance)
 
-  private def fair(height: Int): Boolean = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.FairPOS.id)
+  private def fair(height: Int): Boolean = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.FairPoS.id)
 }
 
 object NxtPoSCalculator extends PoSCalculator
