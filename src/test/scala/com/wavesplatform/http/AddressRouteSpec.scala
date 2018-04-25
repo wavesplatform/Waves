@@ -37,7 +37,7 @@ class AddressRouteSpec
     mock[ChannelGroup],
     new TestTime,
     TestFunctionalitySettings.Stub,
-    FeesSettings(SmartAccountSettings(10000, 1), Map.empty)
+    FeesSettings(SmartAccountSettings(10000), Map.empty)
   ).route
 
   private val generatedMessages = for {
@@ -154,7 +154,7 @@ class AddressRouteSpec
       (response \ "script").as[String] shouldBe "WpgBYoY"
       (response \ "scriptText").as[String] shouldBe "TRUE"
       (response \ "complexity").as[Long] shouldBe 1
-      (response \ "extraFee").as[Long] shouldBe 10001
+      (response \ "extraFee").as[Long] shouldBe 10000
     }
 
     (blockchain.accountScript _).when(allAccounts(2).toAddress).onCall((_: Address) => None)

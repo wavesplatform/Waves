@@ -125,8 +125,8 @@ object CommonValidation {
       case _ => Right(tx)
     }
 
-  def checkFee[T <: Transaction](blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = {
-    if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) Right(tx)
+  def checkFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
+    if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) Right(())
     else
       for {
         feeInUnits <- tx match {
@@ -161,12 +161,12 @@ object CommonValidation {
             } yield wavesFee
         }
         minimumFee = feeInUnits * Sponsorship.FeeUnit
-        result <- Either.cond(
+        _ <- Either.cond(
           wavesFee >= minimumFee,
-          tx,
+          (),
           GenericError(
             s"Fee in ${tx.assetFee._1.fold("WAVES")(_.toString)} for ${tx.builder.classTag} does not exceed minimal value of $minimumFee WAVES")
         )
-      } yield result
+      } yield ()
   }
 }

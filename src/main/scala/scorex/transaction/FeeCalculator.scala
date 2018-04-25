@@ -1,13 +1,10 @@
 package scorex.transaction
 
-import com.wavesplatform.lang.v1.ctx.Context
-import com.wavesplatform.lang.v1.{FunctionHeader, ScriptComplexityCalculator}
 import com.wavesplatform.settings.{FeesSettings, FunctionalitySettings}
 import com.wavesplatform.state._
 import scorex.transaction.FeeCalculator._
 import scorex.transaction.ValidationError.{GenericError, InsufficientFee}
 import scorex.transaction.assets._
-import scorex.transaction.smart.script.Script
 
 /**
   * Class to check, that transaction contains enough fee to put it to UTX pool
@@ -16,7 +13,7 @@ class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
 
   private val Kb = 1024
 
-  private val functionCosts: Map[FunctionHeader, Long] = Context.functionCosts(com.wavesplatform.utils.dummyContext.functions.values)
+  // private val functionCosts: Map[FunctionHeader, Long] = Context.functionCosts(com.wavesplatform.utils.dummyContext.functions.values)
 
   private val map: Map[String, Long] = {
     settings.fees.flatMap { fs =>
@@ -55,17 +52,14 @@ class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
         }
       )
 
-      scriptComplexity <- script match {
-        case Some(Script.Expr(expr)) =>
-          ScriptComplexityCalculator(functionCosts, expr) match {
-            case Right(x) => Right(settings.smartAccount.baseExtraCharge + x)
-            case Left(e)  => Left(ValidationError.GenericError(e))
-          }
-        case Some(x) => throw new IllegalStateException(s"Doesn't know how to calculate complexity for a script of ${x.version} version")
-        case None    => Right(0L)
-      }
+      // @TODO
+      //      scriptComplexity <- script match {
+      //        case Some(Script.Expr(expr)) => ScriptComplexityCalculator(functionCosts, expr).left.map(ValidationError.GenericError(_))
+      //        case None                    => Right(0L)
+      //        case Some(x)                 => throw new IllegalStateException(s"Doesn't know how to calculate complexity for a script of ${x.version} version")
+      //      }
 
-      totalRequiredFee = minTxFee + (scriptComplexity * settings.smartAccount.extraChargePerOp).toLong
+      totalRequiredFee = minTxFee + settings.smartAccount.extraFee
       _ <- Either.cond(
         txFeeValue >= totalRequiredFee,
         (),

@@ -44,11 +44,10 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings, feesSetti
         ScriptCompiler(code).fold(
           e => Json.obj("error" -> e), {
             case (script, complexity) =>
-              val extraFee = feesSettings.smartAccount.baseExtraCharge + feesSettings.smartAccount.extraChargePerOp * complexity
               Json.obj(
                 "script"     -> script.bytes().base58,
                 "complexity" -> complexity,
-                "extraFee"   -> extraFee.toLong
+                "extraFee"   -> feesSettings.smartAccount.extraFee
               )
           }
         )
@@ -79,12 +78,11 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings, feesSetti
           .fold(
             e => Json.obj("error" -> e), {
               case (script, complexity) =>
-                val extraFee = feesSettings.smartAccount.baseExtraCharge + feesSettings.smartAccount.extraChargePerOp * complexity
                 Json.obj(
                   "script"     -> code,
                   "scriptText" -> script.text,
                   "complexity" -> complexity,
-                  "extraFee"   -> extraFee.toLong
+                  "extraFee"   -> feesSettings.smartAccount.extraFee
                 )
             }
           )
