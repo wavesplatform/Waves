@@ -108,6 +108,8 @@ object AsyncHttpApi extends Assertions {
     def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
       retrying(f(_get(s"${n.nodeApiEndpoint}$path")).build())
 
+    def seed(address: String): Future[String] = getWithApiKey(s"/addresses/seed/$address").as[JsValue].map(v => (v \ "seed").as[String])
+
     def getWithApiKey(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
       _get(s"${n.nodeApiEndpoint}$path")
         .withApiKey(n.apiKey)

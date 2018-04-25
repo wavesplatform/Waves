@@ -52,6 +52,9 @@ object SyncHttpApi extends Assertions {
     def get(path: String): Response =
       Await.result(async(n).get(path), RequestAwaitTime)
 
+    def seed(address: String): String =
+      Await.result(async(n).seed(address), RequestAwaitTime)
+
     def postJson[A: Writes](path: String, body: A): Response =
       Await.result(async(n).postJson(path, body), RequestAwaitTime)
 
