@@ -1,9 +1,9 @@
 package scorex.transaction.base
 
 import scorex.account.AddressOrAlias
-import scorex.transaction.{AssetId, Transaction}
+import scorex.transaction.AssetId
 
-trait TransferTxBase { _: Transaction =>
+trait TransferTxBase extends TxBase {
   def recipient: AddressOrAlias
   def assetId: Option[AssetId]
   def feeAssetId: Option[AssetId]

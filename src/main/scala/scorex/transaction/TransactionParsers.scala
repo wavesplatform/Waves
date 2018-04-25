@@ -75,7 +75,7 @@ object TransactionParsers {
       }
   } ++ intermediate ++ modern
 
-  val byName: Map[String, TransactionParser] = (old ++ intermediate).map {
+  val byName: Map[String, TransactionParser] = (old ++ intermediate ++ modern).map {
     case (_, builder) => builder.classTag.runtimeClass.getSimpleName -> builder
   }
 
@@ -86,7 +86,7 @@ object TransactionParsers {
     data.headOption
       .fold[Try[Byte]](Failure(new IllegalArgumentException("Can't find the significant byte: the buffer is empty")))(Success(_))
       .flatMap { headByte =>
-        if (headByte == 0) modernParseBytes(data) orElse intermediateParseBytes(data)
+        if (headByte == 0) intermediateParseBytes(data) orElse modernParseBytes(data)
         else oldParseBytes(headByte, data)
       }
 

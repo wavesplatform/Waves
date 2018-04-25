@@ -23,11 +23,9 @@ final case class DataPayload(entries: List[DataEntry[_]]) extends TxData {
   }
 }
 
-final case class DataTx(header: TxHeader, payload: DataPayload, proofs: Proofs)
-  extends ModernTransaction(DataTx)
-    with DataTxBase {
+final case class DataTx(header: TxHeader, payload: DataPayload, proofs: Proofs) extends ModernTransaction(DataTx) with DataTxBase {
   override def assetFee: (Option[AssetId], Long) = (None, header.fee)
-  override val data: List[DataEntry[_]] = payload.entries
+  override val data: List[DataEntry[_]]          = payload.entries
 }
 
 object DataTx extends TransactionParser.Modern[DataTx, DataPayload] {
@@ -38,18 +36,20 @@ object DataTx extends TransactionParser.Modern[DataTx, DataPayload] {
   override def create(header: TxHeader, data: DataPayload, proofs: Proofs): Try[DataTx] =
     Try(DataTx(header, data, proofs))
 
-  override def parseTxData(version: Byte, bytes: Array[Byte]): Try[(DataPayload, Int)] = {
-    for {
-      entryCount <- Try(Shorts.fromByteArray(bytes))
-      parsed <- Try(List.iterate(DataEntry.parse(bytes, 2), entryCount){ case (e, p) => DataEntry.parse(bytes, p) })
-      entries = parsed.map(_._1)
-      offset = parsed.lastOption.map(_._2) getOrElse 2
-      payload <- ValidateModern
-          .dataPL(entries)
-          .fold(
-            errs => Failure(new Exception(errs.toString())),
-            pl => Success(pl)
-          )
-    } yield (payload, offset)
-  }
+  override def parseTxData(version: Byte, bytes: Array[Byte]): Try[(DataPayload, Int)] =
+    Try {
+      val entryCount = Shorts.fromByteArray(bytes)
+      val (entries, offset) =
+        if (entryCount > 0) {
+          val parsed = List.iterate(DataEntry.parse(bytes, 2), entryCount) { case (e, p) => DataEntry.parse(bytes, p) }
+          (parsed.map(_._1), parsed.last._2)
+        } else (List.empty, 2)
+
+      ValidateModern
+        .dataPL(entries)
+        .fold(
+          errs => Failure(new Exception(errs.toString())),
+          pl => Success((pl, offset))
+        )
+    }.flatten
 }

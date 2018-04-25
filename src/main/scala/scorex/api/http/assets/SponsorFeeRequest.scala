@@ -46,14 +46,16 @@ case class SignedSponsorFeeRequest(@ApiModelProperty(required = true)
     extends BroadcastRequest {
   def toTx: Either[ValidationError, SponsorFeeTx] =
     for {
-      _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
       header = TxHeader(SponsorFeeTx.typeId, version, _sender, fee, timestamp)
-      _assetId    <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
+      _assetId <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
       payload = SponsorFeePayload(_assetId, baseFee)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      t           <- SponsorFeeTx.create(header, payload, _proofs)
-        .toEither.left
+      t <- SponsorFeeTx
+        .create(header, payload, _proofs)
+        .toEither
+        .left
         .map(thr => GenericError(thr.getMessage))
     } yield t
 }

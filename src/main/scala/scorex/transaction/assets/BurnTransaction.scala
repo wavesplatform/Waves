@@ -15,8 +15,8 @@ import scala.util.{Failure, Success, Try}
 
 case class BurnTransaction private (sender: PublicKeyAccount, assetId: ByteStr, amount: Long, fee: Long, timestamp: Long, signature: ByteStr)
     extends SignedTransaction
-      with BurnTxBase
-      with FastHashId {
+    with BurnTxBase
+    with FastHashId {
 
   override val builder: BurnTransaction.type = BurnTransaction
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(

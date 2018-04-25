@@ -1,9 +1,8 @@
 package scorex.transaction.base
 
 import scorex.account.AddressOrAlias
-import scorex.transaction.Transaction
 
-trait LeaseTxBase { _: Transaction =>
+trait LeaseTxBase extends TxBase {
   def amount: Long
   def recipient: AddressOrAlias
 }

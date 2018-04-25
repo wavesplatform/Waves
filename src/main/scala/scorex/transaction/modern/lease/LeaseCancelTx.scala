@@ -20,7 +20,7 @@ final case class LeaseCancelPayload(leaseId: ByteStr) extends TxData {
 }
 
 final case class LeaseCancelTx(header: TxHeader, payload: LeaseCancelPayload, proofs: Proofs)
-  extends ModernTransaction(LeaseCancelTx)
+    extends ModernTransaction(LeaseCancelTx)
     with LeaseCancelTxBase {
   override val assetFee: (Option[AssetId], Long) = (None, header.fee)
 

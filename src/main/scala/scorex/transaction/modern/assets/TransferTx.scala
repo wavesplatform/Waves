@@ -45,16 +45,14 @@ final case class TransferPayload(recipient: AddressOrAlias,
   }
 }
 
-final case class TransferTx(header: TxHeader, payload: TransferPayload, proofs: Proofs)
-  extends ModernTransaction(TransferTx)
-    with TransferTxBase {
+final case class TransferTx(header: TxHeader, payload: TransferPayload, proofs: Proofs) extends ModernTransaction(TransferTx) with TransferTxBase {
   override def assetFee: (Option[AssetId], Long) = (None, header.fee)
 
-  override val recipient: AddressOrAlias = payload.recipient
-  override val assetId: Option[AssetId] = payload.assetId
+  override val recipient: AddressOrAlias   = payload.recipient
+  override val assetId: Option[AssetId]    = payload.assetId
   override val feeAssetId: Option[AssetId] = payload.feeAssetId
-  override val amount: Long = payload.amount
-  override val attachment: Array[Byte] = payload.attachment
+  override val amount: Long                = payload.amount
+  override val attachment: Array[Byte]     = payload.attachment
 }
 
 object TransferTx extends TransactionParser.Modern[TransferTx, TransferPayload] {

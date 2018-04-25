@@ -1,6 +1,5 @@
 package scorex.transaction.modern.assets
 
-import cats.data.Validated.Valid
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
@@ -30,13 +29,11 @@ final case class ReissuePayload(assetId: ByteStr, quantity: Long, reissuable: Bo
   }
 }
 
-final case class ReissueTx(header: TxHeader, payload: ReissuePayload, proofs: Proofs)
-  extends ModernTransaction(ReissueTx)
-    with ReissueTxBase {
+final case class ReissueTx(header: TxHeader, payload: ReissuePayload, proofs: Proofs) extends ModernTransaction(ReissueTx) with ReissueTxBase {
   override val assetFee: (Option[AssetId], Long) = (None, header.fee)
 
-  override val assetId: AssetId = payload.assetId
-  override val quantity: Long = payload.quantity
+  override val assetId: AssetId    = payload.assetId
+  override val quantity: Long      = payload.quantity
   override val reissuable: Boolean = payload.reissuable
 }
 

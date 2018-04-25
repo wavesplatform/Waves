@@ -27,13 +27,11 @@ final case class BurnPayload(assetId: ByteStr, amount: Long) extends TxData {
   }
 }
 
-final case class BurnTx(header: TxHeader, payload: BurnPayload, proofs: Proofs)
-  extends ModernTransaction(BurnTx)
-    with BurnTxBase {
+final case class BurnTx(header: TxHeader, payload: BurnPayload, proofs: Proofs) extends ModernTransaction(BurnTx) with BurnTxBase {
   override def assetFee: (Option[AssetId], Long) = (None, header.fee)
 
   override val assetId: AssetId = payload.assetId
-  override val amount: Long = payload.amount
+  override val amount: Long     = payload.amount
 }
 
 object BurnTx extends TransactionParser.Modern[BurnTx, BurnPayload] {

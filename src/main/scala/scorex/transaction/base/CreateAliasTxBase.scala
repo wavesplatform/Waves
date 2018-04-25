@@ -1,8 +1,7 @@
 package scorex.transaction.base
 
 import scorex.account.Alias
-import scorex.transaction.Transaction
 
-trait CreateAliasTxBase { _: Transaction =>
+trait CreateAliasTxBase extends TxBase {
   def alias: Alias
 }

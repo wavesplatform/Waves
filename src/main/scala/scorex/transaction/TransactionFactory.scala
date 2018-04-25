@@ -173,10 +173,14 @@ object TransactionFactory {
       pk <- wallet.findWallet(request.sender)
       assetId   = ByteStr.decodeBase58(request.assetId).get
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- SponsorFeeTx.selfSigned(
-        TxHeader(SponsorFeeTx.typeId, request.version, pk, request.fee, timestamp),
-        SponsorFeePayload(assetId, request.baseFee)
-      ).toEither.left.map(thr => GenericError(thr.getMessage))
+      tx <- SponsorFeeTx
+        .selfSigned(
+          TxHeader(SponsorFeeTx.typeId, request.version, pk, request.fee, timestamp),
+          SponsorFeePayload(assetId, request.baseFee)
+        )
+        .toEither
+        .left
+        .map(thr => GenericError(thr.getMessage))
     } yield tx
 
   def cancelSponsorship(request: CancelFeeSponsorshipRequest, wallet: Wallet, time: Time): Either[ValidationError, CancelFeeSponsorshipTx] =
@@ -184,9 +188,13 @@ object TransactionFactory {
       pk <- wallet.findWallet(request.sender)
       assetId   = ByteStr.decodeBase58(request.assetId).get
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- CancelFeeSponsorshipTx.selfSigned(
-        TxHeader(CancelFeeSponsorshipTx.typeId, request.version, pk, request.fee, timestamp),
-        CancelFeeSponsorshipPayload(assetId)
-      ).toEither.left.map(thr => GenericError(thr.getMessage))
+      tx <- CancelFeeSponsorshipTx
+        .selfSigned(
+          TxHeader(CancelFeeSponsorshipTx.typeId, request.version, pk, request.fee, timestamp),
+          CancelFeeSponsorshipPayload(assetId)
+        )
+        .toEither
+        .left
+        .map(thr => GenericError(thr.getMessage))
     } yield tx
 }

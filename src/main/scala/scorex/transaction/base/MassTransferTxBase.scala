@@ -1,7 +1,11 @@
 package scorex.transaction.base
 
-import scorex.transaction.Transaction
+import scorex.account.PublicKeyAccount
+import scorex.transaction.AssetId
+import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 
-trait MassTransferTxBase { _: Transaction =>
-
+trait MassTransferTxBase extends TxBase {
+  def assetId: Option[AssetId]
+  def sender: PublicKeyAccount
+  def transfers: List[ParsedTransfer]
 }

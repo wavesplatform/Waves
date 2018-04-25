@@ -1,6 +1,5 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state._
@@ -10,9 +9,9 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.signatures.Curve25519.KeyLength
-import scorex.transaction.{GenesisTransaction, ModernTransactionGen}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.modern.assets.SponsorFeeTx
+import scorex.transaction.{GenesisTransaction, ModernTransactionGen}
 
 class BlockchainUpdaterSponsoredFeeBlockTest
     extends PropSpec

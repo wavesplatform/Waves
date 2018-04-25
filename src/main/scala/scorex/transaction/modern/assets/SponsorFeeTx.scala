@@ -25,15 +25,13 @@ final case class SponsorFeePayload(assetId: ByteStr, minFee: Long) extends TxDat
     )
   }
 }
-case class SponsorFeeTx (header: TxHeader,
-                         payload: SponsorFeePayload,
-                         proofs: Proofs)
+case class SponsorFeeTx(header: TxHeader, payload: SponsorFeePayload, proofs: Proofs)
     extends ModernTransaction(SponsorFeeTx)
     with SponsorFeeTxBase
     with FastHashId {
   override def assetFee: (Option[AssetId], Long) = (None, header.fee)
-  override val assetId: AssetId = payload.assetId
-  override val minFee: Long = payload.minFee
+  override val assetId: AssetId                  = payload.assetId
+  override val minFee: Long                      = payload.minFee
 }
 
 object SponsorFeeTx extends TransactionParser.Modern[SponsorFeeTx, SponsorFeePayload] {
@@ -41,14 +39,13 @@ object SponsorFeeTx extends TransactionParser.Modern[SponsorFeeTx, SponsorFeePay
   override val typeId: Byte                 = 14
   override val supportedVersions: Set[Byte] = Set(1)
 
-
   override def create(header: TxHeader, data: SponsorFeePayload, proofs: Proofs): Try[SponsorFeeTx] =
     Try(SponsorFeeTx(header, data, proofs))
 
   override def parseTxData(version: Byte, bytes: Array[Byte]): Try[(SponsorFeePayload, Int)] = {
     for {
       assetId <- parseByteStr(bytes.take(AssetIdLength))
-      minFee <- parseLong(bytes.slice(AssetIdLength, AssetIdLength + 8))
+      minFee  <- parseLong(bytes.slice(AssetIdLength, AssetIdLength + 8))
       payload <- ValidateModern
         .sponsorFellPL(assetId, minFee)
         .fold(

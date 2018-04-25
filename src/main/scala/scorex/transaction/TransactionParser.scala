@@ -1,9 +1,8 @@
 package scorex.transaction
 
-import com.google.common.primitives.{Longs, Shorts}
+import com.google.common.primitives.Longs
 import com.wavesplatform.crypto
-import com.wavesplatform.state._
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{ByteStr, _}
 import scorex.account.{Alias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.transaction.modern.{ModernTransaction, TxData, TxHeader}

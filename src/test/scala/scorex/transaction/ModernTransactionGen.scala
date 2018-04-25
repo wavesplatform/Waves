@@ -3,7 +3,6 @@ package scorex.transaction
 import com.wavesplatform.TransactionGenBase
 import org.scalacheck.Gen
 import scorex.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
-import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.modern._
 import scorex.transaction.modern.assets._
 import scorex.transaction.modern.lease.{LeaseCancelPayload, LeaseCancelTx, LeasePayload, LeaseTx}
@@ -22,10 +21,10 @@ trait ModernTransactionGen extends TransactionGenBase {
   def modernIssueReissueBurnGen(sender: PrivateKeyAccount): Gen[(IssueTx, ReissueTx, BurnTx)] = {
     for {
       (_, name, desc, amount, decimals, reissuable, fee, timestamp) <- issueParamGen
-      issV                                                               <- Gen.oneOf(IssueTx.supportedVersions.toSeq)
-      rissV                                                              <- Gen.oneOf(ReissueTx.supportedVersions.toSeq)
-      burnV                                                              <- Gen.oneOf(BurnTx.supportedVersions.toSeq)
-      proofs                                                             <- proofsGen
+      issV                                                          <- Gen.oneOf(IssueTx.supportedVersions.toSeq)
+      rissV                                                         <- Gen.oneOf(ReissueTx.supportedVersions.toSeq)
+      burnV                                                         <- Gen.oneOf(BurnTx.supportedVersions.toSeq)
+      proofs                                                        <- proofsGen
     } yield {
       val issH  = TxHeader(IssueTx.typeId, issV, sender, fee, timestamp)
       val rissH = TxHeader(ReissueTx.typeId, rissV, sender, fee, timestamp)
@@ -44,7 +43,7 @@ trait ModernTransactionGen extends TransactionGenBase {
   def modernIssueReissueBurnGen: Gen[(IssueTx, ReissueTx, BurnTx)] = {
     for {
       sender <- accountGen
-      txs <- modernIssueReissueBurnGen(sender)
+      txs    <- modernIssueReissueBurnGen(sender)
     } yield txs
   }
 
@@ -102,7 +101,7 @@ trait ModernTransactionGen extends TransactionGenBase {
 
   def dataTxGen: Gen[DataTx] = {
     for {
-      header  <- txHeaderGen(DataTx)
+      header <- txHeaderGen(DataTx)
       payload <- for {
         size <- Gen.choose(0, validation.MaxEntryCount)
         data <- Gen.listOfN(size, dataEntryGen)
@@ -113,47 +112,48 @@ trait ModernTransactionGen extends TransactionGenBase {
 
   def sponsorFeeCancelTxGen(sender: PrivateKeyAccount): Gen[(IssueTx, SponsorFeeTx, SponsorFeeTx, CancelFeeSponsorshipTx)] = {
     for {
-      issueTx <- modernIssueReissueBurnGen(sender).map(_._1)
-      sponsorHeader <- txHeaderGen(sender, SponsorFeeTx)
+      issueTx             <- modernIssueReissueBurnGen(sender).map(_._1)
+      sponsorHeader       <- txHeaderGen(sender, SponsorFeeTx)
       cancelSponsorHeader <- txHeaderGen(sender, CancelFeeSponsorshipTx)
-      minFee <- smallFeeGen
-      minFee1 <- smallFeeGen
-      sponsorPayload = SponsorFeePayload(issueTx.assetId(), minFee)
-      sponsorPayload1 = SponsorFeePayload(issueTx.assetId(), minFee1)
+      minFee              <- smallFeeGen
+      minFee1             <- smallFeeGen
+      sponsorPayload       = SponsorFeePayload(issueTx.assetId(), minFee)
+      sponsorPayload1      = SponsorFeePayload(issueTx.assetId(), minFee1)
       cancelSponsorPayload = CancelFeeSponsorshipPayload(issueTx.assetId())
-    } yield (
-      issueTx,
-      SponsorFeeTx.selfSigned(sponsorHeader, sponsorPayload).get,
-      SponsorFeeTx.selfSigned(sponsorHeader, sponsorPayload1).get,
-      CancelFeeSponsorshipTx.selfSigned(cancelSponsorHeader, cancelSponsorPayload).get
-    )
+    } yield
+      (
+        issueTx,
+        SponsorFeeTx.selfSigned(sponsorHeader, sponsorPayload).get,
+        SponsorFeeTx.selfSigned(sponsorHeader, sponsorPayload1).get,
+        CancelFeeSponsorshipTx.selfSigned(cancelSponsorHeader, cancelSponsorPayload).get
+      )
   }
 
   def sponsorFeeTxGen: Gen[SponsorFeeTx] =
     for {
       sender <- accountGen
-      tx <- sponsorFeeCancelTxGen(sender).map(_._2)
+      tx     <- sponsorFeeCancelTxGen(sender).map(_._2)
     } yield tx
 
   def cancelFeeSponsorshipTxGen: Gen[CancelFeeSponsorshipTx] =
     for {
       sender <- accountGen
-      tx <- sponsorFeeCancelTxGen(sender).map(_._4)
+      tx     <- sponsorFeeCancelTxGen(sender).map(_._4)
     } yield tx
 
   def txHeaderGen(p: TransactionParser): Gen[TxHeader] = {
     for {
-      version <- versionGen(p)
-      sender <- accountGen
-      fee <- smallFeeGen
+      version   <- versionGen(p)
+      sender    <- accountGen
+      fee       <- smallFeeGen
       timestamp <- timestampGen
     } yield TxHeader(p.typeId, version, sender, fee, timestamp)
   }
 
   def txHeaderGen(sender: PublicKeyAccount, p: TransactionParser): Gen[TxHeader] = {
     for {
-      version <- versionGen(p)
-      fee <- smallFeeGen
+      version   <- versionGen(p)
+      fee       <- smallFeeGen
       timestamp <- timestampGen
     } yield TxHeader(p.typeId, version, sender, fee, timestamp)
   }

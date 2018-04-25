@@ -17,7 +17,7 @@ final case class CreateAliasPayload(alias: Alias) extends TxData {
 }
 
 final case class CreateAliasTx(header: TxHeader, payload: CreateAliasPayload, proofs: Proofs)
-  extends ModernTransaction(CreateAliasTx)
+    extends ModernTransaction(CreateAliasTx)
     with CreateAliasTxBase {
   override val assetFee: (Option[AssetId], Long) = (None, header.fee)
 

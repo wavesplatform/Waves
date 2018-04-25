@@ -46,10 +46,14 @@ case class SignedCancelFeeSponsorshipRequest(@ApiModelProperty(required = true)
       _assetId    <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      t           <- CancelFeeSponsorshipTx.create(
-        TxHeader(CancelFeeSponsorshipTx.typeId, version, _sender, fee, timestamp),
-        CancelFeeSponsorshipPayload(_assetId),
-        _proofs
-      ).toEither.left.map(thr => GenericError(thr.getMessage))
+      t <- CancelFeeSponsorshipTx
+        .create(
+          TxHeader(CancelFeeSponsorshipTx.typeId, version, _sender, fee, timestamp),
+          CancelFeeSponsorshipPayload(_assetId),
+          _proofs
+        )
+        .toEither
+        .left
+        .map(thr => GenericError(thr.getMessage))
     } yield t
 }

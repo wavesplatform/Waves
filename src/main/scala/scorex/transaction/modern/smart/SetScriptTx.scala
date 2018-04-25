@@ -25,13 +25,13 @@ final case class SetScriptPayload(chainId: Byte, script: Option[Script]) extends
 }
 
 final case class SetScriptTx(header: TxHeader, payload: SetScriptPayload, proofs: Proofs)
-  extends ModernTransaction(SetScriptTx)
+    extends ModernTransaction(SetScriptTx)
     with SetScriptTxBase
     with ChainSpecific {
   override def assetFee: (Option[AssetId], Long) = (None, header.fee)
 
   override val script: Option[Script] = payload.script
-  override val chainId: Byte = payload.chainId
+  override val chainId: Byte          = payload.chainId
 }
 
 object SetScriptTx extends TransactionParser.Modern[SetScriptTx, SetScriptPayload] {

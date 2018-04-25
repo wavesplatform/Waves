@@ -37,6 +37,8 @@ case class SmartIssueTransaction private (version: Byte,
 
   override val builder: TransactionParser = SmartIssueTransaction
 
+  override val assetId: Coeval[AssetId] = id
+
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(
       Array(builder.typeId, version, chainId),

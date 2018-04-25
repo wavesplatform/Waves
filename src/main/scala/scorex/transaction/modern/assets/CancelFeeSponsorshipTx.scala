@@ -18,21 +18,18 @@ final case class CancelFeeSponsorshipPayload(assetId: AssetId) extends TxData {
   }
 }
 
-case class CancelFeeSponsorshipTx(header: TxHeader,
-                                  payload: CancelFeeSponsorshipPayload,
-                                  proofs: Proofs)
+case class CancelFeeSponsorshipTx(header: TxHeader, payload: CancelFeeSponsorshipPayload, proofs: Proofs)
     extends ModernTransaction(CancelFeeSponsorshipTx)
     with CancelFeeSponsorshipTxBase
     with FastHashId {
   override val assetFee: (Option[AssetId], Long) = (None, header.fee)
-  override val assetId: AssetId = payload.assetId
+  override val assetId: AssetId                  = payload.assetId
 }
 
 object CancelFeeSponsorshipTx extends TransactionParser.Modern[CancelFeeSponsorshipTx, CancelFeeSponsorshipPayload] {
 
   override val typeId: Byte                 = 15
   override val supportedVersions: Set[Byte] = Set(1)
-
 
   override def create(header: TxHeader, data: CancelFeeSponsorshipPayload, proofs: Proofs): Try[CancelFeeSponsorshipTx] =
     Try(CancelFeeSponsorshipTx(header, data, proofs))

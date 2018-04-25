@@ -1,9 +1,8 @@
 package scorex.transaction.base
 
 import com.wavesplatform.state.ByteStr
-import scorex.transaction.Transaction
 
-trait SponsorFeeTxBase { _: Transaction =>
+trait SponsorFeeTxBase extends TxBase {
   def assetId: ByteStr
   def minFee: Long
 }

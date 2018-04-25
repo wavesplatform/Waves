@@ -15,7 +15,7 @@ import scala.util.{Failure, Success, Try}
 
 case class CreateAliasTransaction private (sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, signature: ByteStr)
     extends SignedTransaction
-      with CreateAliasTxBase {
+    with CreateAliasTxBase {
 
   override val builder: TransactionParser = CreateAliasTransaction
   override val id: Coeval[AssetId]        = Coeval.evalOnce(ByteStr(crypto.fastHash(builder.typeId +: alias.bytes.arr)))

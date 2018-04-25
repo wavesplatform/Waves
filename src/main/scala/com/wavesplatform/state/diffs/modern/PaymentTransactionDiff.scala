@@ -1,4 +1,4 @@
-package com.wavesplatform.state.diffs.legacy
+package com.wavesplatform.state.diffs.modern
 
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings

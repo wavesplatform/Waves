@@ -28,13 +28,11 @@ final case class LeasePayload(amount: Long, recipient: AddressOrAlias) extends T
   }
 }
 
-final case class LeaseTx(header: TxHeader, payload: LeasePayload, proofs: Proofs)
-  extends ModernTransaction(LeaseTx)
-    with LeaseTxBase {
+final case class LeaseTx(header: TxHeader, payload: LeasePayload, proofs: Proofs) extends ModernTransaction(LeaseTx) with LeaseTxBase {
   override val assetFee: (Option[AssetId], Long) = (None, header.fee)
   val leaseId: Coeval[ByteStr]                   = id
 
-  override val amount: Long = payload.amount
+  override val amount: Long              = payload.amount
   override val recipient: AddressOrAlias = payload.recipient
 }
 

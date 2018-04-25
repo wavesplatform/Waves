@@ -48,18 +48,18 @@ final case class IssuePayload(chainId: Byte,
 }
 
 final case class IssueTx(header: TxHeader, payload: IssuePayload, proofs: Proofs)
-  extends ModernTransaction(IssueTx)
+    extends ModernTransaction(IssueTx)
     with IssueTxBase
     with ChainSpecific {
   override def assetFee: (Option[AssetId], Long) = (None, header.fee)
 
-  override val chainId: Byte = payload.chainId
-  override val name: Array[Byte] = payload.name
+  override val chainId: Byte            = payload.chainId
+  override val name: Array[Byte]        = payload.name
   override val description: Array[Byte] = payload.description
-  override val quantity: Long = payload.quantity
-  override val decimals: Byte = payload.decimals
-  override val reissuable: Boolean = payload.reissuable
-  override val script: Option[Script] = payload.script
+  override val quantity: Long           = payload.quantity
+  override val decimals: Byte           = payload.decimals
+  override val reissuable: Boolean      = payload.reissuable
+  override val script: Option[Script]   = payload.script
 
   val assetId: Coeval[AssetId] = id
 }

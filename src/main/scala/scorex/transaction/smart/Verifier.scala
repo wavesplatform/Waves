@@ -11,29 +11,30 @@ import scorex.transaction.validation.ValidationError
 
 object Verifier {
 
-  def apply(blockchain: Blockchain, currentBlockHeight: Int)(tx: Transaction): Either[ValidationError, Transaction] =
+  def apply(blockchain: Blockchain, currentBlockHeight: Int)(tx: Transaction): Either[ValidationError, Transaction] = {
     (tx match {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
         (pt, blockchain.accountScript(pt.sender)) match {
-          case (_, Some(script))              => verify(blockchain, script, currentBlockHeight, pt)
+          case (_, Some(script)) => verify(blockchain, script, currentBlockHeight, pt)
           case (stx: SignedTransaction, None) => stx.signaturesValid()
-          case _                              => verifyAsEllipticCurveSignature(pt)
+          case _ => verifyAsEllipticCurveSignature(pt)
         }
     }).flatMap(tx => {
       for {
         assetId <- tx match {
-          case t: TransferTransaction          => t.assetId
+          case t: TransferTransaction => t.assetId
           case t: VersionedTransferTransaction => t.assetId
-          case t: MassTransferTransaction      => t.assetId
-          case t: BurnTransaction              => Some(t.assetId)
-          case t: ReissueTransaction           => Some(t.assetId)
-          case _                               => None
+          case t: MassTransferTransaction => t.assetId
+          case t: BurnTransaction => Some(t.assetId)
+          case t: ReissueTransaction => Some(t.assetId)
+          case _ => None
         }
 
         script <- blockchain.assetDescription(assetId).flatMap(_.script)
       } yield verify(blockchain, script, currentBlockHeight, tx)
     }.getOrElse(Either.right(tx)))
+  }
 
   def verify[T <: Transaction](blockchain: Blockchain, script: Script, height: Int, transaction: T): Either[ValidationError, T] = {
     ScriptRunner[Boolean, T](height, transaction, blockchain, script) match {

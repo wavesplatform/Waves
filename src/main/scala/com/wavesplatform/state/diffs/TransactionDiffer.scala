@@ -3,7 +3,6 @@ package com.wavesplatform.state.diffs
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import scorex.transaction._
-import scorex.transaction.modern.ModernTransaction
 import scorex.transaction.smart.Verifier
 import scorex.transaction.validation.ValidationError
 
@@ -15,17 +14,14 @@ object TransactionDiffer {
       blockchain: Blockchain,
       tx: Transaction): Either[ValidationError, Diff] = {
     for {
-      _ <- Verifier(blockchain, currentBlockHeight)(tx)
-      _ <- CommonValidation.disallowTxFromFuture(settings, currentBlockTimestamp, tx)
-      _ <- CommonValidation.disallowTxFromPast(prevBlockTimestamp, tx)
-      _ <- CommonValidation.disallowBeforeActivationTime(blockchain, currentBlockHeight, tx)
-      _ <- CommonValidation.disallowDuplicateIds(blockchain, settings, currentBlockHeight, tx)
-      _ <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, settings, currentBlockTimestamp, tx)
-      _ <- CommonValidation.checkFee(blockchain, settings, currentBlockHeight, tx)
-      diff <- tx match {
-        case mtx: ModernTransaction => ModernTransactionDiff(settings, prevBlockTimestamp, currentBlockTimestamp, currentBlockHeight)(blockchain, mtx)
-        case _                      => LegacyTransactionDiff(settings, prevBlockTimestamp, currentBlockTimestamp, currentBlockHeight)(blockchain, tx)
-      }
+      _            <- Verifier(blockchain, currentBlockHeight)(tx)
+      _            <- CommonValidation.disallowTxFromFuture(settings, currentBlockTimestamp, tx)
+      _            <- CommonValidation.disallowTxFromPast(prevBlockTimestamp, tx)
+      _            <- CommonValidation.disallowBeforeActivationTime(blockchain, currentBlockHeight, tx)
+      _            <- CommonValidation.disallowDuplicateIds(blockchain, settings, currentBlockHeight, tx)
+      _            <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, settings, currentBlockTimestamp, tx)
+      _            <- CommonValidation.checkFee(blockchain, settings, currentBlockHeight, tx)
+      diff         <- ModernTransactionDiff(settings, prevBlockTimestamp, currentBlockTimestamp, currentBlockHeight)(blockchain, tx)
       positiveDiff <- BalanceDiffValidation(blockchain, currentBlockHeight, settings)(diff)
     } yield positiveDiff
   }.left.map(TransactionValidationError(_, tx))

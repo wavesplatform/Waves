@@ -116,6 +116,10 @@ trait TransactionGenBase extends ScriptGen {
     proofs       <- Gen.listOfN(proofsAmount, genBoundedBytes(0, 50))
   } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
 
+  val singleProofGen: Gen[Proofs] = for {
+    proofBytes <- genBoundedBytes(0, 50)
+  } yield Proofs.create(Seq(ByteStr(proofBytes))).explicitGet()
+
   val scriptGen = BOOLgen(1000).map { expr =>
     val typed = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(PureContext.instance |+| CryptoContext.build(Global)), expr).explicitGet()
     ScriptV1(typed).explicitGet()
@@ -376,15 +380,14 @@ trait TransactionGenBase extends ScriptGen {
       minFee  <- smallFeeGen
       minFee1 <- smallFeeGen
       assetId = issue.assetId()
-      proofs <- proofsGen
     } yield {
       val sponsorFeeheader =
         TxHeader(SponsorFeeTx.typeId, 1, sender, 1 * Constants.UnitsInWave, timestamp)
       val cancelSponsorshipHeader =
         TxHeader(CancelFeeSponsorshipTx.typeId, 1, sender, 1 * Constants.UnitsInWave, timestamp)
-      val tx1 = SponsorFeeTx.create(sponsorFeeheader, SponsorFeePayload(assetId, minFee), proofs)
-      val tx2 = SponsorFeeTx.create(sponsorFeeheader, SponsorFeePayload(assetId, minFee1), proofs)
-      val tx3 = CancelFeeSponsorshipTx.create(cancelSponsorshipHeader, CancelFeeSponsorshipPayload(assetId), proofs)
+      val tx1 = SponsorFeeTx.selfSigned(sponsorFeeheader, SponsorFeePayload(assetId, minFee))
+      val tx2 = SponsorFeeTx.selfSigned(sponsorFeeheader, SponsorFeePayload(assetId, minFee1))
+      val tx3 = CancelFeeSponsorshipTx.selfSigned(cancelSponsorshipHeader, CancelFeeSponsorshipPayload(assetId))
 
       (issue, tx1.get, tx2.get, tx3.get)
     }

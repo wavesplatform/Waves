@@ -7,12 +7,15 @@ import scorex.account.PublicKeyAccount
 import scorex.transaction._
 import cats.implicits._
 import scorex.crypto.encode.Base58
+import scorex.transaction.base.TxBase
 
-abstract class ModernTransaction(val builder: TransactionParser) extends ProvenTransaction with FastHashId {
+abstract class ModernTransaction(val builder: TransactionParser) extends FastHashId with TxBase {
 
   def header: TxHeader
   def payload: TxData
   def proofs: Proofs
+
+  override def fee: Long = header.fee
 
   val headerBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     Bytes.concat(
