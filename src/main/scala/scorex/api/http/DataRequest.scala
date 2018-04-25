@@ -8,8 +8,8 @@ import scorex.account.PublicKeyAccount
 import scorex.transaction.{DataTransaction, Proofs, ValidationError}
 
 object DataRequest {
-  implicit val unsignedReads = Json.reads[DataRequest]
-  implicit val signedReads   = Json.reads[SignedDataRequest]
+  implicit val unsignedDataRequestReads = Json.reads[DataRequest]
+  implicit val signedDataRequestReads   = Json.reads[SignedDataRequest]
 }
 
 case class DataRequest(version: Byte, sender: String, data: List[DataEntry[_]], fee: Long, timestamp: Option[Long] = None)

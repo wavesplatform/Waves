@@ -53,7 +53,7 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
         """.stripMargin
 
       untypedScript = Parser(assetScript).get.value
-      typedScript   = ScriptV1(TypeChecker(dummyTypeCheckerContext, untypedScript).explicitGet())
+      typedScript   = ScriptV1(TypeChecker(dummyTypeCheckerContext, untypedScript).explicitGet()).explicitGet()
 
       issueTransaction = SmartIssueTransaction
         .selfSigned(
