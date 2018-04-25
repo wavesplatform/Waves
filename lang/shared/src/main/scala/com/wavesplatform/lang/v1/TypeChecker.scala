@@ -136,19 +136,23 @@ object TypeChecker {
     case ifExpr: Untyped.IF =>
       (setType(ctx, EitherT.pure(ifExpr.cond)), setType(ctx, EitherT.pure(ifExpr.ifTrue)), setType(ctx, EitherT.pure(ifExpr.ifFalse))).tupled
         .subflatMap[String, Typed.EXPR] {
-          case (resolvedCond, resolvedIfTrue, resolvedIfFalse) =>
-            val ifTrueTpe  = resolvedIfTrue.tpe
-            val ifFalseTpe = resolvedIfFalse.tpe
-            findCommonType(ifTrueTpe, ifFalseTpe) match {
-              case Some(tpe) =>
-                Right(
-                  Typed.IF(
-                    cond = resolvedCond,
-                    ifTrue = resolvedIfTrue,
-                    ifFalse = resolvedIfFalse,
-                    tpe = tpe
-                  ))
-              case None => Left(s"Can't find common type for $ifTrueTpe and $ifFalseTpe")
+          case (resolvedCond: Typed.EXPR, resolvedIfTrue, resolvedIfFalse) =>
+            if (resolvedCond.tpe != BOOLEAN)
+              Left(s"IF clause is expected to be BOOLEAN, acutal: ${resolvedCond.tpe}")
+            else {
+              val ifTrueTpe  = resolvedIfTrue.tpe
+              val ifFalseTpe = resolvedIfFalse.tpe
+              findCommonType(ifTrueTpe, ifFalseTpe) match {
+                case Some(tpe) =>
+                  Right(
+                    Typed.IF(
+                      cond = resolvedCond,
+                      ifTrue = resolvedIfTrue,
+                      ifFalse = resolvedIfFalse,
+                      tpe = tpe
+                    ))
+                case None => Left(s"Can't find common type for $ifTrueTpe and $ifFalseTpe")
+              }
             }
         }
 
