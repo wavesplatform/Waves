@@ -21,6 +21,7 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
                                                                                                                      TRUE),
     "BINARY_OP with wrong types"                   -> "Typecheck failed: Can't find a function '+'" -> BINARY_OP(TRUE, SUM_OP, CONST_LONG(1)),
     "IF can't find common"                         -> "Can't find common type" -> IF(TRUE, TRUE, CONST_LONG(0)),
+    "IF clause must be boolean"                    -> "IF clause is expected to be BOOLEAN" -> IF(CONST_LONG(0), TRUE, FALSE),
     "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(multiplierFunction.name, List(CONST_LONG(0))),
     "FUNCTION_CALL with upper type"                -> "Non-matching types" -> FUNCTION_CALL(unitOnNone.name, List(FUNCTION_CALL("Some", List(CONST_LONG(3))))),
     "FUNCTION_CALL with wrong type of argument"    -> "Typecheck failed: Non-matching types: expected: LONG, actual: BOOLEAN" -> FUNCTION_CALL(
