@@ -4,9 +4,10 @@ import com.google.common.primitives.{Bytes, Shorts}
 import com.wavesplatform.state.DataEntry
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
+import scorex.transaction.validation.ValidateModern
 import scorex.transaction.{AssetId, Proofs, TransactionParser}
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 final case class DataPayload(entries: List[DataEntry[_]]) extends TxData {
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
@@ -33,14 +34,18 @@ object DataTx extends TransactionParser.Modern[DataTx, DataPayload] {
   override def create(header: TxHeader, data: DataPayload, proofs: Proofs): Try[DataTx] =
     Try(DataTx(header, data, proofs))
 
-  override def parseTxData(version: Byte, bytes: Array[Byte]): Try[(DataPayload, Int)] = Try {
-    val entryCount = Shorts.fromByteArray(bytes)
-    val (entries, p1) =
-      if (entryCount > 0) {
-        val parsed = List.iterate(DataEntry.parse(bytes, 2), entryCount) { case (e, p) => DataEntry.parse(bytes, p) }
-        (parsed.map(_._1), parsed.last._2)
-      } else (List.empty, 2)
-
-    (DataPayload(entries), p1)
+  override def parseTxData(version: Byte, bytes: Array[Byte]): Try[(DataPayload, Int)] = {
+    for {
+      entryCount <- parseShorts(bytes)
+      parsed <- Try(List.iterate(DataEntry.parse(bytes, 2), entryCount){ case (e, p) => DataEntry.parse(bytes, p) })
+      entries = parsed.map(_._1)
+      offset = parsed.lastOption.map(_._2) getOrElse 2
+      payload <- ValidateModern
+          .dataPL(entries)
+          .fold(
+            errs => Failure(new Exception(errs.toString())),
+            pl => Success(pl)
+          )
+    } yield (payload, offset)
   }
 }

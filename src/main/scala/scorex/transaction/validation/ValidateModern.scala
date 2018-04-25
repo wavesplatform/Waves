@@ -1,15 +1,16 @@
 package scorex.transaction.validation
 
+import cats.data.Validated
 import cats.implicits._
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{ByteStr, DataEntry}
 import scorex.account.{AddressOrAlias, PublicKeyAccount}
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets.{MassTransferTransaction, SmartIssueTransaction, VersionedTransferTransaction}
-import scorex.transaction.modern.TxHeader
+import scorex.transaction.modern.{DataPayload, TxHeader}
 import scorex.transaction.modern.assets._
 import scorex.transaction.modern.lease.{LeaseCancelPayload, LeasePayload}
 import scorex.transaction.smart.script.Script
-import scorex.transaction.{AssetId, Proofs}
+import scorex.transaction.{AssetId, Proofs, modern}
 
 object ValidateModern {
 
@@ -129,5 +130,14 @@ object ValidateModern {
         case (am, at) =>
           TransferPayload(recipient, assetId, feeAssetId, am, at)
       }
+  }
+
+  def dataPL(entries: List[DataEntry[_]]): Validated[DataPayload] = {
+    Validated
+      .condNel(
+        entries.length < MaxEntryCount && entries.forall(_.valid),
+        DataPayload(entries),
+        ValidationError.TooBigArray
+      )
   }
 }

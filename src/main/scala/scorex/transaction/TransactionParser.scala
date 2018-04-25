@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import com.google.common.primitives.Longs
+import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.state.ByteStr
 import scorex.account.{Alias, PublicKeyAccount}
 import scorex.crypto.signatures.Curve25519.KeyLength
@@ -167,6 +167,10 @@ object TransactionParser {
 
     def parseLong(bytes: Array[Byte]): Try[Long] = Try {
       Longs.fromByteArray(bytes)
+    }
+
+    def parseShorts(bytes: Array[Byte]): Try[Short] = Try {
+      Shorts.fromByteArray(bytes)
     }
 
     def parseProofs(bytes: Array[Byte]): Try[Proofs] = {

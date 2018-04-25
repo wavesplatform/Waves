@@ -6,8 +6,9 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.transaction._
 import scorex.transaction.modern.{ModernTransaction, TxData, TxHeader}
+import scorex.transaction.validation.ValidateModern
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 final case class BurnPayload(assetId: ByteStr, amount: Long) extends TxData {
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
@@ -41,6 +42,12 @@ object BurnTx extends TransactionParser.Modern[BurnTx, BurnPayload] {
     for {
       assetId <- parseByteStr(bytes.take(AssetIdLength))
       amount  <- parseLong(bytes.slice(AssetIdLength, AssetIdLength + 8))
-    } yield (BurnPayload(assetId, amount), AssetIdLength + 8)
+      payload <- ValidateModern
+        .burnPL(assetId, amount)
+        .fold(
+          errs => Failure(new Exception(errs.toString())),
+          pl => Success(pl)
+        )
+    } yield (payload, AssetIdLength + 8)
   }
 }

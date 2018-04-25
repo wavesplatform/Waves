@@ -1,13 +1,15 @@
 package scorex.transaction.modern.assets
 
+import cats.data.Validated.Valid
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.transaction._
 import scorex.transaction.modern.{ModernTransaction, TxData, TxHeader}
+import scorex.transaction.validation.ValidateModern
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 final case class ReissuePayload(assetId: ByteStr, quantity: Long, reissuable: Boolean) extends TxData {
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
@@ -46,6 +48,12 @@ object ReissueTx extends TransactionParser.Modern[ReissueTx, ReissuePayload] {
       assetId  <- parseByteStr(bytes.take(AssetIdLength))
       quantity <- parseLong(bytes.slice(AssetIdLength, AssetIdLength + 8))
       reissuable = bytes.slice(AssetIdLength + 8, AssetIdLength + 9).head == (1: Byte)
+      payload <- ValidateModern
+        .reissuePL(assetId, quantity, reissuable)
+        .fold(
+          errs => Failure(new Exception(errs.toString())),
+          pl => Success(pl)
+        )
     } yield (ReissuePayload(assetId, quantity, reissuable), AssetIdLength + 9)
   }
 }

@@ -7,6 +7,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.AddressOrAlias
 import scorex.transaction._
 import scorex.transaction.modern.{ModernTransaction, TxData, TxHeader}
+import scorex.transaction.validation.ValidateModern
 
 import scala.util.{Failure, Success, Try}
 
@@ -47,5 +48,11 @@ object LeaseTx extends TransactionParser.Modern[LeaseTx, LeasePayload] {
       (recipient, recipientEnd) = recRes
       amountStart               = recipientEnd
       amount <- parseLong(bytes.slice(amountStart, amountStart + 8))
-    } yield (LeasePayload(amount, recipient), amountStart + 8)
+      payload <- ValidateModern
+        .leasePL(amount, recipient)
+        .fold(
+          errs => Failure(new Exception(errs.toString())),
+          pl => Success(pl)
+        )
+    } yield (payload, amountStart + 8)
 }
