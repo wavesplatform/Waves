@@ -243,7 +243,7 @@ class MinerImpl(allChannels: ChannelGroup,
                                       block: Block,
                                       account: PublicKeyAccount): Either[String, (Long, Long)] = {
     val b = GeneratingBalanceProvider.balance(blockchainUpdater, fs, height, account.toAddress)
-    if (GeneratingBalanceProvider.validateHeight(blockchainUpdater, height, b)) {
+    if (GeneratingBalanceProvider.isMiningAllowed(blockchainUpdater, height, b)) {
       val cData        = block.consensusData
       val s            = pos.generatorSignature(cData.generationSignature.arr, account.publicKey)
       val h            = pos.hit(s)

@@ -67,8 +67,11 @@ package object appender extends ScorexLogging {
       _ <- blockConsensusValidation(blockchainUpdater, settings, pos, time.correctedTime(), block) { height =>
         val balance = GeneratingBalanceProvider.balance(blockchainUpdater, settings.blockchainSettings.functionalitySettings, height, block.sender)
         Either.cond(
-          GeneratingBalanceProvider.validateHeight(blockchainUpdater, height, balance) && GeneratingBalanceProvider
-            .validateTime(settings.blockchainSettings.functionalitySettings, block.timestamp, balance),
+          GeneratingBalanceProvider.isEffectiveBalanceValid(blockchainUpdater,
+                                                            settings.blockchainSettings.functionalitySettings,
+                                                            height,
+                                                            block,
+                                                            balance),
           balance,
           s"generator's effective balance $balance is less that required for generation"
         )
