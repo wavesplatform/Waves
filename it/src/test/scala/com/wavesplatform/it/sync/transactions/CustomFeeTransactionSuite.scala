@@ -39,7 +39,7 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     notMiner.assertBalances(senderAddress, balance1 - fees, eff1 - fees)
     notMiner.assertAssetBalance(senderAddress, issuedAssetId, defaultAssetQuantity)
 
-    // until `blocks-for-feature-activation` blocks have been mined, sponsorship does not occur
+    // until `feature-check-blocks-period` blocks have been mined, sponsorship does not occur
     val unsponsoredId = sender.transfer(senderAddress, secondAddress, 1, transferFee, Some(issuedAssetId), Some(issuedAssetId)).id
     nodes.waitForHeightAriseAndTxPresent(unsponsoredId)
     notMiner.assertBalances(senderAddress, balance1 - fees, eff1 - fees)
@@ -50,7 +50,7 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     notMiner.assertAssetBalance(secondAddress, issuedAssetId, 1)
     notMiner.assertAssetBalance(minerAddress, issuedAssetId, transferFee)
 
-    // after `blocks-for-feature-activation` blocks asset fees should be sponsored
+    // after `feature-check-blocks-period` asset fees should be sponsored
     nodes.waitForSameBlocksAt(featureCheckBlocksPeriod)
     val sponsoredId = sender.transfer(senderAddress, secondAddress, 1, transferFee, Some(issuedAssetId), Some(issuedAssetId)).id
     nodes.waitForHeightAriseAndTxPresent(sponsoredId)
@@ -94,6 +94,7 @@ object CustomFeeTransactionSuite {
   private val minerConfig = ConfigFactory.parseString(s"""
       | waves.fees.transfer.$assetId = 100000
       | waves.blockchain.custom.functionality {
+      |   feature-check-blocks-period = $featureCheckBlocksPeriod
       |   blocks-for-feature-activation = $featureCheckBlocksPeriod
       |   pre-activated-features = { 7 = 0 }
       |}""".stripMargin)

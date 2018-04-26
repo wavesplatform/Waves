@@ -34,7 +34,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
     alice                       <- accountGen
     bob                         <- accountGen
     (feeAsset, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(alice)
-    wavesFee                    = Sponsorship.toWaves(sponsorTx.minFee.get, sponsorTx.minFee.get) ///
+    wavesFee                    = Sponsorship.toWaves(sponsorTx.minFee.get, Sponsorship.FeeUnit)
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     masterToAlice: TransferTransaction = TransferTransaction
       .create(None,
