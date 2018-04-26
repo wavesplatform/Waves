@@ -61,6 +61,7 @@ object StateSyntheticBenchmark {
             recipient.toAddress,
             amount,
             ts,
+            None,
             300000,
             Array.emptyByteArray
           )

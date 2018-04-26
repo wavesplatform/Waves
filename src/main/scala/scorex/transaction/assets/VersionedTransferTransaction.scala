@@ -28,7 +28,7 @@ case class VersionedTransferTransaction private (version: Byte,
     with FastHashId {
 
   override val builder: TransactionParser        = VersionedTransferTransaction
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override val assetFee: (Option[AssetId], Long) = (feeAssetId, fee)
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val timestampBytes  = Longs.toByteArray(timestamp)

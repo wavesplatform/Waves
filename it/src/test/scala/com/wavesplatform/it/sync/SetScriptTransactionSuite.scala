@@ -39,6 +39,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           recipient = acc0,
           amount = 3 * transferAmount + 3 * (0.00001.waves + 0.00002.waves), // Script fee
           timestamp = System.currentTimeMillis(),
+          feeAssetId = None,
           feeAmount = fee,
           attachment = Array.emptyByteArray
         )
@@ -93,6 +94,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           recipient = acc3,
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
+          feeAssetId = None,
           feeAmount = fee + 0.00001.waves + 0.00002.waves,
           attachment = Array.emptyByteArray
         )
@@ -158,6 +160,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           recipient = acc3,
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
+          feeAssetId = None,
           feeAmount = fee + 0.00001.waves + 0.00002.waves,
           attachment = Array.emptyByteArray
         )
