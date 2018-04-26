@@ -35,9 +35,9 @@ case class SponsorFeeTransaction private (version: Byte,
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
-      "version" -> version,
-      "assetId" -> assetId.base58,
-      "baseFee" -> minAssetFee
+      "version"     -> version,
+      "assetId"     -> assetId.base58,
+      "minAssetFee" -> minAssetFee
     ))
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)

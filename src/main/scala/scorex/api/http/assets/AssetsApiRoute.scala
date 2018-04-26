@@ -290,7 +290,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         required = true,
         paramType = "body",
         dataType = "scorex.api.http.assets.SponsorFeeRequest",
-        defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"baseFee\":100000000,\"fee\":100000000}"
+        defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"minAssetFee\":100000000,\"fee\":100000000}"
       )
     ))
   def sponsorRoute: Route =
