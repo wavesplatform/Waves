@@ -272,7 +272,10 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
           "script"         -> JsString(description.script.fold("")(s => s.bytes().base58)),
           "scriptText"     -> JsString(description.script.fold("")(s => s.text)),
-          "sponsorship"    -> JsNumber(description.sponsorship)
+          "minAssetFee" -> (description.sponsorship match {
+            case 0           => JsNull
+            case sponsorship => JsNumber(sponsorship)
+          })
         )
       )
     }).left.map(m => CustomValidationError(m))
