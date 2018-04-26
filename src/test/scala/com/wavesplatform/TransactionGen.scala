@@ -112,7 +112,7 @@ trait TransactionGenBase extends ScriptGen {
     proofs       <- Gen.listOfN(proofsAmount, genBoundedBytes(0, 50))
   } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
 
-  val scriptGen = BOOLgen(1000).map { expr =>
+  val scriptGen = BOOLgen(100).map { expr =>
     val typed = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(PureContext.instance |+| CryptoContext.build(Global)), expr).explicitGet()
     ScriptV1(typed).explicitGet()
   }

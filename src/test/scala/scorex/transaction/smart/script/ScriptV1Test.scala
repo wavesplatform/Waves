@@ -2,7 +2,7 @@ package scorex.transaction.smart.script
 
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.{FunctionHeaderType => FHT}
-import com.wavesplatform.lang.v1.Terms.BOOLEAN
+import com.wavesplatform.lang.v1.Terms.{BOOLEAN, LONG}
 import com.wavesplatform.lang.v1.Terms.Typed._
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import org.scalacheck.Gen
@@ -34,10 +34,47 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
           function = FunctionHeader(name = "sigVerify", List(FHT.BYTEVECTOR, FHT.BYTEVECTOR, FHT.BYTEVECTOR)),
           args = List(byteVector, byteVector, byteVector),
           BOOLEAN
-        ): EXPR
+        )
       }
-      .reduceLeft(IF(_, _, FALSE, BOOLEAN))
-    ScriptV1(expr) shouldBe Left("Script is too complex: 1890083 > 1800000")
+      .reduceLeft[EXPR](IF(_, _, FALSE, BOOLEAN))
+
+    val r = ScriptV1(expr)
+    r shouldBe 'left
+    r.left.get should startWith("Script is too complex")
+  }
+
+  property("ScriptV1.apply should deny too big scripts") {
+    val bigSum = (1 to 100).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
+      FUNCTION_CALL(
+        function = FunctionHeader(name = "+", List(FHT.LONG, FHT.LONG)),
+        args = List(r, CONST_LONG(i)),
+        LONG
+      )
+    }
+    val expr = FUNCTION_CALL(
+      function = FunctionHeader(name = "==", List(FHT.LONG, FHT.LONG)),
+      args = List(CONST_LONG(1), bigSum),
+      BOOLEAN
+    )
+
+    val r = ScriptV1(expr)
+    r shouldBe 'left
+    r.left.get should startWith("Script is too large")
+  }
+
+  property("19 sigVerify should fit in maxSizeInBytes") {
+    val byteVector = CONST_BYTEVECTOR(ByteVector(1))
+    val expr = (1 to 19)
+      .map { _ =>
+        FUNCTION_CALL(
+          function = FunctionHeader(name = "sigVerify", List(FHT.BYTEVECTOR, FHT.BYTEVECTOR, FHT.BYTEVECTOR)),
+          args = List(byteVector, byteVector, byteVector),
+          BOOLEAN
+        )
+      }
+      .reduceLeft[EXPR](IF(_, _, FALSE, BOOLEAN))
+
+    ScriptV1(expr) shouldBe 'right
   }
 
 }
