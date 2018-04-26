@@ -144,7 +144,7 @@ object CommonValidation {
           case etx: ExchangeTransaction             => Right(3)
           case atx: CreateAliasTransaction          => Right(1)
           case dtx: DataTransaction                 => Right(1 + (dtx.bytes().length - 1) / 1024)
-          case sstx: SetScriptTransaction           => Right(1)
+          case sstx: SetScriptTransaction           => Right(5)
           case sttx: VersionedTransferTransaction   => Right(1)
           case stx: SponsorFeeTransaction           => Right(1000)
           case ctx: CancelFeeSponsorshipTransaction => Right(1000)

@@ -14,8 +14,9 @@ import scorex.transaction.assets.{IssueTransaction, SponsorFeeTransaction, Trans
 class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   def settings(sponsorshipActivationHeight: Int) =
-    TestFunctionalitySettings.Enabled
-      .copy(preActivatedFeatures = Map(BlockchainFeatures.FeeSponsorship.id -> sponsorshipActivationHeight), blocksForFeatureActivation = 1)
+    TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.FeeSponsorship.id -> sponsorshipActivationHeight),
+                                           featureCheckBlocksPeriod = 1,
+                                           blocksForFeatureActivation = 1)
 
   property("work") {
     val s = settings(0)
