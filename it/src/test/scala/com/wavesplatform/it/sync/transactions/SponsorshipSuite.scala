@@ -29,7 +29,7 @@ class SponsorshipSuite extends BaseTransactionSuite {
   def assertSponsorship(assetId: String, sponsorship: Long) = {
     val response = sender.get(s"/assets/details/$assetId")
     val jsv      = Json.parse(response.getResponseBody)
-    assert((jsv \ "sponsorship").as[Long] == sponsorship)
+    assert((jsv \ "minAssetFee").asOpt[Long] == Some(sponsorship).filter(_ != 0))
   }
 
   test("Fee in sponsored asset works correctly") {
