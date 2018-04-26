@@ -20,7 +20,7 @@ case class SponsorFeeRequest(@ApiModelProperty(required = true)
                              @ApiModelProperty(value = "Asset to be sponsored", required = true)
                              assetId: String,
                              @ApiModelProperty(value = "Asset amount per fee unit", required = true)
-                             baseFee: Long,
+                             baseFee: Option[Long],
                              @ApiModelProperty(required = true)
                              fee: Long,
                              timestamp: Option[Long] = None)
@@ -33,7 +33,7 @@ case class SignedSponsorFeeRequest(@ApiModelProperty(required = true)
                                    @ApiModelProperty(value = "Asset to be sponsored", required = true)
                                    assetId: String,
                                    @ApiModelProperty(required = true)
-                                   baseFee: Long,
+                                   baseFee: Option[Long],
                                    @ApiModelProperty(required = true)
                                    fee: Long,
                                    @ApiModelProperty(required = true)

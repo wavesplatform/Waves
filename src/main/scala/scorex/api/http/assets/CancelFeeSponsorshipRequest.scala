@@ -5,7 +5,7 @@ import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
-import scorex.transaction.assets.CancelFeeSponsorshipTransaction
+import scorex.transaction.assets.{CancelFeeSponsorshipTransaction, SponsorFeeTransaction}
 import scorex.transaction.{AssetIdStringLength, Proofs, ValidationError}
 
 object CancelFeeSponsorshipRequest {
@@ -37,7 +37,7 @@ case class SignedCancelFeeSponsorshipRequest(@ApiModelProperty(required = true)
                                              @ApiModelProperty(required = true)
                                              proofs: List[String])
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, CancelFeeSponsorshipTransaction] =
+  def toTx: Either[ValidationError, SponsorFeeTransaction] =
     for {
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _assetId    <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
