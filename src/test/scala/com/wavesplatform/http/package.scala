@@ -111,6 +111,7 @@ package object http {
       (JsPath \ "assetId").formatNullable[AssetId] and
       (JsPath \ "amount").format[Long] and
       (JsPath \ "timestamp").format[Long] and
+      (JsPath \ "feeAssetId").formatNullable[AssetId] and
       (JsPath \ "fee").format[Long] and
       (JsPath \ "attachment")
         .format[String]

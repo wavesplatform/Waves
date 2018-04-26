@@ -21,6 +21,8 @@ case class SignedVersionedTransferRequest(@ApiModelProperty(value = "Base58 enco
                                           recipient: String,
                                           @ApiModelProperty(required = true, example = "1000000")
                                           amount: Long,
+                                          @ApiModelProperty(value = "Base58 encoded Fee Asset ID")
+                                          feeAssetId: Option[String],
                                           @ApiModelProperty(required = true)
                                           fee: Long,
                                           @ApiModelProperty(required = true)
@@ -36,10 +38,11 @@ case class SignedVersionedTransferRequest(@ApiModelProperty(value = "Base58 enco
     for {
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _assetId    <- parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
+      _feeAssetId <- parseBase58ToOption(feeAssetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       _recipient  <- AddressOrAlias.fromString(recipient)
       _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
-      t           <- VersionedTransferTransaction.create(version, _assetId, _sender, _recipient, amount, timestamp, fee, _attachment.arr, _proofs)
+      t           <- VersionedTransferTransaction.create(version, _assetId, _sender, _recipient, amount, timestamp, _feeAssetId, fee, _attachment.arr, _proofs)
     } yield t
 }

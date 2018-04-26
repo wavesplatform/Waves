@@ -253,10 +253,13 @@ trait TransactionGenBase extends ScriptGen {
     .label("transferTransaction")
 
   val versionedTransferGen = (for {
-    version                                                                   <- Gen.oneOf(VersionedTransferTransaction.supportedVersions.toSeq)
-    (assetId, sender, recipient, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
-    proofs                                                                    <- proofsGen
-  } yield VersionedTransferTransaction.create(version, assetId, sender, recipient, amount, timestamp, feeAmount, attachment, proofs).explicitGet())
+    version                                                                            <- Gen.oneOf(VersionedTransferTransaction.supportedVersions.toSeq)
+    (assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment) <- transferParamGen
+    proofs                                                                             <- proofsGen
+  } yield
+    VersionedTransferTransaction
+      .create(version, assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, proofs)
+      .explicitGet())
     .label("VersionedTransferTransaction")
 
   def versionedTransferGenP(sender: PublicKeyAccount, recipient: Address, proofs: Proofs) =
@@ -265,7 +268,8 @@ trait TransactionGenBase extends ScriptGen {
       amt       <- positiveLongGen
       fee       <- smallFeeGen
       timestamp <- timestampGen
-    } yield VersionedTransferTransaction.create(version, None, sender, recipient, amt, timestamp, fee, Array.emptyByteArray, proofs).explicitGet())
+    } yield
+      VersionedTransferTransaction.create(version, None, sender, recipient, amt, timestamp, None, fee, Array.emptyByteArray, proofs).explicitGet())
       .label("VersionedTransferTransactionP")
 
   val transferWithWavesFeeGen = for {

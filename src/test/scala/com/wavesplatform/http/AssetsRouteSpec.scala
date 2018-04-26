@@ -61,6 +61,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
         version = 2,
         assetId = None,
         amount = 1 * Waves,
+        feeAssetId = None,
         fee = Waves / 3,
         sender = senderPrivateKey.address,
         attachment = None,

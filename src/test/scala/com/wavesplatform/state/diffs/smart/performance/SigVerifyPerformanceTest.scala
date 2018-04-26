@@ -32,7 +32,7 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
       version <- Gen.oneOf(VersionedTransferTransaction.supportedVersions.toSeq)
       amt     <- smallFeeGen
       fee     <- smallFeeGen
-    } yield VersionedTransferTransaction.selfSigned(version, None, from, to.toAddress, amt, ts, fee, Array.emptyByteArray).explicitGet()
+    } yield VersionedTransferTransaction.selfSigned(version, None, from, to.toAddress, amt, ts, None, fee, Array.emptyByteArray).explicitGet()
 
   private def differentTransfers(typed: Typed.EXPR) =
     for {
