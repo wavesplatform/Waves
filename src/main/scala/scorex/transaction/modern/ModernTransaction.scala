@@ -26,7 +26,9 @@ abstract class ModernTransaction(val builder: TransactionParser) extends FastHas
     )
   }
 
-  override val bodyBytes: Coeval[Array[Byte]] = payload.bytes
+  override val bodyBytes: Coeval[Array[Byte]] =
+    (headerBytes, payload.bytes)
+      .mapN { case (h, p) => Bytes.concat(h, p) }
 
   override val bytes: Coeval[Array[Byte]] = //Coeval.evalOnce(Bytes.concat(headerBytes(), bodyBytes(), proofs.bytes()))
     (headerBytes, payload.bytes, proofs.bytes)

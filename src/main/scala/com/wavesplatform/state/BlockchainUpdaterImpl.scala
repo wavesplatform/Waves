@@ -18,6 +18,7 @@ import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.transaction.Transaction.Type
 import scorex.transaction._
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
+import scorex.transaction.base.LeaseTxBase
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.script.Script
 import scorex.transaction.validation.ValidationError
@@ -490,13 +491,13 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     }
   }
 
-  override def allActiveLeases: Set[LeaseTransaction] = ngState.fold(blockchain.allActiveLeases) { ng =>
+  override def allActiveLeases: Set[LeaseTxBase] = ngState.fold(blockchain.allActiveLeases) { ng =>
     val (active, canceled) = ng.bestLiquidDiff.leaseState.partition(_._2)
     val fromDiff = active.keys
       .map { id =>
         ng.bestLiquidDiff.transactions(id)._2
       }
-      .collect { case lt: LeaseTransaction => lt }
+      .collect { case lt: LeaseTxBase => lt }
       .toSet
     val fromInner = blockchain.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
     fromDiff ++ fromInner

@@ -3,7 +3,7 @@ package com.wavesplatform.state
 import com.wavesplatform.state.reader.LeaseDetails
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}
-import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.base.LeaseTxBase
 import scorex.transaction.smart.script.Script
 import scorex.transaction.{AssetId, Transaction}
 
@@ -65,7 +65,7 @@ trait Blockchain {
   def wavesDistribution(height: Int): Map[Address, Long]
 
   // the following methods are used exclusively by patches
-  def allActiveLeases: Set[LeaseTransaction]
+  def allActiveLeases: Set[LeaseTxBase]
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */

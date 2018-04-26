@@ -7,7 +7,7 @@ import scorex.block.{Block, BlockHeader}
 import scorex.transaction.{AssetId, Transaction}
 import scorex.transaction.Transaction.Type
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
-import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.base.LeaseTxBase
 import scorex.transaction.smart.script.Script
 
 class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends Blockchain {
@@ -61,7 +61,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
       diff.transactions.get(leaseId).collect {
-        case (h, lt: LeaseTransaction, _) =>
+        case (h, lt: LeaseTxBase, _) =>
           LeaseDetails(lt.sender, lt.recipient, h, lt.amount, diff.leaseState(lt.id()))
       }
   }
@@ -98,13 +98,13 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
 
   override def resolveAlias(a: Alias): Option[Address] = diff.aliases.get(a).orElse(inner.resolveAlias(a))
 
-  override def allActiveLeases: Set[LeaseTransaction] = {
+  override def allActiveLeases: Set[LeaseTxBase] = {
     val (active, canceled) = diff.leaseState.partition(_._2)
     val fromDiff = active.keys
       .map { id =>
         diff.transactions(id)._2
       }
-      .collect { case lt: LeaseTransaction => lt }
+      .collect { case lt: LeaseTxBase => lt }
       .toSet
     val fromInner = inner.allActiveLeases.filterNot(ltx => canceled.keySet.contains(ltx.id()))
     fromDiff ++ fromInner

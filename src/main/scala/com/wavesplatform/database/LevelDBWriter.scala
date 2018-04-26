@@ -14,10 +14,9 @@ import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}
 import scorex.transaction.Transaction.Type
 import scorex.transaction._
-import scorex.transaction.assets.{MassTransferTransaction, VersionedTransferTransaction, _}
+import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.base._
 import scorex.transaction.smart.script.{Script, ScriptReader}
 import scorex.utils.ScorexLogging
 
@@ -688,16 +687,16 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
 
           rw.delete(ktxId)
           tx match {
-            case _: GenesisTransaction                                                                                         => // genesis transaction can not be rolled back
-            case _: PaymentTransaction | _: TransferTransaction | _: VersionedTransferTransaction | _: MassTransferTransaction => // balances already restored
+            case _: GenesisTransaction                                             => // genesis transaction can not be rolled back
+            case _: PaymentTransaction | _: TransferTxBase | _: MassTransferTxBase => // balances already restored
 
-            case _: IssueTransaction        => rollbackAssetInfo(rw, tx.id(), currentHeight)
-            case tx: ReissueTransaction     => rollbackAssetInfo(rw, tx.assetId, currentHeight)
-            case tx: BurnTransaction        => rollbackAssetInfo(rw, tx.assetId, currentHeight)
-            case _: LeaseTransaction        => rollbackLeaseStatus(rw, tx.id(), currentHeight)
-            case tx: LeaseCancelTransaction => rollbackLeaseStatus(rw, tx.leaseId, currentHeight)
+            case _: IssueTxBase        => rollbackAssetInfo(rw, tx.id(), currentHeight)
+            case tx: ReissueTxBase     => rollbackAssetInfo(rw, tx.assetId, currentHeight)
+            case tx: BurnTxBase        => rollbackAssetInfo(rw, tx.assetId, currentHeight)
+            case _: LeaseTxBase        => rollbackLeaseStatus(rw, tx.id(), currentHeight)
+            case tx: LeaseCancelTxBase => rollbackLeaseStatus(rw, tx.leaseId, currentHeight)
 
-            case tx: SetScriptTransaction =>
+            case tx: SetScriptTxBase =>
               val address = tx.sender.toAddress
               scriptCache.invalidate(address)
               addressIdCache.get(address).foreach { addressId =>
@@ -705,7 +704,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
                 rw.filterHistory(k.addressScriptHistory(addressId), currentHeight)
               }
 
-            case tx: DataTransaction =>
+            case tx: DataTxBase =>
               val address = tx.sender.toAddress
               addressIdCache.get(address).foreach { addressId =>
                 tx.data.foreach { e =>
@@ -715,7 +714,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
                 }
               }
 
-            case tx: CreateAliasTransaction => rw.delete(k.addressIdOfAlias(tx.alias))
+            case tx: CreateAliasTxBase => rw.delete(k.addressIdOfAlias(tx.alias))
             case tx: ExchangeTransaction =>
               rollbackOrderFill(rw, ByteStr(tx.buyOrder.id()), currentHeight)
               rollbackOrderFill(rw, ByteStr(tx.sellOrder.id()), currentHeight)
@@ -779,7 +778,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
     db.get(k.transactionInfo(leaseId)) match {
-      case Some((h, lt: LeaseTransaction)) =>
+      case Some((h, lt: LeaseTxBase)) =>
         Some(LeaseDetails(lt.sender, lt.recipient, h, lt.amount, loadLeaseStatus(db, leaseId)))
       case _ => None
     }
@@ -797,7 +796,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
     }
   }
 
-  override def allActiveLeases: Set[LeaseTransaction] = readOnly { db =>
+  override def allActiveLeases: Set[LeaseTxBase] = readOnly { db =>
     val txs = for {
       h  <- 1 to db.get(k.height)
       id <- db.get(k.transactionIdsAtHeight(h))
@@ -805,7 +804,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
       (_, tx) <- db.get(k.transactionInfo(id))
     } yield tx
 
-    txs.collect { case lt: LeaseTransaction => lt }.toSet
+    txs.collect { case lt: LeaseTxBase => lt }.toSet
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]) = readOnly { db =>

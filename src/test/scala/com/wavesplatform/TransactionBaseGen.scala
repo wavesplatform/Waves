@@ -8,7 +8,7 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, Data
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import scorex.account.{AddressOrAlias, Alias, PrivateKeyAccount, PublicKeyAccount}
-import scorex.transaction.{DataTransaction, Proofs}
+import scorex.transaction.Proofs
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.transaction.smart.script.v1.ScriptV1
@@ -169,7 +169,6 @@ trait TransactionGenBase extends ScriptGen {
   } yield Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee)
 
   import DataEntry.{MaxKeySize, MaxValueSize}
-  import DataTransaction.MaxEntryCount
 
   val dataKeyGen = for {
     size <- Gen.choose[Byte](0, MaxKeySize)

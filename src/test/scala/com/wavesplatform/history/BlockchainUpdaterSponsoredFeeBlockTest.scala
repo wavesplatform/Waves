@@ -1,6 +1,6 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.{ModernTransactionGen, OldTransactionGen}
+import com.wavesplatform.OldTransactionGen
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state._

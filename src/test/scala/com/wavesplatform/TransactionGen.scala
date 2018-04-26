@@ -3,12 +3,14 @@ package com.wavesplatform
 import monix.eval.TaskCircuitBreaker.Timestamp
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
-import scorex.account.{AddressScheme, PrivateKeyAccount}
+import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import scorex.transaction.AssetId
-import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
-import scorex.transaction.base.{BurnTxBase, IssueTxBase, ReissueTxBase}
+import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.base._
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.modern.TxHeader
 import scorex.transaction.modern.assets._
+import scorex.transaction.modern.lease.{LeaseCancelPayload, LeaseCancelTx, LeasePayload, LeaseTx}
 
 trait TransactionGen extends OldTransactionGen with ModernTransactionGen { self: Suite =>
 
@@ -91,5 +93,44 @@ trait TransactionGen extends OldTransactionGen with ModernTransactionGen { self:
       bq     <- Gen.choose(0, iq)
       result <- anyIssueReissueBurnGenerator(iq, rq, bq, sender)
     } yield result
+  }
+
+  def anyLeaseCancelLeaseGen(leaseSender: PrivateKeyAccount,
+                             recipient: PrivateKeyAccount,
+                             leaseCancelSender: PrivateKeyAccount): Gen[(LeaseTxBase, LeaseCancelTxBase)] = {
+    for {
+      (_, amount, fee, timestamp, _) <- leaseParamGen
+      lease <- for {
+        leaseHeader <- txHeaderGen(leaseSender, LeaseTx)
+        leasePayload = LeasePayload(amount, recipient)
+        tx <- Gen.oneOf(
+          LeaseTransaction.create(leaseSender, amount, fee, timestamp, recipient).right.get,
+          LeaseTx.selfSigned(leaseHeader, leasePayload).get
+        )
+      } yield tx
+      leaseId = lease.id()
+      leaseCancel <- for {
+        leaseCancelHeader <- txHeaderGen(leaseCancelSender, LeaseCancelTx)
+        leaseCancelPayload = LeaseCancelPayload(leaseId)
+        tx <- Gen.oneOf(
+          LeaseCancelTransaction.create(leaseCancelSender, leaseId, fee, timestamp + 1).right.get,
+          LeaseCancelTx.selfSigned(leaseCancelHeader, leaseCancelPayload).get
+        )
+      } yield tx
+    } yield (lease, leaseCancel)
+  }
+
+  def wavesAnyTransferGen(sender: PrivateKeyAccount, recipient: AddressOrAlias): Gen[TransferTxBase] = {
+    for {
+      (_, _, _, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
+      transfer <- for {
+        header <- txHeaderGen(sender, TransferTx)
+        payload = TransferPayload(recipient, None, None, amount, Array.emptyByteArray)
+        tx <- Gen.oneOf(
+          TransferTx.selfSigned(header, payload).get,
+          TransferTransaction.create(None, sender, recipient, amount, timestamp, None, feeAmount, attachment).right.get
+        )
+      } yield tx
+    } yield transfer
   }
 }
