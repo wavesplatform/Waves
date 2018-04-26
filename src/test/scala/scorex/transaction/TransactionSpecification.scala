@@ -1,12 +1,12 @@
 package scorex.transaction
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.assets.TransferTransaction
 
-class TransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class TransactionSpecification extends PropSpec with PropertyChecks with Matchers with OldTransactionGen {
 
   property("transaction fields should be constructed in a right way") {
     forAll(bytes32gen, bytes32gen, timestampGen, positiveLongGen, positiveLongGen) {

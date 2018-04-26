@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -10,7 +10,7 @@ import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.lease.LeaseTransaction
 
-class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
 
   property("disallows overflow") {
     val preconditionsAndPayment: Gen[(GenesisTransaction, GenesisTransaction, TransferTransaction, TransferTransaction)] = for {

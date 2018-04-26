@@ -1,7 +1,7 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.network.RxScoreObserver.{BestChannel, SyncWith}
-import com.wavesplatform.{RxScheduler, TransactionGen}
+import com.wavesplatform.{RxScheduler, OldTransactionGen}
 import io.netty.channel.Channel
 import io.netty.channel.local.LocalChannel
 import monix.eval.Coeval
@@ -10,7 +10,7 @@ import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 
-class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen with RxScheduler {
+class RxScoreObserverSpec extends FreeSpec with Matchers with OldTransactionGen with RxScheduler {
   override def testSchedulerName = "test-rx-score-observer"
 
   def withObserver(f: (Coeval[Seq[SyncWith]], PublishSubject[BigInt], PublishSubject[(Channel, BigInt)], PublishSubject[Channel]) => Any) = {

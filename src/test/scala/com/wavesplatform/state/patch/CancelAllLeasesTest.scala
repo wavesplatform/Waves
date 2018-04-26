@@ -1,7 +1,7 @@
 package com.wavesplatform.state.patch
 
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -10,7 +10,7 @@ import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
-class CancelAllLeasesTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class CancelAllLeasesTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
 
   private val settings =
     TestFunctionalitySettings.Enabled.copy(resetEffectiveBalancesAtHeight = 5, allowMultipleLeaseCancelTransactionUntilTimestamp = Long.MaxValue / 2)

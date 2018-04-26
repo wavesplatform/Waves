@@ -10,6 +10,7 @@ import scorex.transaction.validation.ValidationError.{AlreadyInTheState, Generic
 import scorex.transaction._
 import scorex.transaction.assets.{MassTransferTransaction, VersionedTransferTransaction, _}
 import scorex.transaction.assets.exchange.ExchangeTransaction
+import scorex.transaction.base._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.modern.assets.{CancelFeeSponsorshipTx, SponsorFeeTx}
 import scorex.transaction.smart.SetScriptTransaction
@@ -93,24 +94,23 @@ object CommonValidation {
       )
 
     tx match {
-      case _: BurnTransaction              => Right(tx)
-      case _: PaymentTransaction           => Right(tx)
-      case _: GenesisTransaction           => Right(tx)
-      case _: TransferTransaction          => Right(tx)
-      case _: IssueTransaction             => Right(tx)
-      case _: ReissueTransaction           => Right(tx)
-      case _: ExchangeTransaction          => Right(tx)
-      case _: LeaseTransaction             => Right(tx)
-      case _: LeaseCancelTransaction       => Right(tx)
-      case _: CreateAliasTransaction       => Right(tx)
-      case _: MassTransferTransaction      => activationBarrier(BlockchainFeatures.MassTransfer)
-      case _: DataTransaction              => activationBarrier(BlockchainFeatures.DataTransaction)
-      case _: SetScriptTransaction         => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: VersionedTransferTransaction => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: SmartIssueTransaction        => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: SponsorFeeTx                 => activationBarrier(BlockchainFeatures.FeeSponsorship)
-      case _: CancelFeeSponsorshipTx       => activationBarrier(BlockchainFeatures.FeeSponsorship)
-      case _                               => Left(GenericError("Unknown transaction must be explicitly activated"))
+      case _: PaymentTransaction              => Right(tx)
+      case _: GenesisTransaction              => Right(tx)
+      case _: TransferTxBase                  => Right(tx)
+      case t: IssueTxBase if t.script.isEmpty => Right(tx)
+      case _: ReissueTxBase                   => Right(tx)
+      case _: ExchangeTransaction             => Right(tx)
+      case _: BurnTxBase                      => Right(tx)
+      case _: LeaseTxBase                     => Right(tx)
+      case _: LeaseCancelTxBase               => Right(tx)
+      case _: CreateAliasTxBase               => Right(tx)
+      case _: IssueTxBase                     => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: MassTransferTxBase              => activationBarrier(BlockchainFeatures.MassTransfer)
+      case _: DataTxBase                      => activationBarrier(BlockchainFeatures.DataTransaction)
+      case _: SetScriptTxBase                 => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: SponsorFeeTxBase                => activationBarrier(BlockchainFeatures.FeeSponsorship)
+      case _: CancelFeeSponsorshipTxBase      => activationBarrier(BlockchainFeatures.FeeSponsorship)
+      case _                                  => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }
 

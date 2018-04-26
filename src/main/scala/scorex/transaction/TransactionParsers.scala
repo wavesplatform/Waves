@@ -41,7 +41,6 @@ object TransactionParsers {
     VersionedTransferTransaction,
     SetScriptTransaction,
     SmartIssueTransaction,
-    SmartIssueTransaction,
     VersionedTransferTransaction,
     SetScriptTransaction,
   ).flatMap { x =>
@@ -86,7 +85,7 @@ object TransactionParsers {
     data.headOption
       .fold[Try[Byte]](Failure(new IllegalArgumentException("Can't find the significant byte: the buffer is empty")))(Success(_))
       .flatMap { headByte =>
-        if (headByte == 0) intermediateParseBytes(data) orElse modernParseBytes(data)
+        if (headByte == 0) modernParseBytes(data) orElse intermediateParseBytes(data)
         else oldParseBytes(headByte, data)
       }
 

@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state._
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, OldTransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -11,7 +11,7 @@ import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.smart.SetScriptTransaction
 
-class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
+class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink with WithDB {
 
   private val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
 

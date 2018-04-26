@@ -6,7 +6,7 @@ import com.wavesplatform.lang.v1.Terms.Typed.TRUE
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Inside, Matchers, PropSpec}
@@ -21,7 +21,7 @@ import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.validation.ValidationError
 
-class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
+class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with Inside with NoShrink {
 
   property("preserves waves invariant, stores match info, rewards matcher") {
 

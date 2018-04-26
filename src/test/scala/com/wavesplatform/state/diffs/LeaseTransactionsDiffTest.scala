@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import com.wavesplatform.state._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -13,7 +13,7 @@ import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
-class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
 
   private val allowMultipleLeaseCancelTransactionUntilTimestamp = Long.MaxValue / 2
   private val settings =

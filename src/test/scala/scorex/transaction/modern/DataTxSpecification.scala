@@ -1,8 +1,9 @@
 package scorex.transaction.modern
 
+import com.wavesplatform.ModernTransactionGen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
-import scorex.transaction.{ModernTransactionGen, TransactionParsers}
+import scorex.transaction.TransactionParsers
 
 class DataTxSpecification extends PropSpec with PropertyChecks with Matchers with ModernTransactionGen {
   property("DataTx serialization roudtrip") {

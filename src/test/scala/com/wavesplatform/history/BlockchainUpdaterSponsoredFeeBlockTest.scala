@@ -1,5 +1,6 @@
 package com.wavesplatform.history
 
+import com.wavesplatform.{ModernTransactionGen, OldTransactionGen}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state._
@@ -11,14 +12,14 @@ import scorex.account.PrivateKeyAccount
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.modern.assets.SponsorFeeTx
-import scorex.transaction.{GenesisTransaction, ModernTransactionGen}
+import scorex.transaction.GenesisTransaction
 
 class BlockchainUpdaterSponsoredFeeBlockTest
     extends PropSpec
     with PropertyChecks
     with DomainScenarioDrivenPropertyCheck
     with Matchers
-    with ModernTransactionGen {
+    with OldTransactionGen {
 
   private val amtTx = 100000
 

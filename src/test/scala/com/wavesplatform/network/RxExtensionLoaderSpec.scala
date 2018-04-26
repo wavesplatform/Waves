@@ -3,7 +3,7 @@ package com.wavesplatform.network
 import com.wavesplatform.network.RxExtensionLoader.ExtensionBlocks
 import com.wavesplatform.network.RxScoreObserver.{BestChannel, ChannelClosedAndSyncWith}
 import com.wavesplatform.state.ByteStr
-import com.wavesplatform.{BlockGen, RxScheduler, TransactionGen}
+import com.wavesplatform.{BlockGen, RxScheduler, OldTransactionGen}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.local.LocalChannel
@@ -17,7 +17,7 @@ import scorex.transaction.validation.ValidationError
 
 import scala.concurrent.duration._
 
-class RxExtensionLoaderSpec extends FreeSpec with Matchers with TransactionGen with RxScheduler with BlockGen {
+class RxExtensionLoaderSpec extends FreeSpec with Matchers with OldTransactionGen with RxScheduler with BlockGen {
 
   val MaxRollback = 10
   type Applier = (Channel, ExtensionBlocks) => Task[Either[ValidationError, Option[BigInt]]]

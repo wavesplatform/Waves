@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats.Monoid
 import com.wavesplatform.state._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -10,7 +10,7 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.{GenesisTransaction, PaymentTransaction}
 
-class PaymentTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class PaymentTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
 
   val preconditionsAndPayments: Gen[(GenesisTransaction, PaymentTransaction, PaymentTransaction)] = for {
     master    <- accountGen

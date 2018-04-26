@@ -5,7 +5,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state._
 import scorex.transaction.validation.ValidationError.{GenericError, TransactionNotAllowedByScript}
 import scorex.transaction._
-import scorex.transaction.assets._
+import scorex.transaction.base.{BurnTxBase, MassTransferTxBase, ReissueTxBase, TransferTxBase}
 import scorex.transaction.smart.script.{Script, ScriptRunner}
 import scorex.transaction.validation.ValidationError
 
@@ -16,19 +16,18 @@ object Verifier {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
         (pt, blockchain.accountScript(pt.sender)) match {
-          case (_, Some(script)) => verify(blockchain, script, currentBlockHeight, pt)
+          case (_, Some(script))              => verify(blockchain, script, currentBlockHeight, pt)
           case (stx: SignedTransaction, None) => stx.signaturesValid()
-          case _ => verifyAsEllipticCurveSignature(pt)
+          case _                              => verifyAsEllipticCurveSignature(pt)
         }
     }).flatMap(tx => {
       for {
         assetId <- tx match {
-          case t: TransferTransaction => t.assetId
-          case t: VersionedTransferTransaction => t.assetId
-          case t: MassTransferTransaction => t.assetId
-          case t: BurnTransaction => Some(t.assetId)
-          case t: ReissueTransaction => Some(t.assetId)
-          case _ => None
+          case t: TransferTxBase     => t.assetId
+          case t: MassTransferTxBase => t.assetId
+          case t: BurnTxBase         => Some(t.assetId)
+          case t: ReissueTxBase      => Some(t.assetId)
+          case _                     => None
         }
 
         script <- blockchain.assetDescription(assetId).flatMap(_.script)

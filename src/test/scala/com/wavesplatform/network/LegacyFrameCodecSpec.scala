@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.{TransactionGen, crypto}
+import com.wavesplatform.{OldTransactionGen, crypto}
 import io.netty.buffer.Unpooled.wrappedBuffer
 import io.netty.buffer.{ByteBuf, Unpooled}
 import io.netty.channel.embedded.EmbeddedChannel
@@ -11,7 +11,7 @@ import org.scalatest.{FreeSpec, Matchers}
 import scorex.network.message.{Message => ScorexMessage}
 import scorex.transaction.Transaction
 
-class LegacyFrameCodecSpec extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen {
+class LegacyFrameCodecSpec extends FreeSpec with Matchers with MockFactory with PropertyChecks with OldTransactionGen {
 
   "should handle one message" in forAll(issueGen) { origTx =>
     val codec = new LegacyFrameCodec(PeerDatabase.NoOp)

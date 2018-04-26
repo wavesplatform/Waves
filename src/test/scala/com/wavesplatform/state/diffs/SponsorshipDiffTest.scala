@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state._
 import org.scalatest.prop.PropertyChecks
@@ -13,7 +13,7 @@ import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.modern.TxHeader
 import scorex.transaction.modern.assets.{SponsorFeePayload, SponsorFeeTx}
 
-class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen {
 
   def settings(sponsorshipActivationHeight: Int) =
     TestFunctionalitySettings.Enabled

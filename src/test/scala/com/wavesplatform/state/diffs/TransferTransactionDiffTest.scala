@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs
 import cats.implicits._
 import com.wavesplatform.state.diffs.modern.AssetTxDiff
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -13,7 +13,7 @@ import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction, TransferTransaction}
 import scorex.transaction.validation.ValidationError.GenericError
 
-class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
 
   val preconditionsAndTransfer: Gen[(GenesisTransaction, IssueTransaction, IssueTransaction, TransferTransaction)] = for {
     master    <- accountGen

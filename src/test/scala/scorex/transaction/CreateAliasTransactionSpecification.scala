@@ -1,11 +1,11 @@
 package scorex.transaction
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{Alias, PrivateKeyAccount}
 
-class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks with Matchers with OldTransactionGen {
 
   property("CreateAliasTransaction serialization roundtrip") {
     forAll(createAliasGen) { tx: CreateAliasTransaction =>

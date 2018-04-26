@@ -5,7 +5,7 @@ import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
-import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
+import com.wavesplatform.{BlockGen, NoShrink, TestTime, OldTransactionGen}
 import io.netty.channel.group.ChannelGroup
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
@@ -21,7 +21,7 @@ class TransactionsRouteSpec
     with RestAPISettingsHelper
     with MockFactory
     with Matchers
-    with TransactionGen
+    with OldTransactionGen
     with BlockGen
     with PropertyChecks
     with NoShrink {

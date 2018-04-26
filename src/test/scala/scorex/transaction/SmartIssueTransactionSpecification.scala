@@ -1,12 +1,12 @@
 package scorex.transaction
 
-import com.wavesplatform.{TransactionGen, WithDB}
+import com.wavesplatform.{OldTransactionGen, WithDB}
 import com.wavesplatform.state.HistoryTest
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.assets.SmartIssueTransaction
 
-class SmartIssueTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithDB with HistoryTest {
+class SmartIssueTransactionSpecification extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with WithDB with HistoryTest {
 
   property("SmartIssueTransaction serialization roundtrip") {
     forAll(smartIssueTransactionGen()) { tx: SmartIssueTransaction =>

@@ -18,7 +18,7 @@ import com.wavesplatform.settings.{
 }
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.{ByteStr, EitherExt2, _}
-import com.wavesplatform.{NoShrink, TestHelpers, TestTime, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, TestHelpers, TestTime, OldTransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
@@ -39,7 +39,7 @@ import scorex.utils.Time
 
 import scala.concurrent.duration._
 
-class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen with NoShrink with WithDB {
+class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with PropertyChecks with OldTransactionGen with NoShrink with WithDB {
 
   private val calculatorSettings = FeesSettings(
     SmartAccountSettings(10, 1),

@@ -7,7 +7,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.utils._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, OldTransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -17,7 +17,7 @@ import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
 import scorex.transaction.smart.script.v1.ScriptV1
 
-class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
+class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink with WithDB {
 
   private val AmtOfTxs = 10000
 

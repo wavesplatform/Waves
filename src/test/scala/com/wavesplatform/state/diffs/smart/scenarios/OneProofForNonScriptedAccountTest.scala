@@ -4,7 +4,7 @@ import com.wavesplatform.lang.v1.Terms.Typed
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffEi, produce}
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -13,7 +13,7 @@ import scorex.transaction.assets.VersionedTransferTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.{GenesisTransaction, Proofs}
 
-class OneProofForNonScriptedAccountTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class OneProofForNonScriptedAccountTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
 
   property("exactly 1 proof required for non-scripted accounts") {
     val s = for {

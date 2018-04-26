@@ -1,12 +1,12 @@
-package scorex.transaction
+package com.wavesplatform
 
-import com.wavesplatform.TransactionGenBase
 import org.scalacheck.Gen
 import scorex.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import scorex.transaction.modern._
 import scorex.transaction.modern.assets._
 import scorex.transaction.modern.lease.{LeaseCancelPayload, LeaseCancelTx, LeasePayload, LeaseTx}
 import scorex.transaction.modern.smart.{SetScriptPayload, SetScriptTx}
+import scorex.transaction.{TransactionParser, validation}
 
 trait ModernTransactionGen extends TransactionGenBase {
 
@@ -24,7 +24,6 @@ trait ModernTransactionGen extends TransactionGenBase {
       issV                                                          <- Gen.oneOf(IssueTx.supportedVersions.toSeq)
       rissV                                                         <- Gen.oneOf(ReissueTx.supportedVersions.toSeq)
       burnV                                                         <- Gen.oneOf(BurnTx.supportedVersions.toSeq)
-      proofs                                                        <- proofsGen
     } yield {
       val issH  = TxHeader(IssueTx.typeId, issV, sender, fee, timestamp)
       val rissH = TxHeader(ReissueTx.typeId, rissV, sender, fee, timestamp)
@@ -32,9 +31,9 @@ trait ModernTransactionGen extends TransactionGenBase {
 
       val issPl = IssuePayload(AddressScheme.current.chainId, name, desc, amount, decimals, reissuable, None)
 
-      val issueTx   = IssueTx(issH, issPl, proofs)
-      val reissueTx = ReissueTx(rissH, ReissuePayload(issueTx.assetId(), amount, reissuable), proofs)
-      val burnTx    = BurnTx(burnH, BurnPayload(issueTx.assetId(), amount), proofs)
+      val issueTx   = IssueTx.selfSigned(issH, issPl).get
+      val reissueTx = ReissueTx.selfSigned(rissH, ReissuePayload(issueTx.assetId(), amount, reissuable)).get
+      val burnTx    = BurnTx.selfSigned(burnH, BurnPayload(issueTx.assetId(), amount)).get
 
       (issueTx, reissueTx, burnTx)
     }

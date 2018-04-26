@@ -1,6 +1,6 @@
 package com.wavesplatform.mining
 
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
@@ -8,7 +8,7 @@ import scorex.block.Block
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.Transaction
 
-class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with PropertyChecks with TransactionGen with NoShrink {
+class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with PropertyChecks with OldTransactionGen with NoShrink {
   "OneDimensionalMiningConstraint" - {
     "should be empty if the limit is 0, but not overfilled" in {
       val tank = OneDimensionalMiningConstraint.full(createConstConstraint(0))

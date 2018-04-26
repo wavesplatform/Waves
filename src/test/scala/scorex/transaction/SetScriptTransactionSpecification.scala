@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import com.wavesplatform.state._
 import org.scalacheck.Gen
 import org.scalatest._
@@ -8,7 +8,7 @@ import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.smart.SetScriptTransaction
 
-class SetScriptTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class SetScriptTransactionSpecification extends PropSpec with PropertyChecks with Matchers with OldTransactionGen {
 
   private val versionGen: Gen[Byte] = Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
   private val versionAndAccountGen: Gen[(Byte, PrivateKeyAccount)] = for {

@@ -5,8 +5,6 @@ import java.util
 import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.state.{
-  Sponsorship,
-  SponsorshipValue,
   AccountDataInfo,
   AssetDescription,
   AssetInfo,
@@ -15,12 +13,13 @@ import com.wavesplatform.state.{
   Diff,
   LeaseBalance,
   Portfolio,
+  Sponsorship,
+  SponsorshipValue,
   VolumeAndFee
 }
 import scorex.account.{Address, Alias}
 import scorex.block.Block
-import scorex.transaction.Transaction
-import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
+import scorex.transaction.base.IssueTxBase
 import scorex.transaction.smart.script.Script
 import scorex.transaction.{AssetId, Transaction}
 
@@ -175,9 +174,7 @@ trait Caches extends Blockchain {
     for ((id, ai) <- diff.issuedAssets) {
       assetInfoCache.put(id, Some(ai))
       diff.transactions.get(id) match {
-        case Some((_, it: IssueTransaction, _)) =>
-          assetDescriptionCache.put(id, Some(AssetDescription(it.sender, it.name, it.description, it.decimals, ai.isReissuable, ai.volume, None, 0)))
-        case Some((_, it: SmartIssueTransaction, _)) =>
+        case Some((_, it: IssueTxBase, _)) =>
           assetDescriptionCache.put(id,
                                     Some(AssetDescription(it.sender, it.name, it.description, it.decimals, ai.isReissuable, ai.volume, it.script, 0)))
         case _ =>

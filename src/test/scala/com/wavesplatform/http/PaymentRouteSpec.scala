@@ -3,7 +3,7 @@ package com.wavesplatform.http
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state.Diff
 import com.wavesplatform.utx.UtxPool
-import com.wavesplatform.{NoShrink, TestWallet, TransactionGen}
+import com.wavesplatform.{NoShrink, TestWallet, OldTransactionGen}
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
@@ -19,7 +19,7 @@ class PaymentRouteSpec
     with PropertyChecks
     with RestAPISettingsHelper
     with TestWallet
-    with TransactionGen
+    with OldTransactionGen
     with NoShrink {
 
   private val utx = stub[UtxPool]

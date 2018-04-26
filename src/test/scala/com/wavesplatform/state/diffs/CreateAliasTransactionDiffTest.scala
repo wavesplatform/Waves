@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import com.wavesplatform.state._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -11,7 +11,7 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.{CreateAliasTransaction, GenesisTransaction}
 
-class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
 
   val preconditionsAndAliasCreations
     : Gen[(GenesisTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction)] = for {

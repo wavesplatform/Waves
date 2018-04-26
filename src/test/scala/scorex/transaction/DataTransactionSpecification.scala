@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.google.common.primitives.Shorts
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import com.wavesplatform.state.DataEntry._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, LongDataEntry}
 import org.scalacheck.{Arbitrary, Gen}
@@ -13,7 +13,7 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.DataTransaction.MaxEntryCount
 import scorex.transaction.validation.ValidationError
 
-class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with OldTransactionGen {
 
   private def checkSerialization(tx: DataTransaction): Assertion = {
     val parsed = DataTransaction.parseBytes(tx.bytes()).get

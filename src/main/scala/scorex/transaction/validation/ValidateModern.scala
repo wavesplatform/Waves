@@ -1,6 +1,5 @@
 package scorex.transaction.validation
 
-import cats.data.Validated
 import cats.implicits._
 import com.wavesplatform.state.{ByteStr, DataEntry}
 import scorex.account.{AddressOrAlias, PublicKeyAccount}
@@ -133,12 +132,8 @@ object ValidateModern {
   }
 
   def dataPL(entries: List[DataEntry[_]]): Validated[DataPayload] = {
-    Validated
-      .condNel(
-        entries.length < MaxEntryCount && entries.forall(_.valid),
-        DataPayload(entries),
-        ValidationError.TooBigArray
-      )
+    validateDataEntries(entries)
+      .map(es => DataPayload(es))
   }
 
   def sponsorFellPL(assetId: AssetId, minFee: Long): Validated[SponsorFeePayload] = {

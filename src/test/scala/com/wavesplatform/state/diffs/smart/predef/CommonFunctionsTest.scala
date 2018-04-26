@@ -3,12 +3,12 @@ package com.wavesplatform.state.diffs.smart.predef
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 
-class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
 
   property("extract should transaction assetId if exists") {
     forAll(transferGen) {

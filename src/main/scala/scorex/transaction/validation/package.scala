@@ -3,6 +3,7 @@ package scorex.transaction
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import scorex.transaction.validation.ValidationError._
 import cats.implicits._
+import com.wavesplatform.state.DataEntry
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 
 import scala.util.Try
@@ -126,6 +127,15 @@ package object validation {
         ts > 0,
         ts,
         ValidationError.NegativeTimestamp
+      )
+  }
+
+  def validateDataEntries(entries: List[DataEntry[_]]): Validated[List[DataEntry[_]]] = {
+    Validated
+      .condNel(
+        entries.length < MaxEntryCount && entries.forall(_.valid),
+        entries,
+        ValidationError.TooBigArray
       )
   }
 }

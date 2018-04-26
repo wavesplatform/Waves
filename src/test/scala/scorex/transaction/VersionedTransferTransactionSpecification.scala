@@ -1,13 +1,13 @@
 package scorex.transaction
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import com.wavesplatform.state._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.assets.VersionedTransferTransaction
 
-class VersionedTransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class VersionedTransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with OldTransactionGen {
 
   private val versionGen: Gen[Byte] = Gen.oneOf(VersionedTransferTransaction.supportedVersions.toSeq)
 

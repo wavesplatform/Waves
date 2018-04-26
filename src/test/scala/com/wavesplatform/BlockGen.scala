@@ -8,7 +8,7 @@ import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction.{SignedTransaction, Transaction}
 
-trait BlockGen extends TransactionGen { _: Suite =>
+trait BlockGen extends OldTransactionGen { _: Suite =>
 
   import BlockGen._
 

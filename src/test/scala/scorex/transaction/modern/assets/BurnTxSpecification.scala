@@ -1,8 +1,9 @@
 package scorex.transaction.modern.assets
 
+import com.wavesplatform.ModernTransactionGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scorex.transaction.{ModernTransactionGen, TransactionParsers}
+import scorex.transaction.TransactionParsers
 
 class BurnTxSpecification extends PropSpec with PropertyChecks with Matchers with ModernTransactionGen {
 

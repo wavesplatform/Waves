@@ -60,15 +60,14 @@ object AssetTxDiff {
     })
   }
 
-  def transfer(blockchain: Blockchain, s: FunctionalitySettings, blockTime: Long, height: Int)
-              (tx: TransferTxBase): Either[ValidationError, Diff] = {
+  def transfer(blockchain: Blockchain, s: FunctionalitySettings, blockTime: Long, height: Int)(tx: TransferTxBase): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender.publicKey)
 
     val isInvalidEi = for {
       recipient <- blockchain.resolveAliasEi(tx.recipient)
       _ <- Either.cond((tx.feeAssetId >>= blockchain.assetDescription >>= (_.script)).isEmpty,
-        (),
-        GenericError("Smart assets can't participate in TransferTransactions as a fee"))
+                       (),
+                       GenericError("Smart assets can't participate in TransferTransactions as a fee"))
       portfolios = (tx.assetId match {
         case None =>
           Map(sender -> Portfolio(-tx.amount, LeaseBalance.empty, Map.empty)).combine(
@@ -110,7 +109,8 @@ object AssetTxDiff {
     }
   }
 
-  def sponsor(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(tx: SponsorFeeTxBase): Either[ValidationError, Diff] = {
+  def sponsor(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(
+      tx: SponsorFeeTxBase): Either[ValidationError, Diff] = {
     validateAsset(tx, blockchain, tx.assetId, true).flatMap { _ =>
       Right(
         Diff(
@@ -122,7 +122,8 @@ object AssetTxDiff {
     }
   }
 
-  def cancelSponsorship(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(tx: CancelFeeSponsorshipTxBase): Either[ValidationError, Diff] = {
+  def cancelSponsorship(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(
+      tx: CancelFeeSponsorshipTxBase): Either[ValidationError, Diff] = {
     validateAsset(tx, blockchain, tx.assetId, true).flatMap { _ =>
       Right(
         Diff(

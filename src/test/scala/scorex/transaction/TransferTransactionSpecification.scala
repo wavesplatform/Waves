@@ -1,11 +1,11 @@
 package scorex.transaction
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.assets.TransferTransaction
 
-class TransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class TransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with OldTransactionGen {
 
   property("Transfer serialization roundtrip") {
     forAll(transferGen) { transfer: TransferTransaction =>

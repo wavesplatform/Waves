@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import org.scalacheck.Arbitrary
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -10,7 +10,7 @@ import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 import scorex.transaction.assets.MassTransferTransaction.MaxTransferCount
 import scorex.transaction.validation.ValidationError
 
-class MassTransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class MassTransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with OldTransactionGen {
 
   property("serialization roundtrip") {
     forAll(massTransferGen) { tx: MassTransferTransaction =>

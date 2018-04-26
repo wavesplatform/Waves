@@ -14,14 +14,14 @@ object ModernTransactionDiff {
       blockchain: Blockchain,
       tx: Transaction): Either[ValidationError, Diff] = {
     tx match {
-      case gtx: GenesisTransaction => GenesisTransactionDiff(currentBlockHeight)(gtx)
-      case ptx: PaymentTransaction => PaymentTransactionDiff(blockchain, currentBlockHeight, settings, currentBlockTimestamp)(ptx)
-      case etx: ExchangeTransaction => ExchangeTransactionDiff(blockchain, currentBlockHeight)(etx)
+      case gtx: GenesisTransaction          => GenesisTransactionDiff(currentBlockHeight)(gtx)
+      case ptx: PaymentTransaction          => PaymentTransactionDiff(blockchain, currentBlockHeight, settings, currentBlockTimestamp)(ptx)
+      case etx: ExchangeTransaction         => ExchangeTransactionDiff(blockchain, currentBlockHeight)(etx)
       case itx: IssueTxBase                 => AssetTxDiff.issue(currentBlockHeight)(itx)
       case rtx: ReissueTxBase               => AssetTxDiff.reissue(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(rtx)
       case btx: BurnTxBase                  => AssetTxDiff.burn(blockchain, currentBlockHeight)(btx)
       case ttx: TransferTxBase              => AssetTxDiff.transfer(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(ttx)
-      case mttx: MassTransferTxBase => MassTranserTxDiff(blockchain, currentBlockTimestamp, currentBlockHeight)(mttx)
+      case mttx: MassTransferTxBase         => MassTranserTxDiff(blockchain, currentBlockTimestamp, currentBlockHeight)(mttx)
       case dtx: DataTxBase                  => DataTxDiff(blockchain, currentBlockHeight)(dtx)
       case ltx: LeaseTxBase                 => LeaseTxDiff.lease(blockchain, currentBlockHeight)(ltx)
       case lctx: LeaseCancelTxBase          => LeaseTxDiff.leaseCancel(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(lctx)
