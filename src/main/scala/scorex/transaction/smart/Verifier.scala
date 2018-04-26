@@ -22,12 +22,11 @@ object Verifier {
     }).flatMap(tx => {
       for {
         assetId <- tx match {
-          case t: V1TransferTransaction        => t.assetId
-          case t: VersionedTransferTransaction => t.assetId
-          case t: MassTransferTransaction      => t.assetId
-          case t: BurnTransaction              => Some(t.assetId)
-          case t: ReissueTransaction           => Some(t.assetId)
-          case _                               => None
+          case t: TransferTransaction     => t.assetId
+          case t: MassTransferTransaction => t.assetId
+          case t: BurnTransaction         => Some(t.assetId)
+          case t: ReissueTransaction      => Some(t.assetId)
+          case _                          => None
         }
 
         script <- blockchain.assetDescription(assetId).flatMap(_.script)

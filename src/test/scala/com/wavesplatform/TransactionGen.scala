@@ -211,7 +211,26 @@ trait TransactionGenBase extends ScriptGen {
                          feeAssetId: Option[AssetId]): Gen[V1TransferTransaction] =
     for {
       (_, _, _, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
-    } yield V1TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
+    } yield V1TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).explicitGet()
+
+  def versionedTransferGeneratorP(sender: PrivateKeyAccount,
+                                  recipient: AddressOrAlias,
+                                  assetId: Option[AssetId],
+                                  feeAssetId: Option[AssetId]): Gen[VersionedTransferTransaction] =
+    for {
+      (_, _, _, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
+    } yield
+      VersionedTransferTransaction
+        .selfSigned(VersionedTransferTransaction.supportedVersions.head,
+                    assetId,
+                    sender,
+                    recipient,
+                    amount,
+                    timestamp,
+                    feeAssetId,
+                    feeAmount,
+                    attachment)
+        .explicitGet()
 
   def transferGeneratorP(timestamp: Long, sender: PrivateKeyAccount, recipient: AddressOrAlias, maxAmount: Long): Gen[V1TransferTransaction] =
     for {

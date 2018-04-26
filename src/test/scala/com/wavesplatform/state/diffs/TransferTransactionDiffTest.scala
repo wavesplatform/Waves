@@ -10,11 +10,11 @@ import scorex.account.Address
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction, V1TransferTransaction}
+import scorex.transaction.assets._
 
-class V1TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
-  val preconditionsAndTransfer: Gen[(GenesisTransaction, IssueTransaction, IssueTransaction, V1TransferTransaction)] = for {
+  val preconditionsAndTransfer: Gen[(GenesisTransaction, IssueTransaction, IssueTransaction, TransferTransaction)] = for {
     master    <- accountGen
     recepient <- otherAccountGen(candidate = master)
     ts        <- positiveIntGen
@@ -24,7 +24,9 @@ class V1TransferTransactionDiffTest extends PropSpec with PropertyChecks with Ma
     maybeAsset               <- Gen.option(issue1)
     maybeAsset2              <- Gen.option(issue2)
     maybeFeeAsset            <- Gen.oneOf(maybeAsset, maybeAsset2)
-    transfer                 <- transferGeneratorP(master, recepient, maybeAsset.map(_.id()), maybeFeeAsset.map(_.id()))
+    transferV1               <- transferGeneratorP(master, recepient, maybeAsset.map(_.id()), maybeFeeAsset.map(_.id()))
+    transferV2               <- versionedTransferGeneratorP(master, recepient, maybeAsset.map(_.id()), maybeFeeAsset.map(_.id()))
+    transfer                 <- Gen.oneOf(transferV1, transferV2)
   } yield (genesis, issue1, issue2, transfer)
 
   property("transfers assets to recipient preserving waves invariant") {
@@ -46,7 +48,7 @@ class V1TransferTransactionDiffTest extends PropSpec with PropertyChecks with Ma
     }
   }
 
-  val transferWithSmartAssetFee: Gen[(GenesisTransaction, IssueTransaction, SmartIssueTransaction, V1TransferTransaction)] = {
+  val transferWithSmartAssetFee: Gen[(GenesisTransaction, IssueTransaction, SmartIssueTransaction, TransferTransaction)] = {
     for {
       master    <- accountGen
       recepient <- otherAccountGen(master)
@@ -54,7 +56,9 @@ class V1TransferTransactionDiffTest extends PropSpec with PropertyChecks with Ma
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
       issue: IssueTransaction         <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
       feeIssue: SmartIssueTransaction <- smartIssueTransactionGen(master, scriptGen.map(_.some))
-      transfer                        <- transferGeneratorP(master, recepient, issue.id().some, feeIssue.id().some)
+      transferV1                      <- transferGeneratorP(master, recepient, issue.id().some, feeIssue.id().some)
+      transferV2                      <- transferGeneratorP(master, recepient, issue.id().some, feeIssue.id().some)
+      transfer                        <- Gen.oneOf(transferV1, transferV2)
     } yield (genesis, issue, feeIssue, transfer)
   }
 

@@ -17,7 +17,7 @@ import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
 import scorex.transaction._
-import scorex.transaction.assets.{MassTransferTransaction, V1TransferTransaction}
+import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.collection.JavaConverters._
@@ -81,7 +81,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
       sender match {
         case Some(addr) if utxSettings.blacklistSenderAddresses.contains(addr) =>
           val recipients = tx match {
-            case tt: V1TransferTransaction    => Seq(tt.recipient)
+            case tt: TransferTransaction      => Seq(tt.recipient)
             case mtt: MassTransferTransaction => mtt.transfers.map(_.address)
             case _                            => Seq()
           }
