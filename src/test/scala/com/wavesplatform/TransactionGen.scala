@@ -3,7 +3,7 @@ package com.wavesplatform
 import monix.eval.TaskCircuitBreaker.Timestamp
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
-import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
+import scorex.account.{Address, AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import scorex.transaction.AssetId
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.base._
@@ -11,6 +11,7 @@ import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.modern.TxHeader
 import scorex.transaction.modern.assets._
 import scorex.transaction.modern.lease.{LeaseCancelPayload, LeaseCancelTx, LeasePayload, LeaseTx}
+import scorex.transaction.validation.ValidationError
 
 trait TransactionGen extends OldTransactionGen with ModernTransactionGen { self: Suite =>
 
@@ -122,15 +123,22 @@ trait TransactionGen extends OldTransactionGen with ModernTransactionGen { self:
 
   def wavesAnyTransferGen(sender: PrivateKeyAccount, recipient: AddressOrAlias): Gen[TransferTxBase] = {
     for {
-      (_, _, _, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
-      transfer <- for {
-        header <- txHeaderGen(sender, TransferTx)
-        payload = TransferPayload(recipient, None, None, amount, Array.emptyByteArray)
-        tx <- Gen.oneOf(
-          TransferTx.selfSigned(header, payload).get,
-          TransferTransaction.create(None, sender, recipient, amount, timestamp, None, feeAmount, attachment).right.get
-        )
-      } yield tx
+      (_, _, _, amount, timestamp, _, feeAmount, _) <- transferParamGen
+      transfer <- createAnyWavesTransfer(sender, recipient, amount, feeAmount, timestamp)
     } yield transfer
+  }
+
+  def createAnyWavesTransfer(sender: PrivateKeyAccount,
+                          recipient: AddressOrAlias,
+                          amount: Long,
+                          fee: Long,
+                          timestamp: Long): Gen[TransferTxBase] = {
+    Gen.oneOf(
+      TransferTransaction.create(None, sender, recipient, amount, timestamp, None, fee, Array()).right.get,
+      TransferTx.selfSigned(
+        TxHeader(TransferTx.typeId, TransferTx.supportedVersions.head, sender, fee, timestamp),
+        TransferPayload(recipient, None, None, amount, Array.emptyByteArray)
+      ).get
+    )
   }
 }
