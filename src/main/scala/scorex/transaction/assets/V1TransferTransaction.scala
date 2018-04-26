@@ -13,20 +13,45 @@ import scorex.serialization.Deser
 import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
+import validation._
+import cats.implicits._
 
-case class TransferTransaction private (assetId: Option[AssetId],
-                                        sender: PublicKeyAccount,
-                                        recipient: AddressOrAlias,
-                                        amount: Long,
-                                        timestamp: Long,
-                                        feeAssetId: Option[AssetId],
-                                        fee: Long,
-                                        attachment: Array[Byte],
-                                        signature: ByteStr)
-    extends SignedTransaction
+trait TransferTransaction extends Transaction {
+  def assetId: Option[AssetId]
+  def sender: PublicKeyAccount
+  def recipient: AddressOrAlias
+  def amount: Long
+  def timestamp: Long
+  def feeAssetId: Option[AssetId]
+  def fee: Long
+  def attachment: Array[Byte]
+}
+
+object TransferTransaction {
+
+  def validate(amount: Long, feeAmount: Long, attachment: Array[Byte]): Either[ValidationError, Unit] = {
+    (validateAmount(amount, "assets"), validateFee(feeAmount), validateAttachment(attachment), validateSum(Seq(amount, feeAmount)))
+      .mapN { case _ => () }
+      .toEither
+      .leftMap(_.head)
+  }
+
+}
+
+case class V1TransferTransaction private (assetId: Option[AssetId],
+                                          sender: PublicKeyAccount,
+                                          recipient: AddressOrAlias,
+                                          amount: Long,
+                                          timestamp: Long,
+                                          feeAssetId: Option[AssetId],
+                                          fee: Long,
+                                          attachment: Array[Byte],
+                                          signature: ByteStr)
+    extends TransferTransaction
+    with SignedTransaction
     with FastHashId {
 
-  override val builder: TransactionParser = TransferTransaction
+  override val builder: TransactionParser = V1TransferTransaction
 
   override val assetFee: (Option[AssetId], Long) = (feeAssetId, fee)
 
@@ -63,7 +88,7 @@ case class TransferTransaction private (assetId: Option[AssetId],
 
 }
 
-object TransferTransaction extends TransactionParserFor[TransferTransaction] with TransactionParser.HardcodedVersion1 {
+object V1TransferTransaction extends TransactionParserFor[V1TransferTransaction] with TransactionParser.HardcodedVersion1 {
 
   override val typeId: Byte = 4
 
@@ -86,15 +111,15 @@ object TransferTransaction extends TransactionParserFor[TransferTransaction] wit
         recRes <- AddressOrAlias.fromBytes(bytes, s1 + 24)
         (recipient, recipientEnd) = recRes
         (attachment, _)           = Deser.parseArraySize(bytes, recipientEnd)
-        tt <- TransferTransaction.create(assetIdOpt.map(ByteStr(_)),
-                                         sender,
-                                         recipient,
-                                         amount,
-                                         timestamp,
-                                         feeAssetIdOpt.map(ByteStr(_)),
-                                         feeAmount,
-                                         attachment,
-                                         signature)
+        tt <- V1TransferTransaction.create(assetIdOpt.map(ByteStr(_)),
+                                           sender,
+                                           recipient,
+                                           amount,
+                                           timestamp,
+                                           feeAssetIdOpt.map(ByteStr(_)),
+                                           feeAmount,
+                                           attachment,
+                                           signature)
       } yield tt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
@@ -107,17 +132,9 @@ object TransferTransaction extends TransactionParserFor[TransferTransaction] wit
              feeAmount: Long,
              attachment: Array[Byte],
              signature: ByteStr): Either[ValidationError, TransactionT] = {
-    if (attachment.length > TransferTransaction.MaxAttachmentSize) {
-      Left(ValidationError.TooBigArray)
-    } else if (amount <= 0) {
-      Left(ValidationError.NegativeAmount(amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
-    } else if (Try(Math.addExact(amount, feeAmount)).isFailure) {
-      Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
-    } else if (feeAmount <= 0) {
-      Left(ValidationError.InsufficientFee())
-    } else {
-      Right(TransferTransaction(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, signature))
-    }
+    TransferTransaction
+      .validate(amount, feeAmount, attachment)
+      .map(_ => V1TransferTransaction(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, signature))
   }
 
   def create(assetId: Option[AssetId],

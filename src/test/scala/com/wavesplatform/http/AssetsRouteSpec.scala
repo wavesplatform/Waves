@@ -14,7 +14,7 @@ import play.api.libs.json.Writes
 import scorex.account.Address
 import scorex.api.http.assets.{AssetsApiRoute, TransferRequest, VersionedTransferRequest}
 import scorex.transaction.Transaction
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.assets.V1TransferTransaction
 import scorex.wallet.Wallet
 
 class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMockFactory with Eventually {
@@ -52,7 +52,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
 
       posting(req) ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[TransferTransaction]
+        responseAs[V1TransferTransaction]
       }
     }
 

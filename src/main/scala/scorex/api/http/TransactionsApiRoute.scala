@@ -171,7 +171,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           case Some(x) =>
             x match {
               case IssueTransaction                => TransactionFactory.issueAsset(jsv.as[IssueRequest], wallet, time)
-              case TransferTransaction             => TransactionFactory.transferAsset(jsv.as[TransferRequest], wallet, time)
+              case V1TransferTransaction           => TransactionFactory.transferAsset(jsv.as[TransferRequest], wallet, time)
               case VersionedTransferTransaction    => TransactionFactory.versionedTransfer(jsv.as[VersionedTransferRequest], wallet, time)
               case MassTransferTransaction         => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
               case ReissueTransaction              => TransactionFactory.reissueAsset(jsv.as[ReissueRequest], wallet, time)
@@ -215,7 +215,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           case Some(x) =>
             x match {
               case IssueTransaction                => jsv.as[SignedIssueRequest].toTx
-              case TransferTransaction             => jsv.as[SignedTransferRequest].toTx
+              case V1TransferTransaction           => jsv.as[SignedTransferRequest].toTx
               case VersionedTransferTransaction    => jsv.as[SignedVersionedTransferRequest].toTx
               case MassTransferTransaction         => jsv.as[SignedMassTransferRequest].toTx
               case ReissueTransaction              => jsv.as[SignedReissueRequest].toTx

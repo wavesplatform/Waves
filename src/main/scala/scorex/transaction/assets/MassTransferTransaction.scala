@@ -128,7 +128,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
           Left(ValidationError.GenericError(s"Number of transfers is greater than $MaxTransferCount"))
         } else if (transfers.exists(_.amount < 0)) {
           Left(ValidationError.GenericError("One of the transfers has negative amount"))
-        } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
+        } else if (attachment.length > V1TransferTransaction.MaxAttachmentSize) {
           Left(ValidationError.TooBigArray)
         } else if (feeAmount <= 0) {
           Left(ValidationError.InsufficientFee())

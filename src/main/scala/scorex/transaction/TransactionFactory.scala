@@ -17,11 +17,11 @@ import scorex.wallet.Wallet
 
 object TransactionFactory {
 
-  def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
+  def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, V1TransferTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipientAcc     <- AddressOrAlias.fromString(request.recipient)
-      tx <- TransferTransaction
+      tx <- V1TransferTransaction
         .create(
           request.assetId.map(s => ByteStr.decodeBase58(s).get),
           senderPrivateKey,

@@ -7,7 +7,7 @@ import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.assets.V1TransferTransaction
 
 class BlockchainUpdaterBadReferencesTest
     extends PropSpec
@@ -16,14 +16,14 @@ class BlockchainUpdaterBadReferencesTest
     with Matchers
     with TransactionGen {
 
-  val preconditionsAndPayments: Gen[(GenesisTransaction, TransferTransaction, TransferTransaction, TransferTransaction)] = for {
+  val preconditionsAndPayments: Gen[(GenesisTransaction, V1TransferTransaction, V1TransferTransaction, V1TransferTransaction)] = for {
     master    <- accountGen
     recipient <- accountGen
     ts        <- positiveIntGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    payment: TransferTransaction  <- wavesTransferGeneratorP(master, recipient)
-    payment2: TransferTransaction <- wavesTransferGeneratorP(master, recipient)
-    payment3: TransferTransaction <- wavesTransferGeneratorP(master, recipient)
+    payment: V1TransferTransaction  <- wavesTransferGeneratorP(master, recipient)
+    payment2: V1TransferTransaction <- wavesTransferGeneratorP(master, recipient)
+    payment3: V1TransferTransaction <- wavesTransferGeneratorP(master, recipient)
   } yield (genesis, payment, payment2, payment3)
 
   property("microBlock: referenced (micro)block doesn't exist") {

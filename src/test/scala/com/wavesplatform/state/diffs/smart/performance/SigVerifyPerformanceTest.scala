@@ -14,18 +14,18 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
+import scorex.transaction.assets.{V1TransferTransaction, VersionedTransferTransaction}
 import scorex.transaction.smart.script.v1.ScriptV1
 
 class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
   private val AmtOfTxs = 10000
 
-  private def simpleSendGen(from: PrivateKeyAccount, to: PublicKeyAccount, ts: Long): Gen[TransferTransaction] =
+  private def simpleSendGen(from: PrivateKeyAccount, to: PublicKeyAccount, ts: Long): Gen[V1TransferTransaction] =
     for {
       amt <- smallFeeGen
       fee <- smallFeeGen
-    } yield TransferTransaction.create(None, from, to.toAddress, amt, ts, None, fee, Array.emptyByteArray).explicitGet()
+    } yield V1TransferTransaction.create(None, from, to.toAddress, amt, ts, None, fee, Array.emptyByteArray).explicitGet()
 
   private def scriptedSendGen(from: PrivateKeyAccount, to: PublicKeyAccount, ts: Long): Gen[VersionedTransferTransaction] =
     for {

@@ -67,7 +67,7 @@ object CommonValidation {
             GenericError(
               "Attempt to pay unavailable funds: balance " +
                 s"${blockchain.portfolio(ptx.sender).balance} is less than ${ptx.amount + ptx.fee}"))
-        case ttx: TransferTransaction     => checkTransfer(ttx.sender, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
+        case ttx: V1TransferTransaction   => checkTransfer(ttx.sender, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
         case mtx: MassTransferTransaction => checkTransfer(mtx.sender, mtx.assetId, mtx.transfers.map(_.amount).sum, None, mtx.fee)
         case _                            => Right(tx)
       }
@@ -94,7 +94,7 @@ object CommonValidation {
       case _: BurnTransaction                 => Right(tx)
       case _: PaymentTransaction              => Right(tx)
       case _: GenesisTransaction              => Right(tx)
-      case _: TransferTransaction             => Right(tx)
+      case _: V1TransferTransaction           => Right(tx)
       case _: IssueTransaction                => Right(tx)
       case _: ReissueTransaction              => Right(tx)
       case _: ExchangeTransaction             => Right(tx)
@@ -137,7 +137,7 @@ object CommonValidation {
           case sitx: SmartIssueTransaction          => Right(1000)
           case rtx: ReissueTransaction              => Right(1000)
           case btx: BurnTransaction                 => Right(1)
-          case ttx: TransferTransaction             => Right(1)
+          case ttx: V1TransferTransaction           => Right(1)
           case mtx: MassTransferTransaction         => Right(1 + (mtx.transfers.size + 1) / 2)
           case ltx: LeaseTransaction                => Right(1)
           case ltx: LeaseCancelTransaction          => Right(1)

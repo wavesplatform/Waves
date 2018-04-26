@@ -9,7 +9,7 @@ import play.api.libs.functional.syntax._
 import scorex.account.{AddressOrAlias, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.{AssetId, Proofs}
-import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
+import scorex.transaction.assets.{V1TransferTransaction, VersionedTransferTransaction}
 import shapeless.{:+:, CNil, Coproduct}
 
 import scala.reflect.ClassTag
@@ -87,7 +87,7 @@ package object http {
     Writes(x => JsString(x.bytes.base58))
   )
 
-  implicit val transferTransactionFormat: Format[TransferTransaction] = (
+  implicit val transferTransactionFormat: Format[V1TransferTransaction] = (
     (JsPath \ "assetId").formatNullable[AssetId] and
       (JsPath \ "sender").format[PublicKeyAccount] and
       (JsPath \ "recipient").format[AddressOrAlias] and
@@ -102,7 +102,7 @@ package object http {
           xs => new String(xs, StandardCharsets.UTF_8)
         ) and
       (JsPath \ "signature").format[ByteStr]
-  )(TransferTransaction.apply, unlift(TransferTransaction.unapply))
+  )(V1TransferTransaction.apply, unlift(V1TransferTransaction.unapply))
 
   implicit val versionedTransferTransactionFormat: Format[VersionedTransferTransaction] = (
     (JsPath \ "version").format[Byte] and
@@ -122,7 +122,7 @@ package object http {
       (JsPath \ "proofs").format[Proofs]
   )(VersionedTransferTransaction.apply, unlift(VersionedTransferTransaction.unapply))
 
-  type TransferTransactions = TransferTransaction :+: VersionedTransferTransaction :+: CNil
+  type TransferTransactions = V1TransferTransaction :+: VersionedTransferTransaction :+: CNil
   implicit val autoTransferTransactionsReads: Reads[TransferTransactions] = Reads { json =>
     (json \ "version").asOpt[Byte] match {
       case None => transferTransactionFormat.reads(json).map(Coproduct[TransferTransactions](_))

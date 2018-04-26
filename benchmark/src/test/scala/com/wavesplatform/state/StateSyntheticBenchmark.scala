@@ -10,7 +10,7 @@ import org.openjdk.jmh.annotations._
 import org.scalacheck.Gen
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.Transaction
-import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
+import scorex.transaction.assets.{V1TransferTransaction, VersionedTransferTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
 
@@ -38,7 +38,7 @@ object StateSyntheticBenchmark {
       for {
         amount    <- Gen.choose(1, waves(1))
         recipient <- accountGen
-      } yield TransferTransaction.create(None, sender, recipient, amount, ts, None, 100000, Array.emptyByteArray).right.get
+      } yield V1TransferTransaction.create(None, sender, recipient, amount, ts, None, 100000, Array.emptyByteArray).right.get
   }
 
   @State(Scope.Benchmark)

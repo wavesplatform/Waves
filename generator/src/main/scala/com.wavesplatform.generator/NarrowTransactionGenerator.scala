@@ -55,7 +55,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
 
     val tradeAssetDistribution = {
       tradeAssetIssue +: accounts.map(acc => {
-        TransferTransaction
+        V1TransferTransaction
           .create(Some(tradeAssetIssue.id()),
                   issueTransactionSender,
                   acc,
@@ -92,7 +92,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
             val amount     = 100000000L + Random.nextInt(Int.MaxValue)
             logOption(
               IssueTransaction.create(sender, name, description, amount, Random.nextInt(9).toByte, reissuable, 100000000L + r.nextInt(100000000), ts))
-          case TransferTransaction =>
+          case V1TransferTransaction =>
             val useAlias  = r.nextBoolean()
             val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
             val sendAsset = r.nextBoolean()
@@ -105,7 +105,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
             } else Some((randomFrom(accounts).get, None))
             senderAndAssetOpt.flatMap {
               case (sender, asset) =>
-                logOption(TransferTransaction
+                logOption(V1TransferTransaction
                   .create(asset, sender, recipient, r.nextInt(500000), ts, None, moreThatStandartFee, Array.fill(r.nextInt(100))(r.nextInt().toByte)))
             }
           case ReissueTransaction =>

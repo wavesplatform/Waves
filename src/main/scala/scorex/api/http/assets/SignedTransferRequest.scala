@@ -6,7 +6,7 @@ import play.api.libs.json._
 import scorex.account.{AddressOrAlias, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParsers.SignatureStringLength
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.assets.V1TransferTransaction
 import scorex.transaction.{AssetIdStringLength, ValidationError}
 
 object SignedTransferRequest {
@@ -45,14 +45,14 @@ case class SignedTransferRequest(@ApiModelProperty(value = "Base58 encoded sende
                                  @ApiModelProperty(required = true)
                                  signature: String)
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, TransferTransaction] =
+  def toTx: Either[ValidationError, V1TransferTransaction] =
     for {
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _assetId    <- parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
       _feeAssetId <- parseBase58ToOption(feeAssetId.filter(_.length > 0), "invalid.feeAssetId", AssetIdStringLength)
       _signature  <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-      _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
+      _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", V1TransferTransaction.MaxAttachmentStringSize)
       _account    <- AddressOrAlias.fromString(recipient)
-      t           <- TransferTransaction.create(_assetId, _sender, _account, amount, timestamp, _feeAssetId, fee, _attachment.arr, _signature)
+      t           <- V1TransferTransaction.create(_assetId, _sender, _account, amount, timestamp, _feeAssetId, fee, _attachment.arr, _signature)
     } yield t
 }

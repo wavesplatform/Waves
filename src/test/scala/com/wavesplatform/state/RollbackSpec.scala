@@ -9,7 +9,7 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, V1TransferTransaction}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction}
@@ -25,7 +25,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
   )
 
   private def transfer(sender: PrivateKeyAccount, recipient: Address, amount: Long) =
-    TransferTransaction.create(None, sender, recipient, amount, nextTs, None, 1, Array.empty[Byte]).explicitGet()
+    V1TransferTransaction.create(None, sender, recipient, amount, nextTs, None, 1, Array.empty[Byte]).explicitGet()
 
   "Rollback resets" - {
     "waves balances" in forAll(accountGen, positiveLongGen, accountGen, Gen.nonEmptyListOf(Gen.choose(1, 10))) {
@@ -120,7 +120,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
               nextTs,
               d.lastBlockId,
               Seq(
-                TransferTransaction
+                V1TransferTransaction
                   .create(Some(issueTransaction.id()), sender, recipient, assetAmount, nextTs, None, 1, Array.empty[Byte])
                   .explicitGet())
             ))

@@ -10,11 +10,11 @@ import scorex.account.Address
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction, TransferTransaction}
+import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction, V1TransferTransaction}
 
-class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class V1TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
-  val preconditionsAndTransfer: Gen[(GenesisTransaction, IssueTransaction, IssueTransaction, TransferTransaction)] = for {
+  val preconditionsAndTransfer: Gen[(GenesisTransaction, IssueTransaction, IssueTransaction, V1TransferTransaction)] = for {
     master    <- accountGen
     recepient <- otherAccountGen(candidate = master)
     ts        <- positiveIntGen
@@ -46,7 +46,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     }
   }
 
-  val transferWithSmartAssetFee: Gen[(GenesisTransaction, IssueTransaction, SmartIssueTransaction, TransferTransaction)] = {
+  val transferWithSmartAssetFee: Gen[(GenesisTransaction, IssueTransaction, SmartIssueTransaction, V1TransferTransaction)] = {
     for {
       master    <- accountGen
       recepient <- otherAccountGen(master)

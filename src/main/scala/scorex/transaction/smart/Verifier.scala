@@ -22,7 +22,7 @@ object Verifier {
     }).flatMap(tx => {
       for {
         assetId <- tx match {
-          case t: TransferTransaction          => t.assetId
+          case t: V1TransferTransaction        => t.assetId
           case t: VersionedTransferTransaction => t.assetId
           case t: MassTransferTransaction      => t.assetId
           case t: BurnTransaction              => Some(t.assetId)

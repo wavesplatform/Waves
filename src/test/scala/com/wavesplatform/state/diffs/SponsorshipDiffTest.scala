@@ -9,7 +9,7 @@ import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.TestBlock.{create => block}
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.{IssueTransaction, SponsorFeeTransaction, TransferTransaction}
+import scorex.transaction.assets.{IssueTransaction, SponsorFeeTransaction, V1TransferTransaction}
 
 class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -98,16 +98,16 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
       recipient                  <- accountGen
       assetId = issueTx.id()
-      assetOverspend = TransferTransaction
+      assetOverspend = V1TransferTransaction
         .create(None, master, recipient.toAddress, 1000000, ts + 1, Some(assetId), issueTx.quantity + 1, Array.emptyByteArray)
         .right
         .get
-      insufficientFee = TransferTransaction
+      insufficientFee = V1TransferTransaction
         .create(None, master, recipient.toAddress, 1000000, ts + 2, Some(assetId), sponsorTx.minFee - 1, Array.emptyByteArray)
         .right
         .get
       fee = 3000 * sponsorTx.minFee
-      wavesOverspend = TransferTransaction
+      wavesOverspend = V1TransferTransaction
         .create(None, master, recipient.toAddress, 1000000, ts + 3, Some(assetId), fee, Array.emptyByteArray)
         .right
         .get
@@ -141,15 +141,15 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       issue                       = IssueTransaction.create(master, Base58.decode("Asset").get, Array.emptyByteArray, 100, 2, false, 100000000, ts + 1).right.get
       assetId                     = issue.id()
       sponsor                     = SponsorFeeTransaction.create(1, master, assetId, 100, 100000000, ts + 2).right.get
-      assetTransfer = TransferTransaction
+      assetTransfer = V1TransferTransaction
         .create(Some(assetId), master, recipient, issue.quantity, ts + 3, None, 100000, Array.emptyByteArray)
         .right
         .get
-      wavesTransfer = TransferTransaction
+      wavesTransfer = V1TransferTransaction
         .create(None, master, recipient, 99800000, ts + 4, None, 100000, Array.emptyByteArray)
         .right
         .get
-      backWavesTransfer = TransferTransaction
+      backWavesTransfer = V1TransferTransaction
         .create(None, recipient, master, 100000, ts + 5, Some(assetId), 100, Array.emptyByteArray)
         .right
         .get

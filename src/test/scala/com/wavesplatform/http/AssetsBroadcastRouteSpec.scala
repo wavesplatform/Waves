@@ -18,7 +18,7 @@ import scorex.api.http._
 import scorex.api.http.assets._
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
+import scorex.transaction.assets.{V1TransferTransaction, VersionedTransferTransaction}
 import scorex.transaction.{Proofs, Transaction, ValidationError}
 import scorex.wallet.Wallet
 import shapeless.Coproduct
@@ -163,7 +163,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
 
     val transferRequest = createSignedTransferRequest(
-      TransferTransaction
+      V1TransferTransaction
         .create(
           assetId = None,
           sender = senderPrivateKey,
@@ -200,7 +200,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
       "accepts TransferRequest" in posting(transferRequest) ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[TransferTransactions].select[TransferTransaction] shouldBe defined
+        responseAs[TransferTransactions].select[V1TransferTransaction] shouldBe defined
       }
 
       "accepts VersionedTransferRequest" in posting(versionedTransferRequest) ~> check {
@@ -220,7 +220,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
         status shouldBe StatusCodes.OK
         val xs = responseAs[Seq[TransferTransactions]]
         xs.size shouldBe 1
-        xs.head.select[TransferTransaction] shouldBe defined
+        xs.head.select[V1TransferTransaction] shouldBe defined
       }
 
       "accepts VersionedTransferRequest" in posting(List(versionedTransferRequest)) ~> check {
@@ -240,7 +240,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
           status shouldBe StatusCodes.OK
           val xs = responseAs[Seq[TransferTransactions]]
           xs.size shouldBe 2
-          xs.flatMap(_.select[TransferTransaction]) shouldNot be(empty)
+          xs.flatMap(_.select[V1TransferTransaction]) shouldNot be(empty)
           xs.flatMap(_.select[VersionedTransferTransaction]) shouldNot be(empty)
         }
       }
@@ -252,7 +252,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
   }
 
-  protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {
+  protected def createSignedTransferRequest(tx: V1TransferTransaction): SignedTransferRequest = {
     import tx._
     SignedTransferRequest(
       Base58.encode(tx.sender.publicKey),

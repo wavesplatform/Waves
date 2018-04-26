@@ -23,7 +23,8 @@ case class VersionedTransferTransaction private (version: Byte,
                                                  fee: Long,
                                                  attachment: Array[Byte],
                                                  proofs: Proofs)
-    extends ProvenTransaction
+    extends TransferTransaction
+    with ProvenTransaction
     with FastHashId {
 
   override val builder: TransactionParser        = VersionedTransferTransaction
@@ -105,19 +106,10 @@ object VersionedTransferTransaction extends TransactionParserFor[VersionedTransf
              feeAmount: Long,
              attachment: Array[Byte],
              proofs: Proofs): Either[ValidationError, TransactionT] = {
-    if (!supportedVersions.contains(version)) {
-      Left(ValidationError.UnsupportedVersion(version))
-    } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
-      Left(ValidationError.TooBigArray)
-    } else if (amount <= 0) {
-      Left(ValidationError.NegativeAmount(amount, "waves"))
-    } else if (Try(Math.addExact(amount, feeAmount)).isFailure) {
-      Left(ValidationError.OverflowError)
-    } else if (feeAmount <= 0) {
-      Left(ValidationError.InsufficientFee())
-    } else {
-      Right(VersionedTransferTransaction(version, sender, recipient, assetId, amount, timestamp, feeAssetId, feeAmount, attachment, proofs))
-    }
+    for {
+      _ <- Either.cond(supportedVersions.contains(version), (), ValidationError.UnsupportedVersion(version))
+      _ <- TransferTransaction.validate(amount, feeAmount, attachment)
+    } yield VersionedTransferTransaction(version, sender, recipient, assetId, amount, timestamp, feeAssetId, feeAmount, attachment, proofs)
   }
 
   def selfSigned(version: Byte,

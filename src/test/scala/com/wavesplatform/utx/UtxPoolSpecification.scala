@@ -30,7 +30,7 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.ValidationError.SenderIsBlacklisted
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
-import scorex.transaction.assets.{IssueTransaction, MassTransferTransaction, TransferTransaction}
+import scorex.transaction.assets.{IssueTransaction, MassTransferTransaction, V1TransferTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
@@ -46,7 +46,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     Seq(
       GenesisTransaction,
       IssueTransaction,
-      TransferTransaction,
+      V1TransferTransaction,
       MassTransferTransaction,
       SetScriptTransaction
     ).map(_.typeId.toInt -> List(FeeSettings("", 0))).toMap
@@ -82,14 +82,14 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
       amount    <- chooseNum(1, (maxAmount * 0.9).toLong)
       recipient <- accountGen
       fee       <- chooseNum(1, (maxAmount * 0.1).toLong)
-    } yield TransferTransaction.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
+    } yield V1TransferTransaction.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
       .label("transferTransaction")
 
   private def transferWithRecipient(sender: PrivateKeyAccount, recipient: PublicKeyAccount, maxAmount: Long, time: Time) =
     (for {
       amount <- chooseNum(1, (maxAmount * 0.9).toLong)
       fee    <- chooseNum(1, (maxAmount * 0.1).toLong)
-    } yield TransferTransaction.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
+    } yield V1TransferTransaction.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
       .label("transferWithRecipient")
 
   private def massTransferWithRecipients(sender: PrivateKeyAccount, recipients: List[PublicKeyAccount], maxAmount: Long, time: Time) = {
@@ -199,7 +199,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     }).label("massTransferWithBlacklisted")
 
   private def utxTest(utxSettings: UtxSettings = UtxSettings(20, 5.seconds, Set.empty, Set.empty, 5.minutes), txCount: Int = 10)(
-      f: (Seq[TransferTransaction], UtxPool, TestTime) => Unit): Unit = forAll(stateGen, chooseNum(2, txCount).label("txCount")) {
+      f: (Seq[V1TransferTransaction], UtxPool, TestTime) => Unit): Unit = forAll(stateGen, chooseNum(2, txCount).label("txCount")) {
     case ((sender, senderBalance, bcu), count) =>
       val time = new TestTime()
 
@@ -272,8 +272,8 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     (sender, senderBalance, utx, bcu.lastBlock.fold(0L)(_.timestamp))
   }
 
-  private def transactionGen(sender: PrivateKeyAccount, ts: Long, feeAmount: Long): Gen[TransferTransaction] = accountGen.map { recipient =>
-    TransferTransaction.create(None, sender, recipient, waves(1), ts, None, feeAmount, Array.emptyByteArray).explicitGet()
+  private def transactionGen(sender: PrivateKeyAccount, ts: Long, feeAmount: Long): Gen[V1TransferTransaction] = accountGen.map { recipient =>
+    V1TransferTransaction.create(None, sender, recipient, waves(1), ts, None, feeAmount, Array.emptyByteArray).explicitGet()
   }
 
   private val notEnoughFeeTxWithScriptedAccount = for {

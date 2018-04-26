@@ -72,7 +72,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
 
   property("Transfer transaction ") {
     val feeCalc = new FeeCalculator(mySettings, noScriptBlockchain)
-    forAll(transferGen) { tx: TransferTransaction =>
+    forAll(transferGen) { tx: V1TransferTransaction =>
       if (tx.feeAssetId.isEmpty) {
         feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 100000)
       } else {
@@ -85,11 +85,11 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
     val feeCalculator = new FeeCalculator(mySettings, noScriptBlockchain)
     val sender        = PrivateKeyAccount(Array.emptyByteArray)
     val recipient     = Address.fromString("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8").right.get
-    val tx1: TransferTransaction = TransferTransaction
+    val tx1: V1TransferTransaction = V1TransferTransaction
       .create(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000, Some(WhitelistedAsset), 2, Array.emptyByteArray)
       .right
       .get
-    val tx2: TransferTransaction = TransferTransaction
+    val tx2: V1TransferTransaction = V1TransferTransaction
       .create(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000, Some(WhitelistedAsset), 1, Array.emptyByteArray)
       .right
       .get

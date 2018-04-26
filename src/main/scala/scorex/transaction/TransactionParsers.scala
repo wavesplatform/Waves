@@ -20,7 +20,7 @@ object TransactionParsers {
     GenesisTransaction,
     PaymentTransaction,
     IssueTransaction,
-    TransferTransaction,
+    V1TransferTransaction,
     ReissueTransaction,
     BurnTransaction,
     ExchangeTransaction,
