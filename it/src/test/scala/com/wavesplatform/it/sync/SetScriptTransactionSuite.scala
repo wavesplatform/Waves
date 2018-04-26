@@ -14,16 +14,17 @@ import scorex.transaction.Proofs
 import scorex.transaction.assets.VersionedTransferTransaction
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
-import scala.util.Random
 
 class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private def randomPk = PrivateKeyAccount(Array.fill[Byte](32)(Random.nextInt(Byte.MaxValue).toByte))
+  private def pkFromAddress(address: String) = PrivateKeyAccount.fromSeed(sender.seed(address)).right.get
 
-  private val acc0 = randomPk
-  private val acc1 = randomPk
-  private val acc2 = randomPk
-  private val acc3 = randomPk
+  private val fourthAddress: String = sender.createAddress
+
+  private val acc0 = pkFromAddress(firstAddress)
+  private val acc1 = pkFromAddress(secondAddress)
+  private val acc2 = pkFromAddress(thirdAddress)
+  private val acc3 = pkFromAddress(fourthAddress)
 
   private val transferAmount: Long = 1.waves
   private val fee: Long            = 0.001.waves
