@@ -13,8 +13,6 @@ class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
 
   private val Kb = 1024
 
-  // private val functionCosts: Map[FunctionHeader, Long] = Context.functionCosts(com.wavesplatform.utils.dummyContext.functions.values)
-
   private val map: Map[String, Long] = {
     settings.fees.flatMap { fs =>
       val transactionType = fs._1
@@ -51,13 +49,6 @@ class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
           s"Fee in ${txFeeAssetId.fold("WAVES")(_.toString)} for ${tx.builder.classTag} transaction does not exceed minimal value of $minTxFee"
         }
       )
-
-      // @TODO
-      //      scriptComplexity <- script match {
-      //        case Some(Script.Expr(expr)) => ScriptComplexityCalculator(functionCosts, expr).left.map(ValidationError.GenericError(_))
-      //        case None                    => Right(0L)
-      //        case Some(x)                 => throw new IllegalStateException(s"Doesn't know how to calculate complexity for a script of ${x.version} version")
-      //      }
 
       totalRequiredFee = minTxFee + script.fold(0L)(_ => settings.smartAccount.extraFee)
       _ <- Either.cond(

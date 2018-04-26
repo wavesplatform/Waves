@@ -2,14 +2,19 @@ package scorex.transaction.smart.script.v1
 
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
-import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType.BYTEVECTOR
 import com.wavesplatform.lang.v1.Terms.{BOOLEAN, Typed}
+import com.wavesplatform.lang.v1.ctx.Context
+import com.wavesplatform.lang.v1.{FunctionHeader, ScriptComplexityCalculator, Serde}
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import scorex.transaction.smart.script.Script
 
 object ScriptV1 {
+  private val functionCosts: Map[FunctionHeader, Long] = Context.functionCosts(com.wavesplatform.utils.dummyContext.functions.values)
+
   private val checksumLength = 4
+  private val maxComplexity  = 20 * functionCosts(FunctionHeader("sigVerify", List(BYTEVECTOR, BYTEVECTOR, BYTEVECTOR)))
 
   def apply(x: Typed.EXPR): Either[String, Script] = {
     def create = new Script {
@@ -24,6 +29,10 @@ object ScriptV1 {
         }
     }
 
-    Either.cond(x.tpe == BOOLEAN, create, "Script should return BOOLEAN")
+    for {
+      _                <- Either.cond(x.tpe == BOOLEAN, (), "Script should return BOOLEAN")
+      scriptComplexity <- ScriptComplexityCalculator(functionCosts, x)
+      _                <- Either.cond(scriptComplexity <= maxComplexity, (), s"Script is too complex: $scriptComplexity > $maxComplexity")
+    } yield create
   }
 }
