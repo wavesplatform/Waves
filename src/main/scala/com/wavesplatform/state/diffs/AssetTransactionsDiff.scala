@@ -78,9 +78,7 @@ object AssetTransactionsDiff {
           height = height,
           tx = tx,
           portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-          sponsorship = tx.minFee.fold(Map[AssetId, SponsorshipValue]()) { minFee =>
-            Map(tx.assetId -> SponsorshipValue(minFee))
-          }
+          sponsorship = Map(tx.assetId         -> SponsorshipValue(tx.minFee.getOrElse(0)))
         ))
     }
   }
