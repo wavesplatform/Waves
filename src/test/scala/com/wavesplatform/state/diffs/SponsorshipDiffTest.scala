@@ -32,13 +32,13 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         val setupBlocks = Seq(block(Seq(genesis, issue)))
         assertDiffAndState(setupBlocks, block(Seq(sponsor)), s) {
           case (diff, state) =>
-            diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(sponsor.minFee.get))
-            state.assetDescription(sponsor.assetId).map(_.sponsorship) shouldBe sponsor.minFee
+            diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(sponsor.minAssetFee.get))
+            state.assetDescription(sponsor.assetId).map(_.sponsorship) shouldBe sponsor.minAssetFee
         }
         assertDiffAndState(setupBlocks, block(Seq(sponsor, sponsor1)), s) {
           case (diff, state) =>
-            diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(sponsor1.minFee.get))
-            state.assetDescription(sponsor.assetId).map(_.sponsorship) shouldBe sponsor1.minFee
+            diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(sponsor1.minAssetFee.get))
+            state.assetDescription(sponsor.assetId).map(_.sponsorship) shouldBe sponsor1.minAssetFee
         }
         assertDiffAndState(setupBlocks, block(Seq(sponsor, sponsor1, cancel)), s) {
           case (diff, state) =>
@@ -101,10 +101,10 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         .right
         .get
       insufficientFee = TransferTransaction
-        .create(None, master, recipient.toAddress, 1000000, ts + 2, Some(assetId), sponsorTx.minFee.get - 1, Array.emptyByteArray)
+        .create(None, master, recipient.toAddress, 1000000, ts + 2, Some(assetId), sponsorTx.minAssetFee.get - 1, Array.emptyByteArray)
         .right
         .get
-      fee = 3000 * sponsorTx.minFee.get
+      fee = 3000 * sponsorTx.minAssetFee.get
       wavesOverspend = TransferTransaction
         .create(None, master, recipient.toAddress, 1000000, ts + 3, Some(assetId), fee, Array.emptyByteArray)
         .right

@@ -20,7 +20,7 @@ case class SponsorFeeRequest(@ApiModelProperty(required = true)
                              @ApiModelProperty(value = "Asset to be sponsored", required = true)
                              assetId: String,
                              @ApiModelProperty(value = "Asset amount per fee unit", required = true)
-                             baseFee: Option[Long],
+                             minAssetFee: Option[Long],
                              @ApiModelProperty(required = true)
                              fee: Long,
                              timestamp: Option[Long] = None)
@@ -33,7 +33,7 @@ case class SignedSponsorFeeRequest(@ApiModelProperty(required = true)
                                    @ApiModelProperty(value = "Asset to be sponsored", required = true)
                                    assetId: String,
                                    @ApiModelProperty(required = true)
-                                   baseFee: Option[Long],
+                                   minAssetFee: Option[Long],
                                    @ApiModelProperty(required = true)
                                    fee: Long,
                                    @ApiModelProperty(required = true)
@@ -47,6 +47,6 @@ case class SignedSponsorFeeRequest(@ApiModelProperty(required = true)
       _assetId    <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      t           <- SponsorFeeTransaction.create(version, _sender, _assetId, baseFee, fee, timestamp, _proofs)
+      t           <- SponsorFeeTransaction.create(version, _sender, _assetId, minAssetFee, fee, timestamp, _proofs)
     } yield t
 }

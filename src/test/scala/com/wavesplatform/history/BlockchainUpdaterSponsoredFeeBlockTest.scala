@@ -34,7 +34,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
     alice                       <- accountGen
     bob                         <- accountGen
     (feeAsset, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(alice)
-    wavesFee                    = Sponsorship.toWaves(sponsorTx.minFee.get, Sponsorship.FeeUnit)
+    wavesFee                    = Sponsorship.toWaves(sponsorTx.minAssetFee.get, Sponsorship.FeeUnit)
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     masterToAlice: TransferTransaction = TransferTransaction
       .create(None,
@@ -68,7 +68,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         amtTx,
         ts + 3,
         Some(feeAsset.id()),
-        sponsorTx.minFee.get,
+        sponsorTx.minAssetFee.get,
         Array.emptyByteArray
       )
       .right
@@ -81,7 +81,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         amtTx,
         ts + 4,
         Some(feeAsset.id()),
-        sponsorTx.minFee.get,
+        sponsorTx.minAssetFee.get,
         Array.emptyByteArray
       )
       .right
