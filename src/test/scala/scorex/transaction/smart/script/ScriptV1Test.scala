@@ -2,9 +2,10 @@ package scorex.transaction.smart.script
 
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.{FunctionHeaderType => FHT}
-import com.wavesplatform.lang.v1.Terms.{BOOLEAN, LONG}
 import com.wavesplatform.lang.v1.Terms.Typed._
+import com.wavesplatform.lang.v1.Terms.{BOOLEAN, LONG}
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
+import com.wavesplatform.state.diffs.produce
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -38,9 +39,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
       }
       .reduceLeft[EXPR](IF(_, _, FALSE, BOOLEAN))
 
-    val r = ScriptV1(expr)
-    r shouldBe 'left
-    r.left.get should startWith("Script is too complex")
+    ScriptV1(expr) should produce("Script is too complex")
   }
 
   property("ScriptV1.apply should deny too big scripts") {
@@ -57,9 +56,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
       BOOLEAN
     )
 
-    val r = ScriptV1(expr)
-    r shouldBe 'left
-    r.left.get should startWith("Script is too large")
+    ScriptV1(expr) should produce("Script is too large")
   }
 
   property("19 sigVerify should fit in maxSizeInBytes") {

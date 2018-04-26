@@ -11,7 +11,6 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.{IssueTransaction, SponsorFeeTransaction, TransferTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
@@ -58,8 +57,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
           blockchain.append(preconditionDiff, genesisBlock)
 
           val r = CommonValidation.checkFee(blockchain, settings, 1, transferTx)
-          r shouldBe 'left
-          r.left.get.toString should startWith("InsufficientFee(Scripted account requires")
+          r should produce("Scripted account requires")
         }
     }
   }
@@ -103,7 +101,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
           blockchain.append(preconditionDiff, genesisBlock)
 
           val r = CommonValidation.checkFee(blockchain, settings, 1, transferTx)
-          r shouldBe Left(GenericError("Scripted accounts can accept transactions with Waves as fee only"))
+          r should produce("Scripted accounts can accept transactions with Waves as fee only")
         }
     }
   }
