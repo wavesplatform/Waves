@@ -1,18 +1,19 @@
 package com.wavesplatform.state.diffs
 
 import cats.implicits._
+import com.wavesplatform.state.diffs.modern.AssetTxDiff
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.account.Address
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction, TransferTransaction}
+import scorex.transaction.validation.ValidationError.GenericError
 
-class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
 
   val preconditionsAndTransfer: Gen[(GenesisTransaction, IssueTransaction, IssueTransaction, TransferTransaction)] = for {
     master    <- accountGen
@@ -65,7 +66,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       case (genesis, issue, fee, transfer) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(issue, fee)), smartEnabledFS) {
           case (_, state) => {
-            val diffOrError = TransferTransactionDiff(state, smartEnabledFS, System.currentTimeMillis(), state.height)(transfer)
+            val diffOrError = AssetTxDiff.transfer(state, smartEnabledFS, System.currentTimeMillis(), state.height)(transfer)
             diffOrError shouldBe Left(GenericError("Smart assets can't participate in TransferTransactions as a fee"))
           }
         }

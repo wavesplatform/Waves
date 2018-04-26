@@ -5,12 +5,12 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.utils.dummyTypeCheckerContext
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 
-class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
 
   property("transfer is allowed but lease is not due to predicate") {
 

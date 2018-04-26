@@ -3,7 +3,7 @@ package com.wavesplatform.network
 import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.{Ints, Longs}
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import io.netty.buffer.Unpooled
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
@@ -12,7 +12,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 
-class HandshakeDecoderSpec extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen with NoShrink {
+class HandshakeDecoderSpec extends FreeSpec with Matchers with MockFactory with PropertyChecks with OldTransactionGen with NoShrink {
 
   "should read a handshake and remove itself from the pipeline" in {
     var mayBeDecodedHandshake: Option[Handshake] = None

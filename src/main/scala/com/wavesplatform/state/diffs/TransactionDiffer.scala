@@ -2,12 +2,9 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import scorex.transaction.ValidationError.UnsupportedTransactionType
 import scorex.transaction._
-import scorex.transaction.assets._
-import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.smart.{SetScriptTransaction, Verifier}
+import scorex.transaction.smart.Verifier
+import scorex.transaction.validation.ValidationError
 
 object TransactionDiffer {
 
@@ -17,35 +14,14 @@ object TransactionDiffer {
       blockchain: Blockchain,
       tx: Transaction): Either[ValidationError, Diff] = {
     for {
-      _ <- Verifier(blockchain, currentBlockHeight)(tx)
-      _ <- CommonValidation.disallowTxFromFuture(settings, currentBlockTimestamp, tx)
-      _ <- CommonValidation.disallowTxFromPast(prevBlockTimestamp, tx)
-      _ <- CommonValidation.disallowBeforeActivationTime(blockchain, currentBlockHeight, tx)
-      _ <- CommonValidation.disallowDuplicateIds(blockchain, settings, currentBlockHeight, tx)
-      _ <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, settings, currentBlockTimestamp, tx)
-      _ <- CommonValidation.checkFee(blockchain, settings, currentBlockHeight, tx)
-      diff <- tx match {
-        case gtx: GenesisTransaction     => GenesisTransactionDiff(currentBlockHeight)(gtx)
-        case ptx: PaymentTransaction     => PaymentTransactionDiff(blockchain, currentBlockHeight, settings, currentBlockTimestamp)(ptx)
-        case itx: IssueTransaction       => AssetTransactionsDiff.issue(currentBlockHeight)(itx)
-        case sitx: SmartIssueTransaction => AssetTransactionsDiff.smartIssue(currentBlockHeight)(sitx)
-        case rtx: ReissueTransaction =>
-          AssetTransactionsDiff.reissue(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(rtx)
-        case btx: BurnTransaction               => AssetTransactionsDiff.burn(blockchain, currentBlockHeight)(btx)
-        case ttx: TransferTransaction           => TransferTransactionDiff(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(ttx)
-        case mtx: MassTransferTransaction       => MassTransferTransactionDiff(blockchain, currentBlockTimestamp, currentBlockHeight)(mtx)
-        case ltx: LeaseTransaction              => LeaseTransactionsDiff.lease(blockchain, currentBlockHeight)(ltx)
-        case ltx: LeaseCancelTransaction        => LeaseTransactionsDiff.leaseCancel(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(ltx)
-        case etx: ExchangeTransaction           => ExchangeTransactionDiff(blockchain, currentBlockHeight)(etx)
-        case atx: CreateAliasTransaction        => CreateAliasTransactionDiff(currentBlockHeight)(atx)
-        case dtx: DataTransaction               => DataTransactionDiff(blockchain, currentBlockHeight)(dtx)
-        case sstx: SetScriptTransaction         => SetScriptTransactionDiff(currentBlockHeight)(sstx)
-        case sttx: VersionedTransferTransaction => ScriptTransferTransactionDiff(blockchain, currentBlockHeight)(sttx)
-        case stx: SponsorFeeTransaction         => AssetTransactionsDiff.sponsor(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(stx)
-        case ctx: CancelFeeSponsorshipTransaction =>
-          AssetTransactionsDiff.cancelSponsorship(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(ctx)
-        case _ => Left(UnsupportedTransactionType)
-      }
+      _            <- Verifier(blockchain, currentBlockHeight)(tx)
+      _            <- CommonValidation.disallowTxFromFuture(settings, currentBlockTimestamp, tx)
+      _            <- CommonValidation.disallowTxFromPast(prevBlockTimestamp, tx)
+      _            <- CommonValidation.disallowBeforeActivationTime(blockchain, currentBlockHeight, tx)
+      _            <- CommonValidation.disallowDuplicateIds(blockchain, settings, currentBlockHeight, tx)
+      _            <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, settings, currentBlockTimestamp, tx)
+      _            <- CommonValidation.checkFee(blockchain, settings, currentBlockHeight, tx)
+      diff         <- ModernTransactionDiff(settings, prevBlockTimestamp, currentBlockTimestamp, currentBlockHeight)(blockchain, tx)
       positiveDiff <- BalanceDiffValidation(blockchain, currentBlockHeight, settings)(diff)
     } yield positiveDiff
   }.left.map(TransactionValidationError(_, tx))

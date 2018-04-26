@@ -21,6 +21,7 @@ import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction.PoSCalc._
 import scorex.transaction._
+import scorex.transaction.validation.ValidationError
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
 

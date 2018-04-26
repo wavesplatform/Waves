@@ -6,6 +6,10 @@ import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.modern.{CreateAliasTx, DataTx}
+import scorex.transaction.modern.assets._
+import scorex.transaction.modern.lease.{LeaseCancelTx, LeaseTx}
+import scorex.transaction.modern.smart.SetScriptTx
 
 import scala.util.{Failure, Success, Try}
 
@@ -32,13 +36,31 @@ object TransactionParsers {
     x.typeId -> x
   }(collection.breakOut)
 
-  private val modern: Map[(Byte, Byte), TransactionParser] = Seq[TransactionParser](
+  private val intermediate: Map[(Byte, Byte), TransactionParser] = Seq[TransactionParser](
     DataTransaction,
     VersionedTransferTransaction,
     SetScriptTransaction,
     SmartIssueTransaction,
-    SponsorFeeTransaction,
-    CancelFeeSponsorshipTransaction
+    VersionedTransferTransaction,
+    SetScriptTransaction,
+  ).flatMap { x =>
+    x.supportedVersions.map { version =>
+      ((x.typeId, version), x)
+    }
+  }(collection.breakOut)
+
+  private val modern: Map[(Byte, Byte), TransactionParser] = Seq[TransactionParser](
+    IssueTx,
+    ReissueTx,
+    BurnTx,
+    TransferTx,
+    CreateAliasTx,
+    LeaseTx,
+    LeaseCancelTx,
+    SetScriptTx,
+    DataTx,
+    SponsorFeeTx,
+    CancelFeeSponsorshipTx
   ).flatMap { x =>
     x.supportedVersions.map { version =>
       ((x.typeId, version), x)
@@ -50,9 +72,9 @@ object TransactionParsers {
       builder.supportedVersions.map { version =>
         ((typeId, version), builder)
       }
-  } ++ modern
+  } ++ intermediate ++ modern
 
-  val byName: Map[String, TransactionParser] = (old ++ modern).map {
+  val byName: Map[String, TransactionParser] = (old ++ intermediate ++ modern).map {
     case (_, builder) => builder.classTag.runtimeClass.getSimpleName -> builder
   }
 
@@ -63,7 +85,7 @@ object TransactionParsers {
     data.headOption
       .fold[Try[Byte]](Failure(new IllegalArgumentException("Can't find the significant byte: the buffer is empty")))(Success(_))
       .flatMap { headByte =>
-        if (headByte == 0) modernParseBytes(data)
+        if (headByte == 0) modernParseBytes(data) orElse intermediateParseBytes(data)
         else oldParseBytes(headByte, data)
       }
 
@@ -72,6 +94,19 @@ object TransactionParsers {
       .get(tpe)
       .fold[Try[TransactionParser]](Failure(new IllegalArgumentException(s"Unknown transaction type (old encoding): '$tpe'")))(Success(_))
       .flatMap(_.parseBytes(data))
+
+  private def intermediateParseBytes(data: Array[Byte]): Try[Transaction] = {
+    if (data.length < 2)
+      Failure(new IllegalArgumentException(s"Can't determine the type and the version of transaction: the buffer has ${data.length} bytes"))
+    else {
+      val Array(_, typeId, version) = data.take(3)
+      intermediate
+        .get((typeId, version))
+        .fold[Try[TransactionParser]](
+          Failure(new IllegalArgumentException(s"Unknown transaction type ($typeId) and version ($version) (intermediate encoding)")))(Success(_))
+        .flatMap(_.parseBytes(data))
+    }
+  }
 
   private def modernParseBytes(data: Array[Byte]): Try[Transaction] = {
     if (data.length < 2)

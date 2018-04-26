@@ -2,13 +2,13 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.db.WithState
 import com.wavesplatform.state._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.settings.TestFunctionalitySettings
 
-class CommonValidationTimeTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithState {
+class CommonValidationTimeTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink with WithState {
 
   property("disallows too old transacions") {
     forAll(for {

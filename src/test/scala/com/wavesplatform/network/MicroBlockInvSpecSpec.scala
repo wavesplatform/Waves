@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import com.wavesplatform.state.ByteStr
 import org.scalacheck.Gen
 import org.scalatest.concurrent.Eventually
@@ -8,7 +8,7 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.crypto.signatures.Curve25519.SignatureLength
 
-class MicroBlockInvSpecSpec extends FreeSpec with Matchers with PropertyChecks with Eventually with TransactionGen {
+class MicroBlockInvSpecSpec extends FreeSpec with Matchers with PropertyChecks with Eventually with OldTransactionGen {
 
   private val microBlockInvGen: Gen[MicroBlockInv] = for {
     acc          <- accountGen

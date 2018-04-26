@@ -15,9 +15,10 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
-import scorex.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
+import scorex.transaction.validation.ValidationError.{GenericError, SenderIsBlacklisted}
 import scorex.transaction._
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
+import scorex.transaction.validation.ValidationError
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.collection.JavaConverters._

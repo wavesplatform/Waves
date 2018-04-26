@@ -3,9 +3,9 @@ package com.wavesplatform.state.diffs
 import cats._
 import cats.implicits._
 import com.wavesplatform.state._
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.{GenericError, OrderValidationError}
+import scorex.transaction.validation.ValidationError.{GenericError, OrderValidationError}
 import scorex.transaction.assets.exchange.ExchangeTransaction
+import scorex.transaction.validation.ValidationError
 
 import scala.util.Right
 

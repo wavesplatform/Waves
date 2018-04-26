@@ -5,8 +5,11 @@ import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
-import scorex.transaction.assets.SponsorFeeTransaction
-import scorex.transaction.{AssetIdStringLength, Proofs, ValidationError}
+import scorex.transaction.modern.TxHeader
+import scorex.transaction.modern.assets.{SponsorFeePayload, SponsorFeeTx}
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.validation.ValidationError.GenericError
+import scorex.transaction.{AssetIdStringLength, Proofs}
 
 object SponsorFeeRequest {
   implicit val unsignedSponsorRequestFormat = Json.format[SponsorFeeRequest]
@@ -41,12 +44,18 @@ case class SignedSponsorFeeRequest(@ApiModelProperty(required = true)
                                    @ApiModelProperty(required = true)
                                    proofs: List[String])
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, SponsorFeeTransaction] =
+  def toTx: Either[ValidationError, SponsorFeeTx] =
     for {
-      _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
-      _assetId    <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
+      _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      header = TxHeader(SponsorFeeTx.typeId, version, _sender, fee, timestamp)
+      _assetId <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
+      payload = SponsorFeePayload(_assetId, baseFee)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      t           <- SponsorFeeTransaction.create(version, _sender, _assetId, baseFee, fee, timestamp, _proofs)
+      t <- SponsorFeeTx
+        .create(header, payload, _proofs)
+        .toEither
+        .left
+        .map(thr => GenericError(thr.getMessage))
     } yield t
 }

@@ -7,6 +7,7 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.Address
 import scorex.transaction.TransactionParsers._
+import scorex.transaction.validation.ValidationError
 
 import scala.util.{Failure, Success, Try}
 

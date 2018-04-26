@@ -4,7 +4,8 @@ import com.wavesplatform.network._
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import scorex.api.http.ApiError
-import scorex.transaction.{Transaction, ValidationError}
+import scorex.transaction.Transaction
+import scorex.transaction.validation.ValidationError
 
 import scala.concurrent.Future
 

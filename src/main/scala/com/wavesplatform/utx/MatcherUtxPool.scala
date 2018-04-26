@@ -7,7 +7,8 @@ import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.mining.TwoDimensionalMiningConstraint
 import com.wavesplatform.state.{ByteStr, Diff, Portfolio}
 import scorex.account.Address
-import scorex.transaction.{AssetId, Authorized, Transaction, ValidationError}
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.{AssetId, Authorized, Transaction}
 import scorex.utils.ScorexLogging
 
 import scala.collection.mutable

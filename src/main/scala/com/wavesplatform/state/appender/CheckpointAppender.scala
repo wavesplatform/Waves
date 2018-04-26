@@ -8,7 +8,8 @@ import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import monix.eval.Task
 import monix.execution.Scheduler
-import scorex.transaction.{BlockchainUpdater, CheckpointService, ValidationError}
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.{BlockchainUpdater, CheckpointService}
 import scorex.utils.ScorexLogging
 
 object CheckpointAppender extends ScorexLogging {

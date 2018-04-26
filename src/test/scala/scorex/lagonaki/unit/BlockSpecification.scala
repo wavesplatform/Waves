@@ -3,7 +3,7 @@ package scorex.lagonaki.unit
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.{NoShrink, TransactionGen, crypto}
+import com.wavesplatform.{NoShrink, OldTransactionGen, crypto}
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalatest._
@@ -13,7 +13,7 @@ import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction._
 import scorex.transaction.assets.TransferTransaction
 
-class BlockSpecification extends PropSpec with PropertyChecks with TransactionGen with Matchers with NoShrink {
+class BlockSpecification extends PropSpec with PropertyChecks with OldTransactionGen with Matchers with NoShrink {
 
   val time = System.currentTimeMillis() - 5000
 

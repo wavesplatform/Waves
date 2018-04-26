@@ -1,8 +1,8 @@
 package scorex.api.http
 
 import com.wavesplatform.state.ByteStr
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.Validation
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.validation.ValidationError.Validation
 
 trait BroadcastRequest {
   protected def parseBase58(v: String, error: String, maxLength: Int): Validation[ByteStr] =

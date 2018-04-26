@@ -8,10 +8,14 @@ import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets._
+import scorex.transaction.assets.{MassTransferTransaction, VersionedTransferTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.modern.TxHeader
+import scorex.transaction.modern.assets.{CancelFeeSponsorshipPayload, CancelFeeSponsorshipTx, SponsorFeePayload, SponsorFeeTx}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.validation.ValidationError.GenericError
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
@@ -164,19 +168,33 @@ object TransactionFactory {
       tx <- DataTransaction.selfSigned(request.version, pk, request.data, request.fee, timestamp)
     } yield tx
 
-  def sponsor(request: SponsorFeeRequest, wallet: Wallet, time: Time): Either[ValidationError, SponsorFeeTransaction] =
+  def sponsor(request: SponsorFeeRequest, wallet: Wallet, time: Time): Either[ValidationError, SponsorFeeTx] =
     for {
       pk <- wallet.findWallet(request.sender)
       assetId   = ByteStr.decodeBase58(request.assetId).get
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- SponsorFeeTransaction.create(request.version, pk, assetId, request.baseFee, request.fee, timestamp)
+      tx <- SponsorFeeTx
+        .selfSigned(
+          TxHeader(SponsorFeeTx.typeId, request.version, pk, request.fee, timestamp),
+          SponsorFeePayload(assetId, request.baseFee)
+        )
+        .toEither
+        .left
+        .map(thr => GenericError(thr.getMessage))
     } yield tx
 
-  def cancelSponsorship(request: CancelFeeSponsorshipRequest, wallet: Wallet, time: Time): Either[ValidationError, CancelFeeSponsorshipTransaction] =
+  def cancelSponsorship(request: CancelFeeSponsorshipRequest, wallet: Wallet, time: Time): Either[ValidationError, CancelFeeSponsorshipTx] =
     for {
       pk <- wallet.findWallet(request.sender)
       assetId   = ByteStr.decodeBase58(request.assetId).get
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- CancelFeeSponsorshipTransaction.create(request.version, pk, assetId, request.fee, timestamp)
+      tx <- CancelFeeSponsorshipTx
+        .selfSigned(
+          TxHeader(CancelFeeSponsorshipTx.typeId, request.version, pk, request.fee, timestamp),
+          CancelFeeSponsorshipPayload(assetId)
+        )
+        .toEither
+        .left
+        .map(thr => GenericError(thr.getMessage))
     } yield tx
 }

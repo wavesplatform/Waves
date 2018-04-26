@@ -1,14 +1,14 @@
 package com.wavesplatform.state.reader
 
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
 
-class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
   val setup: Gen[(GenesisTransaction, Int, Int, Int)] = for {
     master <- accountGen
     ts     <- positiveIntGen

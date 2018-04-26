@@ -1,6 +1,6 @@
 package scorex.transaction.assets.exchange
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import com.wavesplatform.state.ByteStr
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -9,7 +9,7 @@ import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.OrderJson._
 
-class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers with OldTransactionGen {
 
   property("Read Order from json") {
     val pk        = PrivateKeyAccount("123".getBytes)

@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -8,7 +8,7 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.TransferTransaction
 
-class CommonValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class CommonValidationTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen {
 
   property("disallows double spending") {
     val preconditionsAndPayment: Gen[(GenesisTransaction, TransferTransaction)] = for {

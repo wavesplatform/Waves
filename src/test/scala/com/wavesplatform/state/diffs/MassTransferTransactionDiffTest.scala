@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -10,10 +10,10 @@ import scorex.account.{Address, PrivateKeyAccount}
 import scorex.lagonaki.mocks.TestBlock.{create => block}
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
+import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
-import scorex.transaction.assets.{IssueTransaction, MassTransferTransaction}
 
-class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
 
   val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 0))
 
@@ -63,7 +63,7 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
       }
     }
 
-    import MassTransferTransaction.{MaxTransferCount => Max}
+    import scorex.transaction.assets.MassTransferTransaction.{MaxTransferCount => Max}
     Seq(0, 1, Max) foreach testDiff // test edge cases
     Gen.choose(2, Max - 1) map testDiff
   }

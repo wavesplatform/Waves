@@ -1,6 +1,6 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import org.scalacheck.Gen
@@ -14,7 +14,7 @@ class BlockchainUpdaterGeneratorFeeSameBlockTest
     with PropertyChecks
     with DomainScenarioDrivenPropertyCheck
     with Matchers
-    with TransactionGen {
+    with OldTransactionGen {
 
   type Setup = (GenesisTransaction, TransferTransaction, TransferTransaction)
 

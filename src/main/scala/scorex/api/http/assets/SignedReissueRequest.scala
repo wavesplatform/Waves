@@ -6,7 +6,8 @@ import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParsers.SignatureStringLength
 import scorex.transaction.assets.ReissueTransaction
-import scorex.transaction.{AssetIdStringLength, ValidationError}
+import scorex.transaction.AssetIdStringLength
+import scorex.transaction.validation.ValidationError
 
 object SignedReissueRequest {
   implicit val assetReissueRequestReads: Format[SignedReissueRequest] = Json.format

@@ -5,7 +5,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.utils.dummyTypeCheckerContext
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -15,7 +15,7 @@ import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.{DataTransaction, GenesisTransaction, Proofs}
 
-class OracleDataTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class OracleDataTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
   val preconditions: Gen[(GenesisTransaction, GenesisTransaction, SetScriptTransaction, DataTransaction, VersionedTransferTransaction)] =
     for {
       master <- accountGen

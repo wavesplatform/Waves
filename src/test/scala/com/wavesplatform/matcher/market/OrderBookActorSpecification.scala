@@ -21,6 +21,7 @@ import scorex.settings.TestFunctionalitySettings
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import scorex.transaction.validation.ValidationError
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 

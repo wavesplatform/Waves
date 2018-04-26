@@ -1,16 +1,15 @@
-package com.wavesplatform.state.diffs
+package com.wavesplatform.state.diffs.modern
 
-import cats.implicits._
-import com.wavesplatform.state._
+import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
 import scorex.account.Address
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.{GenericError, Validation}
-import scorex.transaction.assets.MassTransferTransaction
+import cats.implicits._
 import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
+import scorex.transaction.base.MassTransferTxBase
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.validation.ValidationError.{GenericError, Validation}
 
-object MassTransferTransactionDiff {
-
-  def apply(blockchain: Blockchain, blockTime: Long, height: Int)(tx: MassTransferTransaction): Either[ValidationError, Diff] = {
+object MassTranserTxDiff {
+  def apply(blockchain: Blockchain, blockTime: Long, height: Int)(tx: MassTransferTxBase): Either[ValidationError, Diff] = {
     def parseTransfer(xfer: ParsedTransfer): Validation[(Map[Address, Portfolio], Long)] = {
       for {
         recipientAddr <- blockchain.resolveAliasEi(xfer.address)

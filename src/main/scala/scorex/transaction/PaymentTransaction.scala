@@ -10,6 +10,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.signatures.Curve25519.SignatureLength
 import scorex.transaction.TransactionParsers._
+import scorex.transaction.validation.ValidationError
 
 import scala.util.{Failure, Success, Try}
 

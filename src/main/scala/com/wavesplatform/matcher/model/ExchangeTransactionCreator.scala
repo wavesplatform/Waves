@@ -4,8 +4,8 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
-import scorex.transaction.ValidationError
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
+import scorex.transaction.validation.ValidationError
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 

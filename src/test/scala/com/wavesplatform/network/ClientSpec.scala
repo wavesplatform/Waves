@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import java.util.concurrent.ConcurrentHashMap
 
-import com.wavesplatform.{TransactionGen, Version}
+import com.wavesplatform.{OldTransactionGen, Version}
 import io.netty.buffer.{ByteBuf, Unpooled}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
@@ -13,7 +13,7 @@ import org.scalatest.{FreeSpec, Matchers}
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
-class ClientSpec extends FreeSpec with Matchers with MockFactory with TransactionGen {
+class ClientSpec extends FreeSpec with Matchers with MockFactory with OldTransactionGen {
 
   private val clientHandshake = new Handshake(
     applicationName = "wavesI",

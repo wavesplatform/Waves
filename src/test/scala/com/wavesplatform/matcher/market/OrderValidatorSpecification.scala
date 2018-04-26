@@ -10,9 +10,9 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.transaction.ValidationError
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, Order}
+import scorex.transaction.validation.ValidationError
 import scorex.wallet.Wallet
 
 class OrderValidatorSpecification

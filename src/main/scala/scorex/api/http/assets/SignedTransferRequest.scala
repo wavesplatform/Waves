@@ -7,7 +7,8 @@ import scorex.account.{AddressOrAlias, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParsers.SignatureStringLength
 import scorex.transaction.assets.TransferTransaction
-import scorex.transaction.{AssetIdStringLength, ValidationError}
+import scorex.transaction.AssetIdStringLength
+import scorex.transaction.validation.ValidationError
 
 object SignedTransferRequest {
   implicit val reads: Reads[SignedTransferRequest] = (

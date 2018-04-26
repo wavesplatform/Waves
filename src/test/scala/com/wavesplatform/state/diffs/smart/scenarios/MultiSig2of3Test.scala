@@ -6,7 +6,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.utils._
-import com.wavesplatform.{NoShrink, TransactionGen, crypto}
+import com.wavesplatform.{NoShrink, OldTransactionGen, crypto}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -17,7 +17,7 @@ import scorex.transaction.assets.VersionedTransferTransaction
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
 
-class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
 
   def multisigTypedExpr(pk0: PublicKeyAccount, pk1: PublicKeyAccount, pk2: PublicKeyAccount): Typed.EXPR = {
     val script =

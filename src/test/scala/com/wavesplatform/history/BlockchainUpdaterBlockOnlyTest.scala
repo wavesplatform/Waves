@@ -1,6 +1,6 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import com.wavesplatform.state.diffs._
 import org.scalacheck.Gen
 import org.scalatest._
@@ -8,7 +8,12 @@ import org.scalatest.prop.PropertyChecks
 import scorex.transaction._
 import scorex.transaction.assets.TransferTransaction
 
-class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
+class BlockchainUpdaterBlockOnlyTest
+    extends PropSpec
+    with PropertyChecks
+    with DomainScenarioDrivenPropertyCheck
+    with Matchers
+    with OldTransactionGen {
 
   def preconditionsAndPayments(paymentsAmt: Int): Gen[(GenesisTransaction, Seq[TransferTransaction])] =
     for {

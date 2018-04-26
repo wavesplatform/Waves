@@ -1,19 +1,19 @@
-package com.wavesplatform.state.diffs
+package com.wavesplatform.state.diffs.modern
 
-import cats._
+import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state._
+import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
 import scorex.account.Address
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.base.{LeaseCancelTxBase, LeaseTxBase}
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.validation.ValidationError.GenericError
 
 import scala.util.{Left, Right}
 
-object LeaseTransactionsDiff {
+object LeaseTxDiff {
 
-  def lease(blockchain: Blockchain, height: Int)(tx: LeaseTransaction): Either[ValidationError, Diff] = {
+  def lease(blockchain: Blockchain, height: Int)(tx: LeaseTxBase): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender.publicKey)
     blockchain.resolveAliasEi(tx.recipient).flatMap { recipient =>
       if (recipient == sender)
@@ -34,7 +34,7 @@ object LeaseTransactionsDiff {
   }
 
   def leaseCancel(blockchain: Blockchain, settings: FunctionalitySettings, time: Long, height: Int)(
-      tx: LeaseCancelTransaction): Either[ValidationError, Diff] = {
+      tx: LeaseCancelTxBase): Either[ValidationError, Diff] = {
     val leaseEi = blockchain.leaseDetails(tx.leaseId) match {
       case None    => Left(GenericError(s"Related LeaseTransaction not found"))
       case Some(l) => Right(l)
@@ -49,12 +49,16 @@ object LeaseTransactionsDiff {
       canceller = Address.fromPublicKey(tx.sender.publicKey)
       portfolioDiff <- if (tx.sender == lease.sender) {
         Right(
-          Monoid.combine(Map(canceller -> Portfolio(-tx.fee, LeaseBalance(0, -lease.amount), Map.empty)),
-                         Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0), Map.empty))))
+          Monoid.combine(
+            Map(canceller -> Portfolio(-tx.fee, LeaseBalance(0, -lease.amount), Map.empty)),
+            Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0), Map.empty))
+          ))
       } else if (time < settings.allowMultipleLeaseCancelTransactionUntilTimestamp) { // cancel of another acc
         Right(
-          Monoid.combine(Map(canceller -> Portfolio(-tx.fee, LeaseBalance(0, -lease.amount), Map.empty)),
-                         Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0), Map.empty))))
+          Monoid.combine(
+            Map(canceller -> Portfolio(-tx.fee, LeaseBalance(0, -lease.amount), Map.empty)),
+            Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0), Map.empty))
+          ))
       } else
         Left(
           GenericError(

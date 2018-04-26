@@ -1,6 +1,6 @@
 package com.wavesplatform.mining
 
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
@@ -8,7 +8,7 @@ import scorex.block.Block
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.Transaction
 
-class TwoDimensionalMiningConstraintSuite extends FreeSpec with Matchers with PropertyChecks with TransactionGen with NoShrink {
+class TwoDimensionalMiningConstraintSuite extends FreeSpec with Matchers with PropertyChecks with OldTransactionGen with NoShrink {
   "TwoDimensionalMiningConstraint" - {
     "isEmpty" - {
       val emptyConstraintGen: Gen[TwoDimensionalMiningConstraint] = for {

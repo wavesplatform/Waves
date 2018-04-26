@@ -7,7 +7,8 @@ import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
-import scorex.transaction.{Proofs, ValidationError}
+import scorex.transaction.Proofs
+import scorex.transaction.validation.ValidationError
 
 object SignedSetScriptRequest {
   implicit val jsonFormat: OFormat[SignedSetScriptRequest] = Json.format

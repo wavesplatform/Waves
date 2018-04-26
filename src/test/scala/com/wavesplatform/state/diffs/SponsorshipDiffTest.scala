@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state._
 import org.scalatest.prop.PropertyChecks
@@ -9,9 +9,11 @@ import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.TestBlock.{create => block}
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.{IssueTransaction, SponsorFeeTransaction, TransferTransaction}
+import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
+import scorex.transaction.modern.TxHeader
+import scorex.transaction.modern.assets.{SponsorFeePayload, SponsorFeeTx}
 
-class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen {
 
   def settings(sponsorshipActivationHeight: Int) =
     TestFunctionalitySettings.Enabled
@@ -81,10 +83,10 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       case (genesis, issue, sponsor, cancel) =>
         val setupBlocks = Seq(block(Seq(genesis, issue)))
         assertDiffEi(setupBlocks, block(Seq(sponsor)), s) { blockDiffEi =>
-          blockDiffEi should produce("SponsorFeeTransaction transaction has not been activated")
+          blockDiffEi should produce("SponsorFeeTx transaction has not been activated")
         }
         assertDiffEi(setupBlocks, block(Seq(cancel)), s) { blockDiffEi =>
-          blockDiffEi should produce("CancelFeeSponsorshipTransaction transaction has not been activated")
+          blockDiffEi should produce("CancelFeeSponsorshipTx transaction has not been activated")
         }
     }
   }
@@ -140,7 +142,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       genesis: GenesisTransaction = GenesisTransaction.create(master, 300000000, ts).right.get
       issue                       = IssueTransaction.create(master, Base58.decode("Asset").get, Array.emptyByteArray, 100, 2, false, 100000000, ts + 1).right.get
       assetId                     = issue.id()
-      sponsor                     = SponsorFeeTransaction.create(1, master, assetId, 100, 100000000, ts + 2).right.get
+      sponsor                     = SponsorFeeTx.selfSigned(TxHeader(SponsorFeeTx.typeId, 1, master, 100000000, ts + 2), SponsorFeePayload(assetId, 100)).get
       assetTransfer = TransferTransaction
         .create(Some(assetId), master, recipient, issue.quantity, ts + 3, None, 100000, Array.emptyByteArray)
         .right

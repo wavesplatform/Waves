@@ -4,7 +4,8 @@ import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import play.api.libs.json._
 import scorex.account.{Address, AddressOrAlias, Alias}
-import scorex.transaction.{Transaction, ValidationError}
+import scorex.transaction.Transaction
+import scorex.transaction.validation.ValidationError
 
 case class ApiErrorResponse(error: Int, message: String)
 

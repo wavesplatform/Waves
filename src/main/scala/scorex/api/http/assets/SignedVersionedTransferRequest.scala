@@ -6,7 +6,8 @@ import play.api.libs.json.{Json, OFormat}
 import scorex.account.{AddressOrAlias, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
-import scorex.transaction.{AssetIdStringLength, Proofs, ValidationError}
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.{AssetIdStringLength, Proofs}
 
 object SignedVersionedTransferRequest {
   implicit val format: OFormat[SignedVersionedTransferRequest] = Json.format

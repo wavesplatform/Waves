@@ -9,8 +9,8 @@ import com.wavesplatform.state.ByteStr
 import com.wavesplatform.utils.{JsonFileStorage, _}
 import play.api.libs.json._
 import scorex.account.{Address, PrivateKeyAccount}
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.MissingSenderPrivateKey
+import scorex.transaction.validation.ValidationError.MissingSenderPrivateKey
+import scorex.transaction.validation.ValidationError
 import scorex.utils.{ScorexLogging, randomBytes}
 
 import scala.collection.concurrent.TrieMap

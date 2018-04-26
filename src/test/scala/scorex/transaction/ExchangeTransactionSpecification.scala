@@ -1,15 +1,16 @@
 package scorex.transaction
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import com.wavesplatform.state.ByteStr
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
-import scorex.transaction.ValidationError.OrderValidationError
+import scorex.transaction.validation.ValidationError.OrderValidationError
 import scorex.transaction.assets.exchange.{Order, _}
+import scorex.transaction.validation.ValidationError
 import scorex.utils._
 
-class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with Matchers with OldTransactionGen {
 
   property("ExchangeTransaction transaction serialization roundtrip") {
     forAll(exchangeTransactionGen) { om =>

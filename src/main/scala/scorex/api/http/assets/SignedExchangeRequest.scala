@@ -5,8 +5,8 @@ import play.api.libs.json.{Format, Json}
 import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParsers.SignatureStringLength
-import scorex.transaction.ValidationError
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
+import scorex.transaction.validation.ValidationError
 
 object SignedExchangeRequest {
   implicit val orderFormat: Format[Order]                                 = scorex.transaction.assets.exchange.OrderJson.orderFormat

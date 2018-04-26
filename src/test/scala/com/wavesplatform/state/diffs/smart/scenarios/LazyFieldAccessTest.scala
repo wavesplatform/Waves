@@ -5,7 +5,7 @@ import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{assertDiffAndState, assertDiffEi, produce}
 import com.wavesplatform.utils.dummyTypeCheckerContext
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -15,7 +15,7 @@ import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.SetScriptTransaction
 
-class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
 
   private def preconditionsTransferAndLease(code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = {
     val untyped = Parser(code).get.value

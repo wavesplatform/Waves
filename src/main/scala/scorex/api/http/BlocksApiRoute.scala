@@ -13,6 +13,7 @@ import monix.execution.Scheduler.Implicits.global
 import play.api.libs.json._
 import scorex.block.BlockHeader
 import scorex.transaction._
+import scorex.transaction.validation.ValidationError
 
 import scala.concurrent._
 import scala.util.Try

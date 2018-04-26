@@ -10,8 +10,10 @@ import scorex.account.Address
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.TransferTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.base.{LeaseCancelTxBase, LeaseTxBase, TransferTxBase}
+import scorex.transaction.lease.LeaseCancelTransaction
+import scorex.transaction.modern.TxHeader
+import scorex.transaction.modern.lease.{LeaseCancelPayload, LeaseCancelTx}
 
 class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -23,12 +25,12 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
   property("can lease/cancel lease preserving waves invariant") {
 
-    val sunnyDayLeaseLeaseCancel: Gen[(GenesisTransaction, LeaseTransaction, LeaseCancelTransaction)] = for {
+    val sunnyDayLeaseLeaseCancel: Gen[(GenesisTransaction, LeaseTxBase, LeaseCancelTxBase)] = for {
       master    <- accountGen
       recipient <- accountGen suchThat (_ != master)
       ts        <- positiveIntGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      (lease, unlease) <- leaseAndCancelGeneratorP(master, recipient, master)
+      (lease, unlease) <- anyLeaseCancelLeaseGen(master, recipient, master)
     } yield (genesis, lease, unlease)
 
     forAll(sunnyDayLeaseLeaseCancel) {
@@ -60,16 +62,19 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     }
   }
 
-  val cancelLeaseTwice: Gen[(GenesisTransaction, TransferTransaction, LeaseTransaction, LeaseCancelTransaction, LeaseCancelTransaction)] = for {
+  val cancelLeaseTwice: Gen[(GenesisTransaction, TransferTxBase, LeaseTxBase, LeaseCancelTxBase, LeaseCancelTxBase)] = for {
     master   <- accountGen
     recpient <- accountGen suchThat (_ != master)
     ts       <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    (lease, unlease) <- leaseAndCancelGeneratorP(master, recpient, master)
+    (lease, unlease) <- anyLeaseCancelLeaseGen(master, recpient, master)
     fee2             <- smallFeeGen
-    unlease2 = LeaseCancelTransaction.create(master, lease.id(), fee2, ts + 1).right.get
+    unlease2 <- Gen.oneOf(
+      LeaseCancelTx.selfSigned(TxHeader(LeaseCancelTx.typeId, 2, master, fee2, ts + 1), LeaseCancelPayload(lease.id())).get,
+      LeaseCancelTransaction.create(master, lease.id(), fee2, ts + 1).right.get
+    )
     // ensure recipient has enough effective balance
-    payment <- wavesTransferGeneratorP(master, recpient) suchThat (_.amount > lease.amount)
+    payment <- wavesAnyTransferGen(master, recpient) suchThat (_.amount > lease.amount)
   } yield (genesis, payment, lease, unlease, unlease2)
 
   property("cannot cancel lease twice after allowMultipleLeaseCancelTransactionUntilTimestamp") {
@@ -93,14 +98,14 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   }
 
   property("cannot lease more than actual balance(cannot lease forward)") {
-    val setup: Gen[(GenesisTransaction, LeaseTransaction, LeaseTransaction)] = for {
+    val setup: Gen[(GenesisTransaction, LeaseTxBase, LeaseTxBase)] = for {
       master    <- accountGen
       recipient <- accountGen suchThat (_ != master)
       forward   <- accountGen suchThat (!Set(master, recipient).contains(_))
       ts        <- positiveIntGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      (lease, _)        <- leaseAndCancelGeneratorP(master, recipient, master)
-      (leaseForward, _) <- leaseAndCancelGeneratorP(recipient, forward, recipient)
+      (lease, _)        <- anyLeaseCancelLeaseGen(master, recipient, master)
+      (leaseForward, _) <- anyLeaseCancelLeaseGen(recipient, forward, recipient)
     } yield (genesis, lease, leaseForward)
 
     forAll(setup) {
@@ -111,8 +116,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     }
   }
 
-  def cancelLeaseOfAnotherSender(
-      unleaseByRecipient: Boolean): Gen[(GenesisTransaction, GenesisTransaction, LeaseTransaction, LeaseCancelTransaction)] =
+  def cancelLeaseOfAnotherSender(unleaseByRecipient: Boolean): Gen[(GenesisTransaction, GenesisTransaction, LeaseTxBase, LeaseCancelTxBase)] =
     for {
       master    <- accountGen
       recipient <- accountGen suchThat (_ != master)
@@ -121,9 +125,16 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       ts <- timestampGen
       genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
       genesis2: GenesisTransaction = GenesisTransaction.create(unleaser, ENOUGH_AMT, ts).right.get
-      (lease, _) <- leaseAndCancelGeneratorP(master, recipient, master)
+      (lease, _) <- anyLeaseCancelLeaseGen(master, recipient, master)
       fee2       <- smallFeeGen
-      unleaseOtherOrRecipient = LeaseCancelTransaction.create(unleaser, lease.id(), fee2, ts + 1).right.get
+      unleaseOtherOrRecipient <- for {
+        header <- txHeaderGen(unleaser, LeaseCancelTx)
+        leaseCancelPayload = LeaseCancelPayload(lease.id())
+        tx <- Gen.oneOf(
+          LeaseCancelTransaction.create(unleaser, lease.id(), fee2, ts + 1).right.get,
+          LeaseCancelTx.selfSigned(header, leaseCancelPayload).get
+        )
+      } yield tx
     } yield (genesis, genesis2, lease, unleaseOtherOrRecipient)
 
   property("cannot cancel lease of another sender after allowMultipleLeaseCancelTransactionUntilTimestamp") {

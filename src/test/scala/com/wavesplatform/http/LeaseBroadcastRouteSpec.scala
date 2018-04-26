@@ -15,7 +15,7 @@ import play.api.libs.json.Json._
 import play.api.libs.json._
 import scorex.api.http._
 import scorex.api.http.leasing.LeaseBroadcastApiRoute
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.validation.ValidationError.GenericError
 import scorex.transaction.Transaction
 
 class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {

@@ -4,7 +4,7 @@ import com.wavesplatform.lang.v1.ctx.Obj
 import com.wavesplatform.lang.v1.{EvaluatorV1, Parser, TypeChecker}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState, produce}
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import fastparse.core.Parsed
 import monix.eval.Coeval
 import org.scalacheck.Gen
@@ -17,7 +17,7 @@ import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.smart.BlockchainContext
 import scorex.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
 
-class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
 
   val preconditionsAndAliasCreations: Gen[(Seq[GenesisTransaction], CreateAliasTransaction, TransferTransaction, TransferTransaction)] = for {
     master                   <- accountGen

@@ -6,8 +6,8 @@ import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.Terms.BOOLEAN
 import com.wavesplatform.lang.v1.Terms.Typed.EXPR
-import scorex.transaction.ValidationError.ScriptParseError
 import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.validation.ValidationError.ScriptParseError
 
 object ScriptReader {
 

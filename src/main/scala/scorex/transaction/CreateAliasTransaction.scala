@@ -8,11 +8,14 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account._
 import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.serialization.Deser
+import scorex.transaction.base.CreateAliasTxBase
+import scorex.transaction.validation.ValidationError
 
 import scala.util.{Failure, Success, Try}
 
 case class CreateAliasTransaction private (sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, signature: ByteStr)
-    extends SignedTransaction {
+    extends SignedTransaction
+    with CreateAliasTxBase {
 
   override val builder: TransactionParser = CreateAliasTransaction
   override val id: Coeval[AssetId]        = Coeval.evalOnce(ByteStr(crypto.fastHash(builder.typeId +: alias.bytes.arr)))

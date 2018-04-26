@@ -1,6 +1,6 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import org.scalacheck.Gen
@@ -17,7 +17,7 @@ class BlockchainUpdaterMicroblockBadSignaturesTest
     with PropertyChecks
     with DomainScenarioDrivenPropertyCheck
     with Matchers
-    with TransactionGen {
+    with OldTransactionGen {
 
   val preconditionsAndPayments: Gen[(GenesisTransaction, TransferTransaction, TransferTransaction)] = for {
     master    <- accountGen

@@ -10,11 +10,16 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock, SignerData}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.ValidationError.MicroBlockAppendError
+import scorex.transaction.validation.ValidationError.MicroBlockAppendError
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{GenesisTransaction, Transaction}
 
-class BlockchainUpdaterLiquidBlockTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
+class BlockchainUpdaterLiquidBlockTest
+    extends PropSpec
+    with PropertyChecks
+    with DomainScenarioDrivenPropertyCheck
+    with Matchers
+    with OldTransactionGen {
 
   private val preconditionsAndPayments: Gen[(Block, Block, Seq[MicroBlock])] = for {
     richAccount        <- accountGen

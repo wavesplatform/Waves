@@ -7,7 +7,8 @@ import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParsers.SignatureStringLength
 import scorex.transaction.assets.BurnTransaction
-import scorex.transaction.{AssetIdStringLength, ValidationError}
+import scorex.transaction.AssetIdStringLength
+import scorex.transaction.validation.ValidationError
 
 object SignedBurnRequest {
   implicit val reads: Reads[SignedBurnRequest] = (

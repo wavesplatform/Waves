@@ -5,7 +5,8 @@ import com.wavesplatform.state.DataEntry
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
-import scorex.transaction.{DataTransaction, Proofs, ValidationError}
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.{DataTransaction, Proofs}
 
 object DataRequest {
   implicit val unsignedDataRequestReads = Json.reads[DataRequest]

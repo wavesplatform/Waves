@@ -4,6 +4,7 @@ import com.wavesplatform.state.ByteStr
 import monix.reactive.Observable
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
+import scorex.transaction.validation.ValidationError
 
 trait BlockchainUpdater {
   def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]]

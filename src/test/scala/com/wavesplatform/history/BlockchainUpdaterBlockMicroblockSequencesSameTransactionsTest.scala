@@ -2,7 +2,7 @@ package com.wavesplatform.history
 
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -16,7 +16,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
     with PropertyChecks
     with DomainScenarioDrivenPropertyCheck
     with Matchers
-    with TransactionGen
+    with OldTransactionGen
     with NoShrink {
 
   import BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest._

@@ -9,7 +9,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.utils._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -18,7 +18,7 @@ import scorex.transaction.assets.{SmartIssueTransaction, TransferTransaction}
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.{DataTransaction, GenesisTransaction}
 
-class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
   val preconditions: Gen[
     (Seq[GenesisTransaction], SmartIssueTransaction, DataTransaction, TransferTransaction, DataTransaction, DataTransaction, TransferTransaction)] =
     for {

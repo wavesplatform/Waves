@@ -1,10 +1,11 @@
-package scorex.transaction
+package scorex.transaction.validation
 
 import com.google.common.base.Throwables
 import com.wavesplatform.state.ByteStr
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.assets.exchange.Order
+import scorex.transaction.{Signed, Transaction}
 
 import scala.util.Either
 
@@ -24,6 +25,8 @@ object ValidationError {
   case object TooBigArray extends ValidationError
 
   case object InvalidName extends ValidationError
+
+  case object NegativeTimestamp extends ValidationError
 
   case object OverflowError extends ValidationError
 

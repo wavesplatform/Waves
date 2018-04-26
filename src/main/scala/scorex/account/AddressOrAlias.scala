@@ -2,7 +2,7 @@ package scorex.account
 
 import com.wavesplatform.state.ByteStr
 import scorex.serialization.Deser
-import scorex.transaction.ValidationError
+import scorex.transaction.validation.ValidationError
 
 trait AddressOrAlias {
   def stringRepr: String

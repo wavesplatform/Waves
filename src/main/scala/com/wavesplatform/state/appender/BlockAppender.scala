@@ -13,8 +13,9 @@ import kamon.Kamon
 import monix.eval.Task
 import monix.execution.Scheduler
 import scorex.block.Block
-import scorex.transaction.ValidationError.{BlockAppendError, InvalidSignature}
-import scorex.transaction.{BlockchainUpdater, CheckpointService, ValidationError}
+import scorex.transaction.validation.ValidationError
+import scorex.transaction.validation.ValidationError.{BlockAppendError, InvalidSignature}
+import scorex.transaction.{BlockchainUpdater, CheckpointService}
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.util.Right

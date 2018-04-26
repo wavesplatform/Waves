@@ -10,18 +10,19 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.account.AddressScheme
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets._
+import scorex.transaction.assets.{SmartIssueTransaction, _}
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import scorex.settings.TestFunctionalitySettings
 import cats.implicits._
 import com.wavesplatform.lang.v1.{Parser, TypeChecker}
+import scorex.transaction.base.{BurnTxBase, IssueTxBase, ReissueTxBase}
 import scorex.transaction.smart.script.v1.ScriptV1
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
-  def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransaction, BurnTransaction))] =
+  def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTxBase), (ReissueTxBase, BurnTxBase))] =
     for {
       master <- accountGen
       ts     <- timestampGen
@@ -29,7 +30,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       ia                     <- positiveLongGen
       ra                     <- positiveLongGen
       ba                     <- positiveLongGen.suchThat(x => x < ia + ra)
-      (issue, reissue, burn) <- issueReissueBurnGeneratorP(ia, ra, ba, master) suchThat (_._1.reissuable == isReissuable)
+      (issue, reissue, burn) <- anyIssueReissueBurnGenerator(ia, ra, ba, master) suchThat (_._1.reissuable == isReissuable)
     } yield ((genesis, issue), (reissue, burn))
 
   property("Issue+Reissue+Burn do not break waves invariant and updates state") {
@@ -50,12 +51,12 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   }
 
   property("Cannot reissue/burn non-existing alias") {
-    val setup: Gen[(GenesisTransaction, ReissueTransaction, BurnTransaction)] = for {
+    val setup: Gen[(GenesisTransaction, ReissueTxBase, BurnTxBase)] = for {
       master <- accountGen
       ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      reissue <- reissueGen
-      burn    <- burnGen
+      reissue <- Gen.oneOf(reissueTxGen, reissueGen)
+      burn    <- Gen.oneOf(burnGen, burnTxGen)
     } yield (genesis, reissue, burn)
 
     forAll(setup) {
@@ -77,8 +78,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       reissuable2            <- Arbitrary.arbitrary[Boolean]
       fee                    <- Gen.choose(1L, 2000000L)
       timestamp              <- timestampGen
-      reissue = ReissueTransaction.create(other, issue.assetId(), quantity, reissuable2, fee, timestamp).right.get
-      burn    = BurnTransaction.create(other, issue.assetId(), quantity, fee, timestamp).right.get
+      reissue                <- anyReissueTxGen(other, issue.assetId(), quantity, reissuable2, fee, timestamp)
+      burn                   <- anyBurnTxGen(other, issue.assetId(), quantity, fee, timestamp)
     } yield ((gen, issue), reissue, burn)
 
     forAll(setup) {

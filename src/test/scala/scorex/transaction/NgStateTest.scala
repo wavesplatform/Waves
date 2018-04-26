@@ -4,13 +4,13 @@ import com.wavesplatform.history._
 import com.wavesplatform.mining.TxNumberEstimator
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.{Diff, NgState}
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, OldTransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.transaction.assets.TransferTransaction
 
-class NgStateTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class NgStateTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
 
   def preconditionsAndPayments(amt: Int): Gen[(GenesisTransaction, Seq[TransferTransaction])] =
     for {

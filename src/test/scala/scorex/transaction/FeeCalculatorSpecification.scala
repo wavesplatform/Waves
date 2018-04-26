@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OldTransactionGen
 import com.wavesplatform.settings.FeesSettings
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.state._
@@ -13,7 +13,7 @@ import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.script.Script
 
-class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with MockFactory {
+class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with MockFactory {
 
   private val configString =
     """waves {

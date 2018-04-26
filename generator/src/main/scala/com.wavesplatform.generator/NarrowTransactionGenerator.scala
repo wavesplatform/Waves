@@ -13,6 +13,7 @@ import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.validation.ValidationError
 import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration._

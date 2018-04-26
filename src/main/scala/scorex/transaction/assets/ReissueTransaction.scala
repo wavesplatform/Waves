@@ -8,6 +8,8 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.transaction._
+import scorex.transaction.base.ReissueTxBase
+import scorex.transaction.validation.ValidationError
 
 import scala.util.{Failure, Success, Try}
 
@@ -19,6 +21,7 @@ case class ReissueTransaction private (sender: PublicKeyAccount,
                                        timestamp: Long,
                                        signature: ByteStr)
     extends SignedTransaction
+    with ReissueTxBase
     with FastHashId {
 
   override val builder: ReissueTransaction.type = ReissueTransaction

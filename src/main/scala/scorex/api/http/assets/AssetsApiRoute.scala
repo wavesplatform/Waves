@@ -62,7 +62,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         Success(assetId).filter(_.length <= AssetIdStringLength).flatMap(Base58.decode) match {
           case Success(byteArray) =>
             Json.toJson(blockchain.assetDistribution(blockchain.height, ByteStr(byteArray)).map { case (a, b) => a.stringRepr -> b })
-          case Failure(_) => ApiError.fromValidationError(scorex.transaction.ValidationError.GenericError("Must be base58-encoded assetId"))
+          case Failure(_) =>
+            ApiError.fromValidationError(scorex.transaction.validation.ValidationError.GenericError("Must be base58-encoded assetId"))
         }
       }
     }

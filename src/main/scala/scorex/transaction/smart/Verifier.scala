@@ -3,14 +3,15 @@ package scorex.transaction.smart
 import cats.syntax.all._
 import com.wavesplatform.crypto
 import com.wavesplatform.state._
-import scorex.transaction.ValidationError.{GenericError, TransactionNotAllowedByScript}
+import scorex.transaction.validation.ValidationError.{GenericError, TransactionNotAllowedByScript}
 import scorex.transaction._
-import scorex.transaction.assets._
+import scorex.transaction.base.{BurnTxBase, MassTransferTxBase, ReissueTxBase, TransferTxBase}
 import scorex.transaction.smart.script.{Script, ScriptRunner}
+import scorex.transaction.validation.ValidationError
 
 object Verifier {
 
-  def apply(blockchain: Blockchain, currentBlockHeight: Int)(tx: Transaction): Either[ValidationError, Transaction] =
+  def apply(blockchain: Blockchain, currentBlockHeight: Int)(tx: Transaction): Either[ValidationError, Transaction] = {
     (tx match {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
@@ -22,17 +23,17 @@ object Verifier {
     }).flatMap(tx => {
       for {
         assetId <- tx match {
-          case t: TransferTransaction          => t.assetId
-          case t: VersionedTransferTransaction => t.assetId
-          case t: MassTransferTransaction      => t.assetId
-          case t: BurnTransaction              => Some(t.assetId)
-          case t: ReissueTransaction           => Some(t.assetId)
-          case _                               => None
+          case t: TransferTxBase     => t.assetId
+          case t: MassTransferTxBase => t.assetId
+          case t: BurnTxBase         => Some(t.assetId)
+          case t: ReissueTxBase      => Some(t.assetId)
+          case _                     => None
         }
 
         script <- blockchain.assetDescription(assetId).flatMap(_.script)
       } yield verify(blockchain, script, currentBlockHeight, tx)
     }.getOrElse(Either.right(tx)))
+  }
 
   def verify[T <: Transaction](blockchain: Blockchain, script: Script, height: Int, transaction: T): Either[ValidationError, T] = {
     ScriptRunner[Boolean, T](height, transaction, blockchain, script) match {
