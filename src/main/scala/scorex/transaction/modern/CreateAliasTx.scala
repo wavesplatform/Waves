@@ -1,5 +1,7 @@
 package scorex.transaction.modern
 
+import com.wavesplatform.crypto
+import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.Alias
@@ -21,7 +23,9 @@ final case class CreateAliasTx(header: TxHeader, payload: CreateAliasPayload, pr
     with CreateAliasTxBase {
   override val assetFee: (Option[AssetId], Long) = (None, header.fee)
 
-  override val alias: Alias = payload.alias
+  override val alias: Alias        = payload.alias
+  override val id: Coeval[AssetId] = Coeval.evalOnce(ByteStr(crypto.fastHash(builder.typeId +: alias.bytes.arr)))
+
 }
 
 object CreateAliasTx extends TransactionParser.Modern[CreateAliasTx, CreateAliasPayload] {

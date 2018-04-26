@@ -76,7 +76,7 @@ trait ModernTransactionGen extends TransactionGenBase {
     for {
       header  <- txHeaderGen(CreateAliasTx)
       payload <- aliasGen.map(a => CreateAliasPayload(a))
-      proofs  <- proofsGen
+      proofs  <- singleProofGen
     } yield CreateAliasTx(header, payload, proofs)
   }
 
@@ -86,7 +86,7 @@ trait ModernTransactionGen extends TransactionGenBase {
       version                                                                       <- Gen.oneOf(TransferTx.supportedVersions.toSeq)
       header  = TxHeader(TransferTx.typeId, version, sender, feeAmount, timestamp)
       payload = TransferPayload(recipient, assetId, feeId, amount, attachment)
-      proofs <- proofsGen
+      proofs <- singleProofGen
     } yield TransferTx(header, payload, proofs)
   }
 
@@ -94,7 +94,7 @@ trait ModernTransactionGen extends TransactionGenBase {
     for {
       header  <- txHeaderGen(SetScriptTx)
       payload <- scriptGen.map(s => SetScriptPayload(AddressScheme.current.chainId, Some(s)))
-      proofs  <- proofsGen
+      proofs  <- singleProofGen
     } yield SetScriptTx(header, payload, proofs)
   }
 
@@ -105,7 +105,7 @@ trait ModernTransactionGen extends TransactionGenBase {
         size <- Gen.choose(0, validation.MaxEntryCount)
         data <- Gen.listOfN(size, dataEntryGen)
       } yield DataPayload(data)
-      proofs <- proofsGen
+      proofs <- singleProofGen
     } yield DataTx(header, payload, proofs)
   }
 

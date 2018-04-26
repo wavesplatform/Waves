@@ -2,6 +2,7 @@ package com.wavesplatform
 
 import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.block.Block
+import scorex.transaction.base.{CreateAliasTxBase, LeaseTxBase}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.validation.ValidationError
 import scorex.transaction.validation.ValidationError.{AliasDoesNotExist, GenericError}
@@ -74,12 +75,12 @@ package object state {
     def aliasesOfAddress(address: Address): Seq[Alias] =
       blockchain
         .addressTransactions(address, Set(CreateAliasTransaction.typeId), Int.MaxValue, 0)
-        .collect { case (_, a: CreateAliasTransaction) => a.alias }
+        .collect { case (_, a: CreateAliasTxBase) => a.alias }
 
-    def activeLeases(address: Address): Seq[(Int, LeaseTransaction)] =
+    def activeLeases(address: Address): Seq[(Int, LeaseTxBase)] =
       blockchain
         .addressTransactions(address, Set(LeaseTransaction.typeId), Int.MaxValue, 0)
-        .collect { case (h, l: LeaseTransaction) if blockchain.leaseDetails(l.id()).exists(_.isActive) => h -> l }
+        .collect { case (h, l: LeaseTxBase) if blockchain.leaseDetails(l.id()).exists(_.isActive) => h -> l }
   }
 
 }

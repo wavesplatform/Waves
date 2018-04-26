@@ -2,19 +2,18 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import com.wavesplatform.state._
-import com.wavesplatform.{NoShrink, OldTransactionGen}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.{CreateAliasTransaction, GenesisTransaction}
+import scorex.transaction.GenesisTransaction
+import scorex.transaction.base.CreateAliasTxBase
 
-class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with OldTransactionGen with NoShrink {
+class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
-  val preconditionsAndAliasCreations
-    : Gen[(GenesisTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction)] = for {
+  val preconditionsAndAliasCreations: Gen[(GenesisTransaction, CreateAliasTxBase, CreateAliasTxBase, CreateAliasTxBase, CreateAliasTxBase)] = for {
     master <- accountGen
     ts     <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
@@ -22,10 +21,10 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
     alias2                   <- aliasGen suchThat (_.name != alias.name)
     fee                      <- smallFeeGen
     other: PrivateKeyAccount <- accountGen
-    aliasTx                = CreateAliasTransaction.create(master, alias, fee, ts).right.get
-    sameAliasTx            = CreateAliasTransaction.create(master, alias, fee + 1, ts).right.get
-    sameAliasOtherSenderTx = CreateAliasTransaction.create(other, alias, fee + 2, ts).right.get
-    anotherAliasTx         = CreateAliasTransaction.create(master, alias2, fee + 3, ts).right.get
+    aliasTx                  <- anyCreateAliasTransactionGen(master, alias, fee, ts)
+    sameAliasTx              <- anyCreateAliasTransactionGen(master, alias, fee + 1, ts)
+    sameAliasOtherSenderTx   <- anyCreateAliasTransactionGen(other, alias, fee + 2, ts)
+    anotherAliasTx           <- anyCreateAliasTransactionGen(master, alias2, fee + 3, ts)
   } yield (genesis, aliasTx, sameAliasTx, sameAliasOtherSenderTx, anotherAliasTx)
 
   property("can create and resolve aliases preserving waves invariant") {
@@ -66,16 +65,16 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
     ts               <- positiveIntGen
     gen: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     gen2: GenesisTransaction = GenesisTransaction.create(aliasedRecipient, ENOUGH_AMT + 1, ts).right.get
-    issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
-    issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
-    maybeAsset               <- Gen.option(issue1)
-    maybeAsset2              <- Gen.option(issue2)
-    maybeFeeAsset            <- Gen.oneOf(maybeAsset, maybeAsset2)
-    alias                    <- aliasGen
-    fee                      <- smallFeeGen
-    aliasTx = CreateAliasTransaction.create(aliasedRecipient, alias, fee, ts).right.get
-    transfer <- transferGeneratorP(master, alias, maybeAsset.map(_.id()), maybeFeeAsset.map(_.id()))
-    lease    <- leaseAndCancelGeneratorP(master, alias, master).map(_._1)
+    issue1        <- anyIssueReissueBurnGen(ENOUGH_AMT, master).map(_._1)
+    issue2        <- anyIssueReissueBurnGen(ENOUGH_AMT, master).map(_._1)
+    maybeAsset    <- Gen.option(issue1)
+    maybeAsset2   <- Gen.option(issue2)
+    maybeFeeAsset <- Gen.oneOf(maybeAsset, maybeAsset2)
+    alias         <- aliasGen
+    fee           <- smallFeeGen
+    aliasTx       <- anyCreateAliasTransactionGen(aliasedRecipient, alias, fee, ts)
+    transfer      <- transferGeneratorP(master, alias, maybeAsset.map(_.id()), maybeFeeAsset.map(_.id()))
+    lease         <- anyLeaseCancelLeaseGen(master, alias, master).map(_._1)
   } yield (gen, gen2, issue1, issue2, aliasTx, transfer, lease)
 
   property("Can transfer to alias") {
