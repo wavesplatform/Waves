@@ -8,7 +8,7 @@ import io.netty.channel.embedded.EmbeddedChannel
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.IssueTransactionV1
 import scorex.transaction.{SignedTransaction, Transaction}
 
 class MessageCodecSpec extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen {
@@ -18,7 +18,7 @@ class MessageCodecSpec extends FreeSpec with Matchers with MockFactory with Prop
     val ch    = new EmbeddedChannel(codec)
 
     ch.writeInbound(RawBytes(TransactionSpec.messageCode, "foo".getBytes(StandardCharsets.UTF_8)))
-    ch.readInbound[IssueTransaction]()
+    ch.readInbound[IssueTransactionV1]()
 
     codec.blockCalls shouldBe 1
   }

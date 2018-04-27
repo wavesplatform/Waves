@@ -3,19 +3,11 @@ package com.wavesplatform.utx
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
+import com.wavesplatform.lang.v1.CompilerV1
 import com.wavesplatform.lang.v1.Terms.Typed
 import com.wavesplatform.lang.v1.TypeChecker.TypeCheckerContext
-import com.wavesplatform.lang.v1.{CompilerV1, ScriptComplexityCalculator}
 import com.wavesplatform.mining._
-import com.wavesplatform.settings.{
-  BlockchainSettings,
-  FeeSettings,
-  FeesSettings,
-  FunctionalitySettings,
-  SmartAccountSettings,
-  UtxSettings,
-  WavesSettings
-}
+import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.{ByteStr, EitherExt2, _}
 import com.wavesplatform.{NoShrink, TestHelpers, TestTime, TransactionGen, WithDB}
@@ -29,11 +21,12 @@ import scorex.block.Block
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.ValidationError.SenderIsBlacklisted
-import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
-import scorex.transaction.assets.{IssueTransaction, MassTransferTransaction, TransferTransaction}
+import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import scorex.transaction.assets.IssueTransactionV1
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.transfer._
 import scorex.transaction.{FeeCalculator, GenesisTransaction, Transaction}
 import scorex.utils.Time
 
@@ -42,15 +35,16 @@ import scala.concurrent.duration._
 class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen with NoShrink with WithDB {
 
   private val calculatorSettings = FeesSettings(
-    SmartAccountSettings(10, 1),
+    SmartAccountSettings(10),
     Seq(
       GenesisTransaction,
-      IssueTransaction,
-      TransferTransaction,
+      IssueTransactionV1,
+      TransferTransactionV1,
       MassTransferTransaction,
       SetScriptTransaction
     ).map(_.typeId.toInt -> List(FeeSettings("", 0))).toMap
   )
+  import calculatorSettings.smartAccount.extraFee
 
   private def mkBlockchain(senderAccount: Address, senderBalance: Long) = {
     val config          = ConfigFactory.load()
@@ -81,15 +75,15 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     (for {
       amount    <- chooseNum(1, (maxAmount * 0.9).toLong)
       recipient <- accountGen
-      fee       <- chooseNum(1, (maxAmount * 0.1).toLong)
-    } yield TransferTransaction.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
+      fee       <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
+    } yield TransferTransactionV1.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
       .label("transferTransaction")
 
   private def transferWithRecipient(sender: PrivateKeyAccount, recipient: PublicKeyAccount, maxAmount: Long, time: Time) =
     (for {
       amount <- chooseNum(1, (maxAmount * 0.9).toLong)
-      fee    <- chooseNum(1, (maxAmount * 0.1).toLong)
-    } yield TransferTransaction.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
+      fee    <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
+    } yield TransferTransactionV1.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
       .label("transferWithRecipient")
 
   private def massTransferWithRecipients(sender: PrivateKeyAccount, recipients: List[PublicKeyAccount], maxAmount: Long, time: Time) = {
@@ -97,7 +91,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
     val txs = for {
       version <- Gen.oneOf(MassTransferTransaction.supportedVersions.toSeq)
-      fee     <- chooseNum(1, amount)
+      fee     <- chooseNum(extraFee, amount)
     } yield MassTransferTransaction.selfSigned(version, None, sender, transfers, time.getTimestamp(), fee, Array.empty[Byte]).right.get
     txs.label("transferWithRecipient")
   }
@@ -117,7 +111,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     (sender, senderBalance, bcu) <- stateGen
     recipient                    <- accountGen
     n                            <- chooseNum(3, 10)
-    fee                          <- chooseNum(1, (senderBalance * 0.01).toLong)
+    fee                          <- chooseNum(extraFee, (senderBalance * 0.01).toLong)
     offset                       <- chooseNum(1000L, 2000L)
   } yield {
     val time = new TestTime()
@@ -199,7 +193,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     }).label("massTransferWithBlacklisted")
 
   private def utxTest(utxSettings: UtxSettings = UtxSettings(20, 5.seconds, Set.empty, Set.empty, 5.minutes), txCount: Int = 10)(
-      f: (Seq[TransferTransaction], UtxPool, TestTime) => Unit): Unit = forAll(stateGen, chooseNum(2, txCount).label("txCount")) {
+      f: (Seq[TransferTransactionV1], UtxPool, TestTime) => Unit): Unit = forAll(stateGen, chooseNum(2, txCount).label("txCount")) {
     case ((sender, senderBalance, bcu), count) =>
       val time = new TestTime()
 
@@ -241,11 +235,6 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
 
   private val script: Script = ScriptV1(expr).explicitGet()
 
-  private val scriptExtraFee: Long = (
-    calculatorSettings.smartAccount.baseExtraCharge + ScriptComplexityCalculator(Map.empty, expr)
-      .explicitGet() * calculatorSettings.smartAccount.extraChargePerOp
-  ).toLong
-
   private def preconditionsGen(lastBlockId: ByteStr, master: PrivateKeyAccount): Gen[Seq[Block]] =
     for {
       version <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
@@ -272,19 +261,19 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     (sender, senderBalance, utx, bcu.lastBlock.fold(0L)(_.timestamp))
   }
 
-  private def transactionGen(sender: PrivateKeyAccount, ts: Long, feeAmount: Long): Gen[TransferTransaction] = accountGen.map { recipient =>
-    TransferTransaction.create(None, sender, recipient, waves(1), ts, None, feeAmount, Array.emptyByteArray).explicitGet()
+  private def transactionGen(sender: PrivateKeyAccount, ts: Long, feeAmount: Long): Gen[TransferTransactionV1] = accountGen.map { recipient =>
+    TransferTransactionV1.create(None, sender, recipient, waves(1), ts, None, feeAmount, Array.emptyByteArray).explicitGet()
   }
 
   private val notEnoughFeeTxWithScriptedAccount = for {
-    (sender, senderBalance, utx, ts) <- withScriptedAccount
-    feeAmount                        <- choose[Long](1, scriptExtraFee - 1)
-    tx                               <- transactionGen(sender, ts + 1, feeAmount)
+    (sender, _, utx, ts) <- withScriptedAccount
+    feeAmount            <- choose[Long](1, extraFee - 1)
+    tx                   <- transactionGen(sender, ts + 1, feeAmount)
   } yield (utx, tx)
 
   private val enoughFeeTxWithScriptedAccount = for {
     (sender, senderBalance, utx, ts) <- withScriptedAccount
-    feeAmount                        <- choose(scriptExtraFee, senderBalance / 2)
+    feeAmount                        <- choose(extraFee, senderBalance / 2)
     tx                               <- transactionGen(sender, ts + 1, feeAmount)
   } yield (utx, tx)
 

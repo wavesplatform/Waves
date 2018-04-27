@@ -14,7 +14,7 @@ import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.ValidationError.AccountBalanceError
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.{IssueTransaction, IssueTransactionV1}
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
@@ -80,14 +80,14 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
   }
 
   property("buy waves without enough money for fee") {
-    val preconditions: Gen[(GenesisTransaction, GenesisTransaction, IssueTransaction, ExchangeTransaction)] = for {
+    val preconditions: Gen[(GenesisTransaction, GenesisTransaction, IssueTransactionV1, ExchangeTransaction)] = for {
       buyer  <- accountGen
       seller <- accountGen
       ts     <- timestampGen
       gen1: GenesisTransaction = GenesisTransaction.create(buyer, 1 * Constants.UnitsInWave, ts).right.get
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
-      issue1: IssueTransaction <- issueGen(buyer)
-      exchange                 <- exchangeGeneratorP(buyer, seller, None, Some(issue1.id()), fixedMatcherFee = Some(300000))
+      issue1: IssueTransactionV1 <- issueGen(buyer)
+      exchange                   <- exchangeGeneratorP(buyer, seller, None, Some(issue1.id()), fixedMatcherFee = Some(300000))
     } yield (gen1, gen2, issue1, exchange)
 
     forAll(preconditions) {
@@ -126,7 +126,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     val MatcherFee = 300000L
     val Ts         = 1000L
 
-    val preconditions: Gen[(PrivateKeyAccount, PrivateKeyAccount, PrivateKeyAccount, GenesisTransaction, GenesisTransaction, IssueTransaction)] =
+    val preconditions: Gen[(PrivateKeyAccount, PrivateKeyAccount, PrivateKeyAccount, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
       for {
         buyer   <- accountGen
         seller  <- accountGen
@@ -134,7 +134,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         ts      <- timestampGen
         gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).right.get
         gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
-        issue1: IssueTransaction <- issueGen(seller)
+        issue1: IssueTransactionV1 <- issueGen(seller)
       } yield (buyer, seller, matcher, gen1, gen2, issue1)
 
     forAll(preconditions, priceGen) {
@@ -155,7 +155,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     val MatcherFee = 300000L
     val Ts         = 1000L
 
-    val preconditions: Gen[(PrivateKeyAccount, PrivateKeyAccount, PrivateKeyAccount, GenesisTransaction, GenesisTransaction, IssueTransaction)] =
+    val preconditions: Gen[(PrivateKeyAccount, PrivateKeyAccount, PrivateKeyAccount, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
       for {
         buyer   <- accountGen
         seller  <- accountGen
@@ -163,7 +163,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         ts      <- timestampGen
         gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).right.get
         gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
-        issue1: IssueTransaction <- issueGen(seller, fixedQuantity = Some(1000L))
+        issue1: IssueTransactionV1 <- issueGen(seller, fixedQuantity = Some(1000L))
       } yield (buyer, seller, matcher, gen1, gen2, issue1)
 
     forAll(preconditions, priceGen) {

@@ -1,7 +1,7 @@
 package scorex.api.http.assets
 
 import play.api.libs.json.Json
-import scorex.transaction.assets.MassTransferTransaction.Transfer
+import scorex.transaction.transfer.MassTransferTransaction.Transfer
 
 case class MassTransferRequest(version: Byte,
                                assetId: Option[String],

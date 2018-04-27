@@ -19,7 +19,7 @@ import org.scalatest._
 import scorex.account.PrivateKeyAccount
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction._
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.IssueTransactionV1
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
@@ -55,7 +55,7 @@ class OrderBookActorSpecification
                   ByteStr("BTC".getBytes)   -> hugeAmount,
                   ByteStr("WAVES".getBytes) -> hugeAmount
                 )))
-  val issueTransaction: IssueTransaction = IssueTransaction
+  val issueTransaction: IssueTransactionV1 = IssueTransactionV1
     .create(PrivateKeyAccount("123".getBytes), "MinerReward".getBytes, Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
     .right
     .get

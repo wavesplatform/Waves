@@ -2,7 +2,7 @@ package scorex.api.http.assets
 
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, JsNumber, JsObject, Json}
-import scorex.transaction.assets.SmartIssueTransaction
+import scorex.transaction.assets.IssueTransactionV2
 
 case class SmartIssueRequest(@ApiModelProperty(required = true)
                              version: Byte,
@@ -27,6 +27,6 @@ case class SmartIssueRequest(@ApiModelProperty(required = true)
 object SmartIssueRequest {
   implicit val jsonFormat: Format[SmartIssueRequest] = Json.format
   implicit class SmartIssueRequestExt(val self: SmartIssueRequest) extends AnyVal {
-    def toJsObject: JsObject = Json.toJson(self).as[JsObject] + ("type" -> JsNumber(SmartIssueTransaction.typeId.toInt))
+    def toJsObject: JsObject = Json.toJson(self).as[JsObject] + ("type" -> JsNumber(IssueTransactionV2.typeId.toInt))
   }
 }

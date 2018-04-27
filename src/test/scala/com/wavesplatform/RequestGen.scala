@@ -9,7 +9,8 @@ import scorex.api.http.assets._
 import scorex.api.http.leasing.{SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.crypto.encode.Base58
 import scorex.crypto.signatures.Curve25519.SignatureLength
-import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
+import scorex.transaction.assets._
+import scorex.transaction.transfer._
 
 trait RequestGen extends TransactionGen { _: Suite =>
   val nonPositiveLong: G[Long] = choose(Long.MinValue, 0).label("non-positive value")

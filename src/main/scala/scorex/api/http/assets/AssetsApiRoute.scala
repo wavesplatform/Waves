@@ -272,7 +272,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
           "script"         -> JsString(description.script.fold("")(s => s.bytes().base58)),
           "scriptText"     -> JsString(description.script.fold("")(s => s.text)),
-          "minAssetFee" -> (description.sponsorship match {
+          "minSponsoredAssetFee" -> (description.sponsorship match {
             case 0           => JsNull
             case sponsorship => JsNumber(sponsorship)
           })
@@ -290,7 +290,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         required = true,
         paramType = "body",
         dataType = "scorex.api.http.assets.SponsorFeeRequest",
-        defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"minAssetFee\":100000000,\"fee\":100000000}"
+        defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"minSponsoredAssetFee\":100000000,\"fee\":100000000}"
       )
     ))
   def sponsorRoute: Route =

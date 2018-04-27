@@ -9,7 +9,7 @@ import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json._
 import scorex.api.http.assets.MassTransferRequest
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.MassTransferTransaction.Transfer
+import scorex.transaction.transfer.MassTransferTransaction.Transfer
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -177,24 +177,24 @@ class TransactionsApiSuite extends BaseTransactionSuite {
 
     signAndBroadcast(
       Json.obj(
-        "type"        -> 14,
-        "version"     -> 1,
-        "sender"      -> firstAddress,
-        "assetId"     -> assetId,
-        "minAssetFee" -> 100,
-        "fee"         -> 1.waves
+        "type"                 -> 14,
+        "version"              -> 1,
+        "sender"               -> firstAddress,
+        "assetId"              -> assetId,
+        "minSponsoredAssetFee" -> 100,
+        "fee"                  -> 1.waves
       ),
       usesProofs = true
     )
 
     signAndBroadcast(
       Json.obj(
-        "type"        -> 14,
-        "version"     -> 1,
-        "sender"      -> firstAddress,
-        "assetId"     -> assetId,
-        "minAssetFee" -> JsNull,
-        "fee"         -> 1.waves
+        "type"                 -> 14,
+        "version"              -> 1,
+        "sender"               -> firstAddress,
+        "assetId"              -> assetId,
+        "minSponsoredAssetFee" -> JsNull,
+        "fee"                  -> 1.waves
       ),
       usesProofs = true
     )

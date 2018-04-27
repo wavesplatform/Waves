@@ -7,8 +7,10 @@ import org.scalatest.CancelAfterFailure
 import play.api.libs.json.{JsNumber, JsObject, Json}
 import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.MassTransferTransaction.{MaxTransferCount, Transfer}
-import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
+import scorex.transaction.transfer.MassTransferTransaction.Transfer
+import scorex.transaction.transfer.MassTransferTransaction.MaxTransferCount
+import scorex.transaction.transfer.TransferTransaction.MaxAttachmentSize
+import scorex.transaction.transfer._
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -19,7 +21,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   private val transferAmount             = 5.waves
   private val leasingAmount              = 5.waves
   private val leasingFee                 = 0.003.waves
-  private val transferFee                = notMiner.settings.feesSettings.fees(TransferTransaction.typeId)(0).fee
+  private val transferFee                = notMiner.settings.feesSettings.fees(TransferTransactionV1.typeId)(0).fee
   private val issueFee                   = 1.waves
   private val massTransferFeePerTransfer = notMiner.settings.feesSettings.fees(MassTransferTransaction.typeId)(0).fee
 
@@ -105,7 +107,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("invalid transfer should not be in UTX or blockchain") {
-    import scorex.transaction.assets.TransferTransaction.MaxAttachmentSize
+    import scorex.transaction.transfer._
 
     def request(version: Byte = MassTransferTransaction.version,
                 transfers: List[Transfer] = List(Transfer(secondAddress, transferAmount)),

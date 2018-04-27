@@ -7,7 +7,7 @@ import play.api.libs.json.{Format, Json}
 import scorex.account.{AddressScheme, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.{Proofs, ValidationError}
-import scorex.transaction.assets.SmartIssueTransaction
+import scorex.transaction.assets.IssueTransactionV2
 import scorex.transaction.smart.script.Script
 
 object SignedSmartIssueRequest {
@@ -37,7 +37,7 @@ case class SignedSmartIssueRequest(@ApiModelProperty(required = true)
                                    @ApiModelProperty(required = true)
                                    proofs: List[String])
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, SmartIssueTransaction] =
+  def toTx: Either[ValidationError, IssueTransactionV2] =
     for {
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
@@ -46,7 +46,7 @@ case class SignedSmartIssueRequest(@ApiModelProperty(required = true)
         case None    => Right(None)
         case Some(s) => Script.fromBase58String(s).map(Some(_))
       }
-      t <- SmartIssueTransaction.create(
+      t <- IssueTransactionV2.create(
         version,
         AddressScheme.current.chainId,
         _sender,

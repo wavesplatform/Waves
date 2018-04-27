@@ -14,7 +14,7 @@ import scala.util.{Failure, Success, Try}
 case class SponsorFeeTransaction private (version: Byte,
                                           sender: PublicKeyAccount,
                                           assetId: ByteStr,
-                                          minAssetFee: Option[Long],
+                                          minSponsoredAssetFee: Option[Long],
                                           fee: Long,
                                           timestamp: Long,
                                           proofs: Proofs)
@@ -28,16 +28,16 @@ case class SponsorFeeTransaction private (version: Byte,
       Array(builder.typeId),
       sender.publicKey,
       assetId.arr,
-      Longs.toByteArray(minAssetFee.getOrElse(0)),
+      Longs.toByteArray(minSponsoredAssetFee.getOrElse(0)),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     ))
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
-      "version"     -> version,
-      "assetId"     -> assetId.base58,
-      "minAssetFee" -> minAssetFee
+      "version"              -> version,
+      "assetId"              -> assetId.base58,
+      "minSponsoredAssetFee" -> minSponsoredAssetFee
     ))
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
@@ -73,27 +73,27 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
   def create(version: Byte,
              sender: PublicKeyAccount,
              assetId: ByteStr,
-             minAssetFee: Option[Long],
+             minSponsoredAssetFee: Option[Long],
              fee: Long,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] =
     if (!supportedVersions.contains(version)) {
       Left(ValidationError.UnsupportedVersion(version))
-    } else if (minAssetFee.exists(_ <= 0)) {
-      Left(ValidationError.NegativeMinFee(minAssetFee.get, "asset"))
+    } else if (minSponsoredAssetFee.exists(_ <= 0)) {
+      Left(ValidationError.NegativeMinFee(minSponsoredAssetFee.get, "asset"))
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee())
     } else {
-      Right(SponsorFeeTransaction(version, sender, assetId, minAssetFee, fee, timestamp, proofs))
+      Right(SponsorFeeTransaction(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs))
     }
 
   def create(version: Byte,
              sender: PrivateKeyAccount,
              assetId: ByteStr,
-             minAssetFee: Option[Long],
+             minSponsoredAssetFee: Option[Long],
              fee: Long,
              timestamp: Long): Either[ValidationError, TransactionT] =
-    create(version, sender, assetId, minAssetFee, fee, timestamp, Proofs.empty).right.map { unsigned =>
+    create(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes())))).explicitGet())
     }
 }

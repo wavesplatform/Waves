@@ -5,8 +5,8 @@ import java.util.concurrent.ThreadLocalRandom
 import com.wavesplatform.generator.utils.Implicits._
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.crypto.signatures.Curve25519.KeyLength
-import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
-import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
+import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import scorex.transaction.transfer._
 import scorex.transaction.{Proofs, Transaction}
 
 object Gen {
@@ -24,7 +24,7 @@ object Gen {
       .zip(feeGen)
       .map {
         case ((src, dst), fee) =>
-          TransferTransaction.create(None, src, dst, fee, System.currentTimeMillis(), None, fee, Array.emptyByteArray)
+          TransferTransactionV1.create(None, src, dst, fee, System.currentTimeMillis(), None, fee, Array.emptyByteArray)
       }
       .collect { case Right(x) => x }
   }

@@ -16,7 +16,7 @@ object BlockchainFeatures {
     SmallerMinimalGeneratingBalance,
     NG,
     MassTransfer,
-    /*SmartAccounts, */
+    SmartAccounts,
     DataTransaction,
     BurnAnyTokens,
     FeeSponsorship
