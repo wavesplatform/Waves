@@ -8,7 +8,7 @@ import scorex.transaction.TransactionParsers
 
 import scala.collection.JavaConverters._
 
-case class SmartAccountSettings(baseExtraCharge: Long, extraChargePerOp: Double)
+case class SmartAccountSettings(extraFee: Long)
 case class FeeSettings(asset: String, fee: Long)
 
 case class FeesSettings(smartAccount: SmartAccountSettings, fees: Map[Int, Seq[FeeSettings]])

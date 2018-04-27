@@ -90,7 +90,7 @@ object WavesContext {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getdataF(name: String, dataType: DataType) =
-      PredefFunction(name, 90000, OPTION(dataType.innerType), List(("address", addressType.typeRef), ("key", STRING))) {
+      PredefFunction(name, 100, OPTION(dataType.innerType), List(("address", addressType.typeRef), ("key", STRING))) {
         case (addr: Obj) :: (k: String) :: Nil => environmentFunctions.getData(addr, k, dataType)
         case _                                 => ???
       }
@@ -99,14 +99,14 @@ object WavesContext {
     val getBooleanF: PredefFunction   = getdataF("getBoolean", DataType.Boolean)
     val getByteArrayF: PredefFunction = getdataF("getByteArray", DataType.ByteArray)
 
-    val addressFromPublicKeyF: PredefFunction = PredefFunction("addressFromPublicKey", 7500, addressType.typeRef, List(("publicKey", BYTEVECTOR))) {
+    val addressFromPublicKeyF: PredefFunction = PredefFunction("addressFromPublicKey", 100, addressType.typeRef, List(("publicKey", BYTEVECTOR))) {
       case (pk: ByteVector) :: Nil =>
         val r = environmentFunctions.addressFromPublicKey(pk)
         Right(Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(r)))))
       case _ => ???
     }
 
-    val addressFromStringF: PredefFunction = PredefFunction("addressFromString", 6000, optionAddress, List(("string", STRING))) {
+    val addressFromStringF: PredefFunction = PredefFunction("addressFromString", 100, optionAddress, List(("string", STRING))) {
       case (addressString: String) :: Nil =>
         val r = environmentFunctions.addressFromString(addressString)
         r.map(_.map(x => Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(x))))))
@@ -114,7 +114,7 @@ object WavesContext {
     }
 
     val addressFromRecipientF: PredefFunction =
-      PredefFunction("addressFromRecipient", 14500, addressType.typeRef, List(("AddressOrAlias", TYPEREF(addressOrAliasType.name)))) {
+      PredefFunction("addressFromRecipient", 100, addressType.typeRef, List(("AddressOrAlias", TYPEREF(addressOrAliasType.name)))) {
         case Obj(fields) :: Nil =>
           val r = environmentFunctions.addressFromRecipient(fields)
           r.map(resolved => Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(resolved))))))
@@ -126,7 +126,7 @@ object WavesContext {
 
     val txByIdF = {
       val returnType = OPTION(transactionType.typeRef)
-      PredefFunction("getTransactionById", 37000, returnType, List(("id", BYTEVECTOR))) {
+      PredefFunction("getTransactionById", 100, returnType, List(("id", BYTEVECTOR))) {
         case (id: ByteVector) :: Nil =>
           val maybeDomainTx = env.transactionById(id.toArray).map(transactionObject)
           Right(maybeDomainTx).map(_.asInstanceOf[returnType.Underlying])
@@ -135,7 +135,7 @@ object WavesContext {
     }
 
     val accountBalanceF: PredefFunction =
-      PredefFunction("accountBalance", 200000, LONG, List(("addressOrAlias", TYPEREF(addressOrAliasType.name)))) {
+      PredefFunction("accountBalance", 100, LONG, List(("addressOrAlias", TYPEREF(addressOrAliasType.name)))) {
         case Obj(fields) :: Nil =>
           fields("bytes").value
             .map(_.asInstanceOf[ByteVector].toArray)
@@ -146,7 +146,7 @@ object WavesContext {
       }
 
     val accountAssetBalanceF: PredefFunction =
-      PredefFunction("accountAssetBalance", 200000, LONG, List(("addressOrAlias", TYPEREF(addressOrAliasType.name)), ("assetId", BYTEVECTOR))) {
+      PredefFunction("accountAssetBalance", 100, LONG, List(("addressOrAlias", TYPEREF(addressOrAliasType.name)), ("assetId", BYTEVECTOR))) {
         case Obj(fields) :: (assetId: ByteVector) :: Nil =>
           fields("bytes").value
             .map(_.asInstanceOf[ByteVector].toArray)
@@ -157,7 +157,7 @@ object WavesContext {
       }
 
     val txHeightByIdF =
-      PredefFunction("transactionHeightById", 25000, OPTION(LONG), List(("id", BYTEVECTOR))) {
+      PredefFunction("transactionHeightById", 100, OPTION(LONG), List(("id", BYTEVECTOR))) {
         case (id: ByteVector) :: Nil => Right(env.transactionHeightById(id.toArray))
         case _                       => ???
       }

@@ -4,8 +4,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.Serde
-import com.wavesplatform.lang.v1.Terms.BOOLEAN
-import com.wavesplatform.lang.v1.Terms.Typed.EXPR
+import scodec.Attempt.{Failure, Successful}
 import scorex.transaction.ValidationError.ScriptParseError
 import scorex.transaction.smart.script.v1.ScriptV1
 
@@ -24,24 +23,20 @@ object ScriptReader {
       sv <- ScriptVersion
         .fromInt(version)
         .fold[Either[ScriptParseError, ScriptVersion]](Left(ScriptParseError(s"Invalid version: $version")))(v => Right(v))
-      expr <- sv match {
-        case V1 => readExprV1(scriptBytes)
+      script <- sv match {
+        case V1 =>
+          ScriptV1
+            .validateBytes(scriptBytes)
+            .flatMap { _ =>
+              Serde.codec.decode(scodec.bits.BitVector(scriptBytes)) match {
+                case Failure(e)    => Left(e.toString())
+                case Successful(x) => ScriptV1(x.value, checkSize = false)
+              }
+            }
+            .left
+            .map(ScriptParseError)
       }
-      script <- ScriptV1(expr).left.map(ScriptParseError)
     } yield script
-  }
-
-  private def readExprV1(bytes: Array[Byte]): Either[ScriptParseError, EXPR] = {
-    def validateExpr(expr: EXPR): Either[ScriptParseError, EXPR] =
-      Either.cond(expr.tpe == BOOLEAN, expr, ScriptParseError("Script should return BOOLEAN"))
-
-    Serde.codec
-      .decode(scodec.bits.BitVector(bytes))
-      .toEither
-      .map(_.value)
-      .left
-      .map(err => ScriptParseError(err.toString()))
-      .flatMap(validateExpr)
   }
 
 }

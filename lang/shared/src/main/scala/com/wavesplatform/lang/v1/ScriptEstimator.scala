@@ -4,7 +4,7 @@ import cats.data.EitherT
 import com.wavesplatform.lang.v1.Terms._
 import monix.eval.Coeval
 
-object ScriptComplexityCalculator {
+object ScriptEstimator {
   def apply(functionCosts: Map[FunctionHeader, Long], t: Typed.EXPR): Either[String, Long] = {
     type Result[T] = EitherT[Coeval, String, T]
 

@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.testing
 
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.v1.Terms.Typed._
 import com.wavesplatform.lang.v1.Terms._
 import org.scalacheck._
@@ -52,14 +53,13 @@ trait TypedScriptGen {
   def REFgen(tpe: TYPE): Gen[EXPR] = Gen.identifier.map(REF(_, tpe))
 
   def FUNCTION_CALLgen(resultType: TYPE): Gen[EXPR] =
-    for {
-      name <- Arbitrary.arbString.arbitrary
-    } yield
+    Gen.const(
       FUNCTION_CALL(
-        function = FunctionHeader(name, List.empty),
-        args = List.empty,
+        function = FunctionHeader("+", List(FunctionHeaderType.LONG, FunctionHeaderType.LONG)),
+        args = List(CONST_LONG(1), CONST_LONG(1)),
         resultType
       )
+    )
 
   def LETgen(gas: Int): Gen[LET] =
     for {

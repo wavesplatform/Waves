@@ -6,7 +6,7 @@ import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Portfolio, _}
 import scorex.account.Address
-import scorex.transaction.ValidationError.{AlreadyInTheState, GenericError, Mistiming, UnsupportedTransactionType}
+import scorex.transaction.ValidationError._
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -21,6 +21,7 @@ object CommonValidation {
 
   val MaxTimeTransactionOverBlockDiff: FiniteDuration     = 90.minutes
   val MaxTimePrevBlockOverTransactionDiff: FiniteDuration = 2.hours
+  private val ScriptExtraFee                              = 400000L
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
                                                           settings: FunctionalitySettings,
@@ -126,30 +127,34 @@ object CommonValidation {
       case _ => Right(tx)
     }
 
-  def checkFee[T <: Transaction](blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = {
-    if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) Right(tx)
-    else
+  def checkFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
+    def hasScript: Boolean = tx match {
+      case tx: Transaction with Authorized => blockchain.accountScript(tx.sender).isDefined
+      case _                               => false
+    }
+    def feeInUnits: Either[ValidationError, Int] = tx match {
+      case _: GenesisTransaction       => Right(0)
+      case _: PaymentTransaction       => Right(1)
+      case _: IssueTransactionV1       => Right(1000)
+      case _: IssueTransactionV2       => Right(1000)
+      case _: ReissueTransaction       => Right(1000)
+      case _: BurnTransaction          => Right(1)
+      case _: TransferTransactionV1    => Right(1)
+      case tx: MassTransferTransaction => Right(1 + (tx.transfers.size + 1) / 2)
+      case _: LeaseTransaction         => Right(1)
+      case _: LeaseCancelTransaction   => Right(1)
+      case _: ExchangeTransaction      => Right(3)
+      case _: CreateAliasTransaction   => Right(1)
+      case tx: DataTransaction         => Right(1 + (tx.bytes().length - 1) / 1024)
+      case _: SetScriptTransaction     => Right(1)
+      case _: TransferTransactionV2    => Right(1)
+      case _: SponsorFeeTransaction    => Right(1000)
+      case _                           => Left(UnsupportedTransactionType)
+    }
+    if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs))
       for {
-        feeInUnits <- tx match {
-          case gtx: GenesisTransaction      => Right(0)
-          case ptx: PaymentTransaction      => Right(1)
-          case itx: IssueTransactionV1      => Right(1000)
-          case sitx: IssueTransactionV2     => Right(1000)
-          case rtx: ReissueTransaction      => Right(1000)
-          case btx: BurnTransaction         => Right(1)
-          case ttx: TransferTransactionV1   => Right(1)
-          case mtx: MassTransferTransaction => Right(1 + (mtx.transfers.size + 1) / 2)
-          case ltx: LeaseTransaction        => Right(1)
-          case ltx: LeaseCancelTransaction  => Right(1)
-          case etx: ExchangeTransaction     => Right(3)
-          case atx: CreateAliasTransaction  => Right(1)
-          case dtx: DataTransaction         => Right(1 + (dtx.bytes().length - 1) / 1024)
-          case sstx: SetScriptTransaction   => Right(5)
-          case sttx: TransferTransactionV2  => Right(1)
-          case stx: SponsorFeeTransaction   => Right(1000)
-          case _                            => Left(UnsupportedTransactionType)
-        }
-        wavesFee <- tx.assetFee._1 match {
+        feeInUnits <- feeInUnits
+        txWavesFee <- tx.assetFee._1 match {
           case None => Right(tx.assetFee._2)
           case Some(assetId) =>
             for {
@@ -162,12 +167,33 @@ object CommonValidation {
             } yield wavesFee
         }
         minimumFee = feeInUnits * Sponsorship.FeeUnit
-        result <- Either.cond(
-          wavesFee >= minimumFee,
-          tx,
+        _ <- Either.cond(
+          txWavesFee >= minimumFee,
+          (),
           GenericError(
-            s"Fee in ${tx.assetFee._1.fold("WAVES")(_.toString)} for ${tx.builder.classTag} does not exceed minimal value of $minimumFee WAVES")
+            s"Fee in ${tx.assetFee._1.fold("WAVES")(_.toString)} for ${tx.builder.classTag} does not exceed minimal value of $minimumFee WAVES: $txWavesFee")
         )
-      } yield result
+        totalRequiredFee = minimumFee + (if (hasScript) ScriptExtraFee else 0L)
+        _ <- Either.cond(
+          txWavesFee >= totalRequiredFee,
+          (),
+          InsufficientFee(s"Scripted account requires $totalRequiredFee fee for this transaction, but given: $txWavesFee")
+        )
+      } yield ()
+    else if (hasScript)
+      for {
+        feeInUnits <- feeInUnits
+        txWavesFee <- tx.assetFee._1 match {
+          case None    => Right(tx.assetFee._2)
+          case Some(_) => Left(GenericError("Scripted accounts can accept transactions with Waves as fee only"))
+        }
+        totalRequiredFee = feeInUnits * Sponsorship.FeeUnit + ScriptExtraFee
+        _ <- Either.cond(
+          txWavesFee >= totalRequiredFee,
+          (),
+          InsufficientFee(s"Scripted account requires $totalRequiredFee fee for this transaction, but given: $txWavesFee")
+        )
+      } yield ()
+    else Right(())
   }
 }

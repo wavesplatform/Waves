@@ -33,13 +33,13 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         val setupBlocks = Seq(block(Seq(genesis, issue)))
         assertDiffAndState(setupBlocks, block(Seq(sponsor)), s) {
           case (diff, state) =>
-            diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(sponsor.minAssetFee.get))
-            state.assetDescription(sponsor.assetId).map(_.sponsorship) shouldBe sponsor.minAssetFee
+            diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(sponsor.minSponsoredAssetFee.get))
+            state.assetDescription(sponsor.assetId).map(_.sponsorship) shouldBe sponsor.minSponsoredAssetFee
         }
         assertDiffAndState(setupBlocks, block(Seq(sponsor, sponsor1)), s) {
           case (diff, state) =>
-            diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(sponsor1.minAssetFee.get))
-            state.assetDescription(sponsor.assetId).map(_.sponsorship) shouldBe sponsor1.minAssetFee
+            diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(sponsor1.minSponsoredAssetFee.get))
+            state.assetDescription(sponsor.assetId).map(_.sponsorship) shouldBe sponsor1.minSponsoredAssetFee
         }
         assertDiffAndState(setupBlocks, block(Seq(sponsor, sponsor1, cancel)), s) {
           case (diff, state) =>
@@ -102,10 +102,10 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         .right
         .get
       insufficientFee = TransferTransactionV1
-        .create(None, master, recipient.toAddress, 1000000, ts + 2, Some(assetId), sponsorTx.minAssetFee.get - 1, Array.emptyByteArray)
+        .create(None, master, recipient.toAddress, 1000000, ts + 2, Some(assetId), sponsorTx.minSponsoredAssetFee.get - 1, Array.emptyByteArray)
         .right
         .get
-      fee = 3000 * sponsorTx.minAssetFee.get
+      fee = 3000 * sponsorTx.minSponsoredAssetFee.get
       wavesOverspend = TransferTransactionV1
         .create(None, master, recipient.toAddress, 1000000, ts + 3, Some(assetId), fee, Array.emptyByteArray)
         .right

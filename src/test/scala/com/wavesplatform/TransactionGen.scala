@@ -93,7 +93,7 @@ trait TransactionGenBase extends ScriptGen {
 
   val positiveLongGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L / 100)
   val positiveIntGen: Gen[Int]   = Gen.choose(1, Int.MaxValue / 100)
-  val smallFeeGen: Gen[Long]     = Gen.choose(1, 100000000)
+  val smallFeeGen: Gen[Long]     = Gen.choose(400000, 100000000)
 
   val maxOrderTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + time.correctedTime())
   val timestampGen: Gen[Long]    = Gen.choose(1, Long.MaxValue - 100)
@@ -113,7 +113,7 @@ trait TransactionGenBase extends ScriptGen {
     proofs       <- Gen.listOfN(proofsAmount, genBoundedBytes(0, 50))
   } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
 
-  val scriptGen = BOOLgen(1000).map { expr =>
+  val scriptGen = BOOLgen(100).map { expr =>
     val typed = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(PureContext.instance |+| CryptoContext.build(Global)), expr).explicitGet()
     ScriptV1(typed).explicitGet()
   }
