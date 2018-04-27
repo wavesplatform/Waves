@@ -27,9 +27,8 @@ object PredefFunction {
     override def eval(args: List[Any]): TrampolinedExecResult[Any] = {
       EitherT.fromEither[Coeval](ev(args))
     }
-    override lazy val signature = FunctionTypeSignature(args.map(_._2), resultType)
-    override lazy val header: FunctionHeader =
-      FunctionHeader(name, args.map(_._2).map(FunctionHeader.FunctionHeaderType.fromTypePlaceholder)(collection.breakOut))
+    override lazy val signature              = FunctionTypeSignature(args.map(_._2), resultType)
+    override lazy val header: FunctionHeader = FunctionHeader(name, args.map(_._2).map(FunctionHeader.FunctionHeaderType.fromTypePlaceholder))
   }
 
   def apply(name: String, cost: Long, resultType: TYPEPLACEHOLDER, args: List[(String, TYPEPLACEHOLDER)])(
