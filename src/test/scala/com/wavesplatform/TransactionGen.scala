@@ -363,7 +363,7 @@ trait TransactionGenBase extends ScriptGen {
   val burnGen: Gen[BurnTransaction]       = issueReissueBurnGen.map(_._3)
 
   def sponsorFeeCancelSponsorFeeGen(
-      sender: PrivateKeyAccount): Gen[(IssueTransaction, SponsorFeeTransaction, SponsorFeeTransaction, CancelFeeSponsorshipTransaction)] =
+      sender: PrivateKeyAccount): Gen[(IssueTransaction, SponsorFeeTransaction, SponsorFeeTransaction, SponsorFeeTransaction)] =
     for {
       (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
       issue = IssueTransaction
@@ -375,9 +375,9 @@ trait TransactionGenBase extends ScriptGen {
       assetId = issue.assetId()
     } yield
       (issue,
-       SponsorFeeTransaction.create(1, sender, assetId, minFee, 1 * Constants.UnitsInWave, timestamp).right.get,
-       SponsorFeeTransaction.create(1, sender, assetId, minFee1, 1 * Constants.UnitsInWave, timestamp).right.get,
-       CancelFeeSponsorshipTransaction.create(1, sender, assetId, 1 * Constants.UnitsInWave, timestamp).right.get,
+       SponsorFeeTransaction.create(1, sender, assetId, Some(minFee), 1 * Constants.UnitsInWave, timestamp).right.get,
+       SponsorFeeTransaction.create(1, sender, assetId, Some(minFee1), 1 * Constants.UnitsInWave, timestamp).right.get,
+       SponsorFeeTransaction.create(1, sender, assetId, None, 1 * Constants.UnitsInWave, timestamp).right.get,
       )
 
   val sponsorFeeGen = for {
