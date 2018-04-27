@@ -174,7 +174,7 @@ object CommonValidation {
           GenericError(
             s"Fee in ${tx.assetFee._1.fold("WAVES")(_.toString)} for ${tx.builder.classTag} does not exceed minimal value of $minimumFee WAVES: $txWavesFee")
         )
-        totalRequiredFee = minimumFee + (if (hasScript) 400000L else 0L)
+        totalRequiredFee = minimumFee + (if (hasScript) ScriptExtraFee else 0L)
         _ <- Either.cond(
           txWavesFee >= totalRequiredFee,
           (),

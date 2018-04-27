@@ -92,7 +92,7 @@ trait TransactionGenBase extends ScriptGen {
 
   val positiveLongGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L / 100)
   val positiveIntGen: Gen[Int]   = Gen.choose(1, Int.MaxValue / 100)
-  val smallFeeGen: Gen[Long]     = Gen.choose(1, 100000000)
+  val smallFeeGen: Gen[Long]     = Gen.choose(400000, 100000000)
 
   val maxOrderTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + time.correctedTime())
   val timestampGen: Gen[Long]    = Gen.choose(1, Long.MaxValue - 100)
