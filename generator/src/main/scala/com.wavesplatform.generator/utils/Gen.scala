@@ -5,7 +5,7 @@ import java.util.concurrent.ThreadLocalRandom
 import com.wavesplatform.generator.utils.Implicits._
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.crypto.signatures.Curve25519.KeyLength
-import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
+import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.transfer._
 import scorex.transaction.{Proofs, Transaction}
 

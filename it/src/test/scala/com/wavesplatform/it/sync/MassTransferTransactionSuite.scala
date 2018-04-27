@@ -7,7 +7,9 @@ import org.scalatest.CancelAfterFailure
 import play.api.libs.json.{JsNumber, JsObject, Json}
 import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.MassTransferTransaction.{MaxTransferCount, Transfer}
+import scorex.transaction.transfer.MassTransferTransaction.Transfer
+import scorex.transaction.transfer.MassTransferTransaction.MaxTransferCount
+import scorex.transaction.transfer.TransferTransaction.MaxAttachmentSize
 import scorex.transaction.transfer._
 
 import scala.concurrent.duration._

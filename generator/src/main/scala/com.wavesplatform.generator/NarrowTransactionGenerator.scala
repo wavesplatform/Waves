@@ -9,10 +9,10 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, Long
 import org.slf4j.LoggerFactory
 import scorex.account.{Alias, PrivateKeyAccount}
 import scorex.transaction._
-import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.transfer._
 import scorex.utils.LoggerFacade
 
@@ -21,7 +21,8 @@ import scala.util.Random
 
 class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKeyAccount]) extends TransactionGenerator {
 
-  private def r       = ThreadLocalRandom.current
+  private def r = ThreadLocalRandom.current
+
   private val log     = LoggerFacade(LoggerFactory.getLogger(getClass))
   private val typeGen = new DistributedRandomGenerator(settings.probabilities)
 
@@ -82,6 +83,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
         def moreThatStandartFee = 100000L + r.nextInt(100000)
 
         def ts = System.currentTimeMillis()
+
         val tx = typeGen.getRandom match {
           case IssueTransactionV1 =>
             val sender      = randomFrom(accounts).get
@@ -234,8 +236,8 @@ object NarrowTransactionGenerator {
     implicit val toPrintable: Show[Settings] = { x =>
       import x._
       s"""transactions per iteration: $transactions
-          |probabilities:
-          |  ${probabilities.mkString("\n  ")}""".stripMargin
+         |probabilities:
+         |  ${probabilities.mkString("\n  ")}""".stripMargin
     }
   }
 
