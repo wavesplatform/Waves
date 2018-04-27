@@ -11,7 +11,8 @@ import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.{IssueTransaction, SponsorFeeTransaction, TransferTransaction}
+import scorex.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
+import scorex.transaction.transfer._
 
 class BlockchainUpdaterSponsoredFeeBlockTest
     extends PropSpec
@@ -23,7 +24,13 @@ class BlockchainUpdaterSponsoredFeeBlockTest
   private val amtTx = 100000
 
   type Setup =
-    (GenesisTransaction, TransferTransaction, IssueTransaction, SponsorFeeTransaction, TransferTransaction, TransferTransaction, TransferTransaction)
+    (GenesisTransaction,
+     TransferTransactionV1,
+     IssueTransaction,
+     SponsorFeeTransaction,
+     TransferTransactionV1,
+     TransferTransactionV1,
+     TransferTransactionV1)
 
   val sponsorPreconditions: Gen[Setup] = for {
 
@@ -36,7 +43,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
     (feeAsset, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(alice)
     wavesFee                    = Sponsorship.toWaves(sponsorTx.minSponsoredAssetFee.get, sponsorTx.minSponsoredAssetFee.get)
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    masterToAlice: TransferTransaction = TransferTransaction
+    masterToAlice: TransferTransactionV1 = TransferTransactionV1
       .create(None,
               master,
               alice,
@@ -47,7 +54,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
               Array.emptyByteArray)
       .right
       .get
-    aliceToBob: TransferTransaction = TransferTransaction
+    aliceToBob: TransferTransactionV1 = TransferTransactionV1
       .create(
         Some(feeAsset.id()),
         alice,
@@ -60,7 +67,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       )
       .right
       .get
-    bobToMaster: TransferTransaction = TransferTransaction
+    bobToMaster: TransferTransactionV1 = TransferTransactionV1
       .create(
         Some(feeAsset.id()),
         bob,
@@ -73,7 +80,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       )
       .right
       .get
-    bobToMaster2: TransferTransaction = TransferTransaction
+    bobToMaster2: TransferTransactionV1 = TransferTransactionV1
       .create(
         Some(feeAsset.id()),
         bob,

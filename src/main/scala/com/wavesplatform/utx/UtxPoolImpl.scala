@@ -17,7 +17,7 @@ import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
 import scorex.transaction._
-import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
+import scorex.transaction.transfer._
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.collection.JavaConverters._

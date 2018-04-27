@@ -18,7 +18,7 @@ import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.transaction.Transaction.Type
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import scorex.transaction._
-import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
+import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.script.Script
 import scorex.utils.{ScorexLogging, Time}
@@ -408,8 +408,6 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
           .get(id)
           .collectFirst {
             case (_, it: IssueTransaction, _) =>
-              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, None, sponsorship)
-            case (_, it: SmartIssueTransaction, _) =>
               AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, it.script, sponsorship)
           }
           .map(z =>

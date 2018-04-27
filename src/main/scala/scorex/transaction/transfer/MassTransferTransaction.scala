@@ -1,4 +1,4 @@
-package scorex.transaction.assets
+package scorex.transaction.transfer
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
@@ -12,8 +12,7 @@ import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
 import scorex.transaction.ValidationError.Validation
 import scorex.transaction._
-import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, toJson}
-
+import MassTransferTransaction.{ParsedTransfer, toJson}
 import scala.util.{Either, Failure, Success, Try}
 
 case class MassTransferTransaction private (version: Byte,

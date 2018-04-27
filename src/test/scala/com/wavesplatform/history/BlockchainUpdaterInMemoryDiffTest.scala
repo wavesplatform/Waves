@@ -7,7 +7,7 @@ import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction._
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.transfer._
 
 class BlockchainUpdaterInMemoryDiffTest
     extends PropSpec
@@ -15,13 +15,13 @@ class BlockchainUpdaterInMemoryDiffTest
     with DomainScenarioDrivenPropertyCheck
     with Matchers
     with TransactionGen {
-  val preconditionsAndPayments: Gen[(GenesisTransaction, TransferTransaction, TransferTransaction)] = for {
+  val preconditionsAndPayments: Gen[(GenesisTransaction, TransferTransactionV1, TransferTransactionV1)] = for {
     master    <- accountGen
     recipient <- accountGen
     ts        <- positiveIntGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    payment: TransferTransaction  <- wavesTransferGeneratorP(master, recipient)
-    payment2: TransferTransaction <- wavesTransferGeneratorP(master, recipient)
+    payment: TransferTransactionV1  <- wavesTransferGeneratorP(master, recipient)
+    payment2: TransferTransactionV1 <- wavesTransferGeneratorP(master, recipient)
   } yield (genesis, payment, payment2)
 
   property("compaction with liquid block doesn't make liquid block affect state once") {

@@ -12,6 +12,7 @@ import scorex.account.{Address, PrivateKeyAccount}
 import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.script.Script
+import scorex.transaction.transfer._
 
 class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with MockFactory {
 
@@ -69,7 +70,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
 
   property("Transfer transaction ") {
     val feeCalc = new FeeCalculator(mySettings, noScriptBlockchain)
-    forAll(transferGen) { tx: TransferTransaction =>
+    forAll(transferGen) { tx: TransferTransactionV1 =>
       if (tx.feeAssetId.isEmpty) {
         feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 100000)
       } else {
@@ -82,11 +83,11 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
     val feeCalculator = new FeeCalculator(mySettings, noScriptBlockchain)
     val sender        = PrivateKeyAccount(Array.emptyByteArray)
     val recipient     = Address.fromString("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8").right.get
-    val tx1: TransferTransaction = TransferTransaction
+    val tx1: TransferTransactionV1 = TransferTransactionV1
       .create(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000, Some(WhitelistedAsset), 12, Array.emptyByteArray)
       .right
       .get
-    val tx2: TransferTransaction = TransferTransaction
+    val tx2: TransferTransactionV1 = TransferTransactionV1
       .create(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000, Some(WhitelistedAsset), 1, Array.emptyByteArray)
       .right
       .get
@@ -104,7 +105,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
 
   property("Issue transaction ") {
     val feeCalc = new FeeCalculator(mySettings, noScriptBlockchain)
-    forAll(issueGen) { tx: IssueTransaction =>
+    forAll(issueV1Gen) { tx: IssueTransaction =>
       feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 100000000)
     }
   }

@@ -3,19 +3,19 @@ package scorex.transaction
 import com.wavesplatform.TransactionGen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.{IssueTransaction, IssueTransactionV1}
 
-class IssueTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class IssueTransactionV1Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Issue serialization roundtrip") {
-    forAll(issueGen) { issue: IssueTransaction =>
-      val recovered = IssueTransaction.parseBytes(issue.bytes()).get
+    forAll(issueV1Gen) { issue: IssueTransaction =>
+      val recovered = IssueTransactionV1.parseBytes(issue.bytes()).get
       recovered.bytes() shouldEqual issue.bytes()
     }
   }
 
   property("Issue serialization from TypedTransaction") {
-    forAll(issueGen) { issue: IssueTransaction =>
+    forAll(issueV1Gen) { issue: IssueTransaction =>
       val recovered = TransactionParsers.parseBytes(issue.bytes()).get
       recovered.bytes() shouldEqual issue.bytes()
     }

@@ -4,11 +4,11 @@ import cats.implicits._
 import com.wavesplatform.state._
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}
-import scorex.transaction.{AssetId, Transaction}
 import scorex.transaction.Transaction.Type
-import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction}
+import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.script.Script
+import scorex.transaction.{AssetId, Transaction}
 
 class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends Blockchain {
 
@@ -51,8 +51,6 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
           .get(id)
           .collectFirst {
             case (_, it: IssueTransaction, _) =>
-              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, None, sponsorship)
-            case (_, it: SmartIssueTransaction, _) =>
               AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, it.script, sponsorship)
           }
           .map(z => diff.issuedAssets.get(id).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = r.script)))

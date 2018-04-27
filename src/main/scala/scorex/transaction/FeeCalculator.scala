@@ -4,11 +4,8 @@ import com.wavesplatform.settings.{FeesSettings, FunctionalitySettings}
 import com.wavesplatform.state._
 import scorex.transaction.FeeCalculator._
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets._
+import scorex.transaction.transfer._
 
-/**
-  * Class to check, that transaction contains enough fee to put it to UTX pool
-  */
 class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
 
   private val Kb = 1024
@@ -51,7 +48,7 @@ class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
       txMinBaseFee * sizeInKb
     case tx: MassTransferTransaction =>
       val transferFeeSpec = map.getOrElse(
-        TransactionAssetFee(TransferTransaction.typeId, txFeeAssetId).key,
+        TransactionAssetFee(TransferTransactionV1.typeId, txFeeAssetId).key,
         throw new IllegalStateException("Can't find spec for TransferTransaction")
       )
       transferFeeSpec + txMinBaseFee * tx.transfers.size

@@ -24,9 +24,9 @@ import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.api.http.{AddressApiRoute, ApiErrorResponse, DataRequest}
-import scorex.transaction.assets.MassTransferTransaction
-import scorex.transaction.assets.MassTransferTransaction.Transfer
+import scorex.transaction.transfer.MassTransferTransaction.Transfer
 import scorex.transaction.assets.exchange.Order
+import scorex.transaction.transfer._
 import scorex.waves.http.DebugApiRoute._
 import scorex.waves.http.DebugMessage._
 import scorex.waves.http.{DebugMessage, RollbackParams}

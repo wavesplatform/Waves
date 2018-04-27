@@ -10,7 +10,7 @@ import org.scalatest.CancelAfterFailure
 import scorex.account.PrivateKeyAccount
 import scorex.api.http.assets.SignedIssueRequest
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.IssueTransactionV1
 
 class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
@@ -75,7 +75,7 @@ object CustomFeeTransactionSuite {
 
   private val seed = Default(3).getString("account-seed")
   private val pk   = PrivateKeyAccount.fromSeed(seed).right.get
-  val assetTx = IssueTransaction
+  val assetTx = IssueTransactionV1
     .create(
       sender = pk,
       name = "asset".getBytes(),
@@ -108,7 +108,7 @@ object CustomFeeTransactionSuite {
     notMinerConfig.withFallback(Default(3))
   )
 
-  def createSignedIssueRequest(tx: IssueTransaction): SignedIssueRequest = {
+  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueRequest = {
     import tx._
     SignedIssueRequest(
       Base58.encode(tx.sender.publicKey),
