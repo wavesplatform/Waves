@@ -14,7 +14,7 @@ import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.ValidationError.AccountBalanceError
-import scorex.transaction.assets.IssueTransactionV1
+import scorex.transaction.assets.{IssueTransaction, IssueTransactionV1}
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
@@ -24,17 +24,17 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
   property("preserves waves invariant, stores match info, rewards matcher") {
 
-    val preconditionsAndExchange: Gen[(GenesisTransaction, GenesisTransaction, IssueTransactionV1, IssueTransactionV1, ExchangeTransaction)] = for {
+    val preconditionsAndExchange: Gen[(GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
       buyer  <- accountGen
       seller <- accountGen
       ts     <- timestampGen
       gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).right.get
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
-      issue1: IssueTransactionV1 <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1)
-      issue2: IssueTransactionV1 <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1)
-      maybeAsset1                <- Gen.option(issue1.id())
-      maybeAsset2                <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
-      exchange                   <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
+      issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1)
+      issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1)
+      maybeAsset1              <- Gen.option(issue1.id())
+      maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
+      exchange                 <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
     } yield (gen1, gen2, issue1, issue2, exchange)
 
     forAll(preconditionsAndExchange) {
@@ -56,7 +56,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
 
     val preconditionsAndExchange
-      : Gen[(GenesisTransaction, GenesisTransaction, SetScriptTransaction, IssueTransactionV1, IssueTransactionV1, ExchangeTransaction)] = for {
+      : Gen[(GenesisTransaction, GenesisTransaction, SetScriptTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
       version <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
       buyer   <- accountGen
       seller  <- accountGen
@@ -65,11 +65,11 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).right.get
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
       setScript                = SetScriptTransaction.selfSigned(version, seller, Some(ScriptV1(TRUE).explicitGet()), fee, ts).explicitGet()
-      issue1: IssueTransactionV1 <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1)
-      issue2: IssueTransactionV1 <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1)
-      maybeAsset1                <- Gen.option(issue1.id())
-      maybeAsset2                <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
-      exchange                   <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
+      issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1)
+      issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1)
+      maybeAsset1              <- Gen.option(issue1.id())
+      maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
+      exchange                 <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
     } yield (gen1, gen2, setScript, issue1, issue2, exchange)
 
     forAll(preconditionsAndExchange) {

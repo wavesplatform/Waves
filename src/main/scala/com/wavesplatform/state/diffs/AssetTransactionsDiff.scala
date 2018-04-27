@@ -14,17 +14,6 @@ import scala.util.{Left, Right}
 object AssetTransactionsDiff {
 
   def issue(height: Int)(tx: IssueTransaction): Either[ValidationError, Diff] = {
-    val info = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity, script = None)
-    Right(
-      Diff(
-        height = height,
-        tx = tx,
-        portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.assetId() -> tx.quantity))),
-        assetInfos = Map(tx.assetId()        -> info)
-      ))
-  }
-
-  def smartIssue(height: Int)(tx: IssueTransactionV2): Either[ValidationError, Diff] = {
     val info = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity, script = tx.script)
     Right(
       Diff(
