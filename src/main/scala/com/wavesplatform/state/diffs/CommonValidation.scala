@@ -175,8 +175,24 @@ object CommonValidation {
             GenericError(
               s"Fee in ${feeAssetId.fold("WAVES")(_.toString)} for ${tx.builder.classTag} does not exceed minimal value of $minimumFee WAVES: $feeAmount")
           )
-        } yield (feeAssetId, restFeeAmount)
+        } yield (None, restFeeAmount)
       }
+
+    def isSmartToken: Boolean = tx.assetFee._1.flatMap(blockchain.assetDescription).exists(_.script.isDefined)
+
+    def restFeeAfterSmartTokens(inputFee: (Option[AssetId], Long)): Either[ValidationError, (Option[AssetId], Long)] =
+      if (isSmartToken) {
+        val (feeAssetId, feeAmount) = inputFee
+        for {
+          _ <- Either.cond(feeAssetId.isEmpty, (), GenericError("Transactions with smart tokens require Waves as fee"))
+          restFeeAmount = feeAmount - ScriptExtraFee
+          _ <- Either.cond(
+            restFeeAmount >= 0,
+            (),
+            InsufficientFee(s"This transaction with a smart token requires ${-restFeeAmount} additional fee")
+          )
+        } yield (feeAssetId, restFeeAmount)
+      } else Right(inputFee)
 
     def hasSmartAccountScript: Boolean = tx match {
       case tx: Transaction with Authorized => blockchain.accountScript(tx.sender).isDefined
@@ -197,25 +213,9 @@ object CommonValidation {
         } yield (feeAssetId, restFeeAmount)
       } else Right(inputFee)
 
-    def isSmartToken: Boolean = tx.assetFee._1.flatMap(blockchain.assetDescription).exists(_.script.isDefined)
-
-    def restFeeAfterSmartTokens(inputFee: (Option[AssetId], Long)): Either[ValidationError, (Option[AssetId], Long)] =
-      if (isSmartToken) {
-        val (feeAssetId, feeAmount) = inputFee
-        for {
-          _ <- Either.cond(feeAssetId.isEmpty, (), GenericError("Transactions with smart tokens require Waves as fee"))
-          restFeeAmount = feeAmount - ScriptExtraFee
-          _ <- Either.cond(
-            restFeeAmount >= 0,
-            (),
-            InsufficientFee(s"This transaction with a smart token requires ${-restFeeAmount} additional fee")
-          )
-        } yield (feeAssetId, restFeeAmount)
-      } else Right(inputFee)
-
     restFeeAfterSponsorship(tx.assetFee)
-      .flatMap(restFeeAfterSmartAccounts)
       .flatMap(restFeeAfterSmartTokens)
+      .flatMap(restFeeAfterSmartAccounts)
       .map(_ => ())
   }
 }
