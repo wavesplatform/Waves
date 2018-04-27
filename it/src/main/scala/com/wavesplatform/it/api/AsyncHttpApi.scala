@@ -284,8 +284,8 @@ object AsyncHttpApi extends Assertions {
     def assetsBalance(address: String): Future[FullAssetsInfo] =
       get(s"/assets/balance/$address").as[FullAssetsInfo]
 
-    def sponsorAsset(sourceAddress: String, assetId: String, minAssetFee: Long, fee: Long): Future[Transaction] =
-      postJson("/assets/sponsor", SponsorFeeRequest(1, sourceAddress, assetId, Some(minAssetFee), fee)).as[Transaction]
+    def sponsorAsset(sourceAddress: String, assetId: String, minSponsoredAssetFee: Long, fee: Long): Future[Transaction] =
+      postJson("/assets/sponsor", SponsorFeeRequest(1, sourceAddress, assetId, Some(minSponsoredAssetFee), fee)).as[Transaction]
 
     def cancelSponsorship(sourceAddress: String, assetId: String, fee: Long): Future[Transaction] =
       postJson("/assets/sponsor", SponsorFeeRequest(1, sourceAddress, assetId, None, fee)).as[Transaction]
