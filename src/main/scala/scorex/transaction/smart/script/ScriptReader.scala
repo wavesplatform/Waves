@@ -30,7 +30,7 @@ object ScriptReader {
             .flatMap { _ =>
               Serde.codec.decode(scodec.bits.BitVector(scriptBytes)) match {
                 case Failure(e)    => Left(e.toString())
-                case Successful(x) => ScriptV1(x.value, checkBytes = false)
+                case Successful(x) => ScriptV1(x.value, checkSize = false)
               }
             }
             .left

@@ -20,13 +20,13 @@ object ScriptV1 {
   def validateBytes(bs: Array[Byte]): Either[String, Unit] =
     Either.cond(bs.length <= maxSizeInBytes, (), s"Script is too large: ${bs.length} bytes > $maxSizeInBytes bytes")
 
-  def apply(x: Typed.EXPR, checkBytes: Boolean = true): Either[String, Script] =
+  def apply(x: Typed.EXPR, checkSize: Boolean = true): Either[String, Script] =
     for {
       _                <- Either.cond(x.tpe == BOOLEAN, (), "Script should return BOOLEAN")
       scriptComplexity <- ScriptEstimator(functionCosts, x)
       _                <- Either.cond(scriptComplexity <= maxComplexity, (), s"Script is too complex: $scriptComplexity > $maxComplexity")
       s = new ScriptV1(x)
-      _ <- if (checkBytes) validateBytes(s.bytes().arr) else Right(())
+      _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())
     } yield s
 
   private class ScriptV1(override val expr: Typed.EXPR) extends Script {
