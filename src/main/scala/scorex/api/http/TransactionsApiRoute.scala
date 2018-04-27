@@ -170,13 +170,14 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
           case Some(x) =>
             x match {
-              case IssueTransactionV1      => TransactionFactory.issueAsset(jsv.as[IssueV1Request], wallet, time)
-              case IssueTransactionV2      => TransactionFactory.smartIssue(jsv.as[IssueV2Request], wallet, time)
-              case TransferTransactionV1   => TransactionFactory.transferAsset(jsv.as[TransferV1Request], wallet, time)
-              case TransferTransactionV2   => TransactionFactory.versionedTransfer(jsv.as[TransferV2Request], wallet, time)
-              case MassTransferTransaction => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
-              case ReissueTransactionV1    => TransactionFactory.reissueAsset(jsv.as[ReissueRequest], wallet, time)
+              case IssueTransactionV1      => TransactionFactory.issueAssetV1(jsv.as[IssueV1Request], wallet, time)
+              case IssueTransactionV2      => TransactionFactory.issueAssetV2(jsv.as[IssueV2Request], wallet, time)
+              case TransferTransactionV1   => TransactionFactory.transferAssetV1(jsv.as[TransferV1Request], wallet, time)
+              case TransferTransactionV2   => TransactionFactory.transferAssetV2(jsv.as[TransferV2Request], wallet, time)
+              case ReissueTransactionV1    => TransactionFactory.reissueAssetV1(jsv.as[ReissueV1Request], wallet, time)
+              case ReissueTransactionV2    => TransactionFactory.reissueAssetV2(jsv.as[ReissueV2Request], wallet, time)
               case BurnTransaction         => TransactionFactory.burnAsset(jsv.as[BurnRequest], wallet, time)
+              case MassTransferTransaction => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
               case LeaseTransaction        => TransactionFactory.lease(jsv.as[LeaseRequest], wallet, time)
               case LeaseCancelTransaction  => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
               case CreateAliasTransaction  => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
@@ -218,7 +219,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case TransferTransactionV1   => jsv.as[SignedTransferV1Request].toTx
               case TransferTransactionV2   => jsv.as[SignedTransferV2Request].toTx
               case MassTransferTransaction => jsv.as[SignedMassTransferRequest].toTx
-              case ReissueTransactionV1    => jsv.as[SignedReissueRequest].toTx
+              case ReissueTransactionV1    => jsv.as[SignedReissueV1Request].toTx
+              case ReissueTransactionV2    => jsv.as[SignedReissueV2Request].toTx
               case BurnTransaction         => jsv.as[SignedBurnRequest].toTx
               case LeaseTransaction        => jsv.as[SignedLeaseRequest].toTx
               case LeaseCancelTransaction  => jsv.as[SignedLeaseCancelRequest].toTx

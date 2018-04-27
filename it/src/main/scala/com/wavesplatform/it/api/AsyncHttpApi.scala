@@ -273,7 +273,7 @@ object AsyncHttpApi extends Assertions {
     def scriptCompile(code: String) = post("/utils/script/compile", code).as[CompiledScript]
 
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Future[Transaction] =
-      postJson("/assets/reissue", ReissueRequest(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
+      postJson("/assets/reissue", ReissueV1Request(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
 
     def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Future[Transaction] =
       postJson("/assets/burn", BurnRequest(sourceAddress, assetId, quantity, fee)).as[Transaction]

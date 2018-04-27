@@ -73,17 +73,17 @@ trait RequestGen extends TransactionGen { _: Suite =>
     quantity <- positiveLongGen
   } yield (assetId, quantity)
 
-  val reissueReq: G[ReissueRequest] = for {
+  val reissueReq: G[ReissueV1Request] = for {
     (account, fee)      <- commonFields
     (assetId, quantity) <- reissueBurnFields
     reissuable          <- G.oneOf(true, false)
-  } yield ReissueRequest(account, assetId, quantity, reissuable, fee)
+  } yield ReissueV1Request(account, assetId, quantity, reissuable, fee)
 
-  val broadcastReissueReq: G[SignedReissueRequest] = for {
+  val broadcastReissueReq: G[SignedReissueV1Request] = for {
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _rr        <- reissueReq
-  } yield SignedReissueRequest(_rr.sender, _rr.assetId, _rr.quantity, _rr.reissuable, _rr.fee, _timestamp, _signature)
+  } yield SignedReissueV1Request(_rr.sender, _rr.assetId, _rr.quantity, _rr.reissuable, _rr.fee, _timestamp, _signature)
 
   val burnReq: G[BurnRequest] = for {
     (account, fee)      <- commonFields

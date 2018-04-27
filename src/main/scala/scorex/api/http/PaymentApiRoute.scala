@@ -47,7 +47,7 @@ case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPo
     ))
   def payment: Route = (path("payment") & post & withAuth) {
     json[TransferV1Request] { p =>
-      doBroadcast(TransactionFactory.transferAsset(p, wallet, time))
+      doBroadcast(TransactionFactory.transferAssetV1(p, wallet, time))
     }
   }
 }

@@ -53,7 +53,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
         |"signature":"4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
         |}
       """.stripMargin
-    val req = Json.parse(json).validate[SignedReissueRequest].get
+    val req = Json.parse(json).validate[SignedReissueV1Request].get
     req.assetId shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
     req.signature shouldBe "4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
     req.fee shouldBe 100000L

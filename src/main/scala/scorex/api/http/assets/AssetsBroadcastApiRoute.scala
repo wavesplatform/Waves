@@ -71,7 +71,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
       new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])
     ))
   def reissue: Route = (path("reissue") & post) {
-    json[SignedReissueRequest] { reissueReq =>
+    json[SignedReissueV1Request] { reissueReq =>
       doBroadcast(reissueReq.toTx)
     }
   }
