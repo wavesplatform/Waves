@@ -25,7 +25,7 @@ object AssetTransactionsDiff {
   }
 
   def reissue(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(
-      tx: ReissueTransactionV1): Either[ValidationError, Diff] =
+      tx: ReissueTransaction): Either[ValidationError, Diff] =
     validateAsset(tx, blockchain, tx.assetId, issuerOnly = true).flatMap { _ =>
       val oldInfo = blockchain.assetDescription(tx.assetId).get
       if (!oldInfo.reissuable && blockTime > settings.allowInvalidReissueInSameBlockUntilTimestamp) {

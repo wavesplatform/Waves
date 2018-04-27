@@ -46,7 +46,7 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
     case g: GenesisTransaction      => Right(g.amount)
     case g: PaymentTransaction      => Right(g.amount)
     case g: IssueTransaction        => Right(g.quantity)
-    case g: ReissueTransactionV1    => Right(g.quantity)
+    case g: ReissueTransaction      => Right(g.quantity)
     case g: BurnTransaction         => Right(g.amount)
     case g: LeaseTransaction        => Right(g.amount)
     case g: TransferTransaction     => Right(g.amount)
@@ -69,9 +69,9 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
   }
 
   override def reissuable: Either[String, Boolean] = tx match {
-    case g: IssueTransaction     => Right(g.reissuable)
-    case g: ReissueTransactionV1 => Right(g.reissuable)
-    case _                       => Left("Transaction doesn't contain reissuable")
+    case g: IssueTransaction   => Right(g.reissuable)
+    case g: ReissueTransaction => Right(g.reissuable)
+    case _                     => Left("Transaction doesn't contain reissuable")
   }
 
   override def decimals: Either[String, Byte] = tx match {

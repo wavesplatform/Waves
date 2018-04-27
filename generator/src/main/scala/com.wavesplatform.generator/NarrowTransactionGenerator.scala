@@ -202,9 +202,9 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
           case Some(tx: IssueTransactionV1) => validIssueTxs :+ tx
           case _                            => validIssueTxs
         }, tx match {
-          case Some(tx: IssueTransactionV1) if tx.reissuable    => reissuableIssueTxs :+ tx
-          case Some(tx: ReissueTransactionV1) if !tx.reissuable => reissuableIssueTxs.filter(_.id != tx.id)
-          case _                                                => reissuableIssueTxs
+          case Some(tx: IssueTransactionV1) if tx.reissuable  => reissuableIssueTxs :+ tx
+          case Some(tx: ReissueTransaction) if !tx.reissuable => reissuableIssueTxs.filter(_.id != tx.id)
+          case _                                              => reissuableIssueTxs
         }, tx match {
           case Some(tx: LeaseTransaction)       => activeLeaseTransactions :+ tx
           case Some(tx: LeaseCancelTransaction) => activeLeaseTransactions.filter(_.id != tx.leaseId)
