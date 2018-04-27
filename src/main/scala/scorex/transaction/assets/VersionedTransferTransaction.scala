@@ -4,9 +4,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.crypto
 import com.wavesplatform.state._
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
 import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.encode.Base58
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
 import scorex.transaction._
@@ -49,16 +47,6 @@ case class VersionedTransferTransaction private (version: Byte,
       Deser.serializeArray(attachment)
     )
   }
-
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
-      "version"    -> version,
-      "recipient"  -> recipient.stringRepr,
-      "assetId"    -> assetId.map(_.base58),
-      "feeAssetId" -> feeAssetId.map(_.base58),
-      "amount"     -> amount,
-      "attachment" -> Base58.encode(attachment)
-    ))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 

@@ -16,15 +16,25 @@ import scala.util.{Failure, Success, Try}
 import validation._
 import cats.implicits._
 
-trait TransferTransaction extends Transaction {
+trait TransferTransaction extends ProvenTransaction {
   def assetId: Option[AssetId]
-  def sender: PublicKeyAccount
   def recipient: AddressOrAlias
   def amount: Long
-  def timestamp: Long
   def feeAssetId: Option[AssetId]
   def fee: Long
   def attachment: Array[Byte]
+  def version: Byte
+
+  override final val json: Coeval[JsObject] = Coeval.evalOnce(
+    jsonBase() ++ Json.obj(
+      "version"    -> version,
+      "recipient"  -> recipient.stringRepr,
+      "assetId"    -> assetId.map(_.base58),
+      "feeAssetId" -> feeAssetId.map(_.base58),
+      "amount"     -> amount,
+      "attachment" -> Base58.encode(attachment)
+    ))
+
 }
 
 object TransferTransaction {
@@ -75,17 +85,9 @@ case class V1TransferTransaction private (assetId: Option[AssetId],
     )
   }
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
-      "recipient"  -> recipient.stringRepr,
-      "assetId"    -> assetId.map(_.base58),
-      "amount"     -> amount,
-      "feeAsset"   -> feeAssetId.map(_.base58),
-      "attachment" -> Base58.encode(attachment)
-    ))
-
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), signature.arr, bodyBytes()))
 
+  override val version: Byte = 1: Byte
 }
 
 object V1TransferTransaction extends TransactionParserFor[V1TransferTransaction] with TransactionParser.HardcodedVersion1 {
