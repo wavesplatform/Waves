@@ -1,12 +1,10 @@
 package scorex.transaction.assets
 
-import com.google.common.primitives.{Bytes, Longs}
+import com.google.common.primitives.Bytes
 import com.wavesplatform.crypto
 import com.wavesplatform.state._
 import monix.eval.Coeval
 import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.signatures.Curve25519.KeyLength
-import scorex.serialization.Deser
 import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
@@ -28,25 +26,7 @@ case class VersionedTransferTransaction private (version: Byte,
   override val builder: TransactionParser        = VersionedTransferTransaction
   override val assetFee: (Option[AssetId], Long) = (feeAssetId, fee)
 
-  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
-    val timestampBytes  = Longs.toByteArray(timestamp)
-    val assetIdBytes    = assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
-    val feeAssetIdBytes = feeAssetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
-    val amountBytes     = Longs.toByteArray(amount)
-    val feeBytes        = Longs.toByteArray(fee)
-
-    Bytes.concat(
-      Array(builder.typeId, version),
-      sender.publicKey,
-      assetIdBytes,
-      timestampBytes,
-      amountBytes,
-      feeAssetIdBytes,
-      feeBytes,
-      recipient.bytes.arr,
-      Deser.serializeArray(attachment)
-    )
-  }
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Array(builder.typeId, version) ++ bytesBase())
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
@@ -59,18 +39,10 @@ object VersionedTransferTransaction extends TransactionParserFor[VersionedTransf
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
-      val sender              = PublicKeyAccount(bytes.slice(0, KeyLength))
-      val (assetIdOpt, s0)    = Deser.parseByteArrayOption(bytes, KeyLength, AssetIdLength)
-      val timestamp           = Longs.fromByteArray(bytes.slice(s0, s0 + 8))
-      val amount              = Longs.fromByteArray(bytes.slice(s0 + 8, s0 + 16))
-      val (feeAssetIdOpt, s1) = Deser.parseByteArrayOption(bytes, s0 + 16, AssetIdLength)
-      val feeAmount           = Longs.fromByteArray(bytes.slice(s1, s1 + 8))
-
       (for {
-        recRes <- AddressOrAlias.fromBytes(bytes, s1 + 8)
-        (recipient, recipientEnd) = recRes
-        (attachment, attachEnd)   = Deser.parseArraySize(bytes, recipientEnd)
-        proofs <- Proofs.fromBytes(bytes.drop(attachEnd))
+        parsed <- TransferTransaction.parseBase(bytes, 0)
+        (sender, assetIdOpt, feeAssetIdOpt, timestamp, amount, feeAmount, recipient, attachment, end) = parsed
+        proofs <- Proofs.fromBytes(bytes.drop(end))
         tt <- VersionedTransferTransaction.create(version,
                                                   assetIdOpt.map(ByteStr(_)),
                                                   sender,
