@@ -6,17 +6,17 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.V1TransferTransaction
+import scorex.transaction.transfer._
 
 class CommonValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("disallows double spending") {
-    val preconditionsAndPayment: Gen[(GenesisTransaction, V1TransferTransaction)] = for {
+    val preconditionsAndPayment: Gen[(GenesisTransaction, TransferTransactionV1)] = for {
       master    <- accountGen
       recipient <- otherAccountGen(candidate = master)
       ts        <- positiveIntGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      transfer: V1TransferTransaction <- wavesTransferGeneratorP(master, recipient)
+      transfer: TransferTransactionV1 <- wavesTransferGeneratorP(master, recipient)
     } yield (genesis, transfer)
 
     forAll(preconditionsAndPayment) {

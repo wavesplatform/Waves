@@ -5,8 +5,8 @@ import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json._
 import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
-import scorex.transaction.assets.MassTransferTransaction.Transfer
-import scorex.transaction.assets.{MassTransferTransaction, V1TransferTransaction}
+import scorex.transaction.transfer.MassTransferTransaction.Transfer
+import scorex.transaction.transfer._
 import scorex.transaction.{AssetIdStringLength, Proofs, ValidationError}
 
 object SignedMassTransferRequest {
@@ -37,7 +37,7 @@ case class SignedMassTransferRequest(@ApiModelProperty(required = true)
       _assetId    <- parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", V1TransferTransaction.MaxAttachmentStringSize)
+      _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
       _transfers  <- MassTransferTransaction.parseTransfersList(transfers)
       t           <- MassTransferTransaction.create(version, _assetId, _sender, _transfers, timestamp, fee, _attachment.arr, _proofs)
     } yield t

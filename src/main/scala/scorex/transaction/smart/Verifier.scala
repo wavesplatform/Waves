@@ -7,6 +7,7 @@ import scorex.transaction.ValidationError.{GenericError, TransactionNotAllowedBy
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.smart.script.{Script, ScriptRunner}
+import scorex.transaction.transfer._
 
 object Verifier {
 

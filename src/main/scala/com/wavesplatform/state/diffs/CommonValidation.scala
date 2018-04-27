@@ -12,6 +12,7 @@ import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.transfer._
 
 import scala.concurrent.duration._
 import scala.util.{Left, Right}
@@ -91,23 +92,23 @@ object CommonValidation {
       )
 
     tx match {
-      case _: BurnTransaction              => Right(tx)
-      case _: PaymentTransaction           => Right(tx)
-      case _: GenesisTransaction           => Right(tx)
-      case _: V1TransferTransaction        => Right(tx)
-      case _: IssueTransaction             => Right(tx)
-      case _: ReissueTransaction           => Right(tx)
-      case _: ExchangeTransaction          => Right(tx)
-      case _: LeaseTransaction             => Right(tx)
-      case _: LeaseCancelTransaction       => Right(tx)
-      case _: CreateAliasTransaction       => Right(tx)
-      case _: MassTransferTransaction      => activationBarrier(BlockchainFeatures.MassTransfer)
-      case _: DataTransaction              => activationBarrier(BlockchainFeatures.DataTransaction)
-      case _: SetScriptTransaction         => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: VersionedTransferTransaction => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: SmartIssueTransaction        => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: SponsorFeeTransaction        => activationBarrier(BlockchainFeatures.FeeSponsorship)
-      case _                               => Left(GenericError("Unknown transaction must be explicitly activated"))
+      case _: BurnTransaction         => Right(tx)
+      case _: PaymentTransaction      => Right(tx)
+      case _: GenesisTransaction      => Right(tx)
+      case _: TransferTransactionV1   => Right(tx)
+      case _: IssueTransaction        => Right(tx)
+      case _: ReissueTransaction      => Right(tx)
+      case _: ExchangeTransaction     => Right(tx)
+      case _: LeaseTransaction        => Right(tx)
+      case _: LeaseCancelTransaction  => Right(tx)
+      case _: CreateAliasTransaction  => Right(tx)
+      case _: MassTransferTransaction => activationBarrier(BlockchainFeatures.MassTransfer)
+      case _: DataTransaction         => activationBarrier(BlockchainFeatures.DataTransaction)
+      case _: SetScriptTransaction    => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: TransferTransactionV2   => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: SmartIssueTransaction   => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: SponsorFeeTransaction   => activationBarrier(BlockchainFeatures.FeeSponsorship)
+      case _                          => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }
 
@@ -130,23 +131,23 @@ object CommonValidation {
     else
       for {
         feeInUnits <- tx match {
-          case gtx: GenesisTransaction            => Right(0)
-          case ptx: PaymentTransaction            => Right(1)
-          case itx: IssueTransaction              => Right(1000)
-          case sitx: SmartIssueTransaction        => Right(1000)
-          case rtx: ReissueTransaction            => Right(1000)
-          case btx: BurnTransaction               => Right(1)
-          case ttx: V1TransferTransaction         => Right(1)
-          case mtx: MassTransferTransaction       => Right(1 + (mtx.transfers.size + 1) / 2)
-          case ltx: LeaseTransaction              => Right(1)
-          case ltx: LeaseCancelTransaction        => Right(1)
-          case etx: ExchangeTransaction           => Right(3)
-          case atx: CreateAliasTransaction        => Right(1)
-          case dtx: DataTransaction               => Right(1 + (dtx.bytes().length - 1) / 1024)
-          case sstx: SetScriptTransaction         => Right(5)
-          case sttx: VersionedTransferTransaction => Right(1)
-          case stx: SponsorFeeTransaction         => Right(1000)
-          case _                                  => Left(UnsupportedTransactionType)
+          case gtx: GenesisTransaction      => Right(0)
+          case ptx: PaymentTransaction      => Right(1)
+          case itx: IssueTransaction        => Right(1000)
+          case sitx: SmartIssueTransaction  => Right(1000)
+          case rtx: ReissueTransaction      => Right(1000)
+          case btx: BurnTransaction         => Right(1)
+          case ttx: TransferTransactionV1   => Right(1)
+          case mtx: MassTransferTransaction => Right(1 + (mtx.transfers.size + 1) / 2)
+          case ltx: LeaseTransaction        => Right(1)
+          case ltx: LeaseCancelTransaction  => Right(1)
+          case etx: ExchangeTransaction     => Right(3)
+          case atx: CreateAliasTransaction  => Right(1)
+          case dtx: DataTransaction         => Right(1 + (dtx.bytes().length - 1) / 1024)
+          case sstx: SetScriptTransaction   => Right(5)
+          case sttx: TransferTransactionV2  => Right(1)
+          case stx: SponsorFeeTransaction   => Right(1000)
+          case _                            => Left(UnsupportedTransactionType)
         }
         wavesFee <- tx.assetFee._1 match {
           case None => Right(tx.assetFee._2)

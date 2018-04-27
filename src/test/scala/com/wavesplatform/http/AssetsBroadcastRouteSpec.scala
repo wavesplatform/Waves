@@ -18,7 +18,7 @@ import scorex.api.http._
 import scorex.api.http.assets._
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.{V1TransferTransaction, VersionedTransferTransaction}
+import scorex.transaction.transfer._
 import scorex.transaction.{Proofs, Transaction, ValidationError}
 import scorex.wallet.Wallet
 import shapeless.Coproduct
@@ -163,7 +163,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
 
     val transferRequest = createSignedTransferRequest(
-      V1TransferTransaction
+      TransferTransactionV1
         .create(
           assetId = None,
           sender = senderPrivateKey,
@@ -179,7 +179,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     )
 
     val versionedTransferRequest = createSignedVersionedTransferRequest(
-      VersionedTransferTransaction
+      TransferTransactionV2
         .create(
           assetId = None,
           sender = senderPrivateKey,
@@ -200,12 +200,12 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
       "accepts TransferRequest" in posting(transferRequest) ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[TransferTransactions].select[V1TransferTransaction] shouldBe defined
+        responseAs[TransferTransactions].select[TransferTransactionV1] shouldBe defined
       }
 
       "accepts VersionedTransferRequest" in posting(versionedTransferRequest) ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[TransferTransactions].select[VersionedTransferTransaction] shouldBe defined
+        responseAs[TransferTransactions].select[TransferTransactionV2] shouldBe defined
       }
 
       "returns a error if it is not a transfer request" in posting(issueReq.sample.get) ~> check {
@@ -220,14 +220,14 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
         status shouldBe StatusCodes.OK
         val xs = responseAs[Seq[TransferTransactions]]
         xs.size shouldBe 1
-        xs.head.select[V1TransferTransaction] shouldBe defined
+        xs.head.select[TransferTransactionV1] shouldBe defined
       }
 
       "accepts VersionedTransferRequest" in posting(List(versionedTransferRequest)) ~> check {
         status shouldBe StatusCodes.OK
         val xs = responseAs[Seq[TransferTransactions]]
         xs.size shouldBe 1
-        xs.head.select[VersionedTransferTransaction] shouldBe defined
+        xs.head.select[TransferTransactionV2] shouldBe defined
       }
 
       "accepts both TransferRequest and VersionedTransferRequest" in {
@@ -240,8 +240,8 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
           status shouldBe StatusCodes.OK
           val xs = responseAs[Seq[TransferTransactions]]
           xs.size shouldBe 2
-          xs.flatMap(_.select[V1TransferTransaction]) shouldNot be(empty)
-          xs.flatMap(_.select[VersionedTransferTransaction]) shouldNot be(empty)
+          xs.flatMap(_.select[TransferTransactionV1]) shouldNot be(empty)
+          xs.flatMap(_.select[TransferTransactionV2]) shouldNot be(empty)
         }
       }
 
@@ -252,7 +252,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
   }
 
-  protected def createSignedTransferRequest(tx: V1TransferTransaction): SignedTransferRequest = {
+  protected def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferRequest = {
     import tx._
     SignedTransferRequest(
       Base58.encode(tx.sender.publicKey),
@@ -267,7 +267,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     )
   }
 
-  protected def createSignedVersionedTransferRequest(tx: VersionedTransferTransaction): SignedVersionedTransferRequest = {
+  protected def createSignedVersionedTransferRequest(tx: TransferTransactionV2): SignedVersionedTransferRequest = {
     import tx._
     SignedVersionedTransferRequest(
       Base58.encode(tx.sender.publicKey),

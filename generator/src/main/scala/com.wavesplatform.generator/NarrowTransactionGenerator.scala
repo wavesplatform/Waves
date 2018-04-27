@@ -13,6 +13,7 @@ import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.transfer._
 import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration._
@@ -55,7 +56,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
 
     val tradeAssetDistribution = {
       tradeAssetIssue +: accounts.map(acc => {
-        V1TransferTransaction
+        TransferTransactionV1
           .create(Some(tradeAssetIssue.id()),
                   issueTransactionSender,
                   acc,
@@ -92,7 +93,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
             val amount     = 100000000L + Random.nextInt(Int.MaxValue)
             logOption(
               IssueTransaction.create(sender, name, description, amount, Random.nextInt(9).toByte, reissuable, 100000000L + r.nextInt(100000000), ts))
-          case V1TransferTransaction =>
+          case TransferTransactionV1 =>
             val useAlias  = r.nextBoolean()
             val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
             val sendAsset = r.nextBoolean()
@@ -105,7 +106,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
             } else Some((randomFrom(accounts).get, None))
             senderAndAssetOpt.flatMap {
               case (sender, asset) =>
-                logOption(V1TransferTransaction
+                logOption(TransferTransactionV1
                   .create(asset, sender, recipient, r.nextInt(500000), ts, None, moreThatStandartFee, Array.fill(r.nextInt(100))(r.nextInt().toByte)))
             }
           case ReissueTransaction =>

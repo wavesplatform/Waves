@@ -1,4 +1,4 @@
-package scorex.transaction.assets
+package scorex.transaction.transfer
 
 import com.google.common.primitives.Bytes
 import com.wavesplatform.crypto
@@ -9,30 +9,27 @@ import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
-case class VersionedTransferTransaction private (version: Byte,
-                                                 sender: PublicKeyAccount,
-                                                 recipient: AddressOrAlias,
-                                                 assetId: Option[AssetId],
-                                                 amount: Long,
-                                                 timestamp: Long,
-                                                 feeAssetId: Option[AssetId],
-                                                 fee: Long,
-                                                 attachment: Array[Byte],
-                                                 proofs: Proofs)
+case class TransferTransactionV2 private (version: Byte,
+                                          sender: PublicKeyAccount,
+                                          recipient: AddressOrAlias,
+                                          assetId: Option[AssetId],
+                                          amount: Long,
+                                          timestamp: Long,
+                                          feeAssetId: Option[AssetId],
+                                          fee: Long,
+                                          attachment: Array[Byte],
+                                          proofs: Proofs)
     extends TransferTransaction
     with ProvenTransaction
     with FastHashId {
 
-  override val builder: TransactionParser        = VersionedTransferTransaction
-  override val assetFee: (Option[AssetId], Long) = (feeAssetId, fee)
-
+  override val builder: TransactionParser     = TransferTransactionV2
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Array(builder.typeId, version) ++ bytesBase())
-
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
+  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
 }
 
-object VersionedTransferTransaction extends TransactionParserFor[VersionedTransferTransaction] with TransactionParser.MultipleVersions {
+object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2] with TransactionParser.MultipleVersions {
 
   override val typeId: Byte                 = 4
   override val supportedVersions: Set[Byte] = Set(2)
@@ -43,16 +40,16 @@ object VersionedTransferTransaction extends TransactionParserFor[VersionedTransf
         parsed <- TransferTransaction.parseBase(bytes, 0)
         (sender, assetIdOpt, feeAssetIdOpt, timestamp, amount, feeAmount, recipient, attachment, end) = parsed
         proofs <- Proofs.fromBytes(bytes.drop(end))
-        tt <- VersionedTransferTransaction.create(version,
-                                                  assetIdOpt.map(ByteStr(_)),
-                                                  sender,
-                                                  recipient,
-                                                  amount,
-                                                  timestamp,
-                                                  feeAssetIdOpt.map(ByteStr(_)),
-                                                  feeAmount,
-                                                  attachment,
-                                                  proofs)
+        tt <- TransferTransactionV2.create(version,
+                                           assetIdOpt.map(ByteStr(_)),
+                                           sender,
+                                           recipient,
+                                           amount,
+                                           timestamp,
+                                           feeAssetIdOpt.map(ByteStr(_)),
+                                           feeAmount,
+                                           attachment,
+                                           proofs)
       } yield tt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
@@ -69,7 +66,7 @@ object VersionedTransferTransaction extends TransactionParserFor[VersionedTransf
     for {
       _ <- Either.cond(supportedVersions.contains(version), (), ValidationError.UnsupportedVersion(version))
       _ <- TransferTransaction.validate(amount, feeAmount, attachment)
-    } yield VersionedTransferTransaction(version, sender, recipient, assetId, amount, timestamp, feeAssetId, feeAmount, attachment, proofs)
+    } yield TransferTransactionV2(version, sender, recipient, assetId, amount, timestamp, feeAssetId, feeAmount, attachment, proofs)
   }
 
   def selfSigned(version: Byte,

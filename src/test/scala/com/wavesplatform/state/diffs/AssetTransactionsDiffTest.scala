@@ -18,6 +18,7 @@ import scorex.settings.TestFunctionalitySettings
 import cats.implicits._
 import com.wavesplatform.lang.v1.{Parser, TypeChecker}
 import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.transfer._
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
@@ -186,8 +187,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       decimals    <- Gen.choose(1: Byte, 8: Byte)
       issue   = IssueTransaction.create(issuer, assetName, description, quantity, decimals, true, fee, timestamp).right.get
       assetId = issue.assetId()
-      attachment <- genBoundedBytes(0, V1TransferTransaction.MaxAttachmentSize)
-      transfer = V1TransferTransaction.create(Some(assetId), issuer, holder, quantity - 1, timestamp, None, fee, attachment).right.get
+      attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
+      transfer = TransferTransactionV1.create(Some(assetId), issuer, holder, quantity - 1, timestamp, None, fee, attachment).right.get
       reissue  = ReissueTransaction.create(issuer, assetId, (Long.MaxValue - quantity) + 1, true, 1, timestamp).right.get
     } yield (issuer, assetId, genesis, issue, reissue, transfer)
 
@@ -219,7 +220,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     ScriptV1(TypeChecker(dummyTypeCheckerContext, expr).explicitGet()).explicitGet()
   }
 
-  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], SmartIssueTransaction, V1TransferTransaction, ReissueTransaction)] =
+  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], SmartIssueTransaction, TransferTransactionV1, ReissueTransaction)] =
     for {
       version            <- Gen.oneOf(SmartIssueTransaction.supportedVersions.toSeq)
       timestamp          <- timestampGen
@@ -245,7 +246,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
                     timestamp + 1)
         .explicitGet()
       assetId = issue.id()
-      transfer = V1TransferTransaction
+      transfer = TransferTransactionV1
         .create(Some(assetId), accountA, accountB, issue.quantity, timestamp + 2, None, smallFee, Array.empty)
         .explicitGet()
       reissue = ReissueTransaction.create(accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()

@@ -4,12 +4,12 @@ import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.implicits._
 import com.wavesplatform.state.DataEntry
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
+import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import scorex.transaction.transfer._
 
 import scala.util.Try
 
 package object validation {
-  val MaxAttachmentSize    = 140
   val MaxDescriptionLength = 1000
   val MaxAssetNameLength   = 16
   val MinAssetNameLength   = 4
@@ -86,7 +86,7 @@ package object validation {
   def validateAttachment(attachment: Array[Byte]): Validated[Array[Byte]] = {
     Validated
       .condNel(
-        attachment.length <= MaxAttachmentSize,
+        attachment.length <= TransferTransaction.MaxAttachmentSize,
         attachment,
         ValidationError.TooBigArray
       )

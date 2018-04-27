@@ -8,6 +8,7 @@ import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.{SetScriptTransaction, Verifier}
+import scorex.transaction.transfer._
 
 object TransactionDiffer {
 

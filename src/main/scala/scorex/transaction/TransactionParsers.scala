@@ -6,6 +6,7 @@ import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.transfer._
 
 import scala.util.{Failure, Success, Try}
 
@@ -20,7 +21,7 @@ object TransactionParsers {
     GenesisTransaction,
     PaymentTransaction,
     IssueTransaction,
-    V1TransferTransaction,
+    TransferTransactionV1,
     ReissueTransaction,
     BurnTransaction,
     ExchangeTransaction,
@@ -34,7 +35,7 @@ object TransactionParsers {
 
   private val modern: Map[(Byte, Byte), TransactionParser] = Seq[TransactionParser](
     DataTransaction,
-    VersionedTransferTransaction,
+    TransferTransactionV2,
     SetScriptTransaction,
     SmartIssueTransaction,
     SponsorFeeTransaction

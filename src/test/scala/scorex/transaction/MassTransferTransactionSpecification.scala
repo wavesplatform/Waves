@@ -5,8 +5,8 @@ import org.scalacheck.Arbitrary
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
-import scorex.transaction.assets.{MassTransferTransaction, V1TransferTransaction}
+import scorex.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
+import scorex.transaction.transfer._
 
 class MassTransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -63,7 +63,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
         val feeOverflowEi = create(version, assetId, sender, feeOverflow, timestamp, oneHalf, attachment, proofs)
         feeOverflowEi shouldBe Left(ValidationError.OverflowError)
 
-        val longAttachment   = Array.fill(V1TransferTransaction.MaxAttachmentSize + 1)(1: Byte)
+        val longAttachment   = Array.fill(TransferTransaction.MaxAttachmentSize + 1)(1: Byte)
         val longAttachmentEi = create(version, assetId, sender, transfers, timestamp, fee, longAttachment, proofs)
         longAttachmentEi shouldBe Left(ValidationError.TooBigArray)
 

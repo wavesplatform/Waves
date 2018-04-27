@@ -11,7 +11,7 @@ import org.scalatest.prop.PropertyChecks
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction._
-import scorex.transaction.assets.V1TransferTransaction
+import scorex.transaction.transfer._
 
 class BlockSpecification extends PropSpec with PropertyChecks with TransactionGen with Matchers with NoShrink {
 
@@ -40,7 +40,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
       assetId = Some(ByteStr(assetBytes))
       sender                                    <- accountGen
       recipient                                 <- accountGen
-      paymentTransaction: V1TransferTransaction <- wavesTransferGeneratorP(time, sender, recipient)
+      paymentTransaction: TransferTransactionV1 <- wavesTransferGeneratorP(time, sender, recipient)
     } yield
       Block
         .buildAndSign(3,

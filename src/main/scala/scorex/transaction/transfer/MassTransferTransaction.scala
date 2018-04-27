@@ -1,4 +1,4 @@
-package scorex.transaction.assets
+package scorex.transaction.transfer
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
@@ -12,8 +12,7 @@ import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
 import scorex.transaction.ValidationError.Validation
 import scorex.transaction._
-import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, toJson}
-
+import MassTransferTransaction.{ParsedTransfer, toJson}
 import scala.util.{Either, Failure, Success, Try}
 
 case class MassTransferTransaction private (version: Byte,
@@ -128,7 +127,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
           Left(ValidationError.GenericError(s"Number of transfers is greater than $MaxTransferCount"))
         } else if (transfers.exists(_.amount < 0)) {
           Left(ValidationError.GenericError("One of the transfers has negative amount"))
-        } else if (attachment.length > V1TransferTransaction.MaxAttachmentSize) {
+        } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
           Left(ValidationError.TooBigArray)
         } else if (feeAmount <= 0) {
           Left(ValidationError.InsufficientFee())

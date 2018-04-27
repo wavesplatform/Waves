@@ -12,16 +12,17 @@ import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
+import scorex.transaction.transfer._
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
 object TransactionFactory {
 
-  def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, V1TransferTransaction] =
+  def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransactionV1] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipientAcc     <- AddressOrAlias.fromString(request.recipient)
-      tx <- V1TransferTransaction
+      tx <- TransferTransactionV1
         .create(
           request.assetId.map(s => ByteStr.decodeBase58(s).get),
           senderPrivateKey,
@@ -34,11 +35,11 @@ object TransactionFactory {
         )
     } yield tx
 
-  def versionedTransfer(request: VersionedTransferRequest, wallet: Wallet, time: Time): Either[ValidationError, VersionedTransferTransaction] =
+  def versionedTransfer(request: VersionedTransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransactionV2] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipientAcc     <- AddressOrAlias.fromString(request.recipient)
-      tx <- VersionedTransferTransaction
+      tx <- TransferTransactionV2
         .selfSigned(
           request.version,
           request.assetId.map(s => ByteStr.decodeBase58(s).get),

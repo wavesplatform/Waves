@@ -5,6 +5,7 @@ import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.transfer._
 
 case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lang.v1.traits.Transaction {
   override def bodyBytes: Either[String, ByteVector] = tx match {
@@ -93,10 +94,10 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
   }
 
   override def attachment: Either[String, ByteVector] = tx match {
-    case g: VersionedTransferTransaction => Right(ByteVector(g.attachment))
-    case g: MassTransferTransaction      => Right(ByteVector(g.attachment))
-    case g: TransferTransaction          => Right(ByteVector(g.attachment))
-    case _                               => Left("Transaction doesn't contain attachment")
+    case g: TransferTransactionV2   => Right(ByteVector(g.attachment))
+    case g: MassTransferTransaction => Right(ByteVector(g.attachment))
+    case g: TransferTransaction     => Right(ByteVector(g.attachment))
+    case _                          => Left("Transaction doesn't contain attachment")
   }
 
   override def chainId: Either[String, Byte] = tx match {
@@ -105,11 +106,11 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
   }
 
   override def version: Either[String, Byte] = tx match {
-    case g: VersionedTransferTransaction => Right(g.version)
-    case g: MassTransferTransaction      => Right(g.version)
-    case g: SetScriptTransaction         => Right(g.version)
-    case g: SmartIssueTransaction        => Right(g.version)
-    case g: DataTransaction              => Right(g.version)
-    case _                               => Left("Transaction doesn't contain version")
+    case g: TransferTransactionV2   => Right(g.version)
+    case g: MassTransferTransaction => Right(g.version)
+    case g: SetScriptTransaction    => Right(g.version)
+    case g: SmartIssueTransaction   => Right(g.version)
+    case g: DataTransaction         => Right(g.version)
+    case _                          => Left("Transaction doesn't contain version")
   }
 }

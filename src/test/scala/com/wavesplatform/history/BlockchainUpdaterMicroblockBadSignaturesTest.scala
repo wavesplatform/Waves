@@ -10,7 +10,7 @@ import scorex.account.PrivateKeyAccount
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.V1TransferTransaction
+import scorex.transaction.transfer._
 
 class BlockchainUpdaterMicroblockBadSignaturesTest
     extends PropSpec
@@ -19,13 +19,13 @@ class BlockchainUpdaterMicroblockBadSignaturesTest
     with Matchers
     with TransactionGen {
 
-  val preconditionsAndPayments: Gen[(GenesisTransaction, V1TransferTransaction, V1TransferTransaction)] = for {
+  val preconditionsAndPayments: Gen[(GenesisTransaction, TransferTransactionV1, TransferTransactionV1)] = for {
     master    <- accountGen
     recipient <- accountGen
     ts        <- positiveIntGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    payment: V1TransferTransaction  <- wavesTransferGeneratorP(master, recipient)
-    payment2: V1TransferTransaction <- wavesTransferGeneratorP(master, recipient)
+    payment: TransferTransactionV1  <- wavesTransferGeneratorP(master, recipient)
+    payment2: TransferTransactionV1 <- wavesTransferGeneratorP(master, recipient)
   } yield (genesis, payment, payment2)
 
   property("bad total resulting block signature") {

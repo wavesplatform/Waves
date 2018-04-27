@@ -6,7 +6,7 @@ import com.wavesplatform.state._
 import scorex.account.Address
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets._
+import scorex.transaction.transfer._
 
 import scala.util.Right
 

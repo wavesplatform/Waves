@@ -19,6 +19,7 @@ import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.{Script, ScriptReader}
+import scorex.transaction.transfer._
 import scorex.utils.ScorexLogging
 
 import scala.annotation.tailrec
@@ -688,8 +689,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
 
           rw.delete(ktxId)
           tx match {
-            case _: GenesisTransaction                                                                                         => // genesis transaction can not be rolled back
-            case _: PaymentTransaction | _: TransferTransaction | _: VersionedTransferTransaction | _: MassTransferTransaction => // balances already restored
+            case _: GenesisTransaction                                                                                  => // genesis transaction can not be rolled back
+            case _: PaymentTransaction | _: TransferTransaction | _: TransferTransactionV2 | _: MassTransferTransaction => // balances already restored
 
             case _: IssueTransaction        => rollbackAssetInfo(rw, tx.id(), currentHeight)
             case tx: ReissueTransaction     => rollbackAssetInfo(rw, tx.assetId, currentHeight)

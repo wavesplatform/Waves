@@ -14,18 +14,19 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.account.AddressScheme
-import scorex.transaction.assets.{SmartIssueTransaction, V1TransferTransaction}
+import scorex.transaction.assets.SmartIssueTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.transfer._
 import scorex.transaction.{DataTransaction, GenesisTransaction}
 
 class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions: Gen[(Seq[GenesisTransaction],
                           SmartIssueTransaction,
                           DataTransaction,
-                          V1TransferTransaction,
+                          TransferTransactionV1,
                           DataTransaction,
                           DataTransaction,
-                          V1TransferTransaction)] =
+                          TransferTransactionV1)] =
     for {
       company  <- accountGen
       king     <- accountGen
@@ -82,11 +83,11 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
         .selfSigned(1, king, List(BinaryDataEntry("notary1PK", ByteStr(notary.publicKey))), 1000, ts + 1)
         .explicitGet()
 
-      transferFromCompanyToA = V1TransferTransaction
+      transferFromCompanyToA = TransferTransactionV1
         .create(Some(assetId), company, accountA, 1, ts + 20, None, 1000, Array.empty)
         .explicitGet()
 
-      transferFromAToB = V1TransferTransaction
+      transferFromAToB = TransferTransactionV1
         .create(Some(assetId), accountA, accountB, 1, ts + 30, None, 1000, Array.empty)
         .explicitGet()
 

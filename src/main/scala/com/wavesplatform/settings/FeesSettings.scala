@@ -38,7 +38,12 @@ object FeesSettings {
     val converter = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.LOWER_HYPHEN)
     TransactionParsers.byName
       .map {
-        case (name, p) => converter.convert(name.replace("V1", "").replace("Transaction", "")) -> p.typeId.toInt
+        case (name, p) =>
+          converter.convert(
+            name
+              .replace("V1", "")
+              .replace("V2", "")
+              .replace("Transaction", "")) -> p.typeId.toInt
       }
   }
 
