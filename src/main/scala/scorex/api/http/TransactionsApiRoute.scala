@@ -170,7 +170,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
           case Some(x) =>
             x match {
-              case IssueTransaction        => TransactionFactory.issueAsset(jsv.as[IssueRequest], wallet, time)
+              case IssueTransactionV1      => TransactionFactory.issueAsset(jsv.as[IssueRequest], wallet, time)
               case TransferTransactionV1   => TransactionFactory.transferAsset(jsv.as[TransferRequest], wallet, time)
               case TransferTransactionV2   => TransactionFactory.versionedTransfer(jsv.as[VersionedTransferRequest], wallet, time)
               case MassTransferTransaction => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
@@ -180,7 +180,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case LeaseCancelTransaction  => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
               case CreateAliasTransaction  => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
               case DataTransaction         => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
-              case SmartIssueTransaction   => TransactionFactory.smartIssue(jsv.as[SmartIssueRequest], wallet, time)
+              case IssueTransactionV2      => TransactionFactory.smartIssue(jsv.as[SmartIssueRequest], wallet, time)
               case SetScriptTransaction    => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
               case SponsorFeeTransaction   => TransactionFactory.sponsor(jsv.as[SponsorFeeRequest], wallet, time)
             }
@@ -213,7 +213,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
           case Some(x) =>
             x match {
-              case IssueTransaction        => jsv.as[SignedIssueRequest].toTx
+              case IssueTransactionV1      => jsv.as[SignedIssueRequest].toTx
               case TransferTransactionV1   => jsv.as[SignedTransferRequest].toTx
               case TransferTransactionV2   => jsv.as[SignedVersionedTransferRequest].toTx
               case MassTransferTransaction => jsv.as[SignedMassTransferRequest].toTx
@@ -223,7 +223,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case LeaseCancelTransaction  => jsv.as[SignedLeaseCancelRequest].toTx
               case CreateAliasTransaction  => jsv.as[SignedCreateAliasRequest].toTx
               case DataTransaction         => jsv.as[SignedDataRequest].toTx
-              case SmartIssueTransaction   => jsv.as[SignedSmartIssueRequest].toTx
+              case IssueTransactionV2      => jsv.as[SignedSmartIssueRequest].toTx
               case SetScriptTransaction    => jsv.as[SignedSetScriptRequest].toTx
               case SponsorFeeTransaction   => jsv.as[SignedSponsorFeeRequest].toTx
 

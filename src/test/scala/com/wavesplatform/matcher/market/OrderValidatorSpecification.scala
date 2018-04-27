@@ -11,7 +11,7 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.transaction.ValidationError
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.IssueTransactionV1
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.wallet.Wallet
 
@@ -28,8 +28,8 @@ class OrderValidatorSpecification
   val utxPool: UtxPool = stub[UtxPool]
 
   val bc: Blockchain = stub[Blockchain]
-  val i1: IssueTransaction =
-    IssueTransaction.create(PrivateKeyAccount(Array.empty), "WBTC".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
+  val i1: IssueTransactionV1 =
+    IssueTransactionV1.create(PrivateKeyAccount(Array.empty), "WBTC".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
   (bc.transactionInfo _).when(*).returns(Some((1, i1)))
 
   val s: MatcherSettings             = matcherSettings.copy(account = MatcherAccount.address)

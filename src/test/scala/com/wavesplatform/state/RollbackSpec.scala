@@ -9,7 +9,7 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.assets.{IssueTransaction, ReissueTransaction}
+import scorex.transaction.assets.{IssueTransactionV1, ReissueTransaction}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
@@ -102,7 +102,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
         withDomain() { d =>
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
           val genesisBlockId   = d.lastBlockId
-          val issueTransaction = IssueTransaction.create(sender, "test".getBytes, Array.empty[Byte], assetAmount, 8, true, 1, nextTs).explicitGet()
+          val issueTransaction = IssueTransactionV1.create(sender, "test".getBytes, Array.empty[Byte], assetAmount, 8, true, 1, nextTs).explicitGet()
 
           d.appendBlock(
             TestBlock.create(
@@ -142,7 +142,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
           val genesisBlockId = d.lastBlockId
 
-          val issueTransaction = IssueTransaction.create(sender, name, description, 2000, 8, true, 1, nextTs).explicitGet()
+          val issueTransaction = IssueTransactionV1.create(sender, name, description, 2000, 8, true, 1, nextTs).explicitGet()
           d.blockchainUpdater.assetDescription(issueTransaction.id()) shouldBe 'empty
 
           d.appendBlock(

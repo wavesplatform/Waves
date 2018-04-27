@@ -20,7 +20,7 @@ object TransactionParsers {
   private val old: Map[Byte, TransactionParser] = Seq[TransactionParser](
     GenesisTransaction,
     PaymentTransaction,
-    IssueTransaction,
+    IssueTransactionV1,
     TransferTransactionV1,
     ReissueTransaction,
     BurnTransaction,
@@ -37,7 +37,7 @@ object TransactionParsers {
     DataTransaction,
     TransferTransactionV2,
     SetScriptTransaction,
-    SmartIssueTransaction,
+    IssueTransactionV2,
     SponsorFeeTransaction
   ).flatMap { x =>
     x.supportedVersions.map { version =>

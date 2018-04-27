@@ -7,7 +7,7 @@ import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParsers.SignatureStringLength
 import scorex.transaction.ValidationError
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.IssueTransactionV1
 
 object SignedIssueRequest {
   implicit val assetIssueRequestReads: Format[SignedIssueRequest] = Json.format
@@ -33,18 +33,18 @@ case class SignedIssueRequest(@ApiModelProperty(value = "Base58 encoded Issuer p
                               @ApiModelProperty(required = true)
                               signature: String)
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, IssueTransaction] =
+  def toTx: Either[ValidationError, IssueTransactionV1] =
     for {
       _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid signature", SignatureStringLength)
-      _t <- IssueTransaction.create(_sender,
-                                    name.getBytes(Charsets.UTF_8),
-                                    description.getBytes(Charsets.UTF_8),
-                                    quantity,
-                                    decimals,
-                                    reissuable,
-                                    fee,
-                                    timestamp,
-                                    _signature)
+      _t <- IssueTransactionV1.create(_sender,
+                                      name.getBytes(Charsets.UTF_8),
+                                      description.getBytes(Charsets.UTF_8),
+                                      quantity,
+                                      decimals,
+                                      reissuable,
+                                      fee,
+                                      timestamp,
+                                      _signature)
     } yield _t
 }

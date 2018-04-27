@@ -13,7 +13,7 @@ import org.iq80.leveldb.{DB, Options}
 import scodec.bits.{BitVector, ByteVector}
 import scorex.account.AddressScheme
 import scorex.block.Block
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.IssueTransactionV1
 import scorex.transaction.{Authorized, CreateAliasTransaction, DataTransaction, Transaction}
 import scorex.utils.ScorexLogging
 

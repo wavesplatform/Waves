@@ -22,7 +22,7 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.ValidationError.SenderIsBlacklisted
 import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.IssueTransactionV1
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
@@ -38,7 +38,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     SmartAccountSettings(10, 1),
     Seq(
       GenesisTransaction,
-      IssueTransaction,
+      IssueTransactionV1,
       TransferTransactionV1,
       MassTransferTransaction,
       SetScriptTransaction

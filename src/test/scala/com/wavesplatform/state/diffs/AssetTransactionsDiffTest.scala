@@ -22,7 +22,7 @@ import scorex.transaction.transfer._
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
-  def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransaction, BurnTransaction))] =
+  def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransactionV1), (ReissueTransaction, BurnTransaction))] =
     for {
       master <- accountGen
       ts     <- timestampGen
@@ -129,7 +129,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
-      issue   = IssueTransaction.create(issuer, assetName, description, quantity, decimals, true, fee, timestamp).right.get
+      issue   = IssueTransactionV1.create(issuer, assetName, description, quantity, decimals, true, fee, timestamp).right.get
       assetId = issue.assetId()
       reissue = ReissueTransaction.create(issuer, assetId, Long.MaxValue, true, 1, timestamp).right.get
     } yield (issuer, assetId, genesis, issue, reissue)
@@ -158,7 +158,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
-      issue   = IssueTransaction.create(issuer, assetName, description, quantity, decimals, true, fee, timestamp).right.get
+      issue   = IssueTransactionV1.create(issuer, assetName, description, quantity, decimals, true, fee, timestamp).right.get
       assetId = issue.assetId()
       reissue = ReissueTransaction.create(issuer, assetId, Long.MaxValue, true, 1, timestamp).right.get
     } yield (issuer, assetId, genesis, issue, reissue)
@@ -185,7 +185,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
-      issue   = IssueTransaction.create(issuer, assetName, description, quantity, decimals, true, fee, timestamp).right.get
+      issue   = IssueTransactionV1.create(issuer, assetName, description, quantity, decimals, true, fee, timestamp).right.get
       assetId = issue.assetId()
       attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
       transfer = TransferTransactionV1.create(Some(assetId), issuer, holder, quantity - 1, timestamp, None, fee, attachment).right.get
@@ -220,9 +220,9 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     ScriptV1(TypeChecker(dummyTypeCheckerContext, expr).explicitGet()).explicitGet()
   }
 
-  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], SmartIssueTransaction, TransferTransactionV1, ReissueTransaction)] =
+  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransactionV2, TransferTransactionV1, ReissueTransaction)] =
     for {
-      version            <- Gen.oneOf(SmartIssueTransaction.supportedVersions.toSeq)
+      version            <- Gen.oneOf(IssueTransactionV2.supportedVersions.toSeq)
       timestamp          <- timestampGen
       initialWavesAmount <- Gen.choose(Long.MaxValue / 1000, Long.MaxValue / 100)
       accountA           <- accountGen
@@ -232,7 +232,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       genesisTx2 = GenesisTransaction.create(accountB, initialWavesAmount, timestamp).explicitGet()
       reissuable = true
       (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
-      issue = SmartIssueTransaction
+      issue = IssueTransactionV2
         .selfSigned(version,
                     AddressScheme.current.chainId,
                     accountA,

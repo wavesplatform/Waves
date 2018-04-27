@@ -8,7 +8,7 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.IssueTransactionV1
 import scorex.transaction.{CreateAliasTransaction, GenesisTransaction}
 
 class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
@@ -66,13 +66,13 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
     ts               <- positiveIntGen
     gen: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     gen2: GenesisTransaction = GenesisTransaction.create(aliasedRecipient, ENOUGH_AMT + 1, ts).right.get
-    issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
-    issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
-    maybeAsset               <- Gen.option(issue1)
-    maybeAsset2              <- Gen.option(issue2)
-    maybeFeeAsset            <- Gen.oneOf(maybeAsset, maybeAsset2)
-    alias                    <- aliasGen
-    fee                      <- smallFeeGen
+    issue1: IssueTransactionV1 <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
+    issue2: IssueTransactionV1 <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
+    maybeAsset                 <- Gen.option(issue1)
+    maybeAsset2                <- Gen.option(issue2)
+    maybeFeeAsset              <- Gen.oneOf(maybeAsset, maybeAsset2)
+    alias                      <- aliasGen
+    fee                        <- smallFeeGen
     aliasTx = CreateAliasTransaction.create(aliasedRecipient, alias, fee, ts).right.get
     transfer <- transferGeneratorP(master, alias, maybeAsset.map(_.id()), maybeFeeAsset.map(_.id()))
     lease    <- leaseAndCancelGeneratorP(master, alias, master).map(_._1)

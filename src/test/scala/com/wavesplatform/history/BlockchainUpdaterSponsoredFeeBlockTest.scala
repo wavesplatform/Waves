@@ -11,7 +11,7 @@ import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
+import scorex.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
 import scorex.transaction.transfer._
 
 class BlockchainUpdaterSponsoredFeeBlockTest
@@ -26,7 +26,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
   type Setup =
     (GenesisTransaction,
      TransferTransactionV1,
-     IssueTransaction,
+     IssueTransactionV1,
      SponsorFeeTransaction,
      TransferTransactionV1,
      TransferTransactionV1,

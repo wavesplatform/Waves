@@ -69,28 +69,24 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
   }
 
   override def reissuable: Either[String, Boolean] = tx match {
-    case g: SmartIssueTransaction => Right(g.reissuable)
-    case g: IssueTransaction      => Right(g.reissuable)
-    case g: ReissueTransaction    => Right(g.reissuable)
-    case _                        => Left("Transaction doesn't contain reissuable")
+    case g: IssueTransaction   => Right(g.reissuable)
+    case g: ReissueTransaction => Right(g.reissuable)
+    case _                     => Left("Transaction doesn't contain reissuable")
   }
 
   override def decimals: Either[String, Byte] = tx match {
-    case g: SmartIssueTransaction => Right(g.decimals)
-    case g: IssueTransaction      => Right(g.decimals)
-    case _                        => Left("Transaction doesn't contain decimals")
+    case g: IssueTransaction => Right(g.decimals)
+    case _                   => Left("Transaction doesn't contain decimals")
   }
 
   override def assetDescription: Either[String, ByteVector] = tx match {
-    case g: SmartIssueTransaction => Right(ByteVector(g.description))
-    case g: IssueTransaction      => Right(ByteVector(g.description))
-    case _                        => Left("Transaction doesn't contain asset description")
+    case g: IssueTransaction => Right(ByteVector(g.description))
+    case _                   => Left("Transaction doesn't contain asset description")
   }
 
   override def assetName: Either[String, ByteVector] = tx match {
-    case g: SmartIssueTransaction => Right(ByteVector(g.name))
-    case g: IssueTransaction      => Right(ByteVector(g.name))
-    case _                        => Left("Transaction doesn't contain asset name")
+    case g: IssueTransaction => Right(ByteVector(g.name))
+    case _                   => Left("Transaction doesn't contain asset name")
   }
 
   override def attachment: Either[String, ByteVector] = tx match {
@@ -109,7 +105,7 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
     case g: TransferTransactionV2   => Right(g.version)
     case g: MassTransferTransaction => Right(g.version)
     case g: SetScriptTransaction    => Right(g.version)
-    case g: SmartIssueTransaction   => Right(g.version)
+    case g: IssueTransactionV2      => Right(g.version)
     case g: DataTransaction         => Right(g.version)
     case _                          => Left("Transaction doesn't contain version")
   }

@@ -21,7 +21,7 @@ import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecL
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.AssetId
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.IssueTransactionV1
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
@@ -58,11 +58,11 @@ class MatcherActorSpecification
   var actor: ActorRef = system.actorOf(Props(
     new MatcherActor(orderHistoryRef, wallet, mock[UtxPool], mock[ChannelGroup], settings, blockchain, functionalitySettings) with RestartableActor))
 
-  val i1 = IssueTransaction
+  val i1 = IssueTransactionV1
     .create(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
     .right
     .get
-  val i2 = IssueTransaction
+  val i2 = IssueTransactionV1
     .create(PrivateKeyAccount(Array.empty), "ForbiddenName".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
     .right
     .get

@@ -84,14 +84,14 @@ object TransactionFactory {
       )
     } yield tx
 
-  def smartIssue(request: SmartIssueRequest, wallet: Wallet, time: Time): Either[ValidationError, SmartIssueTransaction] =
+  def smartIssue(request: SmartIssueRequest, wallet: Wallet, time: Time): Either[ValidationError, IssueTransactionV2] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       s <- request.script match {
         case None    => Right(None)
         case Some(s) => Script.fromBase58String(s).map(Some(_))
       }
-      tx <- SmartIssueTransaction.selfSigned(
+      tx <- IssueTransactionV2.selfSigned(
         sender = senderPrivateKey,
         script = s,
         fee = request.fee,
@@ -106,11 +106,11 @@ object TransactionFactory {
       )
     } yield tx
 
-  def issueAsset(request: IssueRequest, wallet: Wallet, time: Time): Either[ValidationError, IssueTransaction] =
+  def issueAsset(request: IssueRequest, wallet: Wallet, time: Time): Either[ValidationError, IssueTransactionV1] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- IssueTransaction.create(
+      tx <- IssueTransactionV1.create(
         senderPrivateKey,
         request.name.getBytes(Charsets.UTF_8),
         request.description.getBytes(Charsets.UTF_8),

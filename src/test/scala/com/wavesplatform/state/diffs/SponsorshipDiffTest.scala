@@ -9,7 +9,7 @@ import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.TestBlock.{create => block}
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
+import scorex.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
 import scorex.transaction.transfer._
 
 class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -137,7 +137,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       recipient <- accountGen
       ts        <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, 300000000, ts).right.get
-      issue                       = IssueTransaction.create(master, Base58.decode("Asset").get, Array.emptyByteArray, 100, 2, false, 100000000, ts + 1).right.get
+      issue                       = IssueTransactionV1.create(master, Base58.decode("Asset").get, Array.emptyByteArray, 100, 2, false, 100000000, ts + 1).right.get
       assetId                     = issue.id()
       sponsor                     = SponsorFeeTransaction.create(1, master, assetId, Some(100), 100000000, ts + 2).right.get
       assetTransfer = TransferTransactionV1

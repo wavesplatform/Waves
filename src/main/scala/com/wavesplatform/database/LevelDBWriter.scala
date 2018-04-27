@@ -506,10 +506,6 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
         val ai          = LevelDBWriter.loadAssetInfo(db, assetId).getOrElse(AssetInfo(false, 0, None))
         val sponsorship = LevelDBWriter.loadSponsorship(db, assetId).fold(0L)(_.minFee)
         Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, ai.script, sponsorship))
-      case Some((_, i: SmartIssueTransaction)) =>
-        val ai          = LevelDBWriter.loadAssetInfo(db, assetId).getOrElse(AssetInfo(false, 0, None))
-        val sponsorship = LevelDBWriter.loadSponsorship(db, assetId).fold(0L)(_.minFee)
-        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, ai.script, sponsorship))
       case _ => None
     }
   }
@@ -689,8 +685,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
 
           rw.delete(ktxId)
           tx match {
-            case _: GenesisTransaction                                                                                  => // genesis transaction can not be rolled back
-            case _: PaymentTransaction | _: TransferTransaction | _: TransferTransactionV2 | _: MassTransferTransaction => // balances already restored
+            case _: GenesisTransaction                                                       => // genesis transaction can not be rolled back
+            case _: PaymentTransaction | _: TransferTransaction | _: MassTransferTransaction => // balances already restored
 
             case _: IssueTransaction        => rollbackAssetInfo(rw, tx.id(), currentHeight)
             case tx: ReissueTransaction     => rollbackAssetInfo(rw, tx.assetId, currentHeight)
