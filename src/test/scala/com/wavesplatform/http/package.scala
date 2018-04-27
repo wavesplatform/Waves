@@ -124,9 +124,9 @@ package object http {
 
   type TransferTransactions = V1TransferTransaction :+: VersionedTransferTransaction :+: CNil
   implicit val autoTransferTransactionsReads: Reads[TransferTransactions] = Reads { json =>
-    (json \ "version").asOpt[Byte] match {
-      case None => transferTransactionFormat.reads(json).map(Coproduct[TransferTransactions](_))
-      case _    => versionedTransferTransactionFormat.reads(json).map(Coproduct[TransferTransactions](_))
+    (json \ "version").asOpt[Int] match {
+      case None | Some(1) => transferTransactionFormat.reads(json).map(Coproduct[TransferTransactions](_))
+      case _              => versionedTransferTransactionFormat.reads(json).map(Coproduct[TransferTransactions](_))
     }
   }
 }

@@ -35,7 +35,7 @@ package object validation {
       .condNel(
         fee > 0,
         fee,
-        ValidationError.InsufficientFee(s"Fee ($fee) cannot be less than 0.")
+        ValidationError.InsufficientFee()
       )
   }
 

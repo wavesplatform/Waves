@@ -24,9 +24,9 @@ package object assets {
 
   type SignedTransferRequests = SignedTransferRequest :+: SignedVersionedTransferRequest :+: CNil
   implicit val autoSignedTransferRequestsReads: Reads[SignedTransferRequests] = Reads { json =>
-    (json \ "version").asOpt[Byte] match {
-      case None => SignedTransferRequest.reads.reads(json).map(Coproduct[SignedTransferRequests](_))
-      case _    => SignedVersionedTransferRequest.format.reads(json).map(Coproduct[SignedTransferRequests](_))
+    (json \ "version").asOpt[Int] match {
+      case None | Some(1) => SignedTransferRequest.reads.reads(json).map(Coproduct[SignedTransferRequests](_))
+      case _              => SignedVersionedTransferRequest.format.reads(json).map(Coproduct[SignedTransferRequests](_))
     }
   }
   implicit val autoSignedTransferRequestsWrites: Writes[SignedTransferRequests] = Writes {

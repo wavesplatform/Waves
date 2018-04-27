@@ -58,7 +58,7 @@ trait TransferTransaction extends ProvenTransaction {
 object TransferTransaction {
 
   def validate(amount: Long, feeAmount: Long, attachment: Array[Byte]): Either[ValidationError, Unit] = {
-    (validateAmount(amount, "assets"), validateFee(feeAmount), validateAttachment(attachment), validateSum(Seq(amount, feeAmount)))
+    (validateAmount(amount, "waves"), validateFee(feeAmount), validateAttachment(attachment), validateSum(Seq(amount, feeAmount)))
       .mapN { case _ => () }
       .toEither
       .leftMap(_.head)
