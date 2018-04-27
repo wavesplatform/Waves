@@ -474,8 +474,7 @@ trait TransactionGenBase extends ScriptGen {
       ts  <- positiveIntGen
     } yield GenesisTransaction.create(recipient, amt, ts).right.get
 
-  import DataEntry.{MaxKeySize, MaxValueSize}
-  import DataTransaction.MaxEntryCount
+  import DataEntry.MaxKeySize
 
   val dataKeyGen = for {
     size <- Gen.choose[Byte](0, MaxKeySize)
@@ -497,33 +496,30 @@ trait TransactionGenBase extends ScriptGen {
       value <- Gen.oneOf(true, false)
     } yield BooleanDataEntry(key, value)
 
-  def binaryEntryGen(keyGen: Gen[String] = dataKeyGen) =
+  def binaryEntryGen(maxSize: Int, keyGen: Gen[String] = dataKeyGen) =
     for {
       key   <- keyGen
-      size  <- Gen.choose(0, MaxValueSize)
+      size  <- Gen.choose(0, maxSize - key.length * 4 - 5)
       value <- byteArrayGen(size)
     } yield BinaryDataEntry(key, ByteStr(value))
 
-  val dataEntryGen = Gen.oneOf(longEntryGen(), booleanEntryGen(), binaryEntryGen())
+  def dataEntryGen(maxSize: Int) = Gen.oneOf(longEntryGen(), booleanEntryGen(), binaryEntryGen(maxSize))
 
-  val dataTransactionGen = {
-    import DataTransaction.MaxEntryCount
-
+  val dataTransactionGen =
     (for {
       sender    <- accountGen
       timestamp <- timestampGen
-      size      <- Gen.choose(0, MaxEntryCount)
-      data      <- Gen.listOfN(size, dataEntryGen)
-      version   <- Gen.oneOf(DataTransaction.supportedVersions.toSeq)
+      size      <- Gen.choose(0, 300)
+      maxEntrySize = (DataTransaction.MaxBytes - 122) / (size max 1) min DataEntry.MaxValueSize
+      data    <- Gen.listOfN(size, dataEntryGen(maxEntrySize))
+      version <- Gen.oneOf(DataTransaction.supportedVersions.toSeq)
     } yield DataTransaction.selfSigned(version, sender, data, 15000000, timestamp).right.get)
       .label("DataTransaction")
-  }
 
   def dataTransactionGenP(sender: PrivateKeyAccount, data: List[DataEntry[_]]): Gen[DataTransaction] =
     (for {
       version   <- Gen.oneOf(DataTransaction.supportedVersions.toSeq)
       timestamp <- timestampGen
-      size      <- Gen.choose(0, MaxEntryCount)
     } yield DataTransaction.selfSigned(version, sender, data, 15000000, timestamp).right.get)
       .label("DataTransactionP")
 

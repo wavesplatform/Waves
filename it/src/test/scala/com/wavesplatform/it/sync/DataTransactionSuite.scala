@@ -78,11 +78,10 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("max transaction size") {
-    import DataEntry.{MaxKeySize, MaxValueSize}
-    import DataTransaction.MaxEntryCount
+    import DataEntry.MaxKeySize
 
     val maxKey = "\u6fae" * MaxKeySize
-    val data   = List.tabulate(MaxEntryCount)(n => BinaryDataEntry(maxKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
+    val data   = List.tabulate(26)(n => BinaryDataEntry("\u6fae" * MaxKeySize, ByteStr(Array.fill(5598)(n.toByte))))
     val fee    = calcDataFee(data)
     val txId   = sender.putData(firstAddress, data, fee).id
 
@@ -240,7 +239,6 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
   test("try to send tx above limits of key, value and size") {
     import DataEntry.{MaxKeySize, MaxValueSize}
-    import DataTransaction.MaxEntryCount
 
     val message  = "Too big sequences requested"
     val extraKey = "a" * (MaxKeySize + 1)
@@ -253,7 +251,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, calcDataFee(extraValueData)), message)
     nodes.waitForHeightArise()
 
-    val extraSizedData = List.tabulate(MaxEntryCount + 1)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
+    val extraSizedData = List.tabulate(5)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
     assertBadRequestAndResponse(sender.putData(firstAddress, extraSizedData, calcDataFee(extraSizedData)), message)
     nodes.waitForHeightArise()
   }
