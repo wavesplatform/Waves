@@ -61,6 +61,9 @@ object SyncHttpApi extends Assertions {
     def accountBalances(acc: String): (Long, Long) =
       Await.result(async(n).accountBalances(acc), RequestAwaitTime)
 
+    def assertBalances(acc: String, balance: Long)(implicit pos: Position): Unit =
+      Await.result(async(n).assertBalances(acc, balance, effectiveBalance = balance), RequestAwaitTime)
+
     def assertBalances(acc: String, balance: Long, effectiveBalance: Long)(implicit pos: Position): Unit =
       Await.result(async(n).assertBalances(acc, balance, effectiveBalance), RequestAwaitTime)
 
