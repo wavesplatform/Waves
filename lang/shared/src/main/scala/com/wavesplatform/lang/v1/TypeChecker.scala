@@ -85,7 +85,7 @@ object TypeChecker {
             resolvedResultType <- TypeInferrer.inferResultType(resultType, resolvedTypeParams)
           } yield
             Typed.FUNCTION_CALL(
-              FunctionHeader(name, f.args.map(FunctionHeaderType.fromTypePlaceholder)),
+              FunctionHeader(name, f.args.map(FunctionHeaderType.fromTypePlaceholder)(collection.breakOut)),
               typedExpressionArgumentsAndTypedPlaceholders.map(_._1),
               resolvedResultType
             )

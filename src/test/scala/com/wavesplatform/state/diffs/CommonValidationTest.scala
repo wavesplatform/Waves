@@ -1,9 +1,9 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.db.WithState
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.v1.Terms.Typed
-import com.wavesplatform.settings.Constants
+import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -40,14 +40,10 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("sponsored transactions should work with smart accounts") {
-    val settings = TestFunctionalitySettings.Enabled
-      .copy(
-        preActivatedFeatures = Map(
-          BlockchainFeatures.FeeSponsorship.id -> 0,
-          BlockchainFeatures.SmartAccounts.id  -> 0
-        ),
-        blocksForFeatureActivation = 1
-      )
+    val settings = createSettings(
+      BlockchainFeatures.FeeSponsorship -> 0,
+      BlockchainFeatures.SmartAccounts  -> 0
+    )
 
     forAll(sponsorAndSetScriptGen) {
       case (genesisTxs, sponsorTx, setScriptTx, transferTx) =>
@@ -63,13 +59,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("sponsored transactions should work without smart accounts") {
-    val settings = TestFunctionalitySettings.Enabled
-      .copy(
-        preActivatedFeatures = Map(
-          BlockchainFeatures.FeeSponsorship.id -> 0
-        ),
-        blocksForFeatureActivation = 1
-      )
+    val settings = createSettings(BlockchainFeatures.FeeSponsorship -> 0)
 
     forAll(sponsorAndSetScriptGen) {
       case (genesisTxs, sponsorTx, _, transferTx) =>
@@ -85,13 +75,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("smart accounts should work without sponsored transactions") {
-    val settings = TestFunctionalitySettings.Enabled
-      .copy(
-        preActivatedFeatures = Map(
-          BlockchainFeatures.SmartAccounts.id -> 0
-        ),
-        blocksForFeatureActivation = 1
-      )
+    val settings = createSettings(BlockchainFeatures.SmartAccounts -> 0)
 
     forAll(sponsorAndSetScriptGen) {
       case (genesisTxs, _, setScriptTx, transferTx) =>
@@ -117,16 +101,16 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
       .create(richAcc, "test".getBytes(), "desc".getBytes(), Long.MaxValue, 2, reissuable = false, Constants.UnitsInWave, ts)
       .explicitGet()
 
-    val sponsorTx = SponsorFeeTransaction
-      .create(1, richAcc, issueTx.id(), 10, Constants.UnitsInWave, ts)
-      .explicitGet()
-
     val transferWavesTx = TransferTransaction
       .create(None, richAcc, recipientAcc, 10 * Constants.UnitsInWave, ts, None, 1 * Constants.UnitsInWave, Array.emptyByteArray)
       .explicitGet()
 
     val transferAssetTx = TransferTransaction
       .create(Some(issueTx.id()), richAcc, recipientAcc, 100, ts, None, 1 * Constants.UnitsInWave, Array.emptyByteArray)
+      .explicitGet()
+
+    val sponsorTx = SponsorFeeTransaction
+      .create(1, richAcc, issueTx.id(), Some(10), Constants.UnitsInWave, ts)
       .explicitGet()
 
     val setScriptTx = SetScriptTransaction
@@ -154,5 +138,13 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
 
     (Vector[Transaction](genesisTx, issueTx, transferWavesTx, transferAssetTx), sponsorTx, setScriptTx, transferAssetsBackTx)
   }
+
+  private def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): FunctionalitySettings =
+    TestFunctionalitySettings.Enabled
+      .copy(
+        preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }(collection.breakOut),
+        blocksForFeatureActivation = 1,
+        featureCheckBlocksPeriod = 1
+      )
 
 }
