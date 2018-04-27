@@ -10,7 +10,7 @@ import play.api.libs.json.Json.parse
 import play.api.libs.json.{Format, JsObject, Json, Writes}
 import scorex.api.http.AddressApiRoute
 import scorex.api.http.assets.SignedIssueRequest
-import scorex.transaction.assets.MassTransferTransaction.Transfer
+import scorex.transaction.transfer.MassTransferTransaction.Transfer
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}

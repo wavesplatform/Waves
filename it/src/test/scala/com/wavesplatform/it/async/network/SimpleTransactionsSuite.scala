@@ -12,7 +12,7 @@ import com.wavesplatform.network.{RawBytes, TransactionSpec}
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import scorex.account.Address
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.transfer._
 
 import scala.concurrent.Await
 import scala.concurrent.Future.traverse
@@ -32,7 +32,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
   private def node = nodes.head
 
   test("valid tx send by network to node should be in blockchain") {
-    val tx = TransferTransaction
+    val tx = TransferTransactionV1
       .create(None, node.privateKey, Address.fromString(node.address).right.get, 1L, System.currentTimeMillis(), None, 100000L, Array())
       .right
       .get
@@ -46,7 +46,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
   }
 
   test("invalid tx send by network to node should be not in UTX or blockchain") {
-    val tx = TransferTransaction
+    val tx = TransferTransactionV1
       .create(None,
               node.privateKey,
               Address.fromString(node.address).right.get,

@@ -7,6 +7,7 @@ import scorex.transaction.ValidationError.{GenericError, TransactionNotAllowedBy
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.smart.script.{Script, ScriptRunner}
+import scorex.transaction.transfer._
 
 object Verifier {
 
@@ -22,12 +23,11 @@ object Verifier {
     }).flatMap(tx => {
       for {
         assetId <- tx match {
-          case t: TransferTransaction          => t.assetId
-          case t: VersionedTransferTransaction => t.assetId
-          case t: MassTransferTransaction      => t.assetId
-          case t: BurnTransaction              => Some(t.assetId)
-          case t: ReissueTransaction           => Some(t.assetId)
-          case _                               => None
+          case t: TransferTransaction     => t.assetId
+          case t: MassTransferTransaction => t.assetId
+          case t: BurnTransaction         => Some(t.assetId)
+          case t: ReissueTransaction      => Some(t.assetId)
+          case _                          => None
         }
 
         script <- blockchain.assetDescription(assetId).flatMap(_.script)

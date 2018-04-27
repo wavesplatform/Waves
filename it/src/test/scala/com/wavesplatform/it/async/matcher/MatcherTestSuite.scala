@@ -13,9 +13,9 @@ import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.api.http.assets.SignedTransferRequest
 import scorex.api.http.leasing.{SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.transfer._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -544,7 +544,7 @@ class MatcherTestSuite
     result.status
   }
 
-  private def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {
+  private def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferRequest = {
     import tx._
     SignedTransferRequest(
       Base58.encode(tx.sender.publicKey),
@@ -583,7 +583,7 @@ class MatcherTestSuite
   }
 
   private def transfer(from: Node, to: Node, assetId: Option[ByteStr], amount: Long, wait: Boolean = false): Unit = {
-    val transferTx = TransferTransaction
+    val transferTx = TransferTransactionV1
       .create(
         assetId = assetId,
         sender = from.privateKey,

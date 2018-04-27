@@ -5,6 +5,7 @@ import play.api.libs.json.{Format, Json}
 case class VersionedTransferRequest(version: Byte,
                                     assetId: Option[String],
                                     amount: Long,
+                                    feeAssetId: Option[String],
                                     fee: Long,
                                     sender: String,
                                     attachment: Option[String],

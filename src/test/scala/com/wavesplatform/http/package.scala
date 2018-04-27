@@ -9,7 +9,7 @@ import play.api.libs.functional.syntax._
 import scorex.account.{AddressOrAlias, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.{AssetId, Proofs}
-import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
+import scorex.transaction.transfer._
 import shapeless.{:+:, CNil, Coproduct}
 
 import scala.reflect.ClassTag
@@ -87,7 +87,7 @@ package object http {
     Writes(x => JsString(x.bytes.base58))
   )
 
-  implicit val transferTransactionFormat: Format[TransferTransaction] = (
+  implicit val transferTransactionFormat: Format[TransferTransactionV1] = (
     (JsPath \ "assetId").formatNullable[AssetId] and
       (JsPath \ "sender").format[PublicKeyAccount] and
       (JsPath \ "recipient").format[AddressOrAlias] and
@@ -102,15 +102,16 @@ package object http {
           xs => new String(xs, StandardCharsets.UTF_8)
         ) and
       (JsPath \ "signature").format[ByteStr]
-  )(TransferTransaction.apply, unlift(TransferTransaction.unapply))
+  )(TransferTransactionV1.apply, unlift(TransferTransactionV1.unapply))
 
-  implicit val versionedTransferTransactionFormat: Format[VersionedTransferTransaction] = (
+  implicit val versionedTransferTransactionFormat: Format[TransferTransactionV2] = (
     (JsPath \ "version").format[Byte] and
       (JsPath \ "sender").format[PublicKeyAccount] and
       (JsPath \ "recipient").format[AddressOrAlias] and
       (JsPath \ "assetId").formatNullable[AssetId] and
       (JsPath \ "amount").format[Long] and
       (JsPath \ "timestamp").format[Long] and
+      (JsPath \ "feeAssetId").formatNullable[AssetId] and
       (JsPath \ "fee").format[Long] and
       (JsPath \ "attachment")
         .format[String]
@@ -119,13 +120,13 @@ package object http {
           xs => new String(xs, StandardCharsets.UTF_8)
         ) and
       (JsPath \ "proofs").format[Proofs]
-  )(VersionedTransferTransaction.apply, unlift(VersionedTransferTransaction.unapply))
+  )(TransferTransactionV2.apply, unlift(TransferTransactionV2.unapply))
 
-  type TransferTransactions = TransferTransaction :+: VersionedTransferTransaction :+: CNil
+  type TransferTransactions = TransferTransactionV1 :+: TransferTransactionV2 :+: CNil
   implicit val autoTransferTransactionsReads: Reads[TransferTransactions] = Reads { json =>
-    (json \ "version").asOpt[Byte] match {
-      case None => transferTransactionFormat.reads(json).map(Coproduct[TransferTransactions](_))
-      case _    => versionedTransferTransactionFormat.reads(json).map(Coproduct[TransferTransactions](_))
+    (json \ "version").asOpt[Int] match {
+      case None | Some(1) => transferTransactionFormat.reads(json).map(Coproduct[TransferTransactions](_))
+      case _              => versionedTransferTransactionFormat.reads(json).map(Coproduct[TransferTransactions](_))
     }
   }
 }

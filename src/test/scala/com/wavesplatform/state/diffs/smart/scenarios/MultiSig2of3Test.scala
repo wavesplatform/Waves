@@ -13,9 +13,9 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.account.PublicKeyAccount
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction._
-import scorex.transaction.assets.VersionedTransferTransaction
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.transfer._
 
 class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -38,8 +38,8 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
     TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
   }
 
-  val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, VersionedTransferTransaction, Seq[ByteStr])] = for {
-    version   <- Gen.oneOf(VersionedTransferTransaction.supportedVersions.toSeq)
+  val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, TransferTransactionV2, Seq[ByteStr])] = for {
+    version   <- Gen.oneOf(TransferTransactionV2.supportedVersions.toSeq)
     master    <- accountGen
     s0        <- accountGen
     s1        <- accountGen
@@ -53,8 +53,8 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
     timestamp <- timestampGen
   } yield {
     val unsigned =
-      VersionedTransferTransaction
-        .create(version, None, master, recepient, amount, timestamp, fee, Array.emptyByteArray, proofs = Proofs.empty)
+      TransferTransactionV2
+        .create(version, None, master, recepient, amount, timestamp, None, fee, Array.emptyByteArray, proofs = Proofs.empty)
         .explicitGet()
     val sig0 = ByteStr(crypto.sign(s0, unsigned.bodyBytes()))
     val sig1 = ByteStr(crypto.sign(s1, unsigned.bodyBytes()))

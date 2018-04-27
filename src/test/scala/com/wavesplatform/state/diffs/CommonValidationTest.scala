@@ -11,20 +11,21 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.assets.{IssueTransaction, SponsorFeeTransaction, TransferTransaction}
+import scorex.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.transfer._
 import scorex.transaction.{GenesisTransaction, Transaction}
 
 class CommonValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithState with NoShrink {
 
   property("disallows double spending") {
-    val preconditionsAndPayment: Gen[(GenesisTransaction, TransferTransaction)] = for {
+    val preconditionsAndPayment: Gen[(GenesisTransaction, TransferTransactionV1)] = for {
       master    <- accountGen
       recipient <- otherAccountGen(candidate = master)
       ts        <- positiveIntGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      transfer: TransferTransaction <- wavesTransferGeneratorP(master, recipient)
+      transfer: TransferTransactionV1 <- wavesTransferGeneratorP(master, recipient)
     } yield (genesis, transfer)
 
     forAll(preconditionsAndPayment) {
@@ -97,15 +98,15 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
   } yield {
     val genesisTx = GenesisTransaction.create(richAcc, ENOUGH_AMT, ts).explicitGet()
 
-    val issueTx = IssueTransaction
+    val issueTx = IssueTransactionV1
       .create(richAcc, "test".getBytes(), "desc".getBytes(), Long.MaxValue, 2, reissuable = false, Constants.UnitsInWave, ts)
       .explicitGet()
 
-    val transferWavesTx = TransferTransaction
+    val transferWavesTx = TransferTransactionV1
       .create(None, richAcc, recipientAcc, 10 * Constants.UnitsInWave, ts, None, 1 * Constants.UnitsInWave, Array.emptyByteArray)
       .explicitGet()
 
-    val transferAssetTx = TransferTransaction
+    val transferAssetTx = TransferTransactionV1
       .create(Some(issueTx.id()), richAcc, recipientAcc, 100, ts, None, 1 * Constants.UnitsInWave, Array.emptyByteArray)
       .explicitGet()
 
@@ -123,7 +124,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
       )
       .explicitGet()
 
-    val transferAssetsBackTx = TransferTransaction
+    val transferAssetsBackTx = TransferTransactionV1
       .create(
         Some(issueTx.id()),
         recipientAcc,

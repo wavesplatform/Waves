@@ -9,7 +9,7 @@ import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json._
 import scorex.api.http.assets.MassTransferRequest
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.MassTransferTransaction.Transfer
+import scorex.transaction.transfer.MassTransferTransaction.Transfer
 
 import scala.concurrent.Await
 import scala.concurrent.duration._

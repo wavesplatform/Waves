@@ -5,8 +5,8 @@ import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json._
 import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
-import scorex.transaction.assets.MassTransferTransaction.Transfer
-import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
+import scorex.transaction.transfer.MassTransferTransaction.Transfer
+import scorex.transaction.transfer._
 import scorex.transaction.{AssetIdStringLength, Proofs, ValidationError}
 
 object SignedMassTransferRequest {
