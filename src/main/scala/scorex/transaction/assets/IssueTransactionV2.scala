@@ -1,11 +1,10 @@
 package scorex.transaction.assets
 
-import com.google.common.primitives.{Bytes, Longs}
+import com.google.common.primitives.Bytes
 import com.wavesplatform.crypto
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import scorex.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
 import scorex.transaction.ValidationError.{GenericError, UnsupportedVersion}
 import scorex.transaction._

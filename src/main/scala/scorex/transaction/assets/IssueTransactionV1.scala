@@ -1,12 +1,11 @@
 package scorex.transaction.assets
 
-import com.google.common.primitives.{Bytes, Longs}
+import com.google.common.primitives.Bytes
 import com.wavesplatform.crypto
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
-import scorex.serialization.Deser
+import scorex.crypto.signatures.Curve25519.SignatureLength
 import scorex.transaction._
 import scorex.transaction.smart.script.Script
 
