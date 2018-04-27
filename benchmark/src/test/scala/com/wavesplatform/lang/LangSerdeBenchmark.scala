@@ -20,6 +20,9 @@ import scodec.bits.BitVector
 class LangSerdeBenchmark {
 
   @Benchmark
+  def serialize_test(st: St, bh: Blackhole): Unit = bh.consume(Serde.codec.encode(st.expr).require)
+
+  @Benchmark
   def deserialize_test(st: St, bh: Blackhole): Unit = bh.consume(Serde.codec.decode(st.serilizedExpr).require.value)
 
 }
@@ -30,14 +33,14 @@ object LangSerdeBenchmark {
   class St {
     private val bigSum = (1 to 100).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
       FUNCTION_CALL(
-        function = FunctionHeader(name = "+", Vector(FHT.LONG, FHT.LONG)),
+        function = FunctionHeader(name = "+", List(FHT.LONG, FHT.LONG)),
         args = List(r, CONST_LONG(i)),
         LONG
       )
     }
 
     val expr: Typed.EXPR = FUNCTION_CALL(
-      function = FunctionHeader(name = "==", Vector(FHT.LONG, FHT.LONG)),
+      function = FunctionHeader(name = "==", List(FHT.LONG, FHT.LONG)),
       args = List(CONST_LONG(1), bigSum),
       BOOLEAN
     )
