@@ -259,12 +259,12 @@ trait TransactionGenBase extends ScriptGen {
                           timestamp: Long): Either[ValidationError, TransferTransactionV1] =
     TransferTransactionV1.create(None, sender, recipient, amount, timestamp, None, fee, Array())
 
-  val transferGen = (for {
+  val transferV1Gen = (for {
     (assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment) <- transferParamGen
   } yield TransferTransactionV1.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get)
     .label("transferTransaction")
 
-  val versionedTransferGen = (for {
+  val transferV2Gen = (for {
     version                                                                            <- Gen.oneOf(TransferTransactionV2.supportedVersions.toSeq)
     (assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment) <- transferParamGen
     proofs                                                                             <- proofsGen
@@ -490,7 +490,7 @@ trait TransactionGenBase extends ScriptGen {
     }
 
   val randomTransactionGen: Gen[SignedTransaction] = (for {
-    tr           <- transferGen
+    tr           <- transferV1Gen
     (is, ri, bu) <- issueReissueBurnGen.retryUntil(_._1.isInstanceOf[IssueTransactionV1])
     ca           <- createAliasGen
     xt           <- exchangeTransactionGen

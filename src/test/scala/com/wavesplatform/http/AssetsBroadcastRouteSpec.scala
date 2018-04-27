@@ -42,7 +42,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
         case o: JsObject => o ++ Json.obj("quantity" -> o.value("amount"))
         case other       => other
       }),
-      ("transfer", transferGen, {
+      ("transfer", transferV1Gen, {
         case o: JsObject if o.value.contains("feeAsset") =>
           o ++ Json.obj("feeAssetId" -> o.value("feeAsset"), "quantity" -> o.value("amount"))
         case other => other
