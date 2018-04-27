@@ -18,10 +18,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
   private val configString =
     """waves {
       |  fees {
-      |    smart-account {
-      |      base-extra-charge = 10
-      |      extra-charge-per-op = 0.5
-      |    }
+      |    smart-account.extra-fee = 10
       |    payment {
       |      WAVES = 100000
       |    }
@@ -86,7 +83,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
     val sender        = PrivateKeyAccount(Array.emptyByteArray)
     val recipient     = Address.fromString("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8").right.get
     val tx1: TransferTransaction = TransferTransaction
-      .create(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000, Some(WhitelistedAsset), 2, Array.emptyByteArray)
+      .create(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000, Some(WhitelistedAsset), 12, Array.emptyByteArray)
       .right
       .get
     val tx2: TransferTransaction = TransferTransaction

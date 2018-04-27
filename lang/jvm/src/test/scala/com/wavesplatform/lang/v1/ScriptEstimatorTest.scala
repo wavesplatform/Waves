@@ -7,7 +7,7 @@ import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
-class ScriptComplexityCalculatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   property("successful on very deep expressions(stack overflow check)") {
     val sumHeader = FunctionHeader("+", List(FunctionHeaderType.LONG, FunctionHeaderType.LONG))
@@ -15,7 +15,7 @@ class ScriptComplexityCalculatorTest extends PropSpec with PropertyChecks with M
       Typed.FUNCTION_CALL(sumHeader, List(Typed.CONST_LONG(1), acc), Terms.LONG)
     }
 
-    ScriptComplexityCalculator(Map(sumHeader -> 1L), expr) shouldBe 'right
+    ScriptEstimator(Map(sumHeader -> 1L), expr) shouldBe 'right
   }
 
 }
