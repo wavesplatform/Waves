@@ -112,6 +112,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           recipient = acc3,
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
+          feeAssetId = None,
           feeAmount = fee + 0.00001.waves + 0.00002.waves,
           attachment = Array.emptyByteArray,
           proofs = Proofs.empty
