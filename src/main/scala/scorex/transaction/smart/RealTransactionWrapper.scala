@@ -30,7 +30,7 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
     case tt: TransferTransaction           => Right(tt.assetId.map(x => ByteVector(x.arr)))
     case vtt: VersionedTransferTransaction => Right(vtt.assetId.map(x => ByteVector(x.arr)))
     case mtt: MassTransferTransaction      => Right(mtt.assetId.map(x => ByteVector(x.arr)))
-    case _                                 => Left("Transaction doesn't transer any asset")
+    case _                                 => Left("Transaction doesn't transfer any asset")
   }
 
   override def recipient: Either[String, ByteVector] = tx match {
@@ -125,7 +125,7 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
   }
 
   override def minSponsoredAssetFee: Either[String, Option[Long]] = tx match {
-    case g: SponsorFeeTransaction  => Right(g.minSponsoredAssetFee)
-    case _: CreateAliasTransaction => Left("Transaction doesn't contain minSponsoredAssetFee")
+    case g: SponsorFeeTransaction => Right(g.minSponsoredAssetFee)
+    case _                        => Left("Transaction doesn't contain minSponsoredAssetFee")
   }
 }
