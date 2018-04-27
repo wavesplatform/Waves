@@ -18,7 +18,7 @@ import scorex.wallet.Wallet
 
 object TransactionFactory {
 
-  def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransactionV1] =
+  def transferAsset(request: TransferV1Request, wallet: Wallet, time: Time): Either[ValidationError, TransferTransactionV1] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipientAcc     <- AddressOrAlias.fromString(request.recipient)
@@ -35,7 +35,7 @@ object TransactionFactory {
         )
     } yield tx
 
-  def versionedTransfer(request: VersionedTransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransactionV2] =
+  def versionedTransfer(request: TransferV2Request, wallet: Wallet, time: Time): Either[ValidationError, TransferTransactionV2] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipientAcc     <- AddressOrAlias.fromString(request.recipient)
@@ -84,7 +84,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def smartIssue(request: SmartIssueRequest, wallet: Wallet, time: Time): Either[ValidationError, IssueTransactionV2] =
+  def smartIssue(request: IssueV2Request, wallet: Wallet, time: Time): Either[ValidationError, IssueTransactionV2] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       s <- request.script match {
@@ -106,7 +106,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def issueAsset(request: IssueRequest, wallet: Wallet, time: Time): Either[ValidationError, IssueTransactionV1] =
+  def issueAsset(request: IssueV1Request, wallet: Wallet, time: Time): Either[ValidationError, IssueTransactionV1] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
@@ -145,11 +145,11 @@ object TransactionFactory {
       tx <- CreateAliasTransaction.create(senderPrivateKey, alias, request.fee, timestamp)
     } yield tx
 
-  def reissueAsset(request: ReissueRequest, wallet: Wallet, time: Time): Either[ValidationError, ReissueTransaction] =
+  def reissueAsset(request: ReissueRequest, wallet: Wallet, time: Time): Either[ValidationError, ReissueTransactionV1] =
     for {
       pk <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- ReissueTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.reissuable, request.fee, timestamp)
+      tx <- ReissueTransactionV1.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.reissuable, request.fee, timestamp)
     } yield tx
 
   def burnAsset(request: BurnRequest, wallet: Wallet, time: Time): Either[ValidationError, BurnTransaction] =

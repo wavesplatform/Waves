@@ -11,17 +11,24 @@ import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
-case class ReissueTransaction private (sender: PublicKeyAccount,
-                                       assetId: ByteStr,
-                                       quantity: Long,
-                                       reissuable: Boolean,
-                                       fee: Long,
-                                       timestamp: Long,
-                                       signature: ByteStr)
+trait ReissueTransaction extends ProvenTransaction {
+  def assetId: ByteStr
+  def quantity: Long
+  def reissuable: Boolean
+  def fee: Long
+}
+
+case class ReissueTransactionV1 private (sender: PublicKeyAccount,
+                                         assetId: ByteStr,
+                                         quantity: Long,
+                                         reissuable: Boolean,
+                                         fee: Long,
+                                         timestamp: Long,
+                                         signature: ByteStr)
     extends SignedTransaction
     with FastHashId {
 
-  override val builder: ReissueTransaction.type = ReissueTransaction
+  override val builder: ReissueTransactionV1.type = ReissueTransactionV1
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(
@@ -46,7 +53,7 @@ case class ReissueTransaction private (sender: PublicKeyAccount,
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), signature.arr, bodyBytes()))
 }
 
-object ReissueTransaction extends TransactionParserFor[ReissueTransaction] with TransactionParser.HardcodedVersion1 {
+object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] with TransactionParser.HardcodedVersion1 {
 
   override val typeId: Byte = 5
 
@@ -63,7 +70,7 @@ object ReissueTransaction extends TransactionParserFor[ReissueTransaction] with 
       val reissuable = bytes.slice(quantityStart + 8, quantityStart + 9).head == (1: Byte)
       val fee        = Longs.fromByteArray(bytes.slice(quantityStart + 9, quantityStart + 17))
       val timestamp  = Longs.fromByteArray(bytes.slice(quantityStart + 17, quantityStart + 25))
-      ReissueTransaction
+      ReissueTransactionV1
         .create(sender, assetId, quantity, reissuable, fee, timestamp, signature)
         .fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
@@ -80,7 +87,7 @@ object ReissueTransaction extends TransactionParserFor[ReissueTransaction] with 
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee())
     } else {
-      Right(ReissueTransaction(sender, assetId, quantity, reissuable, fee, timestamp, signature))
+      Right(ReissueTransactionV1(sender, assetId, quantity, reissuable, fee, timestamp, signature))
     }
 
   def create(sender: PrivateKeyAccount,

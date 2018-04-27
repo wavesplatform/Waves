@@ -53,20 +53,20 @@ trait RequestGen extends TransactionGen { _: Suite =>
     _fee     <- smallFeeGen
   } yield (_account, _fee)
 
-  val issueReq: G[IssueRequest] = for {
+  val issueReq: G[IssueV1Request] = for {
     (account, fee) <- commonFields
     name           <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
     description    <- genBoundedString(0, IssueTransaction.MaxDescriptionLength)
     quantity       <- positiveLongGen
     decimals       <- G.choose[Byte](0, IssueTransaction.MaxDecimals.toByte)
     reissuable     <- G.oneOf(true, false)
-  } yield IssueRequest(account, new String(name), new String(description), quantity, decimals, reissuable, fee)
+  } yield IssueV1Request(account, new String(name), new String(description), quantity, decimals, reissuable, fee)
 
-  val broadcastIssueReq: G[SignedIssueRequest] = for {
+  val broadcastIssueReq: G[SignedIssueV1Request] = for {
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _ir        <- issueReq
-  } yield SignedIssueRequest(_ir.sender, _ir.name, _ir.description, _ir.quantity, _ir.decimals, _ir.reissuable, _ir.fee, _timestamp, _signature)
+  } yield SignedIssueV1Request(_ir.sender, _ir.name, _ir.description, _ir.quantity, _ir.decimals, _ir.reissuable, _ir.fee, _timestamp, _signature)
 
   private val reissueBurnFields = for {
     assetId  <- bytes32gen.map(Base58.encode)
@@ -96,20 +96,20 @@ trait RequestGen extends TransactionGen { _: Suite =>
     _br        <- burnReq
   } yield SignedBurnRequest(_br.sender, _br.assetId, _br.quantity, _br.fee, _timestamp, _signature)
 
-  val transferReq: G[TransferRequest] = for {
+  val transferReq: G[TransferV1Request] = for {
     (account, fee) <- commonFields
     recipient      <- accountOrAliasGen.map(_.stringRepr)
     amount         <- positiveLongGen
     assetId        <- assetIdStringGen
     feeAssetId     <- assetIdStringGen
     attachment     <- genBoundedString(1, 20).map(b => Some(Base58.encode(b)))
-  } yield TransferRequest(assetId, feeAssetId, amount, fee, account, attachment, recipient)
+  } yield TransferV1Request(assetId, feeAssetId, amount, fee, account, attachment, recipient)
 
-  val broadcastTransferReq: G[SignedTransferRequest] = for {
+  val broadcastTransferReq: G[SignedTransferV1Request] = for {
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _tr        <- transferReq
-  } yield SignedTransferRequest(_tr.sender, _tr.assetId, _tr.recipient, _tr.amount, _tr.fee, _tr.feeAssetId, _timestamp, _tr.attachment, _signature)
+  } yield SignedTransferV1Request(_tr.sender, _tr.assetId, _tr.recipient, _tr.amount, _tr.fee, _tr.feeAssetId, _timestamp, _tr.attachment, _signature)
 
   val createAliasReq: G[SignedCreateAliasRequest] = for {
     _signature <- signatureGen

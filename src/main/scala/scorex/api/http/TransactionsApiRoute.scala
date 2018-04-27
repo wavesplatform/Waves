@@ -170,17 +170,17 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
           case Some(x) =>
             x match {
-              case IssueTransactionV1      => TransactionFactory.issueAsset(jsv.as[IssueRequest], wallet, time)
-              case TransferTransactionV1   => TransactionFactory.transferAsset(jsv.as[TransferRequest], wallet, time)
-              case TransferTransactionV2   => TransactionFactory.versionedTransfer(jsv.as[VersionedTransferRequest], wallet, time)
+              case IssueTransactionV1      => TransactionFactory.issueAsset(jsv.as[IssueV1Request], wallet, time)
+              case IssueTransactionV2      => TransactionFactory.smartIssue(jsv.as[IssueV2Request], wallet, time)
+              case TransferTransactionV1   => TransactionFactory.transferAsset(jsv.as[TransferV1Request], wallet, time)
+              case TransferTransactionV2   => TransactionFactory.versionedTransfer(jsv.as[TransferV2Request], wallet, time)
               case MassTransferTransaction => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
-              case ReissueTransaction      => TransactionFactory.reissueAsset(jsv.as[ReissueRequest], wallet, time)
+              case ReissueTransactionV1    => TransactionFactory.reissueAsset(jsv.as[ReissueRequest], wallet, time)
               case BurnTransaction         => TransactionFactory.burnAsset(jsv.as[BurnRequest], wallet, time)
               case LeaseTransaction        => TransactionFactory.lease(jsv.as[LeaseRequest], wallet, time)
               case LeaseCancelTransaction  => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
               case CreateAliasTransaction  => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
               case DataTransaction         => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
-              case IssueTransactionV2      => TransactionFactory.smartIssue(jsv.as[SmartIssueRequest], wallet, time)
               case SetScriptTransaction    => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
               case SponsorFeeTransaction   => TransactionFactory.sponsor(jsv.as[SponsorFeeRequest], wallet, time)
             }
@@ -213,17 +213,17 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
           case Some(x) =>
             x match {
-              case IssueTransactionV1      => jsv.as[SignedIssueRequest].toTx
-              case TransferTransactionV1   => jsv.as[SignedTransferRequest].toTx
-              case TransferTransactionV2   => jsv.as[SignedVersionedTransferRequest].toTx
+              case IssueTransactionV1      => jsv.as[SignedIssueV1Request].toTx
+              case IssueTransactionV2      => jsv.as[SignedIssueV2Request].toTx
+              case TransferTransactionV1   => jsv.as[SignedTransferV1Request].toTx
+              case TransferTransactionV2   => jsv.as[SignedTransferV2Request].toTx
               case MassTransferTransaction => jsv.as[SignedMassTransferRequest].toTx
-              case ReissueTransaction      => jsv.as[SignedReissueRequest].toTx
+              case ReissueTransactionV1    => jsv.as[SignedReissueRequest].toTx
               case BurnTransaction         => jsv.as[SignedBurnRequest].toTx
               case LeaseTransaction        => jsv.as[SignedLeaseRequest].toTx
               case LeaseCancelTransaction  => jsv.as[SignedLeaseCancelRequest].toTx
               case CreateAliasTransaction  => jsv.as[SignedCreateAliasRequest].toTx
               case DataTransaction         => jsv.as[SignedDataRequest].toTx
-              case IssueTransactionV2      => jsv.as[SignedSmartIssueRequest].toTx
               case SetScriptTransaction    => jsv.as[SignedSetScriptRequest].toTx
               case SponsorFeeTransaction   => jsv.as[SignedSponsorFeeRequest].toTx
 

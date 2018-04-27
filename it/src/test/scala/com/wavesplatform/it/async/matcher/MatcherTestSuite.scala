@@ -10,7 +10,7 @@ import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.state.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
-import scorex.api.http.assets.SignedTransferRequest
+import scorex.api.http.assets.SignedTransferV1Request
 import scorex.api.http.leasing.{SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -544,9 +544,9 @@ class MatcherTestSuite
     result.status
   }
 
-  private def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferRequest = {
+  private def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferV1Request = {
     import tx._
-    SignedTransferRequest(
+    SignedTransferV1Request(
       Base58.encode(tx.sender.publicKey),
       assetId.map(_.base58),
       recipient.stringRepr,

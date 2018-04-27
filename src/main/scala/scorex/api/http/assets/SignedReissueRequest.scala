@@ -5,7 +5,7 @@ import play.api.libs.json.{Format, Json}
 import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParsers.SignatureStringLength
-import scorex.transaction.assets.ReissueTransaction
+import scorex.transaction.assets.ReissueTransactionV1
 import scorex.transaction.{AssetIdStringLength, ValidationError}
 
 object SignedReissueRequest {
@@ -27,11 +27,11 @@ case class SignedReissueRequest(@ApiModelProperty(value = "Base58 encoded Issuer
                                 @ApiModelProperty(required = true)
                                 signature: String)
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, ReissueTransaction] =
+  def toTx: Either[ValidationError, ReissueTransactionV1] =
     for {
       _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
       _assetId   <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
-      _t         <- ReissueTransaction.create(_sender, _assetId, quantity, reissuable, fee, timestamp, _signature)
+      _t         <- ReissueTransactionV1.create(_sender, _assetId, quantity, reissuable, fee, timestamp, _signature)
     } yield _t
 }

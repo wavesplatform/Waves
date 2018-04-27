@@ -45,7 +45,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
       new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])
     ))
   def issue: Route = (path("issue") & post) {
-    json[SignedIssueRequest] { issueReq =>
+    json[SignedIssueV1Request] { issueReq =>
       doBroadcast(issueReq.toTx)
     }
   }

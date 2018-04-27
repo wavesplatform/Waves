@@ -328,13 +328,13 @@ trait TransactionGenBase extends ScriptGen {
     timestamp                 <- positiveLongGen
   } yield (sender, assetName, description, quantity, decimals, reissuable, fee, timestamp)
 
-  val issueReissueBurnGen: Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
+  val issueReissueBurnGen: Gen[(IssueTransaction, ReissueTransactionV1, BurnTransaction)] = for {
     amount                    <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
     r                         <- issueReissueBurnGeneratorP(amount, amount, amount, sender)
   } yield r
 
-  def issueReissueBurnGeneratorP(issueQuantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] =
+  def issueReissueBurnGeneratorP(issueQuantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransactionV1, BurnTransaction)] =
     issueReissueBurnGeneratorP(issueQuantity, issueQuantity, issueQuantity, sender)
 
   def createIssue(issuer: PrivateKeyAccount,
@@ -357,7 +357,7 @@ trait TransactionGenBase extends ScriptGen {
                                  reissueQuantity: Long,
                                  burnQuantity: Long,
                                  sender: PrivateKeyAccount,
-                                 allowSmartAsset: Boolean = false): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] =
+                                 allowSmartAsset: Boolean = false): Gen[(IssueTransaction, ReissueTransactionV1, BurnTransaction)] =
     for {
       (_, assetName, description, _, decimals, reissuable, iFee, timestamp) <- issueParamGen
       burnAmount                                                            <- Gen.choose(0L, burnQuantity)
@@ -369,18 +369,18 @@ trait TransactionGenBase extends ScriptGen {
         if (allowSmartAsset) maybeSmartIssue
         else
           IssueTransactionV1.create(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp).right.get
-      val reissue = ReissueTransaction.create(sender, issue.assetId(), reissueQuantity, reissuable2, fee, timestamp).right.get
+      val reissue = ReissueTransactionV1.create(sender, issue.assetId(), reissueQuantity, reissuable2, fee, timestamp).right.get
       val burn    = BurnTransaction.create(sender, issue.assetId(), burnAmount, fee, timestamp).right.get
       (issue, reissue, burn)
     }
 
-  val issueWithInvalidReissuesGen: Gen[(IssueTransactionV1, ReissueTransaction, ReissueTransaction)] = for {
+  val issueWithInvalidReissuesGen: Gen[(IssueTransactionV1, ReissueTransactionV1, ReissueTransactionV1)] = for {
     (sender, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
     fee                                                                      <- smallFeeGen
   } yield {
     val issue    = IssueTransactionV1.create(sender, assetName, description, quantity, decimals, reissuable = true, iFee, timestamp).right.get
-    val reissue1 = ReissueTransaction.create(sender, issue.assetId(), quantity, reissuable = false, fee, timestamp).right.get
-    val reissue2 = ReissueTransaction.create(sender, issue.assetId(), quantity, reissuable = true, fee, timestamp + 1).right.get
+    val reissue1 = ReissueTransactionV1.create(sender, issue.assetId(), quantity, reissuable = false, fee, timestamp).right.get
+    val reissue2 = ReissueTransactionV1.create(sender, issue.assetId(), quantity, reissuable = true, fee, timestamp + 1).right.get
     (issue, reissue1, reissue2)
   }
 
@@ -394,9 +394,9 @@ trait TransactionGenBase extends ScriptGen {
         .get
     }
 
-  val issueV1Gen: Gen[IssueTransaction]   = issueReissueBurnGen.map(_._1)
-  val reissueGen: Gen[ReissueTransaction] = issueReissueBurnGen.map(_._2)
-  val burnGen: Gen[BurnTransaction]       = issueReissueBurnGen.map(_._3)
+  val issueV1Gen: Gen[IssueTransaction]     = issueReissueBurnGen.map(_._1)
+  val reissueGen: Gen[ReissueTransactionV1] = issueReissueBurnGen.map(_._2)
+  val burnGen: Gen[BurnTransaction]         = issueReissueBurnGen.map(_._3)
 
   def sponsorFeeCancelSponsorFeeGen(
       sender: PrivateKeyAccount): Gen[(IssueTransaction, SponsorFeeTransaction, SponsorFeeTransaction, SponsorFeeTransaction)] =

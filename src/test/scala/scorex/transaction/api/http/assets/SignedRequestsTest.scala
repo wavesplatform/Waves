@@ -22,7 +22,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
           "fee": 100000
         }
       """
-    val req = Json.parse(json).validate[SignedIssueRequest].get
+    val req = Json.parse(json).validate[SignedIssueV1Request].get
     req.name shouldBe "string"
     req.quantity shouldBe 100000L
     req.fee shouldBe 100000L
@@ -85,7 +85,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
         |   "attachment":"A"
         |}
       """.stripMargin
-    val req = Json.parse(json).validate[SignedTransferRequest].get
+    val req = Json.parse(json).validate[SignedTransferV1Request].get
     req.recipient shouldBe "3Myss6gmMckKYtka3cKCM563TBJofnxvfD7"
     req.timestamp shouldBe 1479462208828L
     req.assetId shouldBe Some("GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u")
@@ -120,7 +120,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
         |   "attachment":"2Kk7Zsr1e9jsqSBM5hpF"
         |}
       """.stripMargin
-    val req = Json.parse(json).validate[SignedTransferRequest].get
+    val req = Json.parse(json).validate[SignedTransferV1Request].get
     req.recipient shouldBe "3N9UuGeWuDt9NfWbC5oEACHyRoeEMApXAeq"
     req.timestamp shouldBe 1489054107569L
     req.assetId shouldBe Some("6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL")

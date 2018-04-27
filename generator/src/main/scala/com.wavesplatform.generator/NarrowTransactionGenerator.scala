@@ -112,11 +112,11 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
                 logOption(TransferTransactionV1
                   .create(asset, sender, recipient, r.nextInt(500000), ts, None, moreThatStandartFee, Array.fill(r.nextInt(100))(r.nextInt().toByte)))
             }
-          case ReissueTransaction =>
+          case ReissueTransactionV1 =>
             val reissuable = r.nextBoolean()
             randomFrom(reissuableIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
-              logOption(ReissueTransaction.create(sender, assetTx.id(), Random.nextInt(Int.MaxValue), reissuable, moreThatStandartFee, ts))
+              logOption(ReissueTransactionV1.create(sender, assetTx.id(), Random.nextInt(Int.MaxValue), reissuable, moreThatStandartFee, ts))
             })
           case BurnTransaction =>
             randomFrom(validIssueTxs).flatMap(assetTx => {
@@ -202,9 +202,9 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
           case Some(tx: IssueTransactionV1) => validIssueTxs :+ tx
           case _                            => validIssueTxs
         }, tx match {
-          case Some(tx: IssueTransactionV1) if tx.reissuable  => reissuableIssueTxs :+ tx
-          case Some(tx: ReissueTransaction) if !tx.reissuable => reissuableIssueTxs.filter(_.id != tx.id)
-          case _                                              => reissuableIssueTxs
+          case Some(tx: IssueTransactionV1) if tx.reissuable    => reissuableIssueTxs :+ tx
+          case Some(tx: ReissueTransactionV1) if !tx.reissuable => reissuableIssueTxs.filter(_.id != tx.id)
+          case _                                                => reissuableIssueTxs
         }, tx match {
           case Some(tx: LeaseTransaction)       => activeLeaseTransactions :+ tx
           case Some(tx: LeaseCancelTransaction) => activeLeaseTransactions.filter(_.id != tx.leaseId)

@@ -8,7 +8,7 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
-import scorex.api.http.assets.TransferRequest
+import scorex.api.http.assets.TransferV1Request
 import scorex.transaction.TransactionFactory
 import scorex.utils.Time
 import scorex.wallet.Wallet
@@ -46,7 +46,7 @@ case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPo
       new ApiResponse(code = 200, message = "Json with response or error")
     ))
   def payment: Route = (path("payment") & post & withAuth) {
-    json[TransferRequest] { p =>
+    json[TransferV1Request] { p =>
       doBroadcast(TransactionFactory.transferAsset(p, wallet, time))
     }
   }

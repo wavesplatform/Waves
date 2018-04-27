@@ -22,7 +22,7 @@ object TransactionParsers {
     PaymentTransaction,
     IssueTransactionV1,
     TransferTransactionV1,
-    ReissueTransaction,
+    ReissueTransactionV1,
     BurnTransaction,
     ExchangeTransaction,
     LeaseTransaction,

@@ -21,7 +21,7 @@ import scorex.transaction.transfer._
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
-  def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransaction, BurnTransaction))] =
+  def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransactionV1, BurnTransaction))] =
     for {
       master <- accountGen
       ts     <- timestampGen
@@ -50,7 +50,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   }
 
   property("Cannot reissue/burn non-existing alias") {
-    val setup: Gen[(GenesisTransaction, ReissueTransaction, BurnTransaction)] = for {
+    val setup: Gen[(GenesisTransaction, ReissueTransactionV1, BurnTransaction)] = for {
       master <- accountGen
       ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
@@ -77,7 +77,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       reissuable2            <- Arbitrary.arbitrary[Boolean]
       fee                    <- Gen.choose(1L, 2000000L)
       timestamp              <- timestampGen
-      reissue = ReissueTransaction.create(other, issue.assetId(), quantity, reissuable2, fee, timestamp).right.get
+      reissue = ReissueTransactionV1.create(other, issue.assetId(), quantity, reissuable2, fee, timestamp).right.get
       burn    = BurnTransaction.create(other, issue.assetId(), quantity, fee, timestamp).right.get
     } yield ((gen, issue), reissue, burn)
 
@@ -131,7 +131,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       decimals    <- Gen.choose(1: Byte, 8: Byte)
       issue       <- createIssue(issuer, assetName, description, quantity, decimals, true, fee, timestamp)
       assetId = issue.assetId()
-      reissue = ReissueTransaction.create(issuer, assetId, Long.MaxValue, true, 1, timestamp).right.get
+      reissue = ReissueTransactionV1.create(issuer, assetId, Long.MaxValue, true, 1, timestamp).right.get
     } yield (issuer, assetId, genesis, issue, reissue)
 
     val fs =
@@ -160,7 +160,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       decimals    <- Gen.choose(1: Byte, 8: Byte)
       issue       <- createIssue(issuer, assetName, description, quantity, decimals, true, fee, timestamp)
       assetId = issue.assetId()
-      reissue = ReissueTransaction.create(issuer, assetId, Long.MaxValue, true, 1, timestamp).right.get
+      reissue = ReissueTransactionV1.create(issuer, assetId, Long.MaxValue, true, 1, timestamp).right.get
     } yield (issuer, assetId, genesis, issue, reissue)
 
     val fs =
@@ -189,7 +189,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       assetId = issue.assetId()
       attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
       transfer = TransferTransactionV1.create(Some(assetId), issuer, holder, quantity - 1, timestamp, None, fee, attachment).right.get
-      reissue  = ReissueTransaction.create(issuer, assetId, (Long.MaxValue - quantity) + 1, true, 1, timestamp).right.get
+      reissue  = ReissueTransactionV1.create(issuer, assetId, (Long.MaxValue - quantity) + 1, true, 1, timestamp).right.get
     } yield (issuer, assetId, genesis, issue, reissue, transfer)
 
     val fs =
@@ -220,7 +220,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     ScriptV1(TypeChecker(dummyTypeCheckerContext, expr).explicitGet()).explicitGet()
   }
 
-  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransactionV2, TransferTransactionV1, ReissueTransaction)] =
+  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransactionV2, TransferTransactionV1, ReissueTransactionV1)] =
     for {
       version            <- Gen.oneOf(IssueTransactionV2.supportedVersions.toSeq)
       timestamp          <- timestampGen
@@ -249,7 +249,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       transfer = TransferTransactionV1
         .create(Some(assetId), accountA, accountB, issue.quantity, timestamp + 2, None, smallFee, Array.empty)
         .explicitGet()
-      reissue = ReissueTransaction.create(accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
+      reissue = ReissueTransactionV1.create(accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
     } yield (Seq(genesisTx1, genesisTx2), issue, transfer, reissue)
 
   property("Can issue smart asset with script") {

@@ -252,9 +252,9 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
   }
 
-  protected def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferRequest = {
+  protected def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferV1Request = {
     import tx._
-    SignedTransferRequest(
+    SignedTransferV1Request(
       Base58.encode(tx.sender.publicKey),
       assetId.map(_.base58),
       recipient.stringRepr,
@@ -267,9 +267,9 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     )
   }
 
-  protected def createSignedVersionedTransferRequest(tx: TransferTransactionV2): SignedVersionedTransferRequest = {
+  protected def createSignedVersionedTransferRequest(tx: TransferTransactionV2): SignedTransferV2Request = {
     import tx._
-    SignedVersionedTransferRequest(
+    SignedTransferV2Request(
       Base58.encode(tx.sender.publicKey),
       assetId.map(_.base58),
       recipient.stringRepr,

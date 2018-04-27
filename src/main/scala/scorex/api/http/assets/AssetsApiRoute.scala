@@ -153,7 +153,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       )
     ))
   def issue: Route =
-    processRequest("issue", (r: IssueRequest) => doBroadcast(TransactionFactory.issueAsset(r, wallet, time)))
+    processRequest("issue", (r: IssueV1Request) => doBroadcast(TransactionFactory.issueAsset(r, wallet, time)))
 
   @Path("/reissue")
   @ApiOperation(value = "Issue Asset", notes = "Reissue Asset", httpMethod = "POST", produces = "application/json", consumes = "application/json")
