@@ -259,12 +259,12 @@ trait TransactionGenBase extends ScriptGen {
                           timestamp: Long): Either[ValidationError, TransferTransactionV1] =
     TransferTransactionV1.create(None, sender, recipient, amount, timestamp, None, fee, Array())
 
-  val transferGen = (for {
+  val transferV1Gen = (for {
     (assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment) <- transferParamGen
   } yield TransferTransactionV1.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get)
     .label("transferTransaction")
 
-  val versionedTransferGen = (for {
+  val transferV2Gen = (for {
     version                                                                            <- Gen.oneOf(TransferTransactionV2.supportedVersions.toSeq)
     (assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment) <- transferParamGen
     proofs                                                                             <- proofsGen
@@ -353,34 +353,43 @@ trait TransactionGenBase extends ScriptGen {
     Gen.oneOf(Seq(issuev1, issuev2))
   }
 
+  def createReissue(reissuer: PrivateKeyAccount,
+                    assetId: ByteStr,
+                    quantity: Long,
+                    reissuable: Boolean,
+                    fee: Long,
+                    timestamp: Long): Gen[ReissueTransaction] = {
+    val reissuev1 = ReissueTransactionV1.create(reissuer, assetId, quantity, reissuable, fee, timestamp).right.get
+    val reissuev2 = ReissueTransactionV2
+      .selfSigned(ReissueTransactionV2.supportedVersions.head, AddressScheme.current.chainId, reissuer, assetId, quantity, reissuable, fee, timestamp)
+      .right
+      .get
+    Gen.oneOf(Seq(reissuev1, reissuev2))
+  }
+
   def issueReissueBurnGeneratorP(issueQuantity: Long,
                                  reissueQuantity: Long,
                                  burnQuantity: Long,
-                                 sender: PrivateKeyAccount,
-                                 allowSmartAsset: Boolean = false): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] =
+                                 sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] =
     for {
       (_, assetName, description, _, decimals, reissuable, iFee, timestamp) <- issueParamGen
       burnAmount                                                            <- Gen.choose(0L, burnQuantity)
       reissuable2                                                           <- Arbitrary.arbitrary[Boolean]
       fee                                                                   <- smallFeeGen
-      maybeSmartIssue                                                       <- createIssue(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp)
+      issue                                                                 <- createIssue(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp)
+      reissue                                                               <- createReissue(sender, issue.assetId(), reissueQuantity, reissuable2, fee, timestamp)
     } yield {
-      val issue =
-        if (allowSmartAsset) maybeSmartIssue
-        else
-          IssueTransactionV1.create(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp).right.get
-      val reissue = ReissueTransaction.create(sender, issue.assetId(), reissueQuantity, reissuable2, fee, timestamp).right.get
-      val burn    = BurnTransaction.create(sender, issue.assetId(), burnAmount, fee, timestamp).right.get
+      val burn = BurnTransaction.create(sender, issue.assetId(), burnAmount, fee, timestamp).right.get
       (issue, reissue, burn)
     }
 
-  val issueWithInvalidReissuesGen: Gen[(IssueTransactionV1, ReissueTransaction, ReissueTransaction)] = for {
+  val issueWithInvalidReissuesGen: Gen[(IssueTransactionV1, ReissueTransactionV1, ReissueTransactionV1)] = for {
     (sender, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
     fee                                                                      <- smallFeeGen
   } yield {
     val issue    = IssueTransactionV1.create(sender, assetName, description, quantity, decimals, reissuable = true, iFee, timestamp).right.get
-    val reissue1 = ReissueTransaction.create(sender, issue.assetId(), quantity, reissuable = false, fee, timestamp).right.get
-    val reissue2 = ReissueTransaction.create(sender, issue.assetId(), quantity, reissuable = true, fee, timestamp + 1).right.get
+    val reissue1 = ReissueTransactionV1.create(sender, issue.assetId(), quantity, reissuable = false, fee, timestamp).right.get
+    val reissue2 = ReissueTransactionV1.create(sender, issue.assetId(), quantity, reissuable = true, fee, timestamp + 1).right.get
     (issue, reissue1, reissue2)
   }
 
@@ -394,7 +403,7 @@ trait TransactionGenBase extends ScriptGen {
         .get
     }
 
-  val issueV1Gen: Gen[IssueTransaction]   = issueReissueBurnGen.map(_._1)
+  val issueGen: Gen[IssueTransaction]     = issueReissueBurnGen.map(_._1)
   val reissueGen: Gen[ReissueTransaction] = issueReissueBurnGen.map(_._2)
   val burnGen: Gen[BurnTransaction]       = issueReissueBurnGen.map(_._3)
 
@@ -490,11 +499,13 @@ trait TransactionGenBase extends ScriptGen {
     }
 
   val randomTransactionGen: Gen[SignedTransaction] = (for {
-    tr           <- transferGen
-    (is, ri, bu) <- issueReissueBurnGen.retryUntil(_._1.isInstanceOf[IssueTransactionV1])
-    ca           <- createAliasGen
-    xt           <- exchangeTransactionGen
-    tx           <- Gen.oneOf(tr, is.asInstanceOf[IssueTransactionV1], ri, ca, bu, xt)
+    tr <- transferV1Gen
+    (is, ri, bu) <- issueReissueBurnGen.retryUntil {
+      case (i, r, b) => i.isInstanceOf[IssueTransactionV1] && r.isInstanceOf[ReissueTransactionV1]
+    }
+    ca <- createAliasGen
+    xt <- exchangeTransactionGen
+    tx <- Gen.oneOf(tr, is.asInstanceOf[IssueTransactionV1], ri.asInstanceOf[ReissueTransactionV1], ca, bu, xt)
   } yield tx).label("random transaction")
 
   def randomTransactionsGen(count: Int): Gen[Seq[SignedTransaction]] =

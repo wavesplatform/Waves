@@ -12,14 +12,14 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
   private val versionGen: Gen[Byte] = Gen.oneOf(TransferTransactionV2.supportedVersions.toSeq)
 
   property("VersionedTransferTransactionSpecification serialization roundtrip") {
-    forAll(versionedTransferGen) { tx: TransferTransactionV2 =>
+    forAll(transferV2Gen) { tx: TransferTransactionV2 =>
       val recovered = TransferTransactionV2.parseBytes(tx.bytes()).get
       assertTxs(recovered, tx)
     }
   }
 
   property("VersionedTransferTransactionSpecification serialization from TypedTransaction") {
-    forAll(versionedTransferGen) { tx: TransferTransactionV2 =>
+    forAll(transferV2Gen) { tx: TransferTransactionV2 =>
       val recovered = TransactionParsers.parseBytes(tx.bytes()).get
       assertTxs(recovered.asInstanceOf[TransferTransactionV2], tx)
     }

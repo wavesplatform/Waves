@@ -7,7 +7,7 @@ import com.wavesplatform.it.util._
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class ReissueTransactionSuite extends BaseTransactionSuite {
+class ReissueTransactionV1Suite extends BaseTransactionSuite {
 
   private val waitCompletion  = 2.minutes
   private val defaultQuantity = 100000

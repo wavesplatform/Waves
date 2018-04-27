@@ -9,7 +9,7 @@ import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
 import play.api.libs.json.{Format, JsObject, Json, Writes}
 import scorex.api.http.AddressApiRoute
-import scorex.api.http.assets.SignedIssueRequest
+import scorex.api.http.assets.SignedIssueV1Request
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
 
 import scala.concurrent.duration._
@@ -138,7 +138,7 @@ object SyncHttpApi extends Assertions {
     def signedBroadcast(tx: JsObject): Transaction =
       Await.result(async(n).signedBroadcast(tx), RequestAwaitTime)
 
-    def signedIssue(tx: SignedIssueRequest): Transaction =
+    def signedIssue(tx: SignedIssueV1Request): Transaction =
       Await.result(async(n).signedIssue(tx), RequestAwaitTime)
 
     def ensureTxDoesntExist(txId: String): Unit =

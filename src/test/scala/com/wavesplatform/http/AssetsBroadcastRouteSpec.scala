@@ -18,6 +18,7 @@ import scorex.api.http._
 import scorex.api.http.assets._
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
 import scorex.transaction.transfer._
 import scorex.transaction.{Proofs, Transaction, ValidationError}
 import scorex.wallet.Wallet
@@ -36,13 +37,13 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
     val vt = Table[String, G[_ <: Transaction], (JsValue) => JsValue](
       ("url", "generator", "transform"),
-      ("issue", issueV1Gen, identity),
-      ("reissue", reissueGen, identity),
+      ("issue", issueGen.retryUntil(_.isInstanceOf[IssueTransactionV1]), identity),
+      ("reissue", reissueGen.retryUntil(_.isInstanceOf[ReissueTransactionV1]), identity),
       ("burn", burnGen, {
         case o: JsObject => o ++ Json.obj("quantity" -> o.value("amount"))
         case other       => other
       }),
-      ("transfer", transferGen, {
+      ("transfer", transferV1Gen, {
         case o: JsObject if o.value.contains("feeAsset") =>
           o ++ Json.obj("feeAssetId" -> o.value("feeAsset"), "quantity" -> o.value("amount"))
         case other => other
@@ -252,9 +253,9 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
   }
 
-  protected def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferRequest = {
+  protected def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferV1Request = {
     import tx._
-    SignedTransferRequest(
+    SignedTransferV1Request(
       Base58.encode(tx.sender.publicKey),
       assetId.map(_.base58),
       recipient.stringRepr,
@@ -267,9 +268,9 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     )
   }
 
-  protected def createSignedVersionedTransferRequest(tx: TransferTransactionV2): SignedVersionedTransferRequest = {
+  protected def createSignedVersionedTransferRequest(tx: TransferTransactionV2): SignedTransferV2Request = {
     import tx._
-    SignedVersionedTransferRequest(
+    SignedTransferV2Request(
       Base58.encode(tx.sender.publicKey),
       assetId.map(_.base58),
       recipient.stringRepr,
