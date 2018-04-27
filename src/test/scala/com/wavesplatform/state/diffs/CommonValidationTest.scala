@@ -9,9 +9,11 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import scorex.account.AddressScheme
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
+import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction, SponsorFeeTransaction, TransferTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.transfer._
@@ -46,10 +48,9 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
       BlockchainFeatures.SmartAccounts  -> 0
     )
 
-    forAll(sponsorAndSetScriptGen) {
-      case (genesisTxs, sponsorTx, setScriptTx, transferTx) =>
+    forAll(sponsorAndSetScriptGen(sponsorship = true, smartToken = false, smartAccount = true)) {
+      case (genesisBlock, transferTx) =>
         withStateAndHistory(settings) { blockchain =>
-          val genesisBlock     = TestBlock.create(genesisTxs :+ sponsorTx :+ setScriptTx)
           val preconditionDiff = BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock).explicitGet()
           blockchain.append(preconditionDiff, genesisBlock)
 
@@ -62,10 +63,9 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
   property("sponsored transactions should work without smart accounts") {
     val settings = createSettings(BlockchainFeatures.FeeSponsorship -> 0)
 
-    forAll(sponsorAndSetScriptGen) {
-      case (genesisTxs, sponsorTx, _, transferTx) =>
+    forAll(sponsorAndSetScriptGen(sponsorship = true, smartToken = false, smartAccount = false)) {
+      case (genesisBlock, transferTx) =>
         withStateAndHistory(settings) { blockchain =>
-          val genesisBlock     = TestBlock.create(genesisTxs :+ sponsorTx)
           val preconditionDiff = BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock).explicitGet()
           blockchain.append(preconditionDiff, genesisBlock)
 
@@ -78,10 +78,9 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
   property("smart accounts should work without sponsored transactions") {
     val settings = createSettings(BlockchainFeatures.SmartAccounts -> 0)
 
-    forAll(sponsorAndSetScriptGen) {
-      case (genesisTxs, _, setScriptTx, transferTx) =>
+    forAll(sponsorAndSetScriptGen(sponsorship = false, smartToken = false, smartAccount = true)) {
+      case (genesisBlock, transferTx) =>
         withStateAndHistory(settings) { blockchain =>
-          val genesisBlock     = TestBlock.create(genesisTxs :+ setScriptTx)
           val preconditionDiff = BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock).explicitGet()
           blockchain.append(preconditionDiff, genesisBlock)
 
@@ -91,54 +90,85 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     }
   }
 
-  private val sponsorAndSetScriptGen = for {
-    richAcc      <- accountGen
-    recipientAcc <- accountGen
-    ts = System.currentTimeMillis()
-  } yield {
-    val genesisTx = GenesisTransaction.create(richAcc, ENOUGH_AMT, ts).explicitGet()
+  private def sponsorAndSetScriptGen(sponsorship: Boolean, smartToken: Boolean, smartAccount: Boolean) =
+    for {
+      richAcc      <- accountGen
+      recipientAcc <- accountGen
+      ts = System.currentTimeMillis()
+    } yield {
+      val script = ScriptV1(Typed.TRUE).explicitGet()
 
-    val issueTx = IssueTransactionV1
-      .create(richAcc, "test".getBytes(), "desc".getBytes(), Long.MaxValue, 2, reissuable = false, Constants.UnitsInWave, ts)
-      .explicitGet()
+      val genesisTx = GenesisTransaction.create(richAcc, ENOUGH_AMT, ts).explicitGet()
 
-    val transferWavesTx = TransferTransactionV1
-      .create(None, richAcc, recipientAcc, 10 * Constants.UnitsInWave, ts, None, 1 * Constants.UnitsInWave, Array.emptyByteArray)
-      .explicitGet()
+      val issueTx =
+        if (smartToken)
+          SmartIssueTransactionV1
+            .selfSigned(
+              SmartIssueTransactionV1.supportedVersions.head,
+              AddressScheme.current.chainId,
+              richAcc,
+              "test".getBytes(),
+              "desc".getBytes(),
+              Long.MaxValue,
+              2,
+              reissuable = false,
+              Some(script),
+              Constants.UnitsInWave,
+              ts
+            )
+            .explicitGet()
+        else
+          IssueTransaction
+            .create(richAcc, "test".getBytes(), "desc".getBytes(), Long.MaxValue, 2, reissuable = false, Constants.UnitsInWave, ts)
+            .explicitGet()
 
-    val transferAssetTx = TransferTransactionV1
-      .create(Some(issueTx.id()), richAcc, recipientAcc, 100, ts, None, 1 * Constants.UnitsInWave, Array.emptyByteArray)
-      .explicitGet()
+      val transferWavesTx = TransferTransactionV1
+        .create(None, richAcc, recipientAcc, 10 * Constants.UnitsInWave, ts, None, 1 * Constants.UnitsInWave, Array.emptyByteArray)
+        .explicitGet()
 
-    val sponsorTx = SponsorFeeTransaction
-      .create(1, richAcc, issueTx.id(), Some(10), Constants.UnitsInWave, ts)
-      .explicitGet()
+      val transferAssetTx = TransferTransactionV1
+        .create(Some(issueTx.id()), richAcc, recipientAcc, 100, ts, None, 1 * Constants.UnitsInWave, Array.emptyByteArray)
+        .explicitGet()
 
-    val setScriptTx = SetScriptTransaction
-      .selfSigned(
-        SetScriptTransaction.supportedVersions.head,
-        recipientAcc,
-        Some(ScriptV1(Typed.TRUE).explicitGet()),
-        1 * Constants.UnitsInWave,
-        ts
-      )
-      .explicitGet()
+      val sponsorTx =
+        if (sponsorship)
+          Seq(
+            SponsorFeeTransaction
+              .create(1, richAcc, issueTx.id(), Some(10), Constants.UnitsInWave, ts)
+              .explicitGet()
+          )
+        else Seq.empty
 
-    val transferAssetsBackTx = TransferTransactionV1
-      .create(
-        Some(issueTx.id()),
-        recipientAcc,
-        richAcc,
-        1,
-        ts,
-        Some(issueTx.id()),
-        10,
-        Array.emptyByteArray
-      )
-      .explicitGet()
+      val setScriptTx =
+        if (smartAccount)
+          Seq(
+            SetScriptTransaction
+              .selfSigned(
+                SetScriptTransaction.supportedVersions.head,
+                recipientAcc,
+                Some(script),
+                1 * Constants.UnitsInWave,
+                ts
+              )
+              .explicitGet()
+          )
+        else Seq.empty
 
-    (Vector[Transaction](genesisTx, issueTx, transferWavesTx, transferAssetTx), sponsorTx, setScriptTx, transferAssetsBackTx)
-  }
+      val transferAssetsBackTx = TransferTransactionV1
+        .create(
+          Some(issueTx.id()),
+          recipientAcc,
+          richAcc,
+          1,
+          ts,
+          Some(issueTx.id()),
+          10,
+          Array.emptyByteArray
+        )
+        .explicitGet()
+
+      (TestBlock.create(Vector[Transaction](genesisTx, issueTx, transferWavesTx, transferAssetTx) ++ sponsorTx ++ setScriptTx), transferAssetsBackTx)
+    }
 
   private def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): FunctionalitySettings =
     TestFunctionalitySettings.Enabled
