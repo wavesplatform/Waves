@@ -18,6 +18,7 @@ import scorex.api.http._
 import scorex.api.http.assets._
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
 import scorex.transaction.transfer._
 import scorex.transaction.{Proofs, Transaction, ValidationError}
 import scorex.wallet.Wallet
@@ -36,8 +37,8 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
     val vt = Table[String, G[_ <: Transaction], (JsValue) => JsValue](
       ("url", "generator", "transform"),
-      ("issue", issueV1Gen, identity),
-      ("reissue", reissueGen, identity),
+      ("issue", issueGen.retryUntil(_.isInstanceOf[IssueTransactionV1]), identity),
+      ("reissue", reissueGen.retryUntil(_.isInstanceOf[ReissueTransactionV1]), identity),
       ("burn", burnGen, {
         case o: JsObject => o ++ Json.obj("quantity" -> o.value("amount"))
         case other       => other

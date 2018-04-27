@@ -13,7 +13,7 @@ import scorex.transaction.Transaction
 
 class LegacyFrameCodecSpec extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen {
 
-  "should handle one message" in forAll(issueV1Gen) { origTx =>
+  "should handle one message" in forAll(issueGen) { origTx =>
     val codec = new LegacyFrameCodec(PeerDatabase.NoOp)
 
     val buff = Unpooled.buffer
@@ -28,7 +28,7 @@ class LegacyFrameCodecSpec extends FreeSpec with Matchers with MockFactory with 
     decodedBytes.data shouldEqual origTx.bytes()
   }
 
-  "should handle multiple messages" in forAll(Gen.nonEmptyListOf(issueV1Gen)) { origTxs =>
+  "should handle multiple messages" in forAll(Gen.nonEmptyListOf(issueGen)) { origTxs =>
     val codec = new LegacyFrameCodec(PeerDatabase.NoOp)
 
     val buff = Unpooled.buffer

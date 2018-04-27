@@ -21,7 +21,7 @@ import scorex.transaction.transfer._
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
-  def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransactionV1, BurnTransaction))] =
+  def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransaction, BurnTransaction))] =
     for {
       master <- accountGen
       ts     <- timestampGen
@@ -29,7 +29,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       ia                     <- positiveLongGen
       ra                     <- positiveLongGen
       ba                     <- positiveLongGen.suchThat(x => x < ia + ra)
-      (issue, reissue, burn) <- issueReissueBurnGeneratorP(ia, ra, ba, master, true) suchThat (_._1.reissuable == isReissuable)
+      (issue, reissue, burn) <- issueReissueBurnGeneratorP(ia, ra, ba, master) suchThat (_._1.reissuable == isReissuable)
     } yield ((genesis, issue), (reissue, burn))
 
   property("Issue+Reissue+Burn do not break waves invariant and updates state") {
@@ -50,7 +50,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   }
 
   property("Cannot reissue/burn non-existing alias") {
-    val setup: Gen[(GenesisTransaction, ReissueTransactionV1, BurnTransaction)] = for {
+    val setup: Gen[(GenesisTransaction, ReissueTransaction, BurnTransaction)] = for {
       master <- accountGen
       ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
@@ -107,7 +107,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     val fs =
       TestFunctionalitySettings.Enabled
         .copy(
-          preActivatedFeatures = Map(BlockchainFeatures.BurnAnyTokens.id -> 0)
+          preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.BurnAnyTokens.id -> 0)
         )
 
     forAll(setup) {

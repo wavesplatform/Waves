@@ -5,9 +5,8 @@ import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount
-import scorex.transaction.{AssetId, ProvenTransaction, ValidationError}
-import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
-import scorex.transaction._
+import scorex.crypto.signatures.Curve25519.KeyLength
+import scorex.transaction.{AssetId, ProvenTransaction, ValidationError, _}
 
 trait ReissueTransaction extends ProvenTransaction {
   def assetId: ByteStr
@@ -45,14 +44,15 @@ object ReissueTransaction {
     } else Right(())
 
   def parseBase(bytes: Array[Byte], start: Int): (PublicKeyAccount, AssetId, Long, Boolean, Long, Long, Int) = {
-    val sender        = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
-    val assetId       = ByteStr(bytes.slice(SignatureLength + KeyLength + 1, SignatureLength + KeyLength + AssetIdLength + 1))
-    val quantityStart = SignatureLength + KeyLength + AssetIdLength + 1
-    val quantity      = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
-    val reissuable    = bytes.slice(quantityStart + 8, quantityStart + 9).head == (1: Byte)
-    val fee           = Longs.fromByteArray(bytes.slice(quantityStart + 9, quantityStart + 17))
-    val end           = quantityStart + 25
-    val timestamp     = Longs.fromByteArray(bytes.slice(quantityStart + 17, end))
+    val senderEnd  = start + KeyLength
+    val assetIdEnd = senderEnd + AssetIdLength
+    val sender     = PublicKeyAccount(bytes.slice(start, senderEnd))
+    val assetId    = ByteStr(bytes.slice(senderEnd, assetIdEnd))
+    val quantity   = Longs.fromByteArray(bytes.slice(assetIdEnd, assetIdEnd + 8))
+    val reissuable = bytes.slice(assetIdEnd + 8, assetIdEnd + 9).head == (1: Byte)
+    val fee        = Longs.fromByteArray(bytes.slice(assetIdEnd + 9, assetIdEnd + 17))
+    val end        = assetIdEnd + 25
+    val timestamp  = Longs.fromByteArray(bytes.slice(assetIdEnd + 17, end))
 
     (sender, assetId, quantity, reissuable, fee, timestamp, end)
   }
