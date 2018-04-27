@@ -19,7 +19,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
   private def pkFromAddress(address: String) = PrivateKeyAccount.fromSeed(sender.seed(address)).right.get
 
-  private val fourthAddress: String = sender.createAddress
+  private val fourthAddress: String = sender.createAddress()
 
   private val acc0 = pkFromAddress(firstAddress)
   private val acc1 = pkFromAddress(secondAddress)
@@ -110,7 +110,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           recipient = acc3,
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
-          feeAmount = fee + 0.00001.waves + 0.00002.waves,
+          feeAmount = fee + 0.004.waves,
           attachment = Array.emptyByteArray,
           proofs = Proofs.empty
         )
@@ -132,7 +132,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
         version = SetScriptTransaction.supportedVersions.head,
         sender = acc0,
         script = None,
-        fee = fee + 0.00001.waves + 0.00002.waves,
+        fee = fee + 0.004.waves,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs.empty
       )
@@ -158,7 +158,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           recipient = acc3,
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
-          feeAmount = fee + 0.00001.waves + 0.00002.waves,
+          feeAmount = fee + 0.004.waves,
           attachment = Array.emptyByteArray
         )
         .explicitGet()
