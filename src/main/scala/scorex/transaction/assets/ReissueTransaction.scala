@@ -13,11 +13,15 @@ trait ReissueTransaction extends ProvenTransaction {
   def quantity: Long
   def reissuable: Boolean
   def fee: Long
+  def version: Byte
+  def chainByte: Option[Byte]
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
   override final val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
+      "version"    -> version,
+      "chainId"    -> chainByte,
       "assetId"    -> assetId.base58,
       "quantity"   -> quantity,
       "reissuable" -> reissuable

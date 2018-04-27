@@ -29,6 +29,8 @@ case class ReissueTransactionV2 private (version: Byte,
       bytesBase(),
     ))
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
+
+  override def chainByte: Option[Byte] = Some(chainId)
 }
 
 object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] with TransactionParser.MultipleVersions {

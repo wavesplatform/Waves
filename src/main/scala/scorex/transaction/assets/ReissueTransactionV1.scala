@@ -24,6 +24,9 @@ case class ReissueTransactionV1 private (sender: PublicKeyAccount,
   override val builder: ReissueTransactionV1.type = ReissueTransactionV1
   val bodyBytes: Coeval[Array[Byte]]              = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), bytesBase()))
   override val bytes: Coeval[Array[Byte]]         = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), signature.arr, bodyBytes()))
+
+  override def version: Byte           = 1
+  override def chainByte: Option[Byte] = None
 }
 
 object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] with TransactionParser.HardcodedVersion1 {
