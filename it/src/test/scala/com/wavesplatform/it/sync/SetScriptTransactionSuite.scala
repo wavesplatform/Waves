@@ -203,7 +203,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val transfers =
       MassTransferTransaction.parseTransfersList(List(Transfer(thirdAddress, transferAmount), Transfer(secondAddress, transferAmount))).right.get
 
-    val massTransferFee = 0.001.waves + 0.0005.waves * 3
+    val massTransferFee = 0.004.waves + 0.0005.waves * 4
 
     val unsigned =
       MassTransferTransaction
