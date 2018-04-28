@@ -11,14 +11,14 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.lease.LeaseTransactionV1
+import scorex.transaction.lease.{LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
 
 class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   private def preconditionsTransferAndLease(
-      code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransactionV1, TransferTransactionV1)] = {
+      code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransactionV1)] = {
     val untyped = Parser(code).get.value
     val typed   = TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
     preconditionsTransferAndLease(typed)

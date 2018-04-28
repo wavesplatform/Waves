@@ -10,7 +10,7 @@ import scorex.account.Address
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransactionV1}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.transfer._
 
 class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
@@ -23,7 +23,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
   property("can lease/cancel lease preserving waves invariant") {
 
-    val sunnyDayLeaseLeaseCancel: Gen[(GenesisTransaction, LeaseTransactionV1, LeaseCancelTransaction)] = for {
+    val sunnyDayLeaseLeaseCancel: Gen[(GenesisTransaction, LeaseTransaction, LeaseCancelTransaction)] = for {
       master    <- accountGen
       recipient <- accountGen suchThat (_ != master)
       ts        <- positiveIntGen
@@ -60,7 +60,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     }
   }
 
-  val cancelLeaseTwice: Gen[(GenesisTransaction, TransferTransactionV1, LeaseTransactionV1, LeaseCancelTransaction, LeaseCancelTransaction)] = for {
+  val cancelLeaseTwice: Gen[(GenesisTransaction, TransferTransactionV1, LeaseTransaction, LeaseCancelTransaction, LeaseCancelTransaction)] = for {
     master   <- accountGen
     recpient <- accountGen suchThat (_ != master)
     ts       <- timestampGen
@@ -93,7 +93,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   }
 
   property("cannot lease more than actual balance(cannot lease forward)") {
-    val setup: Gen[(GenesisTransaction, LeaseTransactionV1, LeaseTransactionV1)] = for {
+    val setup: Gen[(GenesisTransaction, LeaseTransaction, LeaseTransaction)] = for {
       master    <- accountGen
       recipient <- accountGen suchThat (_ != master)
       forward   <- accountGen suchThat (!Set(master, recipient).contains(_))
@@ -112,7 +112,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   }
 
   def cancelLeaseOfAnotherSender(
-      unleaseByRecipient: Boolean): Gen[(GenesisTransaction, GenesisTransaction, LeaseTransactionV1, LeaseCancelTransaction)] =
+      unleaseByRecipient: Boolean): Gen[(GenesisTransaction, GenesisTransaction, LeaseTransaction, LeaseCancelTransaction)] =
     for {
       master    <- accountGen
       recipient <- accountGen suchThat (_ != master)

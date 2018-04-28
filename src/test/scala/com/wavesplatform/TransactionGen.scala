@@ -173,29 +173,29 @@ trait TransactionGenBase extends ScriptGen {
 
   def leaseAndCancelGeneratorP(leaseSender: PrivateKeyAccount,
                                recipient: AddressOrAlias,
-                               unleaseSender: PrivateKeyAccount): Gen[(LeaseTransactionV1, LeaseCancelTransaction)] =
+                               unleaseSender: PrivateKeyAccount): Gen[(LeaseTransaction, LeaseCancelTransaction)] =
     for {
       (_, amount, fee, timestamp, _) <- leaseParamGen
-      lease = LeaseTransactionV1.create(leaseSender, amount, fee, timestamp, recipient).right.get
-      fee2 <- smallFeeGen
+      lease                          <- createLease(leaseSender, amount, fee, timestamp, recipient)
+      fee2                           <- smallFeeGen
       unlease = LeaseCancelTransaction.create(unleaseSender, lease.id(), fee2, timestamp + 1).right.get
     } yield (lease, unlease)
 
-  val twoLeasesGen: Gen[(LeaseTransactionV1, LeaseTransactionV1)] = for {
+  val twoLeasesGen: Gen[(LeaseTransaction, LeaseTransaction)] = for {
     (sender, amount, fee, timestamp, recipient) <- leaseParamGen
     amount2                                     <- positiveLongGen
     recipient2: PrivateKeyAccount               <- accountGen
     fee2                                        <- smallFeeGen
-  } yield
-    (LeaseTransactionV1.create(sender, amount, fee, timestamp, recipient).right.get,
-     LeaseTransactionV1.create(sender, amount2, fee2, timestamp + 1, recipient2).right.get)
+    lease1                                      <- createLease(sender, amount, fee, timestamp, recipient)
+    lease2                                      <- createLease(sender, amount2, fee2, timestamp + 1, recipient2)
+  } yield (lease1, lease2)
 
-  val leaseAndCancelWithOtherSenderGen: Gen[(LeaseTransactionV1, LeaseCancelTransaction)] = for {
+  val leaseAndCancelWithOtherSenderGen: Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
     (sender, amount, fee, timestamp, recipient) <- leaseParamGen
     otherSender: PrivateKeyAccount              <- accountGen
-    lease = LeaseTransactionV1.create(sender, amount, fee, timestamp, recipient).right.get
-    fee2       <- smallFeeGen
-    timestamp2 <- positiveLongGen
+    lease                                       <- createLease(sender, amount, fee, timestamp, recipient)
+    fee2                                        <- smallFeeGen
+    timestamp2                                  <- positiveLongGen
   } yield (lease, LeaseCancelTransaction.create(otherSender, lease.id(), fee2, timestamp2).right.get)
 
   val leaseGen: Gen[LeaseTransaction]             = leaseAndCancelGen.map(_._1)
@@ -580,7 +580,7 @@ trait TransactionGenBase extends ScriptGen {
     } yield DataTransaction.selfSigned(version, sender, data, 15000000, timestamp).right.get)
       .label("DataTransactionP")
 
-  def preconditionsTransferAndLease(typed: Typed.EXPR): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransactionV1, TransferTransactionV1)] =
+  def preconditionsTransferAndLease(typed: Typed.EXPR): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransactionV1)] =
     for {
       master    <- accountGen
       recipient <- accountGen
