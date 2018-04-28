@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{Instrumented, TxsInBlockchainStats}
-import com.wavesplatform.mining.MiningEstimators
+import com.wavesplatform.mining.{MiningEstimators, MultiDimensionalMiningConstraint}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
@@ -173,7 +173,9 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
             case ((newBlockDiff, discarded)) =>
               val height     = blockchain.height + 1
               val estimators = MiningEstimators(settings.minerSettings, blockchain, blockchain.height)
-              ngState = Some(new NgState(block, newBlockDiff, featuresApprovedWithBlock(block), estimators.total))
+              ngState = Some(
+                new NgState(block, newBlockDiff, featuresApprovedWithBlock(block), MultiDimensionalMiningConstraint.full(estimators.total))
+              )
               lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
               if ((block.timestamp > time
                     .getTimestamp() - settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (height % 100 == 0)) {

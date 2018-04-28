@@ -133,8 +133,11 @@ class MinerImpl(allChannels: ChannelGroup,
             val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
             val sortInBlock   = blockchainUpdater.height <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
 
-            val estimators                         = MiningEstimators(minerSettings, blockchainUpdater, height)
-            val mdConstraint                       = TwoDimensionalMiningConstraint.full(estimators.total, estimators.keyBlock)
+            val estimators = MiningEstimators(minerSettings, blockchainUpdater, height)
+            val mdConstraint = TwoDimensionalMiningConstraint.partial(
+              MultiDimensionalMiningConstraint.full(estimators.total),
+              OneDimensionalMiningConstraint.full(estimators.keyBlock)
+            )
             val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint, sortInBlock)
 
             val features =

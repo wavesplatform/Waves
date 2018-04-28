@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.history._
-import com.wavesplatform.mining.TxNumberEstimator
+import com.wavesplatform.mining.{OneDimensionalMiningConstraint, TxNumberEstimator}
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.{Diff, NgState}
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -27,7 +27,7 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
       case (genesis, payments) =>
         val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-        val ng = new NgState(block, Diff.empty, Set.empty, TxNumberEstimator(Int.MaxValue))
+        val ng = new NgState(block, Diff.empty, Set.empty, OneDimensionalMiningConstraint.full(TxNumberEstimator(Int.MaxValue)))
         microBlocks.foreach(m => ng.append(m, Diff.empty, 0L))
 
         ng.totalDiffOf(microBlocks.last.totalResBlockSig)
@@ -47,12 +47,12 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
       case (genesis, payments) =>
         val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-        val ng = new NgState(block, Diff.empty, Set.empty, TxNumberEstimator(Int.MaxValue))
+        val ng = new NgState(block, Diff.empty, Set.empty, OneDimensionalMiningConstraint.full(TxNumberEstimator(Int.MaxValue)))
         microBlocks.foreach(m => ng.append(m, Diff.empty, 0L))
 
         ng.bestLiquidBlock.uniqueId shouldBe microBlocks.last.totalResBlockSig
 
-        new NgState(block, Diff.empty, Set.empty, TxNumberEstimator(Int.MaxValue)).bestLiquidBlock.uniqueId shouldBe block.uniqueId
+        new NgState(block, Diff.empty, Set.empty, OneDimensionalMiningConstraint.full(TxNumberEstimator(Int.MaxValue))).bestLiquidBlock.uniqueId shouldBe block.uniqueId
     }
   }
 
@@ -62,7 +62,7 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
       case (genesis, payments) =>
         val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-        val ng = new NgState(block, Diff.empty, Set.empty, TxNumberEstimator(Int.MaxValue))
+        val ng = new NgState(block, Diff.empty, Set.empty, OneDimensionalMiningConstraint.full(TxNumberEstimator(Int.MaxValue)))
 
         microBlocks.foldLeft(1000) {
           case (thisTime, m) =>
@@ -75,7 +75,7 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
         ng.bestLastBlockInfo(1051).blockId shouldBe microBlocks.tail.head.totalResBlockSig
         ng.bestLastBlockInfo(2000).blockId shouldBe microBlocks.last.totalResBlockSig
 
-        new NgState(block, Diff.empty, Set.empty, TxNumberEstimator(Int.MaxValue)).bestLiquidBlock.uniqueId shouldBe block.uniqueId
+        new NgState(block, Diff.empty, Set.empty, OneDimensionalMiningConstraint.full(TxNumberEstimator(Int.MaxValue))).bestLiquidBlock.uniqueId shouldBe block.uniqueId
     }
   }
 }

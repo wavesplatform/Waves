@@ -1,5 +1,6 @@
 package com.wavesplatform.mining
 
+import cats.data.NonEmptyList
 import scorex.block.Block
 import scorex.transaction.Transaction
 
@@ -36,4 +37,16 @@ object TwoDimensionalMiningConstraint {
   )
   def partial(firstRest: MiningConstraint, secondRest: MiningConstraint): TwoDimensionalMiningConstraint =
     new TwoDimensionalMiningConstraint(firstRest, secondRest)
+}
+
+case class MultiDimensionalMiningConstraint(constraints: NonEmptyList[MiningConstraint]) extends MiningConstraint {
+  override def isEmpty: Boolean                                      = constraints.exists(_.isEmpty)
+  override def isOverfilled: Boolean                                 = constraints.exists(_.isOverfilled)
+  override def put(x: Block): MultiDimensionalMiningConstraint       = MultiDimensionalMiningConstraint(constraints.map(_.put(x)))
+  override def put(x: Transaction): MultiDimensionalMiningConstraint = MultiDimensionalMiningConstraint(constraints.map(_.put(x)))
+}
+
+object MultiDimensionalMiningConstraint {
+  def full(estimators: NonEmptyList[Estimator]): MultiDimensionalMiningConstraint =
+    MultiDimensionalMiningConstraint(estimators.map(OneDimensionalMiningConstraint.full))
 }

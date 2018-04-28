@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import cats.kernel.Monoid
 import com.google.common.cache.CacheBuilder
-import com.wavesplatform.mining.{Estimator, OneDimensionalMiningConstraint}
+import com.wavesplatform.mining.MiningConstraint
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.{DiscardedMicroBlocks, Transaction}
@@ -12,11 +12,11 @@ import scorex.utils.ScorexLogging
 
 import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
 
-class NgState(val base: Block, val baseBlockDiff: Diff, val approvedFeatures: Set[Short], estimator: Estimator) extends ScorexLogging {
+class NgState(val base: Block, val baseBlockDiff: Diff, val approvedFeatures: Set[Short], baseConstraint: MiningConstraint) extends ScorexLogging {
 
   private val MaxTotalDiffs = 3
 
-  private var constraint                              = OneDimensionalMiningConstraint.full(estimator).put(base)
+  private var constraint                              = baseConstraint.put(base)
   private val microDiffs: MMap[BlockId, (Diff, Long)] = MMap.empty
   private val micros: MList[MicroBlock]               = MList.empty // fresh head
   private val totalBlockDiffCache = CacheBuilder
