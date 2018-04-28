@@ -56,7 +56,7 @@ case class LeaseBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allCh
       )
     ))
   def signedLeaseCancel: Route = (path("cancel") & post) {
-    json[SignedLeaseCancelRequest] { leaseCancelReq =>
+    json[SignedLeaseCancelV1Request] { leaseCancelReq =>
       doBroadcast(leaseCancelReq.toTx)
     }
   }

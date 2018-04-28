@@ -11,7 +11,7 @@ import scorex.account.{Alias, PrivateKeyAccount}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransactionV1}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseTransactionV1}
 import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.transfer._
 import scorex.utils.LoggerFacade
@@ -138,10 +138,10 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
               if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender)).map(_.alias)
               else randomFrom(accounts.filter(_ != sender).map(_.toAddress))
             recipientOpt.flatMap(recipient => logOption(LeaseTransactionV1.create(sender, 1, moreThatStandartFee * 3, ts, recipient)))
-          case LeaseCancelTransaction =>
+          case LeaseCancelTransactionV1 =>
             randomFrom(activeLeaseTransactions).flatMap(lease => {
               val sender = accounts.find(_.address == lease.sender.address).get
-              logOption(LeaseCancelTransaction.create(sender, lease.id(), moreThatStandartFee * 3, ts))
+              logOption(LeaseCancelTransactionV1.create(sender, lease.id(), moreThatStandartFee * 3, ts))
             })
           case CreateAliasTransaction =>
             val sender      = randomFrom(accounts).get

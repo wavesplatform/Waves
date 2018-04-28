@@ -6,7 +6,7 @@ import org.scalatest.Suite
 import scorex.account.Alias
 import scorex.api.http.alias.SignedCreateAliasRequest
 import scorex.api.http.assets._
-import scorex.api.http.leasing.{SignedLeaseCancelRequest, SignedLeaseV1Request}
+import scorex.api.http.leasing.{SignedLeaseCancelV1Request, SignedLeaseV1Request}
 import scorex.crypto.encode.Base58
 import scorex.crypto.signatures.Curve25519.SignatureLength
 import scorex.transaction.assets._
@@ -123,9 +123,9 @@ trait RequestGen extends TransactionGen { _: Suite =>
     _alias     <- leaseGen
   } yield SignedLeaseV1Request(_alias.sender.toString, _alias.amount, _alias.fee, _alias.recipient.toString, _timestamp, _signature)
 
-  val leaseCancelReq: G[SignedLeaseCancelRequest] = for {
+  val leaseCancelReq: G[SignedLeaseCancelV1Request] = for {
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _cancel    <- leaseCancelGen
-  } yield SignedLeaseCancelRequest(_cancel.sender.toString, _cancel.leaseId.base58, _cancel.timestamp, _signature, _cancel.fee)
+  } yield SignedLeaseCancelV1Request(_cancel.sender.toString, _cancel.leaseId.base58, _cancel.timestamp, _signature, _cancel.fee)
 }

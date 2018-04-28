@@ -2,7 +2,7 @@ package scorex.transaction.api.http.leasing
 
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
-import scorex.api.http.leasing.{LeaseCancelRequest, LeaseV1Request, SignedLeaseCancelRequest, SignedLeaseV1Request}
+import scorex.api.http.leasing.{LeaseCancelRequest, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
 
 class LeaseV1RequestsTests extends FunSuite with Matchers {
 
@@ -74,9 +74,9 @@ class LeaseV1RequestsTests extends FunSuite with Matchers {
          }
       """
 
-    val req = Json.parse(json).validate[SignedLeaseCancelRequest].get
+    val req = Json.parse(json).validate[SignedLeaseCancelV1Request].get
 
-    req shouldBe SignedLeaseCancelRequest(
+    req shouldBe SignedLeaseCancelV1Request(
       "CRxqEuxhdZBEHX42MU4FfyJxuHmbDBTaHMhM3Uki7pLw",
       "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5",
       0L,

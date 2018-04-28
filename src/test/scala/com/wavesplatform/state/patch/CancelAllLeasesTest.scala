@@ -8,7 +8,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseTransaction}
 
 class CancelAllLeasesTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -16,7 +16,7 @@ class CancelAllLeasesTest extends PropSpec with PropertyChecks with Matchers wit
     TestFunctionalitySettings.Enabled.copy(resetEffectiveBalancesAtHeight = 5, allowMultipleLeaseCancelTransactionUntilTimestamp = Long.MaxValue / 2)
 
   property("CancelAllLeases cancels all active leases and its effects including those in the block") {
-    val setupAndLeaseInResetBlock: Gen[(GenesisTransaction, GenesisTransaction, LeaseTransaction, LeaseCancelTransaction, LeaseTransaction)] =
+    val setupAndLeaseInResetBlock: Gen[(GenesisTransaction, GenesisTransaction, LeaseTransaction, LeaseCancelTransactionV1, LeaseTransaction)] =
       for {
         master        <- accountGen
         recipient     <- accountGen suchThat (_ != master)
@@ -27,7 +27,7 @@ class CancelAllLeasesTest extends PropSpec with PropertyChecks with Matchers wit
         genesis2: GenesisTransaction = GenesisTransaction.create(otherAccount, ENOUGH_AMT, ts).right.get
         (lease, _) <- leaseAndCancelGeneratorP(master, recipient, master)
         fee2       <- smallFeeGen
-        unleaseOther = LeaseCancelTransaction.create(otherAccount, lease.id(), fee2, ts + 1).right.get
+        unleaseOther = LeaseCancelTransactionV1.create(otherAccount, lease.id(), fee2, ts + 1).right.get
         (lease2, _) <- leaseAndCancelGeneratorP(master, otherAccount2, master)
       } yield (genesis, genesis2, lease, unleaseOther, lease2)
 

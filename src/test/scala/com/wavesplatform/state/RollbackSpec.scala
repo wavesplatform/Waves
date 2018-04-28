@@ -10,7 +10,7 @@ import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransactionV1}
+import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
 import scorex.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction}
@@ -79,7 +79,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
             TestBlock.create(
               nextTs,
               blockWithLeaseId,
-              Seq(LeaseCancelTransaction.create(sender, lt.id(), 1, nextTs).explicitGet())
+              Seq(LeaseCancelTransactionV1.create(sender, lt.id(), 1, nextTs).explicitGet())
             ))
           d.blockchainUpdater.leaseDetails(lt.id()) should contain(LeaseDetails(sender, recipient, 2, leaseAmount, false))
           d.portfolio(sender).lease.out shouldEqual 0
