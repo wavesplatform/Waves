@@ -33,7 +33,7 @@ case class LeaseBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allCh
     ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def signedLease: Route = (path("lease") & post) {
-    json[SignedLeaseRequest] { leaseReq =>
+    json[SignedLeaseV1Request] { leaseReq =>
       doBroadcast(leaseReq.toTx)
     }
   }
@@ -56,7 +56,7 @@ case class LeaseBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allCh
       )
     ))
   def signedLeaseCancel: Route = (path("cancel") & post) {
-    json[SignedLeaseCancelRequest] { leaseCancelReq =>
+    json[SignedLeaseCancelV1Request] { leaseCancelReq =>
       doBroadcast(leaseCancelReq.toTx)
     }
   }

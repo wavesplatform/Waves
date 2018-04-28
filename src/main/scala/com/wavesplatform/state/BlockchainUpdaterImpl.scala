@@ -19,7 +19,7 @@ import scorex.transaction.Transaction.Type
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.lease._
 import scorex.transaction.smart.script.Script
 import scorex.utils.{ScorexLogging, Time}
 

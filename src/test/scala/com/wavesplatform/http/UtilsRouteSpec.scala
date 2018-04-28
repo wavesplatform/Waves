@@ -4,8 +4,8 @@ import com.wavesplatform.crypto
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.Terms.{BOOLEAN, Typed}
-import com.wavesplatform.settings.{FeesSettings, SmartAccountSettings}
 import com.wavesplatform.state.EitherExt2
+import com.wavesplatform.state.diffs.CommonValidation
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue}
@@ -21,8 +21,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       def correctedTime(): Long = System.currentTimeMillis()
       def getTimestamp(): Long  = System.currentTimeMillis()
     },
-    restAPISettings,
-    FeesSettings(SmartAccountSettings(1000), Map.empty)
+    restAPISettings
   ).route
 
   routePath("/script/compile") in {
@@ -37,7 +36,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
       Script.fromBase58String((json \ "script").as[String]) shouldBe Right(expectedScript)
       (json \ "complexity").as[Long] shouldBe 3
-      (json \ "extraFee").as[Long] shouldBe 1000
+      (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }
   }
 
@@ -47,7 +46,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "script").as[String] shouldBe "ENDztao2K4J3jX4YPmCkBynkAeuK7ZXgDLF22c9FPhC74jDE3DQKMfT"
       (json \ "scriptText").as[String] shouldBe "FUNCTION_CALL(FunctionHeader(==,List(LONG, LONG)),List(CONST_LONG(1), CONST_LONG(2)),BOOLEAN)"
       (json \ "complexity").as[Long] shouldBe 3
-      (json \ "extraFee").as[Long] shouldBe 1000
+      (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }
   }
 
