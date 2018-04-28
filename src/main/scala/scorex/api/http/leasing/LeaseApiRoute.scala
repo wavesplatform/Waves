@@ -11,7 +11,7 @@ import play.api.libs.json.JsNumber
 import scorex.BroadcastRoute
 import scorex.account.Address
 import scorex.api.http._
-import scorex.api.http.leasing.LeaseCancelRequest.leaseCancelRequestFormat
+import scorex.api.http.leasing.LeaseCancelV1Request.leaseCancelRequestFormat
 import scorex.api.http.leasing.LeaseV1Request.leaseCancelRequestFormat
 import scorex.transaction._
 import scorex.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
@@ -59,7 +59,7 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
           "{\n\t\"sender\": \"3Myss6gmMckKYtka3cKCM563TBJofnxvfD7\",\n\t\"txId\": \"ABMZDPY4MyQz7kKNAevw5P9eNmRErMutJoV9UNeCtqRV\",\n\t\"fee\": 10000000\n}"
       )
     ))
-  def cancel: Route = processRequest("cancel", (t: LeaseCancelRequest) => doBroadcast(TransactionFactory.leaseCancel(t, wallet, time)))
+  def cancel: Route = processRequest("cancel", (t: LeaseCancelV1Request) => doBroadcast(TransactionFactory.leaseCancelV1(t, wallet, time)))
 
   @Path("/active/{address}")
   @ApiOperation(value = "Get all active leases for an address", httpMethod = "GET")

@@ -6,10 +6,10 @@ import scorex.account._
 import scorex.api.http.DataRequest
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
-import scorex.api.http.leasing.{LeaseCancelRequest, LeaseV1Request, LeaseV2Request}
+import scorex.api.http.leasing.{LeaseCancelV1Request, LeaseCancelV2Request, LeaseV1Request, LeaseV2Request}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets._
-import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1, LeaseTransactionV2}
+import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
 import scorex.transaction.transfer._
@@ -138,11 +138,23 @@ object TransactionFactory {
       tx <- LeaseTransactionV2.selfSigned(request.version, senderPrivateKey, request.amount, request.fee, timestamp, recipientAcc)
     } yield tx
 
-  def leaseCancel(request: LeaseCancelRequest, wallet: Wallet, time: Time): Either[ValidationError, LeaseCancelTransactionV1] =
+  def leaseCancelV1(request: LeaseCancelV1Request, wallet: Wallet, time: Time): Either[ValidationError, LeaseCancelTransactionV1] =
     for {
       pk <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
       tx <- LeaseCancelTransactionV1.create(pk, ByteStr.decodeBase58(request.txId).get, request.fee, timestamp)
+    } yield tx
+
+  def leaseCancelV2(request: LeaseCancelV2Request, wallet: Wallet, time: Time): Either[ValidationError, LeaseCancelTransactionV2] =
+    for {
+      pk <- wallet.findWallet(request.sender)
+      timestamp = request.timestamp.getOrElse(time.getTimestamp())
+      tx <- LeaseCancelTransactionV2.selfSigned(request.version,
+                                                AddressScheme.current.chainId,
+                                                pk,
+                                                ByteStr.decodeBase58(request.txId).get,
+                                                request.fee,
+                                                timestamp)
     } yield tx
 
   def alias(request: CreateAliasRequest, wallet: Wallet, time: Time): Either[ValidationError, CreateAliasTransaction] =

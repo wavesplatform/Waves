@@ -22,7 +22,7 @@ import play.api.libs.json._
 import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
-import scorex.api.http.leasing.{LeaseCancelRequest, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
+import scorex.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
 import scorex.api.http.{AddressApiRoute, ApiErrorResponse, DataRequest}
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
 import scorex.transaction.assets.exchange.Order
@@ -257,7 +257,7 @@ object AsyncHttpApi extends Assertions {
       postJson("/leasing/lease", LeaseV1Request(sourceAddress, amount, fee, recipient)).as[Transaction]
 
     def cancelLease(sourceAddress: String, leaseId: String, fee: Long): Future[Transaction] =
-      postJson("/leasing/cancel", LeaseCancelRequest(sourceAddress, leaseId, fee)).as[Transaction]
+      postJson("/leasing/cancel", LeaseCancelV1Request(sourceAddress, leaseId, fee)).as[Transaction]
 
     def activeLeases(sourceAddress: String) = get(s"/leasing/active/$sourceAddress").as[Seq[Transaction]]
 

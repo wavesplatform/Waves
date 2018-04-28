@@ -21,7 +21,7 @@ import scorex.api.http.leasing._
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.transaction.assets._
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseTransactionV1, LeaseTransactionV2}
+import scorex.transaction.lease._
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
 import scorex.utils.Time
@@ -180,7 +180,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case MassTransferTransaction  => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
               case LeaseTransactionV1       => TransactionFactory.leaseV1(jsv.as[LeaseV1Request], wallet, time)
               case LeaseTransactionV2       => TransactionFactory.leaseV2(jsv.as[LeaseV2Request], wallet, time)
-              case LeaseCancelTransactionV1 => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
+              case LeaseCancelTransactionV1 => TransactionFactory.leaseCancelV1(jsv.as[LeaseCancelV1Request], wallet, time)
+              case LeaseCancelTransactionV2 => TransactionFactory.leaseCancelV2(jsv.as[LeaseCancelV2Request], wallet, time)
               case CreateAliasTransaction   => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
               case DataTransaction          => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
               case SetScriptTransaction     => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
@@ -226,6 +227,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case LeaseTransactionV1       => jsv.as[SignedLeaseV1Request].toTx
               case LeaseTransactionV2       => jsv.as[SignedLeaseV2Request].toTx
               case LeaseCancelTransactionV1 => jsv.as[SignedLeaseCancelV1Request].toTx
+              case LeaseCancelTransactionV2 => jsv.as[SignedLeaseCancelV2Request].toTx
               case CreateAliasTransaction   => jsv.as[SignedCreateAliasRequest].toTx
               case DataTransaction          => jsv.as[SignedDataRequest].toTx
               case SetScriptTransaction     => jsv.as[SignedSetScriptRequest].toTx

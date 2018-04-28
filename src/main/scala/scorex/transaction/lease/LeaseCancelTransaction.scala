@@ -36,10 +36,10 @@ object LeaseCancelTransaction {
 
   def parseBase(bytes: Array[Byte], start: Int) = {
     val sender    = PublicKeyAccount(bytes.slice(start, KeyLength))
-    val fee       = Longs.fromByteArray(bytes.slice(start + KeyLength, KeyLength + 8))
-    val timestamp = Longs.fromByteArray(bytes.slice(start + KeyLength + 8, KeyLength + 16))
-    val leaseId   = ByteStr(bytes.slice(start + KeyLength + 16, KeyLength + 16 + crypto.DigestSize))
+    val fee       = Longs.fromByteArray(bytes.slice(start + KeyLength, start + KeyLength + 8))
+    val timestamp = Longs.fromByteArray(bytes.slice(start + KeyLength + 8, start + KeyLength + 16))
     val end       = start + KeyLength + 16 + crypto.DigestSize
+    val leaseId   = ByteStr(bytes.slice(start + KeyLength + 16, end))
     (sender, fee, timestamp, leaseId, end)
   }
 }
