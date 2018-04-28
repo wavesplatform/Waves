@@ -1,9 +1,9 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.v1
 
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
-import com.wavesplatform.lang.GlobalFunctionsBenchmark._
-import com.wavesplatform.lang.v1.EnvironmentFunctions
+import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark._
 import com.wavesplatform.lang.v1.traits.{DataType, Environment, Transaction}
 import org.openjdk.jmh.annotations._
 import scodec.bits.ByteVector
@@ -15,7 +15,7 @@ import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey, Signature}
 @Fork(1)
 @Warmup(iterations = 10)
 @Measurement(iterations = 10)
-class GlobalFunctionsBenchmark {
+class EnvironmentFunctionsBenchmark {
 
   @Benchmark
   def random_bytes_500_test(): Array[Byte] = randomBytes(DataBytesLength)
@@ -67,7 +67,7 @@ class GlobalFunctionsBenchmark {
 
 }
 
-object GlobalFunctionsBenchmark {
+object EnvironmentFunctionsBenchmark {
 
   val NetworkByte: Byte = 'P'
   val DataBytesLength   = 512

@@ -32,10 +32,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistribution ~ details ~
-        pathPrefix("sponsorship") {
-          sponsorRoute ~ cancelSponsorshipRoute
-        }
+      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistribution ~ details ~ sponsorRoute
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -275,7 +272,10 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
           "script"         -> JsString(description.script.fold("")(s => s.bytes().base58)),
           "scriptText"     -> JsString(description.script.fold("")(s => s.text)),
-          "sponsorship"    -> JsNumber(description.sponsorship)
+          "minSponsoredAssetFee" -> (description.sponsorship match {
+            case 0           => JsNull
+            case sponsorship => JsNumber(sponsorship)
+          })
         )
       )
     }).left.map(m => CustomValidationError(m))
@@ -290,25 +290,9 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         required = true,
         paramType = "body",
         dataType = "scorex.api.http.assets.SponsorFeeRequest",
-        defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"baseFee\":100000000,\"fee\":100000}"
+        defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"minSponsoredAssetFee\":100000000,\"fee\":100000000}"
       )
     ))
   def sponsorRoute: Route =
     processRequest("sponsor", (req: SponsorFeeRequest) => doBroadcast(TransactionFactory.sponsor(req, wallet, time)))
-
-  @Path("/cancel")
-  @ApiOperation(value = "Cancel Asset Fee Sponsorship", httpMethod = "POST", produces = "application/json", consumes = "application/json")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(
-        name = "body",
-        value = "Json with data",
-        required = true,
-        paramType = "body",
-        dataType = "scorex.api.http.assets.CancelFeeSponsorshipRequest",
-        defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"fee\":100000}"
-      )
-    ))
-  def cancelSponsorshipRoute: Route =
-    processRequest("cancel", (req: CancelFeeSponsorshipRequest) => doBroadcast(TransactionFactory.cancelSponsorship(req, wallet, time)))
 }

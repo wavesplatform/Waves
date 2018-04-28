@@ -169,14 +169,6 @@ object TransactionFactory {
       pk <- wallet.findWallet(request.sender)
       assetId   = ByteStr.decodeBase58(request.assetId).get
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- SponsorFeeTransaction.create(request.version, pk, assetId, request.baseFee, request.fee, timestamp)
-    } yield tx
-
-  def cancelSponsorship(request: CancelFeeSponsorshipRequest, wallet: Wallet, time: Time): Either[ValidationError, CancelFeeSponsorshipTransaction] =
-    for {
-      pk <- wallet.findWallet(request.sender)
-      assetId   = ByteStr.decodeBase58(request.assetId).get
-      timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- CancelFeeSponsorshipTransaction.create(request.version, pk, assetId, request.fee, timestamp)
+      tx <- SponsorFeeTransaction.create(request.version, pk, assetId, request.minSponsoredAssetFee, request.fee, timestamp)
     } yield tx
 }

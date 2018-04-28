@@ -92,7 +92,7 @@ trait TransactionGenBase extends ScriptGen {
 
   val positiveLongGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L / 100)
   val positiveIntGen: Gen[Int]   = Gen.choose(1, Int.MaxValue / 100)
-  val smallFeeGen: Gen[Long]     = Gen.choose(1, 100000000)
+  val smallFeeGen: Gen[Long]     = Gen.choose(400000, 100000000)
 
   val maxOrderTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + time.correctedTime())
   val timestampGen: Gen[Long]    = Gen.choose(1, Long.MaxValue - 100)
@@ -112,7 +112,7 @@ trait TransactionGenBase extends ScriptGen {
     proofs       <- Gen.listOfN(proofsAmount, genBoundedBytes(0, 50))
   } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
 
-  val scriptGen = BOOLgen(1000).map { expr =>
+  val scriptGen = BOOLgen(100).map { expr =>
     val typed = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(PureContext.instance |+| CryptoContext.build(Global)), expr).explicitGet()
     ScriptV1(typed).explicitGet()
   }
@@ -363,7 +363,7 @@ trait TransactionGenBase extends ScriptGen {
   val burnGen: Gen[BurnTransaction]       = issueReissueBurnGen.map(_._3)
 
   def sponsorFeeCancelSponsorFeeGen(
-      sender: PrivateKeyAccount): Gen[(IssueTransaction, SponsorFeeTransaction, SponsorFeeTransaction, CancelFeeSponsorshipTransaction)] =
+      sender: PrivateKeyAccount): Gen[(IssueTransaction, SponsorFeeTransaction, SponsorFeeTransaction, SponsorFeeTransaction)] =
     for {
       (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
       issue = IssueTransaction
@@ -375,9 +375,9 @@ trait TransactionGenBase extends ScriptGen {
       assetId = issue.assetId()
     } yield
       (issue,
-       SponsorFeeTransaction.create(1, sender, assetId, minFee, 1 * Constants.UnitsInWave, timestamp).right.get,
-       SponsorFeeTransaction.create(1, sender, assetId, minFee1, 1 * Constants.UnitsInWave, timestamp).right.get,
-       CancelFeeSponsorshipTransaction.create(1, sender, assetId, 1 * Constants.UnitsInWave, timestamp).right.get,
+       SponsorFeeTransaction.create(1, sender, assetId, Some(minFee), 1 * Constants.UnitsInWave, timestamp).right.get,
+       SponsorFeeTransaction.create(1, sender, assetId, Some(minFee1), 1 * Constants.UnitsInWave, timestamp).right.get,
+       SponsorFeeTransaction.create(1, sender, assetId, None, 1 * Constants.UnitsInWave, timestamp).right.get,
       )
 
   val sponsorFeeGen = for {

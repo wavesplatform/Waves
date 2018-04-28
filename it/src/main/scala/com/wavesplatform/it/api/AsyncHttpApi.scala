@@ -108,6 +108,8 @@ object AsyncHttpApi extends Assertions {
     def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
       retrying(f(_get(s"${n.nodeApiEndpoint}$path")).build())
 
+    def seed(address: String): Future[String] = getWithApiKey(s"/addresses/seed/$address").as[JsValue].map(v => (v \ "seed").as[String])
+
     def getWithApiKey(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
       _get(s"${n.nodeApiEndpoint}$path")
         .withApiKey(n.apiKey)
@@ -282,11 +284,11 @@ object AsyncHttpApi extends Assertions {
     def assetsBalance(address: String): Future[FullAssetsInfo] =
       get(s"/assets/balance/$address").as[FullAssetsInfo]
 
-    def sponsorAsset(sourceAddress: String, assetId: String, baseFee: Long, fee: Long): Future[Transaction] =
-      postJson("/assets/sponsorship/sponsor", SponsorFeeRequest(1, sourceAddress, assetId, baseFee, fee)).as[Transaction]
+    def sponsorAsset(sourceAddress: String, assetId: String, minSponsoredAssetFee: Long, fee: Long): Future[Transaction] =
+      postJson("/assets/sponsor", SponsorFeeRequest(1, sourceAddress, assetId, Some(minSponsoredAssetFee), fee)).as[Transaction]
 
     def cancelSponsorship(sourceAddress: String, assetId: String, fee: Long): Future[Transaction] =
-      postJson("/assets/sponsorship/cancel", CancelFeeSponsorshipRequest(1, sourceAddress, assetId, fee)).as[Transaction]
+      postJson("/assets/sponsor", SponsorFeeRequest(1, sourceAddress, assetId, None, fee)).as[Transaction]
 
     def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]

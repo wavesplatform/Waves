@@ -78,20 +78,7 @@ object AssetTransactionsDiff {
           height = height,
           tx = tx,
           portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-          sponsorship = Map(tx.assetId         -> SponsorshipValue(tx.minFee))
-        ))
-    }
-  }
-
-  def cancelSponsorship(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(
-      tx: CancelFeeSponsorshipTransaction): Either[ValidationError, Diff] = {
-    validateAsset(tx, blockchain, tx.assetId, true).flatMap { _ =>
-      Right(
-        Diff(
-          height = height,
-          tx = tx,
-          portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-          sponsorship = Map(tx.assetId         -> SponsorshipValue(0))
+          sponsorship = Map(tx.assetId         -> SponsorshipValue(tx.minSponsoredAssetFee.getOrElse(0)))
         ))
     }
   }

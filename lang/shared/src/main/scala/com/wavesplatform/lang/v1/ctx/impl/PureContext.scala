@@ -13,24 +13,24 @@ object PureContext {
 
   val none: LazyVal = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval).subflatMap(Right(_: Option[Nothing]))) // IDEA HACK
 
-  val extract: PredefFunction = PredefFunction("extract", 5, TYPEPARAM('T'), List(("opt", optionT))) {
+  val extract: PredefFunction = PredefFunction("extract", 1, TYPEPARAM('T'), List(("opt", optionT))) {
     case Some(v) :: Nil => Right(v)
     case None :: Nil    => Left("Extract from empty option")
     case _              => ???
   }
 
-  val some: PredefFunction = PredefFunction("Some", 5, optionT, List(("obj", TYPEPARAM('T')))) {
+  val some: PredefFunction = PredefFunction("Some", 1, optionT, List(("obj", TYPEPARAM('T')))) {
     case v :: Nil => Right(Some(v))
     case _        => ???
   }
 
-  val isDefined: PredefFunction = PredefFunction("isDefined", 5, BOOLEAN, List(("opt", optionT))) {
+  val isDefined: PredefFunction = PredefFunction("isDefined", 1, BOOLEAN, List(("opt", optionT))) {
     case Some(_) :: Nil => Right(true)
     case None :: Nil    => Right(false)
     case _              => ???
   }
 
-  val size: PredefFunction = PredefFunction("size", 5, LONG, List(("byteVector", BYTEVECTOR))) {
+  val size: PredefFunction = PredefFunction("size", 1, LONG, List(("byteVector", BYTEVECTOR))) {
     case (bv: ByteVector) :: Nil => Right(bv.size)
     case _                       => ???
   }
@@ -43,15 +43,15 @@ object PureContext {
     }
   }
 
-  val sumLong       = createOp(SUM_OP, LONG, LONG)((a, b) => a + b)
-  val sumString     = createOp(SUM_OP, STRING, STRING)((a, b) => a + b)
+  val sumLong       = createOp(SUM_OP, LONG, LONG)(_ + _)
+  val sumString     = createOp(SUM_OP, STRING, STRING)(_ + _)
   val sumByteVector = createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR)((a, b) => ByteVector(a.toArray ++ b.toArray))
-  val eqLong        = createOp(EQ_OP, LONG, BOOLEAN)((a, b) => a == b)
-  val eqByteVector  = createOp(EQ_OP, BYTEVECTOR, BOOLEAN)((a, b) => a == b)
-  val eqBool        = createOp(EQ_OP, BOOLEAN, BOOLEAN)((a, b) => a == b)
-  val eqString      = createOp(EQ_OP, STRING, BOOLEAN)((a, b) => a == b)
-  val ge            = createOp(GE_OP, LONG, BOOLEAN)((a, b) => a >= b)
-  val gt            = createOp(GT_OP, LONG, BOOLEAN)((a, b) => a > b)
+  val eqLong        = createOp(EQ_OP, LONG, BOOLEAN)(_ == _)
+  val eqByteVector  = createOp(EQ_OP, BYTEVECTOR, BOOLEAN)(_ == _)
+  val eqBool        = createOp(EQ_OP, BOOLEAN, BOOLEAN)(_ == _)
+  val eqString      = createOp(EQ_OP, STRING, BOOLEAN)(_ == _)
+  val ge            = createOp(GE_OP, LONG, BOOLEAN)(_ >= _)
+  val gt            = createOp(GT_OP, LONG, BOOLEAN)(_ > _)
 
   val operators: Seq[PredefFunction] = Seq(sumLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt)
 
