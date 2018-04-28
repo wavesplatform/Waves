@@ -119,7 +119,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
 
   property("Burn transaction ") {
     val feeCalc = new FeeCalculator(mySettings, noScriptBlockchain)
-    forAll(burnGen) { tx: BurnTransactionV1 =>
+    forAll(burnGen) { tx: BurnTransaction =>
       feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 300000)
     }
   }

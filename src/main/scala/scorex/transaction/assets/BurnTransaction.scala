@@ -7,7 +7,6 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount
 import scorex.crypto.signatures.Curve25519.KeyLength
-import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.transaction.validation._
 
@@ -52,7 +51,7 @@ object BurnTransaction {
   val typeId: Byte = 6
 
   def parseBase(start: Int, bytes: Array[Byte]): (PublicKeyAccount, AssetId, Long, Long, Long, Int) = {
-    val sender        = PublicKeyAccount(bytes.slice(start, KeyLength))
+    val sender        = PublicKeyAccount(bytes.slice(start, start + KeyLength))
     val assetId       = ByteStr(bytes.slice(start + KeyLength, start + KeyLength + AssetIdLength))
     val quantityStart = start + KeyLength + AssetIdLength
 
@@ -67,7 +66,7 @@ object BurnTransaction {
     (validateAmount(amount, "assets"), validateFee(fee))
       .mapN { case _ => () }
       .fold(
-        errs => GenericError(errs.toList mkString ",").asLeft[Unit],
+        _.head.asLeft[Unit],
         _.asRight[ValidationError]
       )
   }

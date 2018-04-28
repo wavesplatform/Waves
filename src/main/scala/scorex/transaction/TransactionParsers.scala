@@ -39,6 +39,7 @@ object TransactionParsers {
     SetScriptTransaction,
     IssueTransactionV2,
     ReissueTransactionV2,
+    BurnTransactionV2,
     SponsorFeeTransaction
   ).flatMap { x =>
     x.supportedVersions.map { version =>

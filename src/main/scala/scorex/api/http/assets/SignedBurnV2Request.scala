@@ -27,8 +27,8 @@ case class SignedBurnV2Request(@ApiModelProperty(value = "BurnTransaction format
 
   def toTx: Either[ValidationError, BurnTransactionV2] =
     for {
-      _sender  <- PublicKeyAccount.fromBase58String(senderPublicKey)
-      _assetId <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
+      _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _assetId    <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       chainId = AddressScheme.current.chainId

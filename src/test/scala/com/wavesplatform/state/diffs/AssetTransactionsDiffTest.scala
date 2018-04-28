@@ -21,7 +21,7 @@ import scorex.transaction.transfer._
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
-  def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransaction, BurnTransactionV1))] =
+  def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransaction, BurnTransaction))] =
     for {
       master <- accountGen
       ts     <- timestampGen
@@ -50,7 +50,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   }
 
   property("Cannot reissue/burn non-existing alias") {
-    val setup: Gen[(GenesisTransaction, ReissueTransaction, BurnTransactionV1)] = for {
+    val setup: Gen[(GenesisTransaction, ReissueTransaction, BurnTransaction)] = for {
       master <- accountGen
       ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
