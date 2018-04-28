@@ -328,13 +328,13 @@ trait TransactionGenBase extends ScriptGen {
     timestamp                 <- positiveLongGen
   } yield (sender, assetName, description, quantity, decimals, reissuable, fee, timestamp)
 
-  val issueReissueBurnGen: Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
+  val issueReissueBurnGen: Gen[(IssueTransaction, ReissueTransaction, BurnTransactionV1)] = for {
     amount                    <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
     r                         <- issueReissueBurnGeneratorP(amount, amount, amount, sender)
   } yield r
 
-  def issueReissueBurnGeneratorP(issueQuantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] =
+  def issueReissueBurnGeneratorP(issueQuantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransactionV1)] =
     issueReissueBurnGeneratorP(issueQuantity, issueQuantity, issueQuantity, sender)
 
   def createIssue(issuer: PrivateKeyAccount,
@@ -370,7 +370,7 @@ trait TransactionGenBase extends ScriptGen {
   def issueReissueBurnGeneratorP(issueQuantity: Long,
                                  reissueQuantity: Long,
                                  burnQuantity: Long,
-                                 sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] =
+                                 sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransactionV1)] =
     for {
       (_, assetName, description, _, decimals, reissuable, iFee, timestamp) <- issueParamGen
       burnAmount                                                            <- Gen.choose(0L, burnQuantity)
@@ -379,7 +379,7 @@ trait TransactionGenBase extends ScriptGen {
       issue                                                                 <- createIssue(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp)
       reissue                                                               <- createReissue(sender, issue.assetId(), reissueQuantity, reissuable2, fee, timestamp)
     } yield {
-      val burn = BurnTransaction.create(sender, issue.assetId(), burnAmount, fee, timestamp).right.get
+      val burn = BurnTransactionV1.create(sender, issue.assetId(), burnAmount, fee, timestamp).right.get
       (issue, reissue, burn)
     }
 
@@ -405,7 +405,7 @@ trait TransactionGenBase extends ScriptGen {
 
   val issueGen: Gen[IssueTransaction]     = issueReissueBurnGen.map(_._1)
   val reissueGen: Gen[ReissueTransaction] = issueReissueBurnGen.map(_._2)
-  val burnGen: Gen[BurnTransaction]       = issueReissueBurnGen.map(_._3)
+  val burnGen: Gen[BurnTransactionV1]       = issueReissueBurnGen.map(_._3)
 
   def sponsorFeeCancelSponsorFeeGen(
       sender: PrivateKeyAccount): Gen[(IssueTransaction, SponsorFeeTransaction, SponsorFeeTransaction, SponsorFeeTransaction)] =

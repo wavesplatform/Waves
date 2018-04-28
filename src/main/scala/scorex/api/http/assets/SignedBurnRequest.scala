@@ -6,7 +6,7 @@ import play.api.libs.json._
 import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParsers.SignatureStringLength
-import scorex.transaction.assets.BurnTransaction
+import scorex.transaction.assets.BurnTransactionV1
 import scorex.transaction.{AssetIdStringLength, ValidationError}
 
 object SignedBurnRequest {
@@ -36,11 +36,11 @@ case class SignedBurnRequest(@ApiModelProperty(value = "Base58 encoded Issuer pu
                              signature: String)
     extends BroadcastRequest {
 
-  def toTx: Either[ValidationError, BurnTransaction] =
+  def toTx: Either[ValidationError, BurnTransactionV1] =
     for {
       _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _assetId   <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-      _t         <- BurnTransaction.create(_sender, _assetId, quantity, fee, timestamp, _signature)
+      _t         <- BurnTransactionV1.create(_sender, _assetId, quantity, fee, timestamp, _signature)
     } yield _t
 }

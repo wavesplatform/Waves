@@ -167,11 +167,11 @@ object TransactionFactory {
                                             timestamp)
     } yield tx
 
-  def burnAsset(request: BurnRequest, wallet: Wallet, time: Time): Either[ValidationError, BurnTransaction] =
+  def burnAsset(request: BurnRequest, wallet: Wallet, time: Time): Either[ValidationError, BurnTransactionV1] =
     for {
       pk <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- BurnTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.fee, timestamp)
+      tx <- BurnTransactionV1.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.fee, timestamp)
     } yield tx
 
   def data(request: DataRequest, wallet: Wallet, time: Time): Either[ValidationError, DataTransaction] =

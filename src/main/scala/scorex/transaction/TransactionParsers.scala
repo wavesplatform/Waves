@@ -23,7 +23,7 @@ object TransactionParsers {
     IssueTransactionV1,
     TransferTransactionV1,
     ReissueTransactionV1,
-    BurnTransaction,
+    BurnTransactionV1,
     ExchangeTransaction,
     LeaseTransaction,
     LeaseCancelTransaction,

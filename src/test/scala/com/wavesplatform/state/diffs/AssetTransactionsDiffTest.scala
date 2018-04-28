@@ -21,7 +21,7 @@ import scorex.transaction.transfer._
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
-  def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransaction, BurnTransaction))] =
+  def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransaction, BurnTransactionV1))] =
     for {
       master <- accountGen
       ts     <- timestampGen
@@ -50,7 +50,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   }
 
   property("Cannot reissue/burn non-existing alias") {
-    val setup: Gen[(GenesisTransaction, ReissueTransaction, BurnTransaction)] = for {
+    val setup: Gen[(GenesisTransaction, ReissueTransaction, BurnTransactionV1)] = for {
       master <- accountGen
       ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
@@ -78,7 +78,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       fee                    <- Gen.choose(1L, 2000000L)
       timestamp              <- timestampGen
       reissue = ReissueTransactionV1.create(other, issue.assetId(), quantity, reissuable2, fee, timestamp).right.get
-      burn    = BurnTransaction.create(other, issue.assetId(), quantity, fee, timestamp).right.get
+      burn    = BurnTransactionV1.create(other, issue.assetId(), quantity, fee, timestamp).right.get
     } yield ((gen, issue), reissue, burn)
 
     forAll(setup) {
@@ -101,7 +101,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       (issue, _, _) <- issueReissueBurnGeneratorP(ENOUGH_AMT, issuer)
       assetTransfer <- transferGeneratorP(issuer, burner, Some(issue.assetId()), None)
       wavesTransfer <- wavesTransferGeneratorP(issuer, burner)
-      burn = BurnTransaction.create(burner, issue.assetId(), assetTransfer.amount, wavesTransfer.amount, timestamp).right.get
+      burn = BurnTransactionV1.create(burner, issue.assetId(), assetTransfer.amount, wavesTransfer.amount, timestamp).right.get
     } yield (genesis, issue, assetTransfer, wavesTransfer, burn)
 
     val fs =

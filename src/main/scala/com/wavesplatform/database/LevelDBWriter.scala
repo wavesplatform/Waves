@@ -690,7 +690,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
 
             case _: IssueTransaction        => rollbackAssetInfo(rw, tx.id(), currentHeight)
             case tx: ReissueTransaction     => rollbackAssetInfo(rw, tx.assetId, currentHeight)
-            case tx: BurnTransaction        => rollbackAssetInfo(rw, tx.assetId, currentHeight)
+            case tx: BurnTransactionV1        => rollbackAssetInfo(rw, tx.assetId, currentHeight)
             case _: LeaseTransaction        => rollbackLeaseStatus(rw, tx.id(), currentHeight)
             case tx: LeaseCancelTransaction => rollbackLeaseStatus(rw, tx.leaseId, currentHeight)
 
