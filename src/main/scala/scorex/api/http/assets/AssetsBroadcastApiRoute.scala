@@ -99,13 +99,8 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
       new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])
     ))
   def burnRoute: Route = (path("burn") & post) {
-    json[SignedBurnRequests] { burnReq =>
-      doBroadcast(
-        burnReq.eliminate(
-          _.toTx,
-          _.eliminate(_.toTx, _ => UnsupportedTransactionType.asLeft[Transaction])
-        )
-      )
+    json[SignedTransferV2Request] { burnReq =>
+      doBroadcast(burnReq.toTx)
     }
   }
 
