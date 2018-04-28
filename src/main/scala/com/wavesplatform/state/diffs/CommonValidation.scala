@@ -21,7 +21,7 @@ object CommonValidation {
 
   val MaxTimeTransactionOverBlockDiff: FiniteDuration     = 90.minutes
   val MaxTimePrevBlockOverTransactionDiff: FiniteDuration = 2.hours
-  private val ScriptExtraFee                              = 400000L
+  val ScriptExtraFee                                      = 400000L
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
                                                           settings: FunctionalitySettings,

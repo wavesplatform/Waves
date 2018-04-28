@@ -12,13 +12,11 @@ import org.scalatest.{Assertion, Matchers, PropSpec}
 import scorex.account.AddressScheme
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
-import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction, SponsorFeeTransaction, TransferTransaction}
+import scorex.transaction.assets.{IssueTransactionV1, IssueTransactionV2, SponsorFeeTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.{GenesisTransaction, Transaction, ValidationError}
 import scorex.transaction.transfer._
-import scorex.transaction.{GenesisTransaction, Transaction}
+import scorex.transaction.{GenesisTransaction, Transaction, ValidationError}
 
 class CommonValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithState with NoShrink {
 
@@ -138,9 +136,9 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
 
       val issueTx =
         if (smartToken)
-          SmartIssueTransactionV1
+          IssueTransactionV2
             .selfSigned(
-              SmartIssueTransactionV1.supportedVersions.head,
+              IssueTransactionV2.supportedVersions.head,
               AddressScheme.current.chainId,
               richAcc,
               "test".getBytes(),
@@ -154,7 +152,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             )
             .explicitGet()
         else
-          IssueTransaction
+          IssueTransactionV1
             .create(richAcc, "test".getBytes(), "desc".getBytes(), Long.MaxValue, 2, reissuable = false, Constants.UnitsInWave, ts)
             .explicitGet()
 
