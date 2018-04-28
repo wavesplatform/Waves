@@ -11,6 +11,8 @@ import io.swagger.annotations._
 import scorex.BroadcastRoute
 import scorex.api.http._
 import scorex.transaction.{Transaction, ValidationError}
+import cats.implicits._
+import scorex.transaction.ValidationError.UnsupportedTransactionType
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -97,8 +99,13 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
       new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])
     ))
   def burnRoute: Route = (path("burn") & post) {
-    json[SignedBurnV1Request] { burnReq =>
-      doBroadcast(burnReq.toTx)
+    json[SignedBurnRequests] { burnReq =>
+      doBroadcast(
+        burnReq.eliminate(
+          _.toTx,
+          _.eliminate(_.toTx, _ => UnsupportedTransactionType.asLeft[Transaction])
+        )
+      )
     }
   }
 

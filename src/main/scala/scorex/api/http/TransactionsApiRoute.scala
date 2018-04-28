@@ -222,6 +222,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case ReissueTransactionV1    => jsv.as[SignedReissueV1Request].toTx
               case ReissueTransactionV2    => jsv.as[SignedReissueV2Request].toTx
               case BurnTransactionV1       => jsv.as[SignedBurnV1Request].toTx
+              case BurnTransactionV2       => jsv.as[SignedBurnV2Request].toTx
               case LeaseTransaction        => jsv.as[SignedLeaseRequest].toTx
               case LeaseCancelTransaction  => jsv.as[SignedLeaseCancelRequest].toTx
               case CreateAliasTransaction  => jsv.as[SignedCreateAliasRequest].toTx

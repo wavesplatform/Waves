@@ -39,4 +39,12 @@ package object assets {
     )
   }
 
+  type SignedBurnRequests = SignedBurnV1Request :+: SignedBurnV2Request :+: CNil
+  implicit val autoSignedBurnRequestsReads: Reads[SignedBurnRequests] = Reads { json =>
+    (json \ "version").asOpt[Int] match {
+      case None | Some(1) => SignedBurnV1Request.reads.reads(json).map(Coproduct[SignedBurnRequests].apply)
+      case _              => SignedBurnV2Request.reads.reads(json).map(Coproduct[SignedBurnRequests].apply)
+    }
+  }
+
 }
