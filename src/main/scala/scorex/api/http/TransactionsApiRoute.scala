@@ -17,11 +17,11 @@ import scorex.api.http.DataRequest._
 import scorex.api.http.alias.{CreateAliasRequest, SignedCreateAliasRequest}
 import scorex.api.http.assets._
 import scorex.api.http.assets.SponsorFeeRequest._
-import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
+import scorex.api.http.leasing._
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.transaction.assets._
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransactionV1}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransactionV1, LeaseTransactionV2}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
 import scorex.utils.Time
@@ -178,7 +178,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case ReissueTransactionV2    => TransactionFactory.reissueAssetV2(jsv.as[ReissueV2Request], wallet, time)
               case BurnTransaction         => TransactionFactory.burnAsset(jsv.as[BurnRequest], wallet, time)
               case MassTransferTransaction => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
-              case LeaseTransactionV1      => TransactionFactory.lease(jsv.as[LeaseRequest], wallet, time)
+              case LeaseTransactionV1      => TransactionFactory.leaseV1(jsv.as[LeaseV1Request], wallet, time)
+              case LeaseTransactionV2      => TransactionFactory.leaseV2(jsv.as[LeaseV2Request], wallet, time)
               case LeaseCancelTransaction  => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
               case CreateAliasTransaction  => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
               case DataTransaction         => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
@@ -222,7 +223,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case ReissueTransactionV1    => jsv.as[SignedReissueV1Request].toTx
               case ReissueTransactionV2    => jsv.as[SignedReissueV2Request].toTx
               case BurnTransaction         => jsv.as[SignedBurnRequest].toTx
-              case LeaseTransactionV1      => jsv.as[SignedLeaseRequest].toTx
+              case LeaseTransactionV1      => jsv.as[SignedLeaseV1Request].toTx
+              case LeaseTransactionV2      => jsv.as[SignedLeaseV2Request].toTx
               case LeaseCancelTransaction  => jsv.as[SignedLeaseCancelRequest].toTx
               case CreateAliasTransaction  => jsv.as[SignedCreateAliasRequest].toTx
               case DataTransaction         => jsv.as[SignedDataRequest].toTx

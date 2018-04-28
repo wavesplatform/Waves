@@ -12,7 +12,7 @@ import scorex.BroadcastRoute
 import scorex.account.Address
 import scorex.api.http._
 import scorex.api.http.leasing.LeaseCancelRequest.leaseCancelRequestFormat
-import scorex.api.http.leasing.LeaseRequest.leaseCancelRequestFormat
+import scorex.api.http.leasing.LeaseV1Request.leaseCancelRequestFormat
 import scorex.transaction._
 import scorex.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
 import scorex.utils.Time
@@ -43,7 +43,7 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
       )
     ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def lease: Route = processRequest("lease", (t: LeaseRequest) => doBroadcast(TransactionFactory.lease(t, wallet, time)))
+  def lease: Route = processRequest("lease", (t: LeaseV1Request) => doBroadcast(TransactionFactory.leaseV1(t, wallet, time)))
 
   @Path("/cancel")
   @ApiOperation(value = "Interrupt a lease", httpMethod = "POST", produces = "application/json", consumes = "application/json")

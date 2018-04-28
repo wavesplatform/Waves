@@ -11,7 +11,7 @@ import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.state.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.api.http.assets.SignedTransferV1Request
-import scorex.api.http.leasing.{SignedLeaseCancelRequest, SignedLeaseRequest}
+import scorex.api.http.leasing.{SignedLeaseCancelRequest, SignedLeaseV1Request}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransactionV1}
@@ -559,9 +559,9 @@ class MatcherTestSuite
     )
   }
 
-  private def createSignedLeaseRequest(tx: LeaseTransactionV1): SignedLeaseRequest = {
+  private def createSignedLeaseRequest(tx: LeaseTransactionV1): SignedLeaseV1Request = {
     import tx._
-    SignedLeaseRequest(
+    SignedLeaseV1Request(
       Base58.encode(tx.sender.publicKey),
       amount,
       fee,
