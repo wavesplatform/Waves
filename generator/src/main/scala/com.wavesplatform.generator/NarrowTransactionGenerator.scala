@@ -118,10 +118,10 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
               val sender = accounts.find(_.address == assetTx.sender.address).get
               logOption(ReissueTransactionV1.create(sender, assetTx.id(), Random.nextInt(Int.MaxValue), reissuable, moreThatStandartFee, ts))
             })
-          case BurnTransaction =>
+          case BurnTransactionV1 =>
             randomFrom(validIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
-              logOption(BurnTransaction.create(sender, assetTx.id(), Random.nextInt(1000), moreThatStandartFee, ts))
+              logOption(BurnTransactionV1.create(sender, assetTx.id(), Random.nextInt(1000), moreThatStandartFee, ts))
             })
           case ExchangeTransaction =>
             val matcher   = randomFrom(accounts).get

@@ -1,6 +1,5 @@
 package scorex.api.http.assets
 
-import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.network._
 import com.wavesplatform.settings.RestAPISettings
@@ -8,6 +7,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
+import javax.ws.rs.Path
 import scorex.BroadcastRoute
 import scorex.api.http._
 import scorex.transaction.{Transaction, ValidationError}
@@ -97,7 +97,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
       new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])
     ))
   def burnRoute: Route = (path("burn") & post) {
-    json[SignedBurnRequest] { burnReq =>
+    json[SignedBurnV1Request] { burnReq =>
       doBroadcast(burnReq.toTx)
     }
   }

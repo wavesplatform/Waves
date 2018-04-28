@@ -153,7 +153,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
         |"signature":"H3F8gAsKYeJAPmxCagLaCHycqkr8KiYvzJ4dhophZs31Unmg3dLwVK5k1v1M2Z5zLuQySthpf3DeEyhL6cdpbqp"
         |}
       """.stripMargin
-    val req = Json.parse(json).validate[SignedBurnRequest].get
+    val req = Json.parse(json).validate[SignedBurnV1Request].get
     req.senderPublicKey shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
     req.signature shouldBe "H3F8gAsKYeJAPmxCagLaCHycqkr8KiYvzJ4dhophZs31Unmg3dLwVK5k1v1M2Z5zLuQySthpf3DeEyhL6cdpbqp"
     req.fee shouldBe 100000000L

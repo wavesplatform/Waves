@@ -113,8 +113,8 @@ class BlockchainUpdaterSponsoredFeeBlockTest
                                            3: Byte,
                                            sponsor.timestamp + 1)
         val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq.empty, PrivateKeyAccount(Array.fill(KeyLength)(1)), 3: Byte, sponsor.timestamp + 1)
-        val block3 = buildBlockOfTxs(block2.uniqueId, Seq(aliceToBob))
-        val block4 = buildBlockOfTxs(block3.uniqueId, Seq(bobToMaster))
+        val block3 = buildBlockOfTxs(block2.uniqueId, Seq(aliceToBob, bobToMaster))
+        val block4 = buildBlockOfTxs(block3.uniqueId, Seq(bobToMaster2))
 
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processMicroBlock(microBlocks(0)).explicitGet()
@@ -123,8 +123,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         domain.blockchainUpdater.processBlock(block1).explicitGet()
         domain.blockchainUpdater.processBlock(block2).explicitGet()
         domain.blockchainUpdater.processBlock(block3).explicitGet()
-        domain.blockchainUpdater.processBlock(block4) shouldBe 'right
-      //domain.blockchainUpdater.processBlock(block) should produce("negative waves balance" /*"unavailable funds"*/)
+        domain.blockchainUpdater.processBlock(block4) should produce("negative waves balance" /*"unavailable funds"*/ )
 
     }
   }

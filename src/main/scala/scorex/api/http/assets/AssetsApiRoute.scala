@@ -191,7 +191,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       )
     ))
   def burnRoute: Route =
-    processRequest("burn", (b: BurnRequest) => doBroadcast(TransactionFactory.burnAsset(b, wallet, time)))
+    processRequest("burn", (b: BurnV1Request) => doBroadcast(TransactionFactory.burnAssetV1(b, wallet, time)))
 
   @Path("/order")
   @ApiOperation(value = "Sign Order",

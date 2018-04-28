@@ -56,7 +56,7 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, TransactionT] =
     IssueTransaction
-      .validateIssueParams(name, description, quantity, decimals, reissuable, fee: Long)
+      .validateIssueParams(name, description, quantity, decimals, reissuable, fee)
       .map(_ => IssueTransactionV1(sender, name, description, quantity, decimals, reissuable, fee, timestamp, signature))
 
   def create(sender: PrivateKeyAccount,

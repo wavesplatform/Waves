@@ -93,7 +93,7 @@ object CommonValidation {
       )
 
     tx match {
-      case _: BurnTransaction          => Right(tx)
+      case _: BurnTransactionV1        => Right(tx)
       case _: PaymentTransaction       => Right(tx)
       case _: GenesisTransaction       => Right(tx)
       case _: TransferTransactionV1    => Right(tx)
@@ -109,6 +109,7 @@ object CommonValidation {
       case _: TransferTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: IssueTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: ReissueTransactionV2     => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: BurnTransactionV2        => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: LeaseTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: LeaseCancelTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: CreateAliasTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
