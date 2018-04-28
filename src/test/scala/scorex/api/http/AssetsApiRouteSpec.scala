@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
-import com.wavesplatform.settings.{FeesSettings, SmartAccountSettings}
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr}
 import com.wavesplatform.utx.UtxPool
@@ -28,7 +27,6 @@ class AssetsApiRouteSpec
 
   private val route = AssetsApiRoute(
     restAPISettings,
-    FeesSettings(SmartAccountSettings(10000), Map.empty),
     testWallet,
     mock[UtxPool],
     mock[ChannelGroup],
@@ -36,7 +34,7 @@ class AssetsApiRouteSpec
     new TestTime
   ).route
 
-  private val smartAssetTx = smartIssueTransactionGen().sample.get
+  private val smartAssetTx = smartIssueTransactionGen().retryUntil(_.script.nonEmpty).sample.get
   private val smartAssetDesc = AssetDescription(
     issuer = smartAssetTx.sender,
     name = smartAssetTx.name,

@@ -2,7 +2,7 @@ package scorex.api.http.assets
 
 import akka.http.scaladsl.server.Route
 import com.google.common.base.Charsets
-import com.wavesplatform.settings.{FeesSettings, RestAPISettings}
+import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.utx.UtxPool
@@ -27,13 +27,7 @@ import scala.util.{Failure, Success}
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings,
-                          feesSettings: FeesSettings,
-                          wallet: Wallet,
-                          utx: UtxPool,
-                          allChannels: ChannelGroup,
-                          blockchain: Blockchain,
-                          time: Time)
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, blockchain: Blockchain, time: Time)
     extends ApiRoute
     with BroadcastRoute {
   val MaxAddressesPerRequest = 1000
