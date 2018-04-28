@@ -1,6 +1,5 @@
 package scorex.transaction.assets
 
-import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
@@ -8,7 +7,6 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.transaction._
-import scorex.transaction.validation._
 
 trait BurnTransaction extends ProvenTransaction {
   def version: Byte
@@ -62,12 +60,10 @@ object BurnTransaction {
     (sender, assetId, quantity, fee, timestamp, quantityStart + 24)
   }
 
-  def validateBurnParams(amount: Long, fee: Long): Either[ValidationError, Unit] = {
-    (validateAmount(amount, "assets"), validateFee(fee))
-      .mapN { case _ => () }
-      .fold(
-        _.head.asLeft[Unit],
-        _.asRight[ValidationError]
-      )
-  }
+  def validateBurnParams(amount: Long, fee: Long): Either[ValidationError, Unit] =
+    if (amount < 0) {
+      Left(ValidationError.NegativeAmount(amount, "assets"))
+    } else if (fee <= 0) {
+      Left(ValidationError.InsufficientFee())
+    } else Right(())
 }
