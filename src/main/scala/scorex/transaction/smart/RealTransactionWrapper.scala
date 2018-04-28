@@ -4,7 +4,7 @@ import scodec.bits.ByteVector
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransactionV1}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction, LeaseTransactionV1}
 import scorex.transaction.transfer._
 
 case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lang.v1.traits.Transaction {
@@ -29,7 +29,7 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
   override def recipient: Either[String, ByteVector] = tx match {
     case pt: PaymentTransaction  => Right(ByteVector(pt.recipient.bytes.arr))
     case tt: TransferTransaction => Right(ByteVector(tt.recipient.bytes.arr))
-    case lt: LeaseTransactionV1  => Right(ByteVector(lt.recipient.bytes.arr))
+    case lt: LeaseTransaction    => Right(ByteVector(lt.recipient.bytes.arr))
     case _                       => Left("Transaction doesn't contain recipient")
   }
 
@@ -48,7 +48,7 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
     case g: IssueTransaction        => Right(g.quantity)
     case g: ReissueTransaction      => Right(g.quantity)
     case g: BurnTransaction         => Right(g.amount)
-    case g: LeaseTransactionV1      => Right(g.amount)
+    case g: LeaseTransaction        => Right(g.amount)
     case g: TransferTransaction     => Right(g.amount)
     case g: ExchangeTransaction     => Right(g.amount)
     case _: CreateAliasTransaction  => Left("Transaction doesn't contain amount")
