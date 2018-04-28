@@ -327,11 +327,11 @@ trait TransactionGenBase extends ScriptGen {
 
   val MinIssueFee = 100000000
 
-  val createAliasGen: Gen[CreateAliasTransaction] = for {
+  val createAliasGen: Gen[CreateAliasTransactionV1] = for {
     timestamp: Long           <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
     alias: Alias              <- aliasGen
-  } yield CreateAliasTransaction.create(sender, alias, MinIssueFee, timestamp).right.get
+  } yield CreateAliasTransactionV1.create(sender, alias, MinIssueFee, timestamp).right.get
 
   val issueParamGen = for {
     sender: PrivateKeyAccount <- accountGen

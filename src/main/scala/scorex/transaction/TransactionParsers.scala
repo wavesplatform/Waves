@@ -27,7 +27,7 @@ object TransactionParsers {
     ExchangeTransaction,
     LeaseTransactionV1,
     LeaseCancelTransactionV1,
-    CreateAliasTransaction,
+    CreateAliasTransactionV1,
     MassTransferTransaction
   ).map { x =>
     x.typeId -> x

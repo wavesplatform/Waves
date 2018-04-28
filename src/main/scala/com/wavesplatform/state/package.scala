@@ -4,7 +4,7 @@ import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.block.Block
 import scorex.transaction.ValidationError.{AliasDoesNotExist, GenericError}
 import scorex.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
-import scorex.transaction.{AssetId, CreateAliasTransaction, Transaction, ValidationError}
+import scorex.transaction.{AssetId, CreateAliasTransactionV1, Transaction, ValidationError}
 
 import scala.reflect.ClassTag
 import scala.util.{Left, Right, Try}
@@ -72,8 +72,8 @@ package object state {
 
     def aliasesOfAddress(address: Address): Seq[Alias] =
       blockchain
-        .addressTransactions(address, Set(CreateAliasTransaction.typeId), Int.MaxValue, 0)
-        .collect { case (_, a: CreateAliasTransaction) => a.alias }
+        .addressTransactions(address, Set(CreateAliasTransactionV1.typeId), Int.MaxValue, 0)
+        .collect { case (_, a: CreateAliasTransactionV1) => a.alias }
 
     def activeLeases(address: Address): Seq[(Int, LeaseTransaction)] =
       blockchain

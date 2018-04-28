@@ -157,12 +157,12 @@ object TransactionFactory {
                                                 timestamp)
     } yield tx
 
-  def alias(request: CreateAliasRequest, wallet: Wallet, time: Time): Either[ValidationError, CreateAliasTransaction] =
+  def alias(request: CreateAliasRequest, wallet: Wallet, time: Time): Either[ValidationError, CreateAliasTransactionV1] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       alias            <- Alias.buildWithCurrentNetworkByte(request.alias)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- CreateAliasTransaction.create(senderPrivateKey, alias, request.fee, timestamp)
+      tx <- CreateAliasTransactionV1.create(senderPrivateKey, alias, request.fee, timestamp)
     } yield tx
 
   def reissueAssetV1(request: ReissueV1Request, wallet: Wallet, time: Time): Either[ValidationError, ReissueTransactionV1] =

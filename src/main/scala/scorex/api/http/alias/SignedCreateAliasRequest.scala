@@ -5,7 +5,7 @@ import play.api.libs.json.{Format, Json}
 import scorex.account.{Alias, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParsers.SignatureStringLength
-import scorex.transaction.{CreateAliasTransaction, ValidationError}
+import scorex.transaction.{CreateAliasTransactionV1, ValidationError}
 
 case class SignedCreateAliasRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                                     senderPublicKey: String,
@@ -18,12 +18,12 @@ case class SignedCreateAliasRequest(@ApiModelProperty(value = "Base58 encoded se
                                     @ApiModelProperty(required = true)
                                     signature: String)
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, CreateAliasTransaction] =
+  def toTx: Either[ValidationError, CreateAliasTransactionV1] =
     for {
       _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
       _alias     <- Alias.buildWithCurrentNetworkByte(alias)
-      _t         <- CreateAliasTransaction.create(_sender, _alias, fee, timestamp, _signature)
+      _t         <- CreateAliasTransactionV1.create(_sender, _alias, fee, timestamp, _signature)
     } yield _t
 }
 

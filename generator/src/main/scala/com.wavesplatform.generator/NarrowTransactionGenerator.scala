@@ -77,7 +77,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
         Seq.empty[IssueTransactionV1],
         Seq.empty[IssueTransactionV1],
         Seq.empty[LeaseTransactionV1],
-        Seq.empty[CreateAliasTransaction]
+        Seq.empty[CreateAliasTransactionV1]
       )) {
       case ((allTxsWithValid, validIssueTxs, reissuableIssueTxs, activeLeaseTransactions, aliases), _) =>
         def moreThatStandartFee = 100000L + r.nextInt(100000)
@@ -143,10 +143,10 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
               val sender = accounts.find(_.address == lease.sender.address).get
               logOption(LeaseCancelTransactionV1.create(sender, lease.id(), moreThatStandartFee * 3, ts))
             })
-          case CreateAliasTransaction =>
+          case CreateAliasTransactionV1 =>
             val sender      = randomFrom(accounts).get
             val aliasString = NarrowTransactionGenerator.generateAlias()
-            logOption(CreateAliasTransaction.create(sender, Alias.buildWithCurrentNetworkByte(aliasString).right.get, 100000, ts))
+            logOption(CreateAliasTransactionV1.create(sender, Alias.buildWithCurrentNetworkByte(aliasString).right.get, 100000, ts))
           case MassTransferTransaction =>
             val transferCount = r.nextInt(MassTransferTransaction.MaxTransferCount)
             val transfers = for (i <- 0 to transferCount) yield {
@@ -210,7 +210,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
           case Some(tx: LeaseCancelTransaction) => activeLeaseTransactions.filter(_.id != tx.leaseId)
           case _                                => activeLeaseTransactions
         }, tx match {
-          case Some(tx: CreateAliasTransaction) => aliases :+ tx
+          case Some(tx: CreateAliasTransactionV1) => aliases :+ tx
           case _                                => aliases
         })
     }
