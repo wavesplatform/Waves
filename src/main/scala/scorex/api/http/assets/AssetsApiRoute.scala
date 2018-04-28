@@ -32,10 +32,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistribution ~ details ~
-        pathPrefix("sponsorship") {
-          sponsorRoute ~ cancelSponsorshipRoute
-        }
+      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistribution ~ details ~ sponsorRoute
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -111,9 +108,9 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     processRequest[TransferRequests](
       "transfer", { req =>
         req.eliminate(
-          x => doBroadcast(TransactionFactory.transferAsset(x, wallet, time)),
+          x => doBroadcast(TransactionFactory.transferAssetV1(x, wallet, time)),
           _.eliminate(
-            x => doBroadcast(TransactionFactory.versionedTransfer(x, wallet, time)),
+            x => doBroadcast(TransactionFactory.transferAssetV2(x, wallet, time)),
             _ => Future.successful(WrongJson(Some(new IllegalArgumentException("Doesn't know how to process request"))))
           )
         )
@@ -156,7 +153,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       )
     ))
   def issue: Route =
-    processRequest("issue", (r: IssueRequest) => doBroadcast(TransactionFactory.issueAsset(r, wallet, time)))
+    processRequest("issue", (r: IssueV1Request) => doBroadcast(TransactionFactory.issueAssetV1(r, wallet, time)))
 
   @Path("/reissue")
   @ApiOperation(value = "Issue Asset", notes = "Reissue Asset", httpMethod = "POST", produces = "application/json", consumes = "application/json")
@@ -172,7 +169,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       )
     ))
   def reissue: Route =
-    processRequest("reissue", (r: ReissueRequest) => doBroadcast(TransactionFactory.reissueAsset(r, wallet, time)))
+    processRequest("reissue", (r: ReissueV1Request) => doBroadcast(TransactionFactory.reissueAssetV1(r, wallet, time)))
 
   @Path("/burn")
   @ApiOperation(value = "Burn Asset",
@@ -275,7 +272,10 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
           "script"         -> JsString(description.script.fold("")(s => s.bytes().base58)),
           "scriptText"     -> JsString(description.script.fold("")(s => s.text)),
-          "sponsorship"    -> JsNumber(description.sponsorship)
+          "minSponsoredAssetFee" -> (description.sponsorship match {
+            case 0           => JsNull
+            case sponsorship => JsNumber(sponsorship)
+          })
         )
       )
     }).left.map(m => CustomValidationError(m))
@@ -290,25 +290,9 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         required = true,
         paramType = "body",
         dataType = "scorex.api.http.assets.SponsorFeeRequest",
-        defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"baseFee\":100000000,\"fee\":100000}"
+        defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"minSponsoredAssetFee\":100000000,\"fee\":100000000}"
       )
     ))
   def sponsorRoute: Route =
     processRequest("sponsor", (req: SponsorFeeRequest) => doBroadcast(TransactionFactory.sponsor(req, wallet, time)))
-
-  @Path("/cancel")
-  @ApiOperation(value = "Cancel Asset Fee Sponsorship", httpMethod = "POST", produces = "application/json", consumes = "application/json")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(
-        name = "body",
-        value = "Json with data",
-        required = true,
-        paramType = "body",
-        dataType = "scorex.api.http.assets.CancelFeeSponsorshipRequest",
-        defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"fee\":100000}"
-      )
-    ))
-  def cancelSponsorshipRoute: Route =
-    processRequest("cancel", (req: CancelFeeSponsorshipRequest) => doBroadcast(TransactionFactory.cancelSponsorship(req, wallet, time)))
 }

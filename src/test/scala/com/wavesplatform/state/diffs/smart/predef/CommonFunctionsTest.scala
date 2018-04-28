@@ -11,7 +11,7 @@ import scodec.bits.ByteVector
 class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   property("extract should transaction assetId if exists") {
-    forAll(transferGen) {
+    forAll(transferV1Gen) {
       case (transfer) =>
         val result = runScript[ByteVector]("extract(tx.assetId)", transfer)
         transfer.assetId match {
@@ -22,7 +22,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
   }
 
   property("isDefined should return true if assetId exists") {
-    forAll(transferGen) {
+    forAll(transferV1Gen) {
       case (transfer) =>
         val result = runScript[Boolean]("isDefined(tx.assetId)", transfer)
         transfer.assetId.isDefined shouldEqual result.right.get

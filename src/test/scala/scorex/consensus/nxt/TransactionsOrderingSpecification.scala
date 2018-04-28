@@ -4,7 +4,7 @@ import com.wavesplatform.state.ByteStr
 import org.scalatest.{Assertions, Matchers, PropSpec}
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.consensus.TransactionsOrdering
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.transfer._
 
 import scala.util.Random
 
@@ -14,7 +14,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
     val txsDifferentById = (0 to 3)
       .map(
         i =>
-          TransferTransaction
+          TransferTransactionV1
             .create(None,
                     PrivateKeyAccount(Array.fill(32)(0)),
                     Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
@@ -28,7 +28,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       .sortBy(t => t.id().base58)
 
     val correctSeq = txsDifferentById ++ Seq(
-      TransferTransaction
+      TransferTransactionV1
         .create(None,
                 PrivateKeyAccount(Array.fill(32)(0)),
                 Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
@@ -39,7 +39,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
                 Array.empty)
         .right
         .get,
-      TransferTransaction
+      TransferTransactionV1
         .create(None,
                 PrivateKeyAccount(Array.fill(32)(0)),
                 Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
@@ -50,7 +50,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
                 Array.empty)
         .right
         .get,
-      TransferTransaction
+      TransferTransactionV1
         .create(None,
                 PrivateKeyAccount(Array.fill(32)(0)),
                 Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
@@ -61,7 +61,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
                 Array.empty)
         .right
         .get,
-      TransferTransaction
+      TransferTransactionV1
         .create(
           None,
           PrivateKeyAccount(Array.fill(32)(0)),
@@ -74,7 +74,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
         )
         .right
         .get,
-      TransferTransaction
+      TransferTransactionV1
         .create(
           None,
           PrivateKeyAccount(Array.fill(32)(0)),
@@ -98,7 +98,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
     val txsDifferentById = (0 to 3)
       .map(
         i =>
-          TransferTransaction
+          TransferTransactionV1
             .create(None,
                     PrivateKeyAccount(Array.fill(32)(0)),
                     Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
@@ -112,7 +112,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       .sortBy(t => t.id().base58)
 
     val correctSeq = txsDifferentById ++ Seq(
-      TransferTransaction
+      TransferTransactionV1
         .create(None,
                 PrivateKeyAccount(Array.fill(32)(0)),
                 Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
@@ -123,7 +123,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
                 Array.empty)
         .right
         .get,
-      TransferTransaction
+      TransferTransactionV1
         .create(None,
                 PrivateKeyAccount(Array.fill(32)(0)),
                 Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
@@ -134,7 +134,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
                 Array.empty)
         .right
         .get,
-      TransferTransaction
+      TransferTransactionV1
         .create(None,
                 PrivateKeyAccount(Array.fill(32)(0)),
                 Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
@@ -145,7 +145,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
                 Array.empty)
         .right
         .get,
-      TransferTransaction
+      TransferTransactionV1
         .create(
           None,
           PrivateKeyAccount(Array.fill(32)(0)),
@@ -158,7 +158,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
         )
         .right
         .get,
-      TransferTransaction
+      TransferTransactionV1
         .create(
           None,
           PrivateKeyAccount(Array.fill(32)(0)),
@@ -180,7 +180,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
 
   property("TransactionsOrdering.InBlock should sort txs by decreasing block timestamp") {
     val correctSeq = Seq(
-      TransferTransaction
+      TransferTransactionV1
         .create(None,
                 PrivateKeyAccount(Array.fill(32)(0)),
                 Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
@@ -191,7 +191,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
                 Array())
         .right
         .get,
-      TransferTransaction
+      TransferTransactionV1
         .create(None,
                 PrivateKeyAccount(Array.fill(32)(0)),
                 Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
@@ -209,7 +209,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
 
   property("TransactionsOrdering.InUTXPool should sort txs by ascending block timestamp") {
     val correctSeq = Seq(
-      TransferTransaction
+      TransferTransactionV1
         .create(None,
                 PrivateKeyAccount(Array.fill(32)(0)),
                 Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
@@ -220,7 +220,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
                 Array())
         .right
         .get,
-      TransferTransaction
+      TransferTransactionV1
         .create(None,
                 PrivateKeyAccount(Array.fill(32)(0)),
                 Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,

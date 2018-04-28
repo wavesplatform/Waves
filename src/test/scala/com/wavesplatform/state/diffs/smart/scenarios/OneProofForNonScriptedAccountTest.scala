@@ -9,15 +9,15 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.assets.VersionedTransferTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.transfer._
 import scorex.transaction.{GenesisTransaction, Proofs}
 
 class OneProofForNonScriptedAccountTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   property("exactly 1 proof required for non-scripted accounts") {
     val s = for {
-      version   <- Gen.oneOf(VersionedTransferTransaction.supportedVersions.toSeq)
+      version   <- Gen.oneOf(TransferTransactionV2.supportedVersions.toSeq)
       master    <- accountGen
       recepient <- accountGen
       amt       <- positiveLongGen
@@ -25,7 +25,7 @@ class OneProofForNonScriptedAccountTest extends PropSpec with PropertyChecks wit
       ts        <- positiveIntGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       setScript <- selfSignedSetScriptTransactionGenP(master, ScriptV1(Typed.TRUE).explicitGet())
-      transfer = VersionedTransferTransaction.selfSigned(version, None, master, recepient, amt, ts, fee, Array.emptyByteArray).explicitGet()
+      transfer = TransferTransactionV2.selfSigned(version, None, master, recepient, amt, ts, None, fee, Array.emptyByteArray).explicitGet()
     } yield (genesis, setScript, transfer)
 
     forAll(s) {

@@ -45,7 +45,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
       new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])
     ))
   def issue: Route = (path("issue") & post) {
-    json[SignedIssueRequest] { issueReq =>
+    json[SignedIssueV1Request] { issueReq =>
       doBroadcast(issueReq.toTx)
     }
   }
@@ -71,7 +71,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
       new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])
     ))
   def reissue: Route = (path("reissue") & post) {
-    json[SignedReissueRequest] { reissueReq =>
+    json[SignedReissueV1Request] { reissueReq =>
       doBroadcast(reissueReq.toTx)
     }
   }
@@ -222,6 +222,33 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
   def exchange: Route = (path("exchange") & post) {
     json[SignedExchangeRequest] { req =>
       doBroadcast(req.toTx)
+    }
+  }
+
+  @Path("/sponsor")
+  @ApiOperation(
+    value = "Broadcast signed Sponsor Asset Fee",
+    notes = "Publish signed Sponsor Asset Fee transaction to the Blockchain",
+    httpMethod = "POST",
+    consumes = "application/json",
+    produces = "application/json"
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "body",
+                           value = "Json with signed Reissue transaction",
+                           required = true,
+                           paramType = "body",
+                           dataType = "scorex.api.http.assets.SignedSponsorFeeRequest")))
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Json with signed Sponsor fee transaction"),
+      new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])
+    ))
+  def sponsor: Route = (path("reissue") & post) {
+    import scorex.api.http.assets.SponsorFeeRequest._
+    json[SignedSponsorFeeRequest] { sponsorReq =>
+      doBroadcast(sponsorReq.toTx)
     }
   }
 }

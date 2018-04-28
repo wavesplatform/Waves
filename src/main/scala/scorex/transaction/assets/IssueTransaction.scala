@@ -1,38 +1,42 @@
 package scorex.transaction.assets
 
-import com.google.common.base.Charsets
+import java.nio.charset.StandardCharsets
+
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.crypto
-import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
+import play.api.libs.json.Json
+import scorex.account.PublicKeyAccount
+import scorex.crypto.signatures.Curve25519
 import scorex.serialization.Deser
-import scorex.transaction._
+import scorex.transaction.smart.script.Script
+import scorex.transaction.{AssetId, ProvenTransaction, ValidationError}
 
-import scala.util.{Failure, Success, Try}
+trait IssueTransaction extends ProvenTransaction {
+  def name: Array[Byte]
+  def description: Array[Byte]
+  def quantity: Long
+  def decimals: Byte
+  def reissuable: Boolean
+  def fee: Long
+  def script: Option[Script]
+  def version: Byte
 
-case class IssueTransaction private (sender: PublicKeyAccount,
-                                     name: Array[Byte],
-                                     description: Array[Byte],
-                                     quantity: Long,
-                                     decimals: Byte,
-                                     reissuable: Boolean,
-                                     fee: Long,
-                                     timestamp: Long,
-                                     signature: ByteStr)
-    extends SignedTransaction
-    with FastHashId {
+  final lazy val assetId                               = id
+  override final val assetFee: (Option[AssetId], Long) = (None, fee)
 
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
-  override val builder: IssueTransaction.type    = IssueTransaction
+  override val json = Coeval.evalOnce(
+    jsonBase() ++ Json.obj(
+      "version"     -> version,
+      "name"        -> new String(name, StandardCharsets.UTF_8),
+      "quantity"    -> quantity,
+      "reissuable"  -> reissuable,
+      "decimals"    -> decimals,
+      "description" -> new String(description, StandardCharsets.UTF_8),
+      "script"      -> script.map(_.text)
+    ))
 
-  val assetId = id
-
-  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
+  final protected val bytesBase: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(
-      Array(builder.typeId),
       sender.publicKey,
       Deser.serializeArray(name),
       Deser.serializeArray(description),
@@ -42,71 +46,13 @@ case class IssueTransaction private (sender: PublicKeyAccount,
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     ))
-
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
-      "assetId"     -> assetId().base58,
-      "name"        -> new String(name, Charsets.UTF_8),
-      "description" -> new String(description, Charsets.UTF_8),
-      "quantity"    -> quantity,
-      "decimals"    -> decimals,
-      "reissuable"  -> reissuable
-    ))
-
-  override val bytes = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), signature.arr, bodyBytes()))
-
 }
-
-object IssueTransaction extends TransactionParserFor[IssueTransaction] with TransactionParser.HardcodedVersion1 {
-
-  override val typeId: Byte = 3
+object IssueTransaction {
 
   val MaxDescriptionLength = 1000
   val MaxAssetNameLength   = 16
   val MinAssetNameLength   = 4
   val MaxDecimals          = 8
-
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
-    Try {
-      val signature = ByteStr(bytes.slice(0, SignatureLength))
-      val txId      = bytes(SignatureLength)
-      require(txId == typeId, s"Signed tx id is not match")
-      val sender                        = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
-      val (assetName, descriptionStart) = Deser.parseArraySize(bytes, SignatureLength + KeyLength + 1)
-      val (description, quantityStart)  = Deser.parseArraySize(bytes, descriptionStart)
-      val quantity                      = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
-      val decimals                      = bytes.slice(quantityStart + 8, quantityStart + 9).head
-      val reissuable                    = bytes.slice(quantityStart + 9, quantityStart + 10).head == (1: Byte)
-      val fee                           = Longs.fromByteArray(bytes.slice(quantityStart + 10, quantityStart + 18))
-      val timestamp                     = Longs.fromByteArray(bytes.slice(quantityStart + 18, quantityStart + 26))
-      IssueTransaction
-        .create(sender, assetName, description, quantity, decimals, reissuable, fee, timestamp, signature)
-        .fold(left => Failure(new Exception(left.toString)), right => Success(right))
-    }.flatten
-
-  def create(sender: PublicKeyAccount,
-             name: Array[Byte],
-             description: Array[Byte],
-             quantity: Long,
-             decimals: Byte,
-             reissuable: Boolean,
-             fee: Long,
-             timestamp: Long,
-             signature: ByteStr): Either[ValidationError, TransactionT] =
-    validateIssueParams(name, description, quantity, decimals, reissuable, fee: Long).map(_ =>
-      IssueTransaction(sender, name, description, quantity, decimals, reissuable, fee, timestamp, signature))
-
-  def create(sender: PrivateKeyAccount,
-             name: Array[Byte],
-             description: Array[Byte],
-             quantity: Long,
-             decimals: Byte,
-             reissuable: Boolean,
-             fee: Long,
-             timestamp: Long): Either[ValidationError, TransactionT] =
-    create(sender, name, description, quantity, decimals, reissuable, fee, timestamp, ByteStr.empty).right.map { unverified =>
-      unverified.copy(signature = ByteStr(crypto.sign(sender, unverified.bodyBytes())))
-    }
 
   def validateIssueParams(name: Array[Byte],
                           description: Array[Byte],
@@ -121,4 +67,16 @@ object IssueTransaction extends TransactionParserFor[IssueTransaction] with Tran
       _ <- Either.cond(decimals >= 0 && decimals <= MaxDecimals, (), ValidationError.TooBigArray)
       _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee())
     } yield ()
+
+  def parseBase(bytes: Array[Byte], start: Int) = {
+    val sender                        = PublicKeyAccount(bytes.slice(start, start + Curve25519.KeyLength))
+    val (assetName, descriptionStart) = Deser.parseArraySize(bytes, start + Curve25519.KeyLength)
+    val (description, quantityStart)  = Deser.parseArraySize(bytes, descriptionStart)
+    val quantity                      = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
+    val decimals                      = bytes.slice(quantityStart + 8, quantityStart + 9).head
+    val reissuable                    = bytes.slice(quantityStart + 9, quantityStart + 10).head == (1: Byte)
+    val fee                           = Longs.fromByteArray(bytes.slice(quantityStart + 10, quantityStart + 18))
+    val timestamp                     = Longs.fromByteArray(bytes.slice(quantityStart + 18, quantityStart + 26))
+    (sender, assetName, description, quantity, decimals, reissuable, fee, timestamp, quantityStart + 26)
+  }
 }

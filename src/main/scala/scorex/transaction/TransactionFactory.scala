@@ -12,16 +12,17 @@ import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
+import scorex.transaction.transfer._
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
 object TransactionFactory {
 
-  def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
+  def transferAssetV1(request: TransferV1Request, wallet: Wallet, time: Time): Either[ValidationError, TransferTransactionV1] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipientAcc     <- AddressOrAlias.fromString(request.recipient)
-      tx <- TransferTransaction
+      tx <- TransferTransactionV1
         .create(
           request.assetId.map(s => ByteStr.decodeBase58(s).get),
           senderPrivateKey,
@@ -34,11 +35,11 @@ object TransactionFactory {
         )
     } yield tx
 
-  def versionedTransfer(request: VersionedTransferRequest, wallet: Wallet, time: Time): Either[ValidationError, VersionedTransferTransaction] =
+  def transferAssetV2(request: TransferV2Request, wallet: Wallet, time: Time): Either[ValidationError, TransferTransactionV2] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipientAcc     <- AddressOrAlias.fromString(request.recipient)
-      tx <- VersionedTransferTransaction
+      tx <- TransferTransactionV2
         .selfSigned(
           request.version,
           request.assetId.map(s => ByteStr.decodeBase58(s).get),
@@ -46,6 +47,7 @@ object TransactionFactory {
           recipientAcc,
           request.amount,
           request.timestamp.getOrElse(time.getTimestamp()),
+          request.feeAssetId.map(s => ByteStr.decodeBase58(s).get),
           request.fee,
           request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray)
         )
@@ -82,14 +84,14 @@ object TransactionFactory {
       )
     } yield tx
 
-  def smartIssue(request: SmartIssueRequest, wallet: Wallet, time: Time): Either[ValidationError, SmartIssueTransaction] =
+  def issueAssetV2(request: IssueV2Request, wallet: Wallet, time: Time): Either[ValidationError, IssueTransactionV2] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       s <- request.script match {
         case None    => Right(None)
         case Some(s) => Script.fromBase58String(s).map(Some(_))
       }
-      tx <- SmartIssueTransaction.selfSigned(
+      tx <- IssueTransactionV2.selfSigned(
         sender = senderPrivateKey,
         script = s,
         fee = request.fee,
@@ -104,11 +106,11 @@ object TransactionFactory {
       )
     } yield tx
 
-  def issueAsset(request: IssueRequest, wallet: Wallet, time: Time): Either[ValidationError, IssueTransaction] =
+  def issueAssetV1(request: IssueV1Request, wallet: Wallet, time: Time): Either[ValidationError, IssueTransactionV1] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- IssueTransaction.create(
+      tx <- IssueTransactionV1.create(
         senderPrivateKey,
         request.name.getBytes(Charsets.UTF_8),
         request.description.getBytes(Charsets.UTF_8),
@@ -143,11 +145,26 @@ object TransactionFactory {
       tx <- CreateAliasTransaction.create(senderPrivateKey, alias, request.fee, timestamp)
     } yield tx
 
-  def reissueAsset(request: ReissueRequest, wallet: Wallet, time: Time): Either[ValidationError, ReissueTransaction] =
+  def reissueAssetV1(request: ReissueV1Request, wallet: Wallet, time: Time): Either[ValidationError, ReissueTransactionV1] =
     for {
       pk <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- ReissueTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.reissuable, request.fee, timestamp)
+      tx <- ReissueTransactionV1.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.reissuable, request.fee, timestamp)
+    } yield tx
+
+  def reissueAssetV2(request: ReissueV2Request, wallet: Wallet, time: Time): Either[ValidationError, ReissueTransactionV2] =
+    for {
+      pk <- wallet.findWallet(request.sender)
+      timestamp = request.timestamp.getOrElse(time.getTimestamp())
+      chainId   = AddressScheme.current.chainId
+      tx <- ReissueTransactionV2.selfSigned(request.version,
+                                            chainId,
+                                            pk,
+                                            ByteStr.decodeBase58(request.assetId).get,
+                                            request.quantity,
+                                            request.reissuable,
+                                            request.fee,
+                                            timestamp)
     } yield tx
 
   def burnAsset(request: BurnRequest, wallet: Wallet, time: Time): Either[ValidationError, BurnTransaction] =
@@ -169,14 +186,6 @@ object TransactionFactory {
       pk <- wallet.findWallet(request.sender)
       assetId   = ByteStr.decodeBase58(request.assetId).get
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- SponsorFeeTransaction.create(request.version, pk, assetId, request.baseFee, request.fee, timestamp)
-    } yield tx
-
-  def cancelSponsorship(request: CancelFeeSponsorshipRequest, wallet: Wallet, time: Time): Either[ValidationError, CancelFeeSponsorshipTransaction] =
-    for {
-      pk <- wallet.findWallet(request.sender)
-      assetId   = ByteStr.decodeBase58(request.assetId).get
-      timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- CancelFeeSponsorshipTransaction.create(request.version, pk, assetId, request.fee, timestamp)
+      tx <- SponsorFeeTransaction.create(request.version, pk, assetId, request.minSponsoredAssetFee, request.fee, timestamp)
     } yield tx
 }

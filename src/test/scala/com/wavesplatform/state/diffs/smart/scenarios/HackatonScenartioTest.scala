@@ -14,13 +14,14 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.account.AddressScheme
-import scorex.transaction.assets.{SmartIssueTransaction, TransferTransaction}
+import scorex.transaction.assets.IssueTransactionV2
 import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.transfer._
 import scorex.transaction.{DataTransaction, GenesisTransaction}
 
 class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions: Gen[
-    (Seq[GenesisTransaction], SmartIssueTransaction, DataTransaction, TransferTransaction, DataTransaction, DataTransaction, TransferTransaction)] =
+    (Seq[GenesisTransaction], IssueTransactionV2, DataTransaction, TransferTransactionV1, DataTransaction, DataTransaction, TransferTransactionV1)] =
     for {
       company  <- accountGen
       king     <- accountGen
@@ -55,7 +56,7 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
       untypedScript = Parser(assetScript).get.value
       typedScript   = ScriptV1(TypeChecker(dummyTypeCheckerContext, untypedScript).explicitGet()).explicitGet()
 
-      issueTransaction = SmartIssueTransaction
+      issueTransaction = IssueTransactionV2
         .selfSigned(
           2,
           AddressScheme.current.chainId,
@@ -77,11 +78,11 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
         .selfSigned(1, king, List(BinaryDataEntry("notary1PK", ByteStr(notary.publicKey))), 1000, ts + 1)
         .explicitGet()
 
-      transferFromCompanyToA = TransferTransaction
+      transferFromCompanyToA = TransferTransactionV1
         .create(Some(assetId), company, accountA, 1, ts + 20, None, 1000, Array.empty)
         .explicitGet()
 
-      transferFromAToB = TransferTransaction
+      transferFromAToB = TransferTransactionV1
         .create(Some(assetId), accountA, accountB, 1, ts + 30, None, 1000, Array.empty)
         .explicitGet()
 

@@ -14,18 +14,18 @@ object CryptoContext {
       case _                      => ???
     }
 
-    val keccak256F: PredefFunction  = hashFunction("keccak256", 14000)(global.keccak256)
-    val blake2b256F: PredefFunction = hashFunction("blake2b256", 3500)(global.blake2b256)
-    val sha256F: PredefFunction     = hashFunction("sha256", 1000)(global.sha256)
+    val keccak256F: PredefFunction  = hashFunction("keccak256", 10)(global.keccak256)
+    val blake2b256F: PredefFunction = hashFunction("blake2b256", 10)(global.blake2b256)
+    val sha256F: PredefFunction     = hashFunction("sha256", 10)(global.sha256)
 
     val sigVerifyF: PredefFunction =
-      PredefFunction("sigVerify", 90000, BOOLEAN, List(("message", BYTEVECTOR), ("sig", BYTEVECTOR), ("pub", BYTEVECTOR))) {
+      PredefFunction("sigVerify", 100, BOOLEAN, List(("message", BYTEVECTOR), ("sig", BYTEVECTOR), ("pub", BYTEVECTOR))) {
         case (m: ByteVector) :: (s: ByteVector) :: (p: ByteVector) :: Nil =>
           Right(global.curve25519verify(m.toArray, s.toArray, p.toArray))
         case _ => ???
       }
 
-    def toBase58StringF: PredefFunction = PredefFunction("toBase58String", 400000, STRING, List(("bytes", BYTEVECTOR))) {
+    def toBase58StringF: PredefFunction = PredefFunction("toBase58String", 10, STRING, List(("bytes", BYTEVECTOR))) {
       case (bytes: ByteVector) :: Nil =>
         Right(global.base58Encode(bytes.toArray))
       case _ => ???

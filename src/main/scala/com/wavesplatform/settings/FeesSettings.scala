@@ -8,7 +8,7 @@ import scorex.transaction.TransactionParsers
 
 import scala.collection.JavaConverters._
 
-case class SmartAccountSettings(baseExtraCharge: Long, extraChargePerOp: Double)
+case class SmartAccountSettings(extraFee: Long)
 case class FeeSettings(asset: String, fee: Long)
 
 case class FeesSettings(smartAccount: SmartAccountSettings, fees: Map[Int, Seq[FeeSettings]])
@@ -38,7 +38,12 @@ object FeesSettings {
     val converter = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.LOWER_HYPHEN)
     TransactionParsers.byName
       .map {
-        case (name, p) => converter.convert(name.replace("Transaction", "")) -> p.typeId.toInt
+        case (name, p) =>
+          converter.convert(
+            name
+              .replace("V1", "")
+              .replace("V2", "")
+              .replace("Transaction", "")) -> p.typeId.toInt
       }
   }
 

@@ -13,13 +13,13 @@ import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.smart.BlockchainContext
+import scorex.transaction.transfer._
 import scorex.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
 
 class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
-  val preconditionsAndAliasCreations: Gen[(Seq[GenesisTransaction], CreateAliasTransaction, TransferTransaction, TransferTransaction)] = for {
+  val preconditionsAndAliasCreations: Gen[(Seq[GenesisTransaction], CreateAliasTransaction, TransferTransactionV1, TransferTransactionV1)] = for {
     master                   <- accountGen
     ts                       <- timestampGen
     other: PrivateKeyAccount <- accountGen

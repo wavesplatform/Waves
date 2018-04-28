@@ -9,13 +9,15 @@ import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.TestBlock.{create => block}
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.{IssueTransaction, SponsorFeeTransaction, TransferTransaction}
+import scorex.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
+import scorex.transaction.transfer._
 
 class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   def settings(sponsorshipActivationHeight: Int) =
-    TestFunctionalitySettings.Enabled
-      .copy(preActivatedFeatures = Map(BlockchainFeatures.FeeSponsorship.id -> sponsorshipActivationHeight), blocksForFeatureActivation = 1)
+    TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.FeeSponsorship.id -> sponsorshipActivationHeight),
+                                           featureCheckBlocksPeriod = 1,
+                                           blocksForFeatureActivation = 1)
 
   property("work") {
     val s = settings(0)
@@ -31,13 +33,13 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         val setupBlocks = Seq(block(Seq(genesis, issue)))
         assertDiffAndState(setupBlocks, block(Seq(sponsor)), s) {
           case (diff, state) =>
-            diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(sponsor.minFee))
-            state.assetDescription(sponsor.assetId).map(_.sponsorship) shouldBe Some(sponsor.minFee)
+            diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(sponsor.minSponsoredAssetFee.get))
+            state.assetDescription(sponsor.assetId).map(_.sponsorship) shouldBe sponsor.minSponsoredAssetFee
         }
         assertDiffAndState(setupBlocks, block(Seq(sponsor, sponsor1)), s) {
           case (diff, state) =>
-            diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(sponsor1.minFee))
-            state.assetDescription(sponsor.assetId).map(_.sponsorship) shouldBe Some(sponsor1.minFee)
+            diff.sponsorship shouldBe Map(sponsor.assetId -> SponsorshipValue(sponsor1.minSponsoredAssetFee.get))
+            state.assetDescription(sponsor.assetId).map(_.sponsorship) shouldBe sponsor1.minSponsoredAssetFee
         }
         assertDiffAndState(setupBlocks, block(Seq(sponsor, sponsor1, cancel)), s) {
           case (diff, state) =>
@@ -74,17 +76,14 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       master <- accountGen
       ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      (issueTx, sponsorTx, _, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
-    } yield (genesis, issueTx, sponsorTx, cancelTx)
+      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
+    } yield (genesis, issueTx, sponsorTx)
 
     forAll(setup) {
-      case (genesis, issue, sponsor, cancel) =>
+      case (genesis, issue, sponsor) =>
         val setupBlocks = Seq(block(Seq(genesis, issue)))
         assertDiffEi(setupBlocks, block(Seq(sponsor)), s) { blockDiffEi =>
           blockDiffEi should produce("SponsorFeeTransaction transaction has not been activated")
-        }
-        assertDiffEi(setupBlocks, block(Seq(cancel)), s) { blockDiffEi =>
-          blockDiffEi should produce("CancelFeeSponsorshipTransaction transaction has not been activated")
         }
     }
   }
@@ -98,16 +97,16 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
       recipient                  <- accountGen
       assetId = issueTx.id()
-      assetOverspend = TransferTransaction
+      assetOverspend = TransferTransactionV1
         .create(None, master, recipient.toAddress, 1000000, ts + 1, Some(assetId), issueTx.quantity + 1, Array.emptyByteArray)
         .right
         .get
-      insufficientFee = TransferTransaction
-        .create(None, master, recipient.toAddress, 1000000, ts + 2, Some(assetId), sponsorTx.minFee - 1, Array.emptyByteArray)
+      insufficientFee = TransferTransactionV1
+        .create(None, master, recipient.toAddress, 1000000, ts + 2, Some(assetId), sponsorTx.minSponsoredAssetFee.get - 1, Array.emptyByteArray)
         .right
         .get
-      fee = 3000 * sponsorTx.minFee
-      wavesOverspend = TransferTransaction
+      fee = 3000 * sponsorTx.minSponsoredAssetFee.get
+      wavesOverspend = TransferTransactionV1
         .create(None, master, recipient.toAddress, 1000000, ts + 3, Some(assetId), fee, Array.emptyByteArray)
         .right
         .get
@@ -138,18 +137,18 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       recipient <- accountGen
       ts        <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, 300000000, ts).right.get
-      issue                       = IssueTransaction.create(master, Base58.decode("Asset").get, Array.emptyByteArray, 100, 2, false, 100000000, ts + 1).right.get
+      issue                       = IssueTransactionV1.create(master, Base58.decode("Asset").get, Array.emptyByteArray, 100, 2, false, 100000000, ts + 1).right.get
       assetId                     = issue.id()
-      sponsor                     = SponsorFeeTransaction.create(1, master, assetId, 100, 100000000, ts + 2).right.get
-      assetTransfer = TransferTransaction
+      sponsor                     = SponsorFeeTransaction.create(1, master, assetId, Some(100), 100000000, ts + 2).right.get
+      assetTransfer = TransferTransactionV1
         .create(Some(assetId), master, recipient, issue.quantity, ts + 3, None, 100000, Array.emptyByteArray)
         .right
         .get
-      wavesTransfer = TransferTransaction
+      wavesTransfer = TransferTransactionV1
         .create(None, master, recipient, 99800000, ts + 4, None, 100000, Array.emptyByteArray)
         .right
         .get
-      backWavesTransfer = TransferTransaction
+      backWavesTransfer = TransferTransactionV1
         .create(None, recipient, master, 100000, ts + 5, Some(assetId), 100, Array.emptyByteArray)
         .right
         .get

@@ -53,7 +53,6 @@ case class NegativeAmount(msg: String) extends ApiError {
   override val message: String  = s"negative amount: $msg"
   override val code: StatusCode = StatusCodes.BadRequest
 }
-
 @Deprecated //"Use InsufficientFee instead"
 case object NegativeFee extends ApiError {
   override val id: Int          = 112

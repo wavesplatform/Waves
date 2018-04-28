@@ -375,8 +375,7 @@ case class AddressApiRoute(settings: RestAPISettings,
         script = script.map(_.bytes().base58),
         scriptText = script.map(_.text),
         complexity = complexity,
-        extraFee =
-          if (complexity == 0) 0 else (feesSettings.smartAccount.baseExtraCharge + complexity * feesSettings.smartAccount.extraChargePerOp).toLong
+        extraFee = if (complexity == 0) 0 else feesSettings.smartAccount.extraFee
       )
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {

@@ -5,7 +5,7 @@ import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state.Sponsorship
-import play.api.libs.json.Json
+import play.api.libs.json.{JsNull, JsNumber, JsValue, Json}
 
 class SponsorshipSuite extends BaseTransactionSuite {
 
@@ -19,16 +19,23 @@ class SponsorshipSuite extends BaseTransactionSuite {
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
       .overrideBase(_.raw("waves.blockchain.custom.functionality.blocks-for-feature-activation=1"))
+      .overrideBase(_.raw("waves.blockchain.custom.functionality.feature-check-blocks-period=1"))
       .withDefault(1)
       .withSpecial(_.nonMiner)
       .buildNonConflicting()
 
   val miner = nodes.head
 
-  def assertSponsorship(assetId: String, sponsorship: Long) = {
+  private def assertMinAssetFee(txId: String, value: JsValue) = {
+    val response = sender.get(s"/transactions/info/$txId")
+    val jsv      = Json.parse(response.getResponseBody)
+    assert((jsv \ "minSponsoredAssetFee").as[JsValue] == value)
+  }
+
+  private def assertSponsorship(assetId: String, sponsorship: Long) = {
     val response = sender.get(s"/assets/details/$assetId")
     val jsv      = Json.parse(response.getResponseBody)
-    assert((jsv \ "sponsorship").as[Long] == sponsorship)
+    assert((jsv \ "minSponsoredAssetFee").asOpt[Long] == Some(sponsorship).filter(_ != 0))
   }
 
   test("Fee in sponsored asset works correctly") {
@@ -45,6 +52,7 @@ class SponsorshipSuite extends BaseTransactionSuite {
     assert(!sponsorId.isEmpty)
     nodes.waitForHeightAriseAndTxPresent(sponsorId)
 
+    assertMinAssetFee(sponsorId, JsNumber(1 * Token))
     assertSponsorship(assetId, 1 * Token)
 
     assertBadRequestAndResponse(
@@ -72,6 +80,7 @@ class SponsorshipSuite extends BaseTransactionSuite {
     assert(!cancelId.isEmpty)
     nodes.waitForHeightAriseAndTxPresent(cancelId)
 
+    assertMinAssetFee(cancelId, JsNull)
     assertSponsorship(assetId, 0L)
 
     assertBadRequestAndResponse(

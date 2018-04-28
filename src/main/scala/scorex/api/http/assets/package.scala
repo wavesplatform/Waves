@@ -5,35 +5,35 @@ import shapeless.{:+:, CNil, Coproduct}
 
 package object assets {
 
-  type TransferRequests = TransferRequest :+: VersionedTransferRequest :+: CNil
+  type TransferRequests = TransferV1Request :+: TransferV2Request :+: CNil
   implicit val autoTransferRequestsReads: Reads[TransferRequests] = Reads { json =>
     (json \ "version").asOpt[Byte] match {
-      case None => TransferRequest.format.reads(json).map(Coproduct[TransferRequests](_))
-      case _    => VersionedTransferRequest.format.reads(json).map(Coproduct[TransferRequests](_))
+      case None => TransferV1Request.format.reads(json).map(Coproduct[TransferRequests](_))
+      case _    => TransferV2Request.format.reads(json).map(Coproduct[TransferRequests](_))
     }
   }
   implicit val autoTransferRequestsWrites: Writes[TransferRequests] = Writes {
     _.eliminate(
-      TransferRequest.format.writes,
+      TransferV1Request.format.writes,
       _.eliminate(
-        VersionedTransferRequest.format.writes,
+        TransferV2Request.format.writes,
         _ => JsNull
       )
     )
   }
 
-  type SignedTransferRequests = SignedTransferRequest :+: SignedVersionedTransferRequest :+: CNil
+  type SignedTransferRequests = SignedTransferV1Request :+: SignedTransferV2Request :+: CNil
   implicit val autoSignedTransferRequestsReads: Reads[SignedTransferRequests] = Reads { json =>
-    (json \ "version").asOpt[Byte] match {
-      case None => SignedTransferRequest.reads.reads(json).map(Coproduct[SignedTransferRequests](_))
-      case _    => SignedVersionedTransferRequest.format.reads(json).map(Coproduct[SignedTransferRequests](_))
+    (json \ "version").asOpt[Int] match {
+      case None | Some(1) => SignedTransferV1Request.reads.reads(json).map(Coproduct[SignedTransferRequests](_))
+      case _              => SignedTransferV2Request.format.reads(json).map(Coproduct[SignedTransferRequests](_))
     }
   }
   implicit val autoSignedTransferRequestsWrites: Writes[SignedTransferRequests] = Writes {
     _.eliminate(
-      SignedTransferRequest.writes.writes,
+      SignedTransferV1Request.writes.writes,
       _.eliminate(
-        SignedVersionedTransferRequest.format.writes,
+        SignedTransferV2Request.format.writes,
         _ => JsNull
       )
     )

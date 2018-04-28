@@ -18,7 +18,8 @@ import scorex.api.http._
 import scorex.api.http.assets._
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.{TransferTransaction, VersionedTransferTransaction}
+import scorex.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
+import scorex.transaction.transfer._
 import scorex.transaction.{Proofs, Transaction, ValidationError}
 import scorex.wallet.Wallet
 import shapeless.Coproduct
@@ -36,13 +37,13 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
     val vt = Table[String, G[_ <: Transaction], (JsValue) => JsValue](
       ("url", "generator", "transform"),
-      ("issue", issueGen, identity),
-      ("reissue", reissueGen, identity),
+      ("issue", issueGen.retryUntil(_.isInstanceOf[IssueTransactionV1]), identity),
+      ("reissue", reissueGen.retryUntil(_.isInstanceOf[ReissueTransactionV1]), identity),
       ("burn", burnGen, {
         case o: JsObject => o ++ Json.obj("quantity" -> o.value("amount"))
         case other       => other
       }),
-      ("transfer", transferGen, {
+      ("transfer", transferV1Gen, {
         case o: JsObject if o.value.contains("feeAsset") =>
           o ++ Json.obj("feeAssetId" -> o.value("feeAsset"), "quantity" -> o.value("amount"))
         case other => other
@@ -163,7 +164,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
 
     val transferRequest = createSignedTransferRequest(
-      TransferTransaction
+      TransferTransactionV1
         .create(
           assetId = None,
           sender = senderPrivateKey,
@@ -179,13 +180,14 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     )
 
     val versionedTransferRequest = createSignedVersionedTransferRequest(
-      VersionedTransferTransaction
+      TransferTransactionV2
         .create(
           assetId = None,
           sender = senderPrivateKey,
           recipient = receiverPrivateKey.toAddress,
           amount = 1 * Waves,
           timestamp = System.currentTimeMillis(),
+          feeAssetId = None,
           feeAmount = Waves / 3,
           attachment = Array.emptyByteArray,
           version = 2,
@@ -199,12 +201,12 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
       "accepts TransferRequest" in posting(transferRequest) ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[TransferTransactions].select[TransferTransaction] shouldBe defined
+        responseAs[TransferTransactions].select[TransferTransactionV1] shouldBe defined
       }
 
       "accepts VersionedTransferRequest" in posting(versionedTransferRequest) ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[TransferTransactions].select[VersionedTransferTransaction] shouldBe defined
+        responseAs[TransferTransactions].select[TransferTransactionV2] shouldBe defined
       }
 
       "returns a error if it is not a transfer request" in posting(issueReq.sample.get) ~> check {
@@ -219,14 +221,14 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
         status shouldBe StatusCodes.OK
         val xs = responseAs[Seq[TransferTransactions]]
         xs.size shouldBe 1
-        xs.head.select[TransferTransaction] shouldBe defined
+        xs.head.select[TransferTransactionV1] shouldBe defined
       }
 
       "accepts VersionedTransferRequest" in posting(List(versionedTransferRequest)) ~> check {
         status shouldBe StatusCodes.OK
         val xs = responseAs[Seq[TransferTransactions]]
         xs.size shouldBe 1
-        xs.head.select[VersionedTransferTransaction] shouldBe defined
+        xs.head.select[TransferTransactionV2] shouldBe defined
       }
 
       "accepts both TransferRequest and VersionedTransferRequest" in {
@@ -239,8 +241,8 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
           status shouldBe StatusCodes.OK
           val xs = responseAs[Seq[TransferTransactions]]
           xs.size shouldBe 2
-          xs.flatMap(_.select[TransferTransaction]) shouldNot be(empty)
-          xs.flatMap(_.select[VersionedTransferTransaction]) shouldNot be(empty)
+          xs.flatMap(_.select[TransferTransactionV1]) shouldNot be(empty)
+          xs.flatMap(_.select[TransferTransactionV2]) shouldNot be(empty)
         }
       }
 
@@ -251,9 +253,9 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
   }
 
-  protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {
+  protected def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferV1Request = {
     import tx._
-    SignedTransferRequest(
+    SignedTransferV1Request(
       Base58.encode(tx.sender.publicKey),
       assetId.map(_.base58),
       recipient.stringRepr,
@@ -266,13 +268,14 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     )
   }
 
-  protected def createSignedVersionedTransferRequest(tx: VersionedTransferTransaction): SignedVersionedTransferRequest = {
+  protected def createSignedVersionedTransferRequest(tx: TransferTransactionV2): SignedTransferV2Request = {
     import tx._
-    SignedVersionedTransferRequest(
+    SignedTransferV2Request(
       Base58.encode(tx.sender.publicKey),
       assetId.map(_.base58),
       recipient.stringRepr,
       amount,
+      feeAssetId.map(_.base58),
       fee,
       timestamp,
       version,
