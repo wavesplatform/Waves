@@ -18,7 +18,6 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
   private val configString =
     """waves {
       |  fees {
-      |    smart-account.extra-fee = 10
       |    payment {
       |      WAVES = 100000
       |    }

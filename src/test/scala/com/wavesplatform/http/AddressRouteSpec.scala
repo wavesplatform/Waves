@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.v1.Terms.Typed
-import com.wavesplatform.settings.{FeesSettings, SmartAccountSettings}
+import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.state.{Blockchain, EitherExt2}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
@@ -36,8 +36,7 @@ class AddressRouteSpec
     mock[UtxPool],
     mock[ChannelGroup],
     new TestTime,
-    TestFunctionalitySettings.Stub,
-    FeesSettings(SmartAccountSettings(10000), Map.empty)
+    TestFunctionalitySettings.Stub
   ).route
 
   private val generatedMessages = for {
@@ -154,7 +153,7 @@ class AddressRouteSpec
       (response \ "script").as[String] shouldBe "WpgBYoY"
       (response \ "scriptText").as[String] shouldBe "TRUE"
       (response \ "complexity").as[Long] shouldBe 1
-      (response \ "extraFee").as[Long] shouldBe 10000
+      (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }
 
     (blockchain.accountScript _).when(allAccounts(2).toAddress).onCall((_: Address) => None)
