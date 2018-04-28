@@ -35,12 +35,12 @@ object Explorer extends ScorexLogging {
     log.info(s"Blockchain height is $blockchainHeight")
     try {
 
-      val flag = args(1).toUpperCase
-      val id   = args(2)
+      val flag      = args(1).toUpperCase
+      val primaryId = args(2)
 
       flag match {
         case "O" =>
-          val orderId = Base58.decode(id).toOption.map(ByteStr.apply)
+          val orderId = Base58.decode(primaryId).toOption.map(ByteStr.apply)
           if (orderId.isDefined) {
             val kVolumeAndFee = LevelDBWriter.k.filledVolumeAndFee(blockchainHeight, orderId.get)
             val bytes1        = db.get(kVolumeAndFee.keyBytes)
@@ -58,8 +58,9 @@ object Explorer extends ScorexLogging {
               log.info(s"\t h = $h: Volume = ${v.volume}, Fee = ${v.fee}")
             }
           } else log.error("No order ID was provided")
+
         case "A" =>
-          val address   = Address.fromString(id).right.get
+          val address   = Address.fromString(primaryId).right.get
           val aid       = LevelDBWriter.k.addressId(address)
           val addressId = aid.parse(db.get(aid.keyBytes)).get
           log.info(s"Address id = $addressId")
@@ -71,18 +72,36 @@ object Explorer extends ScorexLogging {
             val k = LevelDBWriter.k.wavesBalance(h, addressId)
             h -> k.parse(db.get(k.keyBytes))
           }
-
           balances.foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
+
         case "T" =>
-          val address   = Address.fromString(id).right.get
+          val address   = Address.fromString(primaryId).right.get
           val aid       = LevelDBWriter.k.addressId(address)
           val addressId = aid.parse(db.get(aid.keyBytes)).get
           log.info(s"Address id = $addressId")
           val ktxidh = LevelDBWriter.k.addressTransactionIds(args(3).toInt, addressId)
 
-          for ((h, id) <- ktxidh.parse(db.get(ktxidh.keyBytes))) {
-            log.info(s"$id at height $h")
+          for ((t, id) <- ktxidh.parse(db.get(ktxidh.keyBytes))) {
+            log.info(s"$id of type $t")
           }
+
+        case "AA" =>
+          val secondaryId = args(3)
+
+          val address   = Address.fromString(primaryId).right.get
+          val asset     = ByteStr.decodeBase58(secondaryId).get
+          val ai        = LevelDBWriter.k.addressId(address)
+          val addressId = ai.parse(db.get(ai.keyBytes)).get
+          log.info(s"Address ID = $addressId")
+
+          val kabh = LevelDBWriter.k.assetBalanceHistory(addressId, asset)
+          val abh  = kabh.parse(db.get(kabh.keyBytes))
+
+          val balances = abh.map { h =>
+            val k = LevelDBWriter.k.assetBalance(h, addressId, asset)
+            h -> k.parse(db.get(k.keyBytes))
+          }
+          balances.foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
       }
     } finally db.close()
   }
