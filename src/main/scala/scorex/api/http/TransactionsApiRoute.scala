@@ -21,7 +21,7 @@ import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCan
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.transaction.assets._
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransactionV1}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
 import scorex.utils.Time
@@ -178,7 +178,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case ReissueTransactionV2    => TransactionFactory.reissueAssetV2(jsv.as[ReissueV2Request], wallet, time)
               case BurnTransaction         => TransactionFactory.burnAsset(jsv.as[BurnRequest], wallet, time)
               case MassTransferTransaction => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
-              case LeaseTransaction        => TransactionFactory.lease(jsv.as[LeaseRequest], wallet, time)
+              case LeaseTransactionV1      => TransactionFactory.lease(jsv.as[LeaseRequest], wallet, time)
               case LeaseCancelTransaction  => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
               case CreateAliasTransaction  => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
               case DataTransaction         => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
@@ -222,7 +222,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case ReissueTransactionV1    => jsv.as[SignedReissueV1Request].toTx
               case ReissueTransactionV2    => jsv.as[SignedReissueV2Request].toTx
               case BurnTransaction         => jsv.as[SignedBurnRequest].toTx
-              case LeaseTransaction        => jsv.as[SignedLeaseRequest].toTx
+              case LeaseTransactionV1      => jsv.as[SignedLeaseRequest].toTx
               case LeaseCancelTransaction  => jsv.as[SignedLeaseCancelRequest].toTx
               case CreateAliasTransaction  => jsv.as[SignedCreateAliasRequest].toTx
               case DataTransaction         => jsv.as[SignedDataRequest].toTx
@@ -237,10 +237,10 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   }
 
   private def txToExtendedJson(tx: Transaction): JsObject = {
-    import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+    import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransactionV1}
     tx match {
-      case lease: LeaseTransaction =>
-        import LeaseTransaction.Status._
+      case lease: LeaseTransactionV1 =>
+        import scorex.transaction.lease.LeaseTransaction.Status._
         lease.json() ++ Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
       case leaseCancel: LeaseCancelTransaction =>
         leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))

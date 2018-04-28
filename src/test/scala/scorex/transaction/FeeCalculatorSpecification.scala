@@ -10,7 +10,7 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Assertion, Matchers, PropSpec}
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.transaction.assets._
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransactionV1}
 import scorex.transaction.smart.script.Script
 import scorex.transaction.transfer._
 
@@ -126,7 +126,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
 
   property("Lease transaction") {
     val feeCalc = new FeeCalculator(mySettings, noScriptBlockchain)
-    forAll(leaseGen) { tx: LeaseTransaction =>
+    forAll(leaseGen) { tx: LeaseTransactionV1 =>
       feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 400000)
     }
   }

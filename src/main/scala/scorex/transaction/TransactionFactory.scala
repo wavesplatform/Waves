@@ -9,7 +9,7 @@ import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets._
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransactionV1}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
 import scorex.transaction.transfer._
@@ -122,12 +122,12 @@ object TransactionFactory {
       )
     } yield tx
 
-  def lease(request: LeaseRequest, wallet: Wallet, time: Time): Either[ValidationError, LeaseTransaction] =
+  def lease(request: LeaseRequest, wallet: Wallet, time: Time): Either[ValidationError, LeaseTransactionV1] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipientAcc     <- AddressOrAlias.fromString(request.recipient)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- LeaseTransaction.create(senderPrivateKey, request.amount, request.fee, timestamp, recipientAcc)
+      tx <- LeaseTransactionV1.create(senderPrivateKey, request.amount, request.fee, timestamp, recipientAcc)
     } yield tx
 
   def leaseCancel(request: LeaseCancelRequest, wallet: Wallet, time: Time): Either[ValidationError, LeaseCancelTransaction] =

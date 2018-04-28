@@ -14,7 +14,7 @@ import scorex.api.http._
 import scorex.api.http.leasing.LeaseCancelRequest.leaseCancelRequestFormat
 import scorex.api.http.leasing.LeaseRequest.leaseCancelRequestFormat
 import scorex.transaction._
-import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.lease.LeaseTransactionV1
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
@@ -73,9 +73,9 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
         case Left(e) => ApiError.fromValidationError(e)
         case Right(a) =>
           blockchain
-            .addressTransactions(a, Set(LeaseTransaction.typeId), Int.MaxValue, 0)
+            .addressTransactions(a, Set(LeaseTransactionV1.typeId), Int.MaxValue, 0)
             .collect {
-              case (h, lt: LeaseTransaction) if blockchain.leaseDetails(lt.id()).exists(_.isActive) =>
+              case (h, lt: LeaseTransactionV1) if blockchain.leaseDetails(lt.id()).exists(_.isActive) =>
                 lt.json() + ("height" -> JsNumber(h))
             }
       })

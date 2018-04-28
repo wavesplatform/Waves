@@ -6,7 +6,7 @@ import scorex.account.{AddressOrAlias, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParsers.SignatureStringLength
 import scorex.transaction.ValidationError
-import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.lease.LeaseTransactionV1
 
 case class SignedLeaseRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                               senderPublicKey: String,
@@ -21,12 +21,12 @@ case class SignedLeaseRequest(@ApiModelProperty(value = "Base58 encoded sender p
                               @ApiModelProperty(required = true)
                               signature: String)
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, LeaseTransaction] =
+  def toTx: Either[ValidationError, LeaseTransactionV1] =
     for {
       _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
       _recipient <- AddressOrAlias.fromString(recipient)
-      _t         <- LeaseTransaction.create(_sender, amount, fee, timestamp, _recipient, _signature)
+      _t         <- LeaseTransactionV1.create(_sender, amount, fee, timestamp, _recipient, _signature)
     } yield _t
 }
 

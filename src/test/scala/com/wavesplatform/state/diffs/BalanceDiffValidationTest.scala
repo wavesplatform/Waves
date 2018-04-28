@@ -7,7 +7,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.lease.LeaseTransactionV1
 import scorex.transaction.transfer._
 
 class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
@@ -45,8 +45,8 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Matche
       fee  <- smallFeeGen
       amt1 <- Gen.choose(Long.MaxValue / 2 + 1, Long.MaxValue - 1 - fee)
       amt2 <- Gen.choose(Long.MaxValue / 2 + 1, Long.MaxValue - 1 - fee)
-      l1 = LeaseTransaction.create(master1, amt1, fee, ts, recipient).right.get
-      l2 = LeaseTransaction.create(master2, amt2, fee, ts, recipient).right.get
+      l1 = LeaseTransactionV1.create(master1, amt1, fee, ts, recipient).right.get
+      l2 = LeaseTransactionV1.create(master2, amt2, fee, ts, recipient).right.get
     } yield (gen1, gen2, l1, l2)
 
     forAll(setup) {
@@ -56,7 +56,7 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Matche
     }
   }
 
-  val ownLessThatLeaseOut: Gen[(GenesisTransaction, TransferTransactionV1, LeaseTransaction, LeaseTransaction, TransferTransactionV1)] = for {
+  val ownLessThatLeaseOut: Gen[(GenesisTransaction, TransferTransactionV1, LeaseTransactionV1, LeaseTransactionV1, TransferTransactionV1)] = for {
     master <- accountGen
     alice  <- accountGen
     bob    <- accountGen

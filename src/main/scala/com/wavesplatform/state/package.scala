@@ -3,7 +3,7 @@ package com.wavesplatform
 import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.block.Block
 import scorex.transaction.ValidationError.{AliasDoesNotExist, GenericError}
-import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.lease.LeaseTransactionV1
 import scorex.transaction.{AssetId, CreateAliasTransaction, Transaction, ValidationError}
 
 import scala.reflect.ClassTag
@@ -75,10 +75,10 @@ package object state {
         .addressTransactions(address, Set(CreateAliasTransaction.typeId), Int.MaxValue, 0)
         .collect { case (_, a: CreateAliasTransaction) => a.alias }
 
-    def activeLeases(address: Address): Seq[(Int, LeaseTransaction)] =
+    def activeLeases(address: Address): Seq[(Int, LeaseTransactionV1)] =
       blockchain
-        .addressTransactions(address, Set(LeaseTransaction.typeId), Int.MaxValue, 0)
-        .collect { case (h, l: LeaseTransaction) if blockchain.leaseDetails(l.id()).exists(_.isActive) => h -> l }
+        .addressTransactions(address, Set(LeaseTransactionV1.typeId), Int.MaxValue, 0)
+        .collect { case (h, l: LeaseTransactionV1) if blockchain.leaseDetails(l.id()).exists(_.isActive) => h -> l }
   }
 
 }

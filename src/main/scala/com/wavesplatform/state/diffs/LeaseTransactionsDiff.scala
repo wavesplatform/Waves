@@ -7,13 +7,13 @@ import com.wavesplatform.state._
 import scorex.account.Address
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransactionV1}
 
 import scala.util.{Left, Right}
 
 object LeaseTransactionsDiff {
 
-  def lease(blockchain: Blockchain, height: Int)(tx: LeaseTransaction): Either[ValidationError, Diff] = {
+  def lease(blockchain: Blockchain, height: Int)(tx: LeaseTransactionV1): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender.publicKey)
     blockchain.resolveAliasEi(tx.recipient).flatMap { recipient =>
       if (recipient == sender)

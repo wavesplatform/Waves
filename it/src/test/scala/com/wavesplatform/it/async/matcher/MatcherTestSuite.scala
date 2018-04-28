@@ -14,7 +14,7 @@ import scorex.api.http.assets.SignedTransferV1Request
 import scorex.api.http.leasing.{SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransactionV1}
 import scorex.transaction.transfer._
 
 import scala.concurrent.Await
@@ -559,7 +559,7 @@ class MatcherTestSuite
     )
   }
 
-  private def createSignedLeaseRequest(tx: LeaseTransaction): SignedLeaseRequest = {
+  private def createSignedLeaseRequest(tx: LeaseTransactionV1): SignedLeaseRequest = {
     import tx._
     SignedLeaseRequest(
       Base58.encode(tx.sender.publicKey),
@@ -601,7 +601,7 @@ class MatcherTestSuite
   }
 
   private def lease(from: Node, to: Node, amount: Long): ByteStr = {
-    val leaseTx = LeaseTransaction
+    val leaseTx = LeaseTransactionV1
       .create(
         sender = from.privateKey,
         recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).right.get,
