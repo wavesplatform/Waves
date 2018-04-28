@@ -177,6 +177,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case ReissueTransactionV1    => TransactionFactory.reissueAssetV1(jsv.as[ReissueV1Request], wallet, time)
               case ReissueTransactionV2    => TransactionFactory.reissueAssetV2(jsv.as[ReissueV2Request], wallet, time)
               case BurnTransactionV1       => TransactionFactory.burnAssetV1(jsv.as[BurnV1Request], wallet, time)
+              case BurnTransactionV2       => TransactionFactory.burnAssetV2(jsv.as[BurnV2Request], wallet, time)
               case MassTransferTransaction => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
               case LeaseTransaction        => TransactionFactory.lease(jsv.as[LeaseRequest], wallet, time)
               case LeaseCancelTransaction  => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
