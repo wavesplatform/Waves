@@ -10,7 +10,7 @@ import scorex.transaction.ValidationError._
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
+import scorex.transaction.lease._
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
 
@@ -136,21 +136,17 @@ object CommonValidation {
     def feeInUnits: Either[ValidationError, Int] = tx match {
       case _: GenesisTransaction       => Right(0)
       case _: PaymentTransaction       => Right(1)
-      case _: IssueTransactionV1       => Right(1000)
-      case _: IssueTransactionV2       => Right(1000)
+      case _: IssueTransaction         => Right(1000)
       case _: ReissueTransaction       => Right(1000)
       case _: BurnTransaction          => Right(1)
-      case _: TransferTransactionV1    => Right(1)
+      case _: TransferTransaction      => Right(1)
       case tx: MassTransferTransaction => Right(1 + (tx.transfers.size + 1) / 2)
-      case _: LeaseTransactionV1       => Right(1)
-      case _: LeaseTransactionV2       => Right(1)
-      case _: LeaseCancelTransactionV1 => Right(1)
-      case _: LeaseCancelTransactionV2 => Right(1)
+      case _: LeaseTransaction         => Right(1)
+      case _: LeaseCancelTransaction   => Right(1)
       case _: ExchangeTransaction      => Right(3)
-      case _: CreateAliasTransactionV1 => Right(1)
+      case _: CreateAliasTransaction   => Right(1)
       case tx: DataTransaction         => Right(1 + (tx.bytes().length - 1) / 1024)
       case _: SetScriptTransaction     => Right(1)
-      case _: TransferTransactionV2    => Right(1)
       case _: SponsorFeeTransaction    => Right(1000)
       case _                           => Left(UnsupportedTransactionType)
     }
