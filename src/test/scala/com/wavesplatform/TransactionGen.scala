@@ -18,7 +18,7 @@ import scorex.transaction._
 import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransactionV1}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction, LeaseTransactionV1, LeaseTransactionV2}
 import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.smart.SetScriptTransaction
@@ -159,10 +159,16 @@ trait TransactionGenBase extends ScriptGen {
     recipient <- accountGen
   } yield (sender, amount, fee, timestamp, recipient)
 
-  val leaseAndCancelGen: Gen[(LeaseTransactionV1, LeaseCancelTransaction)] = for {
+  def createLease(sender: PrivateKeyAccount, amount: Long, fee: Long, timestamp: Long, recipient: AddressOrAlias) = {
+    val v1 = LeaseTransactionV1.create(sender, amount, fee, timestamp, recipient).right.get
+    val v2 = LeaseTransactionV2.selfSigned(LeaseTransactionV2.supportedVersions.head, sender, amount, fee, timestamp, recipient).right.get
+    Gen.oneOf(v1, v2)
+  }
+
+  val leaseAndCancelGen: Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
     (sender, amount, fee, timestamp, recipient) <- leaseParamGen
-    lease = LeaseTransactionV1.create(sender, amount, fee, timestamp, recipient).right.get
-    cancelFee <- smallFeeGen
+    lease                                       <- createLease(sender, amount, fee, timestamp, recipient)
+    cancelFee                                   <- smallFeeGen
   } yield (lease, LeaseCancelTransaction.create(sender, lease.id(), cancelFee, timestamp + 1).right.get)
 
   def leaseAndCancelGeneratorP(leaseSender: PrivateKeyAccount,
@@ -192,7 +198,7 @@ trait TransactionGenBase extends ScriptGen {
     timestamp2 <- positiveLongGen
   } yield (lease, LeaseCancelTransaction.create(otherSender, lease.id(), fee2, timestamp2).right.get)
 
-  val leaseGen: Gen[LeaseTransactionV1]           = leaseAndCancelGen.map(_._1)
+  val leaseGen: Gen[LeaseTransaction]             = leaseAndCancelGen.map(_._1)
   val leaseCancelGen: Gen[LeaseCancelTransaction] = leaseAndCancelGen.map(_._2)
 
   val transferParamGen = for {

@@ -16,7 +16,7 @@ import scorex.transaction.Transaction.Type
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction, LeaseTransactionV1}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.{Script, ScriptReader}
 import scorex.transaction.transfer._

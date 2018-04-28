@@ -6,7 +6,7 @@ import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}
 import scorex.transaction.Transaction.Type
 import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
+import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.script.Script
 import scorex.transaction.{AssetId, Transaction}
 

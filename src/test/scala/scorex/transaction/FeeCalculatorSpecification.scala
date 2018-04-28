@@ -3,14 +3,13 @@ package scorex.transaction
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.FeesSettings
-import com.wavesplatform.state.ByteStr
-import com.wavesplatform.state._
+import com.wavesplatform.state.{ByteStr, _}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Assertion, Matchers, PropSpec}
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.transaction.assets._
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransactionV1}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.script.Script
 import scorex.transaction.transfer._
 
@@ -126,7 +125,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
 
   property("Lease transaction") {
     val feeCalc = new FeeCalculator(mySettings, noScriptBlockchain)
-    forAll(leaseGen) { tx: LeaseTransactionV1 =>
+    forAll(leaseGen) { tx: LeaseTransaction =>
       feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 400000)
     }
   }

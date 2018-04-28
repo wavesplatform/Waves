@@ -6,7 +6,7 @@ import scorex.transaction.ValidationError.UnsupportedTransactionType
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction, LeaseTransactionV1}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.{SetScriptTransaction, Verifier}
 import scorex.transaction.transfer._
 

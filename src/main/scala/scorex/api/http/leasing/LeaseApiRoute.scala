@@ -14,7 +14,7 @@ import scorex.api.http._
 import scorex.api.http.leasing.LeaseCancelRequest.leaseCancelRequestFormat
 import scorex.api.http.leasing.LeaseRequest.leaseCancelRequestFormat
 import scorex.transaction._
-import scorex.transaction.lease.LeaseTransactionV1
+import scorex.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
