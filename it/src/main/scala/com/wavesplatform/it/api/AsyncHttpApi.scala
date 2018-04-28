@@ -276,7 +276,7 @@ object AsyncHttpApi extends Assertions {
       postJson("/assets/reissue", ReissueV1Request(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
 
     def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Future[Transaction] =
-      postJson("/assets/burn", BurnRequest(sourceAddress, assetId, quantity, fee)).as[Transaction]
+      postJson("/assets/burn", BurnV1Request(sourceAddress, assetId, quantity, fee)).as[Transaction]
 
     def assetBalance(address: String, asset: String): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset").as[AssetBalance]

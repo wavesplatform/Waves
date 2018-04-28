@@ -31,8 +31,8 @@ trait BurnTransaction extends ProvenTransaction {
       "chainId" -> chainByte,
       "version" -> version,
       "assetId" -> assetId.base58,
-      "amount" -> amount,
-      "fee" -> fee
+      "amount"  -> amount,
+      "fee"     -> fee
     )
   }
 
@@ -52,12 +52,12 @@ object BurnTransaction {
   val typeId: Byte = 6
 
   def parseBase(start: Int, bytes: Array[Byte]): (PublicKeyAccount, AssetId, Long, Long, Long, Int) = {
-    val sender = PublicKeyAccount(bytes.slice(start, KeyLength))
-    val assetId = ByteStr(bytes.slice(start + KeyLength, start + KeyLength + AssetIdLength))
+    val sender        = PublicKeyAccount(bytes.slice(start, KeyLength))
+    val assetId       = ByteStr(bytes.slice(start + KeyLength, start + KeyLength + AssetIdLength))
     val quantityStart = start + KeyLength + AssetIdLength
 
-    val quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
-    val fee = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
+    val quantity  = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
+    val fee       = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
     val timestamp = Longs.fromByteArray(bytes.slice(quantityStart + 16, quantityStart + 24))
 
     (sender, assetId, quantity, fee, timestamp, quantityStart + 24)

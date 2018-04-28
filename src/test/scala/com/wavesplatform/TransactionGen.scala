@@ -405,7 +405,7 @@ trait TransactionGenBase extends ScriptGen {
 
   val issueGen: Gen[IssueTransaction]     = issueReissueBurnGen.map(_._1)
   val reissueGen: Gen[ReissueTransaction] = issueReissueBurnGen.map(_._2)
-  val burnGen: Gen[BurnTransactionV1]       = issueReissueBurnGen.map(_._3)
+  val burnGen: Gen[BurnTransactionV1]     = issueReissueBurnGen.map(_._3)
 
   def sponsorFeeCancelSponsorFeeGen(
       sender: PrivateKeyAccount): Gen[(IssueTransaction, SponsorFeeTransaction, SponsorFeeTransaction, SponsorFeeTransaction)] =

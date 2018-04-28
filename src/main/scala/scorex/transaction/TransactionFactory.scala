@@ -167,7 +167,7 @@ object TransactionFactory {
                                             timestamp)
     } yield tx
 
-  def burnAsset(request: BurnRequest, wallet: Wallet, time: Time): Either[ValidationError, BurnTransactionV1] =
+  def burnAssetV1(request: BurnV1Request, wallet: Wallet, time: Time): Either[ValidationError, BurnTransactionV1] =
     for {
       pk <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())

@@ -46,7 +46,7 @@ object AssetTransactionsDiff {
       }
     }
 
-  def burn(blockchain: Blockchain, height: Int)(tx: BurnTransactionV1): Either[ValidationError, Diff] = {
+  def burn(blockchain: Blockchain, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] = {
     val burnAnyTokensEnabled = blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, blockchain.height)
 
     validateAsset(tx, blockchain, tx.assetId, !burnAnyTokensEnabled).map(itx => {

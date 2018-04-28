@@ -97,7 +97,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
       new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])
     ))
   def burnRoute: Route = (path("burn") & post) {
-    json[SignedBurnRequest] { burnReq =>
+    json[SignedBurnV1Request] { burnReq =>
       doBroadcast(burnReq.toTx)
     }
   }

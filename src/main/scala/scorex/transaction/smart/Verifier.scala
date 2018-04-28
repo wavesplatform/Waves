@@ -25,7 +25,7 @@ object Verifier {
         assetId <- tx match {
           case t: TransferTransaction     => t.assetId
           case t: MassTransferTransaction => t.assetId
-          case t: BurnTransactionV1         => Some(t.assetId)
+          case t: BurnTransaction         => Some(t.assetId)
           case t: ReissueTransaction      => Some(t.assetId)
           case _                          => None
         }

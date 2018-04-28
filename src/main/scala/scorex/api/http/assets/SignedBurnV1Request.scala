@@ -9,31 +9,31 @@ import scorex.transaction.TransactionParsers.SignatureStringLength
 import scorex.transaction.assets.BurnTransactionV1
 import scorex.transaction.{AssetIdStringLength, ValidationError}
 
-object SignedBurnRequest {
-  implicit val reads: Reads[SignedBurnRequest] = (
+object SignedBurnV1Request {
+  implicit val reads: Reads[SignedBurnV1Request] = (
     (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "assetId").read[String] and
       (JsPath \ "quantity").read[Long].orElse((JsPath \ "amount").read[Long]) and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "signature").read[String]
-  )(SignedBurnRequest.apply _)
+  )(SignedBurnV1Request.apply _)
 
-  implicit val writes: Writes[SignedBurnRequest] = Json.writes[SignedBurnRequest]
+  implicit val writes: Writes[SignedBurnV1Request] = Json.writes[SignedBurnV1Request]
 }
 
-case class SignedBurnRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
-                             senderPublicKey: String,
-                             @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
-                             assetId: String,
-                             @ApiModelProperty(required = true, example = "1000000")
-                             quantity: Long,
-                             @ApiModelProperty(required = true)
-                             fee: Long,
-                             @ApiModelProperty(required = true)
-                             timestamp: Long,
-                             @ApiModelProperty(required = true)
-                             signature: String)
+case class SignedBurnV1Request(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
+                               senderPublicKey: String,
+                               @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
+                               assetId: String,
+                               @ApiModelProperty(required = true, example = "1000000")
+                               quantity: Long,
+                               @ApiModelProperty(required = true)
+                               fee: Long,
+                               @ApiModelProperty(required = true)
+                               timestamp: Long,
+                               @ApiModelProperty(required = true)
+                               signature: String)
     extends BroadcastRequest {
 
   def toTx: Either[ValidationError, BurnTransactionV1] =

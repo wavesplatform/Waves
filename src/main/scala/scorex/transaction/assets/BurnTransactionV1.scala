@@ -10,13 +10,8 @@ import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
-case class BurnTransactionV1 private(sender: PublicKeyAccount,
-                                     assetId: ByteStr,
-                                     amount: Long,
-                                     fee: Long,
-                                     timestamp: Long,
-                                     signature: ByteStr)
-  extends BurnTransaction
+case class BurnTransactionV1 private (sender: PublicKeyAccount, assetId: ByteStr, amount: Long, fee: Long, timestamp: Long, signature: ByteStr)
+    extends BurnTransaction
     with SignedTransaction
     with FastHashId {
 
@@ -27,7 +22,7 @@ case class BurnTransactionV1 private(sender: PublicKeyAccount,
   override val builder: BurnTransactionV1.type = BurnTransactionV1
 
   override val bodyBytes: Coeval[Array[Byte]] = byteBase.map(base => Bytes.concat(Array(builder.typeId), base))
-  override val bytes: Coeval[Array[Byte]] = bodyBytes.map(body => Bytes.concat(body, signature.arr))
+  override val bytes: Coeval[Array[Byte]]     = bodyBytes.map(body => Bytes.concat(body, signature.arr))
 }
 
 object BurnTransactionV1 extends TransactionParserFor[BurnTransactionV1] with TransactionParser.HardcodedVersion1 {
@@ -37,7 +32,7 @@ object BurnTransactionV1 extends TransactionParserFor[BurnTransactionV1] with Tr
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
       val (sender, assetId, quantity, fee, timestamp, end) = BurnTransaction.parseBase(0, bytes)
-      val signature = ByteStr(bytes.slice(end, end + SignatureLength))
+      val signature                                        = ByteStr(bytes.slice(end, end + SignatureLength))
       BurnTransactionV1
         .create(sender, assetId, quantity, fee, timestamp, signature)
         .fold(left => Failure(new Exception(left.toString)), right => Success(right))
@@ -58,7 +53,3 @@ object BurnTransactionV1 extends TransactionParserFor[BurnTransactionV1] with Tr
       unverified.copy(signature = ByteStr(crypto.sign(sender, unverified.bodyBytes())))
     }
 }
-
-
-
-

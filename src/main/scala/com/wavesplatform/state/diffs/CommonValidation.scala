@@ -93,7 +93,7 @@ object CommonValidation {
       )
 
     tx match {
-      case _: BurnTransactionV1         => Right(tx)
+      case _: BurnTransactionV1       => Right(tx)
       case _: PaymentTransaction      => Right(tx)
       case _: GenesisTransaction      => Right(tx)
       case _: TransferTransactionV1   => Right(tx)
@@ -109,6 +109,7 @@ object CommonValidation {
       case _: TransferTransactionV2   => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: IssueTransactionV2      => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: ReissueTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: BurnTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: SponsorFeeTransaction   => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _                          => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
@@ -139,7 +140,7 @@ object CommonValidation {
       case _: IssueTransactionV1       => Right(1000)
       case _: IssueTransactionV2       => Right(1000)
       case _: ReissueTransaction       => Right(1000)
-      case _: BurnTransactionV1          => Right(1)
+      case _: BurnTransaction          => Right(1)
       case _: TransferTransactionV1    => Right(1)
       case tx: MassTransferTransaction => Right(1 + (tx.transfers.size + 1) / 2)
       case _: LeaseTransaction         => Right(1)

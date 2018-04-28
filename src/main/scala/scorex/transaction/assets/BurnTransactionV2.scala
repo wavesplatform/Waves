@@ -10,15 +10,15 @@ import cats.implicits._
 
 import scala.util.{Failure, Success, Try}
 
-final case class BurnTransactionV2 private(version: Byte,
-                                           chainId: Byte,
-                                           sender: PublicKeyAccount,
-                                           assetId: ByteStr,
-                                           amount: Long,
-                                           fee: Long,
-                                           timestamp: Long,
-                                           proofs: Proofs)
-  extends BurnTransaction
+final case class BurnTransactionV2 private (version: Byte,
+                                            chainId: Byte,
+                                            sender: PublicKeyAccount,
+                                            assetId: ByteStr,
+                                            amount: Long,
+                                            fee: Long,
+                                            timestamp: Long,
+                                            proofs: Proofs)
+    extends BurnTransaction
     with FastHashId {
   override def builder: TransactionParser = BurnTransactionV2
 
@@ -37,18 +37,19 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
 
   override val supportedVersions: Set[Byte] = Set(2)
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[BurnTransactionV2] = Try {
-    val chainId = bytes(0)
-    val (sender, assetId, quantity, fee, timestamp, end) = BurnTransaction.parseBase(1, bytes)
+  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[BurnTransactionV2] =
+    Try {
+      val chainId                                          = bytes(0)
+      val (sender, assetId, quantity, fee, timestamp, end) = BurnTransaction.parseBase(1, bytes)
 
-    (for {
-      proofs <- Proofs.fromBytes(bytes.drop(end))
-      tx <- create(version, chainId, sender, assetId, quantity, fee, timestamp, proofs)
-    } yield tx).fold(
-      err => Failure(new Exception(err.toString)),
-      t => Success(t)
-    )
-  }.flatten
+      (for {
+        proofs <- Proofs.fromBytes(bytes.drop(end))
+        tx     <- create(version, chainId, sender, assetId, quantity, fee, timestamp, proofs)
+      } yield tx).fold(
+        err => Failure(new Exception(err.toString)),
+        t => Success(t)
+      )
+    }.flatten
 
   def create(version: Byte,
              chainId: Byte,
@@ -62,9 +63,15 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
       .validateBurnParams(quantity, fee)
       .map(_ => BurnTransactionV2(version, chainId, sender, assetId, quantity, fee, timestamp, proofs))
 
-  def selfSigned(version: Byte, chainId: Byte, sender: PrivateKeyAccount, assetId: ByteStr, quantity: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] =
+  def selfSigned(version: Byte,
+                 chainId: Byte,
+                 sender: PrivateKeyAccount,
+                 assetId: ByteStr,
+                 quantity: Long,
+                 fee: Long,
+                 timestamp: Long): Either[ValidationError, TransactionT] =
     for {
       unsigned <- create(version, chainId, sender, assetId, quantity, fee, timestamp, Proofs.empty)
-      proofs <- Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes()))))
+      proofs   <- Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes()))))
     } yield unsigned.copy(proofs = proofs)
 }

@@ -85,16 +85,16 @@ trait RequestGen extends TransactionGen { _: Suite =>
     _rr        <- reissueReq
   } yield SignedReissueV1Request(_rr.sender, _rr.assetId, _rr.quantity, _rr.reissuable, _rr.fee, _timestamp, _signature)
 
-  val burnReq: G[BurnRequest] = for {
+  val burnReq: G[BurnV1Request] = for {
     (account, fee)      <- commonFields
     (assetId, quantity) <- reissueBurnFields
-  } yield BurnRequest(account, assetId, quantity, fee)
+  } yield BurnV1Request(account, assetId, quantity, fee)
 
-  val broadcastBurnReq: G[SignedBurnRequest] = for {
+  val broadcastBurnReq: G[SignedBurnV1Request] = for {
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _br        <- burnReq
-  } yield SignedBurnRequest(_br.sender, _br.assetId, _br.quantity, _br.fee, _timestamp, _signature)
+  } yield SignedBurnV1Request(_br.sender, _br.assetId, _br.quantity, _br.fee, _timestamp, _signature)
 
   val transferReq: G[TransferV1Request] = for {
     (account, fee) <- commonFields

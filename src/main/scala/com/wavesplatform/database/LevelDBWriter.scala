@@ -347,13 +347,16 @@ object LevelDBWriter {
       val ndi = newDataInput(data)
       SponsorshipValue(ndi.readLong())
     }
+
     private def writeSponsorship(ai: SponsorshipValue): Array[Byte] = {
       val ndo = newDataOutput()
       ndo.writeBigInt(ai.minFee)
       ndo.toByteArray
     }
+
     def sponsorship(height: Int, assetId: ByteStr): Key[SponsorshipValue] =
       Key(byteKeyWithH(33, height, assetId.arr), readSponsorship, writeSponsorship)
+
     def sponsorshipHistory(assetId: ByteStr): Key[Seq[Int]] = historyKey(34, assetId.arr)
   }
 
@@ -690,7 +693,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
 
             case _: IssueTransaction        => rollbackAssetInfo(rw, tx.id(), currentHeight)
             case tx: ReissueTransaction     => rollbackAssetInfo(rw, tx.assetId, currentHeight)
-            case tx: BurnTransactionV1        => rollbackAssetInfo(rw, tx.assetId, currentHeight)
+            case tx: BurnTransaction        => rollbackAssetInfo(rw, tx.assetId, currentHeight)
             case _: LeaseTransaction        => rollbackLeaseStatus(rw, tx.id(), currentHeight)
             case tx: LeaseCancelTransaction => rollbackLeaseStatus(rw, tx.leaseId, currentHeight)
 
