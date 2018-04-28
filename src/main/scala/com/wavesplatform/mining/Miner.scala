@@ -134,7 +134,7 @@ class MinerImpl(allChannels: ChannelGroup,
             val sortInBlock   = blockchainUpdater.height <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
 
             val estimators = MiningEstimators(minerSettings, blockchainUpdater, height)
-            val mdConstraint = TwoDimensionalMiningConstraint.partial(
+            val mdConstraint = MultiDimensionalMiningConstraint.partial(
               MultiDimensionalMiningConstraint.full(estimators.total),
               OneDimensionalMiningConstraint.full(estimators.keyBlock)
             )
@@ -151,7 +151,7 @@ class MinerImpl(allChannels: ChannelGroup,
             log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
             Block.buildAndSign(version.toByte, currentTime, referencedBlockInfo.blockId, consensusData, unconfirmed, account, features) match {
               case Left(e)  => Left(e.err)
-              case Right(x) => Right((estimators, x, updatedMdConstraint.first))
+              case Right(x) => Right((estimators, x, updatedMdConstraint.constraints.head))
             }
           }
         } yield block
@@ -172,9 +172,9 @@ class MinerImpl(allChannels: ChannelGroup,
       Task.now(Retry)
     } else {
       val (unconfirmed, updatedTotalConstraint) = measureLog("packing unconfirmed transactions for microblock") {
-        val mdConstraint                       = TwoDimensionalMiningConstraint.partial(restTotalConstraint, OneDimensionalMiningConstraint.full(microEstimator))
+        val mdConstraint                       = MultiDimensionalMiningConstraint.partial(restTotalConstraint, OneDimensionalMiningConstraint.full(microEstimator))
         val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint, sortInBlock = false)
-        (unconfirmed, updatedMdConstraint.first)
+        (unconfirmed, updatedMdConstraint.constraints.head)
       }
 
       if (updatedTotalConstraint.isEmpty) {

@@ -23,22 +23,6 @@ object OneDimensionalMiningConstraint {
   def full(estimator: Estimator): OneDimensionalMiningConstraint = new OneDimensionalMiningConstraint(estimator.max, estimator)
 }
 
-case class TwoDimensionalMiningConstraint(first: MiningConstraint, second: MiningConstraint) extends MiningConstraint {
-  override def isEmpty: Boolean                                    = first.isEmpty || second.isEmpty
-  override def isOverfilled: Boolean                               = first.isOverfilled || second.isOverfilled
-  override def put(x: Block): TwoDimensionalMiningConstraint       = TwoDimensionalMiningConstraint(first.put(x), second.put(x))
-  override def put(x: Transaction): TwoDimensionalMiningConstraint = TwoDimensionalMiningConstraint(first.put(x), second.put(x))
-}
-
-object TwoDimensionalMiningConstraint {
-  def full(first: Estimator, second: Estimator): TwoDimensionalMiningConstraint = new TwoDimensionalMiningConstraint(
-    first = OneDimensionalMiningConstraint.full(first),
-    second = OneDimensionalMiningConstraint.full(second)
-  )
-  def partial(firstRest: MiningConstraint, secondRest: MiningConstraint): TwoDimensionalMiningConstraint =
-    new TwoDimensionalMiningConstraint(firstRest, secondRest)
-}
-
 case class MultiDimensionalMiningConstraint(constraints: NonEmptyList[MiningConstraint]) extends MiningConstraint {
   override def isEmpty: Boolean                                      = constraints.exists(_.isEmpty)
   override def isOverfilled: Boolean                                 = constraints.exists(_.isOverfilled)
@@ -49,4 +33,10 @@ case class MultiDimensionalMiningConstraint(constraints: NonEmptyList[MiningCons
 object MultiDimensionalMiningConstraint {
   def full(estimators: NonEmptyList[Estimator]): MultiDimensionalMiningConstraint =
     MultiDimensionalMiningConstraint(estimators.map(OneDimensionalMiningConstraint.full))
+
+  def full(estimator1: Estimator, estimator2: Estimator): MultiDimensionalMiningConstraint =
+    MultiDimensionalMiningConstraint(NonEmptyList.of(estimator1, estimator2).map(OneDimensionalMiningConstraint.full))
+
+  def partial(constraint1: MiningConstraint, constraint2: MiningConstraint): MultiDimensionalMiningConstraint =
+    MultiDimensionalMiningConstraint(NonEmptyList.of(constraint1, constraint2))
 }

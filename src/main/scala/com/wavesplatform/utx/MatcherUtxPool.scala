@@ -4,7 +4,7 @@ import akka.event.EventStream
 import cats.kernel.Monoid
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.model.Events.BalanceChanged
-import com.wavesplatform.mining.TwoDimensionalMiningConstraint
+import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.state.{ByteStr, Diff, Portfolio}
 import scorex.account.Address
 import scorex.transaction.{AssetId, Authorized, Transaction, ValidationError}
@@ -45,7 +45,7 @@ class MatcherUtxPool(underlying: UtxPool, matcherSettings: MatcherSettings, even
 
   override def transactionById(transactionId: ByteStr): Option[Transaction] = underlying.transactionById(transactionId)
 
-  override def packUnconfirmed(rest: TwoDimensionalMiningConstraint, sortInBlock: Boolean): (Seq[Transaction], TwoDimensionalMiningConstraint) =
+  override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, sortInBlock: Boolean): (Seq[Transaction], MultiDimensionalMiningConstraint) =
     underlying.packUnconfirmed(rest, sortInBlock)
 
   override def batched[Result](f: UtxBatchOps => Result): Result = {

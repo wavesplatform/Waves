@@ -58,15 +58,16 @@ object MiningEstimators {
     val isMassTransferEnabled = activatedFeatures.contains(BlockchainFeatures.MassTransfer.id)
     val isScriptEnabled       = activatedFeatures.contains(BlockchainFeatures.SmartAccounts.id)
 
-    val total =
+    val total = NonEmptyList.one(
       if (isMassTransferEnabled) SizeEstimator(MaxTxsSizeInBytes)
       else {
         val maxTxs = if (isNgEnabled) Block.MaxTransactionsPerBlockVer3 else ClassicAmountOfTxsInBlock
         TxNumberEstimator(maxTxs)
       }
+    )
 
     MiningEstimators(
-      total = if (isScriptEnabled) NonEmptyList.of(total, ScriptRunNumberEstimator(MaxScriptRunsInBlock, blockchain)) else NonEmptyList.one(total),
+      total = if (isScriptEnabled) ScriptRunNumberEstimator(MaxScriptRunsInBlock, blockchain) :: total else total,
       keyBlock =
         if (isMassTransferEnabled) TxNumberEstimator(0)
         else {
