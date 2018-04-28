@@ -144,6 +144,7 @@ object CommonValidation {
       case _: TransferTransactionV1    => Right(1)
       case tx: MassTransferTransaction => Right(1 + (tx.transfers.size + 1) / 2)
       case _: LeaseTransactionV1       => Right(1)
+      case _: LeaseTransactionV2       => Right(1)
       case _: LeaseCancelTransaction   => Right(1)
       case _: ExchangeTransaction      => Right(3)
       case _: CreateAliasTransaction   => Right(1)

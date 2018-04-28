@@ -15,8 +15,8 @@ import scorex.BroadcastRoute
 import scorex.account.Address
 import scorex.api.http.DataRequest._
 import scorex.api.http.alias.{CreateAliasRequest, SignedCreateAliasRequest}
-import scorex.api.http.assets._
 import scorex.api.http.assets.SponsorFeeRequest._
+import scorex.api.http.assets._
 import scorex.api.http.leasing._
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
@@ -239,9 +239,9 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   }
 
   private def txToExtendedJson(tx: Transaction): JsObject = {
-    import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransactionV1}
+    import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
     tx match {
-      case lease: LeaseTransactionV1 =>
+      case lease: LeaseTransaction =>
         import scorex.transaction.lease.LeaseTransaction.Status._
         lease.json() ++ Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
       case leaseCancel: LeaseCancelTransaction =>
