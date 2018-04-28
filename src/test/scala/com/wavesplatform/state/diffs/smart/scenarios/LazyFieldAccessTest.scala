@@ -11,7 +11,7 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.lease.{LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
 

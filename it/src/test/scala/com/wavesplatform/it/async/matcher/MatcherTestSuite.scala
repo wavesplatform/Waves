@@ -11,10 +11,10 @@ import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.state.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.api.http.assets.SignedTransferV1Request
-import scorex.api.http.leasing.{SignedLeaseCancelRequest, SignedLeaseRequest}
+import scorex.api.http.leasing.{SignedLeaseCancelV1Request, SignedLeaseV1Request}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import scorex.transaction.transfer._
 
 import scala.concurrent.Await
@@ -559,9 +559,9 @@ class MatcherTestSuite
     )
   }
 
-  private def createSignedLeaseRequest(tx: LeaseTransaction): SignedLeaseRequest = {
+  private def createSignedLeaseRequest(tx: LeaseTransactionV1): SignedLeaseV1Request = {
     import tx._
-    SignedLeaseRequest(
+    SignedLeaseV1Request(
       Base58.encode(tx.sender.publicKey),
       amount,
       fee,
@@ -571,9 +571,9 @@ class MatcherTestSuite
     )
   }
 
-  private def createSignedLeaseCancelRequest(tx: LeaseCancelTransaction): SignedLeaseCancelRequest = {
+  private def createSignedLeaseCancelRequest(tx: LeaseCancelTransactionV1): SignedLeaseCancelV1Request = {
     import tx._
-    SignedLeaseCancelRequest(
+    SignedLeaseCancelV1Request(
       Base58.encode(tx.sender.publicKey),
       leaseId.base58,
       timestamp,
@@ -601,7 +601,7 @@ class MatcherTestSuite
   }
 
   private def lease(from: Node, to: Node, amount: Long): ByteStr = {
-    val leaseTx = LeaseTransaction
+    val leaseTx = LeaseTransactionV1
       .create(
         sender = from.privateKey,
         recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).right.get,
@@ -617,7 +617,7 @@ class MatcherTestSuite
   }
 
   private def cancelLease(sender: Node, leaseId: ByteStr, amount: Long): Unit = {
-    val cancelLeaseTx = LeaseCancelTransaction
+    val cancelLeaseTx = LeaseCancelTransactionV1
       .create(
         sender = sender.privateKey,
         leaseId = leaseId,

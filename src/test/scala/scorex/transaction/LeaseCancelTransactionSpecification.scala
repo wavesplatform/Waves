@@ -9,7 +9,7 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
 
   property("Lease cancel serialization roundtrip") {
     forAll(leaseCancelGen) { tx: LeaseCancelTransaction =>
-      val recovered = LeaseCancelTransaction.parseBytes(tx.bytes()).get
+      val recovered = tx.builder.parseBytes(tx.bytes()).get.asInstanceOf[LeaseCancelTransaction]
       assertTxs(recovered, tx)
     }
   }
@@ -24,7 +24,7 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
   private def assertTxs(first: LeaseCancelTransaction, second: LeaseCancelTransaction): Unit = {
     first.leaseId shouldEqual second.leaseId
     first.fee shouldEqual second.fee
-    first.signature shouldEqual second.signature
+    first.proofs shouldEqual second.proofs
     first.bytes() shouldEqual second.bytes()
   }
 

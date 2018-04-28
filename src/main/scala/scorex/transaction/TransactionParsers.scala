@@ -4,7 +4,7 @@ import com.wavesplatform.utils.base58Length
 import scorex.crypto.signatures.Curve25519
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
 
@@ -25,8 +25,8 @@ object TransactionParsers {
     ReissueTransactionV1,
     BurnTransaction,
     ExchangeTransaction,
-    LeaseTransaction,
-    LeaseCancelTransaction,
+    LeaseTransactionV1,
+    LeaseCancelTransactionV1,
     CreateAliasTransaction,
     MassTransferTransaction
   ).map { x =>
@@ -39,6 +39,8 @@ object TransactionParsers {
     SetScriptTransaction,
     IssueTransactionV2,
     ReissueTransactionV2,
+    LeaseTransactionV2,
+    LeaseCancelTransactionV2,
     SponsorFeeTransaction
   ).flatMap { x =>
     x.supportedVersions.map { version =>

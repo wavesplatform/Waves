@@ -10,7 +10,7 @@ import scorex.transaction.ValidationError._
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
 
@@ -93,24 +93,26 @@ object CommonValidation {
       )
 
     tx match {
-      case _: BurnTransaction         => Right(tx)
-      case _: PaymentTransaction      => Right(tx)
-      case _: GenesisTransaction      => Right(tx)
-      case _: TransferTransactionV1   => Right(tx)
-      case _: IssueTransactionV1      => Right(tx)
-      case _: ReissueTransactionV1    => Right(tx)
-      case _: ExchangeTransaction     => Right(tx)
-      case _: LeaseTransaction        => Right(tx)
-      case _: LeaseCancelTransaction  => Right(tx)
-      case _: CreateAliasTransaction  => Right(tx)
-      case _: MassTransferTransaction => activationBarrier(BlockchainFeatures.MassTransfer)
-      case _: DataTransaction         => activationBarrier(BlockchainFeatures.DataTransaction)
-      case _: SetScriptTransaction    => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: TransferTransactionV2   => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: IssueTransactionV2      => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: ReissueTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: SponsorFeeTransaction   => activationBarrier(BlockchainFeatures.FeeSponsorship)
-      case _                          => Left(GenericError("Unknown transaction must be explicitly activated"))
+      case _: BurnTransaction          => Right(tx)
+      case _: PaymentTransaction       => Right(tx)
+      case _: GenesisTransaction       => Right(tx)
+      case _: TransferTransactionV1    => Right(tx)
+      case _: IssueTransactionV1       => Right(tx)
+      case _: ReissueTransactionV1     => Right(tx)
+      case _: ExchangeTransaction      => Right(tx)
+      case _: LeaseTransactionV1       => Right(tx)
+      case _: LeaseCancelTransactionV1 => Right(tx)
+      case _: CreateAliasTransaction   => Right(tx)
+      case _: MassTransferTransaction  => activationBarrier(BlockchainFeatures.MassTransfer)
+      case _: DataTransaction          => activationBarrier(BlockchainFeatures.DataTransaction)
+      case _: SetScriptTransaction     => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: TransferTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: IssueTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: ReissueTransactionV2     => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: LeaseTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: LeaseCancelTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: SponsorFeeTransaction    => activationBarrier(BlockchainFeatures.FeeSponsorship)
+      case _                           => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }
 
@@ -138,8 +140,10 @@ object CommonValidation {
       case _: BurnTransaction          => Right(1)
       case _: TransferTransactionV1    => Right(1)
       case tx: MassTransferTransaction => Right(1 + (tx.transfers.size + 1) / 2)
-      case _: LeaseTransaction         => Right(1)
-      case _: LeaseCancelTransaction   => Right(1)
+      case _: LeaseTransactionV1       => Right(1)
+      case _: LeaseTransactionV2       => Right(1)
+      case _: LeaseCancelTransactionV1 => Right(1)
+      case _: LeaseCancelTransactionV2 => Right(1)
       case _: ExchangeTransaction      => Right(3)
       case _: CreateAliasTransaction   => Right(1)
       case tx: DataTransaction         => Right(1 + (tx.bytes().length - 1) / 1024)

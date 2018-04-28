@@ -11,7 +11,7 @@ import scorex.account.{Alias, PrivateKeyAccount}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseTransactionV1}
 import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.transfer._
 import scorex.utils.LoggerFacade
@@ -76,7 +76,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
         Seq.empty[Transaction],
         Seq.empty[IssueTransactionV1],
         Seq.empty[IssueTransactionV1],
-        Seq.empty[LeaseTransaction],
+        Seq.empty[LeaseTransactionV1],
         Seq.empty[CreateAliasTransaction]
       )) {
       case ((allTxsWithValid, validIssueTxs, reissuableIssueTxs, activeLeaseTransactions, aliases), _) =>
@@ -131,17 +131,17 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
             val buyer     = randomFrom(accounts).get
             val buyOrder  = Order.buy(buyer, matcher, pair, 100000000, 1, ts, ts + 1.day.toMillis, moreThatStandartFee * 3)
             logOption(ExchangeTransaction.create(matcher, buyOrder, sellOrder, 100000000, 1, 300000, 300000, moreThatStandartFee * 3, ts))
-          case LeaseTransaction =>
+          case LeaseTransactionV1 =>
             val sender   = randomFrom(accounts).get
             val useAlias = r.nextBoolean()
             val recipientOpt =
               if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender)).map(_.alias)
               else randomFrom(accounts.filter(_ != sender).map(_.toAddress))
-            recipientOpt.flatMap(recipient => logOption(LeaseTransaction.create(sender, 1, moreThatStandartFee * 3, ts, recipient)))
-          case LeaseCancelTransaction =>
+            recipientOpt.flatMap(recipient => logOption(LeaseTransactionV1.create(sender, 1, moreThatStandartFee * 3, ts, recipient)))
+          case LeaseCancelTransactionV1 =>
             randomFrom(activeLeaseTransactions).flatMap(lease => {
               val sender = accounts.find(_.address == lease.sender.address).get
-              logOption(LeaseCancelTransaction.create(sender, lease.id(), moreThatStandartFee * 3, ts))
+              logOption(LeaseCancelTransactionV1.create(sender, lease.id(), moreThatStandartFee * 3, ts))
             })
           case CreateAliasTransaction =>
             val sender      = randomFrom(accounts).get
@@ -206,7 +206,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
           case Some(tx: ReissueTransaction) if !tx.reissuable => reissuableIssueTxs.filter(_.id != tx.id)
           case _                                              => reissuableIssueTxs
         }, tx match {
-          case Some(tx: LeaseTransaction)       => activeLeaseTransactions :+ tx
+          case Some(tx: LeaseTransactionV1)     => activeLeaseTransactions :+ tx
           case Some(tx: LeaseCancelTransaction) => activeLeaseTransactions.filter(_.id != tx.leaseId)
           case _                                => activeLeaseTransactions
         }, tx match {
