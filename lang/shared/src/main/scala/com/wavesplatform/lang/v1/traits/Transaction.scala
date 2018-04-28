@@ -11,7 +11,8 @@ trait Transaction {
   def timestamp: Long
   def bodyBytes: Either[String, ByteVector]
   def senderPk: Either[String, ByteVector]
-  def assetId: Either[String, Option[ByteVector]]
+  def transferAssetId: Either[String, Option[ByteVector]]
+  def assetId: Either[String, ByteVector]
   def proofs: Either[String, IndexedSeq[ByteVector]]
   def recipient: Either[String, ByteVector]
   def aliasText: Either[String, String]
@@ -22,4 +23,5 @@ trait Transaction {
   def attachment: Either[String, ByteVector]
   def chainId: Either[String, Byte]
   def version: Either[String, Byte]
+  def minSponsoredAssetFee: Either[String, Option[Long]]
 }
