@@ -45,8 +45,8 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Matche
       fee  <- smallFeeGen
       amt1 <- Gen.choose(Long.MaxValue / 2 + 1, Long.MaxValue - 1 - fee)
       amt2 <- Gen.choose(Long.MaxValue / 2 + 1, Long.MaxValue - 1 - fee)
-      l1 = LeaseTransaction.create(master1, amt1, fee, ts, recipient).right.get
-      l2 = LeaseTransaction.create(master2, amt2, fee, ts, recipient).right.get
+      l1   <- createLease(master1, amt1, fee, ts, recipient)
+      l2   <- createLease(master2, amt2, fee, ts, recipient)
     } yield (gen1, gen2, l1, l2)
 
     forAll(setup) {

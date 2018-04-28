@@ -1,78 +1,41 @@
 package scorex.transaction.lease
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.crypto
-import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Address, AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
-import scorex.transaction._
+import scorex.account.{Address, AddressOrAlias, PublicKeyAccount}
+import scorex.transaction.{AssetId, ProvenTransaction, ValidationError}
+import scala.util.Try
+import scorex.crypto.signatures.Curve25519.KeyLength
 
-import scala.util.{Failure, Success, Try}
+trait LeaseTransaction extends ProvenTransaction {
+  def amount: Long
+  def fee: Long
+  def recipient: AddressOrAlias
+  def version: Byte
+  override val assetFee: (Option[AssetId], Long) = (None, fee)
 
-case class LeaseTransaction private (sender: PublicKeyAccount,
-                                     amount: Long,
-                                     fee: Long,
-                                     timestamp: Long,
-                                     recipient: AddressOrAlias,
-                                     signature: ByteStr)
-    extends SignedTransaction
-    with FastHashId {
-
-  override val builder: TransactionParser = LeaseTransaction
-
-  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    Bytes.concat(Array(builder.typeId),
-                 sender.publicKey,
-                 recipient.bytes.arr,
-                 Longs.toByteArray(amount),
-                 Longs.toByteArray(fee),
-                 Longs.toByteArray(timestamp)))
-
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
+  override final val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
+      "version"   -> version,
       "amount"    -> amount,
       "recipient" -> recipient.stringRepr,
       "fee"       -> fee,
       "timestamp" -> timestamp
     ))
 
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
-  override val bytes: Coeval[Array[Byte]]        = Coeval.evalOnce(Bytes.concat(bodyBytes(), signature.arr))
-
+  protected final val bytesBase = Coeval.evalOnce(
+    Bytes.concat(sender.publicKey, recipient.bytes.arr, Longs.toByteArray(amount), Longs.toByteArray(fee), Longs.toByteArray(timestamp)))
 }
 
-object LeaseTransaction extends TransactionParserFor[LeaseTransaction] with TransactionParser.HardcodedVersion1 {
-
-  override val typeId: Byte = 8
+object LeaseTransaction {
 
   object Status {
     val Active   = "active"
     val Canceled = "canceled"
   }
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
-    Try {
-      val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
-      (for {
-        recRes <- AddressOrAlias.fromBytes(bytes, KeyLength)
-        (recipient, recipientEnd) = recRes
-        quantityStart             = recipientEnd
-        quantity                  = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
-        fee                       = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
-        timestamp                 = Longs.fromByteArray(bytes.slice(quantityStart + 16, quantityStart + 24))
-        signature                 = ByteStr(bytes.slice(quantityStart + 24, quantityStart + 24 + SignatureLength))
-        lt <- LeaseTransaction.create(sender, quantity, fee, timestamp, recipient, signature)
-      } yield lt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
-    }.flatten
-
-  def create(sender: PublicKeyAccount,
-             amount: Long,
-             fee: Long,
-             timestamp: Long,
-             recipient: AddressOrAlias,
-             signature: ByteStr): Either[ValidationError, TransactionT] = {
+  def validateLeaseParams(amount: Long, fee: Long, recipient: AddressOrAlias, sender: PublicKeyAccount) =
     if (amount <= 0) {
       Left(ValidationError.NegativeAmount(amount, "waves"))
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
@@ -81,18 +44,19 @@ object LeaseTransaction extends TransactionParserFor[LeaseTransaction] with Tran
       Left(ValidationError.InsufficientFee())
     } else if (recipient.isInstanceOf[Address] && sender.stringRepr == recipient.stringRepr) {
       Left(ValidationError.ToSelf)
-    } else {
-      Right(LeaseTransaction(sender, amount, fee, timestamp, recipient, signature))
-    }
+    } else Right(())
+
+  def parseBase(bytes: Array[Byte], start: Int) = {
+    val sender = PublicKeyAccount(bytes.slice(start, KeyLength))
+    for {
+      recRes <- AddressOrAlias.fromBytes(bytes, start + KeyLength)
+      (recipient, recipientEnd) = recRes
+      quantityStart             = recipientEnd
+      quantity                  = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
+      fee                       = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
+      end                       = quantityStart + 24
+      timestamp                 = Longs.fromByteArray(bytes.slice(quantityStart + 16, end))
+    } yield (sender, recipient, quantity, fee, timestamp, end)
   }
 
-  def create(sender: PrivateKeyAccount,
-             amount: Long,
-             fee: Long,
-             timestamp: Long,
-             recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
-    create(sender, amount, fee, timestamp, recipient, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
-    }
-  }
 }

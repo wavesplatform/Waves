@@ -7,7 +7,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.lease.LeaseTransactionV1
 import scorex.transaction.transfer._
 
 class CancelLeaseOverflowTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
@@ -26,8 +26,8 @@ class CancelLeaseOverflowTest extends PropSpec with PropertyChecks with Matchers
       (
         GenesisTransaction.create(sender1, amount + fee, ts).right.get,
         GenesisTransaction.create(sender2, amount + fee * 2, ts).right.get,
-        LeaseTransaction.create(sender1, amount, fee, ts, sender2).right.get,
-        LeaseTransaction.create(sender2, amount, fee, ts, recipient).right.get,
+        LeaseTransactionV1.create(sender1, amount, fee, ts, sender2).right.get,
+        LeaseTransactionV1.create(sender2, amount, fee, ts, recipient).right.get,
         TransferTransactionV1.create(None, sender2, recipient, amount, ts, None, fee, Array.emptyByteArray).right.get
       )
 

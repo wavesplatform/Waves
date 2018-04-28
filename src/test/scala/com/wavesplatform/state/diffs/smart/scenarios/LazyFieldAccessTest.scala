@@ -11,7 +11,7 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.lease.{LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
 
@@ -28,7 +28,7 @@ class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers wit
     """
       |
       | if (tx.type == 4)
-      |   then isDefined(tx.assetId)==false
+      |   then isDefined(tx.transferAssetId)==false
       |   else false
       |
       """.stripMargin
@@ -36,7 +36,7 @@ class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers wit
   private val badScript =
     """
       |
-      | isDefined(tx.assetId) == false
+      | isDefined(tx.transferAssetId) == false
       |
       """.stripMargin
 
@@ -53,7 +53,7 @@ class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers wit
       case ((genesis, script, lease, transfer)) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(totalDiffEi =>
-          totalDiffEi should produce("doesn't contain asset id"))
+          totalDiffEi should produce("doesn't transfer any asset"))
     }
   }
 }

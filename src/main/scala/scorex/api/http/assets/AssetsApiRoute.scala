@@ -3,6 +3,7 @@ package scorex.api.http.assets
 import akka.http.scaladsl.server.Route
 import com.google.common.base.Charsets
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
@@ -16,6 +17,7 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
+import scorex.transaction.smart.script.ScriptCompiler
 import scorex.transaction.{AssetIdStringLength, TransactionFactory}
 import scorex.utils.Time
 import scorex.wallet.Wallet
@@ -258,6 +260,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         case _                   => None
       }).toRight("No issue transaction found with given asset ID")
       description <- blockchain.assetDescription(id).toRight("Failed to get description of the asset")
+      complexity  <- description.script.fold[Either[String, Long]](Right(0))(ScriptCompiler.estimate)
     } yield {
       JsObject(
         Seq(
@@ -270,8 +273,10 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           "decimals"       -> JsNumber(tx.decimals.toInt),
           "reissuable"     -> JsBoolean(description.reissuable),
           "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
-          "script"         -> JsString(description.script.fold("")(s => s.bytes().base58)),
-          "scriptText"     -> JsString(description.script.fold("")(s => s.text)),
+          "script"         -> JsString(description.script.fold("")(_.bytes().base58)),
+          "scriptText"     -> JsString(description.script.fold("")(_.text)),
+          "complexity"     -> JsNumber(complexity),
+          "extraFee"       -> JsNumber(if (description.script.isEmpty) 0 else CommonValidation.ScriptExtraFee),
           "minSponsoredAssetFee" -> (description.sponsorship match {
             case 0           => JsNull
             case sponsorship => JsNumber(sponsorship)
