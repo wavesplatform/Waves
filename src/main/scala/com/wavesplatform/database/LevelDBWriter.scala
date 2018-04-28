@@ -347,13 +347,16 @@ object LevelDBWriter {
       val ndi = newDataInput(data)
       SponsorshipValue(ndi.readLong())
     }
+
     private def writeSponsorship(ai: SponsorshipValue): Array[Byte] = {
       val ndo = newDataOutput()
       ndo.writeBigInt(ai.minFee)
       ndo.toByteArray
     }
+
     def sponsorship(height: Int, assetId: ByteStr): Key[SponsorshipValue] =
       Key(byteKeyWithH(33, height, assetId.arr), readSponsorship, writeSponsorship)
+
     def sponsorshipHistory(assetId: ByteStr): Key[Seq[Int]] = historyKey(34, assetId.arr)
   }
 

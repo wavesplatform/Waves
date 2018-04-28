@@ -23,7 +23,7 @@ object TransactionParsers {
     IssueTransactionV1,
     TransferTransactionV1,
     ReissueTransactionV1,
-    BurnTransaction,
+    BurnTransactionV1,
     ExchangeTransaction,
     LeaseTransactionV1,
     LeaseCancelTransactionV1,
@@ -39,6 +39,7 @@ object TransactionParsers {
     SetScriptTransaction,
     IssueTransactionV2,
     ReissueTransactionV2,
+    BurnTransactionV2,
     LeaseTransactionV2,
     LeaseCancelTransactionV2,
     SponsorFeeTransaction

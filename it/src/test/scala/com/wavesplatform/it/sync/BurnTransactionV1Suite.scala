@@ -5,7 +5,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 
-class BurnTransactionSuite extends BaseTransactionSuite {
+class BurnTransactionV1Suite extends BaseTransactionSuite {
 
   private val defaultQuantity = 100000
   private val decimals: Byte  = 2

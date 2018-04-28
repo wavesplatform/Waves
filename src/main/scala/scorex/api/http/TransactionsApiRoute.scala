@@ -176,7 +176,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case TransferTransactionV2    => TransactionFactory.transferAssetV2(jsv.as[TransferV2Request], wallet, time)
               case ReissueTransactionV1     => TransactionFactory.reissueAssetV1(jsv.as[ReissueV1Request], wallet, time)
               case ReissueTransactionV2     => TransactionFactory.reissueAssetV2(jsv.as[ReissueV2Request], wallet, time)
-              case BurnTransaction          => TransactionFactory.burnAsset(jsv.as[BurnRequest], wallet, time)
+              case BurnTransactionV1        => TransactionFactory.burnAssetV1(jsv.as[BurnV1Request], wallet, time)
+              case BurnTransactionV2        => TransactionFactory.burnAssetV2(jsv.as[BurnV2Request], wallet, time)
               case MassTransferTransaction  => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
               case LeaseTransactionV1       => TransactionFactory.leaseV1(jsv.as[LeaseV1Request], wallet, time)
               case LeaseTransactionV2       => TransactionFactory.leaseV2(jsv.as[LeaseV2Request], wallet, time)
@@ -223,7 +224,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case MassTransferTransaction  => jsv.as[SignedMassTransferRequest].toTx
               case ReissueTransactionV1     => jsv.as[SignedReissueV1Request].toTx
               case ReissueTransactionV2     => jsv.as[SignedReissueV2Request].toTx
-              case BurnTransaction          => jsv.as[SignedBurnRequest].toTx
+              case BurnTransactionV1        => jsv.as[SignedBurnV1Request].toTx
+              case BurnTransactionV2        => jsv.as[SignedBurnV2Request].toTx
               case LeaseTransactionV1       => jsv.as[SignedLeaseV1Request].toTx
               case LeaseTransactionV2       => jsv.as[SignedLeaseV2Request].toTx
               case LeaseCancelTransactionV1 => jsv.as[SignedLeaseCancelV1Request].toTx
