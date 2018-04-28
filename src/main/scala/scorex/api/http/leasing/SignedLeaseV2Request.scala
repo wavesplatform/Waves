@@ -5,7 +5,7 @@ import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
 import scorex.account.{AddressOrAlias, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
-import scorex.transaction.lease.{LeaseTransactionV1, LeaseTransactionV2}
+import scorex.transaction.lease.LeaseTransactionV2
 import scorex.transaction.{Proofs, ValidationError}
 
 case class SignedLeaseV2Request(@ApiModelProperty(required = true)
