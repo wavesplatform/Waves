@@ -5,7 +5,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
+class IssueTransactionV1Suite extends BaseTransactionSuite with TableDrivenPropertyChecks {
 
   private val defaultQuantity = 100000
   private val assetFee        = 5.waves

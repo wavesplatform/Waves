@@ -10,7 +10,8 @@ import scorex.account.Address
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.{IssueTransaction, SmartIssueTransaction, TransferTransaction}
+import scorex.transaction.assets._
+import scorex.transaction.transfer._
 
 class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -24,7 +25,9 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     maybeAsset               <- Gen.option(issue1)
     maybeAsset2              <- Gen.option(issue2)
     maybeFeeAsset            <- Gen.oneOf(maybeAsset, maybeAsset2)
-    transfer                 <- transferGeneratorP(master, recepient, maybeAsset.map(_.id()), maybeFeeAsset.map(_.id()))
+    transferV1               <- transferGeneratorP(master, recepient, maybeAsset.map(_.id()), maybeFeeAsset.map(_.id()))
+    transferV2               <- versionedTransferGeneratorP(master, recepient, maybeAsset.map(_.id()), maybeFeeAsset.map(_.id()))
+    transfer                 <- Gen.oneOf(transferV1, transferV2)
   } yield (genesis, issue1, issue2, transfer)
 
   property("transfers assets to recipient preserving waves invariant") {
@@ -46,15 +49,17 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     }
   }
 
-  val transferWithSmartAssetFee: Gen[(GenesisTransaction, IssueTransaction, SmartIssueTransaction, TransferTransaction)] = {
+  val transferWithSmartAssetFee: Gen[(GenesisTransaction, IssueTransaction, IssueTransactionV2, TransferTransaction)] = {
     for {
       master    <- accountGen
       recepient <- otherAccountGen(master)
       ts        <- positiveIntGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      issue: IssueTransaction         <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
-      feeIssue: SmartIssueTransaction <- smartIssueTransactionGen(master, scriptGen.map(_.some))
-      transfer                        <- transferGeneratorP(master, recepient, issue.id().some, feeIssue.id().some)
+      issue: IssueTransaction      <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
+      feeIssue: IssueTransactionV2 <- smartIssueTransactionGen(master, scriptGen.map(_.some))
+      transferV1                   <- transferGeneratorP(master, recepient, issue.id().some, feeIssue.id().some)
+      transferV2                   <- transferGeneratorP(master, recepient, issue.id().some, feeIssue.id().some)
+      transfer                     <- Gen.oneOf(transferV1, transferV2)
     } yield (genesis, issue, feeIssue, transfer)
   }
 

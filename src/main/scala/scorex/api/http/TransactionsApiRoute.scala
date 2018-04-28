@@ -23,6 +23,7 @@ import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.transfer._
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
@@ -169,19 +170,20 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
           case Some(x) =>
             x match {
-              case IssueTransaction             => TransactionFactory.issueAsset(jsv.as[IssueRequest], wallet, time)
-              case TransferTransaction          => TransactionFactory.transferAsset(jsv.as[TransferRequest], wallet, time)
-              case VersionedTransferTransaction => TransactionFactory.versionedTransfer(jsv.as[VersionedTransferRequest], wallet, time)
-              case MassTransferTransaction      => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
-              case ReissueTransaction           => TransactionFactory.reissueAsset(jsv.as[ReissueRequest], wallet, time)
-              case BurnTransaction              => TransactionFactory.burnAsset(jsv.as[BurnRequest], wallet, time)
-              case LeaseTransaction             => TransactionFactory.lease(jsv.as[LeaseRequest], wallet, time)
-              case LeaseCancelTransaction       => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
-              case CreateAliasTransaction       => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
-              case DataTransaction              => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
-              case SmartIssueTransaction        => TransactionFactory.smartIssue(jsv.as[SmartIssueRequest], wallet, time)
-              case SetScriptTransaction         => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
-              case SponsorFeeTransaction        => TransactionFactory.sponsor(jsv.as[SponsorFeeRequest], wallet, time)
+              case IssueTransactionV1      => TransactionFactory.issueAssetV1(jsv.as[IssueV1Request], wallet, time)
+              case IssueTransactionV2      => TransactionFactory.issueAssetV2(jsv.as[IssueV2Request], wallet, time)
+              case TransferTransactionV1   => TransactionFactory.transferAssetV1(jsv.as[TransferV1Request], wallet, time)
+              case TransferTransactionV2   => TransactionFactory.transferAssetV2(jsv.as[TransferV2Request], wallet, time)
+              case ReissueTransactionV1    => TransactionFactory.reissueAssetV1(jsv.as[ReissueV1Request], wallet, time)
+              case ReissueTransactionV2    => TransactionFactory.reissueAssetV2(jsv.as[ReissueV2Request], wallet, time)
+              case BurnTransaction         => TransactionFactory.burnAsset(jsv.as[BurnRequest], wallet, time)
+              case MassTransferTransaction => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
+              case LeaseTransaction        => TransactionFactory.lease(jsv.as[LeaseRequest], wallet, time)
+              case LeaseCancelTransaction  => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
+              case CreateAliasTransaction  => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
+              case DataTransaction         => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
+              case SetScriptTransaction    => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
+              case SponsorFeeTransaction   => TransactionFactory.sponsor(jsv.as[SponsorFeeRequest], wallet, time)
             }
         }
         r match {
@@ -212,19 +214,21 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
           case Some(x) =>
             x match {
-              case IssueTransaction             => jsv.as[SignedIssueRequest].toTx
-              case TransferTransaction          => jsv.as[SignedTransferRequest].toTx
-              case VersionedTransferTransaction => jsv.as[SignedVersionedTransferRequest].toTx
-              case MassTransferTransaction      => jsv.as[SignedMassTransferRequest].toTx
-              case ReissueTransaction           => jsv.as[SignedReissueRequest].toTx
-              case BurnTransaction              => jsv.as[SignedBurnRequest].toTx
-              case LeaseTransaction             => jsv.as[SignedLeaseRequest].toTx
-              case LeaseCancelTransaction       => jsv.as[SignedLeaseCancelRequest].toTx
-              case CreateAliasTransaction       => jsv.as[SignedCreateAliasRequest].toTx
-              case DataTransaction              => jsv.as[SignedDataRequest].toTx
-              case SmartIssueTransaction        => jsv.as[SignedSmartIssueRequest].toTx
-              case SetScriptTransaction         => jsv.as[SignedSetScriptRequest].toTx
-              case SponsorFeeTransaction        => jsv.as[SignedSponsorFeeRequest].toTx
+              case IssueTransactionV1      => jsv.as[SignedIssueV1Request].toTx
+              case IssueTransactionV2      => jsv.as[SignedIssueV2Request].toTx
+              case TransferTransactionV1   => jsv.as[SignedTransferV1Request].toTx
+              case TransferTransactionV2   => jsv.as[SignedTransferV2Request].toTx
+              case MassTransferTransaction => jsv.as[SignedMassTransferRequest].toTx
+              case ReissueTransactionV1    => jsv.as[SignedReissueV1Request].toTx
+              case ReissueTransactionV2    => jsv.as[SignedReissueV2Request].toTx
+              case BurnTransaction         => jsv.as[SignedBurnRequest].toTx
+              case LeaseTransaction        => jsv.as[SignedLeaseRequest].toTx
+              case LeaseCancelTransaction  => jsv.as[SignedLeaseCancelRequest].toTx
+              case CreateAliasTransaction  => jsv.as[SignedCreateAliasRequest].toTx
+              case DataTransaction         => jsv.as[SignedDataRequest].toTx
+              case SetScriptTransaction    => jsv.as[SignedSetScriptRequest].toTx
+              case SponsorFeeTransaction   => jsv.as[SignedSponsorFeeRequest].toTx
+
             }
         }
         doBroadcast(r)
@@ -249,7 +253,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     * Currently implemented for MassTransfer transaction only.
     */
   private def txToCompactJson(address: Address, tx: Transaction): JsObject = {
-    import scorex.transaction.assets.MassTransferTransaction
+    import scorex.transaction.transfer._
     tx match {
       case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(address)
       case _                                                               => txToExtendedJson(tx)

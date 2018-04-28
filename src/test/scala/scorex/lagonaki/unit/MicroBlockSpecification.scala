@@ -9,7 +9,7 @@ import org.scalatest.{FunSuite, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction._
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.transfer._
 
 import scala.util.Random
 
@@ -23,10 +23,10 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
 
   test("MicroBlock with txs bytes/parse roundtrip") {
 
-    val ts                       = System.currentTimeMillis() - 5000
-    val tr: TransferTransaction  = TransferTransaction.create(None, sender, gen, 5, ts + 1, None, 2, Array()).right.get
-    val assetId                  = Some(ByteStr(Array.fill(AssetIdLength)(Random.nextInt(100).toByte)))
-    val tr2: TransferTransaction = TransferTransaction.create(assetId, sender, gen, 5, ts + 2, None, 2, Array()).right.get
+    val ts                         = System.currentTimeMillis() - 5000
+    val tr: TransferTransactionV1  = TransferTransactionV1.create(None, sender, gen, 5, ts + 1, None, 2, Array()).right.get
+    val assetId                    = Some(ByteStr(Array.fill(AssetIdLength)(Random.nextInt(100).toByte)))
+    val tr2: TransferTransactionV1 = TransferTransactionV1.create(assetId, sender, gen, 5, ts + 2, None, 2, Array()).right.get
 
     val transactions = Seq(tr, tr2)
 
@@ -46,7 +46,7 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
 
   test("MicroBlock cannot be created with zero transactions") {
 
-    val transactions       = Seq.empty[TransferTransaction]
+    val transactions       = Seq.empty[TransferTransactionV1]
     val eitherBlockOrError = MicroBlock.buildAndSign(sender, transactions, prevResBlockSig, totalResBlockSig)
 
     eitherBlockOrError should produce("cannot create empty MicroBlock")
@@ -54,7 +54,7 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
 
   test("MicroBlock cannot contain more than Miner.MaxTransactionsPerMicroblock") {
 
-    val transaction  = TransferTransaction.create(None, sender, gen, 5, System.currentTimeMillis(), None, 1000, Array()).right.get
+    val transaction  = TransferTransactionV1.create(None, sender, gen, 5, System.currentTimeMillis(), None, 1000, Array()).right.get
     val transactions = Seq.fill(Miner.MaxTransactionsPerMicroblock + 1)(transaction)
 
     val eitherBlockOrError = MicroBlock.buildAndSign(sender, transactions, prevResBlockSig, totalResBlockSig)

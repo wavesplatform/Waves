@@ -14,17 +14,6 @@ import scala.util.{Left, Right}
 object AssetTransactionsDiff {
 
   def issue(height: Int)(tx: IssueTransaction): Either[ValidationError, Diff] = {
-    val info = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity, script = None)
-    Right(
-      Diff(
-        height = height,
-        tx = tx,
-        portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.assetId() -> tx.quantity))),
-        assetInfos = Map(tx.assetId()        -> info)
-      ))
-  }
-
-  def smartIssue(height: Int)(tx: SmartIssueTransaction): Either[ValidationError, Diff] = {
     val info = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity, script = tx.script)
     Right(
       Diff(
@@ -85,9 +74,7 @@ object AssetTransactionsDiff {
 
   private def validateAsset(tx: ProvenTransaction, blockchain: Blockchain, assetId: AssetId, issuerOnly: Boolean): Either[ValidationError, Unit] = {
     blockchain.transactionInfo(assetId) match {
-      case Some((_, itx: IssueTransaction)) if !validIssuer(issuerOnly, tx.sender, itx.sender) =>
-        Left(GenericError("Asset was issued by other address"))
-      case Some((_, sitx: SmartIssueTransaction)) if sitx.script.isEmpty && !validIssuer(issuerOnly, tx.sender, sitx.sender) =>
+      case Some((_, sitx: IssueTransaction)) if sitx.script.isEmpty && !validIssuer(issuerOnly, tx.sender, sitx.sender) =>
         Left(GenericError("Asset was issued by other address"))
       case None =>
         Left(GenericError("Referenced assetId not found"))

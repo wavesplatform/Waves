@@ -1,5 +1,6 @@
 package scorex.settings
 
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
 
 object TestFunctionalitySettings {
@@ -16,7 +17,7 @@ object TestFunctionalitySettings {
     allowMultipleLeaseCancelTransactionUntilTimestamp = 0L,
     resetEffectiveBalancesAtHeight = 0,
     blockVersion3AfterHeight = 0,
-    preActivatedFeatures = Map.empty,
+    preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0),
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue
   )
 

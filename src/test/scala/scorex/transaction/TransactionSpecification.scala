@@ -4,7 +4,7 @@ import com.wavesplatform.TransactionGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.transfer._
 
 class TransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -30,12 +30,12 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
         val sender    = PrivateKeyAccount(senderSeed)
         val recipient = PrivateKeyAccount(recipientSeed)
         val tx        = createWavesTransfer(sender, recipient, amount, fee, time).right.get
-        val txAfter   = TransferTransaction.parseBytes(tx.bytes()).get
+        val txAfter   = TransferTransactionV1.parseBytes(tx.bytes()).get
 
         txAfter.getClass.shouldBe(tx.getClass)
 
         tx.signature shouldEqual txAfter.signature
-        tx.sender shouldEqual txAfter.asInstanceOf[TransferTransaction].sender
+        tx.sender shouldEqual txAfter.asInstanceOf[TransferTransactionV1].sender
         tx.recipient shouldEqual txAfter.recipient
         tx.timestamp shouldEqual txAfter.timestamp
         tx.amount shouldEqual txAfter.amount
@@ -49,12 +49,12 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
         val sender    = PrivateKeyAccount(senderSeed)
         val recipient = PrivateKeyAccount(recipientSeed)
         val tx        = createWavesTransfer(sender, recipient, amount, fee, time).right.get
-        val txAfter   = TransactionParsers.parseBytes(tx.bytes()).get.asInstanceOf[TransferTransaction]
+        val txAfter   = TransactionParsers.parseBytes(tx.bytes()).get.asInstanceOf[TransferTransactionV1]
 
         txAfter.getClass.shouldBe(tx.getClass)
 
         tx.signature shouldEqual txAfter.signature
-        tx.sender shouldEqual txAfter.asInstanceOf[TransferTransaction].sender
+        tx.sender shouldEqual txAfter.asInstanceOf[TransferTransactionV1].sender
         tx.recipient shouldEqual txAfter.recipient
         tx.timestamp shouldEqual txAfter.timestamp
         tx.amount shouldEqual txAfter.amount

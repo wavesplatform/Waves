@@ -4,7 +4,8 @@ import java.security.SecureRandom
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.crypto
-import com.wavesplatform.settings.{FeesSettings, RestAPISettings}
+import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.diffs.CommonValidation
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.Json
@@ -14,7 +15,7 @@ import scorex.utils.Time
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
-case class UtilsApiRoute(timeService: Time, settings: RestAPISettings, feesSettings: FeesSettings) extends ApiRoute {
+case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends ApiRoute {
 
   import UtilsApiRoute._
 
@@ -47,7 +48,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings, feesSetti
               Json.obj(
                 "script"     -> script.bytes().base58,
                 "complexity" -> complexity,
-                "extraFee"   -> feesSettings.smartAccount.extraFee
+                "extraFee"   -> CommonValidation.ScriptExtraFee
               )
           }
         )
@@ -82,7 +83,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings, feesSetti
                   "script"     -> code,
                   "scriptText" -> script.text,
                   "complexity" -> complexity,
-                  "extraFee"   -> feesSettings.smartAccount.extraFee
+                  "extraFee"   -> CommonValidation.ScriptExtraFee
                 )
             }
           )

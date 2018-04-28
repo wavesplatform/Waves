@@ -8,9 +8,9 @@ import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.Transaction
 import org.scalatest.Suite
 import scorex.account.{Address, AddressOrAlias, AddressScheme, PrivateKeyAccount}
-import scorex.api.http.assets.SignedTransferRequest
+import scorex.api.http.assets.SignedTransferV1Request
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.transfer._
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.Future
@@ -87,7 +87,7 @@ trait TransferSending extends ScorexLogging {
       .map {
         case (x, i) =>
           createSignedTransferRequest(
-            TransferTransaction
+            TransferTransactionV1
               .create(
                 assetId = None,
                 sender = PrivateKeyAccount.fromSeed(x.senderSeed).right.get,
@@ -111,9 +111,9 @@ trait TransferSending extends ScorexLogging {
       .map(_.flatten)
   }
 
-  protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {
+  protected def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferV1Request = {
     import tx._
-    SignedTransferRequest(
+    SignedTransferV1Request(
       Base58.encode(tx.sender.publicKey),
       assetId.map(_.base58),
       recipient.stringRepr,

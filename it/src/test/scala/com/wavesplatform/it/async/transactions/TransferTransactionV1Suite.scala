@@ -7,13 +7,13 @@ import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
 import scorex.account.AddressOrAlias
 import scorex.api.http.Mistiming
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.transfer._
 
 import scala.concurrent.Await
 import scala.concurrent.Future.{sequence, traverse}
 import scala.concurrent.duration._
 
-class TransferTransactionSuite extends BaseTransactionSuite with TransferSending with CancelAfterFailure {
+class TransferTransactionV1Suite extends BaseTransactionSuite with TransferSending with CancelAfterFailure {
 
   private val waitCompletion       = 2.minutes
   private val defaultAssetQuantity = 100000
@@ -65,7 +65,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
 
   test("invalid signed waves transfer should not be in UTX or blockchain") {
     def invalidByTsTx(ts: Long) =
-      TransferTransaction
+      TransferTransactionV1
         .create(None, sender.privateKey, AddressOrAlias.fromString(sender.address).right.get, 1, ts, None, 1.waves, Array.emptyByteArray)
         .right
         .get

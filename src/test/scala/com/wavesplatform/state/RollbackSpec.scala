@@ -9,9 +9,10 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.transfer._
 import scorex.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction}
 
 class RollbackSpec extends FreeSpec with Matchers with WithState with TransactionGen with PropertyChecks with NoShrink {
@@ -25,7 +26,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
   )
 
   private def transfer(sender: PrivateKeyAccount, recipient: Address, amount: Long) =
-    TransferTransaction.create(None, sender, recipient, amount, nextTs, None, 1, Array.empty[Byte]).explicitGet()
+    TransferTransactionV1.create(None, sender, recipient, amount, nextTs, None, 1, Array.empty[Byte]).explicitGet()
 
   "Rollback resets" - {
     "waves balances" in forAll(accountGen, positiveLongGen, accountGen, Gen.nonEmptyListOf(Gen.choose(1, 10))) {
@@ -101,7 +102,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
         withDomain() { d =>
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
           val genesisBlockId   = d.lastBlockId
-          val issueTransaction = IssueTransaction.create(sender, "test".getBytes, Array.empty[Byte], assetAmount, 8, true, 1, nextTs).explicitGet()
+          val issueTransaction = IssueTransactionV1.create(sender, "test".getBytes, Array.empty[Byte], assetAmount, 8, true, 1, nextTs).explicitGet()
 
           d.appendBlock(
             TestBlock.create(
@@ -120,7 +121,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
               nextTs,
               d.lastBlockId,
               Seq(
-                TransferTransaction
+                TransferTransactionV1
                   .create(Some(issueTransaction.id()), sender, recipient, assetAmount, nextTs, None, 1, Array.empty[Byte])
                   .explicitGet())
             ))
@@ -141,7 +142,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
           val genesisBlockId = d.lastBlockId
 
-          val issueTransaction = IssueTransaction.create(sender, name, description, 2000, 8, true, 1, nextTs).explicitGet()
+          val issueTransaction = IssueTransactionV1.create(sender, name, description, 2000, 8, true, 1, nextTs).explicitGet()
           d.blockchainUpdater.assetDescription(issueTransaction.id()) shouldBe 'empty
 
           d.appendBlock(
@@ -160,7 +161,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
             TestBlock.create(nextTs,
                              blockIdWithIssue,
                              Seq(
-                               ReissueTransaction.create(sender, issueTransaction.id(), 2000, false, 1, nextTs).explicitGet()
+                               ReissueTransactionV1.create(sender, issueTransaction.id(), 2000, false, 1, nextTs).explicitGet()
                              )))
 
           d.blockchainUpdater.assetDescription(issueTransaction.id()) should contain(
