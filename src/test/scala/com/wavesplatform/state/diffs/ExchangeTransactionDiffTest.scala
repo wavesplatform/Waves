@@ -30,8 +30,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       ts     <- timestampGen
       gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).right.get
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
-      issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1)
-      issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1)
+      issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
+      issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
       maybeAsset1              <- Gen.option(issue1.id())
       maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
       exchange                 <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
@@ -65,8 +65,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).right.get
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
       setScript                = SetScriptTransaction.selfSigned(version, seller, Some(ScriptV1(TRUE).explicitGet()), fee, ts).explicitGet()
-      issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1)
-      issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1)
+      issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
+      issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
       maybeAsset1              <- Gen.option(issue1.id())
       maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
       exchange                 <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)

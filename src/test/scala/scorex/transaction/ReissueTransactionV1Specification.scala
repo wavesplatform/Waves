@@ -5,11 +5,11 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.assets.ReissueTransaction
 
-class ReissueTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class ReissueTransactionV1Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Reissue serialization roundtrip") {
     forAll(reissueGen) { issue: ReissueTransaction =>
-      val recovered = ReissueTransaction.parseBytes(issue.bytes()).get
+      val recovered = issue.builder.parseBytes(issue.bytes()).get
       recovered.bytes() shouldEqual issue.bytes()
     }
   }

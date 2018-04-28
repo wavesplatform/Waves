@@ -98,7 +98,7 @@ object CommonValidation {
       case _: GenesisTransaction      => Right(tx)
       case _: TransferTransactionV1   => Right(tx)
       case _: IssueTransactionV1      => Right(tx)
-      case _: ReissueTransaction      => Right(tx)
+      case _: ReissueTransactionV1    => Right(tx)
       case _: ExchangeTransaction     => Right(tx)
       case _: LeaseTransaction        => Right(tx)
       case _: LeaseCancelTransaction  => Right(tx)
@@ -108,6 +108,7 @@ object CommonValidation {
       case _: SetScriptTransaction    => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: TransferTransactionV2   => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: IssueTransactionV2      => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: ReissueTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: SponsorFeeTransaction   => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _                          => Left(GenericError("Unknown transaction must be explicitly activated"))
     }

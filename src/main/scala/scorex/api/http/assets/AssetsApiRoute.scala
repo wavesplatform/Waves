@@ -108,9 +108,9 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     processRequest[TransferRequests](
       "transfer", { req =>
         req.eliminate(
-          x => doBroadcast(TransactionFactory.transferAsset(x, wallet, time)),
+          x => doBroadcast(TransactionFactory.transferAssetV1(x, wallet, time)),
           _.eliminate(
-            x => doBroadcast(TransactionFactory.versionedTransfer(x, wallet, time)),
+            x => doBroadcast(TransactionFactory.transferAssetV2(x, wallet, time)),
             _ => Future.successful(WrongJson(Some(new IllegalArgumentException("Doesn't know how to process request"))))
           )
         )
@@ -153,7 +153,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       )
     ))
   def issue: Route =
-    processRequest("issue", (r: IssueRequest) => doBroadcast(TransactionFactory.issueAsset(r, wallet, time)))
+    processRequest("issue", (r: IssueV1Request) => doBroadcast(TransactionFactory.issueAssetV1(r, wallet, time)))
 
   @Path("/reissue")
   @ApiOperation(value = "Issue Asset", notes = "Reissue Asset", httpMethod = "POST", produces = "application/json", consumes = "application/json")
@@ -169,7 +169,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       )
     ))
   def reissue: Route =
-    processRequest("reissue", (r: ReissueRequest) => doBroadcast(TransactionFactory.reissueAsset(r, wallet, time)))
+    processRequest("reissue", (r: ReissueV1Request) => doBroadcast(TransactionFactory.reissueAssetV1(r, wallet, time)))
 
   @Path("/burn")
   @ApiOperation(value = "Burn Asset",

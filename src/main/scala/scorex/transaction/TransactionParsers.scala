@@ -22,7 +22,7 @@ object TransactionParsers {
     PaymentTransaction,
     IssueTransactionV1,
     TransferTransactionV1,
-    ReissueTransaction,
+    ReissueTransactionV1,
     BurnTransaction,
     ExchangeTransaction,
     LeaseTransaction,
@@ -38,6 +38,7 @@ object TransactionParsers {
     TransferTransactionV2,
     SetScriptTransaction,
     IssueTransactionV2,
+    ReissueTransactionV2,
     SponsorFeeTransaction
   ).flatMap { x =>
     x.supportedVersions.map { version =>
