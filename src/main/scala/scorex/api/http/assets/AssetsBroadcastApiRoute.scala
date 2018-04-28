@@ -1,6 +1,5 @@
 package scorex.api.http.assets
 
-import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.network._
 import com.wavesplatform.settings.RestAPISettings
@@ -8,11 +7,10 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
+import javax.ws.rs.Path
 import scorex.BroadcastRoute
 import scorex.api.http._
 import scorex.transaction.{Transaction, ValidationError}
-import cats.implicits._
-import scorex.transaction.ValidationError.UnsupportedTransactionType
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
