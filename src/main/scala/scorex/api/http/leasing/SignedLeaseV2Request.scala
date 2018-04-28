@@ -23,7 +23,7 @@ case class SignedLeaseV2Request(@ApiModelProperty(required = true)
                                 @ApiModelProperty(required = true)
                                 proofs: List[String])
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, LeaseTransactionV1] =
+  def toTx: Either[ValidationError, LeaseTransactionV2] =
     for {
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
