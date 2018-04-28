@@ -7,7 +7,7 @@ import com.wavesplatform.it.transactions.{BaseTransactionSuite, NodesFromDocker}
 import com.wavesplatform.state.Sponsorship
 import com.wavesplatform.it.util._
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
-import play.api.libs.json.Json
+import play.api.libs.json.{JsNumber, JsValue, Json}
 
 class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with ReportingTestName with CancelAfterFailure {
 
@@ -22,6 +22,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
       .overrideBase(_.raw("waves.blockchain.custom.functionality.blocks-for-feature-activation=1"))
+      .overrideBase(_.raw("waves.blockchain.custom.functionality.feature-check-blocks-period=1"))
       .withDefault(1)
       .withSpecial(3, _.nonMiner)
       .buildNonConflicting()
@@ -31,13 +32,20 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
   val alice   = nodes(2)
   val bob     = nodes(3)
 
-  def assertSponsorship(assetId: String, sponsorship: Long) = {
-    val response = sponsor.get(s"/assets/details/$assetId")
-    val jsv      = Json.parse(response.getResponseBody)
-    assert((jsv \ "sponsorship").as[Long] == sponsorship)
-  }
-
   "Fee in sponsored asset works correctly" - {
+
+    def assertMinAssetFee(txId: String, value: JsValue) = {
+      val response = miner.get(s"/transactions/info/$txId")
+      val jsv      = Json.parse(response.getResponseBody)
+      assert((jsv \ "minSponsoredAssetFee").as[JsValue] == value)
+    }
+
+    def assertSponsorship(assetId: String, sponsorship: Long) = {
+      val response = miner.get(s"/assets/details/$assetId")
+      val jsv      = Json.parse(response.getResponseBody)
+      assert((jsv \ "minSponsoredAssetFee").asOpt[Long] == Some(sponsorship).filter(_ != 0))
+    }
+
     val sponsorWavesBalance = miner.accountBalances(sponsor.address)._2
     val sponsorAssetTotal   = 100 * Token
     val minerWavesBalance   = miner.accountBalances(miner.address)._2
@@ -57,18 +65,28 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       sponsor
         .issue(sponsor.address, "NonSponsAsset", "Created by Sponsorship Suite", sponsorAssetTotal, decimals = 2, reissuable = false, fee = 1 * Waves)
         .id
-    assert(!sponsorAssetId.isEmpty)
-    assert(!nonSponsoredAssetId.isEmpty)
+    //   assert(!sponsorAssetId.isEmpty)
+    //  assert(!nonSponsoredAssetId.isEmpty)
     nodes.waitForHeightAriseAndTxPresent(sponsorAssetId)
 
     val transferTxToAlice = sponsor.transfer(sponsor.address, alice.address, sponsorAssetTotal / 2, minWavesFee, Some(sponsorAssetId), None).id
     nodes.waitForHeightAriseAndTxPresent(transferTxToAlice)
 
-    val sponsorId = sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = 1 * Token, fee = 1 * Waves).id
-    assert(!sponsorId.isEmpty)
+    val sponsorId = sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = 2 * Token, fee = 1 * Waves).id
+    //   assert(!sponsorId.isEmpty)
     nodes.waitForHeightAriseAndTxPresent(sponsorId)
 
-    assertSponsorship(sponsorAssetId, 1 * Token)
+    //   assertSponsorship(sponsorAssetId, 1 * Token)
+    //  assertMinAssetFee(sponsorId, JsNumber(1 * Token))
+
+    "invalid tx if fee less then minimal" in {
+      assertBadRequestAndResponse(
+        sponsor
+          .transfer(sponsor.address, alice.address, 10 * Token, fee = TinyFee, assetId = Some(sponsorAssetId), feeAssetId = Some(sponsorAssetId))
+          .id,
+        s"Fee in $sponsorAssetId .* does not exceed minimal value"
+      )
+    }
 
     "check before test accounts balances" in {
       miner.assertAssetBalance(sponsor.address, sponsorAssetId, sponsorAssetTotal / 2)
@@ -105,15 +123,6 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       miner.assertBalances(miner.address, minerWavesBalanceAfterFirstXferTest + Sponsorship.FeeUnit * LargeFee / Token)
     }
 
-    "invalid tx if fee less then minimal" in {
-      assertBadRequestAndResponse(
-        sponsor
-          .transfer(sponsor.address, alice.address, 10 * Token, fee = TinyFee, assetId = Some(sponsorAssetId), feeAssetId = Some(sponsorAssetId))
-          .id,
-        s"Fee in $sponsorAssetId .* does not exceed minimal value"
-      )
-    }
-
     "cancel sponsorship, cannot pay fees in non sponsored assets " in {
       val cancelSponsorshipTxId = sponsor.cancelSponsorship(sponsor.address, sponsorAssetId, fee = 1.waves).id
       nodes.waitForHeightAriseAndTxPresent(cancelSponsorshipTxId)
@@ -124,40 +133,6 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
         s"Asset $nonSponsoredAssetId is not sponsored, cannot be used to pay fees"
       )
     }
-    //    "others" in {
-    //
-    //      val xfer1Id =
-    //        miner.transfer(sponsor.address, alice.address, LargeFee * 2, fee = SmallFee, assetId = Some(sponsorAssetId), feeAssetId = Some(sponsorAssetId)).id
-    //      assert(!xfer1Id.isEmpty)
-    //      nodes.waitForHeightAriseAndTxPresent(xfer1Id)
-    //      val waves1 = sponsorWavesBalance - 2 * Waves - Sponsorship.FeeUnit * SmallFee / Token
-    //      miner.assertBalances(sponsor.address, waves1, waves1)
-    //      val sponsorAssetBalance = sponsorAssetTotal - LargeFee * 2
-    //      miner.assertAssetBalance(sponsor.address, sponsorAssetId, sponsorAssetBalance)
-    //    }
-    ////
-    //      val xfer2Id = sender.transfer(secondAddress, thirdAddress, 10 * Token, fee = LargeFee, assetId = None, feeAssetId = Some(assetId)).id
-    //      assert(!xfer2Id.isEmpty)
-    //      nodes.waitForHeightAriseAndTxPresent(xfer2Id)
-    //      val waves2 = waves1 - Sponsorship.FeeUnit * LargeFee / Token
-    //      miner.assertBalances(firstAddress, waves2, waves2)
-    //      val asset2 = sponsorAssetBalance + LargeFee
-    //      miner.assertAssetBalance(firstAddress, assetId, asset2)
-    //
-    //      val cancelId = sender.cancelSponsorship(firstAddress, assetId, fee = 1 * Waves).id
-    //      assert(!cancelId.isEmpty)
-    //      nodes.waitForHeightAriseAndTxPresent(cancelId)
-    //
-    //      assertSponsorship(assetId, 0L)
-    //
-    //      assertBadRequestAndResponse(
-    //        sender.transfer(secondAddress, thirdAddress, 10 * Token, fee = 1 * Token, assetId = None, feeAssetId = Some(assetId)).id,
-    //        s"Asset $assetId is not sponsored, cannot be used to pay fees"
-    //      )
-    //
-    //      // by this time, the miner should have fully collected fees for asset issue, sponsorship and both transfers
-    //      val minerWaves = miner.accountBalances(miner.address)._1
-    //      assert(minerWaves - minerWavesBalance >= waves2 - sponsorWavesBalance)
 
   }
 }
