@@ -3,7 +3,7 @@ package scorex.transaction
 import com.wavesplatform.TransactionGen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseCancelTransactionV2}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV2}
 
 class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -15,7 +15,7 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
   }
 
   property("Lease cancel serialization from TypedTransaction") {
-    forAll(leaseCancelGen.retryUntil(_.isInstanceOf[LeaseCancelTransactionV2])) { tx: LeaseCancelTransaction =>
+    forAll(leaseCancelGen) { tx: LeaseCancelTransaction =>
       val recovered = TransactionParsers.parseBytes(tx.bytes()).get
       assertTxs(recovered.asInstanceOf[LeaseCancelTransaction], tx)
     }
