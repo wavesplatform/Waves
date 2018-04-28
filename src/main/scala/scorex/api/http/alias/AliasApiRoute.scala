@@ -39,7 +39,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
       )
     ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def alias: Route = processRequest("create", (t: CreateAliasRequest) => doBroadcast(TransactionFactory.alias(t, wallet, time)))
+  def alias: Route = processRequest("create", (t: CreateAliasV1Request) => doBroadcast(TransactionFactory.aliasV1(t, wallet, time)))
   @Path("/by-alias/{alias}")
   @ApiOperation(
     value = "Account",

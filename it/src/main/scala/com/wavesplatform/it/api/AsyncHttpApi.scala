@@ -20,7 +20,7 @@ import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json._
 import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
-import scorex.api.http.alias.CreateAliasRequest
+import scorex.api.http.alias.CreateAliasV1Request
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
 import scorex.api.http.{AddressApiRoute, ApiErrorResponse, DataRequest}
@@ -355,7 +355,7 @@ object AsyncHttpApi extends Assertions {
     }
 
     def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
-      postJson("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
+      postJson("/alias/create", CreateAliasV1Request(targetAddress, alias, fee)).as[Transaction]
 
     def aliasByAddress(targetAddress: String): Future[Seq[String]] =
       get(s"/alias/by-address/$targetAddress").as[Seq[String]]

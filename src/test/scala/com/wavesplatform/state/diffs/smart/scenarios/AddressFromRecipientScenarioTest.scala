@@ -15,19 +15,19 @@ import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.smart.BlockchainContext
 import scorex.transaction.transfer._
-import scorex.transaction.{CreateAliasTransactionV1, GenesisTransaction, Transaction}
+import scorex.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
 
 class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
-  val preconditionsAndAliasCreations: Gen[(Seq[GenesisTransaction], CreateAliasTransactionV1, TransferTransactionV1, TransferTransactionV1)] = for {
+  val preconditionsAndAliasCreations: Gen[(Seq[GenesisTransaction], CreateAliasTransaction, TransferTransactionV1, TransferTransactionV1)] = for {
     master                   <- accountGen
     ts                       <- timestampGen
     other: PrivateKeyAccount <- accountGen
     genesis1: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     genesis2: GenesisTransaction = GenesisTransaction.create(other, ENOUGH_AMT, ts).right.get
-    alias <- aliasGen
-    fee   <- smallFeeGen
-    aliasTx = CreateAliasTransactionV1.create(other, alias, fee, ts).right.get
+    alias              <- aliasGen
+    fee                <- smallFeeGen
+    aliasTx            <- createAliasGen(other, alias, fee, ts)
     transferViaAddress <- transferGeneratorP(master, other, None, None)
     transferViaAlias   <- transferGeneratorP(master, AddressOrAlias.fromBytes(alias.bytes.arr, 0).right.get._1, None, None)
   } yield (Seq(genesis1, genesis2), aliasTx, transferViaAddress, transferViaAlias)

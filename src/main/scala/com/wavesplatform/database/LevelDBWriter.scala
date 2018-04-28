@@ -712,7 +712,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
                 }
               }
 
-            case tx: CreateAliasTransactionV1 => rw.delete(k.addressIdOfAlias(tx.alias))
+            case tx: CreateAliasTransaction => rw.delete(k.addressIdOfAlias(tx.alias))
             case tx: ExchangeTransaction =>
               rollbackOrderFill(rw, ByteStr(tx.buyOrder.id()), currentHeight)
               rollbackOrderFill(rw, ByteStr(tx.sellOrder.id()), currentHeight)

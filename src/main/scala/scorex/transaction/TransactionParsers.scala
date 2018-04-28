@@ -38,6 +38,7 @@ object TransactionParsers {
     TransferTransactionV2,
     SetScriptTransaction,
     IssueTransactionV2,
+    CreateAliasTransactionV2,
     ReissueTransactionV2,
     LeaseTransactionV2,
     LeaseCancelTransactionV2,

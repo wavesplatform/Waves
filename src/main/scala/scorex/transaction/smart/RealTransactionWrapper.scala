@@ -58,7 +58,7 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
     case g: LeaseTransaction        => Right(g.amount)
     case g: TransferTransaction     => Right(g.amount)
     case g: ExchangeTransaction     => Right(g.amount)
-    case _: CreateAliasTransactionV1  => Left("Transaction doesn't contain amount")
+    case _: CreateAliasTransaction  => Left("Transaction doesn't contain amount")
     case _: SetScriptTransaction    => Left("Transaction doesn't contain amount")
     case _: MassTransferTransaction => Left("Transaction doesn't contain amount")
     case _: LeaseCancelTransaction  => Left("Transaction doesn't contain amount")
@@ -71,7 +71,7 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
   override def timestamp: Long = tx.timestamp
 
   override def aliasText: Either[String, String] = tx match {
-    case g: CreateAliasTransactionV1 => Right(g.alias.name)
+    case g: CreateAliasTransaction => Right(g.alias.name)
     case _                         => Left("Transaction doesn't contain alias text")
   }
 

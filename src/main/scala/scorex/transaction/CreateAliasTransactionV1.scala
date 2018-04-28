@@ -1,54 +1,13 @@
 package scorex.transaction
 
-import com.google.common.primitives.{Bytes, Longs}
+import com.google.common.primitives.Bytes
 import com.wavesplatform.crypto
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
 import scorex.account._
-import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
-import scorex.serialization.Deser
+import scorex.crypto.signatures.Curve25519.SignatureLength
+
 import scala.util.{Failure, Success, Try}
-
-trait CreateAliasTransaction extends ProvenTransaction {
-  def version: Byte
-  def alias: Alias
-  def fee: Long
-  def timestamp: Long
-
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
-
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
-      "version"   -> version,
-      "alias"     -> alias.name,
-      "fee"       -> fee,
-      "timestamp" -> timestamp
-    ))
-
-  val baseBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
-    Bytes.concat(
-      sender.publicKey,
-      Deser.serializeArray(alias.bytes.arr),
-      Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp)
-    )
-  }
-}
-
-object CreateAliasTransaction {
-  val typeId: Byte = 10
-
-  def parseBase(start: Int, bytes: Array[Byte]): Try[(PublicKeyAccount, Alias, Long, Long, Int)] = {
-    for {
-      sender <- Try(PublicKeyAccount(bytes.slice(start, start + KeyLength)))
-      (aliasBytes, aliasEnd) = Deser.parseArraySize(bytes, start + KeyLength)
-      alias     <- Alias.fromBytes(aliasBytes).fold(err => Failure(new Exception(err.toString)), Success.apply)
-      fee       <- Try(Longs.fromByteArray(bytes.slice(aliasEnd, aliasEnd + 8)))
-      timestamp <- Try(Longs.fromByteArray(bytes.slice(aliasEnd + 8, aliasEnd + 16)))
-    } yield (sender, alias, fee, timestamp, aliasEnd + 16)
-  }
-}
 
 case class CreateAliasTransactionV1 private (sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, signature: ByteStr)
     extends CreateAliasTransaction

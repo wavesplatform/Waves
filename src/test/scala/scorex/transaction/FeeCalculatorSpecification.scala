@@ -138,7 +138,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
 
   property("Create alias transaction") {
     val feeCalc = new FeeCalculator(mySettings, noScriptBlockchain)
-    forAll(createAliasGen) { tx: CreateAliasTransactionV1 =>
+    forAll(createAliasGen) { tx: CreateAliasTransaction =>
       feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 600000)
     }
   }

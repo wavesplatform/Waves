@@ -4,7 +4,7 @@ import com.google.common.base.Charsets
 import com.wavesplatform.state.ByteStr
 import scorex.account._
 import scorex.api.http.DataRequest
-import scorex.api.http.alias.CreateAliasRequest
+import scorex.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request}
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelV1Request, LeaseCancelV2Request, LeaseV1Request, LeaseV2Request}
 import scorex.crypto.encode.Base58
@@ -157,12 +157,20 @@ object TransactionFactory {
                                                 timestamp)
     } yield tx
 
-  def alias(request: CreateAliasRequest, wallet: Wallet, time: Time): Either[ValidationError, CreateAliasTransactionV1] =
+  def aliasV1(request: CreateAliasV1Request, wallet: Wallet, time: Time): Either[ValidationError, CreateAliasTransactionV1] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       alias            <- Alias.buildWithCurrentNetworkByte(request.alias)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
       tx <- CreateAliasTransactionV1.create(senderPrivateKey, alias, request.fee, timestamp)
+    } yield tx
+
+  def aliasV2(request: CreateAliasV2Request, wallet: Wallet, time: Time): Either[ValidationError, CreateAliasTransactionV2] =
+    for {
+      senderPrivateKey <- wallet.findWallet(request.sender)
+      alias            <- Alias.buildWithCurrentNetworkByte(request.alias)
+      timestamp = request.timestamp.getOrElse(time.getTimestamp())
+      tx <- CreateAliasTransactionV2.selfSigned(senderPrivateKey, request.version, alias, request.fee, timestamp)
     } yield tx
 
   def reissueAssetV1(request: ReissueV1Request, wallet: Wallet, time: Time): Either[ValidationError, ReissueTransactionV1] =

@@ -8,16 +8,16 @@ import scorex.account.{Alias, PrivateKeyAccount}
 class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("CreateAliasTransaction serialization roundtrip") {
-    forAll(createAliasGen) { tx: CreateAliasTransactionV1 =>
-      val recovered = CreateAliasTransactionV1.parseBytes(tx.bytes()).get
-      assertTxs(recovered, tx)
+    forAll(createAliasGen) { tx: CreateAliasTransaction =>
+      val recovered = tx.builder.parseBytes(tx.bytes()).get
+      recovered shouldEqual tx
     }
   }
 
   property("CreateAliasTransaction serialization from TypedTransaction") {
-    forAll(createAliasGen) { tx: CreateAliasTransactionV1 =>
+    forAll(createAliasGen) { tx: CreateAliasTransaction =>
       val recovered = TransactionParsers.parseBytes(tx.bytes()).get
-      assertTxs(recovered.asInstanceOf[CreateAliasTransactionV1], tx)
+      recovered shouldEqual tx
     }
   }
 
@@ -28,13 +28,5 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
         val tx2 = CreateAliasTransactionV1.create(a2, a, MinIssueFee, t).right.get
         tx1.id() shouldBe tx2.id()
     }
-  }
-
-  private def assertTxs(first: CreateAliasTransactionV1, second: CreateAliasTransactionV1): Unit = {
-    first.sender.address shouldEqual second.sender.address
-    first.timestamp shouldEqual second.timestamp
-    first.fee shouldEqual second.fee
-    first.alias.bytes shouldEqual second.alias.bytes
-    first.bytes() shouldEqual second.bytes()
   }
 }

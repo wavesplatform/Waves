@@ -111,7 +111,8 @@ object CommonValidation {
       case _: ReissueTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: LeaseTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: LeaseCancelTransactionV2 =>activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: SponsorFeeTransaction   => activationBarrier(BlockchainFeatures.FeeSponsorship)
+      case _: CreateAliasTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _:SponsorFeeTransaction   => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _                          => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }
@@ -145,7 +146,7 @@ object CommonValidation {
       case _: LeaseCancelTransactionV1 => Right(1)
       case _: LeaseCancelTransactionV2 => Right(1)
       case _: ExchangeTransaction      => Right(3)
-      case _: CreateAliasTransactionV1   => Right(1)
+      case _: CreateAliasTransactionV1 => Right(1)
       case tx: DataTransaction         => Right(1 + (tx.bytes().length - 1) / 1024)
       case _: SetScriptTransaction     => Right(1)
       case _: TransferTransactionV2    => Right(1)

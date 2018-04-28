@@ -77,7 +77,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
         Seq.empty[IssueTransactionV1],
         Seq.empty[IssueTransactionV1],
         Seq.empty[LeaseTransactionV1],
-        Seq.empty[CreateAliasTransactionV1]
+        Seq.empty[CreateAliasTransaction]
       )) {
       case ((allTxsWithValid, validIssueTxs, reissuableIssueTxs, activeLeaseTransactions, aliases), _) =>
         def moreThatStandartFee = 100000L + r.nextInt(100000)
@@ -210,7 +210,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
           case Some(tx: LeaseCancelTransaction) => activeLeaseTransactions.filter(_.id != tx.leaseId)
           case _                                => activeLeaseTransactions
         }, tx match {
-          case Some(tx: CreateAliasTransactionV1) => aliases :+ tx
+          case Some(tx: CreateAliasTransaction) => aliases :+ tx
           case _                                => aliases
         })
     }
