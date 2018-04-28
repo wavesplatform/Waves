@@ -4,7 +4,7 @@ import org.scalacheck.Gen.{alphaNumChar, choose, listOfN, oneOf}
 import org.scalacheck.{Arbitrary, Gen => G}
 import org.scalatest.Suite
 import scorex.account.Alias
-import scorex.api.http.alias.SignedCreateAliasRequest
+import scorex.api.http.alias.SignedCreateAliasV1Request
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{SignedLeaseCancelV1Request, SignedLeaseV1Request}
 import scorex.crypto.encode.Base58
@@ -111,11 +111,11 @@ trait RequestGen extends TransactionGen { _: Suite =>
     _tr        <- transferReq
   } yield SignedTransferV1Request(_tr.sender, _tr.assetId, _tr.recipient, _tr.amount, _tr.fee, _tr.feeAssetId, _timestamp, _tr.attachment, _signature)
 
-  val createAliasReq: G[SignedCreateAliasRequest] = for {
+  val createAliasReq: G[SignedCreateAliasV1Request] = for {
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _alias     <- createAliasGen
-  } yield SignedCreateAliasRequest(_alias.sender.toString, _alias.fee, _alias.alias.name, _timestamp, _signature)
+  } yield SignedCreateAliasV1Request(_alias.sender.toString, _alias.fee, _alias.alias.name, _timestamp, _signature)
 
   val leaseReq: G[SignedLeaseV1Request] = for {
     _signature <- signatureGen

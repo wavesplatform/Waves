@@ -29,7 +29,7 @@ class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with Reques
     def posting(url: String, v: JsValue): RouteTestResult = Post(routePath(url), v) ~> route
 
     "when state validation fails" in {
-      forAll(createAliasGen) { (t: Transaction) =>
+      forAll(createAliasGen.retryUntil(_.version == 1)) { (t: Transaction) =>
         posting("create", t.json()) should produce(StateCheckFailed(t, "foo"))
       }
     }
@@ -39,7 +39,7 @@ class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with Reques
     val route = AliasBroadcastApiRoute(settings, utx, allChannels).route
 
     "create alias transaction" in forAll(createAliasReq) { req =>
-      import scorex.api.http.alias.SignedCreateAliasRequest.broadcastAliasRequestReadsFormat
+      import scorex.api.http.alias.SignedCreateAliasV1Request.broadcastAliasV1RequestReadsFormat
 
       def posting(v: JsValue): RouteTestResult = Post(routePath("create"), v) ~> route
 

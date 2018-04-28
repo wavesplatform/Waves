@@ -14,7 +14,7 @@ import play.api.libs.json._
 import scorex.BroadcastRoute
 import scorex.account.Address
 import scorex.api.http.DataRequest._
-import scorex.api.http.alias.{CreateAliasRequest, SignedCreateAliasRequest}
+import scorex.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request, SignedCreateAliasV1Request, SignedCreateAliasV2Request}
 import scorex.api.http.assets.SponsorFeeRequest._
 import scorex.api.http.assets._
 import scorex.api.http.leasing._
@@ -183,7 +183,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case LeaseTransactionV2       => TransactionFactory.leaseV2(jsv.as[LeaseV2Request], wallet, time)
               case LeaseCancelTransactionV1 => TransactionFactory.leaseCancelV1(jsv.as[LeaseCancelV1Request], wallet, time)
               case LeaseCancelTransactionV2 => TransactionFactory.leaseCancelV2(jsv.as[LeaseCancelV2Request], wallet, time)
-              case CreateAliasTransaction   => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
+              case CreateAliasTransactionV1 => TransactionFactory.aliasV1(jsv.as[CreateAliasV1Request], wallet, time)
+              case CreateAliasTransactionV2 => TransactionFactory.aliasV2(jsv.as[CreateAliasV2Request], wallet, time)
               case DataTransaction          => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
               case SetScriptTransaction     => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
               case SponsorFeeTransaction    => TransactionFactory.sponsor(jsv.as[SponsorFeeRequest], wallet, time)
@@ -230,7 +231,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case LeaseTransactionV2       => jsv.as[SignedLeaseV2Request].toTx
               case LeaseCancelTransactionV1 => jsv.as[SignedLeaseCancelV1Request].toTx
               case LeaseCancelTransactionV2 => jsv.as[SignedLeaseCancelV2Request].toTx
-              case CreateAliasTransaction   => jsv.as[SignedCreateAliasRequest].toTx
+              case CreateAliasTransactionV1 => jsv.as[SignedCreateAliasV1Request].toTx
+              case CreateAliasTransactionV2 => jsv.as[SignedCreateAliasV2Request].toTx
               case DataTransaction          => jsv.as[SignedDataRequest].toTx
               case SetScriptTransaction     => jsv.as[SignedSetScriptRequest].toTx
               case SponsorFeeTransaction    => jsv.as[SignedSponsorFeeRequest].toTx

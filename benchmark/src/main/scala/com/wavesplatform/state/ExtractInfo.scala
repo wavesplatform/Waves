@@ -14,7 +14,7 @@ import scodec.bits.{BitVector, ByteVector}
 import scorex.account.AddressScheme
 import scorex.block.Block
 import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.{Authorized, CreateAliasTransaction, DataTransaction, Transaction}
+import scorex.transaction.{Authorized, CreateAliasTransactionV1, DataTransaction, Transaction}
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
@@ -65,7 +65,7 @@ object ExtractInfo extends App with ScorexLogging {
     val aliasTxs = nonEmptyBlocks(benchSettings.aliasesFromHeight)
       .flatMap(_.transactionData)
       .collect {
-        case _: CreateAliasTransaction => true
+        case _: CreateAliasTransactionV1 => true
       }
 
     val restTxs = nonEmptyBlocks(benchSettings.restTxsFromHeight)
@@ -81,7 +81,7 @@ object ExtractInfo extends App with ScorexLogging {
     } yield sender.toAddress.stringRepr
     write("accounts", benchSettings.accountsFile, takeUniq(1000, accounts))
 
-    val aliasTxIds = aliasTxs.map(_.asInstanceOf[CreateAliasTransaction].alias.stringRepr)
+    val aliasTxIds = aliasTxs.map(_.asInstanceOf[CreateAliasTransactionV1].alias.stringRepr)
     write("aliases", benchSettings.aliasesFile, aliasTxIds.take(1000))
 
     val restTxIds = restTxs.map(_.id().base58)

@@ -13,7 +13,7 @@ import scorex.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
 import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
-import scorex.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction}
+import scorex.transaction.{CreateAliasTransactionV1, DataTransaction, GenesisTransaction}
 
 class RollbackSpec extends FreeSpec with Matchers with WithState with TransactionGen with PropertyChecks with NoShrink {
   private val time   = new TestTime
@@ -187,7 +187,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
             TestBlock.create(
               nextTs,
               genesisBlockId,
-              Seq(CreateAliasTransaction.create(sender, alias, 1, nextTs).explicitGet())
+              Seq(CreateAliasTransactionV1.create(sender, alias, 1, nextTs).explicitGet())
             ))
 
           d.blockchainUpdater.resolveAlias(alias) should contain(sender.toAddress)

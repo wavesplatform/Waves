@@ -331,7 +331,22 @@ trait TransactionGenBase extends ScriptGen {
     timestamp: Long           <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
     alias: Alias              <- aliasGen
-  } yield CreateAliasTransaction.create(sender, alias, MinIssueFee, timestamp).right.get
+    version                   <- Gen.oneOf(CreateAliasTransactionV2.supportedVersions.toSeq)
+    tx <- Gen.oneOf(
+      CreateAliasTransactionV1.create(sender, alias, MinIssueFee, timestamp).right.get,
+      CreateAliasTransactionV2.selfSigned(sender, version, alias, MinIssueFee, timestamp).right.get
+    )
+  } yield tx
+
+  def createAliasGen(sender: PrivateKeyAccount, alias: Alias, fee: Long, timestamp: Long): Gen[CreateAliasTransaction] = {
+    for {
+      version <- Gen.oneOf(CreateAliasTransactionV2.supportedVersions.toSeq)
+      tx <- Gen.oneOf(
+        CreateAliasTransactionV1.create(sender, alias, fee, timestamp).right.get,
+        CreateAliasTransactionV2.selfSigned(sender, version, alias, fee, timestamp).right.get
+      )
+    } yield tx
+  }
 
   val issueParamGen = for {
     sender: PrivateKeyAccount <- accountGen
@@ -538,7 +553,7 @@ trait TransactionGenBase extends ScriptGen {
     (is, ri, bu) <- issueReissueBurnGen.retryUntil {
       case (i, r, b) => i.version == 1 && r.version == 1 && b.version == 1
     }
-    ca <- createAliasGen
+    ca <- createAliasGen.retryUntil(_.version == 1).map(_.asInstanceOf[CreateAliasTransactionV1])
     xt <- exchangeTransactionGen
     tx <- Gen.oneOf(tr, is.asInstanceOf[IssueTransactionV1], ri.asInstanceOf[ReissueTransactionV1], ca, bu.asInstanceOf[BurnTransactionV1], xt)
   } yield tx).label("random transaction")

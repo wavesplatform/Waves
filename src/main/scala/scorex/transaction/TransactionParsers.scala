@@ -27,7 +27,7 @@ object TransactionParsers {
     ExchangeTransaction,
     LeaseTransactionV1,
     LeaseCancelTransactionV1,
-    CreateAliasTransaction,
+    CreateAliasTransactionV1,
     MassTransferTransaction
   ).map { x =>
     x.typeId -> x
@@ -38,6 +38,7 @@ object TransactionParsers {
     TransferTransactionV2,
     SetScriptTransaction,
     IssueTransactionV2,
+    CreateAliasTransactionV2,
     ReissueTransactionV2,
     BurnTransactionV2,
     LeaseTransactionV2,
