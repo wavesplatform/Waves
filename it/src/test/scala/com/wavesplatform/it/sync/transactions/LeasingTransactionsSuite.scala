@@ -5,7 +5,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.Json
-import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.lease.LeaseTransactionV1
 
 class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFailure {
 
@@ -48,7 +48,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("lease cancellation reverts eff.b. changes; lessor pays fee for both lease and cancellation") {
-    import LeaseTransaction.Status._
+    import scorex.transaction.lease.LeaseTransaction.Status._
 
     def getStatus(txId: String): String = {
       val r = sender.get(s"/transactions/info/$txId")

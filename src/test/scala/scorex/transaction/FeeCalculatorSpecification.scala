@@ -3,8 +3,7 @@ package scorex.transaction
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.FeesSettings
-import com.wavesplatform.state.ByteStr
-import com.wavesplatform.state._
+import com.wavesplatform.state.{ByteStr, _}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Assertion, Matchers, PropSpec}
@@ -19,7 +18,6 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
   private val configString =
     """waves {
       |  fees {
-      |    smart-account.extra-fee = 10
       |    payment {
       |      WAVES = 100000
       |    }

@@ -6,8 +6,9 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto
-import com.wavesplatform.settings.{FeesSettings, FunctionalitySettings, RestAPISettings}
+import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
@@ -32,8 +33,7 @@ case class AddressApiRoute(settings: RestAPISettings,
                            utx: UtxPool,
                            allChannels: ChannelGroup,
                            time: Time,
-                           functionalitySettings: FunctionalitySettings,
-                           feesSettings: FeesSettings)
+                           functionalitySettings: FunctionalitySettings)
     extends ApiRoute
     with BroadcastRoute {
 
@@ -375,7 +375,7 @@ case class AddressApiRoute(settings: RestAPISettings,
         script = script.map(_.bytes().base58),
         scriptText = script.map(_.text),
         complexity = complexity,
-        extraFee = if (complexity == 0) 0 else feesSettings.smartAccount.extraFee
+        extraFee = if (script.isEmpty) 0 else CommonValidation.ScriptExtraFee
       )
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {

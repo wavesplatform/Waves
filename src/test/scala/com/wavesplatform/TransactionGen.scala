@@ -18,7 +18,7 @@ import scorex.transaction._
 import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.lease._
 import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.smart.SetScriptTransaction
@@ -159,20 +159,35 @@ trait TransactionGenBase extends ScriptGen {
     recipient <- accountGen
   } yield (sender, amount, fee, timestamp, recipient)
 
+  def createLease(sender: PrivateKeyAccount, amount: Long, fee: Long, timestamp: Long, recipient: AddressOrAlias) = {
+    val v1 = LeaseTransactionV1.create(sender, amount, fee, timestamp, recipient).right.get
+    val v2 = LeaseTransactionV2.selfSigned(LeaseTransactionV2.supportedVersions.head, sender, amount, fee, timestamp, recipient).right.get
+    Gen.oneOf(v1, v2)
+  }
+
+  def createLeaseCancel(sender: PrivateKeyAccount, leaseId: ByteStr, cancelFee: Long, timestamp: Long) = {
+    val v1 = LeaseCancelTransactionV1.create(sender, leaseId, cancelFee, timestamp + 1).right.get
+    val v2 = LeaseCancelTransactionV2
+      .selfSigned(LeaseTransactionV2.supportedVersions.head, AddressScheme.current.chainId, sender, leaseId, cancelFee, timestamp + 1)
+      .right
+      .get
+    Gen.oneOf(v1, v2)
+  }
   val leaseAndCancelGen: Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
     (sender, amount, fee, timestamp, recipient) <- leaseParamGen
-    lease = LeaseTransaction.create(sender, amount, fee, timestamp, recipient).right.get
-    cancelFee <- smallFeeGen
-  } yield (lease, LeaseCancelTransaction.create(sender, lease.id(), cancelFee, timestamp + 1).right.get)
+    lease                                       <- createLease(sender, amount, fee, timestamp, recipient)
+    cancelFee                                   <- smallFeeGen
+    leaseCancel                                 <- createLeaseCancel(sender, lease.id(), cancelFee, timestamp + 1)
+  } yield (lease, leaseCancel)
 
   def leaseAndCancelGeneratorP(leaseSender: PrivateKeyAccount,
                                recipient: AddressOrAlias,
                                unleaseSender: PrivateKeyAccount): Gen[(LeaseTransaction, LeaseCancelTransaction)] =
     for {
       (_, amount, fee, timestamp, _) <- leaseParamGen
-      lease = LeaseTransaction.create(leaseSender, amount, fee, timestamp, recipient).right.get
-      fee2 <- smallFeeGen
-      unlease = LeaseCancelTransaction.create(unleaseSender, lease.id(), fee2, timestamp + 1).right.get
+      lease                          <- createLease(leaseSender, amount, fee, timestamp, recipient)
+      fee2                           <- smallFeeGen
+      unlease                        <- createLeaseCancel(unleaseSender, lease.id(), fee2, timestamp + 1)
     } yield (lease, unlease)
 
   val twoLeasesGen: Gen[(LeaseTransaction, LeaseTransaction)] = for {
@@ -180,17 +195,18 @@ trait TransactionGenBase extends ScriptGen {
     amount2                                     <- positiveLongGen
     recipient2: PrivateKeyAccount               <- accountGen
     fee2                                        <- smallFeeGen
-  } yield
-    (LeaseTransaction.create(sender, amount, fee, timestamp, recipient).right.get,
-     LeaseTransaction.create(sender, amount2, fee2, timestamp + 1, recipient2).right.get)
+    lease1                                      <- createLease(sender, amount, fee, timestamp, recipient)
+    lease2                                      <- createLease(sender, amount2, fee2, timestamp + 1, recipient2)
+  } yield (lease1, lease2)
 
   val leaseAndCancelWithOtherSenderGen: Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
     (sender, amount, fee, timestamp, recipient) <- leaseParamGen
     otherSender: PrivateKeyAccount              <- accountGen
-    lease = LeaseTransaction.create(sender, amount, fee, timestamp, recipient).right.get
-    fee2       <- smallFeeGen
-    timestamp2 <- positiveLongGen
-  } yield (lease, LeaseCancelTransaction.create(otherSender, lease.id(), fee2, timestamp2).right.get)
+    lease                                       <- createLease(sender, amount, fee, timestamp, recipient)
+    fee2                                        <- smallFeeGen
+    timestamp2                                  <- positiveLongGen
+    leaseCancel                                 <- createLeaseCancel(otherSender, lease.id(), fee2, timestamp2)
+  } yield (lease, leaseCancel)
 
   val leaseGen: Gen[LeaseTransaction]             = leaseAndCancelGen.map(_._1)
   val leaseCancelGen: Gen[LeaseCancelTransaction] = leaseAndCancelGen.map(_._2)
@@ -315,7 +331,22 @@ trait TransactionGenBase extends ScriptGen {
     timestamp: Long           <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
     alias: Alias              <- aliasGen
-  } yield CreateAliasTransaction.create(sender, alias, MinIssueFee, timestamp).right.get
+    version                   <- Gen.oneOf(CreateAliasTransactionV2.supportedVersions.toSeq)
+    tx <- Gen.oneOf(
+      CreateAliasTransactionV1.create(sender, alias, MinIssueFee, timestamp).right.get,
+      CreateAliasTransactionV2.selfSigned(sender, version, alias, MinIssueFee, timestamp).right.get
+    )
+  } yield tx
+
+  def createAliasGen(sender: PrivateKeyAccount, alias: Alias, fee: Long, timestamp: Long): Gen[CreateAliasTransaction] = {
+    for {
+      version <- Gen.oneOf(CreateAliasTransactionV2.supportedVersions.toSeq)
+      tx <- Gen.oneOf(
+        CreateAliasTransactionV1.create(sender, alias, fee, timestamp).right.get,
+        CreateAliasTransactionV2.selfSigned(sender, version, alias, fee, timestamp).right.get
+      )
+    } yield tx
+  }
 
   val issueParamGen = for {
     sender: PrivateKeyAccount <- accountGen
@@ -336,6 +367,10 @@ trait TransactionGenBase extends ScriptGen {
 
   def issueReissueBurnGeneratorP(issueQuantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] =
     issueReissueBurnGeneratorP(issueQuantity, issueQuantity, issueQuantity, sender)
+
+  def versionGen(builder: TransactionParser): Gen[Byte] = {
+    Gen.oneOf(builder.supportedVersions.toSeq)
+  }
 
   def createIssue(issuer: PrivateKeyAccount,
                   assetName: Array[Byte],
@@ -359,12 +394,29 @@ trait TransactionGenBase extends ScriptGen {
                     reissuable: Boolean,
                     fee: Long,
                     timestamp: Long): Gen[ReissueTransaction] = {
-    val reissuev1 = ReissueTransactionV1.create(reissuer, assetId, quantity, reissuable, fee, timestamp).right.get
-    val reissuev2 = ReissueTransactionV2
-      .selfSigned(ReissueTransactionV2.supportedVersions.head, AddressScheme.current.chainId, reissuer, assetId, quantity, reissuable, fee, timestamp)
-      .right
-      .get
-    Gen.oneOf(Seq(reissuev1, reissuev2))
+    for {
+      version <- versionGen(ReissueTransactionV2)
+      tx <- Gen.oneOf(
+        ReissueTransactionV1
+          .create(reissuer, assetId, quantity, reissuable, fee, timestamp)
+          .right
+          .get,
+        ReissueTransactionV2
+          .selfSigned(version, AddressScheme.current.chainId, reissuer, assetId, quantity, reissuable, fee, timestamp)
+          .right
+          .get
+      )
+    } yield tx
+  }
+
+  def createBurn(burner: PrivateKeyAccount, assetId: AssetId, amount: Long, fee: Long, timestamp: Long): Gen[BurnTransaction] = {
+    for {
+      version <- versionGen(BurnTransactionV2)
+      tx <- Gen.oneOf(
+        BurnTransactionV1.create(burner, assetId, amount, fee, timestamp).right.get,
+        BurnTransactionV2.selfSigned(version, AddressScheme.current.chainId, burner, assetId, amount, fee, timestamp).right.get
+      )
+    } yield tx
   }
 
   def issueReissueBurnGeneratorP(issueQuantity: Long,
@@ -378,10 +430,8 @@ trait TransactionGenBase extends ScriptGen {
       fee                                                                   <- smallFeeGen
       issue                                                                 <- createIssue(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp)
       reissue                                                               <- createReissue(sender, issue.assetId(), reissueQuantity, reissuable2, fee, timestamp)
-    } yield {
-      val burn = BurnTransaction.create(sender, issue.assetId(), burnAmount, fee, timestamp).right.get
-      (issue, reissue, burn)
-    }
+      burn                                                                  <- createBurn(sender, issue.assetId(), burnQuantity, fee, timestamp)
+    } yield (issue, reissue, burn)
 
   val issueWithInvalidReissuesGen: Gen[(IssueTransactionV1, ReissueTransactionV1, ReissueTransactionV1)] = for {
     (sender, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
@@ -501,11 +551,11 @@ trait TransactionGenBase extends ScriptGen {
   val randomTransactionGen: Gen[SignedTransaction] = (for {
     tr <- transferV1Gen
     (is, ri, bu) <- issueReissueBurnGen.retryUntil {
-      case (i, r, b) => i.isInstanceOf[IssueTransactionV1] && r.isInstanceOf[ReissueTransactionV1]
+      case (i, r, b) => i.version == 1 && r.version == 1 && b.version == 1
     }
-    ca <- createAliasGen
+    ca <- createAliasGen.retryUntil(_.version == 1).map(_.asInstanceOf[CreateAliasTransactionV1])
     xt <- exchangeTransactionGen
-    tx <- Gen.oneOf(tr, is.asInstanceOf[IssueTransactionV1], ri.asInstanceOf[ReissueTransactionV1], ca, bu, xt)
+    tx <- Gen.oneOf(tr, is.asInstanceOf[IssueTransactionV1], ri.asInstanceOf[ReissueTransactionV1], ca, bu.asInstanceOf[BurnTransactionV1], xt)
   } yield tx).label("random transaction")
 
   def randomTransactionsGen(count: Int): Gen[Seq[SignedTransaction]] =

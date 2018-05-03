@@ -20,9 +20,9 @@ import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json._
 import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
-import scorex.api.http.alias.CreateAliasRequest
+import scorex.api.http.alias.CreateAliasV1Request
 import scorex.api.http.assets._
-import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
+import scorex.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
 import scorex.api.http.{AddressApiRoute, ApiErrorResponse, DataRequest}
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
 import scorex.transaction.assets.exchange.Order
@@ -254,10 +254,10 @@ object AsyncHttpApi extends Assertions {
       postJson("/waves/payment", PaymentRequest(amount, fee, sourceAddress, recipient)).as[Transaction]
 
     def lease(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
-      postJson("/leasing/lease", LeaseRequest(sourceAddress, amount, fee, recipient)).as[Transaction]
+      postJson("/leasing/lease", LeaseV1Request(sourceAddress, amount, fee, recipient)).as[Transaction]
 
     def cancelLease(sourceAddress: String, leaseId: String, fee: Long): Future[Transaction] =
-      postJson("/leasing/cancel", LeaseCancelRequest(sourceAddress, leaseId, fee)).as[Transaction]
+      postJson("/leasing/cancel", LeaseCancelV1Request(sourceAddress, leaseId, fee)).as[Transaction]
 
     def activeLeases(sourceAddress: String) = get(s"/leasing/active/$sourceAddress").as[Seq[Transaction]]
 
@@ -276,7 +276,7 @@ object AsyncHttpApi extends Assertions {
       postJson("/assets/reissue", ReissueV1Request(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
 
     def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Future[Transaction] =
-      postJson("/assets/burn", BurnRequest(sourceAddress, assetId, quantity, fee)).as[Transaction]
+      postJson("/assets/burn", BurnV1Request(sourceAddress, assetId, quantity, fee)).as[Transaction]
 
     def assetBalance(address: String, asset: String): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset").as[AssetBalance]
@@ -311,10 +311,10 @@ object AsyncHttpApi extends Assertions {
     def signedTransfer(transfer: SignedTransferV1Request): Future[Transaction] =
       postJson("/assets/broadcast/transfer", transfer).as[Transaction]
 
-    def signedLease(lease: SignedLeaseRequest): Future[Transaction] =
+    def signedLease(lease: SignedLeaseV1Request): Future[Transaction] =
       postJson("/leasing/broadcast/lease", lease).as[Transaction]
 
-    def signedLeaseCancel(leaseCancel: SignedLeaseCancelRequest): Future[Transaction] =
+    def signedLeaseCancel(leaseCancel: SignedLeaseCancelV1Request): Future[Transaction] =
       postJson("/leasing/broadcast/cancel", leaseCancel).as[Transaction]
 
     def broadcastRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
@@ -355,7 +355,7 @@ object AsyncHttpApi extends Assertions {
     }
 
     def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
-      postJson("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
+      postJson("/alias/create", CreateAliasV1Request(targetAddress, alias, fee)).as[Transaction]
 
     def aliasByAddress(targetAddress: String): Future[Seq[String]] =
       get(s"/alias/by-address/$targetAddress").as[Seq[String]]

@@ -9,7 +9,7 @@ class BurnTransactionSpecification extends PropSpec with PropertyChecks with Mat
 
   property("Burn serialization roundtrip") {
     forAll(burnGen) { issue: BurnTransaction =>
-      val recovered = BurnTransaction.parseBytes(issue.bytes()).get
+      val recovered = issue.builder.parseBytes(issue.bytes()).get
       recovered.bytes() shouldEqual issue.bytes()
     }
   }

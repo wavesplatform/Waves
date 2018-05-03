@@ -4,12 +4,12 @@ import com.google.common.base.Charsets
 import com.wavesplatform.state.ByteStr
 import scorex.account._
 import scorex.api.http.DataRequest
-import scorex.api.http.alias.CreateAliasRequest
+import scorex.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request}
 import scorex.api.http.assets._
-import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
+import scorex.api.http.leasing.{LeaseCancelV1Request, LeaseCancelV2Request, LeaseV1Request, LeaseV2Request}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets._
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
 import scorex.transaction.transfer._
@@ -122,27 +122,55 @@ object TransactionFactory {
       )
     } yield tx
 
-  def lease(request: LeaseRequest, wallet: Wallet, time: Time): Either[ValidationError, LeaseTransaction] =
+  def leaseV1(request: LeaseV1Request, wallet: Wallet, time: Time): Either[ValidationError, LeaseTransactionV1] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipientAcc     <- AddressOrAlias.fromString(request.recipient)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- LeaseTransaction.create(senderPrivateKey, request.amount, request.fee, timestamp, recipientAcc)
+      tx <- LeaseTransactionV1.create(senderPrivateKey, request.amount, request.fee, timestamp, recipientAcc)
     } yield tx
 
-  def leaseCancel(request: LeaseCancelRequest, wallet: Wallet, time: Time): Either[ValidationError, LeaseCancelTransaction] =
+  def leaseV2(request: LeaseV2Request, wallet: Wallet, time: Time): Either[ValidationError, LeaseTransactionV2] =
+    for {
+      senderPrivateKey <- wallet.findWallet(request.sender)
+      recipientAcc     <- AddressOrAlias.fromString(request.recipient)
+      timestamp = request.timestamp.getOrElse(time.getTimestamp())
+      tx <- LeaseTransactionV2.selfSigned(request.version, senderPrivateKey, request.amount, request.fee, timestamp, recipientAcc)
+    } yield tx
+
+  def leaseCancelV1(request: LeaseCancelV1Request, wallet: Wallet, time: Time): Either[ValidationError, LeaseCancelTransactionV1] =
     for {
       pk <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- LeaseCancelTransaction.create(pk, ByteStr.decodeBase58(request.txId).get, request.fee, timestamp)
+      tx <- LeaseCancelTransactionV1.create(pk, ByteStr.decodeBase58(request.txId).get, request.fee, timestamp)
     } yield tx
 
-  def alias(request: CreateAliasRequest, wallet: Wallet, time: Time): Either[ValidationError, CreateAliasTransaction] =
+  def leaseCancelV2(request: LeaseCancelV2Request, wallet: Wallet, time: Time): Either[ValidationError, LeaseCancelTransactionV2] =
+    for {
+      pk <- wallet.findWallet(request.sender)
+      timestamp = request.timestamp.getOrElse(time.getTimestamp())
+      tx <- LeaseCancelTransactionV2.selfSigned(request.version,
+                                                AddressScheme.current.chainId,
+                                                pk,
+                                                ByteStr.decodeBase58(request.txId).get,
+                                                request.fee,
+                                                timestamp)
+    } yield tx
+
+  def aliasV1(request: CreateAliasV1Request, wallet: Wallet, time: Time): Either[ValidationError, CreateAliasTransactionV1] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       alias            <- Alias.buildWithCurrentNetworkByte(request.alias)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- CreateAliasTransaction.create(senderPrivateKey, alias, request.fee, timestamp)
+      tx <- CreateAliasTransactionV1.create(senderPrivateKey, alias, request.fee, timestamp)
+    } yield tx
+
+  def aliasV2(request: CreateAliasV2Request, wallet: Wallet, time: Time): Either[ValidationError, CreateAliasTransactionV2] =
+    for {
+      senderPrivateKey <- wallet.findWallet(request.sender)
+      alias            <- Alias.buildWithCurrentNetworkByte(request.alias)
+      timestamp = request.timestamp.getOrElse(time.getTimestamp())
+      tx <- CreateAliasTransactionV2.selfSigned(senderPrivateKey, request.version, alias, request.fee, timestamp)
     } yield tx
 
   def reissueAssetV1(request: ReissueV1Request, wallet: Wallet, time: Time): Either[ValidationError, ReissueTransactionV1] =
@@ -167,11 +195,24 @@ object TransactionFactory {
                                             timestamp)
     } yield tx
 
-  def burnAsset(request: BurnRequest, wallet: Wallet, time: Time): Either[ValidationError, BurnTransaction] =
+  def burnAssetV1(request: BurnV1Request, wallet: Wallet, time: Time): Either[ValidationError, BurnTransactionV1] =
     for {
       pk <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- BurnTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.fee, timestamp)
+      tx <- BurnTransactionV1.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.fee, timestamp)
+    } yield tx
+
+  def burnAssetV2(request: BurnV2Request, wallet: Wallet, time: Time): Either[ValidationError, BurnTransactionV2] =
+    for {
+      pk <- wallet.findWallet(request.sender)
+      timestamp = request.timestamp.getOrElse(time.getTimestamp())
+      tx <- BurnTransactionV2.selfSigned(request.version,
+                                         AddressScheme.current.chainId,
+                                         pk,
+                                         ByteStr.decodeBase58(request.assetId).get,
+                                         request.quantity,
+                                         request.fee,
+                                         timestamp)
     } yield tx
 
   def data(request: DataRequest, wallet: Wallet, time: Time): Either[ValidationError, DataTransaction] =

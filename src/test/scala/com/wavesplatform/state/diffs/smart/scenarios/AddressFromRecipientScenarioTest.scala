@@ -25,9 +25,9 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
     other: PrivateKeyAccount <- accountGen
     genesis1: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     genesis2: GenesisTransaction = GenesisTransaction.create(other, ENOUGH_AMT, ts).right.get
-    alias <- aliasGen
-    fee   <- smallFeeGen
-    aliasTx = CreateAliasTransaction.create(other, alias, fee, ts).right.get
+    alias              <- aliasGen
+    fee                <- smallFeeGen
+    aliasTx            <- createAliasGen(other, alias, fee, ts)
     transferViaAddress <- transferGeneratorP(master, other, None, None)
     transferViaAlias   <- transferGeneratorP(master, AddressOrAlias.fromBytes(alias.bytes.arr, 0).right.get._1, None, None)
   } yield (Seq(genesis1, genesis2), aliasTx, transferViaAddress, transferViaAlias)

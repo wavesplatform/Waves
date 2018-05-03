@@ -15,6 +15,7 @@ object WavesContext {
 
   private val optionByteVector: OPTION = OPTION(BYTEVECTOR)
   private val optionAddress            = OPTION(addressType.typeRef)
+  private val optionLong: OPTION = OPTION(LONG)
 
   private val transactionType = PredefType(
     "Transaction",
@@ -43,8 +44,10 @@ object WavesContext {
       "proof5"           -> BYTEVECTOR,
       "proof6"           -> BYTEVECTOR,
       "proof7"           -> BYTEVECTOR,
-      "assetId"          -> optionByteVector,
-      "recipient"        -> addressOrAliasType.typeRef
+      "transferAssetId"  -> optionByteVector,
+      "assetId"          -> BYTEVECTOR,
+      "recipient"        -> addressOrAliasType.typeRef,
+      "minSponsoredAssetFee"           -> optionLong
     )
   )
   private def proofBinding(tx: Transaction, x: Int): LazyVal =
@@ -65,7 +68,8 @@ object WavesContext {
         "timestamp"  -> LazyVal(LONG)(EitherT.pure(tx.timestamp)),
         "bodyBytes"  -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.bodyBytes)),
         "senderPk"   -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.senderPk)),
-        "assetId"    -> LazyVal(optionByteVector)(EitherT.fromEither(tx.assetId.map(_.asInstanceOf[optionByteVector.Underlying]))),
+        "transferAssetId"    -> LazyVal(optionByteVector)(EitherT.fromEither(tx.transferAssetId.map(_.asInstanceOf[optionByteVector.Underlying]))),
+        "assetId"    -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.assetId)),
         "recipient" -> LazyVal(addressOrAliasType.typeRef)(EitherT.fromEither(tx.recipient.map(bv =>
           Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(bv))))))),
         "attachment"       -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.attachment)),
@@ -76,6 +80,7 @@ object WavesContext {
         "decimals"         -> LazyVal(LONG)(EitherT.fromEither(tx.decimals.map(_.toLong))),
         "chainId"          -> LazyVal(LONG)(EitherT.fromEither(tx.chainId.map(_.toLong))),
         "version"          -> LazyVal(LONG)(EitherT.fromEither(tx.version.map(_.toLong))),
+        "minSponsoredAssetFee"     -> LazyVal(optionLong)(EitherT.fromEither(tx.minSponsoredAssetFee.map(_.asInstanceOf[optionLong.Underlying]))),
         "proof0"           -> proofBinding(tx, 0),
         "proof1"           -> proofBinding(tx, 1),
         "proof2"           -> proofBinding(tx, 2),

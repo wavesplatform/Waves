@@ -4,9 +4,9 @@ import org.scalacheck.Gen.{alphaNumChar, choose, listOfN, oneOf}
 import org.scalacheck.{Arbitrary, Gen => G}
 import org.scalatest.Suite
 import scorex.account.Alias
-import scorex.api.http.alias.SignedCreateAliasRequest
+import scorex.api.http.alias.SignedCreateAliasV1Request
 import scorex.api.http.assets._
-import scorex.api.http.leasing.{SignedLeaseCancelRequest, SignedLeaseRequest}
+import scorex.api.http.leasing.{SignedLeaseCancelV1Request, SignedLeaseV1Request}
 import scorex.crypto.encode.Base58
 import scorex.crypto.signatures.Curve25519.SignatureLength
 import scorex.transaction.assets._
@@ -85,16 +85,16 @@ trait RequestGen extends TransactionGen { _: Suite =>
     _rr        <- reissueReq
   } yield SignedReissueV1Request(_rr.sender, _rr.assetId, _rr.quantity, _rr.reissuable, _rr.fee, _timestamp, _signature)
 
-  val burnReq: G[BurnRequest] = for {
+  val burnReq: G[BurnV1Request] = for {
     (account, fee)      <- commonFields
     (assetId, quantity) <- reissueBurnFields
-  } yield BurnRequest(account, assetId, quantity, fee)
+  } yield BurnV1Request(account, assetId, quantity, fee)
 
-  val broadcastBurnReq: G[SignedBurnRequest] = for {
+  val broadcastBurnReq: G[SignedBurnV1Request] = for {
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _br        <- burnReq
-  } yield SignedBurnRequest(_br.sender, _br.assetId, _br.quantity, _br.fee, _timestamp, _signature)
+  } yield SignedBurnV1Request(_br.sender, _br.assetId, _br.quantity, _br.fee, _timestamp, _signature)
 
   val transferReq: G[TransferV1Request] = for {
     (account, fee) <- commonFields
@@ -111,21 +111,21 @@ trait RequestGen extends TransactionGen { _: Suite =>
     _tr        <- transferReq
   } yield SignedTransferV1Request(_tr.sender, _tr.assetId, _tr.recipient, _tr.amount, _tr.fee, _tr.feeAssetId, _timestamp, _tr.attachment, _signature)
 
-  val createAliasReq: G[SignedCreateAliasRequest] = for {
+  val createAliasReq: G[SignedCreateAliasV1Request] = for {
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _alias     <- createAliasGen
-  } yield SignedCreateAliasRequest(_alias.sender.toString, _alias.fee, _alias.alias.name, _timestamp, _signature)
+  } yield SignedCreateAliasV1Request(_alias.sender.toString, _alias.fee, _alias.alias.name, _timestamp, _signature)
 
-  val leaseReq: G[SignedLeaseRequest] = for {
+  val leaseReq: G[SignedLeaseV1Request] = for {
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _alias     <- leaseGen
-  } yield SignedLeaseRequest(_alias.sender.toString, _alias.amount, _alias.fee, _alias.recipient.toString, _timestamp, _signature)
+  } yield SignedLeaseV1Request(_alias.sender.toString, _alias.amount, _alias.fee, _alias.recipient.toString, _timestamp, _signature)
 
-  val leaseCancelReq: G[SignedLeaseCancelRequest] = for {
+  val leaseCancelReq: G[SignedLeaseCancelV1Request] = for {
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _cancel    <- leaseCancelGen
-  } yield SignedLeaseCancelRequest(_cancel.sender.toString, _cancel.leaseId.base58, _cancel.timestamp, _signature, _cancel.fee)
+  } yield SignedLeaseCancelV1Request(_cancel.sender.toString, _cancel.leaseId.base58, _cancel.timestamp, _signature, _cancel.fee)
 }
