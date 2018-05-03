@@ -4,6 +4,7 @@ import cats.implicits._
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.matcher.model.Events.OrderAdded
+import com.wavesplatform.state._
 import com.wavesplatform.utx.UtxPool
 import scorex.account.PublicKeyAccount
 import scorex.transaction.AssetAcc
@@ -19,7 +20,7 @@ trait OrderValidator {
   val settings: MatcherSettings
   val wallet: Wallet
 
-  lazy val matcherPubKey: PublicKeyAccount = wallet.findWallet(settings.account).right.get
+  lazy val matcherPubKey: PublicKeyAccount = wallet.findWallet(settings.account).explicitGet()
   val MinExpiration                        = 60 * 1000L
 
   def isBalanceWithOpenOrdersEnough(order: Order): Validation = {

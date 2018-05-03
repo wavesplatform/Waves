@@ -312,7 +312,7 @@ object LevelDBWriter {
     def addressScriptHistory(addressId: BigInt): Key[Seq[Int]] = historyKey(27, addressId.toByteArray)
 
     def addressScript(height: Int, addressId: BigInt): Key[Option[Script]] =
-      Key.opt(byteKeyWithH(28, height, addressId.toByteArray), ScriptReader.fromBytes(_).right.get, _.bytes().arr)
+      Key.opt(byteKeyWithH(28, height, addressId.toByteArray), ScriptReader.fromBytes(_).explicitGet(), _.bytes().arr)
 
     private def readFeatureMap(data: Array[Byte]): Map[Short, Int] = Option(data).fold(Map.empty[Short, Int]) { _ =>
       val b        = ByteBuffer.wrap(data)

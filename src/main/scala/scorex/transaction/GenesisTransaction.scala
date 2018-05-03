@@ -2,7 +2,7 @@ package scorex.transaction
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.crypto
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{ByteStr, _}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.Address
@@ -71,7 +71,7 @@ object GenesisTransaction extends TransactionParserFor[GenesisTransaction] with 
       position += TimestampLength
 
       val recipientBytes = java.util.Arrays.copyOfRange(bytes, position, position + RECIPIENT_LENGTH)
-      val recipient      = Address.fromBytes(recipientBytes).right.get
+      val recipient      = Address.fromBytes(recipientBytes).explicitGet()
       position += RECIPIENT_LENGTH
 
       val amountBytes = java.util.Arrays.copyOfRange(bytes, position, position + AmountLength)
