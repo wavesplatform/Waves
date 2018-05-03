@@ -4,7 +4,7 @@ import java.util
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.crypto
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
@@ -94,7 +94,7 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
 
       //READ RECIPIENT
       val recipientBytes = util.Arrays.copyOfRange(bytes, position, position + RecipientLength)
-      val recipient      = Address.fromBytes(recipientBytes).right.get
+      val recipient      = Address.fromBytes(recipientBytes).explicitGet()
       position += RecipientLength
 
       //READ AMOUNT
