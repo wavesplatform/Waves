@@ -170,7 +170,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
               }
         }).map {
           _ map {
-            case ((newBlockDiff, discarded)) =>
+            case (newBlockDiff, discarded) =>
               val height     = blockchain.height + 1
               val estimators = MiningEstimators(settings.minerSettings, blockchain, blockchain.height)
               ngState = Some(

@@ -6,6 +6,9 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.Blockchain
 import scorex.block.Block
+import scorex.transaction.assets.exchange.ExchangeTransaction
+import scorex.transaction.assets.{BurnTransaction, ReissueTransaction, SponsorFeeTransaction}
+import scorex.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import scorex.transaction.{Authorized, Transaction}
 
 trait Estimator {
@@ -27,13 +30,18 @@ case class ScriptRunNumberEstimator(max: Long, blockchain: Blockchain) extends E
       case _                                                                              => 0
     }
 
-    val smartTokenRun = for {
-      assetId <- x.assetFee._1
-      desc    <- blockchain.assetDescription(assetId)
-      _       <- desc.script
-    } yield 1
+    val assetIds = x match {
+      case x: TransferTransaction     => x.assetId.toSeq
+      case x: MassTransferTransaction => x.assetId.toSeq
+      case x: BurnTransaction         => Seq(x.assetId)
+      case x: ReissueTransaction      => Seq(x.assetId)
+      case x: SponsorFeeTransaction   => Seq(x.assetId)
+      case x: ExchangeTransaction     => Seq(x.buyOrder.assetPair.amountAsset, x.buyOrder.assetPair.priceAsset).flatten
+      case _                          => Seq.empty
+    }
 
-    smartAccountRun + smartTokenRun.getOrElse(0)
+    val smartTokenRuns = assetIds.flatMap(blockchain.assetDescription).flatMap(_.script)
+    smartAccountRun + smartTokenRuns.size
   }
 }
 
@@ -48,8 +56,8 @@ case class SizeEstimator(max: Long) extends Estimator {
 case class MiningEstimators(total: NonEmptyList[Estimator], keyBlock: Estimator, micro: Estimator)
 
 object MiningEstimators {
+  val MaxScriptRunsInBlock              = 100
   private val ClassicAmountOfTxsInBlock = 100
-  private val MaxScriptRunsInBlock      = 100
   private val MaxTxsSizeInBytes         = 1 * 1024 * 1024 // 1 megabyte
 
   def apply(minerSettings: MinerSettings, blockchain: Blockchain, height: Int): MiningEstimators = {
