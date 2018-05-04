@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{Instrumented, TxsInBlockchainStats}
-import com.wavesplatform.mining.{MiningEstimators, MultiDimensionalMiningConstraint}
+import com.wavesplatform.mining.MiningConstraints
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
@@ -171,10 +171,16 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
         }).map {
           _ map {
             case (newBlockDiff, discarded) =>
-              val height     = blockchain.height + 1
-              val estimators = MiningEstimators(settings.minerSettings, blockchain, blockchain.height)
+              val height         = blockchain.height + 1
+              val estimators     = MiningConstraints(settings.minerSettings, blockchain, blockchain.height)
+              val diffBlockchain = CompositeBlockchain.composite(blockchain, newBlockDiff)
               ngState = Some(
-                new NgState(block, newBlockDiff, featuresApprovedWithBlock(block), MultiDimensionalMiningConstraint.full(estimators.total))
+                new NgState(
+                  block,
+                  newBlockDiff,
+                  featuresApprovedWithBlock(block),
+                  estimators.total.put(diffBlockchain, block)
+                )
               )
               lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
               if ((block.timestamp > time
@@ -216,9 +222,11 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
             for {
               _    <- microBlock.signaturesValid()
               diff <- BlockDiffer.fromMicroBlock(functionalitySettings, this, blockchain.lastBlockTimestamp, microBlock, ng.base.timestamp)
-              _ <- Either.cond(ng.append(microBlock, diff, System.currentTimeMillis),
-                               (),
-                               MicroBlockAppendError("Limit of txs was reached", microBlock))
+              _ <- Either.cond(
+                ng.append(microBlock, diff, CompositeBlockchain.composite(blockchain, diff), System.currentTimeMillis),
+                (),
+                MicroBlockAppendError("Limit of txs was reached", microBlock)
+              )
             } yield {
               log.info(s"$microBlock appended")
               internalLastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, height, score, ready = true))

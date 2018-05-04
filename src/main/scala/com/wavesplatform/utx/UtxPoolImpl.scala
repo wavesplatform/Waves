@@ -124,9 +124,10 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
         case (curr @ (_, _, _, _, skip), _) if skip => curr
         case ((invalid, valid, diff, currRest, _), tx) =>
-          differ(composite(b, diff), tx) match {
+          val updatedBlockchain = composite(b, diff)
+          differ(updatedBlockchain, tx) match {
             case Right(newDiff) =>
-              val updatedRest = currRest.put(tx)
+              val updatedRest = currRest.put(updatedBlockchain, tx)
               if (updatedRest.isOverfilled) (invalid, valid, diff, currRest, true)
               else (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, updatedRest.isEmpty)
             case Left(_) =>

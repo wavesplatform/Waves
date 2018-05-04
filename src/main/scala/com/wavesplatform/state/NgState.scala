@@ -16,7 +16,7 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val approvedFeatures: Se
 
   private val MaxTotalDiffs = 3
 
-  private var constraint                              = baseConstraint.put(base)
+  private var constraint                              = baseConstraint
   private val microDiffs: MMap[BlockId, (Diff, Long)] = MMap.empty
   private val micros: MList[MicroBlock]               = MList.empty // fresh head
   private val totalBlockDiffCache = CacheBuilder
@@ -98,8 +98,8 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val approvedFeatures: Se
     BlockMinerInfo(base.consensusData, base.timestamp, blockId)
   }
 
-  def append(m: MicroBlock, diff: Diff, timestamp: Long): Boolean = {
-    val updatedConstraint = m.transactionData.foldLeft(constraint)(_.put(_))
+  def append(m: MicroBlock, diff: Diff, blockchain: Blockchain, timestamp: Long): Boolean = {
+    val updatedConstraint = m.transactionData.foldLeft(constraint)(_.put(blockchain, _))
     val successful        = !updatedConstraint.isOverfilled
     if (successful) {
       constraint = updatedConstraint

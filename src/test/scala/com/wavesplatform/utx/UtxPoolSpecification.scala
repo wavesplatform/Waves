@@ -426,13 +426,14 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     }
   }
 
-  private def limitByNumber(n: Int): MultiDimensionalMiningConstraint =
-    MultiDimensionalMiningConstraint.full(new CounterEstimator(n), new CounterEstimator(n))
+  private def limitByNumber(n: Int): MultiDimensionalMiningConstraint = MultiDimensionalMiningConstraint(
+    OneDimensionalMiningConstraint(n, CounterEstimator),
+    OneDimensionalMiningConstraint(n, CounterEstimator)
+  )
 
-  private class CounterEstimator(val max: Long) extends Estimator {
-    override implicit def estimate(x: Block): Long = x.transactionCount
-
-    override implicit def estimate(x: Transaction): Long = 1
+  private object CounterEstimator extends Estimator {
+    override implicit def estimate(blockchain: Blockchain, x: Block): Long       = x.transactionCount
+    override implicit def estimate(blockchain: Blockchain, x: Transaction): Long = 1
   }
 
 }

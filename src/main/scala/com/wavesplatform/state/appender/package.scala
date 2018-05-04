@@ -109,8 +109,8 @@ package object appender extends ScorexLogging {
       )
       _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
       _ <- {
-        val constraints = MiningEstimators(settings.minerSettings, blockchain, height)
-        Either.cond(!MultiDimensionalMiningConstraint.full(constraints.total).put(block).isOverfilled, (), GenericError("Block is full"))
+        val constraints = MiningConstraints(settings.minerSettings, blockchain, height)
+        Either.cond(!constraints.total.put(blockchain, block).isOverfilled, (), GenericError("Block is full"))
       }
       _ <- Either.cond(
         blockTime < fs.requireSortedTransactionsAfter

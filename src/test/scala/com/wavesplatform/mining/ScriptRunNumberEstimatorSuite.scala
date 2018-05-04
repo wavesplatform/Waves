@@ -17,16 +17,14 @@ class ScriptRunNumberEstimatorSuite extends FreeSpec with Matchers with PathMock
         val blockchain = stub[Blockchain]
         (blockchain.accountScript _).when(*).onCall((_: Address) => None).anyNumberOfTimes()
 
-        val estimator = ScriptRunNumberEstimator(100, blockchain)
-        estimator.estimate(transferWavesTx) shouldBe 0
+        ScriptRunNumberEstimator.estimate(blockchain, transferWavesTx) shouldBe 0
       }
 
       "should count transactions going from a smart account" in {
         val blockchain = stub[Blockchain]
         (blockchain.accountScript _).when(*).onCall((_: Address) => Some(script)).anyNumberOfTimes()
 
-        val estimator = ScriptRunNumberEstimator(100, blockchain)
-        estimator.estimate(transferWavesTx) shouldBe 1
+        ScriptRunNumberEstimator.estimate(blockchain, transferWavesTx) shouldBe 1
       }
     }
 
@@ -36,8 +34,7 @@ class ScriptRunNumberEstimatorSuite extends FreeSpec with Matchers with PathMock
         (blockchain.accountScript _).when(*).onCall((_: Address) => None).anyNumberOfTimes()
         (blockchain.assetDescription _).when(*).onCall((_: ByteStr) => None).anyNumberOfTimes()
 
-        val estimator = ScriptRunNumberEstimator(100, blockchain)
-        estimator.estimate(transferAssetsTx) shouldBe 0
+        ScriptRunNumberEstimator.estimate(blockchain, transferAssetsTx) shouldBe 0
       }
 
       "should count transactions working with smart tokens" in {
@@ -45,18 +42,17 @@ class ScriptRunNumberEstimatorSuite extends FreeSpec with Matchers with PathMock
         (blockchain.accountScript _).when(*).onCall((_: Address) => None).anyNumberOfTimes()
         (blockchain.assetDescription _).when(*).onCall((_: ByteStr) => Some(assetDescription)).anyNumberOfTimes()
 
-        val estimator = ScriptRunNumberEstimator(100, blockchain)
-        estimator.estimate(transferAssetsTx) shouldBe 1
+        ScriptRunNumberEstimator.estimate(blockchain, transferAssetsTx) shouldBe 1
       }
     }
 
     "should sum both types of transactions" in {
       val blockchain = stub[Blockchain]
-      (blockchain.accountScript _).when(*).onCall((_: Address) => None).anyNumberOfTimes()
+      (blockchain.accountScript _).when(*).onCall((_: Address) => Some(script)).anyNumberOfTimes()
       (blockchain.assetDescription _).when(*).onCall((_: ByteStr) => Some(assetDescription)).anyNumberOfTimes()
 
-      val estimator = ScriptRunNumberEstimator(100, blockchain)
-      estimator.estimate(TestBlock.create(Seq(transferWavesTx, transferAssetsTx))) shouldBe 2
+      // 3 because from one account, so transferAssetsTx is validated by both scripts
+      ScriptRunNumberEstimator.estimate(blockchain, TestBlock.create(Seq(transferWavesTx, transferAssetsTx))) shouldBe 3
     }
   }
 
