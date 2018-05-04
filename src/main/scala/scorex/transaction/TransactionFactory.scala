@@ -142,7 +142,7 @@ object TransactionFactory {
     for {
       pk <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- LeaseCancelTransactionV1.create(pk, ByteStr.decodeBase58(request.txId).get, request.fee, timestamp)
+      tx <- LeaseCancelTransactionV1.create(pk, ByteStr.decodeBase58(request.leaseId).get, request.fee, timestamp)
     } yield tx
 
   def leaseCancelV2(request: LeaseCancelV2Request, wallet: Wallet, time: Time): Either[ValidationError, LeaseCancelTransactionV2] =
@@ -152,7 +152,7 @@ object TransactionFactory {
       tx <- LeaseCancelTransactionV2.selfSigned(request.version,
                                                 AddressScheme.current.chainId,
                                                 pk,
-                                                ByteStr.decodeBase58(request.txId).get,
+                                                ByteStr.decodeBase58(request.leaseId).get,
                                                 request.fee,
                                                 timestamp)
     } yield tx

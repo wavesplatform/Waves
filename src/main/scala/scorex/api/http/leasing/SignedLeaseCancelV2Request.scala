@@ -3,6 +3,7 @@ package scorex.api.http.leasing
 import cats.implicits._
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json._
+import play.api.libs.functional.syntax._
 import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParsers.SignatureStringLength
@@ -34,5 +35,15 @@ case class SignedLeaseCancelV2Request(@ApiModelProperty(required = true)
     } yield _t
 }
 object SignedLeaseCancelV2Request {
-  implicit val broadcastLeaseRequestReadsFormat: Format[SignedLeaseCancelV2Request] = Json.format
+  implicit val reads: Reads[SignedLeaseCancelV2Request] = (
+    (JsPath \ "version").read[Byte] and
+      (JsPath \ "chainId").read[Byte] and
+      (JsPath \ "senderPublicKey").read[String] and
+      (JsPath \ "txId").read[String].orElse((JsPath \ "leaseId").read[String]) and
+      (JsPath \ "timestamp").read[Long] and
+      (JsPath \ "proofs").read[List[String]] and
+      (JsPath \ "fee").read[Long]
+  )(SignedLeaseCancelV2Request.apply _)
+
+  implicit val writes = Json.writes[SignedLeaseCancelV2Request]
 }

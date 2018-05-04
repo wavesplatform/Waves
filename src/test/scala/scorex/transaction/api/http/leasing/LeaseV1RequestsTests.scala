@@ -27,7 +27,7 @@ class LeaseV1RequestsTests extends FunSuite with Matchers {
       """
         {
           "sender": "3Myss6gmMckKYtka3cKCM563TBJofnxvfD7",
-          "txId": "ABMZDPY4MyQz7kKNAevw5P9eNmRErMutJoV9UNeCtqRV",
+          "leaseId": "ABMZDPY4MyQz7kKNAevw5P9eNmRErMutJoV9UNeCtqRV",
           "fee": 10000000
         }
       """

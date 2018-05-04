@@ -20,6 +20,8 @@ case class LeaseCancelTransactionV2 private (version: Byte,
     extends LeaseCancelTransaction
     with FastHashId {
 
+  override def chainByte: Option[Byte] = Some(chainId)
+
   override val builder: TransactionParser = LeaseCancelTransactionV2
 
   val bodyBytes: Coeval[Array[Byte]] =

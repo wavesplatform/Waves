@@ -11,12 +11,14 @@ import scorex.transaction.{AssetId, ProvenTransaction, ValidationError}
 
 trait LeaseCancelTransaction extends ProvenTransaction {
   def version: Byte
+  def chainByte: Option[Byte]
   def leaseId: ByteStr
   def fee: Long
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
+      "chainId"   -> chainByte,
       "version"   -> version,
       "fee"       -> fee,
       "timestamp" -> timestamp,
