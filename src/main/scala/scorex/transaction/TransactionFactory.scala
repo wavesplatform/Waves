@@ -152,7 +152,7 @@ object TransactionFactory {
       tx <- LeaseCancelTransactionV2.selfSigned(request.version,
                                                 AddressScheme.current.chainId,
                                                 pk,
-                                                ByteStr.decodeBase58(request.leaseId).get,
+                                                ByteStr.decodeBase58(request.txId).get,
                                                 request.fee,
                                                 timestamp)
     } yield tx
