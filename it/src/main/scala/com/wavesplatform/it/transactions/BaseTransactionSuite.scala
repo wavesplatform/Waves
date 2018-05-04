@@ -48,4 +48,11 @@ abstract class BaseTransactionSuite
     theNodes.run
     super.beforeAll()
   }
+
+//  protected def calcDataFee(data: List[DataEntry[_]], fee: Long = defaultFee): Long = {
+//    val dataSize = data.map(_.toBytes.length).sum + 128
+//    if (dataSize > 1024) {
+//      fee * (dataSize / 1024 + 1)
+//    } else fee
+//  }
 }
