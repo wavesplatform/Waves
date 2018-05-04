@@ -34,7 +34,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.alias.CreateAliasRequest",
+        dataType = "scorex.api.http.alias.CreateAliasV1Request",
         defaultValue = "{\n\t\"alias\": \"aliasalias\",\n\t\"sender\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n\t\"fee\": 100000\n}"
       )
     ))

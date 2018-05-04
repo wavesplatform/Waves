@@ -101,7 +101,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.assets.TransferRequest",
+        dataType = "scorex.api.http.assets.TransferV2Request",
         defaultValue =
           "{\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500,\"feeAssetId\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\",\"fee\":1579331567487095949,\"timestamp\":4231642878298810008}"
       )
@@ -149,7 +149,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.assets.IssueRequest",
+        dataType = "scorex.api.http.assets.IssueV1Request",
         defaultValue =
           "{\"sender\":\"string\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000,\"decimals\":7,\"reissuable\":false,\"fee\":100000000}"
       )
@@ -166,7 +166,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.assets.ReissueRequest",
+        dataType = "scorex.api.http.assets.ReissueV1Request",
         defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100000,\"reissuable\":false,\"fee\":1}"
       )
     ))
@@ -186,7 +186,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.assets.BurnRequest",
+        dataType = "scorex.api.http.assets.BurnV1Request",
         defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100,\"fee\":100000}"
       )
     ))
