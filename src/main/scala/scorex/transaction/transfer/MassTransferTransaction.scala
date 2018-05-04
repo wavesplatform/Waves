@@ -14,6 +14,7 @@ import scorex.transaction.ValidationError.Validation
 import scorex.transaction._
 import MassTransferTransaction.{ParsedTransfer, toJson}
 import scala.util.{Either, Failure, Success, Try}
+import com.wavesplatform.lang.v1.traits.{Transfer => TransferRepr}
 
 case class MassTransferTransaction private (version: Byte,
                                             assetId: Option[AssetId],
@@ -74,7 +75,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
 
   case class Transfer(recipient: String, amount: Long)
 
-  case class ParsedTransfer(address: AddressOrAlias, amount: Long)
+  case class ParsedTransfer(address: AddressOrAlias, amount: Long) extends TransferRepr
 
   implicit val transferFormat: Format[Transfer] = Json.format
 

@@ -20,6 +20,7 @@ object Serde {
   implicit def d0Option      = d0.bind[FunctionHeaderType.OPTION](7)
   implicit def d0TypeRef     = d0.bind[FunctionHeaderType.TYPEREF](8)
   implicit def d0String      = d0.bind[FunctionHeaderType.STRING.type](9)
+  implicit def d0List      = d0.bind[FunctionHeaderType.LIST](10)
 
   implicit def d                = Discriminated[Typed.EXPR, Int](uint8)
   implicit def dConstInt        = d.bind[Typed.CONST_LONG](0)
@@ -42,6 +43,7 @@ object Serde {
   implicit def tDOption     = tD.bind[OPTION](5)
   implicit def tDTypeRef    = tD.bind[TYPEREF](6)
   implicit def tDString     = tD.bind[STRING.type](7)
+  implicit def tDList     = tD.bind[LIST](8)
 
   val codec: Codec[Typed.EXPR] = Codec[Typed.EXPR]
 

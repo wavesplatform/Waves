@@ -30,6 +30,10 @@ object Terms {
     type Underlying = Option[innerType.Underlying]
     override def typeInfo: TypeInfo[Option[innerType.Underlying]] = TypeInfo.optionTypeInfo(innerType.typeInfo)
   }
+  case class LIST(innerType: TYPE) extends TYPE {
+    type Underlying = IndexedSeq[innerType.Underlying]
+    override def typeInfo: TypeInfo[IndexedSeq[innerType.Underlying]] = TypeInfo.listTypeInfo(innerType.typeInfo)
+  }
   case class TYPEREF(name: String) extends AUTO_TAGGED_TYPE[Obj]
 
   sealed trait BINARY_OP_KIND

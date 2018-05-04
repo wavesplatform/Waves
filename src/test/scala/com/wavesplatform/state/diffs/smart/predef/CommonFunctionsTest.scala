@@ -43,4 +43,12 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
     runScript[Long]("size(base58'')".stripMargin) shouldBe Right(0L)
     runScript[Long](s"size(base58'${ByteStr(arr).base58}')".stripMargin) shouldBe Right(3L)
   }
+
+  property("getTransfer should MassTransfer transfers extract") {
+    forAll(massTransferGen) {
+      case (massTransfer) =>
+        val result = runScript[Long]("extract(getTransfer(tx, 0)).amount", massTransfer)
+        result shouldBe Right(massTransfer.transfers(0).amount)
+    }
+  }
 }
