@@ -45,10 +45,14 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
   }
 
   property("getTransfer should MassTransfer transfers extract") {
-    forAll(massTransferGen) {
+    import scodec.bits.ByteVector
+    //import com.wavesplatform.lang.v1.ctx.Obj
+    forAll(massTransferGen.filter(_.transfers.size > 0)) {
       case (massTransfer) =>
-        val result = runScript[Long]("extract(getTransfer(tx, 0)).amount", massTransfer)
-        result shouldBe Right(massTransfer.transfers(0).amount)
+        val resultAmount = runScript[Long]("extract(getTransfer(tx, 0)).amount", massTransfer)
+        resultAmount shouldBe Right(massTransfer.transfers(0).amount)
+        val resultAddress = runScript[ByteVector]("let a = extract(getTransfer(tx, 0)).address (a.bytes)", massTransfer)
+        resultAddress shouldBe Right(ByteVector(massTransfer.transfers(0).address.bytes.arr))
     }
   }
 }

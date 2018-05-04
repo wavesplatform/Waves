@@ -4,7 +4,7 @@ import cats.data.EitherT
 import com.wavesplatform.lang.v1.EnvironmentFunctions
 import com.wavesplatform.lang.v1.Terms._
 import com.wavesplatform.lang.v1.ctx._
-import com.wavesplatform.lang.v1.traits.{DataType, Environment, Transaction, Transfer}
+import com.wavesplatform.lang.v1.traits.{DataType, Environment, Transaction, Transfer, AddressOrAlias}
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 
@@ -12,6 +12,13 @@ object WavesContext {
 
   private val addressType        = PredefType("Address", List("bytes"        -> BYTEVECTOR))
   private val addressOrAliasType = PredefType("AddressOrAlias", List("bytes" -> BYTEVECTOR))
+
+  private def addressOrAliasObject(address: AddressOrAlias): Obj =
+    Obj(
+      Map(
+        "bytes"       -> LazyVal(BYTEVECTOR)(EitherT.pure(address.byteVector))
+      )
+    )
 
   private val optionByteVector: OPTION = OPTION(BYTEVECTOR)
   private val optionAddress            = OPTION(addressType.typeRef)
@@ -30,7 +37,8 @@ object WavesContext {
   private def transferObject(tf: listTransfers.innerType.Underlying /*Transfer*/): Obj =
     Obj(
       Map(
-        "amount"       -> LazyVal(LONG)(EitherT.pure(tf.asInstanceOf[Transfer].amount))
+        "amount"       -> LazyVal(LONG)(EitherT.pure(tf.asInstanceOf[Transfer].amount)),
+        "address"      -> LazyVal(addressOrAliasType.typeRef)(EitherT.pure(addressOrAliasObject(tf.asInstanceOf[Transfer].address)))
       )
     )
 
