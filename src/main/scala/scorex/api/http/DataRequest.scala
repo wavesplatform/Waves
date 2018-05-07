@@ -5,7 +5,8 @@ import com.wavesplatform.state.DataEntry
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
-import scorex.transaction.{DataTransaction, Proofs, ValidationError}
+import scorex.transaction.data.DataTransactionV1
+import scorex.transaction.{Proofs, ValidationError}
 
 object DataRequest {
   implicit val unsignedDataRequestReads = Json.reads[DataRequest]
@@ -28,11 +29,11 @@ case class SignedDataRequest(@ApiModelProperty(required = true)
                              @ApiModelProperty(required = true)
                              proofs: List[String])
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, DataTransaction] =
+  def toTx: Either[ValidationError, DataTransactionV1] =
     for {
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      t           <- DataTransaction.create(version, _sender, data, fee, timestamp, _proofs)
+      t           <- DataTransactionV1.create(version, _sender, data, fee, timestamp, _proofs)
     } yield t
 }

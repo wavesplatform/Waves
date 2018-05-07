@@ -13,7 +13,7 @@ import scorex.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
 import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
-import scorex.transaction.{CreateAliasTransactionV1, DataTransaction, GenesisTransaction}
+import scorex.transaction.{CreateAliasTransactionV1, GenesisTransaction}
 
 class RollbackSpec extends FreeSpec with Matchers with WithState with TransactionGen with PropertyChecks with NoShrink {
   private val time   = new TestTime

@@ -10,6 +10,7 @@ import scorex.transaction.ValidationError._
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
+import scorex.transaction.data.DataTransactionV1
 import scorex.transaction.lease._
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
@@ -104,7 +105,7 @@ object CommonValidation {
       case _: LeaseCancelTransactionV1 => Right(tx)
       case _: CreateAliasTransactionV1 => Right(tx)
       case _: MassTransferTransaction  => activationBarrier(BlockchainFeatures.MassTransfer)
-      case _: DataTransaction          => activationBarrier(BlockchainFeatures.DataTransaction)
+      case _: DataTransactionV1        => activationBarrier(BlockchainFeatures.DataTransaction)
       case _: SetScriptTransaction     => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: TransferTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: IssueTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
@@ -145,7 +146,7 @@ object CommonValidation {
       case _: LeaseCancelTransaction   => Right(1)
       case _: ExchangeTransaction      => Right(3)
       case _: CreateAliasTransaction   => Right(1)
-      case tx: DataTransaction         => Right(1 + (tx.bytes().length - 1) / 1024)
+      case tx: DataTransactionV1       => Right(1 + (tx.bytes().length - 1) / 1024)
       case _: SetScriptTransaction     => Right(1)
       case _: SponsorFeeTransaction    => Right(1000)
       case _                           => Left(UnsupportedTransactionType)

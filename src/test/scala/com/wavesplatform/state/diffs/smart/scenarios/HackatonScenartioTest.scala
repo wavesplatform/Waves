@@ -17,11 +17,12 @@ import scorex.account.AddressScheme
 import scorex.transaction.assets.IssueTransactionV2
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.transfer._
-import scorex.transaction.{DataTransaction, GenesisTransaction}
+import scorex.transaction.GenesisTransaction
+import scorex.transaction.data.DataTransactionV1
 
 class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions: Gen[
-    (Seq[GenesisTransaction], IssueTransactionV2, DataTransaction, TransferTransactionV1, DataTransaction, DataTransaction, TransferTransactionV1)] =
+    (Seq[GenesisTransaction], IssueTransactionV2, DataTransactionV1, TransferTransactionV1, DataTransactionV1, DataTransactionV1, TransferTransactionV1)] =
     for {
       company  <- accountGen
       king     <- accountGen
@@ -74,7 +75,7 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
 
       assetId = issueTransaction.id()
 
-      kingDataTransaction = DataTransaction
+      kingDataTransaction = DataTransactionV1
         .selfSigned(1, king, List(BinaryDataEntry("notary1PK", ByteStr(notary.publicKey))), 1000, ts + 1)
         .explicitGet()
 
@@ -86,11 +87,11 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
         .create(Some(assetId), accountA, accountB, 1, ts + 30, None, 1000, Array.empty)
         .explicitGet()
 
-      notaryDataTransaction = DataTransaction
+      notaryDataTransaction = DataTransactionV1
         .selfSigned(1, notary, List(BooleanDataEntry(transferFromAToB.id().base58, true)), 1000, ts + 4)
         .explicitGet()
 
-      accountBDataTransaction = DataTransaction
+      accountBDataTransaction = DataTransactionV1
         .selfSigned(1, accountB, List(BooleanDataEntry(transferFromAToB.id().base58, true)), 1000, ts + 5)
         .explicitGet()
     } yield

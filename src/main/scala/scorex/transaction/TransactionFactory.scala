@@ -9,6 +9,7 @@ import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelV1Request, LeaseCancelV2Request, LeaseV1Request, LeaseV2Request}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets._
+import scorex.transaction.data.DataTransactionV1
 import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
@@ -215,11 +216,11 @@ object TransactionFactory {
                                          timestamp)
     } yield tx
 
-  def data(request: DataRequest, wallet: Wallet, time: Time): Either[ValidationError, DataTransaction] =
+  def data(request: DataRequest, wallet: Wallet, time: Time): Either[ValidationError, DataTransactionV1] =
     for {
       pk <- wallet.findWallet(request.sender)
       timestamp = request.timestamp.getOrElse(time.getTimestamp())
-      tx <- DataTransaction.selfSigned(request.version, pk, request.data, request.fee, timestamp)
+      tx <- DataTransactionV1.selfSigned(request.version, pk, request.data, request.fee, timestamp)
     } yield tx
 
   def sponsor(request: SponsorFeeRequest, wallet: Wallet, time: Time): Either[ValidationError, SponsorFeeTransaction] =

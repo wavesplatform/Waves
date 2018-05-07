@@ -18,6 +18,7 @@ import scorex.transaction._
 import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
+import scorex.transaction.data.DataTransactionV1
 import scorex.transaction.lease._
 import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
@@ -572,7 +573,7 @@ trait TransactionGenBase extends ScriptGen {
     } yield GenesisTransaction.create(recipient, amt, ts).right.get
 
   import DataEntry.{MaxKeySize, MaxValueSize}
-  import DataTransaction.MaxEntryCount
+  import DataTransactionV1.MaxEntryCount
 
   val dataKeyGen = for {
     size <- Gen.choose[Byte](0, MaxKeySize)
@@ -604,24 +605,24 @@ trait TransactionGenBase extends ScriptGen {
   val dataEntryGen = Gen.oneOf(longEntryGen(), booleanEntryGen(), binaryEntryGen())
 
   val dataTransactionGen = {
-    import DataTransaction.MaxEntryCount
+    import DataTransactionV1.MaxEntryCount
 
     (for {
       sender    <- accountGen
       timestamp <- timestampGen
       size      <- Gen.choose(0, MaxEntryCount)
       data      <- Gen.listOfN(size, dataEntryGen)
-      version   <- Gen.oneOf(DataTransaction.supportedVersions.toSeq)
-    } yield DataTransaction.selfSigned(version, sender, data, 15000000, timestamp).right.get)
+      version   <- Gen.oneOf(DataTransactionV1.supportedVersions.toSeq)
+    } yield DataTransactionV1.selfSigned(version, sender, data, 15000000, timestamp).right.get)
       .label("DataTransaction")
   }
 
-  def dataTransactionGenP(sender: PrivateKeyAccount, data: List[DataEntry[_]]): Gen[DataTransaction] =
+  def dataTransactionGenP(sender: PrivateKeyAccount, data: List[DataEntry[_]]): Gen[DataTransactionV1] =
     (for {
-      version   <- Gen.oneOf(DataTransaction.supportedVersions.toSeq)
+      version   <- Gen.oneOf(DataTransactionV1.supportedVersions.toSeq)
       timestamp <- timestampGen
       size      <- Gen.choose(0, MaxEntryCount)
-    } yield DataTransaction.selfSigned(version, sender, data, 15000000, timestamp).right.get)
+    } yield DataTransactionV1.selfSigned(version, sender, data, 15000000, timestamp).right.get)
       .label("DataTransactionP")
 
   def preconditionsTransferAndLease(typed: Typed.EXPR): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransactionV1)] =

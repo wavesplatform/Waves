@@ -21,6 +21,7 @@ import scorex.api.http.leasing._
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.transaction.assets._
+import scorex.transaction.data.DataTransactionParser
 import scorex.transaction.lease._
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
@@ -185,7 +186,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case LeaseCancelTransactionV2 => TransactionFactory.leaseCancelV2(jsv.as[LeaseCancelV2Request], wallet, time)
               case CreateAliasTransactionV1 => TransactionFactory.aliasV1(jsv.as[CreateAliasV1Request], wallet, time)
               case CreateAliasTransactionV2 => TransactionFactory.aliasV2(jsv.as[CreateAliasV2Request], wallet, time)
-              case DataTransaction          => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
+              case DataTransactionParser    => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
               case SetScriptTransaction     => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
               case SponsorFeeTransaction    => TransactionFactory.sponsor(jsv.as[SponsorFeeRequest], wallet, time)
             }
@@ -233,7 +234,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case LeaseCancelTransactionV2 => jsv.as[SignedLeaseCancelV2Request].toTx
               case CreateAliasTransactionV1 => jsv.as[SignedCreateAliasV1Request].toTx
               case CreateAliasTransactionV2 => jsv.as[SignedCreateAliasV2Request].toTx
-              case DataTransaction          => jsv.as[SignedDataRequest].toTx
+              case DataTransactionParser    => jsv.as[SignedDataRequest].toTx
               case SetScriptTransaction     => jsv.as[SignedSetScriptRequest].toTx
               case SponsorFeeTransaction    => jsv.as[SignedSponsorFeeRequest].toTx
 
