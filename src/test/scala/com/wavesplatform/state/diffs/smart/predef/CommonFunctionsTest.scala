@@ -53,6 +53,8 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
         resultAmount shouldBe Right(massTransfer.transfers(0).amount)
         val resultAddress = runScript[ByteVector]("let a = extract(getTransfer(tx, 0)).address (a.bytes)", massTransfer)
         resultAddress shouldBe Right(ByteVector(massTransfer.transfers(0).address.bytes.arr))
+        val resultLen = runScript[Long]("tx.transfersNumber", massTransfer)
+        resultLen shouldBe Right(massTransfer.transfers.size.toLong)
     }
   }
 }

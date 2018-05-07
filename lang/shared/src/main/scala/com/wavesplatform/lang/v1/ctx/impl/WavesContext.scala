@@ -73,7 +73,8 @@ object WavesContext {
       "assetId"          -> BYTEVECTOR,
       "recipient"        -> addressOrAliasType.typeRef,
       "minSponsoredAssetFee"           -> optionLong,
-      "transfers"        -> LIST(transferType.typeRef)
+      "transfers"        -> LIST(transferType.typeRef),
+      "transfersNumber"  -> LONG
     )
   )
   private def proofBinding(tx: Transaction, x: Int): LazyVal =
@@ -108,6 +109,7 @@ object WavesContext {
         "version"          -> LazyVal(LONG)(EitherT.fromEither(tx.version.map(_.toLong))),
         "minSponsoredAssetFee"     -> LazyVal(optionLong)(EitherT.fromEither(tx.minSponsoredAssetFee.map(_.asInstanceOf[optionLong.Underlying]))),
         "transfers"        -> LazyVal(listTransfers)(EitherT.fromEither( tx.transfers.map(_.asInstanceOf[listTransfers.Underlying]))),
+        "transfersNumber"  -> LazyVal(LONG)(EitherT.fromEither( tx.transfers.map(_.size.toLong))),
         "proof0"           -> proofBinding(tx, 0),
         "proof1"           -> proofBinding(tx, 1),
         "proof2"           -> proofBinding(tx, 2),
