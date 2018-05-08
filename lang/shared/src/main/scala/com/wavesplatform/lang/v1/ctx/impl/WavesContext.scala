@@ -21,6 +21,7 @@ object WavesContext {
     )
 
   private val optionByteVector: OPTION = OPTION(BYTEVECTOR)
+  private val listByteVector: LIST = LIST(BYTEVECTOR)
   private val optionAddress            = OPTION(addressType.typeRef)
   private val optionLong: OPTION = OPTION(LONG)
 
@@ -69,6 +70,7 @@ object WavesContext {
       "proof5"           -> BYTEVECTOR,
       "proof6"           -> BYTEVECTOR,
       "proof7"           -> BYTEVECTOR,
+      "proofs"           -> listByteVector,
       "transferAssetId"  -> optionByteVector,
       "assetId"          -> BYTEVECTOR,
       "recipient"        -> addressOrAliasType.typeRef,
@@ -115,7 +117,8 @@ object WavesContext {
         "proof4"           -> proofBinding(tx, 4),
         "proof5"           -> proofBinding(tx, 5),
         "proof6"           -> proofBinding(tx, 6),
-        "proof7"           -> proofBinding(tx, 7)
+        "proof7"           -> proofBinding(tx, 7),
+        "proofs"           -> LazyVal(listByteVector)(EitherT.fromEither(tx.proofs.map(_.asInstanceOf[listByteVector.Underlying])))
       ))
 
   def build(env: Environment): Context = {
