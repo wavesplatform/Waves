@@ -4,6 +4,7 @@ import com.wavesplatform.settings.{FeesSettings, FunctionalitySettings}
 import com.wavesplatform.state._
 import scorex.transaction.FeeCalculator._
 import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.data.DataTransaction
 import scorex.transaction.transfer._
 
 class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {

@@ -14,7 +14,8 @@ import scodec.bits.{BitVector, ByteVector}
 import scorex.account.AddressScheme
 import scorex.block.Block
 import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.{Authorized, CreateAliasTransactionV1, DataTransaction, Transaction}
+import scorex.transaction.data.DataTransactionV1
+import scorex.transaction.{Authorized, CreateAliasTransactionV1, Transaction}
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
@@ -101,7 +102,7 @@ object ExtractInfo extends App with ScorexLogging {
       b <- nonEmptyBlocks(benchSettings.dataFromHeight)
       test <- b.transactionData
         .collect {
-          case tx: DataTransaction =>
+          case tx: DataTransactionV1 =>
             val addr = ByteVector(tx.sender.toAddress.bytes.arr)
             tx.data.collectFirst {
               case x: LongDataEntry    => DataTestData(addr, x.key, DataType.Long)

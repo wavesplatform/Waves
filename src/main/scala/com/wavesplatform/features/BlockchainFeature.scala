@@ -11,6 +11,7 @@ object BlockchainFeatures {
   val DataTransaction                 = BlockchainFeature(5, "Data Transaction")
   val BurnAnyTokens                   = BlockchainFeature(6, "Burn Any Tokens")
   val FeeSponsorship                  = BlockchainFeature(7, "Fee Sponsorship")
+  val DataTransactionV2               = BlockchainFeature(8, "Data Transaction V2")
 
   private val dict = Seq(
     SmallerMinimalGeneratingBalance,
@@ -18,6 +19,7 @@ object BlockchainFeatures {
     MassTransfer,
     SmartAccounts,
     DataTransaction,
+    DataTransactionV2,
     BurnAnyTokens,
     FeeSponsorship
   ).map(f => f.id -> f).toMap

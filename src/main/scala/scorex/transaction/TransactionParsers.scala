@@ -4,6 +4,7 @@ import com.wavesplatform.utils.base58Length
 import scorex.crypto.signatures.Curve25519
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
+import scorex.transaction.data.DataTransactionParser
 import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
@@ -34,7 +35,7 @@ object TransactionParsers {
   }(collection.breakOut)
 
   private val modern: Map[(Byte, Byte), TransactionParser] = Seq[TransactionParser](
-    DataTransaction,
+    DataTransactionParser,
     TransferTransactionV2,
     SetScriptTransaction,
     IssueTransactionV2,

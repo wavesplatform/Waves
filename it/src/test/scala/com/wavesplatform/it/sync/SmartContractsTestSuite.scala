@@ -1,20 +1,19 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.crypto
-import com.wavesplatform.it.transactions.BaseTransactionSuite
-import org.scalatest.CancelAfterFailure
-import scorex.account.{AddressScheme, PrivateKeyAccount}
-import com.wavesplatform.it.util._
 import com.wavesplatform.it.api.SyncHttpApi._
-import play.api.libs.json.JsNumber
+import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.{Parser, TypeChecker}
-import com.wavesplatform.utils.dummyTypeCheckerContext
 import com.wavesplatform.state._
+import com.wavesplatform.utils.dummyTypeCheckerContext
+import org.scalatest.CancelAfterFailure
+import play.api.libs.json.JsNumber
+import scorex.account.PrivateKeyAccount
 import scorex.transaction.Proofs
-import scorex.transaction.transfer._
-import scorex.transaction.lease.LeaseCancelTransactionV2
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.transfer._
 
 class SmartContractsTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   private def pkFromAddress(address: String) = PrivateKeyAccount.fromSeed(sender.seed(address)).right.get

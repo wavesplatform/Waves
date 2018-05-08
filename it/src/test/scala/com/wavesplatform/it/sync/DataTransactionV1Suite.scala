@@ -9,12 +9,12 @@ import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
 import scorex.api.http.SignedDataRequest
 import scorex.crypto.encode.Base58
-import scorex.transaction.DataTransaction
+import scorex.transaction.data.{DataTransaction, DataTransactionParser, DataTransactionV1}
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Try}
 
-class DataTransactionSuite extends BaseTransactionSuite {
+class DataTransactionV1Suite extends BaseTransactionSuite {
   private val fee = 100000
 
   test("sender's waves balance is decreased by fee.") {
@@ -49,18 +49,19 @@ class DataTransactionSuite extends BaseTransactionSuite {
     def data(entries: List[DataEntry[_]] = List(LongDataEntry("int", 177)),
              fee: Long = 100000,
              timestamp: Long = System.currentTimeMillis,
-             version: Byte = DataTransaction.supportedVersions.head): DataTransaction =
-      DataTransaction.selfSigned(version, sender.privateKey, entries, fee, timestamp).right.get
+             version: Byte = DataTransactionParser.supportedVersions.head): DataTransactionV1 =
+      DataTransactionV1.selfSigned(version, sender.privateKey, entries, fee, timestamp).right.get
 
-    def request(tx: DataTransaction): SignedDataRequest =
-      SignedDataRequest(DataTransaction.supportedVersions.head,
+    def request(tx: DataTransactionV1): SignedDataRequest =
+      SignedDataRequest(DataTransactionParser.supportedVersions.head,
                         Base58.encode(tx.sender.publicKey),
+                        None,
                         tx.data,
                         tx.fee,
                         tx.timestamp,
                         tx.proofs.base58().toList)
 
-    implicit val w = Json.writes[SignedDataRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(DataTransaction.typeId)))
+    implicit val w = Json.writes[SignedDataRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(DataTransactionParser.typeId)))
 
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val invalidTxs = Seq(
@@ -79,7 +80,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
   test("max transaction size") {
     import DataEntry.{MaxKeySize, MaxValueSize}
-    import DataTransaction.MaxEntryCount
+    import scorex.transaction.data.DataTransaction.MaxEntryCount
 
     val maxKey = "\u6fae" * MaxKeySize
     val data   = List.tabulate(MaxEntryCount)(n => BinaryDataEntry(maxKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
@@ -215,7 +216,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
       val rs = sender.postJsonWithApiKey(
         "/transactions/sign",
         Json.obj("version" -> 1,
-                 "type"    -> DataTransaction.typeId,
+                 "type"    -> DataTransactionParser.typeId,
                  "sender"  -> firstAddress,
                  "data"    -> List(LongDataEntry("int", 333)),
                  "fee"     -> 100000)
@@ -240,7 +241,6 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
   test("try to send tx above limits of key, value and size") {
     import DataEntry.{MaxKeySize, MaxValueSize}
-    import DataTransaction.MaxEntryCount
 
     val message  = "Too big sequences requested"
     val extraKey = "a" * (MaxKeySize + 1)
@@ -253,7 +253,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, calcDataFee(extraValueData)), message)
     nodes.waitForHeightArise()
 
-    val extraSizedData = List.tabulate(MaxEntryCount + 1)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
+    val extraSizedData = List.tabulate(DataTransaction.MaxEntryCount + 1)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
     assertBadRequestAndResponse(sender.putData(firstAddress, extraSizedData, calcDataFee(extraSizedData)), message)
     nodes.waitForHeightArise()
   }

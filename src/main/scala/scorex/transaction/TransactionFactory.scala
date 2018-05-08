@@ -10,6 +10,7 @@ import scorex.api.http.leasing.{LeaseCancelV1Request, LeaseCancelV2Request, Leas
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets._
+import scorex.transaction.data.{DataTransaction, DataTransactionV1}
 import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
@@ -260,7 +261,7 @@ object TransactionFactory {
     wallet.findWallet(request.sender).flatMap(data(request, _, time))
 
   def data(request: DataRequest, senderPrivateKey: PrivateKeyAccount, time: Time): Either[ValidationError, DataTransaction] =
-    DataTransaction.selfSigned(
+    DataTransactionV1.selfSigned(
       request.version,
       senderPrivateKey,
       request.data,
