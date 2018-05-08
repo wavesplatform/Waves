@@ -4,7 +4,7 @@ import com.wavesplatform.settings.{FeesSettings, FunctionalitySettings}
 import com.wavesplatform.state._
 import scorex.transaction.FeeCalculator._
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.data.DataTransactionV1
+import scorex.transaction.data.DataTransaction
 import scorex.transaction.transfer._
 
 class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
@@ -44,7 +44,7 @@ class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
   }
 
   private def minFeeFor(tx: Transaction, txFeeAssetId: Option[AssetId], txMinBaseFee: Long): Long = tx match {
-    case tx: DataTransactionV1 =>
+    case tx: DataTransaction =>
       val sizeInKb = 1 + (tx.bytes().length - 1) / Kb
       txMinBaseFee * sizeInKb
     case tx: MassTransferTransaction =>

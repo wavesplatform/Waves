@@ -301,7 +301,7 @@ object AsyncHttpApi extends Assertions {
 
     def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Future[Transaction] = {
       implicit val w: Writes[DataRequest] = Json.writes[DataRequest]
-      postJson("/addresses/data", DataRequest(1, sourceAddress, data, fee)).as[Transaction]
+      postJson("/addresses/data", DataRequest(1, sourceAddress, None, data, fee)).as[Transaction]
     }
 
     def getData(address: String): Future[List[DataEntry[_]]] = get(s"/addresses/data/$address").as[List[DataEntry[_]]]

@@ -10,7 +10,7 @@ import scorex.transaction.ValidationError._
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.data.DataTransactionV1
+import scorex.transaction.data.{DataTransaction, DataTransactionV1, DataTransactionV2}
 import scorex.transaction.lease._
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
@@ -114,6 +114,7 @@ object CommonValidation {
       case _: LeaseTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: LeaseCancelTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: CreateAliasTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: DataTransactionV2        => activationBarrier(BlockchainFeatures.DataTransactionV2)
       case _: SponsorFeeTransaction    => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _                           => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
@@ -146,7 +147,7 @@ object CommonValidation {
       case _: LeaseCancelTransaction   => Right(1)
       case _: ExchangeTransaction      => Right(3)
       case _: CreateAliasTransaction   => Right(1)
-      case tx: DataTransactionV1       => Right(1 + (tx.bytes().length - 1) / 1024)
+      case _: DataTransaction          => Right(1 + (tx.bytes().length - 1) / 1024)
       case _: SetScriptTransaction     => Right(1)
       case _: SponsorFeeTransaction    => Right(1000)
       case _                           => Left(UnsupportedTransactionType)

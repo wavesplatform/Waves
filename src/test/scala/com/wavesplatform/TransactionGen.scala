@@ -9,20 +9,21 @@ import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import scorex.transaction.data.DataTransaction.MaxEntryCount
 import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import scorex.account.PublicKeyAccount._
 import scorex.account._
 import scorex.transaction._
-import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
-import scorex.transaction.data.DataTransactionV1
+import scorex.transaction.data.{DataTransaction, DataTransactionParser, DataTransactionV1, DataTransactionV2}
 import scorex.transaction.lease._
+import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.transfer._
 import scorex.utils.TimeImpl
 
@@ -573,7 +574,6 @@ trait TransactionGenBase extends ScriptGen {
     } yield GenesisTransaction.create(recipient, amt, ts).right.get
 
   import DataEntry.{MaxKeySize, MaxValueSize}
-  import DataTransactionV1.MaxEntryCount
 
   val dataKeyGen = for {
     size <- Gen.choose[Byte](0, MaxKeySize)
@@ -604,26 +604,36 @@ trait TransactionGenBase extends ScriptGen {
 
   val dataEntryGen = Gen.oneOf(longEntryGen(), booleanEntryGen(), binaryEntryGen())
 
-  val dataTransactionGen = {
-    import DataTransactionV1.MaxEntryCount
+  val dataTransactionGen: Gen[DataTransaction] = {
+    import scorex.transaction.data.DataTransaction.MaxEntryCount
 
     (for {
       sender    <- accountGen
       timestamp <- timestampGen
       size      <- Gen.choose(0, MaxEntryCount)
       data      <- Gen.listOfN(size, dataEntryGen)
-      version   <- Gen.oneOf(DataTransactionV1.supportedVersions.toSeq)
-    } yield DataTransactionV1.selfSigned(version, sender, data, 15000000, timestamp).right.get)
-      .label("DataTransaction")
+      recipient <- Gen.option(Gen.oneOf(accountGen.map(_.toAddress), aliasGen))
+      fee       <- smallFeeGen
+      version   <- Gen.oneOf(DataTransactionParser.supportedVersions.toSeq)
+    } yield {
+      version match {
+        case 1 => DataTransactionV1.selfSigned(1, sender, data, fee, timestamp).explicitGet()
+        case 2 => DataTransactionV2.selfSigned(2, sender, recipient, data, fee, timestamp).explicitGet()
+      }
+    }).label("DataTransaction")
   }
 
-  def dataTransactionGenP(sender: PrivateKeyAccount, data: List[DataEntry[_]]): Gen[DataTransactionV1] =
+  def dataTransactionGenP(sender: PrivateKeyAccount, data: List[DataEntry[_]]): Gen[DataTransaction] =
     (for {
-      version   <- Gen.oneOf(DataTransactionV1.supportedVersions.toSeq)
+      version   <- Gen.oneOf(DataTransactionParser.supportedVersions.toSeq)
       timestamp <- timestampGen
       size      <- Gen.choose(0, MaxEntryCount)
-    } yield DataTransactionV1.selfSigned(version, sender, data, 15000000, timestamp).right.get)
-      .label("DataTransactionP")
+    } yield {
+      version match {
+        case 1 => DataTransactionV1.selfSigned(version, sender, data, 15000000, timestamp).right.get
+        case 2 => DataTransactionV2.selfSigned(version, sender, None, data, 15000000, timestamp).right.get
+      }
+    }).label("DataTransactionP")
 
   def preconditionsTransferAndLease(typed: Typed.EXPR): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransactionV1)] =
     for {

@@ -10,11 +10,16 @@ import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock.{create => block}
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.data.DataTransactionV1
+import scorex.transaction.data.{DataTransaction, DataTransactionParser, DataTransactionV1, DataTransactionV2}
 
 class DataTransactionV1DiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
-  val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.DataTransaction.id -> 0))
+  val fs = TestFunctionalitySettings.Enabled.copy(
+    preActivatedFeatures = Map(
+      BlockchainFeatures.DataTransaction.id   -> 0,
+      BlockchainFeatures.DataTransactionV2.id -> 0,
+    )
+  )
 
   val baseSetup: Gen[(GenesisTransaction, PrivateKeyAccount, Long)] = for {
     master <- accountGen
@@ -22,9 +27,12 @@ class DataTransactionV1DiffTest extends PropSpec with PropertyChecks with Matche
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
   } yield (genesis, master, ts)
 
-  def data(version: Byte, sender: PrivateKeyAccount, data: List[DataEntry[_]], fee: Long, timestamp: Long): DataTransactionV1 =
-    DataTransactionV1.selfSigned(version, sender, data, fee, timestamp).right.get
-
+  def data(version: Byte, sender: PrivateKeyAccount, data: List[DataEntry[_]], fee: Long, timestamp: Long): DataTransaction = {
+    version match {
+      case 1 => DataTransactionV1.selfSigned(version, sender, data, fee, timestamp).right.get
+      case 2 => DataTransactionV2.selfSigned(version, sender, None, data, fee, timestamp).right.get
+    }
+  }
   property("state invariants hold") {
     val setup = for {
       (genesis, master, ts) <- baseSetup
@@ -33,20 +41,20 @@ class DataTransactionV1DiffTest extends PropSpec with PropertyChecks with Matche
       value1 <- positiveLongGen
       item1 = LongDataEntry(key1, value1)
       fee1     <- smallFeeGen
-      version1 <- Gen.oneOf(DataTransactionV1.supportedVersions.toSeq)
+      version1 <- Gen.oneOf(DataTransactionParser.supportedVersions.toSeq)
       dataTx1 = data(version1, master, List(item1), fee1, ts + 10000)
 
       key2   <- validAliasStringGen
       value2 <- Arbitrary.arbitrary[Boolean]
       item2 = BooleanDataEntry(key2, value2)
       fee2     <- smallFeeGen
-      version2 <- Gen.oneOf(DataTransactionV1.supportedVersions.toSeq)
+      version2 <- Gen.oneOf(DataTransactionParser.supportedVersions.toSeq)
       dataTx2 = data(version2, master, List(item2), fee2, ts + 20000)
 
       value3 <- positiveLongGen
       item3 = LongDataEntry(key1, value3)
       fee3     <- smallFeeGen
-      version3 <- Gen.oneOf(DataTransactionV1.supportedVersions.toSeq)
+      version3 <- Gen.oneOf(DataTransactionParser.supportedVersions.toSeq)
       dataTx3 = data(version3, master, List(item3), fee3, ts + 30000)
     } yield (genesis, Seq(item1, item2, item3), Seq(dataTx1, dataTx2, dataTx3))
 
@@ -95,7 +103,7 @@ class DataTransactionV1DiffTest extends PropSpec with PropertyChecks with Matche
       key                   <- validAliasStringGen
       value                 <- bytes64gen
       feeOverhead           <- Gen.choose[Long](1, ENOUGH_AMT)
-      version               <- Gen.oneOf(DataTransactionV1.supportedVersions.toSeq)
+      version               <- Gen.oneOf(DataTransactionParser.supportedVersions.toSeq)
       dataTx = data(version, master, List(BinaryDataEntry(key, ByteStr(value))), ENOUGH_AMT + feeOverhead, ts + 10000)
     } yield (genesis, dataTx)
 
@@ -111,7 +119,7 @@ class DataTransactionV1DiffTest extends PropSpec with PropertyChecks with Matche
     val setup = for {
       (genesis, master, ts) <- baseSetup
       fee                   <- smallFeeGen
-      version               <- Gen.oneOf(DataTransactionV1.supportedVersions.toSeq)
+      version               <- Gen.oneOf(DataTransactionParser.supportedVersions.toSeq)
       dataTx = data(version, master, List(), fee, ts + 10000)
     } yield (genesis, dataTx)
     val settings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.DataTransaction.id -> 10))
@@ -119,7 +127,7 @@ class DataTransactionV1DiffTest extends PropSpec with PropertyChecks with Matche
     forAll(setup) {
       case (genesis, data) =>
         assertDiffEi(Seq(block(Seq(genesis))), block(Seq(data)), settings) { blockDiffEi =>
-          blockDiffEi should produce("DataTransaction transaction has not been activated")
+          blockDiffEi should produce("transaction has not been activated")
         }
     }
   }

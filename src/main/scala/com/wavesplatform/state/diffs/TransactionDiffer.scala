@@ -6,7 +6,7 @@ import scorex.transaction.ValidationError.UnsupportedTransactionType
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.data.DataTransactionV1
+import scorex.transaction.data.DataTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.{SetScriptTransaction, Verifier}
 import scorex.transaction.transfer._
@@ -38,7 +38,7 @@ object TransactionDiffer {
         case ltx: LeaseCancelTransaction  => LeaseTransactionsDiff.leaseCancel(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(ltx)
         case etx: ExchangeTransaction     => ExchangeTransactionDiff(blockchain, currentBlockHeight)(etx)
         case atx: CreateAliasTransaction  => CreateAliasTransactionDiff(currentBlockHeight)(atx)
-        case dtx: DataTransactionV1       => DataTransactionDiff(blockchain, currentBlockHeight)(dtx)
+        case dtx: DataTransaction         => DataTransactionDiff(blockchain, currentBlockHeight)(dtx)
         case sstx: SetScriptTransaction   => SetScriptTransactionDiff(currentBlockHeight)(sstx)
         case stx: SponsorFeeTransaction   => AssetTransactionsDiff.sponsor(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(stx)
         case _                            => Left(UnsupportedTransactionType)

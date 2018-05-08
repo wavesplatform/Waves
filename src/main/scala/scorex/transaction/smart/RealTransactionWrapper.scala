@@ -4,7 +4,7 @@ import scodec.bits.ByteVector
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.data.DataTransactionV1
+import scorex.transaction.data.{DataTransaction, DataTransactionV1}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.transfer._
 
@@ -63,7 +63,7 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
     case _: SetScriptTransaction    => Left("Transaction doesn't contain amount")
     case _: MassTransferTransaction => Left("Transaction doesn't contain amount")
     case _: LeaseCancelTransaction  => Left("Transaction doesn't contain amount")
-    case _: DataTransactionV1       => Left("Transaction doesn't contain amount")
+    case _: DataTransaction         => Left("Transaction doesn't contain amount")
   }
 
   override def feeAssetId: Option[ByteVector] =
@@ -114,7 +114,7 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
     case g: MassTransferTransaction => Right(g.version)
     case g: SetScriptTransaction    => Right(g.version)
     case g: IssueTransactionV2      => Right(g.version)
-    case g: DataTransactionV1       => Right(g.version)
+    case g: DataTransaction         => Right(g.version)
     case g: SponsorFeeTransaction   => Right(g.version)
     case _                          => Left("Transaction doesn't contain version")
   }

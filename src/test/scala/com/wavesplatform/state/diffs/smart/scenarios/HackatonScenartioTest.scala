@@ -21,8 +21,13 @@ import scorex.transaction.GenesisTransaction
 import scorex.transaction.data.DataTransactionV1
 
 class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
-  val preconditions: Gen[
-    (Seq[GenesisTransaction], IssueTransactionV2, DataTransactionV1, TransferTransactionV1, DataTransactionV1, DataTransactionV1, TransferTransactionV1)] =
+  val preconditions: Gen[(Seq[GenesisTransaction],
+                          IssueTransactionV2,
+                          DataTransactionV1,
+                          TransferTransactionV1,
+                          DataTransactionV1,
+                          DataTransactionV1,
+                          TransferTransactionV1)] =
     for {
       company  <- accountGen
       king     <- accountGen

@@ -16,7 +16,7 @@ import scorex.transaction.Transaction.Type
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.data.DataTransactionV1
+import scorex.transaction.data.DataTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.{Script, ScriptReader}
@@ -706,7 +706,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
                 rw.filterHistory(k.addressScriptHistory(addressId), currentHeight)
               }
 
-            case tx: DataTransactionV1 =>
+            case tx: DataTransaction =>
               val address = tx.sender.toAddress
               addressIdCache.get(address).foreach { addressId =>
                 tx.data.foreach { e =>

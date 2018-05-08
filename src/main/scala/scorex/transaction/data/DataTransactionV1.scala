@@ -17,7 +17,7 @@ case class DataTransactionV1 private (version: Byte, sender: PublicKeyAccount, d
 
   override val builder: TransactionParser = DataTransactionParser
 
-  override val bodyBytes: Coeval[Array[Byte]] = baseBytes.map(bb => version +: builder.typeId +: bb)
+  override val bodyBytes: Coeval[Array[Byte]] = baseBytes.map(bb => Bytes.concat(Array(builder.typeId, version), bb))
 
   implicit val dataItemFormat: Format[DataEntry[_]] = DataEntry.Format
 

@@ -21,7 +21,7 @@ final case class DataTransactionV2 private (version: Byte,
   override def builder: TransactionParser = DataTransactionParser
 
   override val bodyBytes: Coeval[Array[Byte]] =
-    baseBytes.map(bb => version +: builder.typeId +: bb)
+    baseBytes.map(bb => Bytes.concat(Array(builder.typeId, version), bb))
 
   override val bytes: Coeval[Array[Byte]] =
     (bodyBytes, proofs.bytes)

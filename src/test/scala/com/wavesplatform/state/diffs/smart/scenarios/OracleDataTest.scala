@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.v1.{Parser, TypeChecker}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
@@ -10,14 +11,23 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.data.DataTransactionV1
+import scorex.settings.TestFunctionalitySettings
+import scorex.transaction.data.DataTransaction
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.transfer._
 import scorex.transaction.{GenesisTransaction, Proofs}
 
 class OracleDataTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
-  val preconditions: Gen[(GenesisTransaction, GenesisTransaction, SetScriptTransaction, DataTransactionV1, TransferTransactionV2)] =
+  val functionalitySettings = TestFunctionalitySettings.Enabled.copy(
+    preActivatedFeatures = Map(
+      BlockchainFeatures.SmartAccounts.id     -> 0,
+      BlockchainFeatures.DataTransaction.id   -> 0,
+      BlockchainFeatures.DataTransactionV2.id -> 0
+    )
+  )
+
+  val preconditions: Gen[(GenesisTransaction, GenesisTransaction, SetScriptTransaction, DataTransaction, TransferTransactionV2)] =
     for {
       master <- accountGen
       oracle <- accountGen
@@ -52,7 +62,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       case ((genesis, genesis2, setScript, dataTransaction, transferFromScripted)) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, genesis2, setScript, dataTransaction))),
                            TestBlock.create(Seq(transferFromScripted)),
-                           smartEnabledFS) { case _ => () }
+                           functionalitySettings) { case _ => () }
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, genesis2, setScript))), TestBlock.create(Seq(transferFromScripted)), smartEnabledFS)(
           totalDiffEi => totalDiffEi should produce("Script execution error"))
     }

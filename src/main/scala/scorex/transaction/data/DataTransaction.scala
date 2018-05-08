@@ -46,9 +46,9 @@ object DataTransaction {
 
   def validate(supportedVersions: Set[Byte], version: Byte, entries: List[DataEntry[_]], fee: Long): Either[ValidationError, Unit] = {
     for {
-      _ <- Either.cond(!supportedVersions.contains(version), (), ValidationError.UnsupportedVersion(version))
-      _ <- Either.cond(entries.lengthCompare(MaxEntryCount) > 0 || entries.exists(!_.valid), (), ValidationError.TooBigArray)
-      _ <- Either.cond(fee <= 0, (), ValidationError.InsufficientFee())
+      _ <- Either.cond(supportedVersions.contains(version), (), ValidationError.UnsupportedVersion(version))
+      _ <- Either.cond(entries.lengthCompare(MaxEntryCount) <= 0 && entries.forall(_.valid), (), ValidationError.TooBigArray)
+      _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee())
     } yield ()
   }
 }
