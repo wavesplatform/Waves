@@ -24,7 +24,7 @@ object Gen {
       .zip(feeGen)
       .map {
         case ((src, dst), fee) =>
-          TransferTransactionV1.create(None, src, dst, fee, System.currentTimeMillis(), None, fee, Array.emptyByteArray)
+          TransferTransactionV1.selfSigned(None, src, dst, fee, System.currentTimeMillis(), None, fee, Array.emptyByteArray)
       }
       .collect { case Right(x) => x }
   }

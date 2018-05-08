@@ -584,7 +584,7 @@ class MatcherTestSuite
 
   private def transfer(from: Node, to: Node, assetId: Option[ByteStr], amount: Long, wait: Boolean = false): Unit = {
     val transferTx = TransferTransactionV1
-      .create(
+      .selfSigned(
         assetId = assetId,
         sender = from.privateKey,
         recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).right.get,
@@ -602,7 +602,7 @@ class MatcherTestSuite
 
   private def lease(from: Node, to: Node, amount: Long): ByteStr = {
     val leaseTx = LeaseTransactionV1
-      .create(
+      .selfSigned(
         sender = from.privateKey,
         recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).right.get,
         amount = amount,
@@ -618,7 +618,7 @@ class MatcherTestSuite
 
   private def cancelLease(sender: Node, leaseId: ByteStr, amount: Long): Unit = {
     val cancelLeaseTx = LeaseCancelTransactionV1
-      .create(
+      .selfSigned(
         sender = sender.privateKey,
         leaseId = leaseId,
         fee = TransactionFee,

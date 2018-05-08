@@ -79,11 +79,11 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
         .explicitGet()
 
       transferFromCompanyToA = TransferTransactionV1
-        .create(Some(assetId), company, accountA, 1, ts + 20, None, 1000, Array.empty)
+        .selfSigned(Some(assetId), company, accountA, 1, ts + 20, None, 1000, Array.empty)
         .explicitGet()
 
       transferFromAToB = TransferTransactionV1
-        .create(Some(assetId), accountA, accountB, 1, ts + 30, None, 1000, Array.empty)
+        .selfSigned(Some(assetId), accountA, accountB, 1, ts + 30, None, 1000, Array.empty)
         .explicitGet()
 
       notaryDataTransaction = DataTransaction

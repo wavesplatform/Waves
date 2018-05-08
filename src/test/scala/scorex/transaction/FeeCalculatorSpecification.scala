@@ -82,11 +82,11 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
     val sender        = PrivateKeyAccount(Array.emptyByteArray)
     val recipient     = Address.fromString("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8").right.get
     val tx1: TransferTransactionV1 = TransferTransactionV1
-      .create(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000, Some(WhitelistedAsset), 12, Array.emptyByteArray)
+      .selfSigned(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000, Some(WhitelistedAsset), 12, Array.emptyByteArray)
       .right
       .get
     val tx2: TransferTransactionV1 = TransferTransactionV1
-      .create(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000, Some(WhitelistedAsset), 1, Array.emptyByteArray)
+      .selfSigned(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000, Some(WhitelistedAsset), 1, Array.emptyByteArray)
       .right
       .get
 

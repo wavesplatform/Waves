@@ -56,15 +56,25 @@ object LeaseTransactionV2 extends TransactionParserFor[LeaseTransactionV2] with 
       _ <- LeaseTransaction.validateLeaseParams(amount, fee, recipient, sender)
     } yield LeaseTransactionV2(version, sender, amount, fee, timestamp, recipient, proofs)
 
+  def signed(version: Byte,
+             sender: PublicKeyAccount,
+             amount: Long,
+             fee: Long,
+             timestamp: Long,
+             recipient: AddressOrAlias,
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+    for {
+      unverified <- create(version, sender, amount, fee, timestamp, recipient, Proofs.empty)
+      proofs     <- Proofs.create(Seq(ByteStr(crypto.sign(signer, unverified.bodyBytes()))))
+    } yield unverified.copy(proofs = proofs)
+  }
+
   def selfSigned(version: Byte,
                  sender: PrivateKeyAccount,
                  amount: Long,
                  fee: Long,
                  timestamp: Long,
                  recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
-    for {
-      unverified <- create(version, sender, amount, fee, timestamp, recipient, Proofs.empty)
-      proofs     <- Proofs.create(Seq(ByteStr(crypto.sign(sender, unverified.bodyBytes()))))
-    } yield unverified.copy(proofs = proofs)
+    signed(version, sender, amount, fee, timestamp, recipient, sender)
   }
 }

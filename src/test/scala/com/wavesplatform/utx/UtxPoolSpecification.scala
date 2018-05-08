@@ -75,14 +75,14 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
       amount    <- chooseNum(1, (maxAmount * 0.9).toLong)
       recipient <- accountGen
       fee       <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
-    } yield TransferTransactionV1.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
+    } yield TransferTransactionV1.selfSigned(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
       .label("transferTransaction")
 
   private def transferWithRecipient(sender: PrivateKeyAccount, recipient: PublicKeyAccount, maxAmount: Long, time: Time) =
     (for {
       amount <- chooseNum(1, (maxAmount * 0.9).toLong)
       fee    <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
-    } yield TransferTransactionV1.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
+    } yield TransferTransactionV1.selfSigned(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
       .label("transferWithRecipient")
 
   private def massTransferWithRecipients(sender: PrivateKeyAccount, recipients: List[PublicKeyAccount], maxAmount: Long, time: Time) = {
@@ -261,7 +261,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
   }
 
   private def transactionGen(sender: PrivateKeyAccount, ts: Long, feeAmount: Long): Gen[TransferTransactionV1] = accountGen.map { recipient =>
-    TransferTransactionV1.create(None, sender, recipient, waves(1), ts, None, feeAmount, Array.emptyByteArray).explicitGet()
+    TransferTransactionV1.selfSigned(None, sender, recipient, waves(1), ts, None, feeAmount, Array.emptyByteArray).explicitGet()
   }
 
   private val notEnoughFeeTxWithScriptedAccount = for {

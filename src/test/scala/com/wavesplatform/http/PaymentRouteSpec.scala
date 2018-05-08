@@ -38,7 +38,7 @@ class PaymentRouteSpec
         }
 
         val sender = testWallet.privateKeyAccounts.head
-        val tx     = TransferTransactionV1.create(None, sender, recipient, amount, timestamp, None, fee, Array())
+        val tx     = TransferTransactionV1.selfSigned(None, sender, recipient, amount, timestamp, None, fee, Array())
 
         val route = PaymentApiRoute(restAPISettings, testWallet, utx, allChannels, time).route
 

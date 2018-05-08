@@ -153,22 +153,22 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             .explicitGet()
         else
           IssueTransactionV1
-            .create(richAcc, "test".getBytes(), "desc".getBytes(), Long.MaxValue, 2, reissuable = false, Constants.UnitsInWave, ts)
+            .selfSigned(richAcc, "test".getBytes(), "desc".getBytes(), Long.MaxValue, 2, reissuable = false, Constants.UnitsInWave, ts)
             .explicitGet()
 
       val transferWavesTx = TransferTransactionV1
-        .create(None, richAcc, recipientAcc, 10 * Constants.UnitsInWave, ts, None, 1 * Constants.UnitsInWave, Array.emptyByteArray)
+        .selfSigned(None, richAcc, recipientAcc, 10 * Constants.UnitsInWave, ts, None, 1 * Constants.UnitsInWave, Array.emptyByteArray)
         .explicitGet()
 
       val transferAssetTx = TransferTransactionV1
-        .create(Some(issueTx.id()), richAcc, recipientAcc, 100, ts, None, 1 * Constants.UnitsInWave, Array.emptyByteArray)
+        .selfSigned(Some(issueTx.id()), richAcc, recipientAcc, 100, ts, None, 1 * Constants.UnitsInWave, Array.emptyByteArray)
         .explicitGet()
 
       val sponsorTx =
         if (sponsorship)
           Seq(
             SponsorFeeTransaction
-              .create(1, richAcc, issueTx.id(), Some(10), Constants.UnitsInWave, ts)
+              .selfSigned(1, richAcc, issueTx.id(), Some(10), Constants.UnitsInWave, ts)
               .explicitGet()
           )
         else Seq.empty
@@ -189,7 +189,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         else Seq.empty
 
       val transferBackTx = TransferTransactionV1
-        .create(
+        .selfSigned(
           Some(issueTx.id()),
           recipientAcc,
           richAcc,

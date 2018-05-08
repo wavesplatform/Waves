@@ -8,7 +8,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.state._
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json._
-import scorex.account.PrivateKeyAccount
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http.assets.{MassTransferRequest, SignedTransferV1Request}
 import scorex.crypto.encode.Base58
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
@@ -216,10 +216,17 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       seed                  <- sender.seed(thirdAddress)
     } yield {
       assert(signedRequestResponse.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
+
       val signedRequestJson = Json.parse(signedRequestResponse.getResponseBody)
-      val signature         = Base58.decode((signedRequestJson \ "signature").as[String]).get
-      val tx                = signedRequestJson.as[SignedTransferV1Request].toTx.explicitGet()
-      val privateKey        = PrivateKeyAccount.fromSeed(seed).explicitGet()
+      val signedRequest     = signedRequestJson.as[SignedTransferV1Request]
+      assert(PublicKeyAccount.fromBase58String(signedRequest.senderPublicKey).explicitGet().address == firstAddress)
+      assert(signedRequest.recipient == secondAddress)
+      assert(signedRequest.fee == 100000)
+      assert(signedRequest.amount == 1.waves)
+
+      val signature  = Base58.decode((signedRequestJson \ "signature").as[String]).get
+      val tx         = signedRequest.toTx.explicitGet()
+      val privateKey = PrivateKeyAccount.fromSeed(seed).explicitGet()
       assert(crypto.verify(signature, tx.bodyBytes(), privateKey.publicKey))
     }
 

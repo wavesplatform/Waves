@@ -59,11 +59,11 @@ class MatcherActorSpecification
     new MatcherActor(orderHistoryRef, wallet, mock[UtxPool], mock[ChannelGroup], settings, blockchain, functionalitySettings) with RestartableActor))
 
   val i1 = IssueTransactionV1
-    .create(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
+    .selfSigned(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
     .right
     .get
   val i2 = IssueTransactionV1
-    .create(PrivateKeyAccount(Array.empty), "ForbiddenName".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
+    .selfSigned(PrivateKeyAccount(Array.empty), "ForbiddenName".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
     .right
     .get
   (blockchain.assetDescription _)
