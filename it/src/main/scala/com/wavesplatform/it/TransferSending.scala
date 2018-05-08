@@ -88,7 +88,7 @@ trait TransferSending extends ScorexLogging {
         case (x, i) =>
           createSignedTransferRequest(
             TransferTransactionV1
-              .create(
+              .selfSigned(
                 assetId = None,
                 sender = PrivateKeyAccount.fromSeed(x.senderSeed).right.get,
                 recipient = AddressOrAlias.fromString(x.targetAddress).right.get,

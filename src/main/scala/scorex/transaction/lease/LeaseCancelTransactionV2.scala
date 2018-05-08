@@ -60,14 +60,24 @@ object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransact
       _ <- LeaseCancelTransaction.validateLeaseCancelParams(leaseId, fee)
     } yield LeaseCancelTransactionV2(version, chainId, sender, leaseId, fee, timestamp, proofs)
 
+  def signed(version: Byte,
+             chainId: Byte,
+             sender: PublicKeyAccount,
+             leaseId: ByteStr,
+             fee: Long,
+             timestamp: Long,
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+    create(version, chainId, sender, leaseId, fee, timestamp, Proofs.empty).right.map { unsigned =>
+      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
+    }
+  }
+
   def selfSigned(version: Byte,
                  chainId: Byte,
                  sender: PrivateKeyAccount,
                  leaseId: ByteStr,
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] = {
-    create(version, chainId, sender, leaseId, fee, timestamp, Proofs.empty).right.map { unsigned =>
-      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes())))).explicitGet())
-    }
+    signed(version, chainId, sender, leaseId, fee, timestamp, sender)
   }
 }

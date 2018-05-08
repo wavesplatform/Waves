@@ -137,6 +137,19 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
     )
   }
 
+  def signed(version: Byte,
+             assetId: Option[AssetId],
+             sender: PublicKeyAccount,
+             transfers: List[ParsedTransfer],
+             timestamp: Long,
+             feeAmount: Long,
+             attachment: Array[Byte],
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+    create(version, assetId, sender, transfers, timestamp, feeAmount, attachment, Proofs.empty).right.map { unsigned =>
+      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
+    }
+  }
+
   def selfSigned(version: Byte,
                  assetId: Option[AssetId],
                  sender: PrivateKeyAccount,
@@ -144,9 +157,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
                  timestamp: Long,
                  feeAmount: Long,
                  attachment: Array[Byte]): Either[ValidationError, TransactionT] = {
-    create(version, assetId, sender, transfers, timestamp, feeAmount, attachment, Proofs.empty).right.map { unsigned =>
-      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes())))).explicitGet())
-    }
+    signed(version, assetId, sender, transfers, timestamp, feeAmount, attachment, sender)
   }
 
   def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] = {

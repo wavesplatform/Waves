@@ -43,9 +43,17 @@ object LeaseCancelTransactionV1 extends TransactionParserFor[LeaseCancelTransact
   def create(sender: PublicKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, TransactionT] =
     LeaseCancelTransaction.validateLeaseCancelParams(leaseId, fee).map(_ => LeaseCancelTransactionV1(sender, leaseId, fee, timestamp, signature))
 
-  def create(sender: PrivateKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+  def signed(sender: PublicKeyAccount,
+             leaseId: ByteStr,
+             fee: Long,
+             timestamp: Long,
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
     create(sender, leaseId, fee, timestamp, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
+      unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bodyBytes())))
     }
+  }
+
+  def selfSigned(sender: PrivateKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+    signed(sender, leaseId, fee, timestamp, sender)
   }
 }

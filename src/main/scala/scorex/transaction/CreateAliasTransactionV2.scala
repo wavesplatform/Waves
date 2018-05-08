@@ -56,14 +56,23 @@ object CreateAliasTransactionV2 extends TransactionParserFor[CreateAliasTransact
       Right(CreateAliasTransactionV2(version, sender, alias, fee, timestamp, proofs))
     }
 
+  def signed(sender: PublicKeyAccount,
+             version: Byte,
+             alias: Alias,
+             fee: Long,
+             timestamp: Long,
+             signer: PrivateKeyAccount): Either[ValidationError, CreateAliasTransactionV2] = {
+    for {
+      unsigned <- create(version, sender, alias, fee, timestamp, Proofs.empty)
+      proofs   <- Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes()))))
+    } yield unsigned.copy(proofs = proofs)
+  }
+
   def selfSigned(sender: PrivateKeyAccount,
                  version: Byte,
                  alias: Alias,
                  fee: Long,
                  timestamp: Long): Either[ValidationError, CreateAliasTransactionV2] = {
-    for {
-      unsigned <- create(version, sender, alias, fee, timestamp, Proofs.empty)
-      proofs   <- Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes()))))
-    } yield unsigned.copy(proofs = proofs)
+    signed(sender, version, alias, fee, timestamp, sender)
   }
 }

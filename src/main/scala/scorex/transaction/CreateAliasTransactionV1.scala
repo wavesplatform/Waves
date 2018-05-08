@@ -48,9 +48,13 @@ object CreateAliasTransactionV1 extends TransactionParserFor[CreateAliasTransact
       Right(CreateAliasTransactionV1(sender, alias, fee, timestamp, signature))
     }
 
-  def create(sender: PrivateKeyAccount, alias: Alias, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+  def signed(sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
     create(sender, alias, fee, timestamp, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
+      unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bodyBytes())))
     }
+  }
+
+  def selfSigned(sender: PrivateKeyAccount, alias: Alias, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+    signed(sender, alias, fee, timestamp, sender)
   }
 }

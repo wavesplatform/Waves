@@ -53,7 +53,7 @@ case class MatcherApiRoute(wallet: Wallet,
   def matcherPublicKey: Route = (pathEndOrSingleSlash & get) {
     complete(
       wallet
-        .findWallet(matcherSettings.account)
+        .findPrivateKey(matcherSettings.account)
         .map(a => JsString(Base58.encode(a.publicKey)))
         .getOrElse[JsValue](JsString("")))
   }
