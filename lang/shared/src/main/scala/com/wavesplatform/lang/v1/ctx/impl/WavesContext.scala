@@ -73,8 +73,7 @@ object WavesContext {
       "assetId"          -> BYTEVECTOR,
       "recipient"        -> addressOrAliasType.typeRef,
       "minSponsoredAssetFee"           -> optionLong,
-      "transfers"        -> LIST(transferType.typeRef),
-      "transfersNumber"  -> LONG
+      "transfers"        -> LIST(transferType.typeRef)
     )
   )
   private def proofBinding(tx: Transaction, x: Int): LazyVal =
@@ -108,8 +107,7 @@ object WavesContext {
         "chainId"          -> LazyVal(LONG)(EitherT.fromEither(tx.chainId.map(_.toLong))),
         "version"          -> LazyVal(LONG)(EitherT.fromEither(tx.version.map(_.toLong))),
         "minSponsoredAssetFee"     -> LazyVal(optionLong)(EitherT.fromEither(tx.minSponsoredAssetFee.map(_.asInstanceOf[optionLong.Underlying]))),
-        "transfers"        -> LazyVal(listTransfers)(EitherT.fromEither( tx.transfers.map(_.asInstanceOf[listTransfers.Underlying]))),
-        "transfersNumber"  -> LazyVal(LONG)(EitherT.fromEither( tx.transfers.map(_.size.toLong))),
+        "transfers"        -> LazyVal(listTransfers)(EitherT.fromEither(tx.transfers.map(tl => tl.map(t => transferObject(t.asInstanceOf[listTransfers.innerType.Underlying])).asInstanceOf[listTransfers.Underlying]))),
         "proof0"           -> proofBinding(tx, 0),
         "proof1"           -> proofBinding(tx, 1),
         "proof2"           -> proofBinding(tx, 2),
@@ -168,25 +166,6 @@ object WavesContext {
       }
     }
 
-    val getTransfer = {
-      val returnType = OPTION(transferType.typeRef)
-      new PredefFunction.PredefFunctionImplT( "getTransfer", 10, returnType, List(("tx", transactionType.typeRef), ("pos", LONG))) {
-        def eval(args: List[Any])  = args match {
-          case Obj(transactionFields) :: (pos : Long) :: Nil =>
-            val transfersVal = transactionFields("transfers")
-            transfersVal.value.map { transfersVal =>
-              val transfers = transfersVal.asInstanceOf[listTransfers.Underlying /*IndexedSeq[Transfer]*/]
-              if(transfers.size >= pos) {
-                Some(transferObject(transfers(pos.toInt))) /*.asInstanceOf[returnType.Underlying] */
-              } else {
-                None
-              }
-            }
-          case _ => ???
-        }
-      }
-    }
-
     val accountBalanceF: PredefFunction =
       PredefFunction("accountBalance", 100, LONG, List(("addressOrAlias", TYPEREF(addressOrAliasType.name)))) {
         case Obj(fields) :: Nil =>
@@ -228,8 +207,7 @@ object WavesContext {
         addressFromStringF,
         addressFromRecipientF,
         accountBalanceF,
-        accountAssetBalanceF,
-        getTransfer
+        accountAssetBalanceF
       )
     )
   }

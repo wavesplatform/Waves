@@ -10,6 +10,7 @@ object FunctionHeader {
     def fromTypePlaceholder(t: Terms.TYPEPLACEHOLDER): FunctionHeaderType = t match {
       case Terms.TYPEPARAM(char)       => FunctionHeaderType.TYPEPARAM(char)
       case Terms.OPTIONTYPEPARAM(x)    => FunctionHeaderType.OPTIONTYPEPARAM(fromTypePlaceholder(x))
+      case Terms.LISTTYPEPARAM(x)    => FunctionHeaderType.LISTTYPEPARAM(fromTypePlaceholder(x))
       case v1.Terms.NOTHING            => FunctionHeaderType.NOTHING
       case v1.Terms.UNIT               => FunctionHeaderType.UNIT
       case v1.Terms.LONG               => FunctionHeaderType.LONG
@@ -23,6 +24,7 @@ object FunctionHeader {
 
     case class TYPEPARAM(char: Byte)                  extends FunctionHeaderType
     case class OPTIONTYPEPARAM(t: FunctionHeaderType) extends FunctionHeaderType
+    case class LISTTYPEPARAM(t: FunctionHeaderType) extends FunctionHeaderType
     case object NOTHING                               extends FunctionHeaderType
     case object UNIT                                  extends FunctionHeaderType
     case object LONG                                  extends FunctionHeaderType

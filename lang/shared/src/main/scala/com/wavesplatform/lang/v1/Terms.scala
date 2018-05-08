@@ -11,6 +11,7 @@ object Terms {
   sealed trait TYPEPLACEHOLDER
   case class TYPEPARAM(char: Byte)               extends TYPEPLACEHOLDER
   case class OPTIONTYPEPARAM(t: TYPEPLACEHOLDER) extends TYPEPLACEHOLDER
+  case class LISTTYPEPARAM(t: TYPEPLACEHOLDER) extends TYPEPLACEHOLDER
 
   sealed trait TYPE extends TYPEPLACEHOLDER {
     type Underlying
