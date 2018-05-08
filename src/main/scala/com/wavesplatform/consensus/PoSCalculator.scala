@@ -85,25 +85,14 @@ object NxtPoSCalculator extends PoSCalculator
 object FairPoSCalculator extends PoSCalculator {
   private val MaxSignature: Array[Byte] = Array.fill[Byte](HitSize)(-1)
   private val MaxHit: BigDecimal        = BigDecimal(BigInt(1, MaxSignature))
-  private val Correction: BigDecimal    = MaxHit / log2(MaxHit)
-
-  override def hit(generatorSignature: Array[Byte]): BigInt = {
-    val h = super.hit(generatorSignature)
-    val x = BigDecimal(h) / MaxHit
-    val y = math.abs(log2(x.toDouble))
-    round(y)
-  }
+  private val C1                        = 120
+  private val C2                        = 1000
+  private val TMin                      = 5000
 
   override def time(hit: BigInt, bt: Long, balance: Long): Long = {
     val h = BigDecimal(hit)
-    val t = BigDecimal(bt)
-    val b = BigDecimal(balance)
-    println(s"hit=$hit bt=$bt balance=$balance")
-    val r: BigDecimal = (h * Correction * 1000) / (t * b)
-    round(log2(1 + r) * 120).toLong
+    round(TMin + C1 * math.log(1 - C2 * math.log((h / MaxHit).toDouble) / (bt * balance).toDouble)).toLong
   }
-
-  private def log2(x: BigDecimal): Double = math.log10(x.toDouble) / math.log10(2.0)
 
   private def round(x: BigDecimal): BigInt = x.setScale(0, BigDecimal.RoundingMode.CEILING).toBigInt()
 }
