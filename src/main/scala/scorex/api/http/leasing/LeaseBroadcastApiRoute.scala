@@ -26,7 +26,7 @@ case class LeaseBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allCh
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.leasing.SignedLeaseRequest",
+        dataType = "scorex.api.http.leasing.SignedLeaseV1Request",
         defaultValue =
           "{\n\t\"amount\": 100000000,\n\t\"recipient\": \"3NBsppTVpai9jq6agi9wXXrWhaMPPig48Aw\",\n\t\"senderPublicKey\": \"11111\",\n\t\"fee\": 100000\n\t\"timestamp\": 12345678,\n\t\"signature\": \"asdasdasd\"\n}"
       )
@@ -50,7 +50,7 @@ case class LeaseBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allCh
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.leasing.SignedLeaseCancelRequest",
+        dataType = "scorex.api.http.leasing.SignedLeaseCancelV1Request",
         defaultValue =
           "{\n\t\"sender\": \"3Myss6gmMckKYtka3cKCM563TBJofnxvfD7\",\n\t\"txId\": \"ABMZDPY4MyQz7kKNAevw5P9eNmRErMutJoV9UNeCtqRV\",\n\t\"fee\": 10000000\n\t\"timestamp\": 12345678,\n\t\"signature\": \"asdasdasd\"\n}"
       )

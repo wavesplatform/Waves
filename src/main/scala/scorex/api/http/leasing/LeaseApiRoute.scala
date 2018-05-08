@@ -37,7 +37,7 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.leasing.LeaseRequest",
+        dataType = "scorex.api.http.leasing.LeaseV1Request",
         defaultValue =
           "{\n\t\"amount\": 100000000,\n\t\"recipient\": \"3NBsppTVpai9jq6agi9wXXrWhaMPPig48Aw\",\n\t\"sender\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n\t\"fee\": 100000\n}"
       )
@@ -54,7 +54,7 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.leasing.LeaseCancelRequest",
+        dataType = "scorex.api.http.leasing.LeaseCancelV1Request",
         defaultValue =
           "{\n\t\"sender\": \"3Myss6gmMckKYtka3cKCM563TBJofnxvfD7\",\n\t\"txId\": \"ABMZDPY4MyQz7kKNAevw5P9eNmRErMutJoV9UNeCtqRV\",\n\t\"fee\": 10000000\n}"
       )

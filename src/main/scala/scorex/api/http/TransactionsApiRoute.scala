@@ -2,6 +2,7 @@ package scorex.api.http
 
 import java.util.NoSuchElementException
 
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import com.wavesplatform.settings.RestAPISettings
@@ -161,40 +162,65 @@ case class TransactionsApiRoute(settings: RestAPISettings,
                            value = "Transaction data including type and optional timestamp in milliseconds")
     ))
   def sign: Route = (pathPrefix("sign") & post & withAuth) {
-    handleExceptions(jsonExceptionHandler) {
-      json[JsObject] { jsv =>
-        val typeId  = (jsv \ "type").as[Byte]
-        val version = (jsv \ "version").asOpt[Byte].getOrElse(1.toByte)
-
-        val r = TransactionParsers.by(typeId, version) match {
-          case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
-          case Some(x) =>
-            x match {
-              case IssueTransactionV1       => TransactionFactory.issueAssetV1(jsv.as[IssueV1Request], wallet, time)
-              case IssueTransactionV2       => TransactionFactory.issueAssetV2(jsv.as[IssueV2Request], wallet, time)
-              case TransferTransactionV1    => TransactionFactory.transferAssetV1(jsv.as[TransferV1Request], wallet, time)
-              case TransferTransactionV2    => TransactionFactory.transferAssetV2(jsv.as[TransferV2Request], wallet, time)
-              case ReissueTransactionV1     => TransactionFactory.reissueAssetV1(jsv.as[ReissueV1Request], wallet, time)
-              case ReissueTransactionV2     => TransactionFactory.reissueAssetV2(jsv.as[ReissueV2Request], wallet, time)
-              case BurnTransactionV1        => TransactionFactory.burnAssetV1(jsv.as[BurnV1Request], wallet, time)
-              case BurnTransactionV2        => TransactionFactory.burnAssetV2(jsv.as[BurnV2Request], wallet, time)
-              case MassTransferTransaction  => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, time)
-              case LeaseTransactionV1       => TransactionFactory.leaseV1(jsv.as[LeaseV1Request], wallet, time)
-              case LeaseTransactionV2       => TransactionFactory.leaseV2(jsv.as[LeaseV2Request], wallet, time)
-              case LeaseCancelTransactionV1 => TransactionFactory.leaseCancelV1(jsv.as[LeaseCancelV1Request], wallet, time)
-              case LeaseCancelTransactionV2 => TransactionFactory.leaseCancelV2(jsv.as[LeaseCancelV2Request], wallet, time)
-              case CreateAliasTransactionV1 => TransactionFactory.aliasV1(jsv.as[CreateAliasV1Request], wallet, time)
-              case CreateAliasTransactionV2 => TransactionFactory.aliasV2(jsv.as[CreateAliasV2Request], wallet, time)
-              case DataTransaction          => TransactionFactory.data(jsv.as[DataRequest], wallet, time)
-              case SetScriptTransaction     => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, time)
-              case SponsorFeeTransaction    => TransactionFactory.sponsor(jsv.as[SponsorFeeRequest], wallet, time)
-            }
-        }
-        r match {
-          case Right(tx) => tx.json()
-          case Left(err) => ApiError.fromValidationError(err)
+    pathEndOrSingleSlash {
+      handleExceptions(jsonExceptionHandler) {
+        json[JsObject] { jsv =>
+          signTransaction((jsv \ "sender").as[String], jsv)
         }
       }
+    } ~ signWithSigner
+  }
+
+  @Path("/sign/{signerAddress}")
+  @ApiOperation(value = "Sign a transaction by a private key of signer address", notes = "Sign a transaction", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "json",
+                           required = true,
+                           dataType = "string",
+                           paramType = "body",
+                           value = "Transaction data including type and optional timestamp in milliseconds")
+    ))
+  def signWithSigner: Route = pathPrefix(Segment) { signerAddress =>
+    handleExceptions(jsonExceptionHandler) {
+      json[JsObject] { jsv =>
+        signTransaction(signerAddress, jsv)
+      }
+    }
+  }
+
+  private def signTransaction(signerAddress: String, jsv: JsObject): ToResponseMarshallable = {
+    val typeId  = (jsv \ "type").as[Byte]
+    val version = (jsv \ "version").asOpt[Byte].getOrElse(1.toByte)
+    val r = TransactionParsers.by(typeId, version) match {
+      case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
+      case Some(x) =>
+        wallet.findWallet(signerAddress).flatMap { pk =>
+          x match {
+            case IssueTransactionV1       => TransactionFactory.issueAssetV1(jsv.as[IssueV1Request], pk, time)
+            case IssueTransactionV2       => TransactionFactory.issueAssetV2(jsv.as[IssueV2Request], pk, time)
+            case TransferTransactionV1    => TransactionFactory.transferAssetV1(jsv.as[TransferV1Request], pk, time)
+            case TransferTransactionV2    => TransactionFactory.transferAssetV2(jsv.as[TransferV2Request], pk, time)
+            case ReissueTransactionV1     => TransactionFactory.reissueAssetV1(jsv.as[ReissueV1Request], pk, time)
+            case ReissueTransactionV2     => TransactionFactory.reissueAssetV2(jsv.as[ReissueV2Request], pk, time)
+            case BurnTransactionV1        => TransactionFactory.burnAssetV1(jsv.as[BurnV1Request], pk, time)
+            case BurnTransactionV2        => TransactionFactory.burnAssetV2(jsv.as[BurnV2Request], pk, time)
+            case MassTransferTransaction  => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], pk, time)
+            case LeaseTransactionV1       => TransactionFactory.leaseV1(jsv.as[LeaseV1Request], pk, time)
+            case LeaseTransactionV2       => TransactionFactory.leaseV2(jsv.as[LeaseV2Request], pk, time)
+            case LeaseCancelTransactionV1 => TransactionFactory.leaseCancelV1(jsv.as[LeaseCancelV1Request], pk, time)
+            case LeaseCancelTransactionV2 => TransactionFactory.leaseCancelV2(jsv.as[LeaseCancelV2Request], pk, time)
+            case CreateAliasTransactionV1 => TransactionFactory.aliasV1(jsv.as[CreateAliasV1Request], pk, time)
+            case CreateAliasTransactionV2 => TransactionFactory.aliasV2(jsv.as[CreateAliasV2Request], pk, time)
+            case DataTransaction          => TransactionFactory.data(jsv.as[DataRequest], pk, time)
+            case SetScriptTransaction     => TransactionFactory.setScript(jsv.as[SetScriptRequest], pk, time)
+            case SponsorFeeTransaction    => TransactionFactory.sponsor(jsv.as[SponsorFeeRequest], pk, time)
+          }
+        }
+    }
+    r match {
+      case Right(tx) => tx.json()
+      case Left(err) => ApiError.fromValidationError(err)
     }
   }
 
