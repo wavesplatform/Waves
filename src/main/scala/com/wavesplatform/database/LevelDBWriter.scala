@@ -868,12 +868,14 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
       val result        = Map.newBuilder[Address, Long]
       var lastAddressId = db.get(k.lastAddressId).getOrElse(BigInt(0))
       while (lastAddressId > 0) {
-        val abh          = db.get(historyKey(lastAddressId))
-        val actualHeight = abh.partition(_ > height)._2.headOption.getOrElse(1)
-        val balance      = db.get(balanceKey(actualHeight, lastAddressId))
-        if (balance > 0) {
-          result += db.get(k.idToAddress(lastAddressId)) -> balance
+        val abh = db.get(historyKey(lastAddressId))
+        for (actualHeight <- abh.partition(_ > height)._2.headOption) {
+          val balance = db.get(balanceKey(actualHeight, lastAddressId))
+          if (balance > 0) {
+            result += db.get(k.idToAddress(lastAddressId)) -> balance
+          }
         }
+
         lastAddressId -= 1
       }
       result.result()

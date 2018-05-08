@@ -1,5 +1,6 @@
 package com.wavesplatform.it.async
 
+import com.wavesplatform.crypto
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -7,7 +8,8 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.state._
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json._
-import scorex.api.http.assets.MassTransferRequest
+import scorex.account.PrivateKeyAccount
+import scorex.api.http.assets.{MassTransferRequest, SignedTransferV1Request}
 import scorex.crypto.encode.Base58
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
 
@@ -198,6 +200,30 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       ),
       usesProofs = true
     )
+  }
+
+  test("/transactions/sign/{signerAddress} should sign a transaction by key of signerAddress") {
+    val json = Json.obj(
+      "type"      -> 4,
+      "sender"    -> firstAddress,
+      "recipient" -> secondAddress,
+      "fee"       -> 100000,
+      "amount"    -> 1.waves
+    )
+
+    val f = for {
+      signedRequestResponse <- sender.postJsonWithApiKey(s"/transactions/sign/$thirdAddress", json)
+      seed                  <- sender.seed(thirdAddress)
+    } yield {
+      assert(signedRequestResponse.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
+      val signedRequestJson = Json.parse(signedRequestResponse.getResponseBody)
+      val signature         = Base58.decode((signedRequestJson \ "signature").as[String]).get
+      val tx                = signedRequestJson.as[SignedTransferV1Request].toTx.explicitGet()
+      val privateKey        = PrivateKeyAccount.fromSeed(seed).explicitGet()
+      assert(crypto.verify(signature, tx.bodyBytes(), privateKey.publicKey))
+    }
+
+    Await.result(f, timeout)
   }
 
   private def signAndBroadcast(json: JsObject, usesProofs: Boolean = false): String = {
