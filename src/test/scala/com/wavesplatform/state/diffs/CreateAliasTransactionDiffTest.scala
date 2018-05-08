@@ -80,7 +80,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
     maybeFeeAsset            <- Gen.oneOf(maybeAsset, maybeAsset2)
     alias                    <- aliasGen
     fee                      <- smallFeeGen
-    aliasTx = CreateAliasTransactionV1.create(aliasedRecipient, alias, fee, ts).right.get
+    aliasTx = CreateAliasTransactionV1.selfSigned(aliasedRecipient, alias, fee, ts).right.get
     transfer <- transferGeneratorP(master, alias, maybeAsset.map(_.id()), maybeFeeAsset.map(_.id()))
     lease    <- leaseAndCancelGeneratorP(master, alias, master).map(_._1)
   } yield (gen, gen2, issue1, issue2, aliasTx, transfer, lease)

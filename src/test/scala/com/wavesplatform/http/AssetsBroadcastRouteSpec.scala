@@ -164,7 +164,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
     val transferRequest = createSignedTransferRequest(
       TransferTransactionV1
-        .create(
+        .selfSigned(
           assetId = None,
           sender = senderPrivateKey,
           recipient = receiverPrivateKey.toAddress,

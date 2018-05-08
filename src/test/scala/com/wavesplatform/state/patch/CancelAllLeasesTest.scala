@@ -27,7 +27,7 @@ class CancelAllLeasesTest extends PropSpec with PropertyChecks with Matchers wit
         genesis2: GenesisTransaction = GenesisTransaction.create(otherAccount, ENOUGH_AMT, ts).right.get
         (lease, _) <- leaseAndCancelGeneratorP(master, recipient, master)
         fee2       <- smallFeeGen
-        unleaseOther = LeaseCancelTransactionV1.create(otherAccount, lease.id(), fee2, ts + 1).right.get
+        unleaseOther = LeaseCancelTransactionV1.selfSigned(otherAccount, lease.id(), fee2, ts + 1).right.get
         (lease2, _) <- leaseAndCancelGeneratorP(master, otherAccount2, master)
       } yield (genesis, genesis2, lease, unleaseOther, lease2)
 
