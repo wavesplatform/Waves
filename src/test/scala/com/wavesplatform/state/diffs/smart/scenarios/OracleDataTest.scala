@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.{Parser, TypeChecker}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._

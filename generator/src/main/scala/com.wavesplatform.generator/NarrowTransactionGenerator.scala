@@ -11,6 +11,7 @@ import scorex.account.{Alias, PrivateKeyAccount}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import scorex.transaction.data.{DataTransactionParser, DataTransactionV1}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseTransactionV1}
 import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.transfer._
@@ -174,7 +175,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
                                                      100000 + 50000 * transferCount,
                                                      Array.fill(r.nextInt(100))(r.nextInt().toByte)))
             }
-          case DataTransaction =>
+          case DataTransactionParser =>
             val sender = randomFrom(accounts).get
             val count  = r.nextInt(10)
 
@@ -195,7 +196,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
               }
             val size = 128 + data.map(_.toBytes.length).sum
             val fee  = 100000 * (size / 1024 + 1)
-            logOption(DataTransaction.selfSigned(1, sender, data.toList, fee, ts))
+            logOption(DataTransactionV1.selfSigned(1, sender, data.toList, fee, ts))
         }
 
         (tx.map(tx => allTxsWithValid :+ tx).getOrElse(allTxsWithValid), tx match {

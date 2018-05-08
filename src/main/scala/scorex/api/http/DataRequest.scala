@@ -36,7 +36,7 @@ case class SignedDataRequest(@ApiModelProperty(required = true)
     for {
       _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _recipient <- recipient
-        .traverse[({ type L[A] = Either[ValidationError, A] })#L, AddressOrAlias](AddressOrAlias.fromString)
+        .traverse[Either[ValidationError, ?], AddressOrAlias](AddressOrAlias.fromString)
         .flatMap(recOpt => {
           Either.cond(
             !(version == 1 && recOpt.nonEmpty),

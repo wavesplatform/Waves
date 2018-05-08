@@ -4,19 +4,15 @@ import com.wavesplatform.state._
 import scorex.transaction.ValidationError
 import scorex.transaction.data.DataTransaction
 import cats.implicits._
+import scorex.account.Address
 
 object DataTransactionDiff {
 
   def apply(blockchain: Blockchain, height: Int)(tx: DataTransaction): Either[ValidationError, Diff] = {
     val sender = tx.sender.toAddress
 
-    val isRecipientValid = tx.recipient
-      .map(blockchain.resolveAliasEi)
-      .fold(true)(_.isRight)
-
     tx.recipient
-      .map(aoa => blockchain.resolveAliasEi(aoa).map(_ => ()))
-      .getOrElse(().asRight[ValidationError])
+      .traverse[Either[ValidationError, ?], Address](blockchain.resolveAliasEi)
       .map(_ => {
         Diff(
           height,

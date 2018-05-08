@@ -10,10 +10,11 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{Format, Json}
 import scorex.api.http.SignedDataRequest
 import scorex.crypto.encode.Base58
+import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.transaction.data.DataTransaction.MaxEntryCount
 import scorex.transaction.data.{DataTransaction, DataTransactionParser, DataTransactionV1, DataTransactionV2}
 
-class DataTransactionV1Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   private def checkSerialization(tx: DataTransaction): Assertion = {
     val parsed = DataTransactionParser.parseBytes(tx.bytes()).get
@@ -43,27 +44,26 @@ class DataTransactionV1Specification extends PropSpec with PropertyChecks with M
   }
 
   property("unknown type handing") {
-    val badTypeIdGen = Gen.choose[Byte](3, Byte.MaxValue)
-    forAll(dataTransactionGen, badTypeIdGen) {
-      case (tx: DataTransactionV1, badTypeId) =>
-        val bytes      = tx.bytes()
-        val entryCount = Shorts.fromByteArray(bytes.drop(35))
-        if (entryCount > 0) {
-          val key1Length = Shorts.fromByteArray(bytes.drop(37))
-          val p          = 39 + key1Length
-          bytes(p) = badTypeId
-          val parsed = DataTransactionParser.parseBytes(bytes)
-          parsed.isFailure shouldBe true
-          parsed.failed.get.getMessage shouldBe s"Unknown type $badTypeId"
-        }
 
-      case (tx: DataTransactionV2, badTypeId) =>
+    val startOffset = KeyLength + 3 // header + sender bytes
+
+    def calculateEntryCountPos(tx: DataTransaction): Int = {
+      tx.version match {
+        case 1 => startOffset
+        case _ => startOffset + 1 + tx.recipient.fold(0)(_.bytes.arr.length)
+      }
+    }
+
+    val badTypeIdGen = Gen.choose[Byte](3, Byte.MaxValue)
+    forAll(dataTransactionGen.retryUntil(_.version == 1), badTypeIdGen) {
+      case (tx, badTypeId) =>
         val bytes         = tx.bytes()
-        val entryCountPos = 35 + tx.recipient.fold(0)(_.bytes.arr.length) + (tx.version - 1)
+        val entryCountPos = calculateEntryCountPos(tx)
         val entryCount    = Shorts.fromByteArray(bytes.drop(entryCountPos))
         if (entryCount > 0) {
           val key1Length = Shorts.fromByteArray(bytes.drop(entryCountPos + 2))
           val p          = entryCountPos + 4 + key1Length
+          println(badTypeId)
           bytes(p) = badTypeId
           val parsed = DataTransactionParser.parseBytes(bytes)
           parsed.isFailure shouldBe true

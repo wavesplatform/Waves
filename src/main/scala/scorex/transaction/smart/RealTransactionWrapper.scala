@@ -4,7 +4,7 @@ import scodec.bits.ByteVector
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.data.{DataTransaction, DataTransactionV1}
+import scorex.transaction.data.DataTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.transfer._
 

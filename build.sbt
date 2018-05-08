@@ -209,6 +209,7 @@ lazy val langJVM = lang.jvm
 lazy val node = project
   .in(file("."))
   .settings(
+    addCompilerPlugin(Dependencies.kindProjector),
     libraryDependencies ++=
       Dependencies.network ++
         Dependencies.db ++
