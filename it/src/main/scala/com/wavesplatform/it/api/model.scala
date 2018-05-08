@@ -1,6 +1,6 @@
 package com.wavesplatform.it.api
 
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import play.api.libs.json._
 import scorex.transaction.assets.exchange.AssetPair
 
@@ -114,8 +114,8 @@ object MessageMatcherResponse {
   implicit val messageMatcherResponseFormat: Format[MessageMatcherResponse] = Json.format
 }
 
-case class OrderbookHistory(id: String, `type`: String, amount: Long, price: Long, timestamp: Long, filled: Int, status: String)
-object OrderbookHistory {
+case class OrderBookHistory(id: String, `type`: String, amount: Long, price: Long, timestamp: Long, filled: Int, status: String)
+object OrderBookHistory {
   implicit val byteStrFormat: Format[ByteStr] = Format(
     Reads {
       case JsString(str) =>

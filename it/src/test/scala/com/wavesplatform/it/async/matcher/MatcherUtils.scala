@@ -81,7 +81,7 @@ trait MatcherUtils {
 
   def matcherGetOrderBook(matcherNode: Node, assetId: String): OrderBookResponse = {
     val futureResult = matcherNode.getOrderBook(assetId)
-    val result = Await.result(futureResult, 1.minute)
+    val result       = Await.result(futureResult, 1.minute)
 
     result
   }
