@@ -2,8 +2,8 @@ package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.lang.TypeInfo
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.EvaluatorV1
 import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval

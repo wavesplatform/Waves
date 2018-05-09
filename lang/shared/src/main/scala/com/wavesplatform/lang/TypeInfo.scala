@@ -1,7 +1,7 @@
 package com.wavesplatform.lang
 
 import cats.implicits._
-import com.wavesplatform.lang.v1.ctx.Obj
+import com.wavesplatform.lang.v1.evaluator.ctx.Obj
 import scodec.bits.ByteVector
 
 import scala.reflect.ClassTag

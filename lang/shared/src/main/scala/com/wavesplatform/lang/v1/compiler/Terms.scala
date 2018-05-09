@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.compiler
 
 import com.wavesplatform.lang.TypeInfo
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.ctx.Obj
+import com.wavesplatform.lang.v1.evaluator.ctx.Obj
 import scodec.bits.ByteVector
 
 object Terms {

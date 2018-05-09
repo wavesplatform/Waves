@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.directives.{Directive, DirectiveKey, DirectiveParser}
-import com.wavesplatform.lang.v1.ctx.Context
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.utils
@@ -15,7 +15,7 @@ import scala.util.{Failure, Success, Try}
 object ScriptCompiler {
 
   private val v1Compiler    = new CompilerV1(utils.dummyTypeCheckerContext)
-  private val functionCosts = Context.functionCosts(utils.dummyContext.functions.values)
+  private val functionCosts = EvaluationContext.functionCosts(utils.dummyContext.functions.values)
 
   def apply(scriptText: String): Either[String, (Script, Long)] = {
     val directives = DirectiveParser(scriptText)

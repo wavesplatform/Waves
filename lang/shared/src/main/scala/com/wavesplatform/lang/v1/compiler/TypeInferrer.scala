@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.v1
+package com.wavesplatform.lang.v1.compiler
 
 import com.wavesplatform.lang.v1.compiler.Terms._
 

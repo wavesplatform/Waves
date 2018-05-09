@@ -1,10 +1,10 @@
-package com.wavesplatform.lang.v1.ctx
+package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats.data.EitherT
 import com.wavesplatform.lang.v1.compiler.Terms.TYPEPLACEHOLDER
 import com.wavesplatform.lang.TrampolinedExecResult
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.ctx.PredefFunction.FunctionTypeSignature
+import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction.FunctionTypeSignature
 import monix.eval.Coeval
 
 sealed trait PredefFunction {

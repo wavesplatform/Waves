@@ -4,9 +4,9 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.Common.multiplierFunction
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.ctx.{Context, PredefFunction, PredefType}
-import com.wavesplatform.lang.v1.ctx.impl.PureContext.none
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, PredefFunction, PredefType}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.none
 
 package object typechecker {
 
@@ -25,7 +25,7 @@ package object typechecker {
 
   val ctx = Monoid.combine(
     PureContext.instance,
-    Context.build(
+    EvaluationContext.build(
       Seq(pointType),
       Map(("None", none)),
       functions = Seq(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, unitOnNone, undefinedOptionLong, idOptionLong)

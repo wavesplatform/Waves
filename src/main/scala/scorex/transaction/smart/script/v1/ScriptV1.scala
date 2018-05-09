@@ -4,14 +4,14 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType.BYTEVECTOR
 import com.wavesplatform.lang.v1.compiler.Terms.{BOOLEAN, Typed}
-import com.wavesplatform.lang.v1.ctx.Context
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.{FunctionHeader, ScriptEstimator, Serde}
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import scorex.transaction.smart.script.Script
 
 object ScriptV1 {
-  private val functionCosts: Map[FunctionHeader, Long] = Context.functionCosts(com.wavesplatform.utils.dummyContext.functions.values)
+  private val functionCosts: Map[FunctionHeader, Long] = EvaluationContext.functionCosts(com.wavesplatform.utils.dummyContext.functions.values)
 
   private val checksumLength = 4
   private val maxComplexity  = 20 * functionCosts(FunctionHeader("sigVerify", List(BYTEVECTOR, BYTEVECTOR, BYTEVECTOR)))

@@ -1,9 +1,8 @@
-package com.wavesplatform.lang.v1.ctx.impl
+package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.EnvironmentFunctions
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.ctx._
+import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.traits.{DataType, Environment, Transaction}
 import monix.eval.Coeval
 import scodec.bits.ByteVector
@@ -91,7 +90,7 @@ object WavesContext {
         "proof7"               -> proofBinding(tx, 7)
       ))
 
-  def build(env: Environment): Context = {
+  def build(env: Environment): EvaluationContext = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getdataF(name: String, dataType: DataType) =
@@ -167,7 +166,7 @@ object WavesContext {
         case _                       => ???
       }
 
-    Context.build(
+    EvaluationContext.build(
       Seq(addressType, addressOrAliasType, transactionType),
       Map(("height", LazyVal(LONG)(EitherT(heightCoeval))), ("tx", LazyVal(TYPEREF(transactionType.name))(EitherT(txCoeval)))),
       Seq(
