@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.ctx.Context._
 import com.wavesplatform.lang.v1.ctx._
 import com.wavesplatform.lang.v1.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluation.EvaluatorV1_1
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.{EvaluatorV1, FunctionHeader}
 import org.scalatest.prop.PropertyChecks
@@ -25,8 +26,19 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     EvaluatorV1[T](context, expr)
   private def simpleDeclarationAndUsage(i: Int) = BLOCK(LET("x", CONST_LONG(i)), REF("x", LONG), LONG)
 
+  private def logTime[A](in: => A): A = {
+    val start = System.currentTimeMillis()
+    in
+    println(System.currentTimeMillis() - start)
+    in
+  }
+
   property("successful on very deep expressions (stack overflow check)") {
     val term = (1 to 100000).foldLeft[EXPR](CONST_LONG(0))((acc, _) => FUNCTION_CALL(sumLong.header, List(acc, CONST_LONG(1)), LONG))
+
+    val r1 = logTime(ev[Long](expr = term))
+    val r2 = logTime(EvaluatorV1_1[Long](PureContext.instance, term))
+
     ev[Long](expr = term) shouldBe Right(100000)
   }
 

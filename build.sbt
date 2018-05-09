@@ -181,6 +181,7 @@ lazy val lang =
     .settings(
       version := "0.0.1",
       test in assembly := {},
+      addCompilerPlugin(Dependencies.kindProjector),
       libraryDependencies ++=
         Dependencies.cats ++
           Dependencies.scalacheck ++
@@ -209,6 +210,7 @@ lazy val langJVM = lang.jvm
 lazy val node = project
   .in(file("."))
   .settings(
+    addCompilerPlugin(Dependencies.kindProjector),
     libraryDependencies ++=
       Dependencies.network ++
         Dependencies.db ++
