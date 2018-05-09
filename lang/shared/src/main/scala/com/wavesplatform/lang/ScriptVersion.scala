@@ -1,7 +1,7 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.v1.Terms
-import com.wavesplatform.lang.v1.ctx.Context
+import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 
 sealed trait ScriptVersion { self =>
   type ExprT
@@ -17,8 +17,8 @@ object ScriptVersion {
 
   object Versions {
     object V1 extends ScriptVersion { self =>
-      override type ExprT = Terms.Typed.EXPR
-      override type CtxT = Context
+      override type ExprT = Terms.EXPR
+      override type CtxT  = EvaluationContext
       override val value: Int = 1
     }
   }

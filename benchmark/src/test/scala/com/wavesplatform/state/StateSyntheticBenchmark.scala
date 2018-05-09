@@ -2,7 +2,8 @@ package com.wavesplatform.state
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.lang.v1.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.StateSyntheticBenchmark._
 import com.wavesplatform.utils.dummyTypeCheckerContext
@@ -73,7 +74,7 @@ object StateSyntheticBenchmark {
 
       val textScript    = "sigVerify(tx.bodyBytes,tx.proof0,tx.senderPk)"
       val untypedScript = Parser(textScript).get.value
-      val typedScript   = TypeChecker(dummyTypeCheckerContext, untypedScript).explicitGet()
+      val typedScript   = CompilerV1(dummyTypeCheckerContext, untypedScript).explicitGet()
 
       val setScriptBlock = nextBlock(
         Seq(

@@ -1,7 +1,8 @@
 package com.wavesplatform.lang.v1.testing
 
-import com.wavesplatform.lang.v1.Terms.Untyped._
-import com.wavesplatform.lang.v1.Terms._
+import com.wavesplatform.lang.v1.parser.BinaryOperation
+import com.wavesplatform.lang.v1.parser.Expressions._
+import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import org.scalacheck._
 
 trait ScriptGen {
@@ -102,7 +103,7 @@ trait ScriptGen {
     case CONST_STRING(x) => withWhitespaces(s"""\"$x\"""")
     case TRUE            => withWhitespaces("true")
     case FALSE           => withWhitespaces("false")
-    case BINARY_OP(x, op: BINARY_OP_KIND, y) =>
+    case BINARY_OP(x, op: BinaryOperation, y) =>
       for {
         arg1 <- toString(x)
         arg2 <- toString(y)

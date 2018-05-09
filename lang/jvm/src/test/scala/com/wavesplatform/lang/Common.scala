@@ -1,7 +1,7 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.v1.Terms
-import com.wavesplatform.lang.v1.ctx.PredefFunction
+import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction
 import org.scalacheck.Shrink
 import org.scalatest.matchers.{MatchResult, Matcher}
 

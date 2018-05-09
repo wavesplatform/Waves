@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.lang.v1.Terms.Typed
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -130,7 +130,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
       recipientAcc <- accountGen
       ts = System.currentTimeMillis()
     } yield {
-      val script = ScriptV1(Typed.TRUE).explicitGet()
+      val script = ScriptV1(TRUE).explicitGet()
 
       val genesisTx = GenesisTransaction.create(richAcc, ENOUGH_AMT, ts).explicitGet()
 

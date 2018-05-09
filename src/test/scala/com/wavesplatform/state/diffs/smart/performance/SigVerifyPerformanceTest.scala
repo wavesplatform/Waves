@@ -1,7 +1,8 @@
 package com.wavesplatform.state.diffs.smart.performance
 
-import com.wavesplatform.lang.v1.Terms.Typed
-import com.wavesplatform.lang.v1.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state._
 import com.wavesplatform.utils._
@@ -34,7 +35,7 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
       fee     <- smallFeeGen
     } yield TransferTransactionV2.selfSigned(version, None, from, to.toAddress, amt, ts, None, fee, Array.emptyByteArray).explicitGet()
 
-  private def differentTransfers(typed: Typed.EXPR) =
+  private def differentTransfers(typed: EXPR) =
     for {
       master    <- accountGen
       recipient <- accountGen
@@ -52,7 +53,7 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
   ignore("parallel native signature verification vs sequential scripted signature verification") {
     val textScript    = "sigVerify(tx.bodyBytes,tx.proof0,tx.senderPk)"
     val untypedScript = Parser(textScript).get.value
-    val typedScript   = TypeChecker(dummyTypeCheckerContext, untypedScript).explicitGet()
+    val typedScript   = CompilerV1(dummyTypeCheckerContext, untypedScript).explicitGet()
 
     forAll(differentTransfers(typedScript)) {
       case (gen, setScript, transfers, scriptTransfers) =>

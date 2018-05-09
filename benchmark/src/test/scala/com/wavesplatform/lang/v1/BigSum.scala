@@ -1,8 +1,8 @@
 package com.wavesplatform.lang.v1
 
 import com.wavesplatform.lang.v1.FunctionHeader.{FunctionHeaderType => FHT}
-import com.wavesplatform.lang.v1.Terms.Typed.{CONST_LONG, EXPR, FUNCTION_CALL}
-import com.wavesplatform.lang.v1.Terms.{BOOLEAN, LONG, Typed}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, EXPR, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.{BOOLEAN, LONG}
 import org.openjdk.jmh.annotations.{Scope, State}
 
 @State(Scope.Benchmark)
@@ -15,7 +15,7 @@ class BigSum {
     )
   }
 
-  val expr: Typed.EXPR = FUNCTION_CALL(
+  val expr: EXPR = FUNCTION_CALL(
     function = FunctionHeader(name = "==", List(FHT.LONG, FHT.LONG)),
     args = List(CONST_LONG(1), bigSum),
     BOOLEAN
