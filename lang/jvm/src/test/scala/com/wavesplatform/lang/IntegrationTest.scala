@@ -15,7 +15,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   private def eval[T: TypeInfo](code: String) = {
     val untyped = Parser(code).get.value
     val ctx     = PureContext.instance
-    val typed   = CompilerV1(CompilerContext.fromExecutionContext(ctx), untyped)
+    val typed   = CompilerV1(CompilerContext.fromEvaluationContext(ctx), untyped)
     typed.flatMap(EvaluatorV1[T](ctx, _))
   }
 

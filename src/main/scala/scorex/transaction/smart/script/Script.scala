@@ -1,6 +1,5 @@
 package scorex.transaction.smart.script
 
-import com.wavesplatform.lang
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.Versioned
 import com.wavesplatform.lang.v1.compiler.Terms

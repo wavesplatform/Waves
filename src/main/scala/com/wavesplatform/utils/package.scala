@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import com.google.common.base.Throwables
 import com.wavesplatform.db.{Storage, VersionedStorage}
-import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import monix.eval.Coeval
 import monix.execution.UncaughtExceptionReporter
@@ -75,7 +75,7 @@ package object utils extends ScorexLogging {
     }
   }
 
-  lazy val dummyNetworkByte: Byte                              = AddressScheme.current.chainId
-  lazy val dummyContext: EvaluationContext                     = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), null)
-  lazy val dummyTypeCheckerContext: CompilerV1.CompilerContext = CompilerV1.CompilerContext.fromContext(dummyContext)
+  lazy val dummyNetworkByte: Byte                   = AddressScheme.current.chainId
+  lazy val dummyContext: EvaluationContext          = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), null)
+  lazy val dummyTypeCheckerContext: CompilerContext = CompilerContext.fromEvaluationContext(dummyContext)
 }

@@ -2,8 +2,8 @@ package com.wavesplatform
 
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.v1.compiler.Terms.Typed
-import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.settings.Constants
@@ -114,7 +114,7 @@ trait TransactionGenBase extends ScriptGen {
   } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
 
   val scriptGen = BOOLgen(100).map { expr =>
-    val typed = CompilerV1(CompilerV1.CompilerContext.fromContext(PureContext.instance |+| CryptoContext.build(Global)), expr).explicitGet()
+    val typed = CompilerV1(CompilerContext.fromEvaluationContext(PureContext.instance |+| CryptoContext.build(Global)), expr).explicitGet()
     ScriptV1(typed).explicitGet()
   }
 

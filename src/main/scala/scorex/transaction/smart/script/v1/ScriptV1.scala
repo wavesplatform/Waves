@@ -3,7 +3,7 @@ package scorex.transaction.smart.script.v1
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType.BYTEVECTOR
-import com.wavesplatform.lang.v1.compiler.Terms.{BOOLEAN, Typed}
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.{FunctionHeader, ScriptEstimator, Serde}
 import com.wavesplatform.state.ByteStr

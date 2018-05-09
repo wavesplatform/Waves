@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.lang.v1.compiler.Terms.Typed
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.state.{Blockchain, EitherExt2}
 import com.wavesplatform.utx.UtxPool
