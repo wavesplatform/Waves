@@ -1,6 +1,6 @@
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.Serde
-import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import fastparse.core.Parsed
 import scodec.bits.BitVector
 
@@ -15,7 +15,7 @@ object JsAPI {
   def compile(input: String): Option[BitVector] = {
     parse(input)
       .fold[Option[Expressions.EXPR]]((_, _, _) => None, (x, _) => Some(x))
-      .flatMap(CompilerV1(CompilerV1.CompilerContext.empty, _).toOption)
+      .flatMap(CompilerV1(CompilerContext.empty, _).toOption)
       .flatMap(Serde.codec.encode(_).toOption)
   }
 }
