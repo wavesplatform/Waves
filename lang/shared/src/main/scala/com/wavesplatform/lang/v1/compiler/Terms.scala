@@ -31,19 +31,17 @@ object Terms {
   }
   case class TYPEREF(name: String) extends AUTO_TAGGED_TYPE[Obj]
 
-  object Typed {
-    sealed abstract class EXPR(val tpe: TYPE)
-    case class LET(name: String, value: EXPR)
-    case class CONST_LONG(t: Long)                                                               extends EXPR(LONG)
-    case class GETTER(ref: EXPR, field: String, override val tpe: TYPE)                          extends EXPR(tpe)
-    case class CONST_BYTEVECTOR(bs: ByteVector)                                                  extends EXPR(BYTEVECTOR)
-    case class CONST_STRING(s: String)                                                           extends EXPR(STRING)
-    case class BLOCK(let: LET, body: EXPR, override val tpe: TYPE)                               extends EXPR(tpe)
-    case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, override val tpe: TYPE)               extends EXPR(tpe)
-    case class REF(key: String, override val tpe: TYPE)                                          extends EXPR(tpe)
-    case object TRUE                                                                             extends EXPR(BOOLEAN)
-    case object FALSE                                                                            extends EXPR(BOOLEAN)
-    case class FUNCTION_CALL(function: FunctionHeader, args: List[EXPR], override val tpe: TYPE) extends EXPR(tpe)
-  }
+  sealed abstract class EXPR(val tpe: TYPE)
+  case class LET(name: String, value: EXPR)
+  case class CONST_LONG(t: Long)                                                               extends EXPR(LONG)
+  case class GETTER(ref: EXPR, field: String, override val tpe: TYPE)                          extends EXPR(tpe)
+  case class CONST_BYTEVECTOR(bs: ByteVector)                                                  extends EXPR(BYTEVECTOR)
+  case class CONST_STRING(s: String)                                                           extends EXPR(STRING)
+  case class BLOCK(let: LET, body: EXPR, override val tpe: TYPE)                               extends EXPR(tpe)
+  case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, override val tpe: TYPE)               extends EXPR(tpe)
+  case class REF(key: String, override val tpe: TYPE)                                          extends EXPR(tpe)
+  case object TRUE                                                                             extends EXPR(BOOLEAN)
+  case object FALSE                                                                            extends EXPR(BOOLEAN)
+  case class FUNCTION_CALL(function: FunctionHeader, args: List[EXPR], override val tpe: TYPE) extends EXPR(tpe)
 
 }

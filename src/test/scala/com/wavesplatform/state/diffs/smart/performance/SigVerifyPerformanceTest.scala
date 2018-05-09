@@ -35,7 +35,7 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
       fee     <- smallFeeGen
     } yield TransferTransactionV2.selfSigned(version, None, from, to.toAddress, amt, ts, None, fee, Array.emptyByteArray).explicitGet()
 
-  private def differentTransfers(typed: Typed.EXPR) =
+  private def differentTransfers(typed: EXPR) =
     for {
       master    <- accountGen
       recipient <- accountGen

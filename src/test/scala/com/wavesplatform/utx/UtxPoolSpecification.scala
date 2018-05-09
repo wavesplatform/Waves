@@ -222,7 +222,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
       (utx, time, tx1, (offset + 1000).millis, tx2)
     }
 
-  private val expr: Typed.EXPR = {
+  private val expr: EXPR = {
     val code =
       """let x = 1
         |let y = 2

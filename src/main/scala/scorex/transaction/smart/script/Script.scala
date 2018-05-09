@@ -33,8 +33,8 @@ object Script {
     } yield script
 
   object Expr {
-    def unapply(arg: Script): Option[Terms.Typed.EXPR] = {
-      if (arg.version == V1) Some(arg.expr.asInstanceOf[Terms.Typed.EXPR])
+    def unapply(arg: Script): Option[Terms.EXPR] = {
+      if (arg.version == V1) Some(arg.expr.asInstanceOf[Terms.EXPR])
       else None
     }
   }

@@ -130,7 +130,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
       recipientAcc <- accountGen
       ts = System.currentTimeMillis()
     } yield {
-      val script = ScriptV1(Typed.TRUE).explicitGet()
+      val script = ScriptV1(TRUE).explicitGet()
 
       val genesisTx = GenesisTransaction.create(richAcc, ENOUGH_AMT, ts).explicitGet()
 

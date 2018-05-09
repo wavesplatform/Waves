@@ -28,9 +28,9 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/compile"), "1 == 2") ~> route ~> check {
       val json = responseAs[JsValue]
       val expectedScript = ScriptV1(
-        Typed.FUNCTION_CALL(
+        FUNCTION_CALL(
           function = FunctionHeader("==", List(FunctionHeader.FunctionHeaderType.LONG, FunctionHeader.FunctionHeaderType.LONG)),
-          args = List(Typed.CONST_LONG(1), Typed.CONST_LONG(2)),
+          args = List(CONST_LONG(1), CONST_LONG(2)),
           tpe = BOOLEAN
         )).explicitGet()
 

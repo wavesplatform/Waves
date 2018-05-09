@@ -5,7 +5,7 @@ import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
-import com.wavesplatform.lang.v1.compiler.Terms.Typed._
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.ctx.Context._
 import com.wavesplatform.lang.v1.ctx._
@@ -311,7 +311,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         letDefs = Map.empty,
         functions = Map(multiplierFunction.header -> multiplierFunction)
       ),
-      expr = FUNCTION_CALL(multiplierFunction.header, List(Typed.CONST_LONG(3), Typed.CONST_LONG(4)), LONG)
+      expr = FUNCTION_CALL(multiplierFunction.header, List(CONST_LONG(3), CONST_LONG(4)), LONG)
     ) shouldBe Right(12)
   }
 
@@ -399,7 +399,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       context = context,
       expr = FUNCTION_CALL(
         function = FunctionHeader(funcName, List(FunctionHeaderType.BYTEVECTOR)),
-        args = List(Typed.CONST_BYTEVECTOR(ByteVector(bodyBytes))),
+        args = List(CONST_BYTEVECTOR(ByteVector(bodyBytes))),
         BYTEVECTOR
       )
     )

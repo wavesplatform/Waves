@@ -3,7 +3,7 @@ package scorex.transaction.smart.script
 import cats.implicits._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType.{LONG => FT_LONG}
-import com.wavesplatform.lang.v1.compiler.Terms.Typed._
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Terms.{BOOLEAN, LONG}
 import com.wavesplatform.state.EitherExt2
 import org.scalatest.prop.PropertyChecks

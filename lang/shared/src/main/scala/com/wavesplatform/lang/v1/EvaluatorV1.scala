@@ -4,7 +4,7 @@ import cats.data.{EitherT, StateT}
 import cats.implicits._
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.TypeInfo._
-import com.wavesplatform.lang.v1.compiler.Terms.Typed.{EXPR, LET}
+import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, LET}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.ctx._
 import com.wavesplatform.lang._
@@ -103,22 +103,22 @@ object EvaluatorV1 extends ExprEvaluator {
     } yield result
   }
 
-  private def evalExpr[T: TypeInfo](t: Typed.EXPR): FF[T] = {
+  private def evalExpr[T: TypeInfo](t: EXPR): FF[T] = {
     (t match {
-      case Typed.BLOCK(let, inner, blockTpe) =>
+      case BLOCK(let, inner, blockTpe) =>
         writeLog("Evaluating BLOCK") *> evalBlock(let, inner, blockTpe) <* writeLog("FINISHED")
-      case Typed.REF(str, _) =>
+      case REF(str, _) =>
         writeLog("Evaluating REF") *> evalRef(str) <* writeLog("FINISHED")
-      case Typed.CONST_LONG(v)       => liftR(v)
-      case Typed.CONST_BYTEVECTOR(v) => liftR(v)
-      case Typed.CONST_STRING(v)     => liftR(v)
-      case Typed.TRUE                => liftR(true)
-      case Typed.FALSE               => liftR(false)
-      case Typed.IF(cond, t1, t2, tpe) =>
+      case CONST_LONG(v)       => liftR(v)
+      case CONST_BYTEVECTOR(v) => liftR(v)
+      case CONST_STRING(v)     => liftR(v)
+      case TRUE                => liftR(true)
+      case FALSE               => liftR(false)
+      case IF(cond, t1, t2, tpe) =>
         writeLog("Evaluating IF") *> evalIF(cond, t1, t2, tpe) <* writeLog("FINISHED")
-      case Typed.GETTER(expr, field, _) =>
+      case GETTER(expr, field, _) =>
         writeLog(s"Evaluating GETTER") *> evalGetter(expr, field) <* writeLog("FINISHED")
-      case Typed.FUNCTION_CALL(header, args, _) =>
+      case FUNCTION_CALL(header, args, _) =>
         writeLog(s"Evaluating FUNCTION_CALL") *> evalFunctionCall(header, args) <* writeLog("FINISHED")
     }).flatMap(v => {
       val ti = typeInfo[T]
@@ -128,7 +128,7 @@ object EvaluatorV1 extends ExprEvaluator {
 
   }
 
-  def apply[A: TypeInfo](c: Context, expr: Typed.EXPR): Either[(Context, ExecutionLog, ExecutionError), A] = {
+  def apply[A: TypeInfo](c: Context, expr: EXPR): Either[(Context, ExecutionLog, ExecutionError), A] = {
     def evaluation = evalExpr[A](expr).value.run(EvaluationContext(c))
 
     evaluation

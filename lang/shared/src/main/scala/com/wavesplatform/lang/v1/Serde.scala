@@ -21,17 +21,17 @@ object Serde {
   implicit def d0TypeRef     = d0.bind[FunctionHeaderType.TYPEREF](8)
   implicit def d0String      = d0.bind[FunctionHeaderType.STRING.type](9)
 
-  implicit def d                = Discriminated[Typed.EXPR, Int](uint8)
-  implicit def dConstInt        = d.bind[Typed.CONST_LONG](0)
-  implicit def dConstByteVector = d.bind[Typed.CONST_BYTEVECTOR](1)
-  implicit def dConstString     = d.bind[Typed.CONST_STRING](2)
-  implicit def dIf              = d.bind[Typed.IF](3)
-  implicit def dComposite       = d.bind[Typed.BLOCK](6)
-  implicit def dRef             = d.bind[Typed.REF](7)
-  implicit def dTrue            = d.bind[Typed.TRUE.type](8)
-  implicit def dFalse           = d.bind[Typed.FALSE.type](9)
-  implicit def dGetter          = d.bind[Typed.GETTER](12)
-  implicit def dFunctionCall    = d.bind[Typed.FUNCTION_CALL](13)
+  implicit def d                = Discriminated[EXPR, Int](uint8)
+  implicit def dConstInt        = d.bind[CONST_LONG](0)
+  implicit def dConstByteVector = d.bind[CONST_BYTEVECTOR](1)
+  implicit def dConstString     = d.bind[CONST_STRING](2)
+  implicit def dIf              = d.bind[IF](3)
+  implicit def dComposite       = d.bind[BLOCK](6)
+  implicit def dRef             = d.bind[REF](7)
+  implicit def dTrue            = d.bind[TRUE.type](8)
+  implicit def dFalse           = d.bind[FALSE.type](9)
+  implicit def dGetter          = d.bind[GETTER](12)
+  implicit def dFunctionCall    = d.bind[FUNCTION_CALL](13)
 
   implicit def tD           = Discriminated[TYPE, Int](uint8)
   implicit def tDNothing    = tD.bind[NOTHING.type](0)
@@ -43,6 +43,6 @@ object Serde {
   implicit def tDTypeRef    = tD.bind[TYPEREF](6)
   implicit def tDString     = tD.bind[STRING.type](7)
 
-  val codec: Codec[Typed.EXPR] = Codec[Typed.EXPR]
+  val codec: Codec[EXPR] = Codec[EXPR]
 
 }

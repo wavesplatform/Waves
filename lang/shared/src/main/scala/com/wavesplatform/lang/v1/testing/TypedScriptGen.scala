@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.testing
 
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
-import com.wavesplatform.lang.v1.compiler.Terms.Typed._
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import org.scalacheck._
 import scodec.bits.ByteVector

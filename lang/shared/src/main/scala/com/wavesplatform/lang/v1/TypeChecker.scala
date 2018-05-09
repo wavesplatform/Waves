@@ -33,12 +33,12 @@ object TypeChecker {
   type TypeCheckResult[T]       = Either[TypeResolutionError, T]
   private type SetTypeResult[T] = EitherT[Coeval, String, T]
 
-  private def setType(ctx: TypeCheckerContext, t: SetTypeResult[Expressions.EXPR]): SetTypeResult[Typed.EXPR] = t.flatMap {
-    case x: Expressions.CONST_LONG       => EitherT.pure(Typed.CONST_LONG(x.value))
-    case x: Expressions.CONST_BYTEVECTOR => EitherT.pure(Typed.CONST_BYTEVECTOR(x.value))
-    case x: Expressions.CONST_STRING     => EitherT.pure(Typed.CONST_STRING(x.value))
-    case Expressions.TRUE                => EitherT.pure(Typed.TRUE)
-    case Expressions.FALSE               => EitherT.pure(Typed.FALSE)
+  private def setType(ctx: TypeCheckerContext, t: SetTypeResult[Expressions.EXPR]): SetTypeResult[EXPR] = t.flatMap {
+    case x: Expressions.CONST_LONG       => EitherT.pure(CONST_LONG(x.value))
+    case x: Expressions.CONST_BYTEVECTOR => EitherT.pure(CONST_BYTEVECTOR(x.value))
+    case x: Expressions.CONST_STRING     => EitherT.pure(CONST_STRING(x.value))
+    case Expressions.TRUE                => EitherT.pure(TRUE)
+    case Expressions.FALSE               => EitherT.pure(FALSE)
     case Expressions.BINARY_OP(a, op, b) =>
       op match {
         case AND_OP => setType(ctx, EitherT.pure(Expressions.IF(a, b, Expressions.FALSE)))
@@ -60,34 +60,34 @@ object TypeChecker {
                 fieldTpe.map(Right(_)).getOrElse(Left(s"Undefined field ${typeRef.name}.${getter.field}"))
               }
 
-              fieldTpe.right.map(tpe => Typed.GETTER(ref = ref, field = getter.field, tpe = tpe))
+              fieldTpe.right.map(tpe => GETTER(ref = ref, field = getter.field, tpe = tpe))
             case x => Left(s"Can't access to '${getter.field}' of a primitive type $x")
           }
         }
 
     case Expressions.FUNCTION_CALL(name, args) =>
-      type ResolvedArgsResult = EitherT[Coeval, String, List[Typed.EXPR]]
+      type ResolvedArgsResult = EitherT[Coeval, String, List[EXPR]]
 
       def resolvedArguments(args: List[Expressions.EXPR]): ResolvedArgsResult = {
         import cats.instances.list._
-        val r: List[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg)))(collection.breakOut)
-        r.sequence[SetTypeResult, Typed.EXPR]
+        val r: List[SetTypeResult[EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg)))(collection.breakOut)
+        r.sequence[SetTypeResult, EXPR]
       }
 
-      def matchOverload(resolvedArgs: List[Typed.EXPR], f: FunctionTypeSignature): Either[String, Typed.EXPR] = {
+      def matchOverload(resolvedArgs: List[EXPR], f: FunctionTypeSignature): Either[String, EXPR] = {
         val argTypes   = f.args
         val resultType = f.result
         if (args.lengthCompare(argTypes.size) != 0)
           Left(s"Function '$name' requires ${argTypes.size} arguments, but ${args.size} are provided")
         else {
-          val typedExpressionArgumentsAndTypedPlaceholders: List[(Typed.EXPR, TYPEPLACEHOLDER)] = resolvedArgs.zip(argTypes)
+          val typedExpressionArgumentsAndTypedPlaceholders: List[(EXPR, TYPEPLACEHOLDER)] = resolvedArgs.zip(argTypes)
 
           val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case ((typedExpr, tph)) => (typedExpr.tpe, tph) }
           for {
             resolvedTypeParams <- TypeInferrer(typePairs)
             resolvedResultType <- TypeInferrer.inferResultType(resultType, resolvedTypeParams)
           } yield
-            Typed.FUNCTION_CALL(
+            FUNCTION_CALL(
               FunctionHeader(name, f.args.map(FunctionHeaderType.fromTypePlaceholder)),
               typedExpressionArgumentsAndTypedPlaceholders.map(_._1),
               resolvedResultType
@@ -119,16 +119,16 @@ object TypeChecker {
     case block: Expressions.BLOCK =>
       import block.let
       (ctx.varDefs.get(let.name), ctx.functionDefs.get(let.name)) match {
-        case (Some(_), _) => EitherT.leftT[Coeval, Typed.EXPR](s"Value '${let.name}' already defined in the scope")
+        case (Some(_), _) => EitherT.leftT[Coeval, EXPR](s"Value '${let.name}' already defined in the scope")
         case (_, Some(_)) =>
-          EitherT.leftT[Coeval, Typed.EXPR](s"Value '${let.name}' can't be defined because function with such name is predefined")
+          EitherT.leftT[Coeval, EXPR](s"Value '${let.name}' can't be defined because function with such name is predefined")
         case (None, None) =>
           setType(ctx, EitherT.pure(let.value)).flatMap { exprTpe =>
             val updatedCtx = ctx.copy(varDefs = ctx.varDefs + (let.name -> exprTpe.tpe))
             setType(updatedCtx, EitherT.pure(block.body))
               .map { inExpr =>
-                Typed.BLOCK(
-                  let = Typed.LET(let.name, exprTpe),
+                BLOCK(
+                  let = LET(let.name, exprTpe),
                   body = inExpr,
                   tpe = inExpr.tpe
                 )
@@ -138,8 +138,8 @@ object TypeChecker {
 
     case ifExpr: Expressions.IF =>
       (setType(ctx, EitherT.pure(ifExpr.cond)), setType(ctx, EitherT.pure(ifExpr.ifTrue)), setType(ctx, EitherT.pure(ifExpr.ifFalse))).tupled
-        .subflatMap[String, Typed.EXPR] {
-          case (resolvedCond: Typed.EXPR, resolvedIfTrue, resolvedIfFalse) =>
+        .subflatMap[String, EXPR] {
+          case (resolvedCond: EXPR, resolvedIfTrue, resolvedIfFalse) =>
             if (resolvedCond.tpe != BOOLEAN)
               Left(s"IF clause is expected to be BOOLEAN, acutal: ${resolvedCond.tpe}")
             else {
@@ -148,7 +148,7 @@ object TypeChecker {
               TypeInferrer.findCommonType(ifTrueTpe, ifFalseTpe) match {
                 case Some(tpe) =>
                   Right(
-                    Typed.IF(
+                    IF(
                       cond = resolvedCond,
                       ifTrue = resolvedIfTrue,
                       ifFalse = resolvedIfFalse,
@@ -164,14 +164,14 @@ object TypeChecker {
         ctx.varDefs
           .get(ref.key)
           .map { tpe =>
-            Typed.REF(key = ref.key, tpe = tpe)
+            REF(key = ref.key, tpe = tpe)
           }
           .toRight(s"A definition of '${ref.key}' is not found")
       }
 
   }
 
-  def apply(c: TypeCheckerContext, expr: Expressions.EXPR): TypeCheckResult[Typed.EXPR] = {
+  def apply(c: TypeCheckerContext, expr: Expressions.EXPR): TypeCheckResult[EXPR] = {
     def result = setType(c, EitherT.pure(expr)).value().left.map { e =>
       s"Typecheck failed: $e"
     }

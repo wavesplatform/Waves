@@ -28,7 +28,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   treeTypeTest(s"unitOnNone(NONE)")(
     ctx = typeCheckerContext,
     expr = Expressions.FUNCTION_CALL(unitOnNone.name, List(Expressions.REF("None"))),
-    expectedResult = Right(Typed.FUNCTION_CALL(unitOnNone.header, List(Typed.REF("None", OPTION(NOTHING))), UNIT))
+    expectedResult = Right(FUNCTION_CALL(unitOnNone.header, List(REF("None", OPTION(NOTHING))), UNIT))
   )
 
   property("successful on very deep expressions(stack overflow check)") {
@@ -49,8 +49,8 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       field = "x"
     ),
     expectedResult = Right(
-      Typed.GETTER(
-        ref = Typed.REF("p", TYPEREF("Point")),
+      GETTER(
+        ref = REF("p", TYPEREF("Point")),
         field = "x",
         tpe = LONG
       ))
@@ -59,34 +59,32 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   treeTypeTest("REF(OBJECT)")(
     ctx = TypeCheckerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> TYPEREF("Point")), functionDefs = Map.empty),
     expr = Expressions.REF("p"),
-    expectedResult = Right(Typed.REF("p", TYPEREF("Point")))
+    expectedResult = Right(REF("p", TYPEREF("Point")))
   )
 
   treeTypeTest("REF x = y")(
     ctx = TypeCheckerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> TYPEREF("Point")), functionDefs = Map.empty),
     expr = Expressions.REF("p"),
-    expectedResult = Right(Typed.REF("p", TYPEREF("Point")))
+    expectedResult = Right(REF("p", TYPEREF("Point")))
   )
 
   treeTypeTest("MULTIPLY(1,2)")(
     ctx = typeCheckerContext,
     expr = Expressions.FUNCTION_CALL(multiplierFunction.name, List(Expressions.CONST_LONG(1), Expressions.CONST_LONG(2))),
-    expectedResult = Right(Typed.FUNCTION_CALL(multiplierFunction.header, List(Typed.CONST_LONG(1), Typed.CONST_LONG(2)), LONG))
+    expectedResult = Right(FUNCTION_CALL(multiplierFunction.header, List(CONST_LONG(1), CONST_LONG(2)), LONG))
   )
 
   treeTypeTest(s"idOptionLong(NONE)")(
     ctx = typeCheckerContext,
     expr = Expressions.FUNCTION_CALL(idOptionLong.name, List(Expressions.REF("None"))),
-    expectedResult = Right(Typed.FUNCTION_CALL(idOptionLong.header, List(Typed.REF("None", OPTION(NOTHING))), UNIT))
+    expectedResult = Right(FUNCTION_CALL(idOptionLong.header, List(REF("None", OPTION(NOTHING))), UNIT))
   )
 
   treeTypeTest(s"idOptionLong(SOME(NONE))")(
     ctx = typeCheckerContext,
     expr = Expressions.FUNCTION_CALL(idOptionLong.name, List(Expressions.FUNCTION_CALL("Some", List(Expressions.REF("None"))))),
-    expectedResult = Right(
-      Typed.FUNCTION_CALL(idOptionLong.header,
-                          List(Typed.FUNCTION_CALL(some.header, List(Typed.REF("None", OPTION(NOTHING))), OPTION(OPTION(NOTHING)))),
-                          UNIT))
+    expectedResult =
+      Right(FUNCTION_CALL(idOptionLong.header, List(FUNCTION_CALL(some.header, List(REF("None", OPTION(NOTHING))), OPTION(OPTION(NOTHING)))), UNIT))
   )
 
   treeTypeTest(s"idOptionLong(SOME(CONST_LONG(3)))")(
@@ -95,15 +93,15 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       Expressions.FUNCTION_CALL(idOptionLong.name,
                                 List(Expressions.FUNCTION_CALL("Some", List(Expressions.FUNCTION_CALL("Some", List(Expressions.CONST_LONG(3))))))),
     expectedResult = Right(
-      Typed.FUNCTION_CALL(
+      FUNCTION_CALL(
         idOptionLong.header,
-        List(Typed.FUNCTION_CALL(some.header, List(Typed.FUNCTION_CALL(some.header, List(Typed.CONST_LONG(3)), OPTION(LONG))), OPTION(OPTION(LONG)))),
+        List(FUNCTION_CALL(some.header, List(FUNCTION_CALL(some.header, List(CONST_LONG(3)), OPTION(LONG))), OPTION(OPTION(LONG)))),
         UNIT
       )
     )
   )
 
-  private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: TypeCheckResult[Typed.EXPR], ctx: TypeCheckerContext): Unit =
+  private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: TypeCheckResult[EXPR], ctx: TypeCheckerContext): Unit =
     property(propertyName) {
       TypeChecker(ctx, expr) shouldBe expectedResult
     }
