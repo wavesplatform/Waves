@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.parser.Terms._
 import com.wavesplatform.lang.v1.TypeChecker
 import com.wavesplatform.lang.v1.TypeChecker.{TypeCheckResult, TypeCheckerContext}
 import com.wavesplatform.lang.v1.ctx.impl.PureContext._
-import com.wavesplatform.lang.v1.parser.BinaryOperations.SUM_OP
+import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks

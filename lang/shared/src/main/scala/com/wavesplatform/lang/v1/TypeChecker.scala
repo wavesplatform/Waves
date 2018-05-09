@@ -3,10 +3,10 @@ package com.wavesplatform.lang.v1
 import cats.data._
 import cats.syntax.all._
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
-import com.wavesplatform.lang.v1.parser.Terms._
 import com.wavesplatform.lang.v1.ctx.{Context, PredefType}
-import com.wavesplatform.lang.v1.parser.{Expressions, Terms}
-import com.wavesplatform.lang.v1.parser.BinaryOperations._
+import com.wavesplatform.lang.v1.parser.BinaryOperation._
+import com.wavesplatform.lang.v1.parser.Expressions
+import com.wavesplatform.lang.v1.parser.Terms._
 import monix.eval.Coeval
 
 import scala.util.{Failure, Success, Try}

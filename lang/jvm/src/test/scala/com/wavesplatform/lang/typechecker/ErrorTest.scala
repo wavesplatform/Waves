@@ -2,7 +2,7 @@ package com.wavesplatform.lang.typechecker
 
 import com.wavesplatform.lang.Common.{NoShrink, multiplierFunction, produce}
 import com.wavesplatform.lang.v1.TypeChecker
-import com.wavesplatform.lang.v1.parser.BinaryOperations.SUM_OP
+import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
