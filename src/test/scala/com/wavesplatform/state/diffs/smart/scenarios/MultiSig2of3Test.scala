@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.TypeChecker
+import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
@@ -36,7 +36,7 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
          |
       """.stripMargin
     val untyped = Parser(script).get.value
-    TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
+    CompilerV1(dummyTypeCheckerContext, untyped).explicitGet()
   }
 
   val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, TransferTransactionV2, Seq[ByteStr])] = for {

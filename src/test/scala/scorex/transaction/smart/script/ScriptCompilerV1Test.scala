@@ -10,7 +10,7 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.transaction.smart.script.v1.ScriptV1
 
-class ScriptCompilerTest extends PropSpec with PropertyChecks with Matchers {
+class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
 
   property("compile script with specified version") {
     val script = scriptWithVersion("1".some)

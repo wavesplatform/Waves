@@ -2,8 +2,9 @@ package com.wavesplatform.lang.typechecker
 
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.TypeChecker
-import com.wavesplatform.lang.v1.TypeChecker.{TypeCheckResult, TypeCheckerContext}
+import com.wavesplatform.lang.v1.compiler
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
+import com.wavesplatform.lang.v1.compiler.CompilerV1.CompilationResult
 import com.wavesplatform.lang.v1.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions
@@ -11,17 +12,17 @@ import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
-class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   property("should infer generic function return type") {
     import com.wavesplatform.lang.v1.parser.Expressions._
-    val Right(v) = TypeChecker(typeCheckerContext, FUNCTION_CALL(idT.name, List(CONST_LONG(1))))
+    val Right(v) = CompilerV1(typeCheckerContext, FUNCTION_CALL(idT.name, List(CONST_LONG(1))))
     v.tpe shouldBe LONG
   }
 
   property("should infer inner types") {
     import com.wavesplatform.lang.v1.parser.Expressions._
-    val Right(v) = TypeChecker(typeCheckerContext, FUNCTION_CALL(extract.name, List(FUNCTION_CALL(undefinedOptionLong.name, List.empty))))
+    val Right(v) = CompilerV1(typeCheckerContext, FUNCTION_CALL(extract.name, List(FUNCTION_CALL(undefinedOptionLong.name, List.empty))))
     v.tpe shouldBe LONG
   }
 
@@ -36,14 +37,14 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       (1 to 100000).foldLeft[Expressions.EXPR](Expressions.CONST_LONG(0))((acc, _) => Expressions.BINARY_OP(acc, SUM_OP, Expressions.CONST_LONG(1)))
     val expectedResult = Right(LONG)
 
-    TypeChecker(typeCheckerContext, expr).map(_.tpe) match {
+    CompilerV1(typeCheckerContext, expr).map(_.tpe) match {
       case Right(x)    => Right(x) shouldBe expectedResult
       case e @ Left(_) => e shouldBe expectedResult
     }
   }
 
   treeTypeTest("GETTER")(
-    ctx = TypeCheckerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> TYPEREF("Point")), functionDefs = Map.empty),
+    ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> TYPEREF("Point")), functionDefs = Map.empty),
     expr = Expressions.GETTER(
       ref = Expressions.REF("p"),
       field = "x"
@@ -57,13 +58,13 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   )
 
   treeTypeTest("REF(OBJECT)")(
-    ctx = TypeCheckerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> TYPEREF("Point")), functionDefs = Map.empty),
+    ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> TYPEREF("Point")), functionDefs = Map.empty),
     expr = Expressions.REF("p"),
     expectedResult = Right(REF("p", TYPEREF("Point")))
   )
 
   treeTypeTest("REF x = y")(
-    ctx = TypeCheckerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> TYPEREF("Point")), functionDefs = Map.empty),
+    ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> TYPEREF("Point")), functionDefs = Map.empty),
     expr = Expressions.REF("p"),
     expectedResult = Right(REF("p", TYPEREF("Point")))
   )
@@ -101,9 +102,9 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     )
   )
 
-  private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: TypeCheckResult[EXPR], ctx: TypeCheckerContext): Unit =
+  private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: CompilationResult[EXPR], ctx: CompilerContext): Unit =
     property(propertyName) {
-      TypeChecker(ctx, expr) shouldBe expectedResult
+      compiler.CompilerV1(ctx, expr) shouldBe expectedResult
     }
 
 }

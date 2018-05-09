@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.lang.v1.TypeChecker
+import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
@@ -41,7 +41,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
                     |
         """.stripMargin
       untypedAllFieldsRequiredScript = Parser(allFieldsRequiredScript).get.value
-      typedAllFieldsRequiredScript   = TypeChecker(dummyTypeCheckerContext, untypedAllFieldsRequiredScript).explicitGet()
+      typedAllFieldsRequiredScript   = CompilerV1(dummyTypeCheckerContext, untypedAllFieldsRequiredScript).explicitGet()
       setScript            <- selfSignedSetScriptTransactionGenP(master, ScriptV1(typedAllFieldsRequiredScript).explicitGet())
       transferFromScripted <- versionedTransferGenP(master, alice, Proofs.empty)
 

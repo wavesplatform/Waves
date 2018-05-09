@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import com.google.common.base.Throwables
 import com.wavesplatform.db.{Storage, VersionedStorage}
-import com.wavesplatform.lang.v1.TypeChecker
+import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.ctx.Context
 import monix.eval.Coeval
 import monix.execution.UncaughtExceptionReporter
@@ -75,7 +75,7 @@ package object utils extends ScorexLogging {
     }
   }
 
-  lazy val dummyNetworkByte: Byte                                  = AddressScheme.current.chainId
-  lazy val dummyContext: Context                                   = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), null)
-  lazy val dummyTypeCheckerContext: TypeChecker.TypeCheckerContext = TypeChecker.TypeCheckerContext.fromContext(dummyContext)
+  lazy val dummyNetworkByte: Byte                              = AddressScheme.current.chainId
+  lazy val dummyContext: Context                               = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), null)
+  lazy val dummyTypeCheckerContext: CompilerV1.CompilerContext = CompilerV1.CompilerContext.fromContext(dummyContext)
 }

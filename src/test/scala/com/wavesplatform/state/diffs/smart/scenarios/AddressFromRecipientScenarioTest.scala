@@ -2,7 +2,8 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.lang.v1.ctx.Obj
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.{EvaluatorV1, TypeChecker}
+import com.wavesplatform.lang.v1.EvaluatorV1
+import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState, produce}
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -38,7 +39,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
       BlockchainContext.build(AddressScheme.current.chainId, Coeval.evalOnce(tx), Coeval.evalOnce(blockchain.height), blockchain)
 
     val Parsed.Success(expr, _) = Parser("addressFromRecipient(tx.recipient)")
-    val Right(typedExpr)        = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(context), expr)
+    val Right(typedExpr)        = CompilerV1(CompilerV1.CompilerContext.fromContext(context), expr)
     EvaluatorV1[Obj](context, typedExpr).left.map(_._3)
   }
 

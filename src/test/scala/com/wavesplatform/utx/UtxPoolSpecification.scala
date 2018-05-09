@@ -3,9 +3,9 @@ package com.wavesplatform.utx
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
-import com.wavesplatform.lang.v1.compiler.Terms.Typed
-import com.wavesplatform.lang.v1.TypeChecker.TypeCheckerContext
 import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.CompilerV1.CompilerContext
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs._
@@ -228,7 +228,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
         |let y = 2
         |true""".stripMargin
 
-    val compiler = new CompilerV1(TypeCheckerContext.empty)
+    val compiler = new CompilerV1(CompilerContext.empty)
     compiler.compile(code, List.empty).explicitGet()
   }
 

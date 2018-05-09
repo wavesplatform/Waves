@@ -4,7 +4,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.v1.TypeChecker
+import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.utils.dummyTypeCheckerContext
@@ -67,7 +67,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
          AC && BC
 
       """.stripMargin).get.value
-      TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
+      CompilerV1(dummyTypeCheckerContext, untyped).explicitGet()
     }
 
     val script = ScriptV1(scriptText).explicitGet()
@@ -185,7 +185,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
         AC && heightVerification
         """.stripMargin).get.value
-      TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
+      CompilerV1(dummyTypeCheckerContext, untyped).explicitGet()
     }
 
     val script = ScriptV1(scriptText).explicitGet()

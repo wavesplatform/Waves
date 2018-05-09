@@ -6,8 +6,8 @@ import org.scalatest.CancelAfterFailure
 import scorex.account.{AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.lang.v1.compiler.CompilerV1
 import play.api.libs.json.JsNumber
-import com.wavesplatform.lang.v1.TypeChecker
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import com.wavesplatform.state._
@@ -55,7 +55,7 @@ class SmartContractsTestSuite extends BaseTransactionSuite with CancelAfterFailu
         approveTxF + approveTxS == 2 || cancelLeasing || approveTxF + approveTxS + changeScript == 3
 
       """.stripMargin).get.value
-      TypeChecker(dummyTypeCheckerContext, sc).explicitGet()
+      CompilerV1(dummyTypeCheckerContext, sc).explicitGet()
     }
 
     val script = ScriptV1(scriptText).explicitGet()
@@ -133,7 +133,7 @@ class SmartContractsTestSuite extends BaseTransactionSuite with CancelAfterFailu
         sigVerify(tx.bodyBytes,tx.proof0,sig1) && sigVerify(tx.bodyBytes,tx.proof1,sig2)
 
       """.stripMargin).get.value
-      TypeChecker(dummyTypeCheckerContext, sc).explicitGet()
+      CompilerV1(dummyTypeCheckerContext, sc).explicitGet()
     }
 
     val newScript = ScriptV1(newScriptText).explicitGet()
