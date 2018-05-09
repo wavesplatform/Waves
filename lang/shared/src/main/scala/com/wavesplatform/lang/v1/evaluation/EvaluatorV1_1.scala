@@ -16,7 +16,6 @@ object EvaluatorV1_1 {
   private def evalBlock(let: LET, inner: EXPR, tpe: TYPE): EvalM[Any] = {
     import let.{name, value}
     for {
-      _   <- writeLog(s"LET: $LET, TYPE: $tpe")
       ctx <- getContext
       result <- {
         if (lets.get(ctx).get(name).isDefined)
@@ -34,7 +33,6 @@ object EvaluatorV1_1 {
 
   private def evalRef(key: String) = {
     for {
-      _   <- writeLog(s"KEY: $key")
       ctx <- getContext
       result <- lets.get(ctx).get(key) match {
         case Some(lzy) => liftTER[Any](lzy.value.value)
@@ -45,11 +43,10 @@ object EvaluatorV1_1 {
 
   private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, tpe: TYPE) = {
     for {
-      _   <- writeLog("Evaluating IF")
-      ifc <- writeLog("Evaluating COND") *> evalExpr[Boolean](cond)
+      ifc <- evalExpr[Boolean](cond)
       result <- ifc match {
-        case true  => writeLog("Evaluating IF_TRUE") *> evalExpr(ifTrue)(tpe.typeInfo)
-        case false => writeLog("Evaluating IF_FALSE") *> evalExpr(ifFalse)(tpe.typeInfo)
+        case true  => evalExpr(ifTrue)(tpe.typeInfo)
+        case false => evalExpr(ifFalse)(tpe.typeInfo)
       }
     } yield result
   }
@@ -66,7 +63,6 @@ object EvaluatorV1_1 {
 
   private def evalFunctionCall(header: FunctionHeader, args: List[EXPR]): EvalM[Any] = {
     for {
-      _   <- writeLog(s"FUNCTION HEADER: $header")
       ctx <- getContext
       result <- funcs
         .get(ctx)
@@ -82,16 +78,16 @@ object EvaluatorV1_1 {
 
   private def evalExpr[T: TypeInfo](t: Typed.EXPR): EvalM[T] = {
     (t match {
-      case Typed.BLOCK(let, inner, blockTpe)    => writeLog("Evaluating BLOCK") *> evalBlock(let, inner, blockTpe) <* writeLog("FINISHED")
-      case Typed.REF(str, _)                    => writeLog("Evaluating REF") *> evalRef(str) <* writeLog("FINISHED")
+      case Typed.BLOCK(let, inner, blockTpe)    => evalBlock(let, inner, blockTpe)
+      case Typed.REF(str, _)                    => evalRef(str)
       case Typed.CONST_LONG(v)                  => liftValue(v)
       case Typed.CONST_BYTEVECTOR(v)            => liftValue(v)
       case Typed.CONST_STRING(v)                => liftValue(v)
       case Typed.TRUE                           => liftValue(true)
       case Typed.FALSE                          => liftValue(false)
-      case Typed.IF(cond, t1, t2, tpe)          => writeLog("Evaluating IF") *> evalIF(cond, t1, t2, tpe) <* writeLog("FINISHED")
-      case Typed.GETTER(expr, field, _)         => writeLog("Evaluating GETTER") *> evalGetter(expr, field) <* writeLog("FINISHED")
-      case Typed.FUNCTION_CALL(header, args, _) => writeLog("Evaluating FUNCTION_CALL") *> evalFunctionCall(header, args) <* writeLog("FINISHED")
+      case Typed.IF(cond, t1, t2, tpe)          => evalIF(cond, t1, t2, tpe)
+      case Typed.GETTER(expr, field, _)         => evalGetter(expr, field)
+      case Typed.FUNCTION_CALL(header, args, _) => evalFunctionCall(header, args)
     }).flatMap(v => {
       val ti = typeInfo[T]
       if (t.tpe.typeInfo <:< ti) liftValue(v.asInstanceOf[T])

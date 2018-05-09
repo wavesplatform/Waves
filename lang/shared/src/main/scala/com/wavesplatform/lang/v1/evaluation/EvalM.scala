@@ -1,75 +1,70 @@
 package com.wavesplatform.lang.v1.evaluation
 
-import cats.{Monad, ~>}
-import cats.data.{EitherT, Kleisli}
+import cats.{Monad, StackSafeMonad, ~>}
+import cats.data.{EitherT, Kleisli, WriterT}
 import com.wavesplatform.lang.{ExecutionError, ExecutionLog, TrampolinedExecResult}
-import com.wavesplatform.lang.v1.EvaluationContext
-import com.wavesplatform.lang.v1.EvaluationContext._
 import com.wavesplatform.lang.v1.ctx.Context
+import com.wavesplatform.lang.v1.ctx.Context.Lenses._
 import monix.eval.Coeval
 import cats.implicits._
+import com.wavesplatform.lang.v1.evaluation.H.EC
 
-final case class EvalM[A](inner: Kleisli[Coeval, CoevalRef[EvaluationContext], A]) {
+object H {
+  type Env = (CoevalRef[Context], StringBuffer)
+  type EC[A] = EitherT[Coeval, ExecutionError, A]
+}
+final case class EvalM[A](inner: Kleisli[Coeval, CoevalRef[Context], Either[ExecutionError, A]]) {
   def ter(ctx: Context): TrampolinedExecResult[A] = {
-    val atom = CoevalRef.of(EvaluationContext(ctx))
+    val atom = CoevalRef.of(ctx)
 
-    EitherT[Coeval, ExecutionError, A] {
-      inner.run(atom)
-        .attempt
-        .map(_.leftMap(_.getMessage))
-    }
+    EitherT(inner.run(atom))
   }
 
   def run(ctx: Context): Either[(Context, ExecutionLog, ExecutionError), A] = {
-    val atom = CoevalRef.of(EvaluationContext(ctx))
+    val atom = CoevalRef.of(ctx)
 
     val action = inner
       .run(atom)
-      .attempt
 
     (for {
       result  <- action
       lastCtx <- atom.read
-    } yield result.left.map(err => (lastCtx.context, lastCtx.getLog, err.getMessage))).value
+    } yield result.left.map(err => (lastCtx, "EMPTY", err))).value
   }
 }
 
 object EvalM {
-  type Inner[A] = Kleisli[Coeval, CoevalRef[EvaluationContext], A]
+  type Inner[A] = Kleisli[Coeval, CoevalRef[Context], A]
 
   private val innerMonad: Monad[Inner] = implicitly[Monad[Inner]]
 
-  implicit val monadInstance: Monad[EvalM] = new Monad[EvalM] {
+  implicit val monadInstance: Monad[EvalM] = new StackSafeMonad[EvalM] {
     override def pure[A](x: A): EvalM[A] =
-      EvalM(Kleisli.pure[Coeval, CoevalRef[EvaluationContext], A](x))
+      EvalM(Kleisli.pure[Coeval, CoevalRef[Context], Either[ExecutionError, A]](x.asRight[ExecutionError]))
 
     override def flatMap[A, B](fa: EvalM[A])(f: A => EvalM[B]): EvalM[B] =
-      EvalM(fa.inner.flatMap(f andThen { _.inner }))
-
-    override def tailRecM[A, B](a: A)(f: A => EvalM[Either[A, B]]): EvalM[B] =
-      EvalM(innerMonad.tailRecM(a)(f andThen { _.inner }))
+      EvalM(fa.inner.flatMap({
+        case Right(v) => f(v).inner
+        case Left(err) => Kleisli.pure(err.asLeft[B])
+      }))
   }
 
   def getContext: EvalM[Context] =
-    EvalM(Kleisli(_.read.map(_.context)))
+    EvalM(Kleisli[Coeval, CoevalRef[Context], Either[ExecutionError, Context]](ref => {
+      ref.read.map(_.asRight[ExecutionError])
+    }))
 
   def updateContext(f: Context => Context): EvalM[Unit] =
-    EvalM(Kleisli(_.update(context.modify(_)(f))))
+    EvalM(Kleisli[Coeval, CoevalRef[Context], Either[ExecutionError, Unit]](ref => {
+      ref.update(f).map(_.asRight[ExecutionError])
+    }))
 
   def liftValue[A](a: A): EvalM[A] =
     monadInstance.pure(a)
 
   def liftError[A](err: ExecutionError): EvalM[A] =
-    EvalM(Kleisli(_ => Coeval.raiseError[A](new Exception(err))))
+    EvalM(Kleisli[Coeval, CoevalRef[Context], Either[ExecutionError, A]](_ => Coeval.delay(err.asLeft[A])))
 
   def liftTER[A](ter: Coeval[Either[ExecutionError, A]]): EvalM[A] =
-    EvalM(Kleisli(_ => {
-      ter.flatMap({
-        case Right(v) => Coeval.delay(v)
-        case Left(err) => Coeval.raiseError(new Exception(err))
-      })
-    }))
-
-  def writeLog(l: String): EvalM[Unit] =
-    EvalM(Kleisli(_.update(_.logAppend(l))))
+    EvalM(Kleisli[Coeval, CoevalRef[Context], Either[ExecutionError, A]](_ => ter))
 }
