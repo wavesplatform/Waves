@@ -1,8 +1,8 @@
 package com.wavesplatform.lang.v1
 
 import com.wavesplatform.lang.v1.FunctionHeader.{FunctionHeaderType => FHT}
-import com.wavesplatform.lang.v1.Terms.Typed.{CONST_LONG, EXPR, FUNCTION_CALL}
-import com.wavesplatform.lang.v1.Terms.{BOOLEAN, LONG, Typed}
+import com.wavesplatform.lang.v1.parser.Terms.Typed.{CONST_LONG, EXPR, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.parser.Terms.{BOOLEAN, LONG, Typed}
 import org.openjdk.jmh.annotations.{Scope, State}
 
 @State(Scope.Benchmark)

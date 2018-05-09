@@ -1,9 +1,9 @@
 package com.wavesplatform.lang.v1.ctx.impl
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.Terms._
-import com.wavesplatform.lang.v1.Terms
 import com.wavesplatform.lang.v1.ctx.{Context, LazyVal, PredefFunction}
+import com.wavesplatform.lang.v1.parser.BinaryOperations._
+import com.wavesplatform.lang.v1.parser.Terms._
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 
@@ -36,7 +36,7 @@ object PureContext {
   }
 
   private def createOp(op: BINARY_OP_KIND, t: TYPE, r: TYPE)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
-    PredefFunction(Terms.opsToFunctions(op), 1, r, List("a" -> t, "b" -> t)) {
+    PredefFunction(opsToFunctions(op), 1, r, List("a" -> t, "b" -> t)) {
       case a :: b :: Nil =>
         Right(body(a.asInstanceOf[t.Underlying], b.asInstanceOf[t.Underlying]))
       case _ => ???

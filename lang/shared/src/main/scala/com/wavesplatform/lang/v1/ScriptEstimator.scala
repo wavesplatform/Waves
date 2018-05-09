@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.Terms._
+import com.wavesplatform.lang.v1.parser.Terms._
 import monix.eval.Coeval
 
 object ScriptEstimator {

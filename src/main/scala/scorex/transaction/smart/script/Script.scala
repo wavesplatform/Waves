@@ -3,6 +3,7 @@ package scorex.transaction.smart.script
 import com.wavesplatform.lang
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.Versioned
+import com.wavesplatform.lang.v1.parser.Terms
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import scorex.crypto.encode.Base58
@@ -32,8 +33,8 @@ object Script {
     } yield script
 
   object Expr {
-    def unapply(arg: Script): Option[lang.v1.Terms.Typed.EXPR] = {
-      if (arg.version == V1) Some(arg.expr.asInstanceOf[lang.v1.Terms.Typed.EXPR])
+    def unapply(arg: Script): Option[Terms.Typed.EXPR] = {
+      if (arg.version == V1) Some(arg.expr.asInstanceOf[Terms.Typed.EXPR])
       else None
     }
   }

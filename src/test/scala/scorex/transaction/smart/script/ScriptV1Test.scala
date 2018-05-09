@@ -2,8 +2,8 @@ package scorex.transaction.smart.script
 
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.{FunctionHeaderType => FHT}
-import com.wavesplatform.lang.v1.Terms.Typed._
-import com.wavesplatform.lang.v1.Terms.{BOOLEAN, LONG}
+import com.wavesplatform.lang.v1.parser.Terms.Typed._
+import com.wavesplatform.lang.v1.parser.Terms.{BOOLEAN, LONG}
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.state.diffs.produce
 import org.scalacheck.Gen

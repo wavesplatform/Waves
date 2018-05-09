@@ -7,7 +7,8 @@ import scorex.account.{AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.api.SyncHttpApi._
 import play.api.libs.json.JsNumber
-import com.wavesplatform.lang.v1.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.TypeChecker
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import com.wavesplatform.state._
 import scorex.transaction.Proofs

@@ -2,8 +2,9 @@ package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.TypeInfo._
-import com.wavesplatform.lang.v1.{EvaluatorV1, Parser, TypeChecker}
+import com.wavesplatform.lang.v1.{EvaluatorV1, TypeChecker}
 import com.wavesplatform.lang.v1.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}

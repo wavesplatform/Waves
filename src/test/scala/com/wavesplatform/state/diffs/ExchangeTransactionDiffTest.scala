@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.v1.Terms.Typed.TRUE
+import com.wavesplatform.lang.v1.parser.Terms.Typed.TRUE
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError

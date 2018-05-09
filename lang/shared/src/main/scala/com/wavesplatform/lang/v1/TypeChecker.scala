@@ -3,8 +3,10 @@ package com.wavesplatform.lang.v1
 import cats.data._
 import cats.syntax.all._
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
-import com.wavesplatform.lang.v1.Terms._
+import com.wavesplatform.lang.v1.parser.Terms._
 import com.wavesplatform.lang.v1.ctx.{Context, PredefType}
+import com.wavesplatform.lang.v1.parser.{Expressions, Terms}
+import com.wavesplatform.lang.v1.parser.BinaryOperations._
 import monix.eval.Coeval
 
 import scala.util.{Failure, Success, Try}
@@ -30,20 +32,20 @@ object TypeChecker {
   type TypeCheckResult[T]       = Either[TypeResolutionError, T]
   private type SetTypeResult[T] = EitherT[Coeval, String, T]
 
-  private def setType(ctx: TypeCheckerContext, t: SetTypeResult[Untyped.EXPR]): SetTypeResult[Typed.EXPR] = t.flatMap {
-    case x: Untyped.CONST_LONG       => EitherT.pure(Typed.CONST_LONG(x.value))
-    case x: Untyped.CONST_BYTEVECTOR => EitherT.pure(Typed.CONST_BYTEVECTOR(x.value))
-    case x: Untyped.CONST_STRING     => EitherT.pure(Typed.CONST_STRING(x.value))
-    case Untyped.TRUE                => EitherT.pure(Typed.TRUE)
-    case Untyped.FALSE               => EitherT.pure(Typed.FALSE)
-    case Untyped.BINARY_OP(a, op, b) =>
+  private def setType(ctx: TypeCheckerContext, t: SetTypeResult[Expressions.EXPR]): SetTypeResult[Typed.EXPR] = t.flatMap {
+    case x: Expressions.CONST_LONG       => EitherT.pure(Typed.CONST_LONG(x.value))
+    case x: Expressions.CONST_BYTEVECTOR => EitherT.pure(Typed.CONST_BYTEVECTOR(x.value))
+    case x: Expressions.CONST_STRING     => EitherT.pure(Typed.CONST_STRING(x.value))
+    case Expressions.TRUE                => EitherT.pure(Typed.TRUE)
+    case Expressions.FALSE               => EitherT.pure(Typed.FALSE)
+    case Expressions.BINARY_OP(a, op, b) =>
       op match {
-        case AND_OP => setType(ctx, EitherT.pure(Untyped.IF(a, b, Untyped.FALSE)))
-        case OR_OP  => setType(ctx, EitherT.pure(Untyped.IF(a, Untyped.TRUE, b)))
-        case _      => setType(ctx, EitherT.pure(Untyped.FUNCTION_CALL(opsToFunctions(op), List(a, b))))
+        case AND_OP => setType(ctx, EitherT.pure(Expressions.IF(a, b, Expressions.FALSE)))
+        case OR_OP  => setType(ctx, EitherT.pure(Expressions.IF(a, Expressions.TRUE, b)))
+        case _      => setType(ctx, EitherT.pure(Expressions.FUNCTION_CALL(opsToFunctions(op), List(a, b))))
       }
 
-    case getter: Untyped.GETTER =>
+    case getter: Expressions.GETTER =>
       setType(ctx, EitherT.pure(getter.ref))
         .subflatMap { ref =>
           ref.tpe match {
@@ -62,10 +64,10 @@ object TypeChecker {
           }
         }
 
-    case Untyped.FUNCTION_CALL(name, args) =>
+    case Expressions.FUNCTION_CALL(name, args) =>
       type ResolvedArgsResult = EitherT[Coeval, String, List[Typed.EXPR]]
 
-      def resolvedArguments(args: List[Terms.Untyped.EXPR]): ResolvedArgsResult = {
+      def resolvedArguments(args: List[Expressions.EXPR]): ResolvedArgsResult = {
         import cats.instances.list._
         val r: List[SetTypeResult[Typed.EXPR]] = args.map(arg => setType(ctx, EitherT.pure(arg)))(collection.breakOut)
         r.sequence[SetTypeResult, Typed.EXPR]
@@ -113,7 +115,7 @@ object TypeChecker {
           }
       }
 
-    case block: Untyped.BLOCK =>
+    case block: Expressions.BLOCK =>
       import block.let
       (ctx.varDefs.get(let.name), ctx.functionDefs.get(let.name)) match {
         case (Some(_), _) => EitherT.leftT[Coeval, Typed.EXPR](s"Value '${let.name}' already defined in the scope")
@@ -133,7 +135,7 @@ object TypeChecker {
           }
       }
 
-    case ifExpr: Untyped.IF =>
+    case ifExpr: Expressions.IF =>
       (setType(ctx, EitherT.pure(ifExpr.cond)), setType(ctx, EitherT.pure(ifExpr.ifTrue)), setType(ctx, EitherT.pure(ifExpr.ifFalse))).tupled
         .subflatMap[String, Typed.EXPR] {
           case (resolvedCond: Typed.EXPR, resolvedIfTrue, resolvedIfFalse) =>
@@ -142,7 +144,7 @@ object TypeChecker {
             else {
               val ifTrueTpe  = resolvedIfTrue.tpe
               val ifFalseTpe = resolvedIfFalse.tpe
-              findCommonType(ifTrueTpe, ifFalseTpe) match {
+              TypeInferrer.findCommonType(ifTrueTpe, ifFalseTpe) match {
                 case Some(tpe) =>
                   Right(
                     Typed.IF(
@@ -156,7 +158,7 @@ object TypeChecker {
             }
         }
 
-    case ref: Untyped.REF =>
+    case ref: Expressions.REF =>
       EitherT.fromEither {
         ctx.varDefs
           .get(ref.key)
@@ -168,7 +170,7 @@ object TypeChecker {
 
   }
 
-  def apply(c: TypeCheckerContext, expr: Untyped.EXPR): TypeCheckResult[Typed.EXPR] = {
+  def apply(c: TypeCheckerContext, expr: Expressions.EXPR): TypeCheckResult[Typed.EXPR] = {
     def result = setType(c, EitherT.pure(expr)).value().left.map { e =>
       s"Typecheck failed: $e"
     }

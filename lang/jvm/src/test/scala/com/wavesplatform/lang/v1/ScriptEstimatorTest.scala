@@ -2,7 +2,8 @@ package com.wavesplatform.lang.v1
 
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
-import com.wavesplatform.lang.v1.Terms._
+import com.wavesplatform.lang.v1.parser.Terms
+import com.wavesplatform.lang.v1.parser.Terms._
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}

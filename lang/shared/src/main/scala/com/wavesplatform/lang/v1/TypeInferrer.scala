@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1
 
-import com.wavesplatform.lang.v1.Terms._
+import com.wavesplatform.lang.v1.parser.Terms._
 
 object TypeInferrer {
 
@@ -19,16 +19,15 @@ object TypeInferrer {
         // a function like Option[T], T => Option[Option[T]]
         // can lead to different interpretations of `T`.
         // `Nothing`, `TypeRef('XXX')` should find common type of `TypeRef('XXX')`
-        val resolved = matchResults.mapValues {
-          matchResults =>
-            if (matchResults.size == 1) Right(matchResults.head.tpe)
-            else {
-              val maybeCommonType = matchResults.tail.map(_.tpe).toVector.foldLeftM(matchResults.head.tpe)(findCommonType)
-              maybeCommonType match {
-                case None => Left(s"Can't match inferred types of ${matchResults.head.name} over ${matchResults.map(_.tpe)}")
-                case Some(commonType) => Right(commonType)
-              }
+        val resolved = matchResults.mapValues { matchResults =>
+          if (matchResults.size == 1) Right(matchResults.head.tpe)
+          else {
+            val maybeCommonType = matchResults.tail.map(_.tpe).toVector.foldLeftM(matchResults.head.tpe)(findCommonType)
+            maybeCommonType match {
+              case None             => Left(s"Can't match inferred types of ${matchResults.head.name} over ${matchResults.map(_.tpe)}")
+              case Some(commonType) => Right(commonType)
             }
+          }
         }
 
         resolved.find(_._2.isLeft) match {
@@ -65,4 +64,17 @@ object TypeInferrer {
       case OPTIONTYPEPARAM(t) => inferResultType(t, resolved).map(OPTION)
     }
   }
+
+  def findCommonType(t1: TYPE, t2: TYPE): Option[TYPE]      = findCommonType(t1, t2, biDirectional = true)
+  def matchType(required: TYPE, actual: TYPE): Option[TYPE] = findCommonType(required, actual, biDirectional = false)
+
+  private def findCommonType(required: TYPE, actual: TYPE, biDirectional: Boolean): Option[TYPE] =
+    if (actual == NOTHING) Some(required)
+    else if (required == NOTHING && biDirectional) Some(actual)
+    else if (required == actual) Some(required)
+    else
+      (required, actual) match {
+        case (OPTION(it1), OPTION(it2)) => findCommonType(it1, it2, biDirectional).map(OPTION)
+        case _                          => None
+      }
 }

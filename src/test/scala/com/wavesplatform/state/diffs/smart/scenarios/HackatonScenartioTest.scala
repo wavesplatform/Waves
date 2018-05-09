@@ -4,7 +4,8 @@ import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.lang.TypeInfo
 import com.wavesplatform.lang.TypeInfo._
-import com.wavesplatform.lang.v1.{EvaluatorV1, Parser, TypeChecker}
+import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.{EvaluatorV1, TypeChecker}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._

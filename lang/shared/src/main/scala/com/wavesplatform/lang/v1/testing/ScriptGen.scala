@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.testing
 
-import com.wavesplatform.lang.v1.Terms.Untyped._
-import com.wavesplatform.lang.v1.Terms._
+import com.wavesplatform.lang.v1.parser.Expressions._
+import com.wavesplatform.lang.v1.parser.BinaryOperations._
 import org.scalacheck._
 
 trait ScriptGen {

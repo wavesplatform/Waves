@@ -1,8 +1,9 @@
 package com.wavesplatform.lang.typechecker
 
 import com.wavesplatform.lang.Common.{NoShrink, multiplierFunction, produce}
-import com.wavesplatform.lang.v1.Terms.{SUM_OP, Untyped}
 import com.wavesplatform.lang.v1.TypeChecker
+import com.wavesplatform.lang.v1.parser.BinaryOperations.SUM_OP
+import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -10,7 +11,7 @@ import scodec.bits.ByteVector
 
 class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  import Untyped._
+  import com.wavesplatform.lang.v1.parser.Expressions._
 
   errorTests(
     "can't define LET with the same name as already defined in scope" -> "already defined in the scope" -> BLOCK(LET("X", CONST_LONG(1)),
@@ -32,7 +33,7 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
                                                                                                               CONST_BYTEVECTOR(ByteVector.empty)))
   )
 
-  private def errorTests(exprs: ((String, String), Untyped.EXPR)*): Unit = exprs.foreach {
+  private def errorTests(exprs: ((String, String), Expressions.EXPR)*): Unit = exprs.foreach {
     case ((label, error), input) =>
       property(s"Error: $label") {
         TypeChecker(typeCheckerContext, input) should produce(error)

@@ -1,7 +1,7 @@
-package com.wavesplatform.lang.v1
+package com.wavesplatform.lang.v1.parser
 
-import com.wavesplatform.lang.v1.Terms.Untyped._
-import com.wavesplatform.lang.v1.Terms._
+import Expressions._
+import BinaryOperations._
 import fastparse.{WhitespaceApi, core}
 import scodec.bits.ByteVector
 

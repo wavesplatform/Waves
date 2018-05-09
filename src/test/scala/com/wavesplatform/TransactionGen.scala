@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.v1.Terms.Typed
+import com.wavesplatform.lang.v1.parser.Terms.Typed
 import com.wavesplatform.lang.v1.TypeChecker
 import com.wavesplatform.lang.v1.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.ScriptGen

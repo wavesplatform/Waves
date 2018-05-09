@@ -2,7 +2,7 @@ package com.wavesplatform.lang
 
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common.multiplierFunction
-import com.wavesplatform.lang.v1.Terms._
+import com.wavesplatform.lang.v1.parser.Terms._
 import com.wavesplatform.lang.v1.TypeChecker.TypeCheckerContext
 import com.wavesplatform.lang.v1.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.ctx.{Context, PredefFunction, PredefType}

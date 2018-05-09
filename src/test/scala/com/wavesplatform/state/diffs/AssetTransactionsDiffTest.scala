@@ -2,7 +2,8 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.v1.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.TypeChecker
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.utils.dummyTypeCheckerContext

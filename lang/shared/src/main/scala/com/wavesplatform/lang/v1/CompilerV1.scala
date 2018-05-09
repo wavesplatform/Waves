@@ -4,6 +4,7 @@ import com.wavesplatform.lang.ExprCompiler
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.directives.Directive
 import com.wavesplatform.lang.v1.TypeChecker.TypeCheckerContext
+import com.wavesplatform.lang.v1.parser.Parser
 import fastparse.core.Parsed.{Failure, Success}
 
 class CompilerV1(ctx: TypeCheckerContext) extends ExprCompiler {

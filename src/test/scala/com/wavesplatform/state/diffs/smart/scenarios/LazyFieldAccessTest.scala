@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.lang.v1.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.TypeChecker
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{assertDiffAndState, assertDiffEi, produce}
@@ -11,7 +12,7 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.lease.{LeaseTransaction}
+import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
 

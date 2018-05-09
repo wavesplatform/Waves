@@ -2,7 +2,8 @@ package com.wavesplatform.state
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.lang.v1.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.TypeChecker
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.StateSyntheticBenchmark._
 import com.wavesplatform.utils.dummyTypeCheckerContext

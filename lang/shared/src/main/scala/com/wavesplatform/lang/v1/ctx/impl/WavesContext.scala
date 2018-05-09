@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.ctx.impl
 
 import cats.data.EitherT
 import com.wavesplatform.lang.v1.EnvironmentFunctions
-import com.wavesplatform.lang.v1.Terms._
+import com.wavesplatform.lang.v1.parser.Terms._
 import com.wavesplatform.lang.v1.ctx._
 import com.wavesplatform.lang.v1.traits.{DataType, Environment, Transaction}
 import monix.eval.Coeval
@@ -15,39 +15,39 @@ object WavesContext {
 
   private val optionByteVector: OPTION = OPTION(BYTEVECTOR)
   private val optionAddress            = OPTION(addressType.typeRef)
-  private val optionLong: OPTION = OPTION(LONG)
+  private val optionLong: OPTION       = OPTION(LONG)
 
   private val transactionType = PredefType(
     "Transaction",
     List(
-      "type"             -> LONG,
-      "id"               -> BYTEVECTOR,
-      "fee"              -> LONG,
-      "feeAssetId"       -> optionByteVector,
-      "timestamp"        -> LONG,
-      "amount"           -> LONG,
-      "bodyBytes"        -> BYTEVECTOR,
-      "senderPk"         -> BYTEVECTOR,
-      "aliasText"        -> STRING,
-      "assetName"        -> BYTEVECTOR,
-      "assetDescription" -> BYTEVECTOR,
-      "attachment"       -> BYTEVECTOR,
-      "decimals"         -> LONG,
-      "chainId"          -> LONG,
-      "version"          -> LONG,
-      "reissuable"       -> BOOLEAN,
-      "proof0"           -> BYTEVECTOR,
-      "proof1"           -> BYTEVECTOR,
-      "proof2"           -> BYTEVECTOR,
-      "proof3"           -> BYTEVECTOR,
-      "proof4"           -> BYTEVECTOR,
-      "proof5"           -> BYTEVECTOR,
-      "proof6"           -> BYTEVECTOR,
-      "proof7"           -> BYTEVECTOR,
-      "transferAssetId"  -> optionByteVector,
-      "assetId"          -> BYTEVECTOR,
-      "recipient"        -> addressOrAliasType.typeRef,
-      "minSponsoredAssetFee"           -> optionLong
+      "type"                 -> LONG,
+      "id"                   -> BYTEVECTOR,
+      "fee"                  -> LONG,
+      "feeAssetId"           -> optionByteVector,
+      "timestamp"            -> LONG,
+      "amount"               -> LONG,
+      "bodyBytes"            -> BYTEVECTOR,
+      "senderPk"             -> BYTEVECTOR,
+      "aliasText"            -> STRING,
+      "assetName"            -> BYTEVECTOR,
+      "assetDescription"     -> BYTEVECTOR,
+      "attachment"           -> BYTEVECTOR,
+      "decimals"             -> LONG,
+      "chainId"              -> LONG,
+      "version"              -> LONG,
+      "reissuable"           -> BOOLEAN,
+      "proof0"               -> BYTEVECTOR,
+      "proof1"               -> BYTEVECTOR,
+      "proof2"               -> BYTEVECTOR,
+      "proof3"               -> BYTEVECTOR,
+      "proof4"               -> BYTEVECTOR,
+      "proof5"               -> BYTEVECTOR,
+      "proof6"               -> BYTEVECTOR,
+      "proof7"               -> BYTEVECTOR,
+      "transferAssetId"      -> optionByteVector,
+      "assetId"              -> BYTEVECTOR,
+      "recipient"            -> addressOrAliasType.typeRef,
+      "minSponsoredAssetFee" -> optionLong
     )
   )
   private def proofBinding(tx: Transaction, x: Int): LazyVal =
@@ -60,35 +60,35 @@ object WavesContext {
   private def transactionObject(tx: Transaction): Obj =
     Obj(
       Map(
-        "type"       -> LazyVal(LONG)(EitherT.pure(tx.transactionType)),
-        "id"         -> LazyVal(BYTEVECTOR)(EitherT.pure(tx.id)),
-        "fee"        -> LazyVal(LONG)(EitherT.pure(tx.fee)),
-        "amount"     -> LazyVal(LONG)(EitherT.fromEither(tx.amount)),
-        "feeAssetId" -> LazyVal(optionByteVector)(EitherT.pure(tx.feeAssetId.map(_.asInstanceOf[optionByteVector.innerType.Underlying]))),
-        "timestamp"  -> LazyVal(LONG)(EitherT.pure(tx.timestamp)),
-        "bodyBytes"  -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.bodyBytes)),
-        "senderPk"   -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.senderPk)),
-        "transferAssetId"    -> LazyVal(optionByteVector)(EitherT.fromEither(tx.transferAssetId.map(_.asInstanceOf[optionByteVector.Underlying]))),
-        "assetId"    -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.assetId)),
+        "type"            -> LazyVal(LONG)(EitherT.pure(tx.transactionType)),
+        "id"              -> LazyVal(BYTEVECTOR)(EitherT.pure(tx.id)),
+        "fee"             -> LazyVal(LONG)(EitherT.pure(tx.fee)),
+        "amount"          -> LazyVal(LONG)(EitherT.fromEither(tx.amount)),
+        "feeAssetId"      -> LazyVal(optionByteVector)(EitherT.pure(tx.feeAssetId.map(_.asInstanceOf[optionByteVector.innerType.Underlying]))),
+        "timestamp"       -> LazyVal(LONG)(EitherT.pure(tx.timestamp)),
+        "bodyBytes"       -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.bodyBytes)),
+        "senderPk"        -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.senderPk)),
+        "transferAssetId" -> LazyVal(optionByteVector)(EitherT.fromEither(tx.transferAssetId.map(_.asInstanceOf[optionByteVector.Underlying]))),
+        "assetId"         -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.assetId)),
         "recipient" -> LazyVal(addressOrAliasType.typeRef)(EitherT.fromEither(tx.recipient.map(bv =>
           Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(bv))))))),
-        "attachment"       -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.attachment)),
-        "assetName"        -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.assetName)),
-        "assetDescription" -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.assetDescription)),
-        "reissuable"       -> LazyVal(BOOLEAN)(EitherT.fromEither(tx.reissuable)),
-        "aliasText"        -> LazyVal(STRING)(EitherT.fromEither(tx.aliasText)),
-        "decimals"         -> LazyVal(LONG)(EitherT.fromEither(tx.decimals.map(_.toLong))),
-        "chainId"          -> LazyVal(LONG)(EitherT.fromEither(tx.chainId.map(_.toLong))),
-        "version"          -> LazyVal(LONG)(EitherT.fromEither(tx.version.map(_.toLong))),
-        "minSponsoredAssetFee"     -> LazyVal(optionLong)(EitherT.fromEither(tx.minSponsoredAssetFee.map(_.asInstanceOf[optionLong.Underlying]))),
-        "proof0"           -> proofBinding(tx, 0),
-        "proof1"           -> proofBinding(tx, 1),
-        "proof2"           -> proofBinding(tx, 2),
-        "proof3"           -> proofBinding(tx, 3),
-        "proof4"           -> proofBinding(tx, 4),
-        "proof5"           -> proofBinding(tx, 5),
-        "proof6"           -> proofBinding(tx, 6),
-        "proof7"           -> proofBinding(tx, 7)
+        "attachment"           -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.attachment)),
+        "assetName"            -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.assetName)),
+        "assetDescription"     -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.assetDescription)),
+        "reissuable"           -> LazyVal(BOOLEAN)(EitherT.fromEither(tx.reissuable)),
+        "aliasText"            -> LazyVal(STRING)(EitherT.fromEither(tx.aliasText)),
+        "decimals"             -> LazyVal(LONG)(EitherT.fromEither(tx.decimals.map(_.toLong))),
+        "chainId"              -> LazyVal(LONG)(EitherT.fromEither(tx.chainId.map(_.toLong))),
+        "version"              -> LazyVal(LONG)(EitherT.fromEither(tx.version.map(_.toLong))),
+        "minSponsoredAssetFee" -> LazyVal(optionLong)(EitherT.fromEither(tx.minSponsoredAssetFee.map(_.asInstanceOf[optionLong.Underlying]))),
+        "proof0"               -> proofBinding(tx, 0),
+        "proof1"               -> proofBinding(tx, 1),
+        "proof2"               -> proofBinding(tx, 2),
+        "proof3"               -> proofBinding(tx, 3),
+        "proof4"               -> proofBinding(tx, 4),
+        "proof5"               -> proofBinding(tx, 5),
+        "proof6"               -> proofBinding(tx, 6),
+        "proof7"               -> proofBinding(tx, 7)
       ))
 
   def build(env: Environment): Context = {

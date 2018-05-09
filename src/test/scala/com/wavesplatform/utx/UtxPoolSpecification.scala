@@ -4,7 +4,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.v1.CompilerV1
-import com.wavesplatform.lang.v1.Terms.Typed
+import com.wavesplatform.lang.v1.parser.Terms.Typed
 import com.wavesplatform.lang.v1.TypeChecker.TypeCheckerContext
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
