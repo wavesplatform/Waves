@@ -415,4 +415,18 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
     )
   }
+
+  property("case custom type field access") {
+    val pointType     = PredefCaseType("Point", List("X" -> LONG, "Y"         -> LONG))
+    val pointInstance = CaseObj(Map("X"                  -> Val(LONG)(3), "Y" -> Val(LONG)(4)))
+    ev[Long](
+      context = PureContext.instance |+| EvaluationContext(
+        typeDefs = Map.empty,
+        caseTypeDefs = Map(pointType.name -> pointType),
+        letDefs = Map(("p", LazyVal(CASETYPEREF(pointType.name))(EitherT.pure(pointInstance)))),
+        functions = Map.empty
+      ),
+      expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", TYPEREF("Point")), "X", LONG), CONST_LONG(2)), LONG)
+    ) shouldBe Right(5)
+  }
 }

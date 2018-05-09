@@ -79,11 +79,20 @@ object EvaluatorV1 extends ExprEvaluator {
 
   private def evalGetter(expr: EXPR, field: String) = {
     for {
-      obj <- evalExpr[Obj](expr)
-      result <- obj.fields.get(field) match {
-        case Some(lzy) => liftCE[Any](lzy.value.value)
-        case None      => liftL[Any](s"field '$field' not found")
+      obj <- evalExpr[AnyObj](expr)
+      result <- obj match {
+        case Obj(fields) =>
+          fields.get(field) match {
+            case Some(lzy) => liftCE[Any](lzy.value.value)
+            case None      => liftL[Any](s"field '$field' not found")
+          }
+        case CaseObj(fields) =>
+          fields.get(field) match {
+            case Some(eager) => liftR[Any](eager.value)
+            case None        => liftL[Any](s"field '$field' not found")
+          }
       }
+
     } yield result
   }
 
@@ -121,9 +130,10 @@ object EvaluatorV1 extends ExprEvaluator {
       case FUNCTION_CALL(header, args, _) =>
         writeLog(s"Evaluating FUNCTION_CALL") *> evalFunctionCall(header, args) <* writeLog("FINISHED")
     }).flatMap(v => {
-      val ti = typeInfo[T]
-      if (t.tpe.typeInfo <:< ti) liftR(v.asInstanceOf[T])
-      else liftL(s"Bad type: expected: ${ti} actual: ${t.tpe.typeInfo}")
+      liftR(v.asInstanceOf[T])
+//      val ti = typeInfo[T]
+//      if (t.tpe.typeInfo <:< ti) liftR(v.asInstanceOf[T])
+//      else liftL(s"Bad type: expected: ${ti} actual: ${t.tpe.typeInfo}")
     })
 
   }

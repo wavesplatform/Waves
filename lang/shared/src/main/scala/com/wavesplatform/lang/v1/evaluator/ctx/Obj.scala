@@ -2,7 +2,9 @@ package com.wavesplatform.lang.v1.evaluator.ctx
 
 import com.wavesplatform.lang.v1.compiler.Terms.TYPE
 
-case class Obj(fields: Map[String, LazyVal])
+sealed trait AnyObj
+
+case class Obj(fields: Map[String, LazyVal]) extends AnyObj
 
 sealed trait Val {
   val tpe: TYPE
@@ -17,4 +19,4 @@ object Val {
   def apply(t: TYPE)(v: t.Underlying): Val = ValImpl(t, v)
 }
 
-case class CaseObj(fields: Map[String, Val])
+case class CaseObj(fields: Map[String, Val]) extends AnyObj
