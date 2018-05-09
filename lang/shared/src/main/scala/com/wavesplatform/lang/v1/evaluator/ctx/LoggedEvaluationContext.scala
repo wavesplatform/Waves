@@ -1,7 +1,6 @@
-package com.wavesplatform.lang.v1.evaluator
+package com.wavesplatform.lang.v1.evaluator.ctx
 
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal, PredefFunction, PredefType}
 import shapeless._
 
 final case class LoggedEvaluationContext(context: EvaluationContext, log: List[String] = List.empty) {
