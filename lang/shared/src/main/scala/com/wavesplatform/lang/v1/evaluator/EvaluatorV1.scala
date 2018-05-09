@@ -5,7 +5,7 @@ import cats.implicits._
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang._
-import com.wavesplatform.lang.v1.evaluator.LoggedEvaluationContext.{funcs, lets}
+import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.{funcs, lets}
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, LET, _}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.FunctionHeader
