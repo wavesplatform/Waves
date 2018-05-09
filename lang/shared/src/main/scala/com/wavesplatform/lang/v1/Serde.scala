@@ -20,6 +20,7 @@ object Serde {
   implicit def d0Option      = d0.bind[FunctionHeaderType.OPTION](7)
   implicit def d0TypeRef     = d0.bind[FunctionHeaderType.TYPEREF](8)
   implicit def d0String      = d0.bind[FunctionHeaderType.STRING.type](9)
+  implicit def d0CaseTypeRef = d0.bind[FunctionHeaderType.CASETYPEREF](10)
 
   implicit def d                = Discriminated[EXPR, Int](uint8)
   implicit def dConstInt        = d.bind[CONST_LONG](0)
@@ -33,15 +34,16 @@ object Serde {
   implicit def dGetter          = d.bind[GETTER](12)
   implicit def dFunctionCall    = d.bind[FUNCTION_CALL](13)
 
-  implicit def tD           = Discriminated[TYPE, Int](uint8)
-  implicit def tDNothing    = tD.bind[NOTHING.type](0)
-  implicit def tDUnit       = tD.bind[UNIT.type](1)
-  implicit def tDInt        = tD.bind[LONG.type](2)
-  implicit def tDByteVector = tD.bind[BYTEVECTOR.type](3)
-  implicit def tDBoolean    = tD.bind[BOOLEAN.type](4)
-  implicit def tDOption     = tD.bind[OPTION](5)
-  implicit def tDTypeRef    = tD.bind[TYPEREF](6)
-  implicit def tDString     = tD.bind[STRING.type](7)
+  implicit def tD            = Discriminated[TYPE, Int](uint8)
+  implicit def tDNothing     = tD.bind[NOTHING.type](0)
+  implicit def tDUnit        = tD.bind[UNIT.type](1)
+  implicit def tDInt         = tD.bind[LONG.type](2)
+  implicit def tDByteVector  = tD.bind[BYTEVECTOR.type](3)
+  implicit def tDBoolean     = tD.bind[BOOLEAN.type](4)
+  implicit def tDOption      = tD.bind[OPTION](5)
+  implicit def tDTypeRef     = tD.bind[TYPEREF](6)
+  implicit def tDString      = tD.bind[STRING.type](7)
+  implicit def tDCaseTypeRef = tD.bind[CASETYPEREF](8)
 
   val codec: Codec[EXPR] = Codec[EXPR]
 

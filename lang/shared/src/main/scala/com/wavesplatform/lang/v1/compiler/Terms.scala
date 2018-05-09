@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.compiler
 
 import com.wavesplatform.lang.TypeInfo
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.evaluator.ctx.Obj
+import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, Obj}
 import scodec.bits.ByteVector
 
 object Terms {
@@ -29,7 +29,8 @@ object Terms {
     type Underlying = Option[innerType.Underlying]
     override def typeInfo: TypeInfo[Option[innerType.Underlying]] = TypeInfo.optionTypeInfo(innerType.typeInfo)
   }
-  case class TYPEREF(name: String) extends AUTO_TAGGED_TYPE[Obj]
+  case class TYPEREF(name: String)     extends AUTO_TAGGED_TYPE[Obj]
+  case class CASETYPEREF(name: String) extends AUTO_TAGGED_TYPE[CaseObj]
 
   sealed abstract class EXPR(val tpe: TYPE)
   case class LET(name: String, value: EXPR)

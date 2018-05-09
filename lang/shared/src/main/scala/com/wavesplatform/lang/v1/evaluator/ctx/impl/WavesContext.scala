@@ -167,9 +167,10 @@ object WavesContext {
       }
 
     EvaluationContext.build(
-      Seq(addressType, addressOrAliasType, transactionType),
-      Map(("height", LazyVal(LONG)(EitherT(heightCoeval))), ("tx", LazyVal(TYPEREF(transactionType.name))(EitherT(txCoeval)))),
-      Seq(
+      types = Seq(addressType, addressOrAliasType, transactionType),
+      caseTypes = Seq.empty,
+      letDefs = Map(("height", LazyVal(LONG)(EitherT(heightCoeval))), ("tx", LazyVal(TYPEREF(transactionType.name))(EitherT(txCoeval)))),
+      functions = Seq(
         txByIdF,
         txHeightByIdF,
         getLongF,
