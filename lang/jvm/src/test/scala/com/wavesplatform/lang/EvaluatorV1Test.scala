@@ -5,8 +5,8 @@ import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
-import com.wavesplatform.lang.v1.parser.Terms.Typed._
-import com.wavesplatform.lang.v1.parser.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.Typed._
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.ctx.Context._
 import com.wavesplatform.lang.v1.ctx._
 import com.wavesplatform.lang.v1.ctx.impl.PureContext._

@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.lang.v1.parser.Terms.Typed
+import com.wavesplatform.lang.v1.compiler.Terms.Typed
 import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.{NoShrink, TransactionGen}

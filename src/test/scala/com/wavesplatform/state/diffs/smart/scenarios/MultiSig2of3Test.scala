@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.lang.v1.parser.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.TypeChecker
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._

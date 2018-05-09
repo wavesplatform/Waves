@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1
 
-import com.wavesplatform.lang.v1.parser.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms._
 
 object TypeInferrer {
 

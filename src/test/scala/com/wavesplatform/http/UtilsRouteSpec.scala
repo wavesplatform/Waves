@@ -3,7 +3,7 @@ package com.wavesplatform.http
 import com.wavesplatform.crypto
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.parser.Terms.{BOOLEAN, Typed}
+import com.wavesplatform.lang.v1.compiler.Terms.{BOOLEAN, Typed}
 import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.state.diffs.CommonValidation
 import org.scalacheck.Gen

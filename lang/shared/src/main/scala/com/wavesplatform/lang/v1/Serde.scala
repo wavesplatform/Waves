@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1
 
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
-import com.wavesplatform.lang.v1.parser.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms._
 import scodec._
 import scodec.codecs._
 

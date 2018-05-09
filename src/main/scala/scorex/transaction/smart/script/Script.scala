@@ -3,7 +3,7 @@ package scorex.transaction.smart.script
 import com.wavesplatform.lang
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.Versioned
-import com.wavesplatform.lang.v1.parser.Terms
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import scorex.crypto.encode.Base58

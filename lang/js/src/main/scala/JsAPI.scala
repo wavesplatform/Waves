@@ -1,4 +1,5 @@
-import com.wavesplatform.lang.v1.parser.{Parser, Terms}
+import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.{Serde, TypeChecker}
 import fastparse.core.Parsed
 import scodec.bits.BitVector

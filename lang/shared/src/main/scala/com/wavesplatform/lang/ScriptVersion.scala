@@ -1,7 +1,7 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.ctx.Context
-import com.wavesplatform.lang.v1.parser.Terms
 
 sealed trait ScriptVersion { self =>
   type ExprT

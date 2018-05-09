@@ -1,9 +1,10 @@
 package com.wavesplatform.lang.v1.ctx
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.parser.Terms.{FunctionTypeSignature, TYPEPLACEHOLDER}
+import com.wavesplatform.lang.v1.compiler.Terms.{TYPEPLACEHOLDER}
 import com.wavesplatform.lang.TrampolinedExecResult
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.ctx.PredefFunction.FunctionTypeSignature
 import monix.eval.Coeval
 
 sealed trait PredefFunction {
@@ -17,6 +18,8 @@ sealed trait PredefFunction {
 }
 
 object PredefFunction {
+
+  case class FunctionTypeSignature(args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER)
 
   case class PredefFunctionImpl(name: String,
                                 cost: Long,

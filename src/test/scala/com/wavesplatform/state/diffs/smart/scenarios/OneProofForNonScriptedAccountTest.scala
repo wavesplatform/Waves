@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.lang.v1.parser.Terms.Typed
+import com.wavesplatform.lang.v1.compiler.Terms.Typed
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffEi, produce}

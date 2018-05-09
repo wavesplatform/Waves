@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.smart.performance
 
-import com.wavesplatform.lang.v1.parser.Terms.Typed
+import com.wavesplatform.lang.v1.compiler.Terms.Typed
 import com.wavesplatform.lang.v1.TypeChecker
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.metrics.Instrumented

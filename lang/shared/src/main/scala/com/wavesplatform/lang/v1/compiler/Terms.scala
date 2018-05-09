@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.v1.parser
+package com.wavesplatform.lang.v1.compiler
 
 import com.wavesplatform.lang.TypeInfo
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -6,8 +6,6 @@ import com.wavesplatform.lang.v1.ctx.Obj
 import scodec.bits.ByteVector
 
 object Terms {
-
-  case class FunctionTypeSignature(args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER)
 
   sealed trait TYPEPLACEHOLDER
   case class TYPEPARAM(char: Byte)               extends TYPEPLACEHOLDER

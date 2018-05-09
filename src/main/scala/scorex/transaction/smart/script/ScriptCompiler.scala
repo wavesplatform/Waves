@@ -5,7 +5,8 @@ import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.directives.{Directive, DirectiveKey, DirectiveParser}
 import com.wavesplatform.lang.v1.ctx.Context
-import com.wavesplatform.lang.v1.{CompilerV1, ScriptEstimator}
+import com.wavesplatform.lang.v1.ScriptEstimator
+import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.utils
 import scorex.transaction.smart.script.v1.ScriptV1
 

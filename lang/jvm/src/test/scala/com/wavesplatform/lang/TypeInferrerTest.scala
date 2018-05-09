@@ -1,6 +1,6 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.v1.parser.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms._
 import org.scalatest.{FreeSpec, Matchers}
 import Common._
 import com.wavesplatform.lang.v1.TypeInferrer

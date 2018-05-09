@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.typechecker
 
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.v1.parser.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.TypeChecker
 import com.wavesplatform.lang.v1.TypeChecker.{TypeCheckResult, TypeCheckerContext}
 import com.wavesplatform.lang.v1.ctx.impl.PureContext._

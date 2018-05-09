@@ -4,8 +4,8 @@ import cats.data.{EitherT, StateT}
 import cats.implicits._
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.TypeInfo._
-import com.wavesplatform.lang.v1.parser.Terms.Typed.{EXPR, LET}
-import com.wavesplatform.lang.v1.parser.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.Typed.{EXPR, LET}
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.ctx._
 import com.wavesplatform.lang._
 import monix.eval.Coeval

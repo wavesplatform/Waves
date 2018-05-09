@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.ctx.impl
 
 import cats.data.EitherT
 import com.wavesplatform.lang.v1.EnvironmentFunctions
-import com.wavesplatform.lang.v1.parser.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.ctx._
 import com.wavesplatform.lang.v1.traits.{DataType, Environment, Transaction}
 import monix.eval.Coeval
