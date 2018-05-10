@@ -44,6 +44,7 @@ object Serde {
   implicit def tDTypeRef     = tD.bind[TYPEREF](6)
   implicit def tDString      = tD.bind[STRING.type](7)
   implicit def tDCaseTypeRef = tD.bind[CASETYPEREF](8)
+  implicit def tDUnion       = tD.bind[UNION](8)
 
   val codec: Codec[EXPR] = Codec[EXPR]
 

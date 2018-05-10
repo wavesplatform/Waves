@@ -1,5 +1,5 @@
 package com.wavesplatform.lang
-import cats.data.EitherT
+import cats.data.{EitherT, NonEmptyList}
 import cats.kernel.Monoid
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common._
@@ -428,5 +428,31 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       ),
       expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", TYPEREF("Point")), "X", LONG), CONST_LONG(2)), LONG)
     ) shouldBe Right(5)
+  }
+
+  property("case custom type field access -- union") {
+    val pointTypeA = PredefCaseType("PointA", List("X" -> LONG, "YA" -> LONG))
+    val pointTypeB = PredefCaseType("PointB", List("X" -> LONG, "YB" -> LONG))
+
+    val AorB = UNION(NonEmptyList.of(CASETYPEREF(pointTypeA.typeRef.name), CASETYPEREF(pointTypeB.typeRef.name)))
+
+    val pointAInstance = CaseObj(Map("X" -> Val(LONG)(3), "YA" -> Val(LONG)(40)))
+    val pointBInstance = CaseObj(Map("X" -> Val(LONG)(3), "YB" -> Val(LONG)(41)))
+
+    def testAccess(instance: CaseObj, field: String) = ev[Long](
+      context = PureContext.instance |+| EvaluationContext(
+        typeDefs = Map.empty,
+        caseTypeDefs = Map(pointTypeA.name -> pointTypeA, pointTypeB.name -> pointTypeB),
+        letDefs = Map("p"                  -> LazyVal(AorB)(EitherT.pure(instance))),
+        functions = Map.empty
+      ),
+      expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", AorB), field, LONG), CONST_LONG(2)), LONG)
+    )
+
+    testAccess(pointAInstance, "X") shouldBe Right(5)
+    testAccess(pointBInstance, "X") shouldBe Right(5)
+    testAccess(pointAInstance, "YA") shouldBe Right(42)
+    testAccess(pointBInstance, "YB") shouldBe Right(43)
+    testAccess(pointAInstance, "YB") should produce("field 'YB' not found")
   }
 }
