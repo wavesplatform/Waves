@@ -54,7 +54,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     genElementCheck(GTgen(gas).map(_._1))
     genElementCheck(ANDgen(gas).map(_._1))
     genElementCheck(ORgen(gas).map(_._1))
-    genElementCheck(BLOCKgen(gas).map(_._1))
+    genElementCheck(BLOCKgen(gas))
   }
 
   property("priority in binary expressions") {
