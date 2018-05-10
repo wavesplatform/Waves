@@ -17,27 +17,7 @@ object Parser {
   import White._
   import fastparse.noApi._
   private val Base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-  private val keywords = Set("let",
-                             "base58",
-                             "true",
-                             "false",
-                             "if",
-                             "then",
-                             "else",
-                             "match",
-                             "case",
-                             "var",
-                             "val",
-                             "final",
-                             "try",
-                             "catch",
-                             "is",
-                             "as",
-                             "class",
-                             "type",
-                             "def",
-                             "func",
-                             "function")
+  private val keywords    = Set("let", "base58", "true", "false", "if", "then", "else", "match", "case")
 
   private val lowerChar             = CharIn('a' to 'z')
   private val upperChar             = CharIn('A' to 'Z')
