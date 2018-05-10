@@ -2,7 +2,8 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.v1.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.utils.dummyTypeCheckerContext
@@ -77,8 +78,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       reissuable2            <- Arbitrary.arbitrary[Boolean]
       fee                    <- Gen.choose(1L, 2000000L)
       timestamp              <- timestampGen
-      reissue = ReissueTransactionV1.create(other, issue.assetId(), quantity, reissuable2, fee, timestamp).right.get
-      burn    = BurnTransactionV1.create(other, issue.assetId(), quantity, fee, timestamp).right.get
+      reissue = ReissueTransactionV1.selfSigned(other, issue.assetId(), quantity, reissuable2, fee, timestamp).right.get
+      burn    = BurnTransactionV1.selfSigned(other, issue.assetId(), quantity, fee, timestamp).right.get
     } yield ((gen, issue), reissue, burn)
 
     forAll(setup) {
@@ -101,7 +102,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       (issue, _, _) <- issueReissueBurnGeneratorP(ENOUGH_AMT, issuer)
       assetTransfer <- transferGeneratorP(issuer, burner, Some(issue.assetId()), None)
       wavesTransfer <- wavesTransferGeneratorP(issuer, burner)
-      burn = BurnTransactionV1.create(burner, issue.assetId(), assetTransfer.amount, wavesTransfer.amount, timestamp).right.get
+      burn = BurnTransactionV1.selfSigned(burner, issue.assetId(), assetTransfer.amount, wavesTransfer.amount, timestamp).right.get
     } yield (genesis, issue, assetTransfer, wavesTransfer, burn)
 
     val fs =
@@ -131,7 +132,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       decimals    <- Gen.choose(1: Byte, 8: Byte)
       issue       <- createIssue(issuer, assetName, description, quantity, decimals, true, fee, timestamp)
       assetId = issue.assetId()
-      reissue = ReissueTransactionV1.create(issuer, assetId, Long.MaxValue, true, 1, timestamp).right.get
+      reissue = ReissueTransactionV1.selfSigned(issuer, assetId, Long.MaxValue, true, 1, timestamp).right.get
     } yield (issuer, assetId, genesis, issue, reissue)
 
     val fs =
@@ -160,7 +161,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       decimals    <- Gen.choose(1: Byte, 8: Byte)
       issue       <- createIssue(issuer, assetName, description, quantity, decimals, true, fee, timestamp)
       assetId = issue.assetId()
-      reissue = ReissueTransactionV1.create(issuer, assetId, Long.MaxValue, true, 1, timestamp).right.get
+      reissue = ReissueTransactionV1.selfSigned(issuer, assetId, Long.MaxValue, true, 1, timestamp).right.get
     } yield (issuer, assetId, genesis, issue, reissue)
 
     val fs =
@@ -188,8 +189,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       issue       <- createIssue(issuer, assetName, description, quantity, decimals, true, fee, timestamp)
       assetId = issue.assetId()
       attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
-      transfer = TransferTransactionV1.create(Some(assetId), issuer, holder, quantity - 1, timestamp, None, fee, attachment).right.get
-      reissue  = ReissueTransactionV1.create(issuer, assetId, (Long.MaxValue - quantity) + 1, true, 1, timestamp).right.get
+      transfer = TransferTransactionV1.selfSigned(Some(assetId), issuer, holder, quantity - 1, timestamp, None, fee, attachment).right.get
+      reissue  = ReissueTransactionV1.selfSigned(issuer, assetId, (Long.MaxValue - quantity) + 1, true, 1, timestamp).right.get
     } yield (issuer, assetId, genesis, issue, reissue, transfer)
 
     val fs =
@@ -217,7 +218,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
   private def createScript(code: String) = {
     val Parsed.Success(expr, _) = Parser(code).get
-    ScriptV1(TypeChecker(dummyTypeCheckerContext, expr).explicitGet()).explicitGet()
+    ScriptV1(CompilerV1(dummyTypeCheckerContext, expr).explicitGet()).explicitGet()
   }
 
   def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransactionV2, TransferTransactionV1, ReissueTransactionV1)] =
@@ -247,9 +248,9 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
         .explicitGet()
       assetId = issue.id()
       transfer = TransferTransactionV1
-        .create(Some(assetId), accountA, accountB, issue.quantity, timestamp + 2, None, smallFee, Array.empty)
+        .selfSigned(Some(assetId), accountA, accountB, issue.quantity, timestamp + 2, None, smallFee, Array.empty)
         .explicitGet()
-      reissue = ReissueTransactionV1.create(accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
+      reissue = ReissueTransactionV1.selfSigned(accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
     } yield (Seq(genesisTx1, genesisTx2), issue, transfer, reissue)
 
   property("Can issue smart asset with script") {

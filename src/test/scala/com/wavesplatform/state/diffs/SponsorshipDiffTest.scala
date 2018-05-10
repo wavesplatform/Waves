@@ -98,16 +98,16 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       recipient                  <- accountGen
       assetId = issueTx.id()
       assetOverspend = TransferTransactionV1
-        .create(None, master, recipient.toAddress, 1000000, ts + 1, Some(assetId), issueTx.quantity + 1, Array.emptyByteArray)
+        .selfSigned(None, master, recipient.toAddress, 1000000, ts + 1, Some(assetId), issueTx.quantity + 1, Array.emptyByteArray)
         .right
         .get
       insufficientFee = TransferTransactionV1
-        .create(None, master, recipient.toAddress, 1000000, ts + 2, Some(assetId), sponsorTx.minSponsoredAssetFee.get - 1, Array.emptyByteArray)
+        .selfSigned(None, master, recipient.toAddress, 1000000, ts + 2, Some(assetId), sponsorTx.minSponsoredAssetFee.get - 1, Array.emptyByteArray)
         .right
         .get
       fee = 3000 * sponsorTx.minSponsoredAssetFee.get
       wavesOverspend = TransferTransactionV1
-        .create(None, master, recipient.toAddress, 1000000, ts + 3, Some(assetId), fee, Array.emptyByteArray)
+        .selfSigned(None, master, recipient.toAddress, 1000000, ts + 3, Some(assetId), fee, Array.emptyByteArray)
         .right
         .get
     } yield (genesis, issueTx, sponsorTx, assetOverspend, insufficientFee, wavesOverspend)
@@ -137,19 +137,19 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       recipient <- accountGen
       ts        <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, 300000000, ts).right.get
-      issue                       = IssueTransactionV1.create(master, Base58.decode("Asset").get, Array.emptyByteArray, 100, 2, false, 100000000, ts + 1).right.get
+      issue                       = IssueTransactionV1.selfSigned(master, Base58.decode("Asset").get, Array.emptyByteArray, 100, 2, false, 100000000, ts + 1).right.get
       assetId                     = issue.id()
-      sponsor                     = SponsorFeeTransaction.create(1, master, assetId, Some(100), 100000000, ts + 2).right.get
+      sponsor                     = SponsorFeeTransaction.selfSigned(1, master, assetId, Some(100), 100000000, ts + 2).right.get
       assetTransfer = TransferTransactionV1
-        .create(Some(assetId), master, recipient, issue.quantity, ts + 3, None, 100000, Array.emptyByteArray)
+        .selfSigned(Some(assetId), master, recipient, issue.quantity, ts + 3, None, 100000, Array.emptyByteArray)
         .right
         .get
       wavesTransfer = TransferTransactionV1
-        .create(None, master, recipient, 99800000, ts + 4, None, 100000, Array.emptyByteArray)
+        .selfSigned(None, master, recipient, 99800000, ts + 4, None, 100000, Array.emptyByteArray)
         .right
         .get
       backWavesTransfer = TransferTransactionV1
-        .create(None, recipient, master, 100000, ts + 5, Some(assetId), 100, Array.emptyByteArray)
+        .selfSigned(None, recipient, master, 100000, ts + 5, Some(assetId), 100, Array.emptyByteArray)
         .right
         .get
     } yield (genesis, issue, sponsor, assetTransfer, wavesTransfer, backWavesTransfer)

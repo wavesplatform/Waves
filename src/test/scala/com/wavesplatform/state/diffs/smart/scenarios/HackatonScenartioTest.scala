@@ -4,8 +4,9 @@ import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.lang.TypeInfo
 import com.wavesplatform.lang.TypeInfo._
-import com.wavesplatform.lang.v1.evaluation.EvaluatorV1
-import com.wavesplatform.lang.v1.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
@@ -55,7 +56,7 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
         """.stripMargin
 
       untypedScript = Parser(assetScript).get.value
-      typedScript   = ScriptV1(TypeChecker(dummyTypeCheckerContext, untypedScript).explicitGet()).explicitGet()
+      typedScript   = ScriptV1(CompilerV1(dummyTypeCheckerContext, untypedScript).explicitGet()).explicitGet()
 
       issueTransaction = IssueTransactionV2
         .selfSigned(
@@ -80,11 +81,11 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
         .explicitGet()
 
       transferFromCompanyToA = TransferTransactionV1
-        .create(Some(assetId), company, accountA, 1, ts + 20, None, 1000, Array.empty)
+        .selfSigned(Some(assetId), company, accountA, 1, ts + 20, None, 1000, Array.empty)
         .explicitGet()
 
       transferFromAToB = TransferTransactionV1
-        .create(Some(assetId), accountA, accountB, 1, ts + 30, None, 1000, Array.empty)
+        .selfSigned(Some(assetId), accountA, accountB, 1, ts + 30, None, 1000, Array.empty)
         .explicitGet()
 
       notaryDataTransaction = DataTransaction
@@ -105,7 +106,7 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
 
   private def eval[T: TypeInfo](code: String) = {
     val untyped = Parser(code).get.value
-    val typed   = TypeChecker(dummyTypeCheckerContext, untyped)
+    val typed   = CompilerV1(dummyTypeCheckerContext, untyped)
     typed.flatMap(EvaluatorV1[T](dummyContext, _))
   }
 

@@ -1,7 +1,7 @@
 package scorex.transaction.smart.script
 
 import cats.implicits._
-import com.wavesplatform.lang.v1.evaluation.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.{ExecutionError, TypeInfo}
 import com.wavesplatform.state._
 import monix.eval.Coeval

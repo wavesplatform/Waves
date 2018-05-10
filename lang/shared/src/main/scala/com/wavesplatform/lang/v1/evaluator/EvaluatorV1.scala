@@ -1,14 +1,13 @@
-package com.wavesplatform.lang.v1.evaluation
+package com.wavesplatform.lang.v1.evaluator
 
 import cats.implicits._
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.Terms.Typed._
-import com.wavesplatform.lang.v1.Terms.{TYPE, Typed}
-import com.wavesplatform.lang.v1.ctx.Context.Lenses._
-import com.wavesplatform.lang.v1.ctx.{Context, LazyVal, Obj}
+import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal, Obj}
 import com.wavesplatform.lang.{ExecutionError, ExprEvaluator, TypeInfo}
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext.Lenses._
 
 object EvaluatorV1 extends ExprEvaluator {
 
@@ -80,18 +79,18 @@ object EvaluatorV1 extends ExprEvaluator {
     } yield result
   }
 
-  private def evalExpr[T: TypeInfo](t: Typed.EXPR): EvalM[T] = {
+  private def evalExpr[T: TypeInfo](t: EXPR): EvalM[T] = {
     (t match {
-      case Typed.BLOCK(let, inner, blockTpe)    => evalBlock(let, inner, blockTpe)
-      case Typed.REF(str, _)                    => evalRef(str)
-      case Typed.CONST_LONG(v)                  => liftValue(v)
-      case Typed.CONST_BYTEVECTOR(v)            => liftValue(v)
-      case Typed.CONST_STRING(v)                => liftValue(v)
-      case Typed.TRUE                           => liftValue(true)
-      case Typed.FALSE                          => liftValue(false)
-      case Typed.IF(cond, t1, t2, tpe)          => evalIF(cond, t1, t2, tpe)
-      case Typed.GETTER(expr, field, _)         => evalGetter(expr, field)
-      case Typed.FUNCTION_CALL(header, args, _) => evalFunctionCall(header, args)
+      case BLOCK(let, inner, blockTpe)    => evalBlock(let, inner, blockTpe)
+      case REF(str, _)                    => evalRef(str)
+      case CONST_LONG(v)                  => liftValue(v)
+      case CONST_BYTEVECTOR(v)            => liftValue(v)
+      case CONST_STRING(v)                => liftValue(v)
+      case TRUE                           => liftValue(true)
+      case FALSE                          => liftValue(false)
+      case IF(cond, t1, t2, tpe)          => evalIF(cond, t1, t2, tpe)
+      case GETTER(expr, field, _)         => evalGetter(expr, field)
+      case FUNCTION_CALL(header, args, _) => evalFunctionCall(header, args)
     }).flatMap(v => {
       val ti = typeInfo[T]
       if (t.tpe.typeInfo <:< ti) liftValue(v.asInstanceOf[T])
@@ -100,7 +99,7 @@ object EvaluatorV1 extends ExprEvaluator {
 
   }
 
-  def apply[A: TypeInfo](c: Context, expr: Typed.EXPR): Either[(Context, ExecutionError), A] = {
+  def apply[A: TypeInfo](c: EvaluationContext, expr: EXPR): Either[(EvaluationContext, ExecutionError), A] = {
     evalExpr[A](expr).run(c)
   }
 }

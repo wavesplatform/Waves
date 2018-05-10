@@ -85,13 +85,22 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
     }
   }
 
+  def signed(version: Byte,
+             sender: PublicKeyAccount,
+             data: List[DataEntry[_]],
+             feeAmount: Long,
+             timestamp: Long,
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+    create(version, sender, data, feeAmount, timestamp, Proofs.empty).right.map { unsigned =>
+      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
+    }
+  }
+
   def selfSigned(version: Byte,
                  sender: PrivateKeyAccount,
                  data: List[DataEntry[_]],
                  feeAmount: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] = {
-    create(version, sender, data, feeAmount, timestamp, Proofs.empty).right.map { unsigned =>
-      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes())))).explicitGet())
-    }
+    signed(version, sender, data, feeAmount, timestamp, sender)
   }
 }

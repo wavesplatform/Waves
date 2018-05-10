@@ -1,9 +1,10 @@
-package com.wavesplatform.lang.v1.ctx.impl
+package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.Terms._
-import com.wavesplatform.lang.v1.Terms
-import com.wavesplatform.lang.v1.ctx.{Context, LazyVal, PredefFunction}
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal, PredefFunction}
+import com.wavesplatform.lang.v1.parser.BinaryOperation._
+import com.wavesplatform.lang.v1.parser.BinaryOperation
+import com.wavesplatform.lang.v1.compiler.Terms._
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 
@@ -35,8 +36,8 @@ object PureContext {
     case _                       => ???
   }
 
-  private def createOp(op: BINARY_OP_KIND, t: TYPE, r: TYPE)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
-    PredefFunction(Terms.opsToFunctions(op), 1, r, List("a" -> t, "b" -> t)) {
+  private def createOp(op: BinaryOperation, t: TYPE, r: TYPE)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
+    PredefFunction(opsToFunctions(op), 1, r, List("a" -> t, "b" -> t)) {
       case a :: b :: Nil =>
         Right(body(a.asInstanceOf[t.Underlying], b.asInstanceOf[t.Underlying]))
       case _ => ???
@@ -55,6 +56,7 @@ object PureContext {
 
   val operators: Seq[PredefFunction] = Seq(sumLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt)
 
-  lazy val instance = Context.build(types = Seq.empty, letDefs = Map(("None", none)), functions = Seq(extract, isDefined, some, size) ++ operators)
+  lazy val instance =
+    EvaluationContext.build(types = Seq.empty, letDefs = Map(("None", none)), functions = Seq(extract, isDefined, some, size) ++ operators)
 
 }

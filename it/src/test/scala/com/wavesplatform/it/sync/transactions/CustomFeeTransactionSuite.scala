@@ -76,7 +76,7 @@ object CustomFeeTransactionSuite {
   private val seed = Default(3).getString("account-seed")
   private val pk   = PrivateKeyAccount.fromSeed(seed).right.get
   val assetTx = IssueTransactionV1
-    .create(
+    .selfSigned(
       sender = pk,
       name = "asset".getBytes(),
       description = "asset description".getBytes(),

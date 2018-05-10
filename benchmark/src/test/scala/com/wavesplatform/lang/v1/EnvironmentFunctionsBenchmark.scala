@@ -4,6 +4,7 @@ import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
 import com.wavesplatform.lang.v1.traits.{DataType, Environment, Transaction}
 import org.openjdk.jmh.annotations._
 import scodec.bits.ByteVector

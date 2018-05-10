@@ -65,6 +65,20 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
       _ <- ReissueTransaction.validateReissueParams(quantity, fee)
     } yield ReissueTransactionV2(version, chainId, sender, assetId, quantity, reissuable, fee, timestamp, proofs)
 
+  def signed(version: Byte,
+             chainId: Byte,
+             sender: PublicKeyAccount,
+             assetId: ByteStr,
+             quantity: Long,
+             reissuable: Boolean,
+             fee: Long,
+             timestamp: Long,
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
+    for {
+      unverified <- create(version, chainId, sender, assetId, quantity, reissuable, fee, timestamp, Proofs.empty)
+      proofs     <- Proofs.create(Seq(ByteStr(crypto.sign(signer, unverified.bodyBytes()))))
+    } yield unverified.copy(proofs = proofs)
+
   def selfSigned(version: Byte,
                  chainId: Byte,
                  sender: PrivateKeyAccount,
@@ -73,8 +87,5 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
                  reissuable: Boolean,
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] =
-    for {
-      unverified <- create(version, chainId, sender, assetId, quantity, reissuable, fee, timestamp, Proofs.empty)
-      proofs     <- Proofs.create(Seq(ByteStr(crypto.sign(sender, unverified.bodyBytes()))))
-    } yield unverified.copy(proofs = proofs)
+    signed(version, chainId, sender, assetId, quantity, reissuable, fee, timestamp, sender)
 }

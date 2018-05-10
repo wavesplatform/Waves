@@ -3,9 +3,8 @@ package com.wavesplatform.utx
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
-import com.wavesplatform.lang.v1.CompilerV1
-import com.wavesplatform.lang.v1.Terms.Typed
-import com.wavesplatform.lang.v1.TypeChecker.TypeCheckerContext
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs._
@@ -75,14 +74,14 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
       amount    <- chooseNum(1, (maxAmount * 0.9).toLong)
       recipient <- accountGen
       fee       <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
-    } yield TransferTransactionV1.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
+    } yield TransferTransactionV1.selfSigned(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
       .label("transferTransaction")
 
   private def transferWithRecipient(sender: PrivateKeyAccount, recipient: PublicKeyAccount, maxAmount: Long, time: Time) =
     (for {
       amount <- chooseNum(1, (maxAmount * 0.9).toLong)
       fee    <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
-    } yield TransferTransactionV1.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
+    } yield TransferTransactionV1.selfSigned(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
       .label("transferWithRecipient")
 
   private def massTransferWithRecipients(sender: PrivateKeyAccount, recipients: List[PublicKeyAccount], maxAmount: Long, time: Time) = {
@@ -222,13 +221,13 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
       (utx, time, tx1, (offset + 1000).millis, tx2)
     }
 
-  private val expr: Typed.EXPR = {
+  private val expr: EXPR = {
     val code =
       """let x = 1
         |let y = 2
         |true""".stripMargin
 
-    val compiler = new CompilerV1(TypeCheckerContext.empty)
+    val compiler = new CompilerV1(CompilerContext.empty)
     compiler.compile(code, List.empty).explicitGet()
   }
 
@@ -261,7 +260,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
   }
 
   private def transactionGen(sender: PrivateKeyAccount, ts: Long, feeAmount: Long): Gen[TransferTransactionV1] = accountGen.map { recipient =>
-    TransferTransactionV1.create(None, sender, recipient, waves(1), ts, None, feeAmount, Array.emptyByteArray).explicitGet()
+    TransferTransactionV1.selfSigned(None, sender, recipient, waves(1), ts, None, feeAmount, Array.emptyByteArray).explicitGet()
   }
 
   private val notEnoughFeeTxWithScriptedAccount = for {

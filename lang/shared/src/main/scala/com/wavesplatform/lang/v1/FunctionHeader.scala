@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1
 
-import com.wavesplatform.lang.v1
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
+import com.wavesplatform.lang.v1.compiler.Terms
 
 case class FunctionHeader(name: String, args: List[FunctionHeaderType])
 object FunctionHeader {
@@ -10,12 +10,12 @@ object FunctionHeader {
     def fromTypePlaceholder(t: Terms.TYPEPLACEHOLDER): FunctionHeaderType = t match {
       case Terms.TYPEPARAM(char)       => FunctionHeaderType.TYPEPARAM(char)
       case Terms.OPTIONTYPEPARAM(x)    => FunctionHeaderType.OPTIONTYPEPARAM(fromTypePlaceholder(x))
-      case v1.Terms.NOTHING            => FunctionHeaderType.NOTHING
-      case v1.Terms.UNIT               => FunctionHeaderType.UNIT
-      case v1.Terms.LONG               => FunctionHeaderType.LONG
-      case v1.Terms.BYTEVECTOR         => FunctionHeaderType.BYTEVECTOR
-      case v1.Terms.BOOLEAN            => FunctionHeaderType.BOOLEAN
-      case v1.Terms.STRING             => FunctionHeaderType.STRING
+      case Terms.NOTHING               => FunctionHeaderType.NOTHING
+      case compiler.Terms.UNIT         => FunctionHeaderType.UNIT
+      case compiler.Terms.LONG         => FunctionHeaderType.LONG
+      case compiler.Terms.BYTEVECTOR   => FunctionHeaderType.BYTEVECTOR
+      case compiler.Terms.BOOLEAN      => FunctionHeaderType.BOOLEAN
+      case compiler.Terms.STRING       => FunctionHeaderType.STRING
       case Terms.OPTION(x)             => FunctionHeaderType.OPTION(fromTypePlaceholder(x))
       case Terms.TYPEREF(name: String) => FunctionHeaderType.TYPEREF(name)
     }

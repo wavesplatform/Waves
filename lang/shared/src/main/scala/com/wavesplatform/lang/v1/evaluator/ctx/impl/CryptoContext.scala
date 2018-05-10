@@ -1,13 +1,13 @@
-package com.wavesplatform.lang.v1.ctx.impl
+package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import com.wavesplatform.lang.v1.Terms.{BOOLEAN, BYTEVECTOR, STRING}
+import com.wavesplatform.lang.v1.compiler.Terms.{BOOLEAN, BYTEVECTOR, STRING}
 import com.wavesplatform.lang.v1.BaseGlobal
-import com.wavesplatform.lang.v1.ctx.{Context, PredefFunction}
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, PredefFunction}
 import scodec.bits.ByteVector
 
 object CryptoContext {
 
-  def build(global: BaseGlobal): Context = {
+  def build(global: BaseGlobal): EvaluationContext = {
 
     def hashFunction(name: String, cost: Long)(h: Array[Byte] => Array[Byte]) = PredefFunction(name, cost, BYTEVECTOR, List(("bytes", BYTEVECTOR))) {
       case (m: ByteVector) :: Nil => Right(ByteVector(h(m.toArray)))
@@ -30,6 +30,6 @@ object CryptoContext {
         Right(global.base58Encode(bytes.toArray))
       case _ => ???
     }
-    Context.build(Seq.empty, Map.empty, Seq(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF))
+    EvaluationContext.build(Seq.empty, Map.empty, Seq(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF))
   }
 }

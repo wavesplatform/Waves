@@ -1,8 +1,7 @@
-package com.wavesplatform.lang.v1.evaluation
+package com.wavesplatform.lang.v1.evaluator
 
 import monix.eval.Coeval
-import monix.execution.atomic._
-import monix.execution.atomic.Atomic
+import monix.execution.atomic.{Atomic, _}
 
 sealed trait CoevalRef[A] {
   def read: Coeval[A]

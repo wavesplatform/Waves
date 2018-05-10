@@ -55,12 +55,23 @@ object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] w
       .validateReissueParams(quantity, fee)
       .map(_ => ReissueTransactionV1(sender, assetId, quantity, reissuable, fee, timestamp, signature))
 
-  def create(sender: PrivateKeyAccount,
+  def signed(sender: PublicKeyAccount,
              assetId: ByteStr,
              quantity: Long,
              reissuable: Boolean,
              fee: Long,
-             timestamp: Long): Either[ValidationError, TransactionT] =
+             timestamp: Long,
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
+    create(sender, assetId, quantity, reissuable, fee, timestamp, ByteStr.empty).right.map { unsigned =>
+      unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bodyBytes())))
+    }
+
+  def selfSigned(sender: PrivateKeyAccount,
+                 assetId: ByteStr,
+                 quantity: Long,
+                 reissuable: Boolean,
+                 fee: Long,
+                 timestamp: Long): Either[ValidationError, TransactionT] =
     create(sender, assetId, quantity, reissuable, fee, timestamp, ByteStr.empty).right.map { unsigned =>
       unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
     }

@@ -37,7 +37,7 @@ trait Wallet {
 object Wallet extends ScorexLogging {
 
   implicit class WalletExtension(w: Wallet) {
-    def findWallet(addressString: String): Either[ValidationError, PrivateKeyAccount] =
+    def findPrivateKey(addressString: String): Either[ValidationError, PrivateKeyAccount] =
       for {
         acc        <- Address.fromString(addressString)
         privKeyAcc <- w.privateKeyAccount(acc)

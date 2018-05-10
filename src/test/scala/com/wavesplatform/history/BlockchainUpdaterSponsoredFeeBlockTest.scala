@@ -44,18 +44,18 @@ class BlockchainUpdaterSponsoredFeeBlockTest
     wavesFee                    = Sponsorship.toWaves(sponsorTx.minSponsoredAssetFee.get, sponsorTx.minSponsoredAssetFee.get)
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     masterToAlice: TransferTransactionV1 = TransferTransactionV1
-      .create(None,
-              master,
-              alice,
-              feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee,
-              ts + 1,
-              None,
-              transferAssetWavesFee,
-              Array.emptyByteArray)
+      .selfSigned(None,
+                  master,
+                  alice,
+                  feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee,
+                  ts + 1,
+                  None,
+                  transferAssetWavesFee,
+                  Array.emptyByteArray)
       .right
       .get
     aliceToBob: TransferTransactionV1 = TransferTransactionV1
-      .create(
+      .selfSigned(
         Some(feeAsset.id()),
         alice,
         bob,
@@ -68,7 +68,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       .right
       .get
     bobToMaster: TransferTransactionV1 = TransferTransactionV1
-      .create(
+      .selfSigned(
         Some(feeAsset.id()),
         bob,
         master,
@@ -81,7 +81,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       .right
       .get
     bobToMaster2: TransferTransactionV1 = TransferTransactionV1
-      .create(
+      .selfSigned(
         Some(feeAsset.id()),
         bob,
         master,

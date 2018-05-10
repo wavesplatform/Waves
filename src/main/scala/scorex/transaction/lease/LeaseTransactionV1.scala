@@ -50,13 +50,22 @@ object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with 
       .validateLeaseParams(amount, fee, recipient, sender)
       .map(_ => LeaseTransactionV1(sender, amount, fee, timestamp, recipient, signature))
 
-  def create(sender: PrivateKeyAccount,
+  def signed(sender: PublicKeyAccount,
              amount: Long,
              fee: Long,
              timestamp: Long,
-             recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
+             recipient: AddressOrAlias,
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
     create(sender, amount, fee, timestamp, recipient, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
+      unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bodyBytes())))
     }
+  }
+
+  def selfSigned(sender: PrivateKeyAccount,
+                 amount: Long,
+                 fee: Long,
+                 timestamp: Long,
+                 recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
+    signed(sender, amount, fee, timestamp, recipient, sender)
   }
 }
