@@ -43,18 +43,18 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
   property("all types of multiline expressions") {
     val gas = 50
-    genElementCheck(CONST_LONGgen)
+    genElementCheck(CONST_LONGgen.map(_._1))
     genElementCheck(STRgen)
     genElementCheck(REFgen)
-    genElementCheck(BOOLgen(gas))
-    genElementCheck(SUMgen(gas))
-    genElementCheck(EQ_INTgen(gas))
-    genElementCheck(INTGen(gas))
-    genElementCheck(GEgen(gas))
-    genElementCheck(GTgen(gas))
-    genElementCheck(ANDgen(gas))
-    genElementCheck(ORgen(gas))
-    genElementCheck(BLOCKgen(gas))
+    genElementCheck(BOOLgen(gas).map(_._1))
+    genElementCheck(SUMgen(gas).map(_._1))
+    genElementCheck(EQ_INTgen(gas).map(_._1))
+    genElementCheck(INTGen(gas).map(_._1))
+    genElementCheck(GEgen(gas).map(_._1))
+    genElementCheck(GTgen(gas).map(_._1))
+    genElementCheck(ANDgen(gas).map(_._1))
+    genElementCheck(ORgen(gas).map(_._1))
+    genElementCheck(BLOCKgen(gas).map(_._1))
   }
 
   property("priority in binary expressions") {
