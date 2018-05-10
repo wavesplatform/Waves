@@ -44,7 +44,7 @@ object PureContext {
     }
   }
 
-  val sumLong       = createOp(SUM_OP, LONG, LONG)(_ + _)
+  val sumLong       = createOp(SUM_OP, LONG, LONG)(Math.addExact)
   val sumString     = createOp(SUM_OP, STRING, STRING)(_ + _)
   val sumByteVector = createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR)((a, b) => ByteVector(a.toArray ++ b.toArray))
   val eqLong        = createOp(EQ_OP, LONG, BOOLEAN)(_ == _)
