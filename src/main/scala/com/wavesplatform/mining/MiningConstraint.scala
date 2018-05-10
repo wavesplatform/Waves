@@ -12,6 +12,15 @@ trait MiningConstraint {
   def put(blockchain: Blockchain, x: Transaction): MiningConstraint
 }
 
+object MiningConstraint {
+  val Unlimited: MiningConstraint = new MiningConstraint {
+    override def isEmpty: Boolean                                              = false
+    override def isOverfilled: Boolean                                         = false
+    override def put(blockchain: Blockchain, x: Block): MiningConstraint       = this
+    override def put(blockchain: Blockchain, x: Transaction): MiningConstraint = this
+  }
+}
+
 case class OneDimensionalMiningConstraint(rest: Long, estimator: Estimator) extends MiningConstraint {
   override def isEmpty: Boolean                                                            = rest <= 0
   override def isOverfilled: Boolean                                                       = rest < 0

@@ -38,7 +38,9 @@ object MiningConstraints {
           val maxTxsForKeyBlock = if (isNgEnabled) minerSettings.maxTransactionsInKeyBlock else ClassicAmountOfTxsInBlock
           OneDimensionalMiningConstraint(maxTxsForKeyBlock, TxNumberEstimator)
         },
-      micro = OneDimensionalMiningConstraint(minerSettings.maxTransactionsInMicroBlock, TxNumberEstimator)
+      micro =
+        if (isNgEnabled) OneDimensionalMiningConstraint(minerSettings.maxTransactionsInMicroBlock, TxNumberEstimator)
+        else MiningConstraint.Unlimited
     )
   }
 }

@@ -159,7 +159,7 @@ class MinerImpl(allChannels: ChannelGroup,
                                         accumulatedBlock: Block,
                                         constraints: MiningConstraints,
                                         restTotalConstraint: MiningConstraint): Task[MicroblockMiningResult] = {
-    log.trace(s"Generating microBlock for $account")
+    log.trace(s"Generating microBlock for $account, constraints: $restTotalConstraint")
     val pc = allChannels.size()
     if (pc < minerSettings.quorum) {
       log.trace(s"Quorum not available ($pc/${minerSettings.quorum}, not forging microblock with ${account.address}")
@@ -174,14 +174,19 @@ class MinerImpl(allChannels: ChannelGroup,
         (unconfirmed, updatedMdConstraint.constraints.head)
       }
 
-      if (updatedTotalConstraint.isEmpty) {
-        log.trace(s"Stopping forging microBlocks, the block is full")
-        Task.now(Stop)
-      } else if (unconfirmed.isEmpty) {
-        log.trace(s"Stopping forging microBlocks, because all transactions are too big")
+      if (unconfirmed.isEmpty) {
+        log.trace {
+          if (updatedTotalConstraint.isEmpty) s"Stopping forging microBlocks, the block is full: $updatedTotalConstraint"
+          else "Stopping forging microBlocks, because all transactions are too big"
+        }
         Task.now(Stop)
       } else {
         log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
+        log.trace(s"${unconfirmed
+          .map { x =>
+            x.getClass.getSimpleName -> x.timestamp
+          }
+          .mkString("\n", "\n", "\n")}")
         val start = System.currentTimeMillis()
         (for {
           signedBlock <- EitherT.fromEither[Task](
@@ -202,9 +207,14 @@ class MinerImpl(allChannels: ChannelGroup,
           case Left(err) => Error(err)
           case Right((microBlock, signedBlock)) =>
             BlockStats.mined(microBlock)
-            log.trace(s"$microBlock has been mined for $account}")
             allChannels.broadcast(MicroBlockInv(account, microBlock.totalResBlockSig, microBlock.prevResBlockSig))
-            Success(signedBlock, updatedTotalConstraint)
+            if (updatedTotalConstraint.isEmpty) {
+              log.trace(s"$microBlock has been mined for $account. Stop forging microBlocks, the block is full: $updatedTotalConstraint")
+              Stop
+            } else {
+              log.trace(s"$microBlock has been mined for $account")
+              Success(signedBlock, updatedTotalConstraint)
+            }
         }
       }
     }
@@ -323,10 +333,8 @@ object Miner {
 
   sealed trait MicroblockMiningResult
 
-  case object Stop extends MicroblockMiningResult
-
-  case object Retry extends MicroblockMiningResult
-
+  case object Stop                                                extends MicroblockMiningResult
+  case object Retry                                               extends MicroblockMiningResult
   case class Error(e: ValidationError)                            extends MicroblockMiningResult
   case class Success(b: Block, totalConstraint: MiningConstraint) extends MicroblockMiningResult
 
