@@ -19,7 +19,14 @@ object ScriptEstimator {
           right <- aux(EitherT.pure(t.ifTrue))
           left  <- aux(EitherT.pure(t.ifFalse))
         } yield 1 + cond + math.max(right, left)
-
+      case t: MATCH =>
+        import cats.instances.list._
+        import cats.syntax.traverse._
+        val exprs: List[EXPR] = t.cases.map(_.expr)
+        for {
+          cond     <- aux(EitherT.pure(t.expr))
+          branches <- exprs.map((ex: EXPR) => aux(EitherT.pure[Coeval, String](ex))).sequence[Result, Long]
+        } yield 1 + cond + branches.max
       case _: REF => EitherT.pure(2)
       case t: FUNCTION_CALL =>
         import cats.instances.list._
