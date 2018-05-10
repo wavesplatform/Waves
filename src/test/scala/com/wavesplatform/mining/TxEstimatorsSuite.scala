@@ -6,25 +6,24 @@ import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, EitherExt
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.{Address, PrivateKeyAccount}
-import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.transfer.TransferTransactionV1
 
-class ScriptRunNumberEstimatorSuite extends FreeSpec with Matchers with PathMockFactory with TransactionGen {
-  "ScriptRunNumberEstimator" - {
+class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with TransactionGen {
+  "scriptRunNumber" - {
     "smart account" - {
       "should not count transactions going from a regular account" in {
         val blockchain = stub[Blockchain]
         (blockchain.accountScript _).when(*).onCall((_: Address) => None).anyNumberOfTimes()
 
-        ScriptRunNumberEstimator.estimate(blockchain, transferWavesTx) shouldBe 0
+        TxEstimators.scriptRunNumber(blockchain, transferWavesTx) shouldBe 0
       }
 
       "should count transactions going from a smart account" in {
         val blockchain = stub[Blockchain]
         (blockchain.accountScript _).when(*).onCall((_: Address) => Some(script)).anyNumberOfTimes()
 
-        ScriptRunNumberEstimator.estimate(blockchain, transferWavesTx) shouldBe 1
+        TxEstimators.scriptRunNumber(blockchain, transferWavesTx) shouldBe 1
       }
     }
 
@@ -34,7 +33,7 @@ class ScriptRunNumberEstimatorSuite extends FreeSpec with Matchers with PathMock
         (blockchain.accountScript _).when(*).onCall((_: Address) => None).anyNumberOfTimes()
         (blockchain.assetDescription _).when(*).onCall((_: ByteStr) => None).anyNumberOfTimes()
 
-        ScriptRunNumberEstimator.estimate(blockchain, transferAssetsTx) shouldBe 0
+        TxEstimators.scriptRunNumber(blockchain, transferAssetsTx) shouldBe 0
       }
 
       "should count transactions working with smart tokens" in {
@@ -42,17 +41,8 @@ class ScriptRunNumberEstimatorSuite extends FreeSpec with Matchers with PathMock
         (blockchain.accountScript _).when(*).onCall((_: Address) => None).anyNumberOfTimes()
         (blockchain.assetDescription _).when(*).onCall((_: ByteStr) => Some(assetDescription)).anyNumberOfTimes()
 
-        ScriptRunNumberEstimator.estimate(blockchain, transferAssetsTx) shouldBe 1
+        TxEstimators.scriptRunNumber(blockchain, transferAssetsTx) shouldBe 1
       }
-    }
-
-    "should sum both types of transactions" in {
-      val blockchain = stub[Blockchain]
-      (blockchain.accountScript _).when(*).onCall((_: Address) => Some(script)).anyNumberOfTimes()
-      (blockchain.assetDescription _).when(*).onCall((_: ByteStr) => Some(assetDescription)).anyNumberOfTimes()
-
-      // 3 because from one account, so transferAssetsTx is validated by both scripts
-      ScriptRunNumberEstimator.estimate(blockchain, TestBlock.create(Seq(transferWavesTx, transferAssetsTx))) shouldBe 3
     }
   }
 

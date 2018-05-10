@@ -6,7 +6,6 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.Transaction
 
 class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with PropertyChecks with PathMockFactory with TransactionGen with NoShrink {
@@ -15,12 +14,6 @@ class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
       val tank = createConstConstraint(0)
       tank.isEmpty shouldBe true
       tank.isOverfilled shouldBe false
-    }
-
-    "put(block)" - tests { (maxTxs, txs) =>
-      val blocks     = txs.map(tx => TestBlock.create(Seq(tx)))
-      val constraint = createConstConstraint(maxTxs, blockSize = 1)
-      blocks.foldLeft(constraint)(_.put(stub[Blockchain], _))
     }
 
     "put(transaction)" - tests { (maxTxs, txs) =>

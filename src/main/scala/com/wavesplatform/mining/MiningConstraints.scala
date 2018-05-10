@@ -21,25 +21,25 @@ object MiningConstraints {
     val isScriptEnabled       = activatedFeatures.contains(BlockchainFeatures.SmartAccounts.id)
 
     val total: MiningConstraint =
-      if (isMassTransferEnabled) OneDimensionalMiningConstraint(MaxTxsSizeInBytes, SizeInBytesEstimator)
+      if (isMassTransferEnabled) OneDimensionalMiningConstraint(MaxTxsSizeInBytes, TxEstimators.sizeInBytes)
       else {
         val maxTxs = if (isNgEnabled) Block.MaxTransactionsPerBlockVer3 else ClassicAmountOfTxsInBlock
-        OneDimensionalMiningConstraint(maxTxs, TxNumberEstimator)
+        OneDimensionalMiningConstraint(maxTxs, TxEstimators.one)
       }
 
     new MiningConstraints(
       total =
         if (isScriptEnabled)
-          MultiDimensionalMiningConstraint(NonEmptyList.of(OneDimensionalMiningConstraint(MaxScriptRunsInBlock, ScriptRunNumberEstimator), total))
+          MultiDimensionalMiningConstraint(NonEmptyList.of(OneDimensionalMiningConstraint(MaxScriptRunsInBlock, TxEstimators.scriptRunNumber), total))
         else total,
       keyBlock =
-        if (isMassTransferEnabled) OneDimensionalMiningConstraint(0, TxNumberEstimator)
+        if (isMassTransferEnabled) OneDimensionalMiningConstraint(0, TxEstimators.one)
         else {
           val maxTxsForKeyBlock = if (isNgEnabled) minerSettings.maxTransactionsInKeyBlock else ClassicAmountOfTxsInBlock
-          OneDimensionalMiningConstraint(maxTxsForKeyBlock, TxNumberEstimator)
+          OneDimensionalMiningConstraint(maxTxsForKeyBlock, TxEstimators.one)
         },
       micro =
-        if (isNgEnabled) OneDimensionalMiningConstraint(minerSettings.maxTransactionsInMicroBlock, TxNumberEstimator)
+        if (isNgEnabled) OneDimensionalMiningConstraint(minerSettings.maxTransactionsInMicroBlock, TxEstimators.one)
         else MiningConstraint.Unlimited
     )
   }

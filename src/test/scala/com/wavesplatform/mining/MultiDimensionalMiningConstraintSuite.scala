@@ -6,7 +6,6 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.Transaction
 
 class MultiDimensionalMiningConstraintSuite
@@ -40,11 +39,6 @@ class MultiDimensionalMiningConstraintSuite
         constraint.isEmpty shouldBe false
         constraint.isOverfilled shouldBe false
       }
-    }
-
-    "put(block)" - tests(createConstConstraint(_, blockSize = 1)) { (initConstraint, txs) =>
-      val blocks = txs.map(x => TestBlock.create(Seq(x)))
-      blocks.foldLeft(initConstraint)(_.put(stub[Blockchain], _))
     }
 
     "put(transaction)" - tests(createConstConstraint(_, transactionSize = 1)) { (initConstraint, txs) =>

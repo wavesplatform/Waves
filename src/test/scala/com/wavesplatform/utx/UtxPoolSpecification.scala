@@ -3,8 +3,8 @@ package com.wavesplatform.utx
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs._
@@ -427,13 +427,8 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
   }
 
   private def limitByNumber(n: Int): MultiDimensionalMiningConstraint = MultiDimensionalMiningConstraint(
-    OneDimensionalMiningConstraint(n, CounterEstimator),
-    OneDimensionalMiningConstraint(n, CounterEstimator)
+    OneDimensionalMiningConstraint(n, TxEstimators.one),
+    OneDimensionalMiningConstraint(n, TxEstimators.one)
   )
-
-  private object CounterEstimator extends Estimator {
-    override implicit def estimate(blockchain: Blockchain, x: Block): Long       = x.transactionCount
-    override implicit def estimate(blockchain: Blockchain, x: Transaction): Long = 1
-  }
 
 }

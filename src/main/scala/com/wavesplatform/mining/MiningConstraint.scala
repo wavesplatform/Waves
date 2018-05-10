@@ -1,39 +1,36 @@
 package com.wavesplatform.mining
 
 import cats.data.NonEmptyList
+import com.wavesplatform.mining.MiningConstraint.TxEstimator
 import com.wavesplatform.state.Blockchain
-import scorex.block.Block
 import scorex.transaction.Transaction
 
 trait MiningConstraint {
   def isEmpty: Boolean
   def isOverfilled: Boolean
-  def put(blockchain: Blockchain, x: Block): MiningConstraint
   def put(blockchain: Blockchain, x: Transaction): MiningConstraint
 }
 
 object MiningConstraint {
+  type TxEstimator = (Blockchain, Transaction) => Long
+
   val Unlimited: MiningConstraint = new MiningConstraint {
     override def isEmpty: Boolean                                              = false
     override def isOverfilled: Boolean                                         = false
-    override def put(blockchain: Blockchain, x: Block): MiningConstraint       = this
     override def put(blockchain: Blockchain, x: Transaction): MiningConstraint = this
   }
 }
 
-case class OneDimensionalMiningConstraint(rest: Long, estimator: Estimator) extends MiningConstraint {
+case class OneDimensionalMiningConstraint(rest: Long, estimator: TxEstimator) extends MiningConstraint {
   override def isEmpty: Boolean                                                            = rest <= 0
   override def isOverfilled: Boolean                                                       = rest < 0
-  override def put(blockchain: Blockchain, x: Block): OneDimensionalMiningConstraint       = put(estimator.estimate(blockchain, x))
-  override def put(blockchain: Blockchain, x: Transaction): OneDimensionalMiningConstraint = put(estimator.estimate(blockchain, x))
+  override def put(blockchain: Blockchain, x: Transaction): OneDimensionalMiningConstraint = put(estimator(blockchain, x))
   private def put(x: Long): OneDimensionalMiningConstraint                                 = copy(rest = this.rest - x)
 }
 
 case class MultiDimensionalMiningConstraint(constraints: NonEmptyList[MiningConstraint]) extends MiningConstraint {
   override def isEmpty: Boolean      = constraints.exists(_.isEmpty)
   override def isOverfilled: Boolean = constraints.exists(_.isOverfilled)
-  override def put(blockchain: Blockchain, x: Block): MultiDimensionalMiningConstraint =
-    MultiDimensionalMiningConstraint(constraints.map(_.put(blockchain, x)))
   override def put(blockchain: Blockchain, x: Transaction): MultiDimensionalMiningConstraint =
     MultiDimensionalMiningConstraint(constraints.map(_.put(blockchain, x)))
 }

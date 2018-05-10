@@ -182,11 +182,6 @@ class MinerImpl(allChannels: ChannelGroup,
         Task.now(Stop)
       } else {
         log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
-        log.trace(s"${unconfirmed
-          .map { x =>
-            x.getClass.getSimpleName -> x.timestamp
-          }
-          .mkString("\n", "\n", "\n")}")
         val start = System.currentTimeMillis()
         (for {
           signedBlock <- EitherT.fromEither[Task](
