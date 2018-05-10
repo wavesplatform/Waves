@@ -1,7 +1,7 @@
-package com.wavesplatform.lang.v1.ctx
+package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.Terms.TYPE
+import com.wavesplatform.lang.v1.compiler.Terms.TYPE
 import com.wavesplatform.lang.TrampolinedExecResult
 import monix.eval.Coeval
 

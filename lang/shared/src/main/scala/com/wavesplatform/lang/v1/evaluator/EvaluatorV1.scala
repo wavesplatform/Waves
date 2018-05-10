@@ -1,28 +1,28 @@
-package com.wavesplatform.lang.v1
+package com.wavesplatform.lang.v1.evaluator
 
 import cats.data.{EitherT, StateT}
 import cats.implicits._
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.TypeInfo._
-import com.wavesplatform.lang.v1.Terms.Typed.{EXPR, LET}
-import com.wavesplatform.lang.v1.Terms._
-import com.wavesplatform.lang.v1.ctx._
 import com.wavesplatform.lang._
+import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.{funcs, lets}
+import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, LET, _}
+import com.wavesplatform.lang.v1.evaluator.ctx._
+import com.wavesplatform.lang.v1.FunctionHeader
 import monix.eval.Coeval
-import EvaluationContext._
 
 object EvaluatorV1 extends ExprEvaluator {
 
   override type V = V1.type
   override val version: V = V1
 
-  private type F0[A] = StateT[Coeval, EvaluationContext, A]
+  private type F0[A] = StateT[Coeval, LoggedEvaluationContext, A]
   private type FF[A] = EitherT[F0, ExecutionError, A]
 
-  private def getContext: FF[EvaluationContext] =
-    EitherT.apply[F0, ExecutionError, EvaluationContext](StateT.get[Coeval, EvaluationContext].map(_.asRight[ExecutionError]))
-  private def updateContext(f: EvaluationContext => EvaluationContext): FF[Unit] =
-    EitherT.apply[F0, ExecutionError, Unit](StateT.modify[Coeval, EvaluationContext](f).map(_.asRight[ExecutionError]))
+  private def getContext: FF[LoggedEvaluationContext] =
+    EitherT.apply[F0, ExecutionError, LoggedEvaluationContext](StateT.get[Coeval, LoggedEvaluationContext].map(_.asRight[ExecutionError]))
+  private def updateContext(f: LoggedEvaluationContext => LoggedEvaluationContext): FF[Unit] =
+    EitherT.apply[F0, ExecutionError, Unit](StateT.modify[Coeval, LoggedEvaluationContext](f).map(_.asRight[ExecutionError]))
 
   private def writeLog(l: String): FF[Unit] = updateContext(_.logAppend(l))
 
@@ -31,7 +31,7 @@ object EvaluatorV1 extends ExprEvaluator {
 
   private def liftCE[A](ei: Coeval[ExecutionError Either A]): FF[A] = EitherT.apply[F0, ExecutionError, A](StateT(s => ei.map(v => (s, v))))
 
-  private def toTER[A](ctx: EvaluationContext, fa: FF[A]): TrampolinedExecResult[A] = {
+  private def toTER[A](ctx: LoggedEvaluationContext, fa: FF[A]): TrampolinedExecResult[A] = {
     fa.value
       .run(ctx)
       .map(t => EitherT.fromEither[Coeval](t._2))
@@ -103,22 +103,22 @@ object EvaluatorV1 extends ExprEvaluator {
     } yield result
   }
 
-  private def evalExpr[T: TypeInfo](t: Typed.EXPR): FF[T] = {
+  private def evalExpr[T: TypeInfo](t: EXPR): FF[T] = {
     (t match {
-      case Typed.BLOCK(let, inner, blockTpe) =>
+      case BLOCK(let, inner, blockTpe) =>
         writeLog("Evaluating BLOCK") *> evalBlock(let, inner, blockTpe) <* writeLog("FINISHED")
-      case Typed.REF(str, _) =>
+      case REF(str, _) =>
         writeLog("Evaluating REF") *> evalRef(str) <* writeLog("FINISHED")
-      case Typed.CONST_LONG(v)       => liftR(v)
-      case Typed.CONST_BYTEVECTOR(v) => liftR(v)
-      case Typed.CONST_STRING(v)     => liftR(v)
-      case Typed.TRUE                => liftR(true)
-      case Typed.FALSE               => liftR(false)
-      case Typed.IF(cond, t1, t2, tpe) =>
+      case CONST_LONG(v)       => liftR(v)
+      case CONST_BYTEVECTOR(v) => liftR(v)
+      case CONST_STRING(v)     => liftR(v)
+      case TRUE                => liftR(true)
+      case FALSE               => liftR(false)
+      case IF(cond, t1, t2, tpe) =>
         writeLog("Evaluating IF") *> evalIF(cond, t1, t2, tpe) <* writeLog("FINISHED")
-      case Typed.GETTER(expr, field, _) =>
+      case GETTER(expr, field, _) =>
         writeLog(s"Evaluating GETTER") *> evalGetter(expr, field) <* writeLog("FINISHED")
-      case Typed.FUNCTION_CALL(header, args, _) =>
+      case FUNCTION_CALL(header, args, _) =>
         writeLog(s"Evaluating FUNCTION_CALL") *> evalFunctionCall(header, args) <* writeLog("FINISHED")
     }).flatMap(v => {
       val ti = typeInfo[T]
@@ -128,8 +128,8 @@ object EvaluatorV1 extends ExprEvaluator {
 
   }
 
-  def apply[A: TypeInfo](c: Context, expr: Typed.EXPR): Either[(Context, ExecutionLog, ExecutionError), A] = {
-    def evaluation = evalExpr[A](expr).value.run(EvaluationContext(c))
+  def apply[A: TypeInfo](c: EvaluationContext, expr: EXPR): Either[(EvaluationContext, ExecutionLog, ExecutionError), A] = {
+    def evaluation = evalExpr[A](expr).value.run(LoggedEvaluationContext(c))
 
     evaluation
       .map({

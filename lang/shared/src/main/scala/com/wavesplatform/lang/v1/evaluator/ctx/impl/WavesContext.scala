@@ -1,9 +1,9 @@
-package com.wavesplatform.lang.v1.ctx.impl
+package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.EnvironmentFunctions
-import com.wavesplatform.lang.v1.Terms._
-import com.wavesplatform.lang.v1.ctx._
+//import com.wavesplatform.lang.v1.EnvironmentFunctions
+import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.traits.{DataType, Environment, Transaction, Transfer, AddressOrAlias}
 import monix.eval.Coeval
 import scodec.bits.ByteVector
@@ -23,7 +23,7 @@ object WavesContext {
   private val optionByteVector: OPTION = OPTION(BYTEVECTOR)
   private val listByteVector: LIST = LIST(BYTEVECTOR)
   private val optionAddress            = OPTION(addressType.typeRef)
-  private val optionLong: OPTION = OPTION(LONG)
+  private val optionLong: OPTION       = OPTION(LONG)
 
   private val transferType = PredefType(
     "Transfer",
@@ -88,16 +88,16 @@ object WavesContext {
   private def transactionObject(tx: Transaction): Obj =
     Obj(
       Map(
-        "type"       -> LazyVal(LONG)(EitherT.pure(tx.transactionType)),
-        "id"         -> LazyVal(BYTEVECTOR)(EitherT.pure(tx.id)),
-        "fee"        -> LazyVal(LONG)(EitherT.pure(tx.fee)),
-        "amount"     -> LazyVal(LONG)(EitherT.fromEither(tx.amount)),
-        "feeAssetId" -> LazyVal(optionByteVector)(EitherT.pure(tx.feeAssetId.map(_.asInstanceOf[optionByteVector.innerType.Underlying]))),
-        "timestamp"  -> LazyVal(LONG)(EitherT.pure(tx.timestamp)),
-        "bodyBytes"  -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.bodyBytes)),
-        "senderPk"   -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.senderPk)),
-        "transferAssetId"    -> LazyVal(optionByteVector)(EitherT.fromEither(tx.transferAssetId.map(_.asInstanceOf[optionByteVector.Underlying]))),
-        "assetId"    -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.assetId)),
+        "type"            -> LazyVal(LONG)(EitherT.pure(tx.transactionType)),
+        "id"              -> LazyVal(BYTEVECTOR)(EitherT.pure(tx.id)),
+        "fee"             -> LazyVal(LONG)(EitherT.pure(tx.fee)),
+        "amount"          -> LazyVal(LONG)(EitherT.fromEither(tx.amount)),
+        "feeAssetId"      -> LazyVal(optionByteVector)(EitherT.pure(tx.feeAssetId.map(_.asInstanceOf[optionByteVector.innerType.Underlying]))),
+        "timestamp"       -> LazyVal(LONG)(EitherT.pure(tx.timestamp)),
+        "bodyBytes"       -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.bodyBytes)),
+        "senderPk"        -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.senderPk)),
+        "transferAssetId" -> LazyVal(optionByteVector)(EitherT.fromEither(tx.transferAssetId.map(_.asInstanceOf[optionByteVector.Underlying]))),
+        "assetId"         -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.assetId)),
         "recipient" -> LazyVal(addressOrAliasType.typeRef)(EitherT.fromEither(tx.recipient.map(bv =>
           Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(bv))))))),
         "attachment"       -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.attachment)),
@@ -121,7 +121,7 @@ object WavesContext {
         "proofs"           -> LazyVal(listByteVector)(EitherT.fromEither(tx.proofs.map(_.asInstanceOf[listByteVector.Underlying])))
       ))
 
-  def build(env: Environment): Context = {
+  def build(env: Environment): EvaluationContext = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getdataF(name: String, dataType: DataType) =
@@ -197,7 +197,7 @@ object WavesContext {
         case _                       => ???
       }
 
-    Context.build(
+    EvaluationContext.build(
       Seq(addressType, addressOrAliasType, transactionType, transferType),
       Map(("height", LazyVal(LONG)(EitherT(heightCoeval))), ("tx", LazyVal(TYPEREF(transactionType.name))(EitherT(txCoeval)))),
       Seq(
