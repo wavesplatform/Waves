@@ -48,7 +48,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("equals works on elements from Gens") {
-    List(CONST_LONGgen, SUMgen(50), INTGen(50)).foreach(gen =>
+    List(CONST_LONGgen.map(_._1), SUMgen(50).map(_._1), INTGen(50).map(_._1)).foreach(gen =>
       forAll(for {
         expr <- gen
         str  <- toString(expr)
@@ -58,7 +58,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     })
 
     forAll(for {
-      expr <- BOOLgen(50)
+      (expr, _) <- BOOLgen(50)
       str  <- toString(expr)
     } yield str) {
       case str =>

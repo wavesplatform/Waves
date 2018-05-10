@@ -44,7 +44,19 @@ object PureContext {
     }
   }
 
-  val sumLong       = createOp(SUM_OP, LONG, LONG)(Math.addExact)
+  private def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
+    PredefFunction(opsToFunctions(op), 1, r, List("a" -> t, "b" -> t)) {
+      case a :: b :: Nil =>
+        try {
+          Right(body(a.asInstanceOf[t.Underlying], b.asInstanceOf[t.Underlying]))
+        } catch {
+          case e: Throwable => Left(e.getMessage())
+        }
+      case _ => ???
+    }
+  }
+
+  val sumLong       = createTryOp(SUM_OP, LONG, LONG)(Math.addExact)
   val sumString     = createOp(SUM_OP, STRING, STRING)(_ + _)
   val sumByteVector = createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR)((a, b) => ByteVector(a.toArray ++ b.toArray))
   val eqLong        = createOp(EQ_OP, LONG, BOOLEAN)(_ == _)
