@@ -1,7 +1,5 @@
 package com.wavesplatform.it.async
 
-import java.util.concurrent.ThreadLocalRandom
-
 import com.typesafe.config.Config
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
@@ -62,9 +60,6 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
     .withDefault(1)
     .build(false)
 
-  private val nodePrivateKeys: Array[PrivateKeyAccount] =
-    nodeConfigs.map(_.getString("account-seed")).map(s => PrivateKeyAccount.fromSeed(s).explicitGet())(collection.breakOut)
-
   private def miner                  = nodes.head
   private val smartAccountPrivateKey = PrivateKeyAccount.fromSeed(NodeConfigs.Default(1).getString("account-seed")).explicitGet()
 
@@ -76,9 +71,9 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
       blockWithSetScript <- miner.blockHeadersAt(2)
       restBlocks         <- miner.blockHeadersSeq(3, 4)
     } yield {
-      blockWithSetScript.transactionCount shouldBe oneElementOf(1 to (1 + MaxScriptRunsInBlock))
+      (1 to (1 + MaxScriptRunsInBlock)) should contain(blockWithSetScript.transactionCount)
       restBlocks.foreach { x =>
-        x.transactionCount shouldBe oneElementOf(1 to MaxScriptRunsInBlock)
+        (1 to MaxScriptRunsInBlock) should contain(x.transactionCount)
       }
     },
     6.minutes
@@ -103,7 +98,5 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
     timestamp = tx.timestamp,
     proofs = tx.proofs.proofs.map(_.base58)(collection.breakOut)
   )
-
-  private def randomNodePrivateKey: PrivateKeyAccount = nodePrivateKeys(ThreadLocalRandom.current().nextInt(nodePrivateKeys.length))
 
 }
