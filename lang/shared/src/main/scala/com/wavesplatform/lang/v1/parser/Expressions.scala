@@ -17,7 +17,7 @@ object Expressions {
   case object TRUE                                                 extends EXPR
   case object FALSE                                                extends EXPR
   case class FUNCTION_CALL(functionName: String, args: List[EXPR]) extends EXPR
-  case class MATCH_CASE(types: List[String], expr: EXPR)
-  case class MATCH(expr: EXPR, cases: List[MATCH_CASE]) extends EXPR
+  case class MATCH_CASE(types: Seq[String], expr: EXPR)
+  case class MATCH(expr: EXPR, cases: Seq[MATCH_CASE]) extends EXPR
 
 }

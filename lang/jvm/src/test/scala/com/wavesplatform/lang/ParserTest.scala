@@ -239,7 +239,6 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         | }
         |
         |
-        |
       """.stripMargin
     parse(code) shouldBe MATCH(REF("tx"), List(MATCH_CASE(List("TypeA"), CONST_LONG(0)), MATCH_CASE(List("TypeB"), CONST_LONG(1))))
   }

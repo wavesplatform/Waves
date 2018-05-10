@@ -17,7 +17,27 @@ object Parser {
   import White._
   import fastparse.noApi._
   private val Base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-  private val keywords    = Set("let", "base58", "true", "false", "if", "then", "else")
+  private val keywords = Set("let",
+                             "base58",
+                             "true",
+                             "false",
+                             "if",
+                             "then",
+                             "else",
+                             "match",
+                             "case",
+                             "var",
+                             "val",
+                             "final",
+                             "try",
+                             "catch",
+                             "is",
+                             "as",
+                             "class",
+                             "type",
+                             "def",
+                             "func",
+                             "function")
 
   private val lowerChar             = CharIn('a' to 'z')
   private val upperChar             = CharIn('A' to 'Z')
@@ -44,6 +64,10 @@ object Parser {
 
   private val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | functionCallP | refP)
 
+  private val typesP: P[Seq[String]]    = varName.rep(min = 1, sep = "|")
+  private val matchCaseP: P[MATCH_CASE] = P("case" ~ typesP ~ "=>" ~ expr).map { case (types, e) => MATCH_CASE(types, e) }
+  private lazy val matchP: P[MATCH]     = P(refP ~ "match" ~ "{" ~ matchCaseP.rep(min = 1) ~ "}").map { case (e, cases) => MATCH(e, cases) }
+
   private val maybeGetterP: P[EXPR] = P(extractableAtom ~~ ("." ~~ varName).?).map {
     case (e, f) => f.fold(e)(GETTER(e, _))
   }
@@ -63,7 +87,7 @@ object Parser {
 
   private val block: P[EXPR] = P(letP ~ expr).map(Function.tupled(BLOCK.apply))
 
-  private val atom      = P(ifP | byteVectorP | stringP | numberP | trueP | falseP | block | maybeGetterP)
+  private val atom      = P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | block | maybeGetterP)
   private lazy val expr = P(binaryOp(opsByPriority) | atom)
 
   private def binaryOp(rest: List[(String, BinaryOperation)]): P[EXPR] = rest match {
