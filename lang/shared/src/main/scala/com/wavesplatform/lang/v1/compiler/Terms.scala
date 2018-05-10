@@ -30,9 +30,11 @@ object Terms {
     type Underlying = Option[innerType.Underlying]
     override def typeInfo: TypeInfo[Option[innerType.Underlying]] = TypeInfo.optionTypeInfo(innerType.typeInfo)
   }
-  case class TYPEREF(name: String)        extends AUTO_TAGGED_TYPE[Obj]
-  case class CASETYPEREF(name: String)    extends AUTO_TAGGED_TYPE[CaseObj]
-  case class UNION(l: NonEmptyList[TYPE]) extends AUTO_TAGGED_TYPE[AnyObj]
+  case class TYPEREF(name: String)     extends AUTO_TAGGED_TYPE[Obj]
+  case class CASETYPEREF(name: String) extends AUTO_TAGGED_TYPE[CaseObj]
+  case class UNION(l: NonEmptyList[TYPE]) extends AUTO_TAGGED_TYPE[AnyObj] {
+    // TODO: implement unions equality, e.g. A|B == B|A
+  }
 
   sealed abstract class EXPR(val tpe: TYPE)
   case class LET(name: String, value: EXPR)

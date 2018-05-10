@@ -228,4 +228,19 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         |2 + 2""".stripMargin
     ) shouldBe false
   }
+
+  property("union type matching") {
+    val code =
+      """
+        |
+        | tx match {
+        |    case TypeA => 0
+        |    case TypeB => 1
+        | }
+        |
+        |
+        |
+      """.stripMargin
+    parse(code) shouldBe MATCH(REF("tx"), List(MATCH_CASE(List("TypeA"), CONST_LONG(0)), MATCH_CASE(List("TypeB"), CONST_LONG(1))))
+  }
 }
