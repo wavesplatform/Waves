@@ -7,7 +7,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.patch.{CancelAllLeases, CancelInvalidLeaseIn, CancelLeaseOverflow}
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
@@ -38,7 +38,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     } else portfolio
   }
 
-  def fromBlock[Constraint <: MiningConstraint](settings: WavesSettings,
+  def fromBlock[Constraint <: MiningConstraint](settings: FunctionalitySettings,
                                                 blockchain: Blockchain,
                                                 maybePrevBlock: Option[Block],
                                                 block: Block,
@@ -54,7 +54,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
         maybePrevBlock.map(
           prevBlock =>
             Diff.empty.copy(portfolios = Map(blockSigner ->
-              clearSponsorship(blockchain, prevBlock.prevBlockFeePart(), stateHeight, settings.blockchainSettings.functionalitySettings))))
+              clearSponsorship(blockchain, prevBlock.prevBlockFeePart(), stateHeight, settings))))
       else None
 
     lazy val currentBlockFeeDistr =
@@ -67,7 +67,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     for {
       _ <- block.signaturesValid()
       r <- apply(
-        settings.blockchainSettings.functionalitySettings,
+        settings,
         blockchain,
         constraint,
         prevBlockTimestamp,
@@ -81,7 +81,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     } yield r
   }
 
-  def fromMicroBlock[Constraint <: MiningConstraint](settings: WavesSettings,
+  def fromMicroBlock[Constraint <: MiningConstraint](settings: FunctionalitySettings,
                                                      blockchain: Blockchain,
                                                      prevBlockTimestamp: Option[Long],
                                                      micro: MicroBlock,
@@ -92,7 +92,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
       _ <- Either.cond(blockchain.activatedFeatures.contains(BlockchainFeatures.NG.id), (), ActivationError(s"MicroBlocks are not yet activated"))
       _ <- micro.signaturesValid()
       r <- apply(
-        settings.blockchainSettings.functionalitySettings,
+        settings,
         blockchain,
         constraint,
         prevBlockTimestamp,
@@ -122,9 +122,6 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     val currentBlockHeight = blockchain.height + heightDiff
     val txDiffer           = TransactionDiffer(settings, prevBlockTimestamp, timestamp, currentBlockHeight) _
 
-    // use constraints
-    // return updated constraints with diff
-
     val txsDiffEi = currentBlockFeeDistr match {
       case Some(feedistr) =>
         val initDiff = Monoid.combine(prevBlockFeeDistr.orEmpty, feedistr)
@@ -132,9 +129,8 @@ object BlockDiffer extends ScorexLogging with Instrumented {
           case (r @ Left(_), _) => r
           case (Right((currDiff, currConstraint)), tx) =>
             val updatedBlockchain = composite(blockchain, currDiff)
-
             val updatedConstraint = updateConstraint(currConstraint, updatedBlockchain, tx)
-            if (updatedConstraint.isOverfilled) Left(ValidationError.GenericError(""))
+            if (updatedConstraint.isOverfilled) Left(ValidationError.GenericError("Limit of txs was reached"))
             else
               txDiffer(updatedBlockchain, tx).map { newDiff =>
                 (currDiff.combine(newDiff), updatedConstraint)
@@ -145,9 +141,8 @@ object BlockDiffer extends ScorexLogging with Instrumented {
           case (r @ Left(_), _) => r
           case (Right((currDiff, currConstraint)), tx) =>
             val updatedBlockchain = composite(blockchain, currDiff)
-
             val updatedConstraint = updateConstraint(currConstraint, updatedBlockchain, tx)
-            if (updatedConstraint.isOverfilled) Left(ValidationError.GenericError(""))
+            if (updatedConstraint.isOverfilled) Left(ValidationError.GenericError("Limit of txs was reached"))
             else
               txDiffer(updatedBlockchain, tx).map { newDiff =>
                 val updatedPortfolios = newDiff.portfolios.combine(

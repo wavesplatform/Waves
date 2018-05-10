@@ -1,7 +1,7 @@
 package com.wavesplatform.mining
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.lang.v1.Terms.Typed
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, EitherExt2}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{FreeSpec, Matchers}
@@ -57,10 +57,10 @@ class ScriptRunNumberEstimatorSuite extends FreeSpec with Matchers with PathMock
   }
 
   private val assetId = ByteStr("coin_id".getBytes())
-  private val script  = ScriptV1(Typed.TRUE, checkSize = false).explicitGet()
+  private val script  = ScriptV1(Terms.TRUE, checkSize = false).explicitGet()
 
   private val transferWavesTx = TransferTransactionV1
-    .create(
+    .selfSigned(
       assetId = None,
       sender = PrivateKeyAccount("sender".getBytes()),
       recipient = PrivateKeyAccount("recipient".getBytes()),
@@ -73,7 +73,7 @@ class ScriptRunNumberEstimatorSuite extends FreeSpec with Matchers with PathMock
     .explicitGet()
 
   private val transferAssetsTx = TransferTransactionV1
-    .create(
+    .selfSigned(
       assetId = Some(assetId),
       sender = PrivateKeyAccount("sender".getBytes()),
       recipient = PrivateKeyAccount("recipient".getBytes()),

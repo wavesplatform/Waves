@@ -119,7 +119,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                 val height            = lastBlockId.flatMap(blockchain.heightOf).getOrElse(0)
                 val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
                 BlockDiffer
-                  .fromBlock(settings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
+                  .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
                   .map(r => Some((r, Seq.empty[Transaction])))
             }
           case Some(ng) =>
@@ -129,7 +129,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                 val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
 
                 BlockDiffer
-                  .fromBlock(settings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
+                  .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
                   .map { r =>
                     log.trace(
                       s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})")
@@ -146,7 +146,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                   val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
 
                   BlockDiffer
-                    .fromBlock(settings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
+                    .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
                     .map(r => Some((r, Seq.empty[Transaction])))
                 }
               } else
@@ -171,7 +171,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
 
                     val diff = BlockDiffer
                       .fromBlock(
-                        settings,
+                        functionalitySettings,
                         CompositeBlockchain.composite(blockchain, referencedLiquidDiff),
                         Some(referencedForgedBlock),
                         block,
@@ -237,7 +237,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
               r <- {
                 val constraints  = MiningConstraints(settings.minerSettings, blockchain, blockchain.height)
                 val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
-                BlockDiffer.fromMicroBlock(settings, this, blockchain.lastBlockTimestamp, microBlock, ng.base.timestamp, mdConstraint)
+                BlockDiffer.fromMicroBlock(functionalitySettings, this, blockchain.lastBlockTimestamp, microBlock, ng.base.timestamp, mdConstraint)
               }
             } yield {
               val (diff, updatedMdConstraint) = r

@@ -1,17 +1,15 @@
 package scorex.transaction
 
 import com.wavesplatform.history._
-import com.wavesplatform.mining.{OneDimensionalMiningConstraint, TxNumberEstimator}
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.state.{Blockchain, Diff, NgState}
+import com.wavesplatform.state.{Diff, NgState}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.transaction.transfer._
 
-class NgStateTest extends PropSpec with PropertyChecks with Matchers with PathMockFactory with TransactionGen with NoShrink {
+class NgStateTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   def preconditionsAndPayments(amt: Int): Gen[(GenesisTransaction, Seq[TransferTransactionV1])] =
     for {
@@ -27,8 +25,8 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with PathMo
       case (genesis, payments) =>
         val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-        val ng = new NgState(block, Diff.empty, Set.empty, OneDimensionalMiningConstraint(Int.MaxValue, TxNumberEstimator))
-        microBlocks.foreach(m => ng.append(m, Diff.empty, stub[Blockchain], 0L))
+        val ng = new NgState(block, Diff.empty, Set.empty)
+        microBlocks.foreach(m => ng.append(m, Diff.empty, 0L))
 
         ng.totalDiffOf(microBlocks.last.totalResBlockSig)
         microBlocks.foreach { m =>
@@ -46,12 +44,12 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with PathMo
       case (genesis, payments) =>
         val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-        val ng = new NgState(block, Diff.empty, Set.empty, OneDimensionalMiningConstraint(Int.MaxValue, TxNumberEstimator))
-        microBlocks.foreach(m => ng.append(m, Diff.empty, stub[Blockchain], 0L))
+        val ng = new NgState(block, Diff.empty, Set.empty)
+        microBlocks.foreach(m => ng.append(m, Diff.empty, 0L))
 
         ng.bestLiquidBlock.uniqueId shouldBe microBlocks.last.totalResBlockSig
 
-        new NgState(block, Diff.empty, Set.empty, OneDimensionalMiningConstraint(Int.MaxValue, TxNumberEstimator)).bestLiquidBlock.uniqueId shouldBe block.uniqueId
+        new NgState(block, Diff.empty, Set.empty).bestLiquidBlock.uniqueId shouldBe block.uniqueId
     }
   }
 
@@ -60,11 +58,11 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with PathMo
       case (genesis, payments) =>
         val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-        val ng = new NgState(block, Diff.empty, Set.empty, OneDimensionalMiningConstraint(Int.MaxValue, TxNumberEstimator))
+        val ng = new NgState(block, Diff.empty, Set.empty)
 
         microBlocks.foldLeft(1000) {
           case (thisTime, m) =>
-            ng.append(m, Diff.empty, stub[Blockchain], thisTime)
+            ng.append(m, Diff.empty, thisTime)
             thisTime + 50
         }
 
@@ -73,7 +71,7 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with PathMo
         ng.bestLastBlockInfo(1051).blockId shouldBe microBlocks.tail.head.totalResBlockSig
         ng.bestLastBlockInfo(2000).blockId shouldBe microBlocks.last.totalResBlockSig
 
-        new NgState(block, Diff.empty, Set.empty, OneDimensionalMiningConstraint(Int.MaxValue, TxNumberEstimator)).bestLiquidBlock.uniqueId shouldBe block.uniqueId
+        new NgState(block, Diff.empty, Set.empty).bestLiquidBlock.uniqueId shouldBe block.uniqueId
     }
   }
 }
