@@ -43,4 +43,9 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
     runScript[Long]("size(base58'')".stripMargin) shouldBe Right(0L)
     runScript[Long](s"size(base58'${ByteStr(arr).base58}')".stripMargin) shouldBe Right(3L)
   }
+
+  property("+ should check overflow") {
+    runScript[Long]("2 + 3") shouldBe Right(5L)
+    runScript[Long](s"1 + ${Long.MaxValue}") should produce("long overflow")
+  }
 }
