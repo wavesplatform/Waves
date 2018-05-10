@@ -2,6 +2,7 @@ package scorex.transaction.assets
 
 import java.nio.charset.StandardCharsets
 
+import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
 import monix.eval.Coeval
 import play.api.libs.json.Json
@@ -9,6 +10,7 @@ import scorex.account.PublicKeyAccount
 import scorex.crypto.signatures.Curve25519
 import scorex.serialization.Deser
 import scorex.transaction.smart.script.Script
+import scorex.transaction.validation._
 import scorex.transaction.{AssetId, ProvenTransaction, ValidationError}
 
 trait IssueTransaction extends ProvenTransaction {
@@ -59,14 +61,17 @@ object IssueTransaction {
                           quantity: Long,
                           decimals: Byte,
                           reissuable: Boolean,
-                          fee: Long): Either[ValidationError, Unit] =
-    for {
-      _ <- Either.cond(quantity > 0, (), ValidationError.NegativeAmount(quantity, "assets"))
-      _ <- Either.cond(description.length <= MaxDescriptionLength, (), ValidationError.TooBigArray)
-      _ <- Either.cond(name.length >= MinAssetNameLength && name.length <= MaxAssetNameLength, (), ValidationError.InvalidName)
-      _ <- Either.cond(decimals >= 0 && decimals <= MaxDecimals, (), ValidationError.TooBigArray)
-      _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee())
-    } yield ()
+                          fee: Long): Either[ValidationError, Unit] = {
+    (
+      validateAmount(quantity, "assets"),
+      validateName(name),
+      validateDescription(description),
+      validateDecimals(decimals),
+      validateFee(fee)
+    ).mapN { case _ => () }
+      .leftMap(_.head)
+      .toEither
+  }
 
   def parseBase(bytes: Array[Byte], start: Int) = {
     val sender                        = PublicKeyAccount(bytes.slice(start, start + Curve25519.KeyLength))
