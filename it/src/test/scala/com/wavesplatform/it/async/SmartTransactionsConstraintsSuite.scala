@@ -6,10 +6,9 @@ import com.typesafe.config.Config
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{NodeConfigs, TransferSending}
-import com.wavesplatform.lang.v1.Terms.Typed
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.mining.MiningConstraints.MaxScriptRunsInBlock
 import com.wavesplatform.state.EitherExt2
-import com.wavesplatform.state.diffs.CommonValidation
 import org.scalatest._
 import play.api.libs.json.{JsNumber, Json}
 import scorex.account.PrivateKeyAccount
@@ -71,15 +70,15 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
 
   s"Block is limited by size after activation" in result(
     for {
-      _      <- miner.signedBroadcast(Json.toJsObject(toRequest(setScriptTx(smartAccountPrivateKey))) + ("type" -> JsNumber(13)))
-      _      <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartAccountPrivateKey.address))
-      _      <- miner.waitForHeight(4)
-      blocks <- miner.blockHeadersSeq(2, 4)
+      _                  <- miner.signedBroadcast(Json.toJsObject(toRequest(setScriptTx(smartAccountPrivateKey))) + ("type" -> JsNumber(13)))
+      _                  <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartAccountPrivateKey.address))
+      _                  <- miner.waitForHeight(4)
+      blockWithSetScript <- miner.blockHeadersAt(2)
+      restBlocks         <- miner.blockHeadersSeq(3, 4)
     } yield {
-      blocks.foreach { header =>
-        println(s"Header: ${header.height}, ${header.transactionCount}, $header")
-//        header.transactionCount shouldBe >=(1)
-//        header.transactionCount shouldBe <=(MaxScriptRunsInBlock)
+      blockWithSetScript.transactionCount shouldBe oneElementOf(1 to (1 + MaxScriptRunsInBlock))
+      restBlocks.foreach { x =>
+        x.transactionCount shouldBe oneElementOf(1 to MaxScriptRunsInBlock)
       }
     },
     6.minutes
@@ -90,7 +89,7 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
       .selfSigned(
         version = 1,
         sender = sender,
-        script = Some(ScriptV1(Typed.TRUE, checkSize = false).explicitGet()),
+        script = Some(ScriptV1(Terms.TRUE, checkSize = false).explicitGet()),
         fee = 1000000,
         timestamp = System.currentTimeMillis() - 5.minutes.toMillis
       )
