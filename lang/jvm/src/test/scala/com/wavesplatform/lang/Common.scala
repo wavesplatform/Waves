@@ -1,13 +1,19 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, PredefFunction}
 import org.scalacheck.Shrink
 import org.scalatest.matchers.{MatchResult, Matcher}
 
 import scala.util.{Left, Right, Try}
 
 object Common {
+
+  def ev[T: TypeInfo](context: EvaluationContext = PureContext.instance, expr: EXPR): Either[(EvaluationContext, ExecutionLog, ExecutionError), T] =
+    EvaluatorV1[T](context, expr)
 
   trait NoShrink {
     implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)

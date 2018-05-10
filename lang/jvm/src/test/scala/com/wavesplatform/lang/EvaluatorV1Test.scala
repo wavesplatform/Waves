@@ -4,27 +4,23 @@ import cats.kernel.Monoid
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.TypeInfo._
+import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
-import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
+import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def ev[T: TypeInfo](context: EvaluationContext = PureContext.instance,
-                              expr: EXPR): Either[(EvaluationContext, ExecutionLog, ExecutionError), T] =
-    EvaluatorV1[T](context, expr)
   private def simpleDeclarationAndUsage(i: Int) = BLOCK(LET("x", CONST_LONG(i)), REF("x", LONG), LONG)
 
   property("successful on very deep expressions (stack overflow check)") {
@@ -414,45 +410,5 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         BYTEVECTOR
       )
     )
-  }
-
-  property("case custom type field access") {
-    val pointType     = PredefCaseType("Point", List("X" -> LONG, "Y"         -> LONG))
-    val pointInstance = CaseObj(Map("X"                  -> Val(LONG)(3), "Y" -> Val(LONG)(4)))
-    ev[Long](
-      context = PureContext.instance |+| EvaluationContext(
-        typeDefs = Map.empty,
-        caseTypeDefs = Map(pointType.name -> pointType),
-        letDefs = Map(("p", LazyVal(CASETYPEREF(pointType.name))(EitherT.pure(pointInstance)))),
-        functions = Map.empty
-      ),
-      expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", TYPEREF("Point")), "X", LONG), CONST_LONG(2)), LONG)
-    ) shouldBe Right(5)
-  }
-
-  property("case custom type field access -- union") {
-    val pointTypeA = PredefCaseType("PointA", List("X" -> LONG, "YA" -> LONG))
-    val pointTypeB = PredefCaseType("PointB", List("X" -> LONG, "YB" -> LONG))
-
-    val AorB = UNION(NonEmptyList.of(CASETYPEREF(pointTypeA.typeRef.name), CASETYPEREF(pointTypeB.typeRef.name)))
-
-    val pointAInstance = CaseObj(Map("X" -> Val(LONG)(3), "YA" -> Val(LONG)(40)))
-    val pointBInstance = CaseObj(Map("X" -> Val(LONG)(3), "YB" -> Val(LONG)(41)))
-
-    def testAccess(instance: CaseObj, field: String) = ev[Long](
-      context = PureContext.instance |+| EvaluationContext(
-        typeDefs = Map.empty,
-        caseTypeDefs = Map(pointTypeA.name -> pointTypeA, pointTypeB.name -> pointTypeB),
-        letDefs = Map("p"                  -> LazyVal(AorB)(EitherT.pure(instance))),
-        functions = Map.empty
-      ),
-      expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", AorB), field, LONG), CONST_LONG(2)), LONG)
-    )
-
-    testAccess(pointAInstance, "X") shouldBe Right(5)
-    testAccess(pointBInstance, "X") shouldBe Right(5)
-    testAccess(pointAInstance, "YA") shouldBe Right(42)
-    testAccess(pointBInstance, "YB") shouldBe Right(43)
-    testAccess(pointAInstance, "YB") should produce("field 'YB' not found")
   }
 }

@@ -5,10 +5,10 @@ import cats.implicits._
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang._
-import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.{funcs, lets}
-import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, LET, _}
-import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, LET, _}
+import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.{funcs, lets}
+import com.wavesplatform.lang.v1.evaluator.ctx._
 import monix.eval.Coeval
 
 object EvaluatorV1 extends ExprEvaluator {
@@ -86,7 +86,7 @@ object EvaluatorV1 extends ExprEvaluator {
             case Some(lzy) => liftCE[Any](lzy.value.value)
             case None      => liftL[Any](s"field '$field' not found")
           }
-        case CaseObj(fields) =>
+        case CaseObj(_, fields) =>
           fields.get(field) match {
             case Some(eager) => liftR[Any](eager.value)
             case None        => liftL[Any](s"field '$field' not found")
@@ -112,6 +112,21 @@ object EvaluatorV1 extends ExprEvaluator {
     } yield result
   }
 
+  private def evalMatch(expr: EXPR, cases: List[MATCH_CASE], tpe: TYPE): FF[tpe.Underlying] = {
+    // we need to eval first to get real type
+    for {
+      exprValue <- evalExpr(expr)(expr.tpe.typeInfo)
+      actualExprType <- exprValue match {
+        case CaseObj(caseTypeRef, _) => liftR(caseTypeRef)
+        case _                       => liftL[tpe.Underlying](s"Expression is of type ${expr.tpe}, but only union types can be matched ")
+      }
+      result <- cases.find(c => c.types.contains(actualExprType)) match {
+        case Some(branch) => evalExpr(branch.expr)(tpe.typeInfo)
+        case None         => liftL[tpe.Underlying](s"Expression of type ${expr.tpe} can't be matched to any provided case")
+      }
+    } yield result
+  }
+
   private def evalExpr[T: TypeInfo](t: EXPR): FF[T] = {
     (t match {
       case BLOCK(let, inner, blockTpe) =>
@@ -129,6 +144,9 @@ object EvaluatorV1 extends ExprEvaluator {
         writeLog(s"Evaluating GETTER") *> evalGetter(expr, field) <* writeLog("FINISHED")
       case FUNCTION_CALL(header, args, _) =>
         writeLog(s"Evaluating FUNCTION_CALL") *> evalFunctionCall(header, args) <* writeLog("FINISHED")
+      case MATCH(expr, cases, tpe) => {
+        writeLog(s"Evaluating MATCH") *> evalMatch(expr, cases, tpe) <* writeLog("FINISHED")
+      }
     }).flatMap(v => {
       liftR(v.asInstanceOf[T])
 //      val ti = typeInfo[T]

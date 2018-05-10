@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction.FunctionTypeSignat
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.parser.Expressions.MATCH
 import monix.eval.Coeval
 
 import scala.util.Try
@@ -173,6 +174,8 @@ object CompilerV1 {
           .toRight(s"A definition of '${ref.key}' is not found")
       }
 
+    case MATCH(expr, cases) =>
+      ???
   }
 
   def apply(c: CompilerContext, expr: Expressions.EXPR): CompilationResult[EXPR] = {
