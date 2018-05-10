@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.ctx
 
 import cats._
-import com.wavesplatform.lang.v1.{EvaluationContext, FunctionHeader}
+import com.wavesplatform.lang.v1.FunctionHeader
 import shapeless._
 
 case class Context(typeDefs: Map[String, PredefType], letDefs: Map[String, LazyVal], functions: Map[FunctionHeader, PredefFunction])

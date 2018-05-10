@@ -13,7 +13,7 @@ object Terms {
   case class OPTIONTYPEPARAM(t: TYPEPLACEHOLDER) extends TYPEPLACEHOLDER
 
   sealed trait TYPE extends TYPEPLACEHOLDER {
-    type Underlying <: Any
+    type Underlying
     def typeInfo: TypeInfo[Underlying]
   }
   sealed abstract class AUTO_TAGGED_TYPE[T](implicit override val typeInfo: TypeInfo[T]) extends TYPE {

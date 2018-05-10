@@ -4,6 +4,7 @@ import cats.kernel.Monoid
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.TypeInfo._
+import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.v1.Terms.Typed._
 import com.wavesplatform.lang.v1.Terms._
@@ -11,39 +12,28 @@ import com.wavesplatform.lang.v1.ctx.Context._
 import com.wavesplatform.lang.v1.ctx._
 import com.wavesplatform.lang.v1.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.evaluation.EvaluatorV1_1
+import com.wavesplatform.lang.v1.evaluation.EvaluatorV1
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.v1.{EvaluatorV1, FunctionHeader}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
-import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
+import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def ev[T: TypeInfo](context: Context = PureContext.instance, expr: EXPR): Either[(Context, ExecutionLog, ExecutionError), T] =
+  private def ev[T: TypeInfo](context: Context = PureContext.instance, expr: EXPR): Either[(Context, ExecutionError), T] =
     EvaluatorV1[T](context, expr)
   private def simpleDeclarationAndUsage(i: Int) = BLOCK(LET("x", CONST_LONG(i)), REF("x", LONG), LONG)
-
-  private def logTime[A](in: => A): A = {
-    val start = System.currentTimeMillis()
-    in
-    println(System.currentTimeMillis() - start)
-    in
-  }
 
   property("successful on very deep expressions (stack overflow check)") {
     val term = (1 to 100000).foldLeft[EXPR](CONST_LONG(0))((acc, _) => FUNCTION_CALL(sumLong.header, List(acc, CONST_LONG(1)), LONG))
 
-    val r1 = logTime(ev[Long](expr = term))
-    val r2 = logTime(EvaluatorV1_1[Long](PureContext.instance, term))
-
     ev[Long](expr = term) shouldBe Right(100000)
   }
 
-  property("return log and context of failed evaluation") {
-    val Left((ctx, log, err)) = ev[Long](
+  property("return error and context of failed evaluation") {
+    val Left((ctx, err)) = ev[Long](
       expr = BLOCK(
         LET("x", CONST_LONG(3)),
         BLOCK(
@@ -55,16 +45,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
     )
 
-    val expectedLog =
-      "Evaluating BLOCK\n" ++
-        "LET: LET(x,CONST_LONG(3)); TYPE: LONG\n" ++
-        "Evaluating BLOCK\n" ++
-        "LET: LET(x,FUNCTION_CALL(FunctionHeader(+,List(LONG, LONG)),List(CONST_LONG(3), CONST_LONG(0)),LONG)); TYPE: LONG"
-
     val expectedError =
       "Value 'x' already defined in the scope"
 
-    log shouldBe expectedLog
     err shouldBe expectedError
     ctx.letDefs.contains("x") shouldBe true
   }
@@ -347,9 +330,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     r.isLeft shouldBe false
   }
 
-  private def sigVerifyTest(bodyBytes: Array[Byte],
-                            publicKey: PublicKey,
-                            signature: Signature): Either[(Context, ExecutionLog, ExecutionError), Boolean] = {
+  private def sigVerifyTest(bodyBytes: Array[Byte], publicKey: PublicKey, signature: Signature): Either[(Context, ExecutionError), Boolean] = {
     val txType = PredefType(
       "Transaction",
       List(
@@ -399,7 +380,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     for ((funcName, funcClass) <- hashFunctions) hashFuncTest(bodyBytes, funcName) shouldBe Right(ByteVector(funcClass.hash(bodyText)))
   }
 
-  private def hashFuncTest(bodyBytes: Array[Byte], funcName: String): Either[(Context, ExecutionLog, ExecutionError), ByteVector] = {
+  private def hashFuncTest(bodyBytes: Array[Byte], funcName: String): Either[(Context, ExecutionError), ByteVector] = {
     val context = Monoid.combineAll(
       Seq(
         PureContext.instance,

@@ -1,18 +1,12 @@
 package com.wavesplatform.lang.v1.evaluation
 
-import cats.{Monad, StackSafeMonad, ~>}
-import cats.data.{EitherT, Kleisli, WriterT}
-import com.wavesplatform.lang.{ExecutionError, ExecutionLog, TrampolinedExecResult}
-import com.wavesplatform.lang.v1.ctx.Context
-import com.wavesplatform.lang.v1.ctx.Context.Lenses._
-import monix.eval.Coeval
+import cats.data.{EitherT, Kleisli}
 import cats.implicits._
-import com.wavesplatform.lang.v1.evaluation.H.EC
+import cats.{Monad, StackSafeMonad}
+import com.wavesplatform.lang.v1.ctx.Context
+import com.wavesplatform.lang.{ExecutionError, TrampolinedExecResult}
+import monix.eval.Coeval
 
-object H {
-  type Env = (CoevalRef[Context], StringBuffer)
-  type EC[A] = EitherT[Coeval, ExecutionError, A]
-}
 final case class EvalM[A](inner: Kleisli[Coeval, CoevalRef[Context], Either[ExecutionError, A]]) {
   def ter(ctx: Context): TrampolinedExecResult[A] = {
     val atom = CoevalRef.of(ctx)
@@ -20,7 +14,7 @@ final case class EvalM[A](inner: Kleisli[Coeval, CoevalRef[Context], Either[Exec
     EitherT(inner.run(atom))
   }
 
-  def run(ctx: Context): Either[(Context, ExecutionLog, ExecutionError), A] = {
+  def run(ctx: Context): Either[(Context, ExecutionError), A] = {
     val atom = CoevalRef.of(ctx)
 
     val action = inner
@@ -29,24 +23,22 @@ final case class EvalM[A](inner: Kleisli[Coeval, CoevalRef[Context], Either[Exec
     (for {
       result  <- action
       lastCtx <- atom.read
-    } yield result.left.map(err => (lastCtx, "EMPTY", err))).value
+    } yield result.left.map(err => (lastCtx, err))).value
   }
 }
 
 object EvalM {
-  type Inner[A] = Kleisli[Coeval, CoevalRef[Context], A]
-
-  private val innerMonad: Monad[Inner] = implicitly[Monad[Inner]]
 
   implicit val monadInstance: Monad[EvalM] = new StackSafeMonad[EvalM] {
     override def pure[A](x: A): EvalM[A] =
       EvalM(Kleisli.pure[Coeval, CoevalRef[Context], Either[ExecutionError, A]](x.asRight[ExecutionError]))
 
-    override def flatMap[A, B](fa: EvalM[A])(f: A => EvalM[B]): EvalM[B] =
+    override def flatMap[A, B](fa: EvalM[A])(f: A => EvalM[B]): EvalM[B] = {
       EvalM(fa.inner.flatMap({
-        case Right(v) => f(v).inner
+        case Right(v)  => f(v).inner
         case Left(err) => Kleisli.pure(err.asLeft[B])
       }))
+    }
   }
 
   def getContext: EvalM[Context] =
@@ -54,10 +46,12 @@ object EvalM {
       ref.read.map(_.asRight[ExecutionError])
     }))
 
-  def updateContext(f: Context => Context): EvalM[Unit] =
+  def setContext(ctx: Context): EvalM[Unit] =
     EvalM(Kleisli[Coeval, CoevalRef[Context], Either[ExecutionError, Unit]](ref => {
-      ref.update(f).map(_.asRight[ExecutionError])
+      ref.write(ctx).map(_.asRight[ExecutionError])
     }))
+
+  def updateContext(f: Context => Context): EvalM[Unit] = getContext >>= (f andThen setContext)
 
   def liftValue[A](a: A): EvalM[A] =
     monadInstance.pure(a)

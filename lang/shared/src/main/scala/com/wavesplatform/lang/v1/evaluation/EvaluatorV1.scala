@@ -1,17 +1,21 @@
 package com.wavesplatform.lang.v1.evaluation
 
-import com.wavesplatform.lang.v1.Terms.{TYPE, Typed}
-import com.wavesplatform.lang.v1.Terms.Typed._
-import com.wavesplatform.lang.v1.ctx.Context.Lenses._
 import cats.implicits._
-import com.wavesplatform.lang.{ExecutionError, ExecutionLog, TypeInfo}
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.Terms.Typed._
+import com.wavesplatform.lang.v1.Terms.{TYPE, Typed}
+import com.wavesplatform.lang.v1.ctx.Context.Lenses._
 import com.wavesplatform.lang.v1.ctx.{Context, LazyVal, Obj}
+import com.wavesplatform.lang.{ExecutionError, ExprEvaluator, TypeInfo}
 
-object EvaluatorV1_1 {
+object EvaluatorV1 extends ExprEvaluator {
 
   import EvalM._
+
+  override type V = V1.type
+  override val version: V = V1
 
   private def evalBlock(let: LET, inner: EXPR, tpe: TYPE): EvalM[Any] = {
     import let.{name, value}
@@ -91,13 +95,12 @@ object EvaluatorV1_1 {
     }).flatMap(v => {
       val ti = typeInfo[T]
       if (t.tpe.typeInfo <:< ti) liftValue(v.asInstanceOf[T])
-      else liftError(s"Bad type: expected: ${ti} actual: ${t.tpe.typeInfo}")
+      else liftError(s"Bad type: expected: $ti actual: ${t.tpe.typeInfo}")
     })
 
   }
 
-  def apply[A: TypeInfo](c: Context, expr: Typed.EXPR): Either[(Context, ExecutionLog, ExecutionError), A] = {
-    evalExpr[A](expr)
-      .run(c)
+  def apply[A: TypeInfo](c: Context, expr: Typed.EXPR): Either[(Context, ExecutionError), A] = {
+    evalExpr[A](expr).run(c)
   }
 }

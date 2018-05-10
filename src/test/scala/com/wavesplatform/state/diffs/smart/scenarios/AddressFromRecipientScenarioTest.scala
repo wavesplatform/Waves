@@ -1,7 +1,8 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.lang.v1.ctx.Obj
-import com.wavesplatform.lang.v1.{EvaluatorV1, Parser, TypeChecker}
+import com.wavesplatform.lang.v1.evaluation.EvaluatorV1
+import com.wavesplatform.lang.v1.{Parser, TypeChecker}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState, produce}
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -38,7 +39,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
 
     val Parsed.Success(expr, _) = Parser("addressFromRecipient(tx.recipient)")
     val Right(typedExpr)        = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(context), expr)
-    EvaluatorV1[Obj](context, typedExpr).left.map(_._3)
+    EvaluatorV1[Obj](context, typedExpr).left.map(_._2)
   }
 
   property("Script can resolve AddressOrAlias") {
