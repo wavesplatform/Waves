@@ -49,7 +49,6 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
     val sponsorWavesBalance = miner.accountBalances(sponsor.address)._2
     val sponsorAssetTotal   = 100 * Token
     val minerWavesBalance   = miner.accountBalances(miner.address)._2
-    val aliceWavesBalance   = miner.accountBalances(alice.address)._2
 
     val sponsorAssetId =
       sponsor

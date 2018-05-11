@@ -14,7 +14,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.util.Random
 
 class RollbackSpecSuite
     extends FreeSpec

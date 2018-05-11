@@ -16,8 +16,8 @@ import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.transfer._
 
-import scala.util.Random
 import scala.concurrent.duration._
+import scala.util.Random
 
 /*
 Scenario:
@@ -26,7 +26,6 @@ Scenario:
 3. Alice funds swapBC1t
 4. Alice can't take money from swapBC1
 5.1 Bob takes funds because he knows secret hash OR 5.2 Wait height and Alice takes funds back
-
  */
 
 class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -55,8 +54,8 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val beforeHeight = sender.height
     val sc1 = {
       val untyped = Parser(s"""
-    let Bob = extract(addressFromString("${BobBC1}")).bytes
-    let Alice = extract(addressFromString("${AliceBC1}")).bytes
+    let Bob = extract(addressFromString("$BobBC1")).bytes
+    let Alice = extract(addressFromString("$AliceBC1")).bytes
     let AlicesPK = base58'${ByteStr(AlicesPK.publicKey)}'
 
     let txRecipient = addressFromRecipient(tx.recipient).bytes
@@ -67,7 +66,8 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
 
     txToBob || backToAliceAfterHeight
       """.stripMargin).get.value
-      CompilerV1(dummyTypeCheckerContext, untyped).explicitGet()
+      assert(untyped.size == 1)
+      CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()
     }
 
     val pkSwapBC1 = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).right.get

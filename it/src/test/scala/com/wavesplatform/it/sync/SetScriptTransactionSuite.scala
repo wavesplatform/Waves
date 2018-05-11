@@ -12,9 +12,9 @@ import org.scalatest.CancelAfterFailure
 import play.api.libs.json.{JsNumber, Json}
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.Proofs
-import scorex.transaction.transfer._
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.transfer._
 
 class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
   private def pkFromAddress(address: String) = PrivateKeyAccount.fromSeed(sender.seed(address)).right.get
@@ -64,7 +64,8 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
          AC && BC
 
       """.stripMargin).get.value
-      CompilerV1(dummyTypeCheckerContext, untyped).explicitGet()
+      assert(untyped.size == 1)
+      CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()
     }
 
     val script = ScriptV1(scriptText).explicitGet()

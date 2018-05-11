@@ -21,7 +21,8 @@ class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers wit
   private def preconditionsTransferAndLease(
       code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransactionV1)] = {
     val untyped = Parser(code).get.value
-    val typed   = CompilerV1(dummyTypeCheckerContext, untyped).explicitGet()
+    assert(untyped.size == 1)
+    val typed = CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()
     preconditionsTransferAndLease(typed)
   }
 
