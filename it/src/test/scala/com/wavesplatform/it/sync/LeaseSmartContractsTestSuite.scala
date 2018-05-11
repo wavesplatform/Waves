@@ -26,7 +26,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
   private val transferAmount: Long = 1.waves
   private val fee: Long            = 0.001.waves
 
-  test("step1: make leasing, setup smart contract and cancel leasing") {
+  test("set contract, make leasing and cancel leasing") {
     val (balance1, eff1) = notMiner.accountBalances(acc0.address)
     val (balance2, eff2) = notMiner.accountBalances(thirdAddress)
 
