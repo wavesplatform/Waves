@@ -26,7 +26,7 @@ trait ScriptGen {
     for {
       (i1, v1) <- INTGen((gas - 2) / 2)
       (i2, v2) <- INTGen((gas - 2) / 2)
-    } yield (BINARY_OP(i1, GE_OP, i2), (v1 >= v1))
+    } yield (BINARY_OP(i1, GE_OP, i2), (v1 >= v2))
 
   def GTgen(gas: Int): Gen[(EXPR, Boolean)] =
     for {
@@ -119,7 +119,7 @@ trait ScriptGen {
       for {
         v <- toString(let.value)
         b <- toString(body)
-      } yield s"let ${let.name} = $v$b\n"
+      } yield s"let ${let.name} = $v $b\n"
     case _ => ???
   }
 }
