@@ -31,7 +31,7 @@ object Terms {
   }
   case class TYPEREF(name: String)     extends AUTO_TAGGED_TYPE[Obj]
   case class CASETYPEREF(name: String) extends AUTO_TAGGED_TYPE[CaseObj]
-  case class UNION(l: List[TYPE]) extends AUTO_TAGGED_TYPE[AnyObj] {
+  case class UNION(l: List[CASETYPEREF]) extends AUTO_TAGGED_TYPE[AnyObj] {
     // TODO: implement unions equality, e.g. A|B == B|A
   }
 
@@ -47,7 +47,7 @@ object Terms {
   case object TRUE                                                                             extends EXPR(BOOLEAN)
   case object FALSE                                                                            extends EXPR(BOOLEAN)
   case class FUNCTION_CALL(function: FunctionHeader, args: List[EXPR], override val tpe: TYPE) extends EXPR(tpe)
-  case class MATCH_CASE(newVarName: Option[String], types: List[TYPE], expr: EXPR)
+  case class MATCH_CASE(newVarName: Option[String], types: List[CASETYPEREF], expr: EXPR)
   case class MATCH(expr: EXPR, cases: List[MATCH_CASE], override val tpe: TYPE) extends EXPR(tpe)
 
 }

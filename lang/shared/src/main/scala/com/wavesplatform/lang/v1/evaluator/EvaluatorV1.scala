@@ -134,7 +134,7 @@ object EvaluatorV1 extends ExprEvaluator {
             case (Some(newName), REF(oldName, _)) if oldName == newName => registerValAndProceed(newName)
             case (Some(newName), _) =>
               if (lets.get(ctx).isDefinedAt(newName))
-                liftL(s"Shadowing non-related variable '$newName' already defined in the scope")
+                liftL(s"Shadowing of non-related variable '$newName' that is already defined in the scope")
               else registerValAndProceed(newName)
           }
 

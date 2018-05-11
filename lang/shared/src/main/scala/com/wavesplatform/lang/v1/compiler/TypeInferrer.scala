@@ -65,6 +65,14 @@ object TypeInferrer {
     }
   }
 
+  def findCommonType(list: Seq[TYPE]): Option[TYPE] = list match {
+    case one :: Nil => Some(one)
+    case head :: tail =>
+      for {
+        t <- findCommonType(tail)
+        r <- findCommonType(head, t)
+      } yield r
+  }
   def findCommonType(t1: TYPE, t2: TYPE): Option[TYPE]      = findCommonType(t1, t2, biDirectional = true)
   def matchType(required: TYPE, actual: TYPE): Option[TYPE] = findCommonType(required, actual, biDirectional = false)
 

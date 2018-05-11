@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction.FunctionTypeSignat
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.parser.Expressions.MATCH
+import com.wavesplatform.lang.v1.parser.Expressions.{MATCH, MATCH_CASE}
 import monix.eval.Coeval
 
 import scala.util.Try
@@ -175,7 +175,29 @@ object CompilerV1 {
       }
 
     case MATCH(expr, cases) =>
-      ???
+      for {
+        typedExpr <- setType(ctx, EitherT.pure(expr))
+        typedMatch <- typedExpr.tpe match {
+          case UNION(possibleTypes) =>
+            // check that all matches have proper variable names
+            val allowedShadow: Option[String] = ???
+            val matchingTypes                 = cases.flatMap(_.types)
+            // TODO: check that comparison is proper
+            val r: SetTypeResult[EXPR] = if (possibleTypes.toSet sameElements matchingTypes.toSet) {
+              def setTypeForCase(mc: MATCH_CASE): SetTypeResult[EXPR] = ???
+              import cats.instances.vector._
+              import cats.syntax.all._
+              cases.toVector.traverse(setTypeForCase).flatMap { caseResultTypes =>
+                TypeInferrer.findCommonType(caseResultTypes.map(_.tpe)) match {
+                  case None             => EitherT.fromEither[Coeval](Left("No common type inferred for branches"))
+                  case Some(commonType) => ???
+                }
+              }
+            } else EitherT.fromEither[Coeval](Left(s"Matching not exaustive: possibleTypes are $possibleTypes, while matched are $matchingTypes"))
+            r
+          case _ => EitherT.fromEither[Coeval](Left("Only union type can be matched"))
+        }
+      } yield typedMatch
   }
 
   def apply(c: CompilerContext, expr: Expressions.EXPR): CompilationResult[EXPR] = {
