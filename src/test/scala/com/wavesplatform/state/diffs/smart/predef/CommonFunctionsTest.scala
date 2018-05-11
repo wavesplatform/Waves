@@ -57,4 +57,9 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
         resultLen shouldBe Right(massTransfer.transfers.size.toLong)
     }
   }
+
+  property("+ should check overflow") {
+    runScript[Long]("2 + 3") shouldBe Right(5L)
+    runScript[Long](s"1 + ${Long.MaxValue}") should produce("long overflow")
+  }
 }
