@@ -41,11 +41,10 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
         let sigB = base58'${ByteStr(acc1.publicKey)}'
         let sigC = base58'${ByteStr(acc2.publicKey)}'
 
-        let otherTx = if (((tx.type == 4) || (tx.type == 11) || (tx.type == 13)) && sigVerify(tx.bodyBytes,tx.proof0,sigA)) then true else false
-        let leaseTx = if ((tx.type == 8) && sigVerify(tx.bodyBytes,tx.proof0,sigA) && sigVerify(tx.bodyBytes,tx.proof2,sigC)) then true else false
-        let leaseCancelTx = if ((tx.type == 9) && sigVerify(tx.bodyBytes,tx.proof1,sigA) && sigVerify(tx.bodyBytes,tx.proof2,sigB)) then true else false
+        let leaseTx =  ((tx.type == 8) && sigVerify(tx.bodyBytes,tx.proof0,sigA) && sigVerify(tx.bodyBytes,tx.proof2,sigC))
+        let leaseCancelTx = ((tx.type == 9) && sigVerify(tx.bodyBytes,tx.proof1,sigA) && sigVerify(tx.bodyBytes,tx.proof2,sigB))
 
-        otherTx || leaseTx || leaseCancelTx
+        leaseTx || leaseCancelTx
         """.stripMargin).get.value
       CompilerV1(dummyTypeCheckerContext, sc).explicitGet()
     }
