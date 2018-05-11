@@ -258,14 +258,14 @@ class MinerImpl(allChannels: ChannelGroup,
 
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = {
     {
-      val height    = blockchainUpdater.height
-      val lastBlock = blockchainUpdater.lastBlock.get
+      val height      = blockchainUpdater.height
+      val blockForHit = (blockchainUpdater.blockAt(height - 100) orElse blockchainUpdater.lastBlock).get
       for {
         _ <- checkAge(height, blockchainUpdater.lastBlockTimestamp.get)
         _ <- Either.cond(blockchainUpdater.accountScript(account).isEmpty,
                          (),
                          s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
-        balanceAndTs <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, lastBlock, account)
+        balanceAndTs <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, blockForHit, account)
         (balance, ts) = balanceAndTs
         offset        = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
       } yield (offset, balance)
