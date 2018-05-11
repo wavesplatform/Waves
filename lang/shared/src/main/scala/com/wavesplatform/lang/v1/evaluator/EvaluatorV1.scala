@@ -113,7 +113,6 @@ object EvaluatorV1 extends ExprEvaluator {
   }
 
   private def evalMatch(expr: EXPR, cases: List[MATCH_CASE], tpe: TYPE): FF[tpe.Underlying] = {
-    // we need to eval first to get real type
     for {
       exprValue <- evalExpr(expr)(expr.tpe.typeInfo)
       actualExprType <- exprValue match {
@@ -121,8 +120,8 @@ object EvaluatorV1 extends ExprEvaluator {
         case _                       => liftL[tpe.Underlying](s"Expression is of type ${expr.tpe}, but only union types can be matched ")
       }
       result <- cases.find(c => c.types.contains(actualExprType)) match {
-        case Some(branch) => evalExpr(branch.expr)(tpe.typeInfo)
-        case None         => liftL[tpe.Underlying](s"Expression of type ${expr.tpe} can't be matched to any provided case")
+        case Some(MATCH_CASE(newVarName, types, matchedExpr)) => evalExpr(matchedExpr)(tpe.typeInfo)
+        case None                                             => liftL[tpe.Underlying](s"Expression of type ${expr.tpe} can't be matched to any provided case")
       }
     } yield result
   }

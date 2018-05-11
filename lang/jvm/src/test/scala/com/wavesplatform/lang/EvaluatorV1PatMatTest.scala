@@ -18,7 +18,7 @@ class EvaluatorV1PatMatTest extends PropSpec with PropertyChecks with Matchers w
   val pointTypeA = PredefCaseType("PointA", List("X" -> LONG, "YA" -> LONG))
   val pointTypeB = PredefCaseType("PointB", List("X" -> LONG, "YB" -> LONG))
 
-  val AorB = UNION(NonEmptyList.of(CASETYPEREF(pointTypeA.typeRef.name), CASETYPEREF(pointTypeB.typeRef.name)))
+  val AorB = UNION(List(CASETYPEREF(pointTypeA.typeRef.name), CASETYPEREF(pointTypeB.typeRef.name)))
 
   val pointAInstance = CaseObj(pointTypeA.typeRef, Map("X" -> Val(LONG)(3), "YA" -> Val(LONG)(40)))
   val pointBInstance = CaseObj(pointTypeB.typeRef, Map("X" -> Val(LONG)(3), "YB" -> Val(LONG)(41)))
@@ -52,8 +52,8 @@ class EvaluatorV1PatMatTest extends PropSpec with PropertyChecks with Matchers w
   property("evaluate according to pattern") {
     val expr = MATCH(REF("p", AorB),
                      List(
-                       MATCH_CASE(List(CASETYPEREF("PointA")), CONST_LONG(0)),
-                       MATCH_CASE(List(CASETYPEREF("PointB")), CONST_LONG(1))
+                       MATCH_CASE(None, List(CASETYPEREF("PointA")), CONST_LONG(0)),
+                       MATCH_CASE(Some("xxx"), List(CASETYPEREF("PointB")), CONST_LONG(1))
                      ),
                      LONG)
     ev[Long](context(pointAInstance), expr) shouldBe Right(0)

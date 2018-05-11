@@ -45,8 +45,8 @@ object Parser {
   private val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | functionCallP | refP)
 
   private val typesP: P[Seq[String]]    = varName.rep(min = 1, sep = "|")
-  private val matchCaseP: P[MATCH_CASE] = P("case" ~ typesP ~ "=>" ~ expr).map { case (types, e) => MATCH_CASE(types, e) }
-  private lazy val matchP: P[MATCH]     = P(refP ~ "match" ~ "{" ~ matchCaseP.rep(min = 1) ~ "}").map { case (e, cases) => MATCH(e, cases) }
+  private val matchCaseP: P[MATCH_CASE] = P("case" ~ varName ~ ":" ~ typesP ~ "=>" ~ expr).map { case (v, types, e) => MATCH_CASE(Some(v), types, e) }
+  private lazy val matchP: P[MATCH]     = P("match" ~ expr ~ "{" ~ matchCaseP.rep(min = 1) ~ "}").map { case (e, cases) => MATCH(e, cases.toList) }
 
   private val maybeGetterP: P[EXPR] = P(extractableAtom ~~ ("." ~~ varName).?).map {
     case (e, f) => f.fold(e)(GETTER(e, _))

@@ -3,7 +3,7 @@ package com.wavesplatform.lang
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions._
-import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.parser.{BinaryOperation, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
 import fastparse.core.Parsed.{Failure, Success}
 import org.scalacheck.Gen
@@ -229,35 +229,59 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     ) shouldBe false
   }
 
-  property("simple union type matching") {
+  property("simple matching") {
     val code =
       """
         |
-        | tx match {
-        |    case TypeA => 0
-        |    case TypeB => 1
+        | match tx {
+        |    case a: TypeA => 0
+        |    case b: TypeB => 1
         | }
         |
       """.stripMargin
-    parse(code) shouldBe MATCH(REF("tx"), List(MATCH_CASE(List("TypeA"), CONST_LONG(0)), MATCH_CASE(List("TypeB"), CONST_LONG(1))))
+    parse(code) shouldBe MATCH(REF("tx"),
+                               List(MATCH_CASE(Some("a"), List("TypeA"), CONST_LONG(0)), MATCH_CASE(Some("b"), List("TypeB"), CONST_LONG(1))))
   }
 
   property("multiple union type matching") {
     val code =
       """
         |
-        | tx match {
-        |    case TypeA => 0
-        |    case TypeB | TypeC => 1
+        | match tx {
+        |    case txa: TypeA => 0
+        |    case underscore : TypeB | TypeC => 1
         | }
         |
       """.stripMargin
-    parse(code) shouldBe MATCH(REF("tx"), List(MATCH_CASE(List("TypeA"), CONST_LONG(0)), MATCH_CASE(List("TypeB", "TypeC"), CONST_LONG(1))))
+    parse(code) shouldBe MATCH(REF("tx"),
+                               List(MATCH_CASE(Some("txa"), List("TypeA"), CONST_LONG(0)),
+                                    MATCH_CASE(Some("underscore"), List("TypeB", "TypeC"), CONST_LONG(1))))
+  }
+
+  property("matching expression") {
+    val code =
+      """
+        |
+        | match foo(x) + bar {
+        |    case x:TypeA => 0
+        |    case y:TypeB | TypeC => 1
+        | }
+        |
+      """.stripMargin
+    parse(code) shouldBe MATCH(
+      BINARY_OP(FUNCTION_CALL("foo", List(REF("x"))), BinaryOperation.SUM_OP, REF("bar")),
+      List(MATCH_CASE(Some("x"), List("TypeA"), CONST_LONG(0)), MATCH_CASE(Some("y"), List("TypeB", "TypeC"), CONST_LONG(1)))
+    )
   }
   property("failure to match") {
-    isParsed("tx match { } ") shouldBe false
-    isParsed("tx match { case => } ") shouldBe false
-    isParsed("tx match { case => 1} ") shouldBe false
-    isParsed("tx match { case TypeA => } ") shouldBe false
+    isParsed("match tx { } ") shouldBe false
+    isParsed("match tx { case => } ") shouldBe false
+    isParsed("match tx { case => 1} ") shouldBe false
+    isParsed("match tx { case TypeA => } ") shouldBe false
+    isParsed("match tx { case TypeA => 1 } ") shouldBe false
+    isParsed("match tx { case  :TypeA => 1 } ") shouldBe false
+    isParsed("match tx { case  x => 1 } ") shouldBe false
+    isParsed("match tx { case  _: | => 1 } ") shouldBe false
+    isParsed("match tx { case  _: |||| => 1 } ") shouldBe false
   }
 }
