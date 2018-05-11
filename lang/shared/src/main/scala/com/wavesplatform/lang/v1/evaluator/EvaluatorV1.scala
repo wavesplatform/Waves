@@ -21,12 +21,14 @@ object EvaluatorV1 extends ExprEvaluator {
 
   private def getContext: FF[LoggedEvaluationContext] =
     EitherT.apply[F0, ExecutionError, LoggedEvaluationContext](StateT.get[Coeval, LoggedEvaluationContext].map(_.asRight[ExecutionError]))
+
   private def updateContext(f: LoggedEvaluationContext => LoggedEvaluationContext): FF[Unit] =
     EitherT.apply[F0, ExecutionError, Unit](StateT.modify[Coeval, LoggedEvaluationContext](f).map(_.asRight[ExecutionError]))
 
   private def writeLog(l: String): FF[Unit] = updateContext(_.logAppend(l))
 
-  private def liftR[A](x: A): FF[A]                = EitherT.apply[F0, ExecutionError, A](StateT(s => Coeval.evalOnce((s, Right(x)))))
+  private def liftR[A](x: A): FF[A] = EitherT.apply[F0, ExecutionError, A](StateT(s => Coeval.evalOnce((s, Right(x)))))
+
   private def liftL[A](err: ExecutionError): FF[A] = EitherT.apply[F0, ExecutionError, A](StateT(s => Coeval.evalOnce((s, Left(err)))))
 
   private def liftCE[A](ei: Coeval[ExecutionError Either A]): FF[A] = EitherT.apply[F0, ExecutionError, A](StateT(s => ei.map(v => (s, v))))
@@ -115,13 +117,29 @@ object EvaluatorV1 extends ExprEvaluator {
   private def evalMatch(expr: EXPR, cases: List[MATCH_CASE], tpe: TYPE): FF[tpe.Underlying] = {
     for {
       exprValue <- evalExpr(expr)(expr.tpe.typeInfo)
+      ctx       <- getContext
       actualExprType <- exprValue match {
         case CaseObj(caseTypeRef, _) => liftR(caseTypeRef)
         case _                       => liftL[tpe.Underlying](s"Expression is of type ${expr.tpe}, but only union types can be matched ")
       }
       result <- cases.find(c => c.types.contains(actualExprType)) match {
-        case Some(MATCH_CASE(newVarName, types, matchedExpr)) => evalExpr(matchedExpr)(tpe.typeInfo)
-        case None                                             => liftL[tpe.Underlying](s"Expression of type ${expr.tpe} can't be matched to any provided case")
+        case Some(MATCH_CASE(maybeNewVarName, types, matchedExpr)) =>
+          lazy val proceed = evalExpr(matchedExpr)(tpe.typeInfo)
+          (maybeNewVarName, expr) match {
+            case (None, _) => proceed
+            case (Some(newName), REF(oldName, _)) if oldName == newName =>
+              val aux = exprValue.asInstanceOf[CaseObj]
+              updateContext(lets.modify(_)(_.updated(newName, LazyVal(UNION(types))(toTER(ctx, liftR(aux)))))) *> proceed
+            case (Some(newName), _) =>
+              if (lets.get(ctx).isDefinedAt(newName))
+                liftL(s"Value '$newName' already defined in the scope")
+              else {
+                val aux = exprValue.asInstanceOf[CaseObj]
+                updateContext(lets.modify(_)(_.updated(newName, LazyVal(UNION(types))(toTER(ctx, liftR(aux)))))) *> proceed
+              }
+          }
+
+        case None => liftL[tpe.Underlying](s"Expression of type ${expr.tpe} can't be matched to any provided case")
       }
     } yield result
   }
@@ -148,9 +166,9 @@ object EvaluatorV1 extends ExprEvaluator {
       }
     }).flatMap(v => {
       liftR(v.asInstanceOf[T])
-//      val ti = typeInfo[T]
-//      if (t.tpe.typeInfo <:< ti) liftR(v.asInstanceOf[T])
-//      else liftL(s"Bad type: expected: ${ti} actual: ${t.tpe.typeInfo}")
+      //      val ti = typeInfo[T]
+      //      if (t.tpe.typeInfo <:< ti) liftR(v.asInstanceOf[T])
+      //      else liftL(s"Bad type: expected: ${ti} actual: ${t.tpe.typeInfo}")
     })
 
   }

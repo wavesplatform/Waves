@@ -1,6 +1,6 @@
 package com.wavesplatform.lang
 
-import cats.data.{EitherT, NonEmptyList}
+import cats.data.EitherT
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.TypeInfo._
