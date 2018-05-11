@@ -60,4 +60,33 @@ class EvaluatorV1PatMatTest extends PropSpec with PropertyChecks with Matchers w
     ev[Long](context(pointBInstance), expr) shouldBe Right(1)
   }
 
+  property("shadowing of initial ref") {
+    val expr = MATCH(
+      REF("p", AorB),
+      List(
+        MATCH_CASE(Some("p"), List(CASETYPEREF("PointA")), CONST_LONG(0)),
+        MATCH_CASE(Some("p"), List(CASETYPEREF("PointB")), CONST_LONG(1))
+      ),
+      LONG
+    )
+    ev[Long](context(pointAInstance), expr) shouldBe Right(0)
+    ev[Long](context(pointBInstance), expr) shouldBe Right(1)
+  }
+
+  property("shadowing of initial and existing ref") {
+    val expr = BLOCK(
+      LET("p0", CONST_LONG(1)),
+      MATCH(
+        REF("p", AorB),
+        List(
+          MATCH_CASE(Some("p"), List(CASETYPEREF("PointA")), CONST_LONG(0)),
+          MATCH_CASE(Some("p0"), List(CASETYPEREF("PointB")), CONST_LONG(1))
+        ),
+        LONG
+      ),
+      LONG
+    )
+    ev[Long](context(pointAInstance), expr) shouldBe Right(0)
+    ev[Long](context(pointBInstance), expr) should produce("already defined")
+  }
 }

@@ -125,18 +125,17 @@ object EvaluatorV1 extends ExprEvaluator {
       result <- cases.find(c => c.types.contains(actualExprType)) match {
         case Some(MATCH_CASE(maybeNewVarName, types, matchedExpr)) =>
           lazy val proceed = evalExpr(matchedExpr)(tpe.typeInfo)
+          def registerValAndProceed(valName: String) = {
+            val aux = exprValue.asInstanceOf[CaseObj]
+            updateContext(lets.modify(_)(_.updated(valName, LazyVal(UNION(types))(toTER(ctx, liftR(aux)))))) *> proceed
+          }
           (maybeNewVarName, expr) match {
-            case (None, _) => proceed
-            case (Some(newName), REF(oldName, _)) if oldName == newName =>
-              val aux = exprValue.asInstanceOf[CaseObj]
-              updateContext(lets.modify(_)(_.updated(newName, LazyVal(UNION(types))(toTER(ctx, liftR(aux)))))) *> proceed
+            case (None, _)                                              => proceed
+            case (Some(newName), REF(oldName, _)) if oldName == newName => registerValAndProceed(newName)
             case (Some(newName), _) =>
               if (lets.get(ctx).isDefinedAt(newName))
-                liftL(s"Value '$newName' already defined in the scope")
-              else {
-                val aux = exprValue.asInstanceOf[CaseObj]
-                updateContext(lets.modify(_)(_.updated(newName, LazyVal(UNION(types))(toTER(ctx, liftR(aux)))))) *> proceed
-              }
+                liftL(s"Shadowing non-related variable '$newName' already defined in the scope")
+              else registerValAndProceed(newName)
           }
 
         case None => liftL[tpe.Underlying](s"Expression of type ${expr.tpe} can't be matched to any provided case")
