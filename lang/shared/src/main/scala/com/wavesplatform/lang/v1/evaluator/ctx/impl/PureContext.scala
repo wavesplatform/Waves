@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal, PredefFunction}
+import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, EvaluationContext, LazyVal, PredefFunction}
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -11,8 +11,10 @@ import scodec.bits.ByteVector
 object PureContext {
   private val optionT                                             = OPTIONTYPEPARAM(TYPEPARAM('T'))
   private val noneCoeval: Coeval[Either[String, Option[Nothing]]] = Coeval.evalOnce(Right(None))
+  private val nothingCoeval: Coeval[Either[String, Nothing]]      = Coeval.defer(Coeval(Right(???)))
 
   val none: LazyVal = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval).subflatMap(Right(_: Option[Nothing]))) // IDEA HACK
+  val err           = LazyVal(NOTHING)(EitherT(nothingCoeval))
 
   val extract: PredefFunction = PredefFunction("extract", 1, TYPEPARAM('T'), List(("opt", optionT))) {
     case Some(v) :: Nil => Right(v)
@@ -23,6 +25,11 @@ object PureContext {
   val some: PredefFunction = PredefFunction("Some", 1, optionT, List(("obj", TYPEPARAM('T')))) {
     case v :: Nil => Right(Some(v))
     case _        => ???
+  }
+
+  val _isInstanceOf: PredefFunction = PredefFunction("_isInstanceOf", 1, BOOLEAN, List(("obj", TYPEPARAM('T')), ("of", STRING))) {
+    case (p: CaseObj) :: (s: String) :: Nil => Right(p.caseType.name == s)
+    case _                                  => ???
   }
 
   val isDefined: PredefFunction = PredefFunction("isDefined", 1, BOOLEAN, List(("opt", optionT))) {
@@ -59,7 +66,7 @@ object PureContext {
   lazy val instance =
     EvaluationContext.build(types = Seq.empty,
                             caseTypes = Seq.empty,
-                            letDefs = Map(("None", none)),
-                            functions = Seq(extract, isDefined, some, size) ++ operators)
+                            letDefs = Map(("None", none), ("???", err)),
+                            functions = Seq(extract, isDefined, some, size, _isInstanceOf) ++ operators)
 
 }

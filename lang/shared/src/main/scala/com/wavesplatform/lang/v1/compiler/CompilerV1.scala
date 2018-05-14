@@ -9,9 +9,10 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction.FunctionTypeSignature
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.MATCH_CASE
-import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
+import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE}
+import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import monix.eval.Coeval
 
 import scala.util.Try
@@ -198,10 +199,8 @@ object CompilerV1 {
 
   private def compileMatch(ctx: CompilerContext, m: Expressions.MATCH): SetTypeResult[EXPR] = {
     val Expressions.MATCH(expr, cases) = m
-    import cats.instances.vector._
-    import cats.syntax.all._
-    val rootMatchTmpArg = "$match" + ctx.tmpArgsIdx
-    val updatedCtx      = ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1)
+    val rootMatchTmpArg                = "$match" + ctx.tmpArgsIdx
+    val updatedCtx                     = ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1)
     def liftedCommonType(l: List[TYPE]): EitherT[Coeval, TypeResolutionError, TYPE] = TypeInferrer.findCommonType(l) match {
       case None     => EitherT.fromEither[Coeval](Left("No common type inferred for branches"))
       case Some(cT) => EitherT.fromEither[Coeval](Right(cT))
@@ -216,9 +215,22 @@ object CompilerV1 {
       _ <- EitherT.cond[Coeval](UNION.eq(u, UNION(matchingTypes.toList.map(CASETYPEREF))),
                                 (),
                                 s"Matching not exhaustive: possibleTypes are ${u.l}, while matched are $matchingTypes")
-      caseResultTypes <- cases.toVector.traverse(c => compileMatchCase(updatedCtx, c, Expressions.REF(rootMatchTmpArg)))
-      commonType      <- liftedCommonType(caseResultTypes.map(_._2.tpe).toList)
-    } yield BLOCK(LET(rootMatchTmpArg, typedExpr), ???, commonType)
+      ifBasedCases: Expressions.EXPR = cases.foldRight(Expressions.REF("???"): Expressions.EXPR) {
+        case (mc, further) =>
+          val swarma = mc.types.foldLeft(Expressions.FALSE: Expressions.EXPR) {
+            case (other, matchType) =>
+              BINARY_OP(Expressions.FUNCTION_CALL("_isInstanceOf", List(Expressions.REF(rootMatchTmpArg), Expressions.CONST_STRING(matchType))),
+                        BinaryOperation.OR_OP,
+                        other)
+          }
+
+          Expressions.IF(swarma, mc.expr, further)
+
+      }
+
+      compiled <- compileBlock(updatedCtx, Expressions.BLOCK(Expressions.LET(rootMatchTmpArg, expr), ifBasedCases))
+
+    } yield compiled
   }
 
   private def compileMatchCase(ctx: CompilerContext, mc: MATCH_CASE, matchRootRef: Expressions.REF): SetTypeResult[(MATCH_CASE, EXPR)] = {

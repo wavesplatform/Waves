@@ -29,12 +29,9 @@ object Terms {
     type Underlying = Option[innerType.Underlying]
     override def typeInfo: TypeInfo[Option[innerType.Underlying]] = TypeInfo.optionTypeInfo(innerType.typeInfo)
   }
-  case class TYPEREF(name: String)     extends AUTO_TAGGED_TYPE[Obj]
-  case class CASETYPEREF(name: String) extends AUTO_TAGGED_TYPE[CaseObj]
-  case class UNION(l: List[CASETYPEREF]) extends AUTO_TAGGED_TYPE[AnyObj] {
-    // TODO: implement unions equality, e.g. A|B == B|A
-  }
-
+  case class TYPEREF(name: String)       extends AUTO_TAGGED_TYPE[Obj]
+  case class CASETYPEREF(name: String)   extends AUTO_TAGGED_TYPE[CaseObj]
+  case class UNION(l: List[CASETYPEREF]) extends AUTO_TAGGED_TYPE[AnyObj]
   object UNION {
     def eq(l1: UNION, l2: UNION): Boolean = l1.l.toSet == l2.l.toSet
     def >=(l1: UNION, l2: UNION): Boolean = {
@@ -55,7 +52,5 @@ object Terms {
   case object TRUE                                                                             extends EXPR(BOOLEAN)
   case object FALSE                                                                            extends EXPR(BOOLEAN)
   case class FUNCTION_CALL(function: FunctionHeader, args: List[EXPR], override val tpe: TYPE) extends EXPR(tpe)
-  case class MATCH_CASE(newVarName: Option[String], types: List[CASETYPEREF], expr: EXPR)
-  case class MATCH(expr: EXPR, cases: List[MATCH_CASE], override val tpe: TYPE) extends EXPR(tpe)
 
 }

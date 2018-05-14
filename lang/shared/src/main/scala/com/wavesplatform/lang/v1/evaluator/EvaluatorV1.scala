@@ -114,35 +114,6 @@ object EvaluatorV1 extends ExprEvaluator {
     } yield result
   }
 
-  private def evalMatch(expr: EXPR, cases: List[MATCH_CASE], tpe: TYPE): FF[tpe.Underlying] = {
-    for {
-      exprValue <- evalExpr(expr)(expr.tpe.typeInfo)
-      ctx       <- getContext
-      actualExprType <- exprValue match {
-        case CaseObj(caseTypeRef, _) => liftR(caseTypeRef)
-        case _                       => liftL[tpe.Underlying](s"Expression is of type ${expr.tpe}, but only union types can be matched ")
-      }
-      result <- cases.find(c => c.types.contains(actualExprType)) match {
-        case Some(MATCH_CASE(maybeNewVarName, types, matchedExpr)) =>
-          lazy val proceed = evalExpr(matchedExpr)(tpe.typeInfo)
-          def registerValAndProceed(valName: String) = {
-            val aux = exprValue.asInstanceOf[CaseObj]
-            updateContext(lets.modify(_)(_.updated(valName, LazyVal(UNION(types))(toTER(ctx, liftR(aux)))))) *> proceed
-          }
-          (maybeNewVarName, expr) match {
-            case (None, _)                                              => proceed
-            case (Some(newName), REF(oldName, _)) if oldName == newName => registerValAndProceed(newName)
-            case (Some(newName), _) =>
-              if (lets.get(ctx).isDefinedAt(newName))
-                liftL(s"Shadowing of non-related variable '$newName' that is already defined in the scope")
-              else registerValAndProceed(newName)
-          }
-
-        case None => liftL[tpe.Underlying](s"Expression of type ${expr.tpe} can't be matched to any provided case")
-      }
-    } yield result
-  }
-
   private def evalExpr[T: TypeInfo](t: EXPR): FF[T] = {
     (t match {
       case BLOCK(let, inner, blockTpe) =>
@@ -160,9 +131,6 @@ object EvaluatorV1 extends ExprEvaluator {
         writeLog(s"Evaluating GETTER") *> evalGetter(expr, field) <* writeLog("FINISHED")
       case FUNCTION_CALL(header, args, _) =>
         writeLog(s"Evaluating FUNCTION_CALL") *> evalFunctionCall(header, args) <* writeLog("FINISHED")
-      case MATCH(expr, cases, tpe) => {
-        writeLog(s"Evaluating MATCH") *> evalMatch(expr, cases, tpe) <* writeLog("FINISHED")
-      }
     }).flatMap(v => {
       liftR(v.asInstanceOf[T])
       //      val ti = typeInfo[T]

@@ -1,7 +1,6 @@
 package com.wavesplatform.lang
 
-import cats.data.EitherT
-import cats.syntax.semigroup._
+import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -13,21 +12,9 @@ import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
-class EvaluatorV1PatMatTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+class EvaluattorV1CaseObjField extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  val pointTypeA = PredefCaseType("PointA", List("X" -> LONG, "YA" -> LONG))
-  val pointTypeB = PredefCaseType("PointB", List("X" -> LONG, "YB" -> LONG))
-
-  val AorB = UNION(List(CASETYPEREF(pointTypeA.typeRef.name), CASETYPEREF(pointTypeB.typeRef.name)))
-
-  val pointAInstance = CaseObj(pointTypeA.typeRef, Map("X" -> Val(LONG)(3), "YA" -> Val(LONG)(40)))
-  val pointBInstance = CaseObj(pointTypeB.typeRef, Map("X" -> Val(LONG)(3), "YB" -> Val(LONG)(41)))
-
-  private def context(instance: CaseObj) =
-    PureContext.instance |+| EvaluationContext.build(Seq.empty,
-                                                     Seq(pointTypeA, pointTypeB),
-                                                     Map("p" -> LazyVal(AorB)(EitherT.pure(instance))),
-                                                     Seq.empty)
+  def context(p: CaseObj): EvaluationContext = Monoid.combine(PureContext.instance, sampleUnionContext(p))
 
   property("case custom type field access") {
     ev[Long](
@@ -47,46 +34,5 @@ class EvaluatorV1PatMatTest extends PropSpec with PropertyChecks with Matchers w
     testAccess(pointAInstance, "YA") shouldBe Right(42)
     testAccess(pointBInstance, "YB") shouldBe Right(43)
     testAccess(pointAInstance, "YB") should produce("field 'YB' not found")
-  }
-
-  property("evaluate according to pattern") {
-    val expr = MATCH(REF("p", AorB),
-                     List(
-                       MATCH_CASE(None, List(CASETYPEREF("PointA")), CONST_LONG(0)),
-                       MATCH_CASE(Some("xxx"), List(CASETYPEREF("PointB")), CONST_LONG(1))
-                     ),
-                     LONG)
-    ev[Long](context(pointAInstance), expr) shouldBe Right(0)
-    ev[Long](context(pointBInstance), expr) shouldBe Right(1)
-  }
-
-  property("shadowing of initial ref") {
-    val expr = MATCH(
-      REF("p", AorB),
-      List(
-        MATCH_CASE(Some("p"), List(CASETYPEREF("PointA")), CONST_LONG(0)),
-        MATCH_CASE(Some("p"), List(CASETYPEREF("PointB")), CONST_LONG(1))
-      ),
-      LONG
-    )
-    ev[Long](context(pointAInstance), expr) shouldBe Right(0)
-    ev[Long](context(pointBInstance), expr) shouldBe Right(1)
-  }
-
-  property("shadowing of initial and existing ref") {
-    val expr = BLOCK(
-      LET("p0", CONST_LONG(1)),
-      MATCH(
-        REF("p", AorB),
-        List(
-          MATCH_CASE(Some("p"), List(CASETYPEREF("PointA")), CONST_LONG(0)),
-          MATCH_CASE(Some("p0"), List(CASETYPEREF("PointB")), CONST_LONG(1))
-        ),
-        LONG
-      ),
-      LONG
-    )
-    ev[Long](context(pointAInstance), expr) shouldBe Right(0)
-    ev[Long](context(pointBInstance), expr) should produce("already defined")
   }
 }
