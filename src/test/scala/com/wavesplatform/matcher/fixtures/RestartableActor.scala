@@ -14,5 +14,5 @@ trait RestartableActor extends PersistentActor {
 object RestartableActor {
   case object RestartActor
 
-  private object RestartActorException extends Exception
+  private object RestartActorException extends Exception("Planned restart")
 }
