@@ -83,6 +83,10 @@ object TypeInferrer {
     else
       (required, actual) match {
         case (OPTION(it1), OPTION(it2)) => findCommonType(it1, it2, biDirectional).map(OPTION)
-        case _                          => None
+        case (r: UNION, a: UNION) =>
+          if (biDirectional && UNION.eq(r, a)) Some(r)
+          else if (!biDirectional && UNION.>=(r, a)) Some(r)
+          else None
+        case _ => None
       }
 }

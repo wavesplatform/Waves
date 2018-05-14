@@ -60,19 +60,30 @@ object CompilerV1 {
 
   private def compileGetter(ctx: CompilerContext, getter: Expressions.GETTER): SetTypeResult[EXPR] =
     compile(ctx, EitherT.pure(getter.ref))
-      .subflatMap { ref =>
-        ref.tpe match {
-          case typeRef: TYPEREF =>
-            val refTpe = ctx.predefTypes.get(typeRef.name).map(Right(_)).getOrElse(Left(s"Undefined type: ${typeRef.name}"))
-            val fieldTpe = refTpe.flatMap { ct =>
-              val fieldTpe = ct.fields.collectFirst {
-                case (fieldName, tpe) if fieldName == getter.field => tpe
+      .subflatMap { subExpr =>
+        def getField(name: String): Either[String, GETTER] = {
+          val refTpe = ctx.predefTypes.get(name).map(Right(_)).getOrElse(Left(s"Undefined type: $name"))
+          val fieldTpe = refTpe.flatMap { ct =>
+            val fieldTpe = ct.fields.collectFirst { case (fieldName, tpe) if fieldName == getter.field => tpe }
+            fieldTpe.map(Right(_)).getOrElse(Left(s"Undefined field $name.${getter.field}"))
+          }
+          fieldTpe.right.map(tpe => GETTER(expr = subExpr, field = getter.field, tpe = tpe))
+        }
+
+        subExpr.tpe match {
+          case typeRef: TYPEREF     => getField(typeRef.name)
+          case typeRef: CASETYPEREF => getField(typeRef.name)
+          case union: UNION =>
+            val x1 = union.l
+              .map(k => ctx.predefTypes(k.name))
+              .map(predefType => predefType.fields.find(_._1 == getter.field))
+            if (x1.contains(None)) Left(s"Undefined field ${getter.field} on $union")
+            else
+              TypeInferrer.findCommonType(x1.map(_.get._2)) match {
+                case Some(cT) => Right(GETTER(expr = subExpr, field = getter.field, tpe = cT))
+                case None     => Left(s"Undefined common type for field ${getter.field} on $union")
               }
 
-              fieldTpe.map(Right(_)).getOrElse(Left(s"Undefined field ${typeRef.name}.${getter.field}"))
-            }
-
-            fieldTpe.right.map(tpe => GETTER(ref = ref, field = getter.field, tpe = tpe))
           case x => Left(s"Can't access to '${getter.field}' of a primitive type $x")
         }
       }
@@ -160,19 +171,20 @@ object CompilerV1 {
       case (_, Some(_)) =>
         EitherT.leftT[Coeval, EXPR](s"Value '${let.name}' can't be defined because function with such name is predefined")
       case (None, None) =>
-        compile(ctx, EitherT.pure(let.value)).flatMap { exprTpe =>
-          val updatedCtx = ctx.copy(varDefs = ctx.varDefs + (let.name -> exprTpe.tpe))
-          compile(updatedCtx, EitherT.pure(block.body))
-            .map { inExpr =>
-              BLOCK(
-                let = LET(let.name, exprTpe),
-                body = inExpr,
-                tpe = inExpr.tpe
-              )
-            }
-        }
+        for {
+          exprTpe <- compile(ctx, EitherT.pure(let.value))
+          _ <- EitherT
+            .cond[Coeval](let.types.forall(ctx.predefTypes.contains), (), s"Value '${let.name}' declared as non-existing type")
+          desiredUnion = if (let.types.isEmpty) exprTpe.tpe else UNION(let.types.toList.map(CASETYPEREF))
+          updatedCtx   = ctx.copy(varDefs = ctx.varDefs + (let.name -> desiredUnion))
+          inExpr <- compile(updatedCtx, EitherT.pure(block.body))
+        } yield
+          BLOCK(
+            let = LET(let.name, exprTpe),
+            body = inExpr,
+            tpe = inExpr.tpe
+          )
     }
-
   }
 
   private def compileRef(ctx: CompilerContext, ref: Expressions.REF): SetTypeResult[EXPR] = EitherT.fromEither {
@@ -186,30 +198,37 @@ object CompilerV1 {
 
   private def compileMatch(ctx: CompilerContext, m: Expressions.MATCH): SetTypeResult[EXPR] = {
     val Expressions.MATCH(expr, cases) = m
+    import cats.instances.vector._
+    import cats.syntax.all._
+    val rootMatchTmpArg = "$match" + ctx.tmpArgsIdx
+    val updatedCtx      = ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1)
+    def liftedCommonType(l: List[TYPE]): EitherT[Coeval, TypeResolutionError, TYPE] = TypeInferrer.findCommonType(l) match {
+      case None     => EitherT.fromEither[Coeval](Left("No common type inferred for branches"))
+      case Some(cT) => EitherT.fromEither[Coeval](Right(cT))
+    }
     for {
       typedExpr <- compile(ctx, EitherT.pure(expr))
-      typedMatch <- typedExpr.tpe match {
-        case UNION(possibleTypes) =>
-          // check that all matches have proper variable names
-          val allowedShadow: Option[String] = ???
-          val matchingTypes                 = cases.flatMap(_.types)
-          // TODO: check that comparison is proper
-          val r: SetTypeResult[EXPR] = if (possibleTypes.toSet sameElements matchingTypes.toSet) {
-            def setTypeForCase(mc: MATCH_CASE): SetTypeResult[EXPR] = ???
-            import cats.instances.vector._
-            import cats.syntax.all._
-            cases.toVector.traverse(setTypeForCase).flatMap { caseResultTypes =>
-              TypeInferrer.findCommonType(caseResultTypes.map(_.tpe)) match {
-                case None             => EitherT.fromEither[Coeval](Left("No common type inferred for branches"))
-                case Some(commonType) => ???
-              }
-            }
-          } else EitherT.fromEither[Coeval](Left(s"Matching not exaustive: possibleTypes are $possibleTypes, while matched are $matchingTypes"))
-          r
-        case _ => EitherT.fromEither[Coeval](Left("Only union type can be matched"))
+      u <- typedExpr.tpe match {
+        case u: UNION => EitherT.fromEither[Coeval](Right(u))
+        case _        => EitherT.fromEither[Coeval](Left("Only union type can be matched"))
       }
-    } yield typedMatch
+      matchingTypes = cases.flatMap(_.types)
+      _ <- EitherT.cond[Coeval](UNION.eq(u, UNION(matchingTypes.toList.map(CASETYPEREF))),
+                                (),
+                                s"Matching not exhaustive: possibleTypes are ${u.l}, while matched are $matchingTypes")
+      caseResultTypes <- cases.toVector.traverse(c => compileMatchCase(updatedCtx, c, Expressions.REF(rootMatchTmpArg)))
+      commonType      <- liftedCommonType(caseResultTypes.map(_._2.tpe).toList)
+    } yield BLOCK(LET(rootMatchTmpArg, typedExpr), ???, commonType)
   }
+
+  private def compileMatchCase(ctx: CompilerContext, mc: MATCH_CASE, matchRootRef: Expressions.REF): SetTypeResult[(MATCH_CASE, EXPR)] = {
+    val tmpExpr: Expressions.EXPR = mc.newVarName match {
+      case Some(nweVal) => Expressions.BLOCK(Expressions.LET(nweVal, matchRootRef, mc.types), mc.expr)
+      case None         => mc.expr
+    }
+    compile(ctx, EitherT.pure(tmpExpr)).map((mc, _))
+  }
+
   def apply(c: CompilerContext, expr: Expressions.EXPR): CompilationResult[EXPR] = {
     def result = compile(c, EitherT.pure(expr)).value().left.map { e =>
       s"Typecheck failed: $e"

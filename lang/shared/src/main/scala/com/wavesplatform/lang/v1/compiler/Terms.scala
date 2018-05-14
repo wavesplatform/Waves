@@ -35,10 +35,18 @@ object Terms {
     // TODO: implement unions equality, e.g. A|B == B|A
   }
 
+  object UNION {
+    def eq(l1: UNION, l2: UNION): Boolean = l1.l.toSet == l2.l.toSet
+    def >=(l1: UNION, l2: UNION): Boolean = {
+      val bigger = l1.l.toSet
+      l2.l.forall(bigger.contains)
+    }
+  }
+
   sealed abstract class EXPR(val tpe: TYPE)
   case class LET(name: String, value: EXPR)
   case class CONST_LONG(t: Long)                                                               extends EXPR(LONG)
-  case class GETTER(ref: EXPR, field: String, override val tpe: TYPE)                          extends EXPR(tpe)
+  case class GETTER(expr: EXPR, field: String, override val tpe: TYPE)                         extends EXPR(tpe)
   case class CONST_BYTEVECTOR(bs: ByteVector)                                                  extends EXPR(BYTEVECTOR)
   case class CONST_STRING(s: String)                                                           extends EXPR(STRING)
   case class BLOCK(let: LET, body: EXPR, override val tpe: TYPE)                               extends EXPR(tpe)

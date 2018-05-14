@@ -11,7 +11,7 @@ object ScriptEstimator {
     def aux(t: Result[EXPR]): Result[Long] = t.flatMap {
       case _: CONST_LONG | _: CONST_BYTEVECTOR | _: CONST_STRING | TRUE | FALSE => EitherT.pure(1)
 
-      case t: GETTER => aux(EitherT.pure(t.ref)).map(_ + 2)
+      case t: GETTER => aux(EitherT.pure(t.expr)).map(_ + 2)
       case t: BLOCK  => aux(EitherT.pure(t.body)).map(_ + 5)
       case t: IF =>
         for {

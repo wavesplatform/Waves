@@ -75,7 +75,7 @@ object Parser {
     case (lessPriorityOp, kind) :: restOps =>
       val operand = binaryOp(restOps)
       P(operand ~ (lessPriorityOp.!.map(_ => kind) ~ operand).rep()).map {
-        case ((left: EXPR, r: Seq[(BinaryOperation, EXPR)])) =>
+        case (left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
           r.foldLeft(left) { case (acc, (currKind, currOperand)) => BINARY_OP(acc, currKind, currOperand) }
       }
   }
