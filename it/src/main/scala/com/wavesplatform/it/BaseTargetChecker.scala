@@ -7,7 +7,7 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.settings._
-import com.wavesplatform.state.{ByteStr, EitherExt2}
+import com.wavesplatform.state.{BlockMinerInfo, ByteStr, EitherExt2}
 import net.ceedubs.ficus.Ficus._
 import scorex.account.PublicKeyAccount
 import scorex.block.Block
@@ -32,13 +32,13 @@ object BaseTargetChecker {
 
     val m = NodeConfigs.Default.map(_.withFallback(sharedConfig)).collect {
       case cfg if cfg.as[Boolean]("waves.miner.enable") =>
-        val account = PublicKeyAccount(cfg.as[ByteStr]("public-key").arr)
-        val address = account.toAddress
-        val balance = bu.balance(address, None)
-        val timeDelta =
-          pos.time(pos.hit(pos.generatorSignature(genesisBlock.uniqueId.arr, account.publicKey)), genesisBlock.consensusData.baseTarget, balance)
+        val account   = PublicKeyAccount(cfg.as[ByteStr]("public-key").arr)
+        val address   = account.toAddress
+        val balance   = bu.balance(address, None)
+        val consensus = genesisBlock.consensusData
+        val timeDelay = pos.validBlockDelay(consensus.generationSignature.arr, account.publicKey, consensus.baseTarget, balance)
 
-        f"$address: ${timeDelta * 1e-3}%10.3f s"
+        f"$address: ${timeDelay * 1e-3}%10.3f s"
     }
 
     docker.close()

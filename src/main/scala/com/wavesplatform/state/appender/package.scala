@@ -136,12 +136,12 @@ package object appender extends ScorexLogging {
           s"declared generation signature ${blockData.generationSignature.base58} does not match calculated generation signature ${ByteStr(calcGs).base58}")
       )
       effectiveBalance <- genBalance(height).left.map(GenericError(_))
-      hit    = pos.hit(blockGs)
-      target = pos.target(parent.timestamp, parent.consensusData.baseTarget, blockTime, effectiveBalance)
+      validBlockTime = pos.validBlockDelay(blockGs, parent.consensusData.baseTarget, effectiveBalance) //pos.time(pos.hit(blockGs), parent.consensusData.baseTarget, effectiveBalance)
       _ <- Either.cond(
-        hit < target || (height == height1 && block.uniqueId == correctBlockId1) || (height == height2 && block.uniqueId == correctBlockId2),
+        blockTime < validBlockTime
+          || (height == height1 && block.uniqueId == correctBlockId1) || (height == height2 && block.uniqueId == correctBlockId2),
         (),
-        GenericError(s"calculated hit $hit >= calculated target $target")
+        GenericError(s"calculated time $validBlockTime < block time $blockTime")
       )
     } yield ()
 

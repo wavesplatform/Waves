@@ -1,7 +1,6 @@
 package com.wavesplatform.consensus
 
 import org.scalatest.{Matchers, PropSpec}
-
 import scala.util.Random
 
 class FairPoSCalculatorTest extends PropSpec with Matchers {
@@ -18,7 +17,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
 
   property("") {
 
-    val balance = 50000000000L * 100000000L
+    val balance = 50000000L * 100000000L
 
     val blockDelaySeconds = 60
 
@@ -26,39 +25,48 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
 
     val first = Block(0, defaultBaseTarget, System.currentTimeMillis(), 0)
 
-    val chain = (1 to 1000 foldLeft List(first)) {
-      case (acc @ last :: _, h) =>
-        val next =
-          calculateBlock(
-            last.height,
+    val chain = (1 to 10000 foldLeft List(first))((acc, _) => {
+      acc match {
+        case last :: _ =>
+          val delay = pos.validBlockDelay(generationSignature, last.baseTarget, balance)
+          val bt = pos.baseTarget(
+            blockDelaySeconds,
+            last.height + 1,
             last.baseTarget,
             last.timestamp,
-            if (h > 3) Some(acc(3).timestamp) else None,
-            balance,
-            blockDelaySeconds
+            if (acc.isDefinedAt(2)) Some(acc(2).timestamp) else None,
+            last.timestamp + delay
           )
 
-        next :: acc
-    }
+          Block(
+            last.height + 1,
+            bt,
+            last.timestamp + delay,
+            delay
+          ) :: acc
 
-    chain.sortBy(-_.timestamp) shouldBe chain
+        case _ => ???
+      }
 
-    chain foreach println
-  }
+    }).reverse
 
-  def calculateBlock(prevHeight: Int, prevBaseTarget: Long, prevTimestamp: Long,
-                     greatParentTimestamp: Option[Long], balance: Long, targetBlockDelaySeconds: Long): Block = {
-    val hit  = pos.hit(generationSignature)
-    val delay = pos.time(hit, prevBaseTarget, balance)
-    val bt   = pos.baseTarget(targetBlockDelaySeconds, prevHeight + 1, prevBaseTarget, prevTimestamp, greatParentTimestamp, prevTimestamp + delay)
+    val maxBT = chain.maxBy(_.baseTarget).baseTarget
+    val avgBT = chain.map(_.baseTarget).sum / chain.length
+    val minBT = chain.minBy(_.baseTarget).baseTarget
 
-    Block(
-      prevHeight + 1,
-      bt,
-      prevTimestamp + delay,
-      delay
+    val maxDelay = chain.tail.maxBy(_.delay).delay
+    val avgDelay = chain.tail.map(_.delay).sum / (chain.length - 1)
+    val minDelay = chain.tail.minBy(_.delay).delay
+
+    print(
+      s"""
+        |BT: $minBT $avgBT $maxBT
+        |Delay: $minDelay $avgDelay $maxDelay
+      """.stripMargin
     )
-  }
 
+    assert(avgDelay < 80000 && avgDelay > 40000)
+    assert(avgBT < 200 && avgBT > 20)
+  }
 
 }
