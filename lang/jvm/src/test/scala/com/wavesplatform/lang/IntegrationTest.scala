@@ -59,7 +59,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     forAll(for {
       (expr, _) <- BOOLgen(50)
-      str  <- toString(expr)
+      str       <- toString(expr)
     } yield str) {
       case str =>
         eval[Boolean](s"$str || true") shouldBe Right(true)

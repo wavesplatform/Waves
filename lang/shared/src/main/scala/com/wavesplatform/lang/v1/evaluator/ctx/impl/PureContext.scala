@@ -45,7 +45,7 @@ object PureContext {
   }
 
 
-  val getElement = PredefFunction("getElement", 10, TYPEPARAM('T'), List("arr" -> LISTTYPEPARAM(TYPEPARAM('T')), "pos" -> LONG)) {
+  val getElement = PredefFunction("getElement", 2, TYPEPARAM('T'), List("arr" -> LISTTYPEPARAM(TYPEPARAM('T')), "pos" -> LONG)) {
     case (arr: IndexedSeq[_]) :: (pos: Long) :: Nil => if(pos < arr.size && 0 <= pos) {
                                                      Right(arr(pos.toInt))
                                                   } else {
@@ -54,7 +54,7 @@ object PureContext {
     case _               => ???
   }
 
-  val getListSize = PredefFunction("listSize", 10, LONG, List("arr" -> LISTTYPEPARAM(TYPEPARAM('T')))) {
+  val getListSize = PredefFunction("size", 2, LONG, List("arr" -> LISTTYPEPARAM(TYPEPARAM('T')))) {
     case (arr: IndexedSeq[_]) :: Nil => {
       
       Right(arr.size.toLong)

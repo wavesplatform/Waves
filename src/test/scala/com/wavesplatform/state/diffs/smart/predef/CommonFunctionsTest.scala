@@ -49,11 +49,11 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
     //import com.wavesplatform.lang.v1.ctx.Obj
     forAll(massTransferGen.filter(_.transfers.size > 0)) {
       case (massTransfer) =>
-        val resultAmount = runScript[Long]("getElement(tx.transfers, 0).amount", massTransfer)
+        val resultAmount = runScript[Long]("tx.transfers[0].amount", massTransfer)
         resultAmount shouldBe Right(massTransfer.transfers(0).amount)
-        val resultAddress = runScript[ByteVector]("let a = getElement(tx.transfers, 0).address (a.bytes)", massTransfer)
+        val resultAddress = runScript[ByteVector]("tx.transfers[0].address.bytes", massTransfer)
         resultAddress shouldBe Right(ByteVector(massTransfer.transfers(0).address.bytes.arr))
-        val resultLen = runScript[Long]("listSize(tx.transfers)", massTransfer)
+        val resultLen = runScript[Long]("size(tx.transfers)", massTransfer)
         resultLen shouldBe Right(massTransfer.transfers.size.toLong)
     }
   }

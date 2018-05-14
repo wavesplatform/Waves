@@ -70,7 +70,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       FALSE,
       OR_OP,
       FUNCTION_CALL(
-        "sigVerify",
+        REF("sigVerify"),
         List(
           CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("333").get)),
           CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("222").get)),
@@ -137,14 +137,14 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("function call") {
-    parse("FOO(1,2)".stripMargin) shouldBe FUNCTION_CALL("FOO", List(CONST_LONG(1), CONST_LONG(2)))
-    parse("FOO(X)".stripMargin) shouldBe FUNCTION_CALL("FOO", List(REF("X")))
+    parse("FOO(1,2)".stripMargin) shouldBe FUNCTION_CALL(REF("FOO"), List(CONST_LONG(1), CONST_LONG(2)))
+    parse("FOO(X)".stripMargin) shouldBe FUNCTION_CALL(REF("FOO"), List(REF("X")))
   }
 
   property("isDefined/extract") {
-    parse("isDefined(X)") shouldBe FUNCTION_CALL("isDefined", List(REF("X")))
-    parse("if(isDefined(X)) then extract(X) else Y") shouldBe IF(FUNCTION_CALL("isDefined", List(REF("X"))),
-                                                                 FUNCTION_CALL("extract", List(REF("X"))),
+    parse("isDefined(X)") shouldBe FUNCTION_CALL(REF("isDefined"), List(REF("X")))
+    parse("if(isDefined(X)) then extract(X) else Y") shouldBe IF(FUNCTION_CALL(REF("isDefined"), List(REF("X"))),
+                                                                 FUNCTION_CALL(REF("extract"), List(REF("X"))),
                                                                  REF("Y"))
   }
 
@@ -161,25 +161,25 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       """.stripMargin
     ) shouldBe GETTER(REF("xxx"), "yyy")
 
-    parse("xxx(yyy).zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parse("xxx(yyy).zzz") shouldBe GETTER(FUNCTION_CALL(REF("xxx"), List(REF("yyy"))), "zzz")
     parse(
       """
         |
         | xxx(yyy).zzz
         |
       """.stripMargin
-    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    ) shouldBe GETTER(FUNCTION_CALL(REF("xxx"), List(REF("yyy"))), "zzz")
 
-    parse("(xxx(yyy)).zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parse("(xxx(yyy)).zzz") shouldBe GETTER(FUNCTION_CALL(REF("xxx"), List(REF("yyy"))), "zzz")
     parse(
       """
         |
         | (xxx(yyy)).zzz
         |
       """.stripMargin
-    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    ) shouldBe GETTER(FUNCTION_CALL(REF("xxx"), List(REF("yyy"))), "zzz")
 
-    parse("{xxx(yyy)}.zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parse("{xxx(yyy)}.zzz") shouldBe GETTER(FUNCTION_CALL(REF("xxx"), List(REF("yyy"))), "zzz")
     parse(
       """
         |
@@ -188,7 +188,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         | }.zzz
         |
       """.stripMargin
-    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    ) shouldBe GETTER(FUNCTION_CALL(REF("xxx"), List(REF("yyy"))), "zzz")
 
     parse(
       """
@@ -199,7 +199,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         | }.zzz
         |
       """.stripMargin
-    ) shouldBe GETTER(BLOCK(LET("yyy", FUNCTION_CALL("aaa", List(REF("bbb")))), FUNCTION_CALL("xxx", List(REF("yyy")))), "zzz")
+    ) shouldBe GETTER(BLOCK(LET("yyy", FUNCTION_CALL(REF("aaa"), List(REF("bbb")))), FUNCTION_CALL(REF("xxx"), List(REF("yyy")))), "zzz")
   }
 
   property("crypto functions") {
@@ -216,7 +216,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
        """.stripMargin
       ) shouldBe
         FUNCTION_CALL(
-          f,
+          REF(f),
           List(CONST_BYTEVECTOR(ByteVector(text.getBytes)))
         )
     }

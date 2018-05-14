@@ -16,6 +16,6 @@ object Expressions {
   case class REF(key: String)                                      extends EXPR
   case object TRUE                                                 extends EXPR
   case object FALSE                                                extends EXPR
-  case class FUNCTION_CALL(functionName: String, args: List[EXPR]) extends EXPR
+  case class FUNCTION_CALL(function: EXPR, args: List[EXPR])       extends EXPR
 
 }
