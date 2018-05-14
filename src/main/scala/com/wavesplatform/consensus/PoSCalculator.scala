@@ -98,7 +98,6 @@ object FairPoSCalculator extends PoSCalculator {
     val h = BigDecimal(hit)
     val t = BigDecimal(bt)
     val b = BigDecimal(balance)
-    println(s"hit=$hit bt=$bt balance=$balance")
     val r: BigDecimal = (h * Correction * 1000) / (t * b)
     round(log2(1 + r) * 120).toLong
   }

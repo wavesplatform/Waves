@@ -8,43 +8,32 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
 
   val pos = FairPoSCalculator
 
-  case class Block(height: Int, hit: BigInt, baseTarget: Long, timestamp: Long)
-
-  val signature = {
-    println("called")
-    Array.fill(32)(0: Byte)
-  }
+  case class Block(height: Int, baseTarget: Long, timestamp: Long, delay: Long)
 
   def generationSignature: Array[Byte] = {
-    val arr = Array[Byte](32)
+    val arr = new Array[Byte](32)
     Random.nextBytes(arr)
     arr
   }
 
-  property("...") {
-    List.fill(10)(generationSignature) map
-      (_.mkString("[", "", "]")) foreach
-      println
-  }
-
   property("") {
 
-    val balance = 50000000000L
+    val balance = 50000000000L * 100000000L
 
     val blockDelaySeconds = 60
 
     val defaultBaseTarget = 100L
-    val height            = 0
 
-    val first = calculateBlock(height, defaultBaseTarget, System.currentTimeMillis(), balance, blockDelaySeconds)
+    val first = Block(0, defaultBaseTarget, System.currentTimeMillis(), 0)
 
     val chain = (1 to 1000 foldLeft List(first)) {
-      case (acc @ last :: _, _) =>
+      case (acc @ last :: _, h) =>
         val next =
           calculateBlock(
             last.height,
             last.baseTarget,
             last.timestamp,
+            if (h > 3) Some(acc(3).timestamp) else None,
             balance,
             blockDelaySeconds
           )
@@ -57,16 +46,19 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
     chain foreach println
   }
 
-  def calculateBlock(prevHeight: Int, prevBaseTarget: Long, prevTimestamp: Long, balance: Long, blockDelaySeconds: Long): Block = {
+  def calculateBlock(prevHeight: Int, prevBaseTarget: Long, prevTimestamp: Long,
+                     greatParentTimestamp: Option[Long], balance: Long, targetBlockDelaySeconds: Long): Block = {
     val hit  = pos.hit(generationSignature)
-    val time = pos.time(hit, prevBaseTarget, balance)
-    val bt   = pos.baseTarget(blockDelaySeconds, prevHeight + 1, prevBaseTarget, prevTimestamp, None, prevTimestamp)
+    val delay = pos.time(hit, prevBaseTarget, balance)
+    val bt   = pos.baseTarget(targetBlockDelaySeconds, prevHeight + 1, prevBaseTarget, prevTimestamp, greatParentTimestamp, prevTimestamp + delay)
 
     Block(
       prevHeight + 1,
-      hit,
       bt,
-      prevTimestamp + time
+      prevTimestamp + delay,
+      delay
     )
   }
+
+
 }
