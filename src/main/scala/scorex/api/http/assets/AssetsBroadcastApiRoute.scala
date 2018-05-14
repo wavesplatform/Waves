@@ -38,7 +38,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
                            value = "Json with signed Issue transaction",
                            required = true,
                            paramType = "body",
-                           dataType = "scorex.api.http.assets.SignedIssueRequest")))
+                           dataType = "scorex.api.http.assets.SignedIssueV1Request")))
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json with signed Asset issue transaction contained Asset ID"),
@@ -64,7 +64,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
                            value = "Json with signed Reissue transaction",
                            required = true,
                            paramType = "body",
-                           dataType = "scorex.api.http.assets.SignedReissueRequest")))
+                           dataType = "scorex.api.http.assets.SignedReissueV1Request")))
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json with signed Asset reissue transaction"),
@@ -90,7 +90,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
                            value = "Json with signed Burn transaction",
                            required = true,
                            paramType = "body",
-                           dataType = "scorex.api.http.assets.SignedBurnRequest")))
+                           dataType = "scorex.api.http.assets.SignedBurnV1Request")))
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json with signed Asset burn transaction"),
@@ -115,7 +115,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
         value = "Array json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.assets.SignedTransferRequest",
+        dataType = "scorex.api.http.assets.SignedTransferV2Request",
         allowMultiple = true,
         defaultValue =
           "[{\n  \"assetId\": \"E9yZC4cVhCDfbjFJCc9CqkAtkoFy5KaCe64iaxHM2adG\",\n  \"senderPublicKey\": \"CRxqEuxhdZBEHX42MU4FfyJxuHmbDBTaHMhM3Uki7pLw\",\n  \"recipient\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n  \"fee\": 100000,\n  \"amount\": 5500000000,\n  \"attachment\": \"BJa6cfyGUmzBFTj3vvvaew\",\n  \"timestamp\": 1479222433704, \n  \"signature\": \"2TyN8pNS7mS9gfCbX2ktpkWVYckoAmRmDZzKH3K35DKs6sUoXHArzukV5hvveK9t79uzT3cA8CYZ9z3Utj6CnCEo\"\n, {\n  \"assetId\": \"E9yZC4cVhCDfbjFJCc9CqkAtkoFy5KaCe64iaxHM2adG\",\n  \"senderPublicKey\": \"CRxqEuxhdZBEHX42MU4FfyJxuHmbDBTaHMhM3Uki7pLw\",\n  \"recipient\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n  \"fee\": 100000,\n  \"amount\": 5500000000,\n  \"attachment\": \"BJa6cfyGUmzBFTj3vvvaew\",\n  \"timestamp\": 1479222433704, \n  \"signature\": \"2TyN8pNS7mS9gfCbX2ktpkWVYckoAmRmDZzKH3K35DKs6sUoXHArzukV5hvveK9t79uzT3cA8CYZ9z3Utj6CnCEo\"\n}]"
@@ -179,7 +179,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
                            value = "Json with signed Transfer transaction",
                            required = true,
                            paramType = "body",
-                           dataType = "scorex.api.http.assets.SignedTransferRequest")))
+                           dataType = "scorex.api.http.assets.SignedTransferV2Request")))
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json with signed Asset transfer transaction"),

@@ -17,6 +17,8 @@ case class LeaseCancelTransactionV1 private (sender: PublicKeyAccount, leaseId: 
 
   override val builder: TransactionParser = LeaseCancelTransactionV1
 
+  override def chainByte: Option[Byte] = None
+
   val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(Bytes.concat(Array(builder.typeId), bytesBase()))
 

@@ -35,12 +35,11 @@ object Explorer extends ScorexLogging {
     log.info(s"Blockchain height is $blockchainHeight")
     try {
 
-      val flag      = args(1).toUpperCase
-      val primaryId = args(2)
+      val flag = args(1).toUpperCase
 
       flag match {
         case "O" =>
-          val orderId = Base58.decode(primaryId).toOption.map(ByteStr.apply)
+          val orderId = Base58.decode(args(2)).toOption.map(ByteStr.apply)
           if (orderId.isDefined) {
             val kVolumeAndFee = LevelDBWriter.k.filledVolumeAndFee(blockchainHeight, orderId.get)
             val bytes1        = db.get(kVolumeAndFee.keyBytes)
@@ -60,7 +59,7 @@ object Explorer extends ScorexLogging {
           } else log.error("No order ID was provided")
 
         case "A" =>
-          val address   = Address.fromString(primaryId).right.get
+          val address   = Address.fromString(args(2)).right.get
           val aid       = LevelDBWriter.k.addressId(address)
           val addressId = aid.parse(db.get(aid.keyBytes)).get
           log.info(s"Address id = $addressId")
@@ -74,8 +73,12 @@ object Explorer extends ScorexLogging {
           }
           balances.foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
 
+        case "AC" =>
+          val lastAddressId = LevelDBWriter.k.lastAddressId.parse(db.get(LevelDBWriter.k.lastAddressId.keyBytes))
+          log.info(s"Last address id: $lastAddressId")
+
         case "T" =>
-          val address   = Address.fromString(primaryId).right.get
+          val address   = Address.fromString(args(2)).right.get
           val aid       = LevelDBWriter.k.addressId(address)
           val addressId = aid.parse(db.get(aid.keyBytes)).get
           log.info(s"Address id = $addressId")
@@ -88,7 +91,7 @@ object Explorer extends ScorexLogging {
         case "AA" =>
           val secondaryId = args(3)
 
-          val address   = Address.fromString(primaryId).right.get
+          val address   = Address.fromString(args(2)).right.get
           val asset     = ByteStr.decodeBase58(secondaryId).get
           val ai        = LevelDBWriter.k.addressId(address)
           val addressId = ai.parse(db.get(ai.keyBytes)).get
