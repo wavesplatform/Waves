@@ -120,6 +120,8 @@ object CompilerV1 {
           }
       }
 
+    case Expressions.FUNCTION_CALL(_, _) => EitherT.fromEither[Coeval](Left("Calling of unnamed function isn't implemented yet."))
+
     case block: Expressions.BLOCK =>
       import block.let
       (ctx.varDefs.get(let.name), ctx.functionDefs.get(let.name)) match {

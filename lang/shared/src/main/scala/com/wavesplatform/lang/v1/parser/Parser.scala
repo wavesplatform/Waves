@@ -54,8 +54,8 @@ object Parser {
       a match {
         case Getter(n) => GETTER(e,n)
         case Args(args) => e match {
-           case function@REF(functionName) => FUNCTION_CALL(function, args.toList)
-           case _ => throw new Exception("Calling of unnamed function isn't implemented yet.") //Parsed.Failure(refP, 0, "Calling of unnamed function isn't implemented yet.")
+           case function => FUNCTION_CALL(function, args.toList)
+                // Only REF(functionName) support now. Calling of unnamed function isn't implemented yet."
         }
         case ListIndex(index) => FUNCTION_CALL(REF("getElement"), List(e, index))
       }
