@@ -9,9 +9,8 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction.FunctionTypeSignature
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE}
+import com.wavesplatform.lang.v1.parser.Expressions.BINARY_OP
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import monix.eval.Coeval
 
@@ -201,10 +200,7 @@ object CompilerV1 {
     val Expressions.MATCH(expr, cases) = m
     val rootMatchTmpArg                = "$match" + ctx.tmpArgsIdx
     val updatedCtx                     = ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1)
-    def liftedCommonType(l: List[TYPE]): EitherT[Coeval, TypeResolutionError, TYPE] = TypeInferrer.findCommonType(l) match {
-      case None     => EitherT.fromEither[Coeval](Left("No common type inferred for branches"))
-      case Some(cT) => EitherT.fromEither[Coeval](Right(cT))
-    }
+
     for {
       typedExpr <- compile(ctx, EitherT.pure(expr))
       u <- typedExpr.tpe match {
@@ -217,28 +213,21 @@ object CompilerV1 {
                                 s"Matching not exhaustive: possibleTypes are ${u.l}, while matched are $matchingTypes")
       ifBasedCases: Expressions.EXPR = cases.foldRight(Expressions.REF("???"): Expressions.EXPR) {
         case (mc, further) =>
-          val swarma = mc.types.foldLeft(Expressions.FALSE: Expressions.EXPR) {
+          val typeSwarma = mc.types.foldLeft(Expressions.FALSE: Expressions.EXPR) {
             case (other, matchType) =>
               BINARY_OP(Expressions.FUNCTION_CALL("_isInstanceOf", List(Expressions.REF(rootMatchTmpArg), Expressions.CONST_STRING(matchType))),
                         BinaryOperation.OR_OP,
                         other)
           }
-
-          Expressions.IF(swarma, mc.expr, further)
+          val blockWithNewVar = mc.newVarName match {
+            case Some(nweVal) => Expressions.BLOCK(Expressions.LET(nweVal, Expressions.REF(rootMatchTmpArg), mc.types), mc.expr)
+            case None         => mc.expr
+          }
+          Expressions.IF(typeSwarma, blockWithNewVar, further)
 
       }
-
       compiled <- compileBlock(updatedCtx, Expressions.BLOCK(Expressions.LET(rootMatchTmpArg, expr), ifBasedCases))
-
     } yield compiled
-  }
-
-  private def compileMatchCase(ctx: CompilerContext, mc: MATCH_CASE, matchRootRef: Expressions.REF): SetTypeResult[(MATCH_CASE, EXPR)] = {
-    val tmpExpr: Expressions.EXPR = mc.newVarName match {
-      case Some(nweVal) => Expressions.BLOCK(Expressions.LET(nweVal, matchRootRef, mc.types), mc.expr)
-      case None         => mc.expr
-    }
-    compile(ctx, EitherT.pure(tmpExpr)).map((mc, _))
   }
 
   def apply(c: CompilerContext, expr: Expressions.EXPR): CompilationResult[EXPR] = {

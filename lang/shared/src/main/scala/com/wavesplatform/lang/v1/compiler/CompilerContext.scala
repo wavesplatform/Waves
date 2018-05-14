@@ -3,9 +3,9 @@ package com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Terms.TYPE
 import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction.FunctionTypeSignature
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, PredefType}
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, PredefBase}
 
-case class CompilerContext(predefTypes: Map[String, PredefType], varDefs: TypeDefs, functionDefs: FunctionSigs, tmpArgsIdx: Int = 0) {
+case class CompilerContext(predefTypes: Map[String, PredefBase], varDefs: TypeDefs, functionDefs: FunctionSigs, tmpArgsIdx: Int = 0) {
   def functionTypeSignaturesByName(name: String): Seq[FunctionTypeSignature] = functionDefs.getOrElse(name, Seq.empty)
 }
 
@@ -18,6 +18,6 @@ object CompilerContext {
 
   def fromEvaluationContext(ctx: EvaluationContext): CompilerContext = {
     val map = ctx.functions.values.groupBy(_.name).mapValues(_.map(_.signature).toSeq)
-    CompilerContext(predefTypes = ctx.typeDefs, varDefs = ctx.letDefs.mapValues(_.tpe), functionDefs = map, tmpArgsIdx = 0)
+    CompilerContext(predefTypes = ctx.typeDefs ++ ctx.caseTypeDefs, varDefs = ctx.letDefs.mapValues(_.tpe), functionDefs = map)
   }
 }
