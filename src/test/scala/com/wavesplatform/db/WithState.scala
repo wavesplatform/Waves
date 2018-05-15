@@ -1,10 +1,9 @@
 package com.wavesplatform.db
 
-import java.io.IOException
-import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file.{FileVisitResult, Files, Path, SimpleFileVisitor}
+import java.nio.file.Files
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.TestHelpers
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings, loadConfig}
@@ -18,22 +17,7 @@ trait WithState extends ScorexLogging {
     try f(new LevelDBWriter(db, fs))
     finally {
       db.close()
-      Files.walkFileTree(
-        path,
-        new SimpleFileVisitor[Path] {
-          override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
-            Option(exc).fold {
-              Files.delete(dir)
-              FileVisitResult.CONTINUE
-            }(throw _)
-          }
-
-          override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
-            Files.delete(file)
-            FileVisitResult.CONTINUE
-          }
-        }
-      )
+      TestHelpers.deleteRecursively(path)
     }
   }
 

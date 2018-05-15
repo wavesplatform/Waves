@@ -10,18 +10,21 @@ object FunctionHeader {
     def fromTypePlaceholder(t: Terms.TYPEPLACEHOLDER): FunctionHeaderType = t match {
       case Terms.TYPEPARAM(char)       => FunctionHeaderType.TYPEPARAM(char)
       case Terms.OPTIONTYPEPARAM(x)    => FunctionHeaderType.OPTIONTYPEPARAM(fromTypePlaceholder(x))
-      case Terms.NOTHING               => FunctionHeaderType.NOTHING
-      case compiler.Terms.UNIT         => FunctionHeaderType.UNIT
-      case compiler.Terms.LONG         => FunctionHeaderType.LONG
-      case compiler.Terms.BYTEVECTOR   => FunctionHeaderType.BYTEVECTOR
-      case compiler.Terms.BOOLEAN      => FunctionHeaderType.BOOLEAN
-      case compiler.Terms.STRING       => FunctionHeaderType.STRING
+      case Terms.LISTTYPEPARAM(x)      => FunctionHeaderType.LISTTYPEPARAM(fromTypePlaceholder(x))
+      case Terms.NOTHING            => FunctionHeaderType.NOTHING
+      case Terms.UNIT               => FunctionHeaderType.UNIT
+      case Terms.LONG               => FunctionHeaderType.LONG
+      case Terms.BYTEVECTOR         => FunctionHeaderType.BYTEVECTOR
+      case Terms.BOOLEAN            => FunctionHeaderType.BOOLEAN
+      case Terms.STRING             => FunctionHeaderType.STRING
       case Terms.OPTION(x)             => FunctionHeaderType.OPTION(fromTypePlaceholder(x))
       case Terms.TYPEREF(name: String) => FunctionHeaderType.TYPEREF(name)
+      case Terms.LIST(x)             => FunctionHeaderType.LIST(fromTypePlaceholder(x))
     }
 
     case class TYPEPARAM(char: Byte)                  extends FunctionHeaderType
     case class OPTIONTYPEPARAM(t: FunctionHeaderType) extends FunctionHeaderType
+    case class LISTTYPEPARAM(t: FunctionHeaderType) extends FunctionHeaderType
     case object NOTHING                               extends FunctionHeaderType
     case object UNIT                                  extends FunctionHeaderType
     case object LONG                                  extends FunctionHeaderType
@@ -29,6 +32,7 @@ object FunctionHeader {
     case object BOOLEAN                               extends FunctionHeaderType
     case object STRING                                extends FunctionHeaderType
     case class OPTION(t: FunctionHeaderType)          extends FunctionHeaderType
+    case class LIST(t: FunctionHeaderType)          extends FunctionHeaderType
     case class TYPEREF(name: String)                  extends FunctionHeaderType
   }
 }

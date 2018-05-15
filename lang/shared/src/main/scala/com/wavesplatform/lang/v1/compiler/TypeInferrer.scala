@@ -40,16 +40,14 @@ object TypeInferrer {
   def matchTypes(actual: TYPE, expected: TYPEPLACEHOLDER): Either[String, Option[MatchResult]] = {
     lazy val err = s"Non-matching types: expected: $expected, actual: $actual"
 
-    expected match {
-      case realType: TYPE =>
+    (expected, actual) match {
+      case (realType: TYPE, _) =>
         Either.cond(matchType(realType, actual).isDefined, None, err)
-      case tp @ TYPEPARAM(char) =>
+      case (tp @ TYPEPARAM(char), _) =>
         Right(Some(MatchResult(actual, tp)))
-      case tp @ OPTIONTYPEPARAM(innerTypeParam) =>
-        actual match {
-          case OPTION(t) => matchTypes(t, innerTypeParam)
-          case _         => Left(err)
-        }
+      case (tp @ OPTIONTYPEPARAM(innerTypeParam), OPTION(t)) => matchTypes(t, innerTypeParam)
+      case (tp @ LISTTYPEPARAM(innerTypeParam), LIST(t)) => matchTypes(t, innerTypeParam)
+      case _         => Left(err)
     }
   }
 
@@ -62,6 +60,7 @@ object TypeInferrer {
           case Some(r) => Right(r)
         }
       case OPTIONTYPEPARAM(t) => inferResultType(t, resolved).map(OPTION)
+      case LISTTYPEPARAM(t) => inferResultType(t, resolved).map(LIST)
     }
   }
 

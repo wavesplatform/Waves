@@ -27,32 +27,8 @@ import scala.collection.immutable
 import scala.collection.mutable.ArrayBuffer
 
 object LevelDBWriter {
-
-  trait Key[V] {
-    def keyBytes: Array[Byte]
-
-    def parse(bytes: Array[Byte]): V
-
-    def encode(v: V): Array[Byte]
-
-    override lazy val toString: String = BigInt(keyBytes).toString(16)
-  }
-
-  object Key {
-    def apply[V](key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[V] = new Key[V] {
-      override def keyBytes: Array[Byte] = key
-
-      override def parse(bytes: Array[Byte]) = parser(bytes)
-
-      override def encode(v: V) = encoder(v)
-    }
-
-    def opt[V](key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[Option[V]] =
-      apply[Option[V]](key, Option(_).map(parser), _.fold[Array[Byte]](null)(encoder))
-  }
-
   object k {
-    val UTF8 = StandardCharsets.UTF_8
+    import StandardCharsets.{UTF_8 => UTF8}
 
     private def h(prefix: Int, height: Int): Array[Byte] = {
       val ndo = newDataOutput(6)
@@ -87,17 +63,6 @@ object LevelDBWriter {
       ndo.writeInt(height)
       ndo.write(addressIdBytes)
       ndo.toByteArray
-    }
-
-    private def writeIntSeq(values: Seq[Int]): Array[Byte] = {
-      val ndo = newDataOutput(4 * values.length)
-      values.foreach(ndo.writeInt)
-      ndo.toByteArray
-    }
-
-    private def readIntSeq(data: Array[Byte]): Seq[Int] = Option(data).fold(Seq.empty[Int]) { d =>
-      val ndi = newDataInput(d)
-      (1 to d.length / 4).map(_ => ndi.readInt())
     }
 
     private def readStrings(data: Array[Byte]): Seq[String] = Option(data).fold(Seq.empty[String]) { d =>

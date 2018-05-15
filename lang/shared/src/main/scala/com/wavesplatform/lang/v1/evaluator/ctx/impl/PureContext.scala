@@ -44,6 +44,24 @@ object PureContext {
     }
   }
 
+
+  val getElement = PredefFunction("getElement", 2, TYPEPARAM('T'), List("arr" -> LISTTYPEPARAM(TYPEPARAM('T')), "pos" -> LONG)) {
+    case (arr: IndexedSeq[_]) :: (pos: Long) :: Nil => if(pos < arr.size && 0 <= pos) {
+                                                     Right(arr(pos.toInt))
+                                                  } else {
+                                                     Left(s"Missing element at position $pos")
+                                                  }
+    case _               => ???
+  }
+
+  val getListSize = PredefFunction("size", 2, LONG, List("arr" -> LISTTYPEPARAM(TYPEPARAM('T')))) {
+    case (arr: IndexedSeq[_]) :: Nil => {
+      
+      Right(arr.size.toLong)
+    }
+    case _               => ???
+  }
+
   private def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
     PredefFunction(opsToFunctions(op), 1, r, List("a" -> t, "b" -> t)) {
       case a :: b :: Nil =>
@@ -66,7 +84,7 @@ object PureContext {
   val ge            = createOp(GE_OP, LONG, BOOLEAN)(_ >= _)
   val gt            = createOp(GT_OP, LONG, BOOLEAN)(_ > _)
 
-  val operators: Seq[PredefFunction] = Seq(sumLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt)
+  val operators: Seq[PredefFunction] = Seq(sumLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt, getElement, getListSize)
 
   lazy val instance =
     EvaluationContext.build(types = Seq.empty, letDefs = Map(("None", none)), functions = Seq(extract, isDefined, some, size) ++ operators)

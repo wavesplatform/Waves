@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -30,7 +31,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     } yield (genesis, transfer)
 
     forAll(preconditionsAndPayment) {
-      case ((genesis, transfer)) =>
+      case (genesis, transfer) =>
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, transfer))), TestBlock.create(Seq(transfer))) { blockDiffEi =>
           blockDiffEi should produce("AlreadyInTheState")
         }
@@ -47,7 +48,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     forAll(gen) {
       case (genesisBlock, transferTx) =>
         withStateAndHistory(settings) { blockchain =>
-          val preconditionDiff = BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock).explicitGet()
+          val preconditionDiff = BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()._1
           blockchain.append(preconditionDiff, genesisBlock)
 
           f(CommonValidation.checkFee(blockchain, settings, 1, transferTx))
@@ -69,7 +70,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     forAll(gen) {
       case (genesisBlock, transferTx) =>
         withStateAndHistory(settings) { blockchain =>
-          val preconditionDiff = BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock).explicitGet()
+          val preconditionDiff = BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()._1
           blockchain.append(preconditionDiff, genesisBlock)
 
           f(CommonValidation.checkFee(blockchain, settings, 1, transferTx))
@@ -91,7 +92,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     forAll(gen) {
       case (genesisBlock, transferTx) =>
         withStateAndHistory(settings) { blockchain =>
-          val preconditionDiff = BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock).explicitGet()
+          val preconditionDiff = BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()._1
           blockchain.append(preconditionDiff, genesisBlock)
 
           f(CommonValidation.checkFee(blockchain, settings, 1, transferTx))
@@ -116,7 +117,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     forAll(gen) {
       case (genesisBlock, transferTx) =>
         withStateAndHistory(settings) { blockchain =>
-          val preconditionDiff = BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock).explicitGet()
+          val preconditionDiff = BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()._1
           blockchain.append(preconditionDiff, genesisBlock)
 
           CommonValidation.checkFee(blockchain, settings, 1, transferTx) shouldBe 'right

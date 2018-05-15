@@ -28,9 +28,10 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
          |let B = base58'${ByteStr(pk1.publicKey)}'
          |let C = base58'${ByteStr(pk2.publicKey)}'
          |
-         |let AC = if(sigVerify(tx.bodyBytes,tx.proof0,A)) then 1 else 0
-         |let BC = if(sigVerify(tx.bodyBytes,tx.proof1,B)) then 1 else 0
-         |let CC = if(sigVerify(tx.bodyBytes,tx.proof2,C)) then 1 else 0
+         |let proofs = tx.proofs
+         |let AC = if(sigVerify(tx.bodyBytes,proofs[0],A)) then 1 else 0
+         |let BC = if(size(proofs) > 1 && sigVerify(tx.bodyBytes,proofs[1],B)) then 1 else 0
+         |let CC = if(size(proofs) > 2 && sigVerify(tx.bodyBytes,proofs[2],C)) then 1 else 0
          |
          | AC + BC+ CC >= 2
          |

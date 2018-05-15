@@ -3,8 +3,8 @@ package com.wavesplatform.utx
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs._
@@ -20,11 +20,11 @@ import scorex.block.Block
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.ValidationError.SenderIsBlacklisted
-import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets.IssueTransactionV1
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.transfer._
 import scorex.transaction.{FeeCalculator, GenesisTransaction, Transaction}
 import scorex.utils.Time
@@ -426,13 +426,9 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     }
   }
 
-  private def limitByNumber(n: Int): TwoDimensionalMiningConstraint =
-    TwoDimensionalMiningConstraint.full(new CounterEstimator(n), new CounterEstimator(n))
-
-  private class CounterEstimator(val max: Long) extends Estimator {
-    override implicit def estimate(x: Block): Long = x.transactionCount
-
-    override implicit def estimate(x: Transaction): Long = 1
-  }
+  private def limitByNumber(n: Int): MultiDimensionalMiningConstraint = MultiDimensionalMiningConstraint(
+    OneDimensionalMiningConstraint(n, TxEstimators.one),
+    OneDimensionalMiningConstraint(n, TxEstimators.one)
+  )
 
 }
