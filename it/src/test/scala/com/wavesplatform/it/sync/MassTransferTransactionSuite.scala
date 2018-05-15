@@ -4,8 +4,8 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json.{JsNumber, JsObject, Json}
-import scorex.api.http.assets.SignedMassTransferRequest
+import play.api.libs.json._
+import scorex.api.http.assets.{MassTransferRequest, SignedMassTransferRequest}
 import scorex.crypto.encode.Base58
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
 import scorex.transaction.transfer.MassTransferTransaction.MaxTransferCount
@@ -221,5 +221,53 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     notMiner.assertBalances(firstAddress, balance1 - massTransferTransactionFee - transferAmount, eff1 - massTransferTransactionFee - transferAmount)
     notMiner.assertBalances(secondAddress, balance2 + transferAmount - aliasFee, eff2 + transferAmount - aliasFee)
+  }
+
+  private def extractTransactionByType(json: JsValue, t: Int): Seq[JsValue] = {
+    json.validate[Seq[JsObject]].getOrElse(Seq.empty[JsValue]).filter(_("type").as[Int] == t)
+  }
+
+  test("reporting MassTransfer transactions") {
+    implicit val mtFormat: Format[MassTransferRequest] = Json.format[MassTransferRequest]
+
+    val transfers = List(Transfer(firstAddress, 5.waves), Transfer(secondAddress, 2.waves), Transfer(thirdAddress, 3.waves))
+    val txId      = sender.massTransfer(firstAddress, transfers, 300000).id
+    nodes.waitForHeightAriseAndTxPresent(txId)
+
+    // /transactions/info/txID should return complete list of transfers
+    val txInfo = Json.parse(sender.get(s"/transactions/info/$txId").getResponseBody).as[MassTransferRequest]
+    assert(txInfo.transfers.size == 3)
+
+    // /transactions/address should return complete transfers list for the sender...
+    val txSender = Json
+      .parse(sender.get(s"/transactions/address/$firstAddress/limit/10").getResponseBody)
+      .as[JsArray]
+      .value
+      .map(js => extractTransactionByType(js, 11).head)
+      .head
+    assert(txSender.as[MassTransferRequest].transfers.size == 3)
+    assert((txSender \ "transferCount").as[Int] == 3)
+    assert((txSender \ "totalAmount").as[Long] == 10.waves)
+    val transfersAfterTrans = txSender.as[MassTransferRequest].transfers
+    assert(transfers.equals(transfersAfterTrans))
+
+    // ...and compact list for recipients
+    val jsTxResipient = Json.parse(sender.get(s"/transactions/address/$secondAddress/limit/10").getResponseBody)
+
+    val txRecipient = Json
+      .parse(
+        sender
+          .get(s"/transactions/address/$secondAddress/limit/10")
+          .getResponseBody)
+      .as[JsArray]
+      .value
+      .map(js => extractTransactionByType(js, 11).head)
+      .head
+
+    assert(txRecipient.as[MassTransferRequest].transfers.size == 1)
+    assert((txRecipient \ "transferCount").as[Int] == 3)
+    assert((txRecipient \ "totalAmount").as[Long] == 10.waves)
+    val transferToSecond = txRecipient.as[MassTransferRequest].transfers.head
+    assert(transfers contains transferToSecond)
   }
 }

@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync
 import com.wavesplatform.crypto
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import org.scalatest.CancelAfterFailure
-import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
+import scorex.account.{AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.lang.v1.compiler.CompilerV1
