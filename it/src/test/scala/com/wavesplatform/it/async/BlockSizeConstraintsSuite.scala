@@ -10,7 +10,7 @@ import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class BlockConstrantsSuite extends FreeSpec with Matchers with TransferSending with NodesFromDocker {
+class BlockSizeConstraintsSuite extends FreeSpec with Matchers with TransferSending with NodesFromDocker {
 
   private val maxTxs          = 5000 // More, than 1mb of block
   private val txsInMicroBlock = 500

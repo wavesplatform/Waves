@@ -4,7 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats._
 import com.wavesplatform.metrics.Instrumented
-import com.wavesplatform.mining.TwoDimensionalMiningConstraint
+import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
@@ -114,7 +114,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
 
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
-  override def packUnconfirmed(rest: TwoDimensionalMiningConstraint, sortInBlock: Boolean): (Seq[Transaction], TwoDimensionalMiningConstraint) = {
+  override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, sortInBlock: Boolean): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
     val b      = blockchain
@@ -124,9 +124,10 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
         case (curr @ (_, _, _, _, skip), _) if skip => curr
         case ((invalid, valid, diff, currRest, _), tx) =>
-          differ(composite(b, diff), tx) match {
+          val updatedBlockchain = composite(b, diff)
+          differ(updatedBlockchain, tx) match {
             case Right(newDiff) =>
-              val updatedRest = currRest.put(tx)
+              val updatedRest = currRest.put(updatedBlockchain, tx)
               if (updatedRest.isOverfilled) (invalid, valid, diff, currRest, true)
               else (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, updatedRest.isEmpty)
             case Left(_) =>
