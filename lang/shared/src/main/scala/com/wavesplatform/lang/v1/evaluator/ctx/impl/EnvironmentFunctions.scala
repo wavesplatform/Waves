@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.v1.evaluator.ctx.{LazyVal, Obj}
+import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, Val}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import scodec.bits.ByteVector
 
@@ -37,16 +37,16 @@ class EnvironmentFunctions(environment: Environment) {
     }
   }
 
-  def getData(addr: Obj, key: String, dataType: DataType): Either[String, Any] =
+  def getData(addr: CaseObj, key: String, dataType: DataType): Either[String, Any] =
     for {
-      bytes           <- addr.fields.get("bytes").fold[Either[String, LazyVal]](Left("Can't find 'bytes'"))(Right(_))
-      rawAddressBytes <- bytes.value.value()
-      addressBytes    <- Try(rawAddressBytes.asInstanceOf[ByteVector].toArray).toEither.left.map(_.getMessage)
+      bytes <- addr.fields.get("bytes").fold[Either[String, Val]](Left("Can't find 'bytes'"))(Right(_))
+      rawAddressBytes = bytes.value
+      addressBytes <- Try(rawAddressBytes.asInstanceOf[ByteVector].toArray).toEither.left.map(_.getMessage)
     } yield environment.data(addressBytes, key, dataType)
 
-  def addressFromRecipient(fields: Map[String, LazyVal]): Either[ExecutionError, Array[Byte]] = {
-    val bytes = fields("bytes").value.map(_.asInstanceOf[ByteVector]).value()
-    bytes.flatMap(bv => environment.resolveAddress(bv.toArray))
+  def addressFromRecipient(fields: Map[String, Val]): Either[ExecutionError, Array[Byte]] = {
+    val bytes = fields("bytes").value.asInstanceOf[ByteVector]
+    environment.resolveAddress(bytes.toArray)
   }
 }
 

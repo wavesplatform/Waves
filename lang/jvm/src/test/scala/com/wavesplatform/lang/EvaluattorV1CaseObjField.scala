@@ -19,7 +19,7 @@ class EvaluattorV1CaseObjField extends PropSpec with PropertyChecks with Matcher
   property("case custom type field access") {
     ev[Long](
       context = context(pointAInstance),
-      expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", TYPEREF("PointA")), "X", LONG), CONST_LONG(2)), LONG)
+      expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", CASETYPEREF("PointA")), "X", LONG), CONST_LONG(2)), LONG)
     ) shouldBe Right(5)
   }
 

@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.compiler
 
 import com.wavesplatform.lang.TypeInfo
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.evaluator.ctx.{AnyObj, CaseObj, Obj}
+import com.wavesplatform.lang.v1.evaluator.ctx.CaseObj
 import scodec.bits.ByteVector
 
 object Terms {
@@ -29,10 +29,10 @@ object Terms {
     type Underlying = Option[innerType.Underlying]
     override def typeInfo: TypeInfo[Option[innerType.Underlying]] = TypeInfo.optionTypeInfo(innerType.typeInfo)
   }
-  case class TYPEREF(name: String)       extends AUTO_TAGGED_TYPE[Obj]
   case class CASETYPEREF(name: String)   extends AUTO_TAGGED_TYPE[CaseObj]
-  case class UNION(l: List[CASETYPEREF]) extends AUTO_TAGGED_TYPE[AnyObj]
+  case class UNION(l: List[CASETYPEREF]) extends AUTO_TAGGED_TYPE[CaseObj]
   object UNION {
+    def apply(l: CASETYPEREF*): UNION     = new UNION(l.toList)
     def eq(l1: UNION, l2: UNION): Boolean = l1.l.toSet == l2.l.toSet
     def >=(l1: UNION, l2: UNION): Boolean = {
       val bigger = l1.l.toSet

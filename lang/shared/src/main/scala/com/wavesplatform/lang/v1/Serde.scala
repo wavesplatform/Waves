@@ -18,7 +18,6 @@ object Serde {
   implicit def d0ByteVector  = d0.bind[FunctionHeaderType.BYTEVECTOR.type](5)
   implicit def d0Boolean     = d0.bind[FunctionHeaderType.BOOLEAN.type](6)
   implicit def d0Option      = d0.bind[FunctionHeaderType.OPTION](7)
-  implicit def d0TypeRef     = d0.bind[FunctionHeaderType.TYPEREF](8)
   implicit def d0String      = d0.bind[FunctionHeaderType.STRING.type](9)
   implicit def d0CaseTypeRef = d0.bind[FunctionHeaderType.CASETYPEREF](10)
   implicit def d0Union       = d0.bind[FunctionHeaderType.UNION](11)
@@ -42,10 +41,9 @@ object Serde {
   implicit def tDByteVector  = tD.bind[BYTEVECTOR.type](3)
   implicit def tDBoolean     = tD.bind[BOOLEAN.type](4)
   implicit def tDOption      = tD.bind[OPTION](5)
-  implicit def tDTypeRef     = tD.bind[TYPEREF](6)
-  implicit def tDString      = tD.bind[STRING.type](7)
-  implicit def tDCaseTypeRef = tD.bind[CASETYPEREF](8)
-  implicit def tDUnion       = tD.bind[UNION](9)
+  implicit def tDString      = tD.bind[STRING.type](6)
+  implicit def tDCaseTypeRef = tD.bind[CASETYPEREF](7)
+  implicit def tDUnion       = tD.bind[UNION](8)
 
   val codec: Codec[EXPR] = Codec[EXPR]
 

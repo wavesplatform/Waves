@@ -17,7 +17,6 @@ object FunctionHeader {
       case compiler.Terms.BOOLEAN          => FunctionHeaderType.BOOLEAN
       case compiler.Terms.STRING           => FunctionHeaderType.STRING
       case Terms.OPTION(x)                 => FunctionHeaderType.OPTION(fromTypePlaceholder(x))
-      case Terms.TYPEREF(name: String)     => FunctionHeaderType.TYPEREF(name)
       case Terms.CASETYPEREF(name: String) => FunctionHeaderType.CASETYPEREF(name)
       case Terms.UNION(refs)               => FunctionHeaderType.UNION(refs.map(r => FunctionHeaderType.CASETYPEREF(r.name)))
     }
@@ -31,7 +30,6 @@ object FunctionHeader {
     case object BOOLEAN                               extends FunctionHeaderType
     case object STRING                                extends FunctionHeaderType
     case class OPTION(t: FunctionHeaderType)          extends FunctionHeaderType
-    case class TYPEREF(name: String)                  extends FunctionHeaderType
     case class CASETYPEREF(name: String)              extends FunctionHeaderType
     case class UNION(l: List[CASETYPEREF])            extends FunctionHeaderType
   }

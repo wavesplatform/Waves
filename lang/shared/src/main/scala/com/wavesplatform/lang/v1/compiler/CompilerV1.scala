@@ -71,7 +71,6 @@ object CompilerV1 {
         }
 
         subExpr.tpe match {
-          case typeRef: TYPEREF     => getField(typeRef.name)
           case typeRef: CASETYPEREF => getField(typeRef.name)
           case union: UNION =>
             val x1 = union.l

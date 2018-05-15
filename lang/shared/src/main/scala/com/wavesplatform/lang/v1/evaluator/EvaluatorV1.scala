@@ -81,13 +81,8 @@ object EvaluatorV1 extends ExprEvaluator {
 
   private def evalGetter(expr: EXPR, field: String) = {
     for {
-      obj <- evalExpr[AnyObj](expr)
+      obj <- evalExpr[CaseObj](expr)
       result <- obj match {
-        case Obj(fields) =>
-          fields.get(field) match {
-            case Some(lzy) => liftCE[Any](lzy.value.value)
-            case None      => liftL[Any](s"field '$field' not found")
-          }
         case CaseObj(_, fields) =>
           fields.get(field) match {
             case Some(eager) => liftR[Any](eager.value)

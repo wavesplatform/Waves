@@ -64,8 +64,7 @@ object PureContext {
   val operators: Seq[PredefFunction] = Seq(sumLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt)
 
   lazy val instance =
-    EvaluationContext.build(types = Seq.empty,
-                            caseTypes = Seq.empty,
+    EvaluationContext.build(caseTypes = Seq.empty,
                             letDefs = Map(("None", none), ("???", err)),
                             functions = Seq(extract, isDefined, some, size, _isInstanceOf) ++ operators)
 

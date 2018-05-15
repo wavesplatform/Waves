@@ -49,5 +49,5 @@ object Common {
   val pointBInstance = CaseObj(pointTypeB.typeRef, Map("X" -> Val(LONG)(3), "YB" -> Val(LONG)(41)))
 
   def sampleUnionContext(instance: CaseObj) =
-    EvaluationContext.build(Seq.empty, Seq(pointTypeA, pointTypeB), Map("p" -> LazyVal(AorB)(EitherT.pure(instance))), Seq.empty)
+    EvaluationContext.build(Seq(pointTypeA, pointTypeB), Map("p" -> LazyVal(AorB)(EitherT.pure(instance))), Seq.empty)
 }

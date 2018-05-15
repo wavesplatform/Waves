@@ -10,7 +10,6 @@ final case class LoggedEvaluationContext(context: EvaluationContext, log: List[S
 
 object LoggedEvaluationContext {
   val context: Lens[LoggedEvaluationContext, EvaluationContext]                 = lens[LoggedEvaluationContext] >> 'context
-  val types: Lens[LoggedEvaluationContext, Map[String, PredefType]]             = lens[LoggedEvaluationContext] >> 'context >> 'typeDefs
   val lets: Lens[LoggedEvaluationContext, Map[String, LazyVal]]                 = lens[LoggedEvaluationContext] >> 'context >> 'letDefs
   val funcs: Lens[LoggedEvaluationContext, Map[FunctionHeader, PredefFunction]] = lens[LoggedEvaluationContext] >> 'context >> 'functions
 }

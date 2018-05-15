@@ -5,12 +5,12 @@ import com.wavesplatform.lang.Common.multiplierFunction
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, PredefFunction, PredefType}
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, PredefCaseType, PredefFunction}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.none
 
 package object typechecker {
 
-  val pointType = PredefType("Point", List("x" -> LONG, "y" -> LONG))
+  val pointType = PredefCaseType("Point", List("x" -> LONG, "y" -> LONG))
 
   val idT = PredefFunction("idT", 1, TYPEPARAM('T'), List("p1" -> TYPEPARAM('T')))(Right(_))
   val extract = PredefFunction("extract", 1, TYPEPARAM('T'), List("p1" -> OPTIONTYPEPARAM(TYPEPARAM('T')))) {
@@ -26,8 +26,7 @@ package object typechecker {
   val ctx = Monoid.combine(
     PureContext.instance,
     EvaluationContext.build(
-      types = Seq(pointType),
-      caseTypes = Seq.empty,
+      caseTypes = Seq(pointType),
       letDefs = Map(("None", none)),
       functions = Seq(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, unitOnNone, undefinedOptionLong, idOptionLong)
     )

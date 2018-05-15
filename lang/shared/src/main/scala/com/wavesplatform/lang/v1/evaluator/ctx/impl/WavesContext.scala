@@ -9,94 +9,153 @@ import scodec.bits.ByteVector
 
 object WavesContext {
 
-  private val addressType        = PredefType("Address", List("bytes"        -> BYTEVECTOR))
-  private val addressOrAliasType = PredefType("AddressOrAlias", List("bytes" -> BYTEVECTOR))
+  private val addressType        = PredefCaseType("Address", List("bytes" -> BYTEVECTOR))
+  private val aliasType          = PredefCaseType("Alias", List("alias" -> STRING))
+  private val addressOrAliasType = UNION(addressType.typeRef, aliasType.typeRef)
 
   private val optionByteVector: OPTION = OPTION(BYTEVECTOR)
   private val optionAddress            = OPTION(addressType.typeRef)
   private val optionLong: OPTION       = OPTION(LONG)
 
-  private val transactionType = PredefType(
-    "Transaction",
-    List(
-      "type"                 -> LONG,
-      "id"                   -> BYTEVECTOR,
-      "fee"                  -> LONG,
-      "feeAssetId"           -> optionByteVector,
-      "timestamp"            -> LONG,
-      "amount"               -> LONG,
-      "bodyBytes"            -> BYTEVECTOR,
-      "senderPk"             -> BYTEVECTOR,
-      "aliasText"            -> STRING,
-      "assetName"            -> BYTEVECTOR,
-      "assetDescription"     -> BYTEVECTOR,
-      "attachment"           -> BYTEVECTOR,
-      "decimals"             -> LONG,
-      "chainId"              -> LONG,
-      "version"              -> LONG,
-      "reissuable"           -> BOOLEAN,
-      "proof0"               -> BYTEVECTOR,
-      "proof1"               -> BYTEVECTOR,
-      "proof2"               -> BYTEVECTOR,
-      "proof3"               -> BYTEVECTOR,
-      "proof4"               -> BYTEVECTOR,
-      "proof5"               -> BYTEVECTOR,
-      "proof6"               -> BYTEVECTOR,
-      "proof7"               -> BYTEVECTOR,
-      "transferAssetId"      -> optionByteVector,
-      "assetId"              -> BYTEVECTOR,
-      "recipient"            -> addressOrAliasType.typeRef,
-      "minSponsoredAssetFee" -> optionLong
-    )
+  private val common = List(
+    "id"        -> BYTEVECTOR,
+    "fee"       -> LONG,
+    "timestamp" -> LONG,
+    "version"   -> LONG,
   )
-  private def proofBinding(tx: Transaction, x: Int): LazyVal =
-    LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.proofs map { pfs =>
-      if (x >= pfs.size)
-        ByteVector.empty
-      else pfs(x)
-    }))
+  private val proven = List(
+    "senderPk"  -> BYTEVECTOR,
+    "bodyBytes" -> BYTEVECTOR,
+    "proof0"    -> BYTEVECTOR,
+    "proof1"    -> BYTEVECTOR,
+    "proof2"    -> BYTEVECTOR,
+    "proof3"    -> BYTEVECTOR,
+    "proof4"    -> BYTEVECTOR,
+    "proof5"    -> BYTEVECTOR,
+    "proof6"    -> BYTEVECTOR,
+    "proof7"    -> BYTEVECTOR,
+  )
 
-  private def transactionObject(tx: Transaction): Obj =
-    Obj(
-      Map(
-        "type"            -> LazyVal(LONG)(EitherT.pure(tx.transactionType)),
-        "id"              -> LazyVal(BYTEVECTOR)(EitherT.pure(tx.id)),
-        "fee"             -> LazyVal(LONG)(EitherT.pure(tx.fee)),
-        "amount"          -> LazyVal(LONG)(EitherT.fromEither(tx.amount)),
-        "feeAssetId"      -> LazyVal(optionByteVector)(EitherT.pure(tx.feeAssetId.map(_.asInstanceOf[optionByteVector.innerType.Underlying]))),
-        "timestamp"       -> LazyVal(LONG)(EitherT.pure(tx.timestamp)),
-        "bodyBytes"       -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.bodyBytes)),
-        "senderPk"        -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.senderPk)),
-        "transferAssetId" -> LazyVal(optionByteVector)(EitherT.fromEither(tx.transferAssetId.map(_.asInstanceOf[optionByteVector.Underlying]))),
-        "assetId"         -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.assetId)),
-        "recipient" -> LazyVal(addressOrAliasType.typeRef)(EitherT.fromEither(tx.recipient.map(bv =>
-          Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(bv))))))),
-        "attachment"           -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.attachment)),
-        "assetName"            -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.assetName)),
-        "assetDescription"     -> LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.assetDescription)),
-        "reissuable"           -> LazyVal(BOOLEAN)(EitherT.fromEither(tx.reissuable)),
-        "aliasText"            -> LazyVal(STRING)(EitherT.fromEither(tx.aliasText)),
-        "decimals"             -> LazyVal(LONG)(EitherT.fromEither(tx.decimals.map(_.toLong))),
-        "chainId"              -> LazyVal(LONG)(EitherT.fromEither(tx.chainId.map(_.toLong))),
-        "version"              -> LazyVal(LONG)(EitherT.fromEither(tx.version.map(_.toLong))),
-        "minSponsoredAssetFee" -> LazyVal(optionLong)(EitherT.fromEither(tx.minSponsoredAssetFee.map(_.asInstanceOf[optionLong.Underlying]))),
-        "proof0"               -> proofBinding(tx, 0),
-        "proof1"               -> proofBinding(tx, 1),
-        "proof2"               -> proofBinding(tx, 2),
-        "proof3"               -> proofBinding(tx, 3),
-        "proof4"               -> proofBinding(tx, 4),
-        "proof5"               -> proofBinding(tx, 5),
-        "proof6"               -> proofBinding(tx, 6),
-        "proof7"               -> proofBinding(tx, 7)
-      ))
+  private val transferTransactionType = PredefCaseType(
+    "TransferTransaction",
+    List(
+      "feeAssetId"      -> optionByteVector,
+      "amount"          -> LONG,
+      "transferAssetId" -> BYTEVECTOR,
+      "recipient"       -> addressOrAliasType,
+      "attachment"      -> BYTEVECTOR
+    ) ++ common ++ proven
+  )
+
+  private val leaseTransactionType = PredefCaseType(
+    "LeaseTransaction",
+    List(
+      "amount"    -> LONG,
+      "recipient" -> addressOrAliasType,
+      "assetId"   -> BYTEVECTOR,
+    ) ++ common ++ proven
+  )
+
+  private val issueTransactionType = PredefCaseType(
+    "IssueTransaction",
+    List(
+      "amount"           -> LONG,
+      "assetName"        -> BYTEVECTOR,
+      "assetDescription" -> BYTEVECTOR,
+      "reissuable"       -> BOOLEAN,
+    ) ++ common ++ proven
+  )
+
+  private val reissueTransactionType = PredefCaseType(
+    "ReissueTransaction",
+    List(
+      "amount"     -> LONG,
+      "reissuable" -> BOOLEAN,
+    ) ++ common ++ proven
+  )
+
+  private val transactionType =
+    UNION(transferTransactionType.typeRef, leaseTransactionType.typeRef, issueTransactionType.typeRef, reissueTransactionType.typeRef)
+
+  private def proofBinding(tx: Transaction, x: Int): Val =
+    Val(BYTEVECTOR)(
+      if (x >= tx.proofs.right.get.size)
+        ByteVector.empty
+      else tx.proofs.right.get(x)
+    )
+
+  private def commonTxPart(tx: Transaction): Map[String, Val] = Map(
+    "id"        -> Val(BYTEVECTOR)(tx.id),
+    "fee"       -> Val(LONG)(tx.fee),
+    "timestamp" -> Val(LONG)(tx.timestamp),
+    "version"   -> Val(LONG)(tx.version.right.get),
+    "bodyBytes" -> Val(BYTEVECTOR)(tx.bodyBytes.right.get)
+  )
+
+  private def provenTxPart(tx: Transaction): Map[String, Val] = Map(
+    "senderPk"  -> Val(BYTEVECTOR)(tx.senderPk.right.get),
+    "bodyBytes" -> Val(BYTEVECTOR)(tx.bodyBytes.right.get),
+    "proof0"    -> proofBinding(tx, 0),
+    "proof1"    -> proofBinding(tx, 1),
+    "proof2"    -> proofBinding(tx, 2),
+    "proof3"    -> proofBinding(tx, 3),
+    "proof4"    -> proofBinding(tx, 4),
+    "proof5"    -> proofBinding(tx, 5),
+    "proof6"    -> proofBinding(tx, 6),
+    "proof7"    -> proofBinding(tx, 7)
+  )
+
+  private def transactionObject(tx: Transaction): CaseObj =
+    tx.transactionType match {
+      case 4 =>
+        CaseObj(
+          transferTransactionType.typeRef,
+          Map(
+            "amount"     -> Val(LONG)(tx.amount.right.get),
+            "feeAssetId" -> Val(optionByteVector)(tx.feeAssetId.asInstanceOf[optionByteVector.Underlying]),
+//            "recipient" -> Val(addressOrAliasType)(EitherT.fromEither(tx.recipient.map(bv => Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(bv))))))),
+            "transferAssetId" -> Val(optionByteVector)(tx.transferAssetId.right.get.asInstanceOf[optionByteVector.Underlying]),
+            "attachment"      -> Val(BYTEVECTOR)(tx.attachment.right.get)
+          ) ++ commonTxPart(tx) ++ provenTxPart(tx)
+        )
+
+      case 5 =>
+        CaseObj(
+          issueTransactionType.typeRef,
+          Map(
+            "amount"           -> Val(LONG)(tx.amount.right.get),
+            "assetName"        -> Val(BYTEVECTOR)(tx.assetName.right.get),
+            "assetDescription" -> Val(BYTEVECTOR)(tx.assetDescription.right.get),
+            "reissuable"       -> Val(BOOLEAN)(tx.reissuable.right.get),
+          ) ++ commonTxPart(tx) ++ provenTxPart(tx)
+        )
+      case 6 =>
+        CaseObj(
+          reissueTransactionType.typeRef,
+          Map(
+            "amount"     -> Val(LONG)(tx.amount.right.get),
+            "reissuable" -> Val(BOOLEAN)(tx.reissuable.right.get),
+          ) ++ commonTxPart(tx) ++ provenTxPart(tx)
+        )
+
+      case 8 =>
+        CaseObj(
+          leaseTransactionType.typeRef,
+          Map(
+            //            "recipient" -> Val(addressOrAliasType)(EitherT.fromEither(tx.recipient.map(bv => Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(bv))))))),
+            "amount"  -> Val(LONG)(tx.amount.right.get),
+            "assetId" -> Val(BYTEVECTOR)(tx.assetId.right.get),
+          ) ++ commonTxPart(tx) ++ provenTxPart(tx)
+        )
+    }
 
   def build(env: Environment): EvaluationContext = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getdataF(name: String, dataType: DataType) =
       PredefFunction(name, 100, OPTION(dataType.innerType), List(("address", addressType.typeRef), ("key", STRING))) {
-        case (addr: Obj) :: (k: String) :: Nil => environmentFunctions.getData(addr, k, dataType)
-        case _                                 => ???
+        case (addr: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addr, k, dataType)
+        case _                                     => ???
       }
 
     val getLongF: PredefFunction      = getdataF("getLong", DataType.Long)
@@ -106,30 +165,30 @@ object WavesContext {
     val addressFromPublicKeyF: PredefFunction = PredefFunction("addressFromPublicKey", 100, addressType.typeRef, List(("publicKey", BYTEVECTOR))) {
       case (pk: ByteVector) :: Nil =>
         val r = environmentFunctions.addressFromPublicKey(pk)
-        Right(Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(r)))))
+        Right(CaseObj(addressType.typeRef, Map("bytes" -> Val(BYTEVECTOR)(r))))
       case _ => ???
     }
 
     val addressFromStringF: PredefFunction = PredefFunction("addressFromString", 100, optionAddress, List(("string", STRING))) {
       case (addressString: String) :: Nil =>
         val r = environmentFunctions.addressFromString(addressString)
-        r.map(_.map(x => Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(x))))))
+        r.map(_.map(x => CaseObj(addressType.typeRef, Map("bytes" -> Val(BYTEVECTOR)(x)))))
       case _ => ???
     }
 
     val addressFromRecipientF: PredefFunction =
-      PredefFunction("addressFromRecipient", 100, addressType.typeRef, List(("AddressOrAlias", TYPEREF(addressOrAliasType.name)))) {
-        case Obj(fields) :: Nil =>
+      PredefFunction("addressFromRecipient", 100, addressType.typeRef, List(("AddressOrAlias", addressOrAliasType))) {
+        case CaseObj(_, fields) :: Nil =>
           val r = environmentFunctions.addressFromRecipient(fields)
-          r.map(resolved => Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(resolved))))))
+          r.map(resolved => CaseObj(addressType.typeRef, Map("bytes" -> Val(BYTEVECTOR)(ByteVector(resolved)))))
         case _ => ???
       }
 
-    val txCoeval: Coeval[Either[String, Obj]]      = Coeval.evalOnce(Right(transactionObject(env.transaction)))
+    val txCoeval: Coeval[Either[String, CaseObj]]  = Coeval.evalOnce(Right(transactionObject(env.transaction)))
     val heightCoeval: Coeval[Either[String, Long]] = Coeval.evalOnce(Right(env.height))
 
     val txByIdF = {
-      val returnType = OPTION(transactionType.typeRef)
+      val returnType = OPTION(transactionType)
       PredefFunction("getTransactionById", 100, returnType, List(("id", BYTEVECTOR))) {
         case (id: ByteVector) :: Nil =>
           val maybeDomainTx = env.transactionById(id.toArray).map(transactionObject)
@@ -139,23 +198,19 @@ object WavesContext {
     }
 
     val accountBalanceF: PredefFunction =
-      PredefFunction("accountBalance", 100, LONG, List(("addressOrAlias", TYPEREF(addressOrAliasType.name)))) {
-        case Obj(fields) :: Nil =>
-          fields("bytes").value
-            .map(_.asInstanceOf[ByteVector].toArray)
-            .map(env.accountBalanceOf(_, None))
-            .value()
+      PredefFunction("accountBalance", 100, LONG, List(("addressOrAlias", addressOrAliasType))) {
+        case CaseObj(_, fields) :: Nil =>
+          val acc = fields("bytes").value.asInstanceOf[ByteVector].toArray
+          env.accountBalanceOf(acc, None)
 
         case _ => ???
       }
 
     val accountAssetBalanceF: PredefFunction =
-      PredefFunction("accountAssetBalance", 100, LONG, List(("addressOrAlias", TYPEREF(addressOrAliasType.name)), ("assetId", BYTEVECTOR))) {
-        case Obj(fields) :: (assetId: ByteVector) :: Nil =>
-          fields("bytes").value
-            .map(_.asInstanceOf[ByteVector].toArray)
-            .map(env.accountBalanceOf(_, Some(assetId.toArray)))
-            .value()
+      PredefFunction("accountAssetBalance", 100, LONG, List(("addressOrAlias", addressOrAliasType), ("assetId", BYTEVECTOR))) {
+        case CaseObj(_, fields) :: (assetId: ByteVector) :: Nil =>
+          val acc = fields("bytes").value.asInstanceOf[ByteVector]
+          env.accountBalanceOf(acc.toArray, Some(assetId.toArray))
 
         case _ => ???
       }
@@ -167,9 +222,8 @@ object WavesContext {
       }
 
     EvaluationContext.build(
-      types = Seq(addressType, addressOrAliasType, transactionType),
-      caseTypes = Seq.empty,
-      letDefs = Map(("height", LazyVal(LONG)(EitherT(heightCoeval))), ("tx", LazyVal(TYPEREF(transactionType.name))(EitherT(txCoeval)))),
+      caseTypes = Seq(addressType, aliasType, transferTransactionType, issueTransactionType, reissueTransactionType, leaseTransactionType),
+      letDefs = Map(("height", LazyVal(LONG)(EitherT(heightCoeval))), ("tx", LazyVal(transactionType)(EitherT(txCoeval)))),
       functions = Seq(
         txByIdF,
         txHeightByIdF,
