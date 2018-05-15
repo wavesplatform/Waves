@@ -27,6 +27,8 @@ object Parser {
   private val escapedUnicodeSymbolP = P("\\" ~ (CharIn("\"\\bfnrt") | unicodeSymbolP))
   private val varName               = (char.repX(min = 1, max = 1) ~~ (digit | char).repX()).!.filter(!keywords.contains(_))
 
+  private val expr = P(binaryOp(opsByPriority) | atom)
+
   private val numberP: P[CONST_LONG] = P(CharIn("+-").rep(max = 1) ~ digit.repX(min = 1)).!.map(t => CONST_LONG(t.toLong))
   private val trueP: P[TRUE.type]    = P("true").map(_ => TRUE)
   private val falseP: P[FALSE.type]  = P("false").map(_ => FALSE)
@@ -38,14 +40,29 @@ object Parser {
 
   private val functionCallArgs: P[Seq[EXPR]] = expr.rep(sep = ",")
 
-  private val functionCallP: P[FUNCTION_CALL] = P(varName ~~ "(" ~ functionCallArgs ~ ")").map {
-    case (functionName, args) => FUNCTION_CALL(functionName, args.toList)
-  }
+  private val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | refP)
 
-  private val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | functionCallP | refP)
+  private abstract class Accessor
+  private case class Getter(name: String)   extends Accessor
+  private case class Args(args: Seq[EXPR])  extends Accessor
+  private case class ListIndex(index: EXPR) extends Accessor
 
-  private val maybeGetterP: P[EXPR] = P(extractableAtom ~~ ("." ~~ varName).?).map {
-    case (e, f) => f.fold(e)(GETTER(e, _))
+  private val accessP: P[Accessor] = P(("." ~~ varName).map(Getter.apply) | ("(" ~/ functionCallArgs.map(Args.apply) ~ ")")) | ("[" ~/ expr.map(
+    ListIndex.apply) ~ "]")
+
+  private val maybeAccessP: P[EXPR] = P(extractableAtom ~~ accessP.rep).map {
+    case (e, f) =>
+      f.foldLeft(e) { (e, a) =>
+        a match {
+          case Getter(n) => GETTER(e, n)
+          case Args(args) =>
+            e match {
+              case REF(functionName) => FUNCTION_CALL(functionName, args.toList)
+              case _                 => ???
+            }
+          case ListIndex(index) => FUNCTION_CALL("getElement", List(e, index))
+        }
+      }
   }
 
   private val byteVectorP: P[CONST_BYTEVECTOR] =
@@ -63,8 +80,7 @@ object Parser {
 
   private val block: P[EXPR] = P(letP ~ expr).map(Function.tupled(BLOCK.apply))
 
-  private val atom      = P(ifP | byteVectorP | stringP | numberP | trueP | falseP | block | maybeGetterP)
-  private lazy val expr = P(binaryOp(opsByPriority) | atom)
+  private val atom = P(ifP | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP)
 
   private def binaryOp(rest: List[(String, BinaryOperation)]): P[EXPR] = rest match {
     case Nil => atom

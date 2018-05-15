@@ -6,6 +6,7 @@ import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.transfer._
+import com.wavesplatform.lang.v1.traits.Transfer
 
 case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lang.v1.traits.Transaction {
   override def bodyBytes: Either[String, ByteVector] = tx match {
@@ -43,6 +44,11 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
   override def proofs: Either[String, IndexedSeq[ByteVector]] = tx match {
     case pt: ProvenTransaction => Right(pt.proofs.proofs.map(pf => ByteVector(pf.arr)).toIndexedSeq)
     case _                     => Left("Transaction doesn't contain proofs")
+  }
+
+  override def transfers: Either[String, IndexedSeq[Transfer]] = tx match {
+    case ms: MassTransferTransaction => Right(ms.transfers.toIndexedSeq)
+    case _                           => Left("Transaction doesn't contain transfers")
   }
 
   override def id: ByteVector = ByteVector(tx.id().arr)
