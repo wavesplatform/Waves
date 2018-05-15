@@ -319,10 +319,10 @@ object LevelDBWriter {
       ndo.toByteArray
     }
 
-    def sponsorship(height: Int, assetId: ByteStr): Key[SponsorshipValue] =
-      Key(byteKeyWithH(33, height, assetId.arr), readSponsorship, writeSponsorship)
-
     def sponsorshipHistory(assetId: ByteStr): Key[Seq[Int]] = historyKey(34, assetId.arr)
+
+    def sponsorship(height: Int, assetId: ByteStr): Key[SponsorshipValue] =
+      Key(byteKeyWithH(35, height, assetId.arr), readSponsorship, writeSponsorship)
   }
 
   private def loadSponsorship(db: ReadOnlyDB, assetId: ByteStr) = {
@@ -661,6 +661,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
             case tx: BurnTransaction        => rollbackAssetInfo(rw, tx.assetId, currentHeight)
             case _: LeaseTransaction        => rollbackLeaseStatus(rw, tx.id(), currentHeight)
             case tx: LeaseCancelTransaction => rollbackLeaseStatus(rw, tx.leaseId, currentHeight)
+            case tx: SponsorFeeTransaction  => rollbackSponsorship(rw, tx.assetId, currentHeight)
 
             case tx: SetScriptTransaction =>
               val address = tx.sender.toAddress
@@ -721,6 +722,13 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
   private def rollbackLeaseStatus(rw: RW, leaseId: ByteStr, currentHeight: Int): Unit = {
     rw.delete(k.leaseStatus(currentHeight, leaseId))
     rw.filterHistory(k.leaseStatusHistory(leaseId), currentHeight)
+  }
+
+  private def rollbackSponsorship(rw: RW, assetId: ByteStr, currentHeight: Int): Unit = {
+    rw.delete(k.sponsorship(currentHeight, assetId))
+    rw.filterHistory(k.sponsorshipHistory(assetId), currentHeight)
+    assetDescriptionCache.invalidate(assetId)
+    sponsorshipCache.invalidate(assetId)
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(db => db.get(k.transactionInfo(id)))
