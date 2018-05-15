@@ -147,6 +147,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     Json.obj(
       "id"               -> Base58.encode(id()),
+      "sender"           -> senderPublicKey.address,
       "senderPublicKey"  -> Base58.encode(senderPublicKey.publicKey),
       "matcherPublicKey" -> Base58.encode(matcherPublicKey.publicKey),
       "assetPair"        -> assetPair.json,
