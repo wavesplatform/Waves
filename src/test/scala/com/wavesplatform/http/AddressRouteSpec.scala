@@ -150,7 +150,7 @@ class AddressRouteSpec
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1)
-      (response \ "script").as[String] shouldBe "WpgBYoY"
+      (response \ "script").as[String] shouldBe "We8Dksx"
       (response \ "scriptText").as[String] shouldBe "TRUE"
       (response \ "complexity").as[Long] shouldBe 1
       (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
