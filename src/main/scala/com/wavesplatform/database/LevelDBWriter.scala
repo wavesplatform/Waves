@@ -762,6 +762,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
   private def rollbackSponsorship(rw: RW, assetId: ByteStr, currentHeight: Int): Unit = {
     rw.delete(k.sponsorship(currentHeight, assetId))
     rw.filterHistory(k.sponsorshipHistory(assetId), currentHeight)
+    assetDescriptionCache.invalidate(assetId)
+    sponsorshipCache.invalidate(assetId)
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(db => db.get(k.transactionInfo(id)))
