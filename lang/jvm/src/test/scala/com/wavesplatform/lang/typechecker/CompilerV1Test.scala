@@ -16,21 +16,20 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
 
   property("should infer generic function return type") {
     import com.wavesplatform.lang.v1.parser.Expressions._
-    val Right(v) = CompilerV1(typeCheckerContext, FUNCTION_CALL(Expressions.REF(idT.name), List(CONST_LONG(1))))
+    val Right(v) = CompilerV1(typeCheckerContext, FUNCTION_CALL(idT.name, List(CONST_LONG(1))))
     v.tpe shouldBe LONG
   }
 
   property("should infer inner types") {
     import com.wavesplatform.lang.v1.parser.Expressions._
     val Right(v) =
-      CompilerV1(typeCheckerContext,
-                 FUNCTION_CALL(Expressions.REF(extract.name), List(FUNCTION_CALL(Expressions.REF(undefinedOptionLong.name), List.empty))))
+      CompilerV1(typeCheckerContext, FUNCTION_CALL(extract.name, List(FUNCTION_CALL(undefinedOptionLong.name, List.empty))))
     v.tpe shouldBe LONG
   }
 
   treeTypeTest(s"unitOnNone(NONE)")(
     ctx = typeCheckerContext,
-    expr = Expressions.FUNCTION_CALL(Expressions.REF(unitOnNone.name), List(Expressions.REF("None"))),
+    expr = Expressions.FUNCTION_CALL(unitOnNone.name, List(Expressions.REF("None"))),
     expectedResult = Right(FUNCTION_CALL(unitOnNone.header, List(REF("None", OPTION(NOTHING))), UNIT))
   )
 
@@ -73,20 +72,19 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
 
   treeTypeTest("MULTIPLY(1,2)")(
     ctx = typeCheckerContext,
-    expr = Expressions.FUNCTION_CALL(Expressions.REF(multiplierFunction.name), List(Expressions.CONST_LONG(1), Expressions.CONST_LONG(2))),
+    expr = Expressions.FUNCTION_CALL(multiplierFunction.name, List(Expressions.CONST_LONG(1), Expressions.CONST_LONG(2))),
     expectedResult = Right(FUNCTION_CALL(multiplierFunction.header, List(CONST_LONG(1), CONST_LONG(2)), LONG))
   )
 
   treeTypeTest(s"idOptionLong(NONE)")(
     ctx = typeCheckerContext,
-    expr = Expressions.FUNCTION_CALL(Expressions.REF(idOptionLong.name), List(Expressions.REF("None"))),
+    expr = Expressions.FUNCTION_CALL(idOptionLong.name, List(Expressions.REF("None"))),
     expectedResult = Right(FUNCTION_CALL(idOptionLong.header, List(REF("None", OPTION(NOTHING))), UNIT))
   )
 
   treeTypeTest(s"idOptionLong(SOME(NONE))")(
     ctx = typeCheckerContext,
-    expr = Expressions.FUNCTION_CALL(Expressions.REF(idOptionLong.name),
-                                     List(Expressions.FUNCTION_CALL(Expressions.REF("Some"), List(Expressions.REF("None"))))),
+    expr = Expressions.FUNCTION_CALL(idOptionLong.name, List(Expressions.FUNCTION_CALL("Some", List(Expressions.REF("None"))))),
     expectedResult =
       Right(FUNCTION_CALL(idOptionLong.header, List(FUNCTION_CALL(some.header, List(REF("None", OPTION(NOTHING))), OPTION(OPTION(NOTHING)))), UNIT))
   )
@@ -94,9 +92,8 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   treeTypeTest(s"idOptionLong(SOME(CONST_LONG(3)))")(
     ctx = typeCheckerContext,
     expr = Expressions.FUNCTION_CALL(
-      Expressions.REF(idOptionLong.name),
-      List(
-        Expressions.FUNCTION_CALL(Expressions.REF("Some"), List(Expressions.FUNCTION_CALL(Expressions.REF("Some"), List(Expressions.CONST_LONG(3))))))
+      idOptionLong.name,
+      List(Expressions.FUNCTION_CALL("Some", List(Expressions.FUNCTION_CALL("Some", List(Expressions.CONST_LONG(3))))))
     ),
     expectedResult = Right(
       FUNCTION_CALL(

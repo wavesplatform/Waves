@@ -47,7 +47,7 @@ object CompilerV1 {
       op match {
         case AND_OP => setType(ctx, EitherT.pure(Expressions.IF(a, b, Expressions.FALSE)))
         case OR_OP  => setType(ctx, EitherT.pure(Expressions.IF(a, Expressions.TRUE, b)))
-        case _      => setType(ctx, EitherT.pure(Expressions.FUNCTION_CALL(Expressions.REF(opsToFunctions(op)), List(a, b))))
+        case _      => setType(ctx, EitherT.pure(Expressions.FUNCTION_CALL(opsToFunctions(op), List(a, b))))
       }
 
     case getter: Expressions.GETTER =>
@@ -69,7 +69,7 @@ object CompilerV1 {
           }
         }
 
-    case Expressions.FUNCTION_CALL(Expressions.REF(name), args) =>
+    case Expressions.FUNCTION_CALL(name, args) =>
       type ResolvedArgsResult = EitherT[Coeval, String, List[EXPR]]
 
       def resolvedArguments(args: List[Expressions.EXPR]): ResolvedArgsResult = {
@@ -119,8 +119,6 @@ object CompilerV1 {
             }
           }
       }
-
-    case Expressions.FUNCTION_CALL(_, _) => EitherT.fromEither[Coeval](Left("Calling of unnamed function isn't implemented yet."))
 
     case block: Expressions.BLOCK =>
       import block.let

@@ -43,23 +43,26 @@ object Parser {
   private val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | refP)
 
   private abstract class Accessor
-  private case class Getter(name: String) extends Accessor
-  private case class Args(args: Seq[EXPR]) extends Accessor
+  private case class Getter(name: String)   extends Accessor
+  private case class Args(args: Seq[EXPR])  extends Accessor
   private case class ListIndex(index: EXPR) extends Accessor
 
-  private val accessP: P[Accessor] = P(("." ~~ varName).map(Getter.apply) | ("(" ~/ functionCallArgs.map(Args.apply) ~ ")")) | ("[" ~/ expr.map(ListIndex.apply) ~ "]")
-  
+  private val accessP: P[Accessor] = P(("." ~~ varName).map(Getter.apply) | ("(" ~/ functionCallArgs.map(Args.apply) ~ ")")) | ("[" ~/ expr.map(
+    ListIndex.apply) ~ "]")
+
   private val maybeAccessP: P[EXPR] = P(extractableAtom ~~ accessP.rep).map {
-    case (e, f) => f.foldLeft(e) { (e, a) =>
-      a match {
-        case Getter(n) => GETTER(e,n)
-        case Args(args) => e match {
-           case function => FUNCTION_CALL(function, args.toList)
-                // Only REF(functionName) support now. Calling of unnamed function isn't implemented yet."
+    case (e, f) =>
+      f.foldLeft(e) { (e, a) =>
+        a match {
+          case Getter(n) => GETTER(e, n)
+          case Args(args) =>
+            e match {
+              case REF(functionName) => FUNCTION_CALL(functionName, args.toList)
+              case _                 => ???
+            }
+          case ListIndex(index) => FUNCTION_CALL("getElement", List(e, index))
         }
-        case ListIndex(index) => FUNCTION_CALL(REF("getElement"), List(e, index))
       }
-    }
   }
 
   private val byteVectorP: P[CONST_BYTEVECTOR] =
@@ -77,7 +80,7 @@ object Parser {
 
   private val block: P[EXPR] = P(letP ~ expr).map(Function.tupled(BLOCK.apply))
 
-  private val atom      = P(ifP | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP)
+  private val atom = P(ifP | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP)
 
   private def binaryOp(rest: List[(String, BinaryOperation)]): P[EXPR] = rest match {
     case Nil => atom
