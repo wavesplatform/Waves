@@ -354,10 +354,10 @@ object LevelDBWriter {
       ndo.toByteArray
     }
 
-    def sponsorship(height: Int, assetId: ByteStr): Key[SponsorshipValue] =
-      Key(byteKeyWithH(33, height, assetId.arr), readSponsorship, writeSponsorship)
-
     def sponsorshipHistory(assetId: ByteStr): Key[Seq[Int]] = historyKey(34, assetId.arr)
+
+    def sponsorship(height: Int, assetId: ByteStr): Key[SponsorshipValue] =
+      Key(byteKeyWithH(35, height, assetId.arr), readSponsorship, writeSponsorship)
   }
 
   private def loadSponsorship(db: ReadOnlyDB, assetId: ByteStr) = {
