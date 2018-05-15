@@ -19,6 +19,7 @@ object FunctionHeader {
       case Terms.OPTION(x)                 => FunctionHeaderType.OPTION(fromTypePlaceholder(x))
       case Terms.TYPEREF(name: String)     => FunctionHeaderType.TYPEREF(name)
       case Terms.CASETYPEREF(name: String) => FunctionHeaderType.CASETYPEREF(name)
+      case Terms.UNION(refs)               => FunctionHeaderType.UNION(refs.map(r => FunctionHeaderType.CASETYPEREF(r.name)))
     }
 
     case class TYPEPARAM(char: Byte)                  extends FunctionHeaderType
@@ -32,5 +33,6 @@ object FunctionHeader {
     case class OPTION(t: FunctionHeaderType)          extends FunctionHeaderType
     case class TYPEREF(name: String)                  extends FunctionHeaderType
     case class CASETYPEREF(name: String)              extends FunctionHeaderType
+    case class UNION(l: List[CASETYPEREF])            extends FunctionHeaderType
   }
 }
