@@ -51,7 +51,37 @@ object PureContext {
     }
   }
 
-  val sumLong       = createOp(SUM_OP, LONG, LONG)(_ + _)
+
+  val getElement = PredefFunction("getElement", 2, TYPEPARAM('T'), List("arr" -> LISTTYPEPARAM(TYPEPARAM('T')), "pos" -> LONG)) {
+    case (arr: IndexedSeq[_]) :: (pos: Long) :: Nil => if(pos < arr.size && 0 <= pos) {
+                                                     Right(arr(pos.toInt))
+                                                  } else {
+                                                     Left(s"Missing element at position $pos")
+                                                  }
+    case _               => ???
+  }
+
+  val getListSize = PredefFunction("size", 2, LONG, List("arr" -> LISTTYPEPARAM(TYPEPARAM('T')))) {
+    case (arr: IndexedSeq[_]) :: Nil => {
+      
+      Right(arr.size.toLong)
+    }
+    case _               => ???
+  }
+
+  private def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
+    PredefFunction(opsToFunctions(op), 1, r, List("a" -> t, "b" -> t)) {
+      case a :: b :: Nil =>
+        try {
+          Right(body(a.asInstanceOf[t.Underlying], b.asInstanceOf[t.Underlying]))
+        } catch {
+          case e: Throwable => Left(e.getMessage())
+        }
+      case _ => ???
+    }
+  }
+
+  val sumLong       = createTryOp(SUM_OP, LONG, LONG)(Math.addExact)
   val sumString     = createOp(SUM_OP, STRING, STRING)(_ + _)
   val sumByteVector = createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR)((a, b) => ByteVector(a.toArray ++ b.toArray))
   val eqLong        = createOp(EQ_OP, LONG, BOOLEAN)(_ == _)
@@ -61,7 +91,7 @@ object PureContext {
   val ge            = createOp(GE_OP, LONG, BOOLEAN)(_ >= _)
   val gt            = createOp(GT_OP, LONG, BOOLEAN)(_ > _)
 
-  val operators: Seq[PredefFunction] = Seq(sumLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt)
+  val operators: Seq[PredefFunction] = Seq(sumLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt, getElement, getListSize)
 
   lazy val instance =
     EvaluationContext.build(caseTypes = Seq.empty,

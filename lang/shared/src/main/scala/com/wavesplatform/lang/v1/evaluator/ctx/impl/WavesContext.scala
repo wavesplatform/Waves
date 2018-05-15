@@ -14,6 +14,7 @@ object WavesContext {
   private val addressOrAliasType = UNION(addressType.typeRef, aliasType.typeRef)
 
   private val optionByteVector: OPTION = OPTION(BYTEVECTOR)
+  private val listByteVector: LIST     = LIST(BYTEVECTOR)
   private val optionAddress            = OPTION(addressType.typeRef)
   private val optionLong: OPTION       = OPTION(LONG)
 
@@ -26,14 +27,7 @@ object WavesContext {
   private val proven = List(
     "senderPk"  -> BYTEVECTOR,
     "bodyBytes" -> BYTEVECTOR,
-    "proof0"    -> BYTEVECTOR,
-    "proof1"    -> BYTEVECTOR,
-    "proof2"    -> BYTEVECTOR,
-    "proof3"    -> BYTEVECTOR,
-    "proof4"    -> BYTEVECTOR,
-    "proof5"    -> BYTEVECTOR,
-    "proof6"    -> BYTEVECTOR,
-    "proof7"    -> BYTEVECTOR,
+    "proofs"    -> listByteVector
   )
 
   private val transferTransactionType = PredefCaseType(
@@ -95,14 +89,7 @@ object WavesContext {
   private def provenTxPart(tx: Transaction): Map[String, Val] = Map(
     "senderPk"  -> Val(BYTEVECTOR)(tx.senderPk.right.get),
     "bodyBytes" -> Val(BYTEVECTOR)(tx.bodyBytes.right.get),
-    "proof0"    -> proofBinding(tx, 0),
-    "proof1"    -> proofBinding(tx, 1),
-    "proof2"    -> proofBinding(tx, 2),
-    "proof3"    -> proofBinding(tx, 3),
-    "proof4"    -> proofBinding(tx, 4),
-    "proof5"    -> proofBinding(tx, 5),
-    "proof6"    -> proofBinding(tx, 6),
-    "proof7"    -> proofBinding(tx, 7)
+    "proofs"    -> Val(listByteVector)(tx.proofs.right.get.toList.asInstanceOf[listByteVector.Underlying])
   )
 
   private def transactionObject(tx: Transaction): CaseObj =

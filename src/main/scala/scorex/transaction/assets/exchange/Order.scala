@@ -147,6 +147,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     Json.obj(
       "id"               -> Base58.encode(id()),
+      "sender"           -> senderPublicKey.address,
       "senderPublicKey"  -> Base58.encode(senderPublicKey.publicKey),
       "matcherPublicKey" -> Base58.encode(matcherPublicKey.publicKey),
       "assetPair"        -> assetPair.json,
@@ -167,15 +168,15 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     obj match {
       case o: Order =>
         o.canEqual(this) &&
-        senderPublicKey == o.senderPublicKey &&
-        matcherPublicKey == o.matcherPublicKey &&
-        assetPair == o.assetPair
-        orderType == o.orderType
-        price == o.price &&
-        amount == o.amount &&
-        expiration == o.expiration &&
-        matcherFee == o.matcherFee &&
-        (signature sameElements o.signature)
+          senderPublicKey == o.senderPublicKey &&
+          matcherPublicKey == o.matcherPublicKey &&
+          assetPair == o.assetPair &&
+          orderType == o.orderType &&
+          price == o.price &&
+          amount == o.amount &&
+          expiration == o.expiration &&
+          matcherFee == o.matcherFee &&
+          (signature sameElements o.signature)
       case _ => false
     }
   }
