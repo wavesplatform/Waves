@@ -1,8 +1,8 @@
 package com.wavesplatform.history
 
+import com.wavesplatform._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -10,7 +10,7 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock, SignerData}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.ValidationError.MicroBlockAppendError
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.transfer._
 import scorex.transaction.{GenesisTransaction, Transaction}
 
@@ -61,7 +61,7 @@ class BlockchainUpdaterLiquidBlockTest extends PropSpec with PropertyChecks with
 
       withClue("All microblocks should not be processed") {
         r match {
-          case Left(e: MicroBlockAppendError) => e.err should include("Limit of txs was reached")
+          case Left(e: GenericError) => e.err should include("Limit of txs was reached")
           case x =>
             val txNumberByMicroBlock = microBlocks.map(_.transactionData.size)
             fail(

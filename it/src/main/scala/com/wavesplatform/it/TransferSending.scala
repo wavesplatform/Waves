@@ -29,6 +29,29 @@ trait TransferSending extends ScorexLogging {
     override val chainId: Byte = 'I'.toByte
   }
 
+  def generateTransfersFromAccount(n: Int, accountAddress: String): Seq[Req] = {
+    val fee      = 100000 + 400000 // + 400000 for scripted accounts
+    val seedSize = 32
+
+    val srcSeed = NodeConfigs.Default
+      .collectFirst {
+        case x if x.getString("address") == accountAddress => x.getString("account-seed")
+      }
+      .getOrElse(throw new RuntimeException(s"Can't find address '$accountAddress' in nodes.conf"))
+
+    val sourceAndDest = (1 to n).map { _ =>
+      val destPk = Array.fill[Byte](seedSize)(Random.nextInt(Byte.MaxValue).toByte)
+      Address.fromPublicKey(destPk).address
+    }
+
+    val requests = sourceAndDest.foldLeft(List.empty[Req]) {
+      case (rs, dstAddr) =>
+        rs :+ Req(srcSeed, dstAddr, fee, fee)
+    }
+
+    requests
+  }
+
   def generateTransfersBetweenAccounts(n: Int, balances: Map[Config, Long]): Seq[Req] = {
     val fee = 100000
     val srcDest = balances.toSeq
