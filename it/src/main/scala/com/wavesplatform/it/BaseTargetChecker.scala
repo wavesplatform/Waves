@@ -7,7 +7,7 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.settings._
-import com.wavesplatform.state.{BlockMinerInfo, ByteStr, EitherExt2}
+import com.wavesplatform.state.{ByteStr, EitherExt2}
 import net.ceedubs.ficus.Ficus._
 import scorex.account.PublicKeyAccount
 import scorex.block.Block
