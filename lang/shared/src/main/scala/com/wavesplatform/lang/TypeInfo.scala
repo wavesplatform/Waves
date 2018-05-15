@@ -96,4 +96,7 @@ object TypeInfo {
 
   implicit def optionTypeInfo[A](implicit tia: TypeInfo[A]): TypeInfo[Option[A]] =
     fromAny(Set(tia), Set(productTypeInfo, serializableTypeInfo))
+
+  implicit def listTypeInfo[A](implicit tia: TypeInfo[A]): TypeInfo[IndexedSeq[A]] =
+    fromAny(Set(tia), Set(productTypeInfo, serializableTypeInfo))
 }

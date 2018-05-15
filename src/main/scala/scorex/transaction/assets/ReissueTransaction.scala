@@ -1,11 +1,13 @@
 package scorex.transaction.assets
 
+import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount
 import scorex.crypto.signatures.Curve25519.KeyLength
+import scorex.transaction.validation._
 import scorex.transaction.{AssetId, ProvenTransaction, ValidationError, _}
 
 trait ReissueTransaction extends ProvenTransaction {
@@ -41,11 +43,10 @@ trait ReissueTransaction extends ProvenTransaction {
 
 object ReissueTransaction {
   def validateReissueParams(quantity: Long, fee: Long): Either[ValidationError, Unit] =
-    if (quantity <= 0) {
-      Left(ValidationError.NegativeAmount(quantity, "assets"))
-    } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee())
-    } else Right(())
+    (validateAmount(quantity, "assets"), validateFee(fee))
+      .mapN { case _ => () }
+      .leftMap(_.head)
+      .toEither
 
   def parseBase(bytes: Array[Byte], start: Int): (PublicKeyAccount, AssetId, Long, Boolean, Long, Long, Int) = {
     val senderEnd  = start + KeyLength

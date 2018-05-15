@@ -24,4 +24,5 @@ trait Transaction {
   def chainId: Either[String, Byte]
   def version: Either[String, Byte]
   def minSponsoredAssetFee: Either[String, Option[Long]]
+  def transfers: Either[String, IndexedSeq[Transfer]]
 }

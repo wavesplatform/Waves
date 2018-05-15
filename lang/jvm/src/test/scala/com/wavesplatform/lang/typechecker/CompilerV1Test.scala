@@ -22,7 +22,8 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
 
   property("should infer inner types") {
     import com.wavesplatform.lang.v1.parser.Expressions._
-    val Right(v) = CompilerV1(typeCheckerContext, FUNCTION_CALL(extract.name, List(FUNCTION_CALL(undefinedOptionLong.name, List.empty))))
+    val Right(v) =
+      CompilerV1(typeCheckerContext, FUNCTION_CALL(extract.name, List(FUNCTION_CALL(undefinedOptionLong.name, List.empty))))
     v.tpe shouldBe LONG
   }
 
@@ -90,9 +91,10 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
 
   treeTypeTest(s"idOptionLong(SOME(CONST_LONG(3)))")(
     ctx = typeCheckerContext,
-    expr =
-      Expressions.FUNCTION_CALL(idOptionLong.name,
-                                List(Expressions.FUNCTION_CALL("Some", List(Expressions.FUNCTION_CALL("Some", List(Expressions.CONST_LONG(3))))))),
+    expr = Expressions.FUNCTION_CALL(
+      idOptionLong.name,
+      List(Expressions.FUNCTION_CALL("Some", List(Expressions.FUNCTION_CALL("Some", List(Expressions.CONST_LONG(3))))))
+    ),
     expectedResult = Right(
       FUNCTION_CALL(
         idOptionLong.header,

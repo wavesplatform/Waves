@@ -10,6 +10,7 @@ object Terms {
   sealed trait TYPEPLACEHOLDER
   case class TYPEPARAM(char: Byte)               extends TYPEPLACEHOLDER
   case class OPTIONTYPEPARAM(t: TYPEPLACEHOLDER) extends TYPEPLACEHOLDER
+  case class LISTTYPEPARAM(t: TYPEPLACEHOLDER)   extends TYPEPLACEHOLDER
 
   sealed trait TYPE extends TYPEPLACEHOLDER {
     type Underlying
@@ -28,6 +29,10 @@ object Terms {
   case class OPTION(innerType: TYPE) extends TYPE {
     type Underlying = Option[innerType.Underlying]
     override def typeInfo: TypeInfo[Option[innerType.Underlying]] = TypeInfo.optionTypeInfo(innerType.typeInfo)
+  }
+  case class LIST(innerType: TYPE) extends TYPE {
+    type Underlying = IndexedSeq[innerType.Underlying]
+    override def typeInfo: TypeInfo[IndexedSeq[innerType.Underlying]] = TypeInfo.listTypeInfo(innerType.typeInfo)
   }
   case class TYPEREF(name: String)       extends AUTO_TAGGED_TYPE[Obj]
   case class CASETYPEREF(name: String)   extends AUTO_TAGGED_TYPE[CaseObj]
