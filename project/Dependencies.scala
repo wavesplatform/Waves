@@ -62,6 +62,7 @@ object Dependencies {
 
   lazy val matcher = Seq(
     akkaModule("persistence"),
+    akkaModule("persistence-tck") % "test",
     "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.4.18.1" % "test",
     "org.ethereum" % "leveldbjni-all" % "1.18.3"
   )
