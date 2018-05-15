@@ -6,6 +6,7 @@ import java.nio.file.Files
 import com.wavesplatform.TransactionGenBase
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.LevelDBFactory
+import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.BlockDiffer
 import org.iq80.leveldb.{DB, Options}
@@ -65,7 +66,7 @@ trait BaseState extends TransactionGenBase {
   )
 
   private def append(prev: Option[Block], next: Block): Unit = {
-    val preconditionDiff = BlockDiffer.fromBlock(fsSettings, state, prev, next).explicitGet()
+    val preconditionDiff = BlockDiffer.fromBlock(fsSettings, state, prev, next, MiningConstraint.Unlimited).explicitGet()._1
     state.append(preconditionDiff, next)
   }
 

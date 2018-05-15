@@ -1,39 +1,25 @@
 package com.wavesplatform.mining
 
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
+import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.block.Block
-import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.Transaction
 
-class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with PropertyChecks with TransactionGen with NoShrink {
+class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with PropertyChecks with PathMockFactory with TransactionGen with NoShrink {
   "OneDimensionalMiningConstraint" - {
     "should be empty if the limit is 0, but not overfilled" in {
-      val tank = OneDimensionalMiningConstraint.full(createConstConstraint(0))
+      val tank = createConstConstraint(0)
       tank.isEmpty shouldBe true
       tank.isOverfilled shouldBe false
     }
 
-    "put(block)" - tests { (maxTxs, txs) =>
-      val estimator  = createConstConstraint(maxTxs, blockSize = 1)
-      val blocks     = txs.map(tx => TestBlock.create(Seq(tx)))
-      val constraint = OneDimensionalMiningConstraint.full(estimator)
-      blocks.foldLeft(constraint)(_.put(_))
-    }
-
     "put(transaction)" - tests { (maxTxs, txs) =>
-      val estimator  = createConstConstraint(maxTxs, transactionSize = 1)
-      val constraint = OneDimensionalMiningConstraint.full(estimator)
-      txs.foldLeft(constraint)(_.put(_))
+      val constraint = createConstConstraint(maxTxs, transactionSize = 1)
+      txs.foldLeft(constraint)(_.put(stub[Blockchain], _))
     }
-  }
-
-  private def createConstConstraint(maxSize: Long, blockSize: => Long = ???, transactionSize: => Long = ???) = new Estimator {
-    override def max: Long                               = maxSize
-    override implicit def estimate(x: Block): Long       = blockSize
-    override implicit def estimate(x: Transaction): Long = transactionSize
   }
 
   private def tests(toConstraint: (Int, List[Transaction]) => MiningConstraint): Unit = {
