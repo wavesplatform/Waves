@@ -85,6 +85,17 @@ object WavesContext {
       else pfs(x)
     }))
 
+  class IndexedSeqWithDefault[T](content: IndexedSeq[T], default: T) extends IndexedSeq[T] {
+    override def apply(idx: Int): T = {
+       if(idx < content.length) {
+          content(idx)
+       } else {
+          default
+       }
+    }
+    override def length: Int = content.length
+  }
+
   private def transactionObject(tx: Transaction): Obj =
     Obj(
       Map(
@@ -118,7 +129,8 @@ object WavesContext {
         "proof5"           -> proofBinding(tx, 5),
         "proof6"           -> proofBinding(tx, 6),
         "proof7"           -> proofBinding(tx, 7),
-        "proofs"           -> LazyVal(listByteVector)(EitherT.fromEither(tx.proofs.map(_.asInstanceOf[listByteVector.Underlying])))
+        "proofs"           -> LazyVal(listByteVector)(EitherT.fromEither(tx.proofs.map(p =>
+                                     new IndexedSeqWithDefault(p.asInstanceOf[listByteVector.Underlying], ByteVector.empty.asInstanceOf[listByteVector.innerType.Underlying]))))
       ))
 
   def build(env: Environment): EvaluationContext = {
