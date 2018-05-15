@@ -1,3 +1,22 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
-case class Obj(fields: Map[String, LazyVal])
+import com.wavesplatform.lang.v1.compiler.Terms.{CASETYPEREF, TYPE}
+
+sealed trait AnyObj
+
+case class Obj(fields: Map[String, LazyVal]) extends AnyObj
+
+sealed trait Val {
+  val tpe: TYPE
+  val value: tpe.Underlying
+}
+
+object Val {
+  private case class ValImpl(tpe: TYPE, v: Any) extends Val {
+    override val value: tpe.Underlying = v.asInstanceOf[tpe.Underlying]
+  }
+
+  def apply(t: TYPE)(v: t.Underlying): Val = ValImpl(t, v)
+}
+
+case class CaseObj(caseType: CASETYPEREF, fields: Map[String, Val]) extends AnyObj
