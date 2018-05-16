@@ -205,8 +205,11 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue)), "value is missing or not a string")
 
-    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("NOTaBase58")))),
-                                "Wrong char in Base58 string")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("base64:not a base64")))),
+                                "Illegal base64 character")
+
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("yomp")))),
+                                "Base64 encoding expected")
   }
 
   test("transaction requires a valid proof") {
