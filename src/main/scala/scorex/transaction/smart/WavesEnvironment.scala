@@ -26,6 +26,7 @@ class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], blo
       case (LongDataEntry(_, value), DataType.Long)        => Some(value)
       case (BooleanDataEntry(_, value), DataType.Boolean)  => Some(value)
       case (BinaryDataEntry(_, value), DataType.ByteArray) => Some(ByteVector(value.arr))
+      case (StringDataEntry(_, value), DataType.String)    => Some(value)
       case _                                               => None
     }
   }
