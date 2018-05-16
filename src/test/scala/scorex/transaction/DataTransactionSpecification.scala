@@ -85,13 +85,14 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   }
 
   property("positive validation cases") {
+    import com.wavesplatform.state._
     val keyRepeatCountGen = Gen.choose(2, MaxEntryCount)
     forAll(dataTransactionGen, dataEntryGen, keyRepeatCountGen) {
       case (DataTransaction(version, sender, data, fee, timestamp, proofs), entry, keyRepeatCount) =>
         def check(data: List[DataEntry[_]]): Assertion = {
           val txEi = DataTransaction.create(version, sender, data, fee, timestamp, proofs)
           txEi shouldBe Right(DataTransaction(version, sender, data, fee, timestamp, proofs))
-          checkSerialization(txEi.right.get)
+          checkSerialization(txEi.explicitGet())
         }
 
         check(List.empty)                                                               // no data

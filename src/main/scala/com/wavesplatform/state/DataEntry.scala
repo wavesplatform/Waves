@@ -119,5 +119,5 @@ case class StringDataEntry(override val key: String, override val value: String)
 
   override def toJson: JsObject = super.toJson + ("type" -> JsString("string")) + ("value" -> JsString(value))
 
-  override def valid: Boolean = super.valid && valueBytes.length <= MaxValueSize
+  override def valid: Boolean = super.valid && value.getBytes("UTF-8").length <= MaxValueSize
 }
