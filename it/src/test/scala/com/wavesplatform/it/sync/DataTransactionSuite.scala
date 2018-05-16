@@ -125,7 +125,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     sender.getData(secondAddress, "int") shouldBe reIntEntry
     sender.getData(secondAddress, "bool") shouldBe boolEntry
-    sender.getData(secondAddress) shouldBe boolList ++ reIntList
+    sender.getData(secondAddress) shouldBe boolList ++ reIntList ++ stringList
 
     // define tx with all types
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
