@@ -609,6 +609,13 @@ trait TransactionGenBase extends ScriptGen {
       value <- byteArrayGen(size)
     } yield BinaryDataEntry(key, ByteStr(value))
 
+  def stringEntryGen(keyGen: Gen[String] = dataKeyGen) =
+    for {
+      key   <- keyGen
+      size  <- Gen.choose(0, MaxValueSize)
+      value <- Gen.listOfN(size, aliasAlphabetGen)
+    } yield StringDataEntry(key, value.mkString)
+
   val dataEntryGen = Gen.oneOf(longEntryGen(), booleanEntryGen(), binaryEntryGen())
 
   val dataTransactionGen = {

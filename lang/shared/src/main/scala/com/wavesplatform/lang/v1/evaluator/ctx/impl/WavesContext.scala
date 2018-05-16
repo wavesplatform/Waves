@@ -134,6 +134,7 @@ object WavesContext {
     val getLongF: PredefFunction      = getdataF("getLong", DataType.Long)
     val getBooleanF: PredefFunction   = getdataF("getBoolean", DataType.Boolean)
     val getByteArrayF: PredefFunction = getdataF("getByteArray", DataType.ByteArray)
+    val getStringF: PredefFunction    = getdataF("getString", DataType.String)
 
     val addressFromPublicKeyF: PredefFunction = PredefFunction("addressFromPublicKey", 100, addressType.typeRef, List(("publicKey", BYTEVECTOR))) {
       case (pk: ByteVector) :: Nil =>
@@ -208,6 +209,7 @@ object WavesContext {
         getLongF,
         getBooleanF,
         getByteArrayF,
+        getStringF,
         addressFromPublicKeyF,
         addressFromStringF,
         addressFromRecipientF,
