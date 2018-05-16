@@ -101,12 +101,13 @@ class MinerImpl(allChannels: ChannelGroup,
   private def ngEnabled: Boolean = blockchainUpdater.featureActivationHeight(BlockchainFeatures.NG.id).exists(blockchainUpdater.height > _ + 1)
 
   private def generateOneBlockTask(account: PrivateKeyAccount, balance: Long)(
-      delay: FiniteDuration): Task[Either[String, (MiningConstraints, Block, MiningConstraint)]] =
+      delay: FiniteDuration): Task[Either[String, (MiningConstraints, Block, MiningConstraint)]] = {
     Task {
       forgeBlock(account, balance)
     }.delayExecution(delay)
+  }
 
-  private def forgeBlock(account: PrivateKeyAccount, balance: Long): Either[String, (MiningEstimators, Block, MiningConstraint)] = {
+  private def forgeBlock(account: PrivateKeyAccount, balance: Long): Either[String, (MiningConstraints, Block, MiningConstraint)] = {
     // should take last block right at the time of mining since microblocks might have been added
     val height                    = blockchainUpdater.height
     val version                   = if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion else NgBlockVersion
