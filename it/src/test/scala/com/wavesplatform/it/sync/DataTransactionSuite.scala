@@ -4,7 +4,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, LongDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, LongDataEntry, StringDataEntry}
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
 import scorex.api.http.SignedDataRequest
@@ -106,6 +106,12 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val tx2       = sender.putData(secondAddress, boolList, calcDataFee(boolList)).id
     nodes.waitForHeightAriseAndTxPresent(tx2)
 
+    // define boolean entry
+    val stringEntry = StringDataEntry("str", "AAA")
+    val stringList  = List(stringEntry)
+    val txS         = sender.putData(secondAddress, stringList, calcDataFee(stringList)).id
+    nodes.waitForHeightAriseAndTxPresent(txS)
+
     sender.getData(secondAddress, "int") shouldBe intEntry
     sender.getData(secondAddress, "bool") shouldBe boolEntry
     sender.getData(secondAddress) shouldBe boolList ++ intList
@@ -125,7 +131,8 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val intEntry2        = LongDataEntry("int", -127)
     val boolEntry2       = BooleanDataEntry("bool", false)
     val blobEntry2       = BinaryDataEntry("blob", ByteStr(Array[Byte](127.toByte, 0, 1, 1)))
-    val dataAllTypes     = List(intEntry2, boolEntry2, blobEntry2)
+    val stringEntry2     = StringDataEntry("str", "BBBB")
+    val dataAllTypes     = List(intEntry2, boolEntry2, blobEntry2, stringEntry2)
     val fee              = calcDataFee(dataAllTypes)
     val txId             = sender.putData(secondAddress, dataAllTypes, fee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
@@ -133,6 +140,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     sender.getData(secondAddress, "int") shouldBe intEntry2
     sender.getData(secondAddress, "bool") shouldBe boolEntry2
     sender.getData(secondAddress, "blob").equals(blobEntry2)
+    sender.getData(secondAddress, "str").equals(stringEntry2)
     sender.getData(secondAddress).equals(dataAllTypes)
 
     notMiner.assertBalances(secondAddress, balance2 - fee, eff2 - fee)
@@ -255,6 +263,10 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     val extraSizedData = List.tabulate(MaxEntryCount + 1)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
     assertBadRequestAndResponse(sender.putData(firstAddress, extraSizedData, calcDataFee(extraSizedData)), message)
+    nodes.waitForHeightArise()
+
+    val extraSizedData2 = List.tabulate(MaxEntryCount + 1)(n => StringDataEntry(extraKey, "A" * MaxValueSize))
+    assertBadRequestAndResponse(sender.putData(firstAddress, extraSizedData2, calcDataFee(extraSizedData2)), message)
     nodes.waitForHeightArise()
   }
 
