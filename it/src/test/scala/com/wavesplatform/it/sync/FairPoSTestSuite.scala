@@ -24,23 +24,8 @@ class FairPoSTestSuite extends FunSuite with CancelAfterFailure with NodesFromDo
 
     val heightAfterTransfer = nodes.head.height
 
-    nodes.head.waitForHeight(heightAfterTransfer + 30, 5.minutes)
+    nodes.head.waitForHeight(heightAfterTransfer + 20, 5.minutes)
   }
-//
-//  test("FairPoS just works") {
-//    val startHeight = nodes.head.height
-//    nodes.head.waitForHeight(startHeight + 99, 5.minutes)
-//    val stopHeight = nodes.head.height
-//
-//    val minedBlocks = nodes.head.blockHeadersSeq(startHeight, stopHeight).map(_.generator)
-//    val actualDistribution = minedBlocks.groupBy(identity).mapValues(_.size.toDouble / minedBlocks.size.toDouble)
-//
-//    val nodesBalances = nodes.map(_.address).map(a => a -> nodes.head.accountBalance(a)).toMap
-//    val totalBalance = nodesBalances.values.sum.toDouble
-//    val expectedDistribution = nodesBalances.mapValues(_.toDouble / totalBalance)
-//
-//    val x: Map[(String, Double), (String, Double)] = expectedDistribution.zip(actualDistribution)
-//  }
 }
 
 object FairPoSTestSuite {
