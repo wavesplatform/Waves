@@ -21,8 +21,7 @@ import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def ev[T: TypeInfo](context: EvaluationContext = PureContext.instance,
-                              expr: EXPR): Either[(EvaluationContext, ExecutionError), T] =
+  private def ev[T: TypeInfo](context: EvaluationContext = PureContext.instance, expr: EXPR): Either[(EvaluationContext, ExecutionError), T] =
     EvaluatorV1[T](context, expr)
   private def simpleDeclarationAndUsage(i: Int) = BLOCK(LET("x", CONST_LONG(i)), REF("x", LONG), LONG)
 
@@ -330,7 +329,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     r.isLeft shouldBe false
   }
 
-  private def sigVerifyTest(bodyBytes: Array[Byte], publicKey: PublicKey, signature: Signature): Either[(EvaluationContext, ExecutionError), Boolean] = {
+  private def sigVerifyTest(bodyBytes: Array[Byte],
+                            publicKey: PublicKey,
+                            signature: Signature): Either[(EvaluationContext, ExecutionError), Boolean] = {
     val txType = PredefType(
       "Transaction",
       List(

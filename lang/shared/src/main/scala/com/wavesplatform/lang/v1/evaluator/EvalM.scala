@@ -1,8 +1,8 @@
 package com.wavesplatform.lang.v1.evaluator
 
+import cats.Monad
 import cats.data.{EitherT, Kleisli}
 import cats.implicits._
-import cats.{Monad, StackSafeMonad}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.{ExecutionError, TrampolinedExecResult}
 import monix.eval.Coeval
@@ -29,7 +29,10 @@ final case class EvalM[A](inner: Kleisli[Coeval, CoevalRef[EvaluationContext], E
 
 object EvalM {
 
-  implicit val monadInstance: Monad[EvalM] = new StackSafeMonad[EvalM] {
+  private type MM[A] = Kleisli[Coeval, CoevalRef[EvaluationContext], A]
+  private val M: Monad[MM] = implicitly
+
+  implicit val monadInstance: Monad[EvalM] = new Monad[EvalM] {
     override def pure[A](x: A): EvalM[A] =
       EvalM(Kleisli.pure[Coeval, CoevalRef[EvaluationContext], Either[ExecutionError, A]](x.asRight[ExecutionError]))
 
@@ -38,6 +41,14 @@ object EvalM {
         case Right(v)  => f(v).inner
         case Left(err) => Kleisli.pure(err.asLeft[B])
       }))
+    }
+
+    override def tailRecM[A, B](a: A)(f: A => EvalM[Either[A, B]]): EvalM[B] = {
+      EvalM(M.tailRecM(a)(f andThen (_.inner.map {
+        case Left(err)        => Right(Left(err))
+        case Right(Left(lv))  => Left(lv)
+        case Right(Right(rv)) => Right(Right(rv))
+      })))
     }
   }
 
