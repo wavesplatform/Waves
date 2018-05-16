@@ -4,16 +4,10 @@ import cats.implicits._
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal, Obj}
-import com.wavesplatform.lang.{ExecutionError, ExprEvaluator, TypeInfo}
-import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext.Lenses._
-import com.wavesplatform.lang._
-import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, LET, _}
-import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.{funcs, lets}
-import com.wavesplatform.lang.v1.evaluator.ctx._
-import monix.eval.Coeval
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext.Lenses._
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal, Obj, _}
+import com.wavesplatform.lang.{ExecutionError, ExprEvaluator, TypeInfo}
 
 object EvaluatorV1 extends ExprEvaluator {
 
@@ -71,8 +65,8 @@ object EvaluatorV1 extends ExprEvaluator {
           }
         case CaseObj(_, fields) =>
           fields.get(field) match {
-            case Some(eager) => liftR[Any](eager.value)
-            case None        => liftL[Any](s"field '$field' not found")
+            case Some(eager) => liftValue[Any](eager.value)
+            case None        => liftError[Any](s"field '$field' not found")
           }
       }
 
@@ -107,10 +101,9 @@ object EvaluatorV1 extends ExprEvaluator {
       case GETTER(expr, field, _)         => evalGetter(expr, field)
       case FUNCTION_CALL(header, args, _) => evalFunctionCall(header, args)
     }).flatMap(v => {
-      liftR(v.asInstanceOf[T])
-      //      val ti = typeInfo[T]
-      //      if (t.tpe.typeInfo <:< ti) liftValue(v.asInstanceOf[T])
-      //      else liftError(s"Bad type: expected: $ti actual: ${t.tpe.typeInfo}")
+      val ti = typeInfo[T]
+      if (t.tpe.typeInfo <:< ti) liftValue(v.asInstanceOf[T])
+      else liftError(s"Bad type: expected: $ti actual: ${t.tpe.typeInfo}")
     })
 
   }

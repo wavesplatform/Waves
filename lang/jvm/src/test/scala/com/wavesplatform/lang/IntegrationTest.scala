@@ -4,12 +4,13 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, EvaluationContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, EvaluationContext}
 
 class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
 
