@@ -61,8 +61,8 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
         let A = base58'${ByteStr(acc1.publicKey)}'
         let B = base58'${ByteStr(acc2.publicKey)}'
 
-        let AC = sigVerify(tx.bodyBytes,tx.proof0,A)
-        let BC = sigVerify(tx.bodyBytes,tx.proof1,B)
+        let AC = sigVerify(tx.bodyBytes,tx.proofs[0],A)
+        let BC = sigVerify(tx.bodyBytes,tx.proofs[1],B)
 
          AC && BC
 
@@ -180,7 +180,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       val untyped = Parser(s"""
         let A = base58'${ByteStr(acc3.publicKey)}'
 
-        let AC = sigVerify(tx.bodyBytes,tx.proof0,A)
+        let AC = sigVerify(tx.bodyBytes,tx.proofs[0],A)
         let heightVerification = if (height > $heightBefore + 10) then true else false
 
         AC && heightVerification
