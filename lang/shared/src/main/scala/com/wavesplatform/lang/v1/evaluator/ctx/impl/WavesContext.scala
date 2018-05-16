@@ -70,12 +70,6 @@ object WavesContext {
       "transfers"            -> LIST(transferType.typeRef)
     )
   )
-  private def proofBinding(tx: Transaction, x: Int): LazyVal =
-    LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.proofs map { pfs =>
-      if (x >= pfs.size)
-        ByteVector.empty
-      else pfs(x)
-    }))
 
   class IndexedSeqWithDefault[T](content: IndexedSeq[T], default: T) extends IndexedSeq[T] {
     override def apply(idx: Int): T = {
