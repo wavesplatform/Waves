@@ -76,7 +76,7 @@ object DataEntry {
                 case JsDefined(JsString(base58)) =>
                   val t = if (base58.isEmpty) Success(Array.emptyByteArray) else Base58.decode(base58) /// Base58 bug
                   t.fold(ex => JsError(ex.getMessage), arr => JsSuccess(BinaryDataEntry(key, ByteStr(arr))))
-                case _ => JsError("value is missing or not a base58")
+                case _ => JsError("value is missing or not a string")
               }
             case JsDefined(JsString("string")) =>
               jsv \ "value" match {

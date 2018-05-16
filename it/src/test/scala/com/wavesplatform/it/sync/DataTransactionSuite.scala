@@ -106,7 +106,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val tx2       = sender.putData(secondAddress, boolList, calcDataFee(boolList)).id
     nodes.waitForHeightAriseAndTxPresent(tx2)
 
-    // define boolean entry
+    // define string entry
     val stringEntry = StringDataEntry("str", "AAA")
     val stringList  = List(stringEntry)
     val txS         = sender.putData(secondAddress, stringList, calcDataFee(stringList)).id
