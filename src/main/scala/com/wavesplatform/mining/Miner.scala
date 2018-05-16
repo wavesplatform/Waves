@@ -1,11 +1,12 @@
 package com.wavesplatform.mining
 
 import cats.data.EitherT
+import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSCalculator}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{BlockStats, HistogramExt, Instrumented}
 import com.wavesplatform.network._
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.appender.{BlockAppender, MicroblockAppender}
 import com.wavesplatform.utx.UtxPool
@@ -15,11 +16,10 @@ import kamon.metric.instrument
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
-import scorex.account.{Address, PrivateKeyAccount}
+import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block._
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.transaction.PoSCalc._
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
@@ -59,6 +59,7 @@ class MinerImpl(allChannels: ChannelGroup,
                 timeService: Time,
                 utx: UtxPool,
                 wallet: Wallet,
+                pos: PoSCalculator,
                 val minerScheduler: SchedulerService,
                 val appenderScheduler: SchedulerService)
     extends Miner
@@ -102,58 +103,72 @@ class MinerImpl(allChannels: ChannelGroup,
   private def generateOneBlockTask(account: PrivateKeyAccount, balance: Long)(
       delay: FiniteDuration): Task[Either[String, (MiningConstraints, Block, MiningConstraint)]] =
     Task {
-      // should take last block right at the time of mining since microblocks might have been added
-      val height                    = blockchainUpdater.height
-      val version                   = if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion else NgBlockVersion
-      val lastBlock                 = blockchainUpdater.lastBlock.get
-      val greatGrandParentTimestamp = blockchainUpdater.parent(lastBlock, 2).map(_.timestamp)
-      val referencedBlockInfo       = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
-      val pc                        = allChannels.size()
-      lazy val currentTime          = timeService.correctedTime()
-      lazy val h                    = calcHit(referencedBlockInfo.consensus, account)
-      lazy val t                    = calcTarget(referencedBlockInfo.timestamp, referencedBlockInfo.consensus.baseTarget, currentTime, balance)
-      measureSuccessful(
-        blockBuildTimeStats,
-        for {
-          _ <- Either.cond(pc >= minerSettings.quorum,
-                           (),
-                           s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
-          _ <- Either.cond(h < t, (), s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.address}")
-          _ = log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${referencedBlockInfo.blockId}")
-          _ = log.debug(s"Previous block ID ${referencedBlockInfo.blockId} at $height with target ${referencedBlockInfo.consensus.baseTarget}")
-          block <- {
-            val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
-            val btg = calcBaseTarget(avgBlockDelay,
-                                     height,
-                                     referencedBlockInfo.consensus.baseTarget,
-                                     referencedBlockInfo.timestamp,
-                                     greatGrandParentTimestamp,
-                                     currentTime)
-            val gs            = calcGeneratorSignature(referencedBlockInfo.consensus, account)
-            val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
-            val sortInBlock   = blockchainUpdater.height <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
-
-            val estimators                         = MiningConstraints(minerSettings, blockchainUpdater, height)
-            val mdConstraint                       = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
-            val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint, sortInBlock)
-
-            val features =
-              if (version <= 2) Set.empty[Short]
-              else
-                settings.featuresSettings.supported
-                  .filterNot(blockchainUpdater.approvedFeatures.keySet)
-                  .filter(BlockchainFeatures.implemented)
-                  .toSet
-
-            log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-            Block.buildAndSign(version.toByte, currentTime, referencedBlockInfo.blockId, consensusData, unconfirmed, account, features) match {
-              case Left(e)  => Left(e.err)
-              case Right(x) => Right((estimators, x, updatedMdConstraint.constraints.head))
-            }
-          }
-        } yield block
-      )
+      forgeBlock(account, balance)
     }.delayExecution(delay)
+
+  private def forgeBlock(account: PrivateKeyAccount, balance: Long): Either[String, (MiningEstimators, Block, MiningConstraint)] = {
+    // should take last block right at the time of mining since microblocks might have been added
+    val height                    = blockchainUpdater.height
+    val version                   = if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion else NgBlockVersion
+    val lastBlock                 = blockchainUpdater.lastBlock.get
+    val greatGrandParentTimestamp = blockchainUpdater.parent(lastBlock, 2).map(_.timestamp)
+    val referencedBlockInfo       = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
+    val pc                        = allChannels.size()
+    lazy val currentTime          = timeService.correctedTime()
+    lazy val blockDelay           = currentTime - lastBlock.timestamp
+    lazy val validBlockDelay = pos.validBlockDelay(
+      referencedBlockInfo.consensus.generationSignature.arr,
+      account.publicKey,
+      referencedBlockInfo.consensus.baseTarget,
+      balance
+    )
+    measureSuccessful(
+      blockBuildTimeStats,
+      for {
+        _ <- Either.cond(pc >= minerSettings.quorum,
+                         (),
+                         s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
+        _ <- Either.cond(
+          blockDelay > validBlockDelay,
+          (),
+          s"${System.currentTimeMillis()}: Block delay $blockDelay was NOT less than estimated delay $validBlockDelay, not forging block with ${account.address}"
+        )
+        _ = log.debug(
+          s"Forging with ${account.address}, Time $blockDelay > Estimated Time $validBlockDelay, balance $balance, prev block ${referencedBlockInfo.blockId}")
+        _ = log.debug(s"Previous block ID ${referencedBlockInfo.blockId} at $height with target ${referencedBlockInfo.consensus.baseTarget}")
+        block <- {
+          val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
+          val btg = pos.baseTarget(avgBlockDelay.toSeconds,
+                                   height,
+                                   referencedBlockInfo.consensus.baseTarget,
+                                   referencedBlockInfo.timestamp,
+                                   greatGrandParentTimestamp,
+                                   currentTime)
+          val gs            = pos.generatorSignature(referencedBlockInfo.consensus.generationSignature.arr, account.publicKey)
+          val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
+          val sortInBlock   = blockchainUpdater.height <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
+
+          val estimators                         = MiningConstraints(minerSettings, blockchainUpdater, height)
+          val mdConstraint                       = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
+          val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint, sortInBlock)
+
+          val features =
+            if (version <= 2) Set.empty[Short]
+            else
+              settings.featuresSettings.supported
+                .filterNot(blockchainUpdater.approvedFeatures.keySet)
+                .filter(BlockchainFeatures.implemented)
+                .toSet
+
+          log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
+          Block.buildAndSign(version.toByte, currentTime, referencedBlockInfo.blockId, consensusData, unconfirmed, account, features) match {
+            case Left(e)  => Left(e.err)
+            case Right(x) => Right((estimators, x, updatedMdConstraint.constraints.head))
+          }
+        }
+      } yield block
+    )
+  }
 
   private def generateOneMicroBlockTask(account: PrivateKeyAccount,
                                         accumulatedBlock: Block,
@@ -242,16 +257,33 @@ class MinerImpl(allChannels: ChannelGroup,
       }
   }
 
+  private def nextBlockGenerationTime(fs: FunctionalitySettings,
+                                      height: Int,
+                                      block: Block,
+                                      account: PublicKeyAccount): Either[String, (Long, Long)] = {
+    val balance = GeneratingBalanceProvider.balance(blockchainUpdater, fs, height, account.toAddress)
+    if (GeneratingBalanceProvider.isMiningAllowed(blockchainUpdater, height, balance)) {
+      val cData        = block.consensusData
+      val blockGS      = cData.generationSignature.arr
+      val baseTarget   = cData.baseTarget
+      val calculatedTs = pos.validBlockDelay(blockGS, account.publicKey, baseTarget, balance) + block.timestamp
+      if (0 < calculatedTs && calculatedTs < Long.MaxValue) {
+        Right((balance, calculatedTs))
+      } else
+        Left(s"Invalid next block generation time: $calculatedTs")
+    } else Left(s"Balance $balance of ${account.address} is lower than required for generation")
+  }
+
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = {
     {
-      val height    = blockchainUpdater.height
-      val lastBlock = blockchainUpdater.lastBlock.get
+      val height      = blockchainUpdater.height
+      val blockForHit = (blockchainUpdater.blockAt(height - 100) orElse blockchainUpdater.lastBlock).get
       for {
         _ <- checkAge(height, blockchainUpdater.lastBlockTimestamp.get)
         _ <- Either.cond(blockchainUpdater.accountScript(account).isEmpty,
                          (),
                          s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
-        balanceAndTs <- nextBlockGenerationTime(height, blockchainUpdater, blockchainSettings.functionalitySettings, lastBlock, account)
+        balanceAndTs <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, blockForHit, account)
         (balance, ts) = balanceAndTs
         offset        = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
       } yield (offset, balance)
@@ -261,7 +293,7 @@ class MinerImpl(allChannels: ChannelGroup,
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(account, balance)(offset).flatMap {
           case Right((estimators, block, totalConstraint)) =>
-            BlockAppender(checkpoint, blockchainUpdater, timeService, utx, settings, appenderScheduler)(block)
+            BlockAppender(checkpoint, blockchainUpdater, timeService, utx, pos, settings, appenderScheduler)(block)
               .asyncBoundary(minerScheduler)
               .map {
                 case Left(err) => log.warn("Error mining Block: " + err.toString)
