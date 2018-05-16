@@ -114,7 +114,8 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     sender.getData(secondAddress, "int") shouldBe intEntry
     sender.getData(secondAddress, "bool") shouldBe boolEntry
-    sender.getData(secondAddress) shouldBe boolList ++ intList
+    sender.getData(secondAddress, "str") shouldBe stringEntry
+    sender.getData(secondAddress) shouldBe boolList ++ intList ++ stringList
 
     // redefine int entry
     val reIntEntry = LongDataEntry("int", 10)
