@@ -3,7 +3,7 @@ package com.wavesplatform.lang
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions._
-import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.parser.{BinaryOperation, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
 import fastparse.core.Parsed.{Failure, Success}
 import org.scalacheck.Gen
@@ -43,17 +43,17 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
   property("all types of multiline expressions") {
     val gas = 50
-    genElementCheck(CONST_LONGgen)
+    genElementCheck(CONST_LONGgen.map(_._1))
     genElementCheck(STRgen)
     genElementCheck(REFgen)
-    genElementCheck(BOOLgen(gas))
-    genElementCheck(SUMgen(gas))
-    genElementCheck(EQ_INTgen(gas))
-    genElementCheck(INTGen(gas))
-    genElementCheck(GEgen(gas))
-    genElementCheck(GTgen(gas))
-    genElementCheck(ANDgen(gas))
-    genElementCheck(ORgen(gas))
+    genElementCheck(BOOLgen(gas).map(_._1))
+    genElementCheck(SUMgen(gas).map(_._1))
+    genElementCheck(EQ_INTgen(gas).map(_._1))
+    genElementCheck(INTGen(gas).map(_._1))
+    genElementCheck(GEgen(gas).map(_._1))
+    genElementCheck(GTgen(gas).map(_._1))
+    genElementCheck(ANDgen(gas).map(_._1))
+    genElementCheck(ORgen(gas).map(_._1))
     genElementCheck(BLOCKgen(gas))
   }
 
@@ -137,14 +137,14 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("function call") {
-    parse("FOO(1,2)".stripMargin) shouldBe FUNCTION_CALL("FOO", List(CONST_LONG(1), CONST_LONG(2)))
-    parse("FOO(X)".stripMargin) shouldBe FUNCTION_CALL("FOO", List(REF("X")))
+    parse("FOO(1,2)".stripMargin) shouldBe FUNCTION_CALL(("FOO"), List(CONST_LONG(1), CONST_LONG(2)))
+    parse("FOO(X)".stripMargin) shouldBe FUNCTION_CALL(("FOO"), List(REF("X")))
   }
 
   property("isDefined/extract") {
-    parse("isDefined(X)") shouldBe FUNCTION_CALL("isDefined", List(REF("X")))
-    parse("if(isDefined(X)) then extract(X) else Y") shouldBe IF(FUNCTION_CALL("isDefined", List(REF("X"))),
-                                                                 FUNCTION_CALL("extract", List(REF("X"))),
+    parse("isDefined(X)") shouldBe FUNCTION_CALL(("isDefined"), List(REF("X")))
+    parse("if(isDefined(X)) then extract(X) else Y") shouldBe IF(FUNCTION_CALL(("isDefined"), List(REF("X"))),
+                                                                 FUNCTION_CALL(("extract"), List(REF("X"))),
                                                                  REF("Y"))
   }
 
@@ -161,25 +161,25 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       """.stripMargin
     ) shouldBe GETTER(REF("xxx"), "yyy")
 
-    parse("xxx(yyy).zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parse("xxx(yyy).zzz") shouldBe GETTER(FUNCTION_CALL(("xxx"), List(REF("yyy"))), "zzz")
     parse(
       """
         |
         | xxx(yyy).zzz
         |
       """.stripMargin
-    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    ) shouldBe GETTER(FUNCTION_CALL(("xxx"), List(REF("yyy"))), "zzz")
 
-    parse("(xxx(yyy)).zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parse("(xxx(yyy)).zzz") shouldBe GETTER(FUNCTION_CALL(("xxx"), List(REF("yyy"))), "zzz")
     parse(
       """
         |
         | (xxx(yyy)).zzz
         |
       """.stripMargin
-    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    ) shouldBe GETTER(FUNCTION_CALL(("xxx"), List(REF("yyy"))), "zzz")
 
-    parse("{xxx(yyy)}.zzz") shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    parse("{xxx(yyy)}.zzz") shouldBe GETTER(FUNCTION_CALL(("xxx"), List(REF("yyy"))), "zzz")
     parse(
       """
         |
@@ -188,7 +188,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         | }.zzz
         |
       """.stripMargin
-    ) shouldBe GETTER(FUNCTION_CALL("xxx", List(REF("yyy"))), "zzz")
+    ) shouldBe GETTER(FUNCTION_CALL(("xxx"), List(REF("yyy"))), "zzz")
 
     parse(
       """
@@ -199,7 +199,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         | }.zzz
         |
       """.stripMargin
-    ) shouldBe GETTER(BLOCK(LET("yyy", FUNCTION_CALL("aaa", List(REF("bbb")))), FUNCTION_CALL("xxx", List(REF("yyy")))), "zzz")
+    ) shouldBe GETTER(BLOCK(LET("yyy", FUNCTION_CALL(("aaa"), List(REF("bbb")))), FUNCTION_CALL(("xxx"), List(REF("yyy")))), "zzz")
   }
 
   property("crypto functions") {
@@ -227,5 +227,61 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       """1 + 1
         |2 + 2""".stripMargin
     ) shouldBe false
+  }
+
+  property("simple matching") {
+    val code =
+      """
+        |
+        | match tx {
+        |    case a: TypeA => 0
+        |    case b: TypeB => 1
+        | }
+        |
+      """.stripMargin
+    parse(code) shouldBe MATCH(REF("tx"),
+                               List(MATCH_CASE(Some("a"), List("TypeA"), CONST_LONG(0)), MATCH_CASE(Some("b"), List("TypeB"), CONST_LONG(1))))
+  }
+
+  property("multiple union type matching") {
+    val code =
+      """
+        |
+        | match tx {
+        |    case txa: TypeA => 0
+        |    case underscore : TypeB | TypeC => 1
+        | }
+        |
+      """.stripMargin
+    parse(code) shouldBe MATCH(REF("tx"),
+                               List(MATCH_CASE(Some("txa"), List("TypeA"), CONST_LONG(0)),
+                                    MATCH_CASE(Some("underscore"), List("TypeB", "TypeC"), CONST_LONG(1))))
+  }
+
+  property("matching expression") {
+    val code =
+      """
+        |
+        | match foo(x) + bar {
+        |    case x:TypeA => 0
+        |    case y:TypeB | TypeC => 1
+        | }
+        |
+      """.stripMargin
+    parse(code) shouldBe MATCH(
+      BINARY_OP(FUNCTION_CALL("foo", List(REF("x"))), BinaryOperation.SUM_OP, REF("bar")),
+      List(MATCH_CASE(Some("x"), List("TypeA"), CONST_LONG(0)), MATCH_CASE(Some("y"), List("TypeB", "TypeC"), CONST_LONG(1)))
+    )
+  }
+  property("failure to match") {
+    isParsed("match tx { } ") shouldBe false
+    isParsed("match tx { case => } ") shouldBe false
+    isParsed("match tx { case => 1} ") shouldBe false
+    isParsed("match tx { case TypeA => } ") shouldBe false
+    isParsed("match tx { case TypeA => 1 } ") shouldBe false
+    isParsed("match tx { case  :TypeA => 1 } ") shouldBe false
+    isParsed("match tx { case  x => 1 } ") shouldBe false
+    isParsed("match tx { case  _: | => 1 } ") shouldBe false
+    isParsed("match tx { case  _: |||| => 1 } ") shouldBe false
   }
 }

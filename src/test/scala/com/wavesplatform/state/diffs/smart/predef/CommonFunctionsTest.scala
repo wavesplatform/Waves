@@ -43,4 +43,23 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
     runScript[Long]("size(base58'')".stripMargin) shouldBe Right(0L)
     runScript[Long](s"size(base58'${ByteStr(arr).base58}')".stripMargin) shouldBe Right(3L)
   }
+
+  property("getTransfer should MassTransfer transfers extract") {
+    import scodec.bits.ByteVector
+    //import com.wavesplatform.lang.v1.ctx.Obj
+    forAll(massTransferGen.filter(_.transfers.size > 0)) {
+      case (massTransfer) =>
+        val resultAmount = runScript[Long]("tx.transfers[0].amount", massTransfer)
+        resultAmount shouldBe Right(massTransfer.transfers(0).amount)
+        val resultAddress = runScript[ByteVector]("tx.transfers[0].address.bytes", massTransfer)
+        resultAddress shouldBe Right(ByteVector(massTransfer.transfers(0).address.bytes.arr))
+        val resultLen = runScript[Long]("size(tx.transfers)", massTransfer)
+        resultLen shouldBe Right(massTransfer.transfers.size.toLong)
+    }
+  }
+
+  property("+ should check overflow") {
+    runScript[Long]("2 + 3") shouldBe Right(5L)
+    runScript[Long](s"1 + ${Long.MaxValue}") should produce("long overflow")
+  }
 }

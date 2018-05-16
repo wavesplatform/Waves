@@ -17,7 +17,7 @@ object Parser {
   import White._
   import fastparse.noApi._
   private val Base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-  private val keywords    = Set("let", "base58", "true", "false", "if", "then", "else")
+  private val keywords    = Set("let", "base58", "true", "false", "if", "then", "else", "match", "case")
 
   private val lowerChar             = CharIn('a' to 'z')
   private val upperChar             = CharIn('A' to 'Z')
@@ -26,6 +26,8 @@ object Parser {
   private val unicodeSymbolP        = P("u" ~ P(digit | char) ~ P(digit | char) ~ P(digit | char) ~ P(digit | char))
   private val escapedUnicodeSymbolP = P("\\" ~ (CharIn("\"\\bfnrt") | unicodeSymbolP))
   private val varName               = (char.repX(min = 1, max = 1) ~~ (digit | char).repX()).!.filter(!keywords.contains(_))
+
+  private val expr = P(binaryOp(opsByPriority) | atom)
 
   private val numberP: P[CONST_LONG] = P(CharIn("+-").rep(max = 1) ~ digit.repX(min = 1)).!.map(t => CONST_LONG(t.toLong))
   private val trueP: P[TRUE.type]    = P("true").map(_ => TRUE)
@@ -38,14 +40,33 @@ object Parser {
 
   private val functionCallArgs: P[Seq[EXPR]] = expr.rep(sep = ",")
 
-  private val functionCallP: P[FUNCTION_CALL] = P(varName ~~ "(" ~ functionCallArgs ~ ")").map {
-    case (functionName, args) => FUNCTION_CALL(functionName, args.toList)
-  }
+  private val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | refP)
 
-  private val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | functionCallP | refP)
+  private abstract class Accessor
+  private case class Getter(name: String)   extends Accessor
+  private case class Args(args: Seq[EXPR])  extends Accessor
+  private case class ListIndex(index: EXPR) extends Accessor
 
-  private val maybeGetterP: P[EXPR] = P(extractableAtom ~~ ("." ~~ varName).?).map {
-    case (e, f) => f.fold(e)(GETTER(e, _))
+  private val typesP: P[Seq[String]]    = varName.rep(min = 1, sep = "|")
+  private val matchCaseP: P[MATCH_CASE] = P("case" ~ varName ~ ":" ~ typesP ~ "=>" ~ expr).map { case (v, types, e) => MATCH_CASE(Some(v), types, e) }
+  private lazy val matchP: P[MATCH]     = P("match" ~ expr ~ "{" ~ matchCaseP.rep(min = 1) ~ "}").map { case (e, cases) => MATCH(e, cases.toList) }
+
+  private val accessP: P[Accessor] = P(("." ~~ varName).map(Getter.apply) | ("(" ~/ functionCallArgs.map(Args.apply) ~ ")")) | ("[" ~/ expr.map(
+    ListIndex.apply) ~ "]")
+
+  private val maybeAccessP: P[EXPR] = P(extractableAtom ~~ accessP.rep).map {
+    case (e, f) =>
+      f.foldLeft(e) { (e, a) =>
+        a match {
+          case Getter(n) => GETTER(e, n)
+          case Args(args) =>
+            e match {
+              case REF(functionName) => FUNCTION_CALL(functionName, args.toList)
+              case _                 => ???
+            }
+          case ListIndex(index) => FUNCTION_CALL("getElement", List(e, index))
+        }
+      }
   }
 
   private val byteVectorP: P[CONST_BYTEVECTOR] =
@@ -63,15 +84,14 @@ object Parser {
 
   private val block: P[EXPR] = P(letP ~ expr).map(Function.tupled(BLOCK.apply))
 
-  private val atom      = P(ifP | byteVectorP | stringP | numberP | trueP | falseP | block | maybeGetterP)
-  private lazy val expr = P(binaryOp(opsByPriority) | atom)
+  private val atom = P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP)
 
   private def binaryOp(rest: List[(String, BinaryOperation)]): P[EXPR] = rest match {
     case Nil => atom
     case (lessPriorityOp, kind) :: restOps =>
       val operand = binaryOp(restOps)
       P(operand ~ (lessPriorityOp.!.map(_ => kind) ~ operand).rep()).map {
-        case ((left: EXPR, r: Seq[(BinaryOperation, EXPR)])) =>
+        case (left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
           r.foldLeft(left) { case (acc, (currKind, currOperand)) => BINARY_OP(acc, currKind, currOperand) }
       }
   }

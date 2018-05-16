@@ -27,32 +27,8 @@ import scala.collection.immutable
 import scala.collection.mutable.ArrayBuffer
 
 object LevelDBWriter {
-
-  trait Key[V] {
-    def keyBytes: Array[Byte]
-
-    def parse(bytes: Array[Byte]): V
-
-    def encode(v: V): Array[Byte]
-
-    override lazy val toString: String = BigInt(keyBytes).toString(16)
-  }
-
-  object Key {
-    def apply[V](key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[V] = new Key[V] {
-      override def keyBytes: Array[Byte] = key
-
-      override def parse(bytes: Array[Byte]) = parser(bytes)
-
-      override def encode(v: V) = encoder(v)
-    }
-
-    def opt[V](key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[Option[V]] =
-      apply[Option[V]](key, Option(_).map(parser), _.fold[Array[Byte]](null)(encoder))
-  }
-
   object k {
-    val UTF8 = StandardCharsets.UTF_8
+    import StandardCharsets.{UTF_8 => UTF8}
 
     private def h(prefix: Int, height: Int): Array[Byte] = {
       val ndo = newDataOutput(6)
@@ -87,17 +63,6 @@ object LevelDBWriter {
       ndo.writeInt(height)
       ndo.write(addressIdBytes)
       ndo.toByteArray
-    }
-
-    private def writeIntSeq(values: Seq[Int]): Array[Byte] = {
-      val ndo = newDataOutput(4 * values.length)
-      values.foreach(ndo.writeInt)
-      ndo.toByteArray
-    }
-
-    private def readIntSeq(data: Array[Byte]): Seq[Int] = Option(data).fold(Seq.empty[Int]) { d =>
-      val ndi = newDataInput(d)
-      (1 to d.length / 4).map(_ => ndi.readInt())
     }
 
     private def readStrings(data: Array[Byte]): Seq[String] = Option(data).fold(Seq.empty[String]) { d =>
@@ -354,10 +319,10 @@ object LevelDBWriter {
       ndo.toByteArray
     }
 
-    def sponsorship(height: Int, assetId: ByteStr): Key[SponsorshipValue] =
-      Key(byteKeyWithH(33, height, assetId.arr), readSponsorship, writeSponsorship)
-
     def sponsorshipHistory(assetId: ByteStr): Key[Seq[Int]] = historyKey(34, assetId.arr)
+
+    def sponsorship(height: Int, assetId: ByteStr): Key[SponsorshipValue] =
+      Key(byteKeyWithH(35, height, assetId.arr), readSponsorship, writeSponsorship)
   }
 
   private def loadSponsorship(db: ReadOnlyDB, assetId: ByteStr) = {
@@ -696,6 +661,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
             case tx: BurnTransaction        => rollbackAssetInfo(rw, tx.assetId, currentHeight)
             case _: LeaseTransaction        => rollbackLeaseStatus(rw, tx.id(), currentHeight)
             case tx: LeaseCancelTransaction => rollbackLeaseStatus(rw, tx.leaseId, currentHeight)
+            case tx: SponsorFeeTransaction  => rollbackSponsorship(rw, tx.assetId, currentHeight)
 
             case tx: SetScriptTransaction =>
               val address = tx.sender.toAddress
@@ -756,6 +722,13 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
   private def rollbackLeaseStatus(rw: RW, leaseId: ByteStr, currentHeight: Int): Unit = {
     rw.delete(k.leaseStatus(currentHeight, leaseId))
     rw.filterHistory(k.leaseStatusHistory(leaseId), currentHeight)
+  }
+
+  private def rollbackSponsorship(rw: RW, assetId: ByteStr, currentHeight: Int): Unit = {
+    rw.delete(k.sponsorship(currentHeight, assetId))
+    rw.filterHistory(k.sponsorshipHistory(assetId), currentHeight)
+    assetDescriptionCache.invalidate(assetId)
+    sponsorshipCache.invalidate(assetId)
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(db => db.get(k.transactionInfo(id)))

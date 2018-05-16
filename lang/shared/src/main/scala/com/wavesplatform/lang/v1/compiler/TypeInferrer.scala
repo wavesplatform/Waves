@@ -40,16 +40,14 @@ object TypeInferrer {
   def matchTypes(actual: TYPE, expected: TYPEPLACEHOLDER): Either[String, Option[MatchResult]] = {
     lazy val err = s"Non-matching types: expected: $expected, actual: $actual"
 
-    expected match {
-      case realType: TYPE =>
+    (expected, actual) match {
+      case (realType: TYPE, _) =>
         Either.cond(matchType(realType, actual).isDefined, None, err)
-      case tp @ TYPEPARAM(char) =>
+      case (tp @ TYPEPARAM(char), _) =>
         Right(Some(MatchResult(actual, tp)))
-      case tp @ OPTIONTYPEPARAM(innerTypeParam) =>
-        actual match {
-          case OPTION(t) => matchTypes(t, innerTypeParam)
-          case _         => Left(err)
-        }
+      case (tp @ OPTIONTYPEPARAM(innerTypeParam), OPTION(t)) => matchTypes(t, innerTypeParam)
+      case (tp @ LISTTYPEPARAM(innerTypeParam), LIST(t)) => matchTypes(t, innerTypeParam)
+      case _         => Left(err)
     }
   }
 
@@ -62,9 +60,18 @@ object TypeInferrer {
           case Some(r) => Right(r)
         }
       case OPTIONTYPEPARAM(t) => inferResultType(t, resolved).map(OPTION)
+      case LISTTYPEPARAM(t) => inferResultType(t, resolved).map(LIST)
     }
   }
 
+  def findCommonType(list: Seq[TYPE]): Option[TYPE] = list match {
+    case one :: Nil => Some(one)
+    case head :: tail =>
+      for {
+        t <- findCommonType(tail)
+        r <- findCommonType(head, t)
+      } yield r
+  }
   def findCommonType(t1: TYPE, t2: TYPE): Option[TYPE]      = findCommonType(t1, t2, biDirectional = true)
   def matchType(required: TYPE, actual: TYPE): Option[TYPE] = findCommonType(required, actual, biDirectional = false)
 
@@ -75,6 +82,10 @@ object TypeInferrer {
     else
       (required, actual) match {
         case (OPTION(it1), OPTION(it2)) => findCommonType(it1, it2, biDirectional).map(OPTION)
-        case _                          => None
+        case (r: UNION, a: UNION) =>
+          if (biDirectional && UNION.eq(r, a)) Some(r)
+          else if (!biDirectional && UNION.>=(r, a)) Some(r)
+          else None
+        case _ => None
       }
 }

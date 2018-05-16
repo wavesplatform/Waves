@@ -8,6 +8,12 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal, Obj}
 import com.wavesplatform.lang.{ExecutionError, ExprEvaluator, TypeInfo}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext.Lenses._
+import com.wavesplatform.lang._
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, LET, _}
+import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.{funcs, lets}
+import com.wavesplatform.lang.v1.evaluator.ctx._
+import monix.eval.Coeval
 
 object EvaluatorV1 extends ExprEvaluator {
 
@@ -56,11 +62,20 @@ object EvaluatorV1 extends ExprEvaluator {
 
   private def evalGetter(expr: EXPR, field: String) = {
     for {
-      obj <- evalExpr[Obj](expr)
-      result <- obj.fields.get(field) match {
-        case Some(lzy) => liftTER[Any](lzy.value.value)
-        case None      => liftError[Any](s"field '$field' not found")
+      obj <- evalExpr[AnyObj](expr)
+      result <- obj match {
+        case Obj(fields) =>
+          fields.get(field) match {
+            case Some(lzy) => liftTER[Any](lzy.value.value)
+            case None      => liftError[Any](s"field '$field' not found")
+          }
+        case CaseObj(_, fields) =>
+          fields.get(field) match {
+            case Some(eager) => liftR[Any](eager.value)
+            case None        => liftL[Any](s"field '$field' not found")
+          }
       }
+
     } yield result
   }
 
@@ -92,9 +107,10 @@ object EvaluatorV1 extends ExprEvaluator {
       case GETTER(expr, field, _)         => evalGetter(expr, field)
       case FUNCTION_CALL(header, args, _) => evalFunctionCall(header, args)
     }).flatMap(v => {
-      val ti = typeInfo[T]
-      if (t.tpe.typeInfo <:< ti) liftValue(v.asInstanceOf[T])
-      else liftError(s"Bad type: expected: $ti actual: ${t.tpe.typeInfo}")
+      liftR(v.asInstanceOf[T])
+      //      val ti = typeInfo[T]
+      //      if (t.tpe.typeInfo <:< ti) liftValue(v.asInstanceOf[T])
+      //      else liftError(s"Bad type: expected: $ti actual: ${t.tpe.typeInfo}")
     })
 
   }

@@ -1,5 +1,7 @@
 package com.wavesplatform
 
+import java.nio.ByteBuffer
+
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.wavesplatform.state._
 import scorex.transaction.smart.script.{Script, ScriptReader}
@@ -39,5 +41,14 @@ package object database {
         Some(ScriptReader.fromBytes(b).explicitGet())
       } else None
     }
+  }
+
+  def writeIntSeq(values: Seq[Int]): Array[Byte] = {
+    values.foldLeft(ByteBuffer.allocate(4 * values.length))(_ putInt _).array()
+  }
+
+  def readIntSeq(data: Array[Byte]): Seq[Int] = Option(data).fold(Seq.empty[Int]) { d =>
+    val in = ByteBuffer.wrap(data)
+    Seq.fill(d.length / 4)(in.getInt)
   }
 }

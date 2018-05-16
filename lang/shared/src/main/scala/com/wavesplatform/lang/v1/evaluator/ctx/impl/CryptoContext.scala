@@ -30,6 +30,6 @@ object CryptoContext {
         Right(global.base58Encode(bytes.toArray))
       case _ => ???
     }
-    EvaluationContext.build(Seq.empty, Map.empty, Seq(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF))
+    EvaluationContext.build(Seq.empty, Seq.empty, Map.empty, Seq(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF))
   }
 }

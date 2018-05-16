@@ -108,10 +108,6 @@ package object appender extends ScorexLogging {
         GenericError(s"Block Version 3 can only appear at height greater than ${fs.blockVersion3AfterHeight}")
       )
       _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
-      _ <- {
-        val constraints = MiningEstimators(settings.minerSettings, blockchain, height)
-        Either.cond(!OneDimensionalMiningConstraint.full(constraints.total).put(block).isOverfilled, (), GenericError("Block is full"))
-      }
       _ <- Either.cond(
         blockTime < fs.requireSortedTransactionsAfter
           || height > fs.dontRequireSortedTransactionsAfter
