@@ -68,16 +68,28 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
       .map(_ => TransferTransactionV1(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, signature))
   }
 
-  def create(assetId: Option[AssetId],
-             sender: PrivateKeyAccount,
+  def signed(assetId: Option[AssetId],
+             sender: PublicKeyAccount,
              recipient: AddressOrAlias,
              amount: Long,
              timestamp: Long,
              feeAssetId: Option[AssetId],
              feeAmount: Long,
-             attachment: Array[Byte]): Either[ValidationError, TransactionT] = {
+             attachment: Array[Byte],
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
     create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
+      unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bodyBytes())))
     }
+  }
+
+  def selfSigned(assetId: Option[AssetId],
+                 sender: PrivateKeyAccount,
+                 recipient: AddressOrAlias,
+                 amount: Long,
+                 timestamp: Long,
+                 feeAssetId: Option[AssetId],
+                 feeAmount: Long,
+                 attachment: Array[Byte]): Either[ValidationError, TransactionT] = {
+    signed(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, sender)
   }
 }

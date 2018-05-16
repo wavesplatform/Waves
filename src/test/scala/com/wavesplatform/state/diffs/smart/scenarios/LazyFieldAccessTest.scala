@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.lang.v1.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{assertDiffAndState, assertDiffEi, produce}
@@ -20,7 +21,7 @@ class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers wit
   private def preconditionsTransferAndLease(
       code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransactionV1)] = {
     val untyped = Parser(code).get.value
-    val typed   = TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
+    val typed   = CompilerV1(dummyTypeCheckerContext, untyped).explicitGet()
     preconditionsTransferAndLease(typed)
   }
 
@@ -28,7 +29,7 @@ class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers wit
     """
       |
       | if (tx.type == 4)
-      |   then isDefined(tx.assetId)==false
+      |   then isDefined(tx.transferAssetId)==false
       |   else false
       |
       """.stripMargin
@@ -36,7 +37,7 @@ class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers wit
   private val badScript =
     """
       |
-      | isDefined(tx.assetId) == false
+      | isDefined(tx.transferAssetId) == false
       |
       """.stripMargin
 
@@ -53,7 +54,7 @@ class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers wit
       case ((genesis, script, lease, transfer)) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(totalDiffEi =>
-          totalDiffEi should produce("doesn't contain asset id"))
+          totalDiffEi should produce("doesn't transfer any asset"))
     }
   }
 }

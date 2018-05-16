@@ -8,7 +8,7 @@ import scorex.transaction.transfer._
 class TransferTransactionV1Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Transfer serialization roundtrip") {
-    forAll(transferGen) { transfer: TransferTransactionV1 =>
+    forAll(transferV1Gen) { transfer: TransferTransactionV1 =>
       val recovered = TransferTransactionV1.parseBytes(transfer.bytes()).get
 
       recovered.sender.address shouldEqual transfer.sender.address
@@ -24,7 +24,7 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
   }
 
   property("Transfer serialization from TypedTransaction") {
-    forAll(transferGen) { tx: TransferTransactionV1 =>
+    forAll(transferV1Gen) { tx: TransferTransactionV1 =>
       val recovered = TransactionParsers.parseBytes(tx.bytes()).get
       recovered.bytes() shouldEqual tx.bytes()
     }

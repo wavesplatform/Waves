@@ -14,6 +14,7 @@ import scorex.transaction.ValidationError.Validation
 import scorex.transaction._
 import MassTransferTransaction.{ParsedTransfer, toJson}
 import scala.util.{Either, Failure, Success, Try}
+import com.wavesplatform.lang.v1.traits.{Transfer => TransferRepr}
 
 case class MassTransferTransaction private (version: Byte,
                                             assetId: Option[AssetId],
@@ -74,7 +75,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
 
   case class Transfer(recipient: String, amount: Long)
 
-  case class ParsedTransfer(address: AddressOrAlias, amount: Long)
+  case class ParsedTransfer(address: AddressOrAlias, amount: Long) extends TransferRepr
 
   implicit val transferFormat: Format[Transfer] = Json.format
 
@@ -137,6 +138,19 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
     )
   }
 
+  def signed(version: Byte,
+             assetId: Option[AssetId],
+             sender: PublicKeyAccount,
+             transfers: List[ParsedTransfer],
+             timestamp: Long,
+             feeAmount: Long,
+             attachment: Array[Byte],
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+    create(version, assetId, sender, transfers, timestamp, feeAmount, attachment, Proofs.empty).right.map { unsigned =>
+      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
+    }
+  }
+
   def selfSigned(version: Byte,
                  assetId: Option[AssetId],
                  sender: PrivateKeyAccount,
@@ -144,9 +158,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
                  timestamp: Long,
                  feeAmount: Long,
                  attachment: Array[Byte]): Either[ValidationError, TransactionT] = {
-    create(version, assetId, sender, transfers, timestamp, feeAmount, attachment, Proofs.empty).right.map { unsigned =>
-      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes())))).explicitGet())
-    }
+    signed(version, assetId, sender, transfers, timestamp, feeAmount, attachment, sender)
   }
 
   def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] = {

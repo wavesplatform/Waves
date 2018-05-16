@@ -56,19 +56,30 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, TransactionT] =
     IssueTransaction
-      .validateIssueParams(name, description, quantity, decimals, reissuable, fee: Long)
+      .validateIssueParams(name, description, quantity, decimals, reissuable, fee)
       .map(_ => IssueTransactionV1(sender, name, description, quantity, decimals, reissuable, fee, timestamp, signature))
 
-  def create(sender: PrivateKeyAccount,
+  def signed(sender: PublicKeyAccount,
              name: Array[Byte],
              description: Array[Byte],
              quantity: Long,
              decimals: Byte,
              reissuable: Boolean,
              fee: Long,
-             timestamp: Long): Either[ValidationError, TransactionT] =
+             timestamp: Long,
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
     create(sender, name, description, quantity, decimals, reissuable, fee, timestamp, ByteStr.empty).right.map { unverified =>
-      unverified.copy(signature = ByteStr(crypto.sign(sender, unverified.bodyBytes())))
+      unverified.copy(signature = ByteStr(crypto.sign(signer, unverified.bodyBytes())))
     }
+
+  def selfSigned(sender: PrivateKeyAccount,
+                 name: Array[Byte],
+                 description: Array[Byte],
+                 quantity: Long,
+                 decimals: Byte,
+                 reissuable: Boolean,
+                 fee: Long,
+                 timestamp: Long): Either[ValidationError, TransactionT] =
+    signed(sender, name, description, quantity, decimals, reissuable, fee, timestamp, sender)
 
 }

@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.traits
 
-import com.wavesplatform.lang.v1.Terms.{BOOLEAN, BYTEVECTOR, LONG, TYPE}
+import com.wavesplatform.lang.v1.compiler.Terms.{BOOLEAN, BYTEVECTOR, LONG, TYPE}
 
 sealed abstract case class DataType(innerType: TYPE)
 object DataType {

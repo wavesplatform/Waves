@@ -8,7 +8,7 @@ import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.Transaction
 import org.scalatest.Suite
 import scorex.account.{Address, AddressOrAlias, AddressScheme, PrivateKeyAccount}
-import scorex.api.http.assets.SignedTransferRequest
+import scorex.api.http.assets.SignedTransferV1Request
 import scorex.crypto.encode.Base58
 import scorex.transaction.transfer._
 import scorex.utils.ScorexLogging
@@ -27,6 +27,29 @@ trait TransferSending extends ScorexLogging {
 
   AddressScheme.current = new AddressScheme {
     override val chainId: Byte = 'I'.toByte
+  }
+
+  def generateTransfersFromAccount(n: Int, accountAddress: String): Seq[Req] = {
+    val fee      = 100000 + 400000 // + 400000 for scripted accounts
+    val seedSize = 32
+
+    val srcSeed = NodeConfigs.Default
+      .collectFirst {
+        case x if x.getString("address") == accountAddress => x.getString("account-seed")
+      }
+      .getOrElse(throw new RuntimeException(s"Can't find address '$accountAddress' in nodes.conf"))
+
+    val sourceAndDest = (1 to n).map { _ =>
+      val destPk = Array.fill[Byte](seedSize)(Random.nextInt(Byte.MaxValue).toByte)
+      Address.fromPublicKey(destPk).address
+    }
+
+    val requests = sourceAndDest.foldLeft(List.empty[Req]) {
+      case (rs, dstAddr) =>
+        rs :+ Req(srcSeed, dstAddr, fee, fee)
+    }
+
+    requests
   }
 
   def generateTransfersBetweenAccounts(n: Int, balances: Map[Config, Long]): Seq[Req] = {
@@ -88,7 +111,7 @@ trait TransferSending extends ScorexLogging {
         case (x, i) =>
           createSignedTransferRequest(
             TransferTransactionV1
-              .create(
+              .selfSigned(
                 assetId = None,
                 sender = PrivateKeyAccount.fromSeed(x.senderSeed).right.get,
                 recipient = AddressOrAlias.fromString(x.targetAddress).right.get,
@@ -111,9 +134,9 @@ trait TransferSending extends ScorexLogging {
       .map(_.flatten)
   }
 
-  protected def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferRequest = {
+  protected def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferV1Request = {
     import tx._
-    SignedTransferRequest(
+    SignedTransferV1Request(
       Base58.encode(tx.sender.publicKey),
       assetId.map(_.base58),
       recipient.stringRepr,

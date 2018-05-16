@@ -3,6 +3,7 @@ package scorex.api.http.assets
 import akka.http.scaladsl.server.Route
 import com.google.common.base.Charsets
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
@@ -16,6 +17,7 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
+import scorex.transaction.smart.script.ScriptCompiler
 import scorex.transaction.{AssetIdStringLength, TransactionFactory}
 import scorex.utils.Time
 import scorex.wallet.Wallet
@@ -99,7 +101,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.assets.TransferRequest",
+        dataType = "scorex.api.http.assets.TransferV2Request",
         defaultValue =
           "{\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500,\"feeAssetId\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\",\"fee\":1579331567487095949,\"timestamp\":4231642878298810008}"
       )
@@ -108,9 +110,9 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     processRequest[TransferRequests](
       "transfer", { req =>
         req.eliminate(
-          x => doBroadcast(TransactionFactory.transferAsset(x, wallet, time)),
+          x => doBroadcast(TransactionFactory.transferAssetV1(x, wallet, time)),
           _.eliminate(
-            x => doBroadcast(TransactionFactory.versionedTransfer(x, wallet, time)),
+            x => doBroadcast(TransactionFactory.transferAssetV2(x, wallet, time)),
             _ => Future.successful(WrongJson(Some(new IllegalArgumentException("Doesn't know how to process request"))))
           )
         )
@@ -147,13 +149,13 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.assets.IssueRequest",
+        dataType = "scorex.api.http.assets.IssueV1Request",
         defaultValue =
           "{\"sender\":\"string\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000,\"decimals\":7,\"reissuable\":false,\"fee\":100000000}"
       )
     ))
   def issue: Route =
-    processRequest("issue", (r: IssueRequest) => doBroadcast(TransactionFactory.issueAsset(r, wallet, time)))
+    processRequest("issue", (r: IssueV1Request) => doBroadcast(TransactionFactory.issueAssetV1(r, wallet, time)))
 
   @Path("/reissue")
   @ApiOperation(value = "Issue Asset", notes = "Reissue Asset", httpMethod = "POST", produces = "application/json", consumes = "application/json")
@@ -164,12 +166,12 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.assets.ReissueRequest",
+        dataType = "scorex.api.http.assets.ReissueV1Request",
         defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100000,\"reissuable\":false,\"fee\":1}"
       )
     ))
   def reissue: Route =
-    processRequest("reissue", (r: ReissueRequest) => doBroadcast(TransactionFactory.reissueAsset(r, wallet, time)))
+    processRequest("reissue", (r: ReissueV1Request) => doBroadcast(TransactionFactory.reissueAssetV1(r, wallet, time)))
 
   @Path("/burn")
   @ApiOperation(value = "Burn Asset",
@@ -184,12 +186,12 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.assets.BurnRequest",
+        dataType = "scorex.api.http.assets.BurnV1Request",
         defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100,\"fee\":100000}"
       )
     ))
   def burnRoute: Route =
-    processRequest("burn", (b: BurnRequest) => doBroadcast(TransactionFactory.burnAsset(b, wallet, time)))
+    processRequest("burn", (b: BurnV1Request) => doBroadcast(TransactionFactory.burnAssetV1(b, wallet, time)))
 
   @Path("/order")
   @ApiOperation(value = "Sign Order",
@@ -258,6 +260,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         case _                   => None
       }).toRight("No issue transaction found with given asset ID")
       description <- blockchain.assetDescription(id).toRight("Failed to get description of the asset")
+      complexity  <- description.script.fold[Either[String, Long]](Right(0))(ScriptCompiler.estimate)
     } yield {
       JsObject(
         Seq(
@@ -270,8 +273,10 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           "decimals"       -> JsNumber(tx.decimals.toInt),
           "reissuable"     -> JsBoolean(description.reissuable),
           "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
-          "script"         -> JsString(description.script.fold("")(s => s.bytes().base58)),
-          "scriptText"     -> JsString(description.script.fold("")(s => s.text)),
+          "script"         -> JsString(description.script.fold("")(_.bytes().base58)),
+          "scriptText"     -> JsString(description.script.fold("")(_.text)),
+          "complexity"     -> JsNumber(complexity),
+          "extraFee"       -> JsNumber(if (description.script.isEmpty) 0 else CommonValidation.ScriptExtraFee),
           "minSponsoredAssetFee" -> (description.sponsorship match {
             case 0           => JsNull
             case sponsorship => JsNumber(sponsorship)

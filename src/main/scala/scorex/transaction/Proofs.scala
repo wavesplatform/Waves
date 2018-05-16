@@ -31,7 +31,7 @@ object Proofs {
 
   def fromBytes(ab: Array[Byte]): Either[ValidationError, Proofs] =
     for {
-      _    <- Either.cond(ab.headOption contains 1, (), GenericError("Proofs version must be 1"))
+      _    <- Either.cond(ab.headOption contains 1, (), GenericError(s"Proofs version must be 1, actual:${ab.headOption}"))
       arrs <- Try(Deser.parseArrays(ab.tail)).toEither.left.map(er => GenericError(er.toString))
       r    <- create(arrs.map(ByteStr(_)))
     } yield r

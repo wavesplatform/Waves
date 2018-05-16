@@ -2,7 +2,7 @@ package scorex.transaction.api.http.alias
 
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
-import scorex.api.http.alias.{CreateAliasRequest, SignedCreateAliasRequest}
+import scorex.api.http.alias.{CreateAliasV1Request, SignedCreateAliasV1Request}
 
 class AliasRequestTests extends FunSuite with Matchers {
   test("CreateAliasRequest") {
@@ -15,9 +15,9 @@ class AliasRequestTests extends FunSuite with Matchers {
         }
       """
 
-    val req = Json.parse(json).validate[CreateAliasRequest].get
+    val req = Json.parse(json).validate[CreateAliasV1Request].get
 
-    req shouldBe CreateAliasRequest("3Myss6gmMckKYtka3cKCM563TBJofnxvfD7", "ALIAS", 10000000)
+    req shouldBe CreateAliasV1Request("3Myss6gmMckKYtka3cKCM563TBJofnxvfD7", "ALIAS", 10000000)
   }
 
   test("SignedCreateAliasRequest") {
@@ -32,9 +32,9 @@ class AliasRequestTests extends FunSuite with Matchers {
           }
        """
 
-    val req = Json.parse(json).validate[SignedCreateAliasRequest].get
+    val req = Json.parse(json).validate[SignedCreateAliasV1Request].get
 
-    req shouldBe SignedCreateAliasRequest(
+    req shouldBe SignedCreateAliasV1Request(
       "CRxqEuxhdZBEHX42MU4FfyJxuHmbDBTaHMhM3Uki7pLw",
       100000,
       "ALIAS",

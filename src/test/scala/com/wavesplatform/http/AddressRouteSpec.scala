@@ -1,8 +1,8 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.lang.v1.Terms.Typed
-import com.wavesplatform.settings.{FeesSettings, SmartAccountSettings}
+import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.state.{Blockchain, EitherExt2}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
@@ -36,8 +36,7 @@ class AddressRouteSpec
     mock[UtxPool],
     mock[ChannelGroup],
     new TestTime,
-    TestFunctionalitySettings.Stub,
-    FeesSettings(SmartAccountSettings(10000), Map.empty)
+    TestFunctionalitySettings.Stub
   ).route
 
   private val generatedMessages = for {
@@ -147,14 +146,14 @@ class AddressRouteSpec
   }
 
   routePath(s"/scriptInfo/${allAddresses(1)}") in {
-    (blockchain.accountScript _).when(allAccounts(1).toAddress).onCall((_: Address) => Some(ScriptV1(Typed.TRUE).explicitGet()))
+    (blockchain.accountScript _).when(allAccounts(1).toAddress).onCall((_: Address) => Some(ScriptV1(TRUE).explicitGet()))
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1)
-      (response \ "script").as[String] shouldBe "WpgBYoY"
+      (response \ "script").as[String] shouldBe "We8Dksx"
       (response \ "scriptText").as[String] shouldBe "TRUE"
       (response \ "complexity").as[Long] shouldBe 1
-      (response \ "extraFee").as[Long] shouldBe 10000
+      (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }
 
     (blockchain.accountScript _).when(allAccounts(2).toAddress).onCall((_: Address) => None)

@@ -5,8 +5,9 @@ import java.nio.charset.StandardCharsets
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.crypto
-import com.wavesplatform.settings.{FeesSettings, FunctionalitySettings, RestAPISettings}
+import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
@@ -31,8 +32,7 @@ case class AddressApiRoute(settings: RestAPISettings,
                            utx: UtxPool,
                            allChannels: ChannelGroup,
                            time: Time,
-                           functionalitySettings: FunctionalitySettings,
-                           feesSettings: FeesSettings)
+                           functionalitySettings: FunctionalitySettings)
     extends ApiRoute
     with BroadcastRoute {
 
@@ -71,7 +71,7 @@ case class AddressApiRoute(settings: RestAPISettings,
       if (Address.fromString(address).isLeft) {
         complete(InvalidAddress)
       } else {
-        val deleted = wallet.findWallet(address).exists(account => wallet.deleteAccount(account))
+        val deleted = wallet.findPrivateKey(address).exists(account => wallet.deleteAccount(account))
         complete(Json.obj("deleted" -> deleted))
       }
     }
@@ -235,7 +235,7 @@ case class AddressApiRoute(settings: RestAPISettings,
   def seed: Route = {
     (path("seed" / Segment) & get & withAuth) { address =>
       complete(for {
-        pk   <- wallet.findWallet(address)
+        pk   <- wallet.findPrivateKey(address)
         seed <- wallet.exportAccountSeed(pk)
       } yield Json.obj("address" -> address, "seed" -> Base58.encode(seed)))
     }
@@ -374,7 +374,7 @@ case class AddressApiRoute(settings: RestAPISettings,
         script = script.map(_.bytes().base58),
         scriptText = script.map(_.text),
         complexity = complexity,
-        extraFee = if (complexity == 0) 0 else feesSettings.smartAccount.extraFee
+        extraFee = if (script.isEmpty) 0 else CommonValidation.ScriptExtraFee
       )
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
@@ -405,7 +405,7 @@ case class AddressApiRoute(settings: RestAPISettings,
   private def signPath(address: String, encode: Boolean) = (post & entity(as[String])) { message =>
     withAuth {
       val res = wallet
-        .findWallet(address)
+        .findPrivateKey(address)
         .map(pk => {
           val messageBytes = message.getBytes(StandardCharsets.UTF_8)
           val signature    = crypto.sign(pk, messageBytes)

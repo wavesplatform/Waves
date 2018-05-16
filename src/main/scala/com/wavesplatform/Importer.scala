@@ -6,7 +6,7 @@ import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
-import com.wavesplatform.mining.TwoDimensionalMiningConstraint
+import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.state.appender.BlockAppender
@@ -38,15 +38,15 @@ object Importer extends ScorexLogging {
 
     implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
     val utxPoolStub = new UtxPool {
-      override def putIfNew(tx: Transaction)                                                   = ???
-      override def removeAll(txs: Traversable[Transaction]): Unit                              = {}
-      override def accountPortfolio(addr: Address)                                             = ???
-      override def portfolio(addr: Address)                                                    = ???
-      override def all                                                                         = ???
-      override def size                                                                        = ???
-      override def transactionById(transactionId: ByteStr)                                     = ???
-      override def packUnconfirmed(rest: TwoDimensionalMiningConstraint, sortInBlock: Boolean) = ???
-      override def close(): Unit                                                               = {}
+      override def putIfNew(tx: Transaction)                                                     = ???
+      override def removeAll(txs: Traversable[Transaction]): Unit                                = {}
+      override def accountPortfolio(addr: Address)                                               = ???
+      override def portfolio(addr: Address)                                                      = ???
+      override def all                                                                           = ???
+      override def size                                                                          = ???
+      override def transactionById(transactionId: ByteStr)                                       = ???
+      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, sortInBlock: Boolean) = ???
+      override def close(): Unit                                                                 = {}
     }
 
     Try(args(1)) match {

@@ -1,12 +1,11 @@
 package scorex.api.http.alias
 
-import javax.ws.rs.Path
-
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
+import javax.ws.rs.Path
 import scorex.BroadcastRoute
 import scorex.api.http._
 
@@ -26,14 +25,14 @@ case class AliasBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allCh
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.alias.SignedCreateAliasRequest",
+        dataType = "scorex.api.http.alias.SignedCreateAliasV1Request",
         defaultValue =
           "{\n\t\"alias\": \"aliasalias\",\n\t\"senderPublicKey\": \"11111\",\n\t\"fee\": 100000\n\t\"timestamp\": 12345678,\n\t\"signature\": \"asdasdasd\"\n}"
       )
     ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def signedCreate: Route = (path("create") & post) {
-    json[SignedCreateAliasRequest] { aliasReq =>
+    json[SignedCreateAliasV1Request] { aliasReq =>
       doBroadcast(aliasReq.toTx)
     }
   }

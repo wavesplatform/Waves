@@ -4,13 +4,13 @@ import cats._
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.{Portfolio, _}
+import com.wavesplatform.state._
 import scorex.account.Address
 import scorex.transaction.ValidationError._
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.lease._
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
 
@@ -21,7 +21,7 @@ object CommonValidation {
 
   val MaxTimeTransactionOverBlockDiff: FiniteDuration     = 90.minutes
   val MaxTimePrevBlockOverTransactionDiff: FiniteDuration = 2.hours
-  private val ScriptExtraFee                              = 400000L
+  val ScriptExtraFee                                      = 400000L
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
                                                           settings: FunctionalitySettings,
@@ -93,23 +93,28 @@ object CommonValidation {
       )
 
     tx match {
-      case _: BurnTransaction         => Right(tx)
-      case _: PaymentTransaction      => Right(tx)
-      case _: GenesisTransaction      => Right(tx)
-      case _: TransferTransactionV1   => Right(tx)
-      case _: IssueTransactionV1      => Right(tx)
-      case _: ReissueTransaction      => Right(tx)
-      case _: ExchangeTransaction     => Right(tx)
-      case _: LeaseTransaction        => Right(tx)
-      case _: LeaseCancelTransaction  => Right(tx)
-      case _: CreateAliasTransaction  => Right(tx)
-      case _: MassTransferTransaction => activationBarrier(BlockchainFeatures.MassTransfer)
-      case _: DataTransaction         => activationBarrier(BlockchainFeatures.DataTransaction)
-      case _: SetScriptTransaction    => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: TransferTransactionV2   => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: IssueTransactionV2      => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: SponsorFeeTransaction   => activationBarrier(BlockchainFeatures.FeeSponsorship)
-      case _                          => Left(GenericError("Unknown transaction must be explicitly activated"))
+      case _: BurnTransactionV1        => Right(tx)
+      case _: PaymentTransaction       => Right(tx)
+      case _: GenesisTransaction       => Right(tx)
+      case _: TransferTransactionV1    => Right(tx)
+      case _: IssueTransactionV1       => Right(tx)
+      case _: ReissueTransactionV1     => Right(tx)
+      case _: ExchangeTransaction      => Right(tx)
+      case _: LeaseTransactionV1       => Right(tx)
+      case _: LeaseCancelTransactionV1 => Right(tx)
+      case _: CreateAliasTransactionV1 => Right(tx)
+      case _: MassTransferTransaction  => activationBarrier(BlockchainFeatures.MassTransfer)
+      case _: DataTransaction          => activationBarrier(BlockchainFeatures.DataTransaction)
+      case _: SetScriptTransaction     => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: TransferTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: IssueTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: ReissueTransactionV2     => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: BurnTransactionV2        => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: LeaseTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: LeaseCancelTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: CreateAliasTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: SponsorFeeTransaction    => activationBarrier(BlockchainFeatures.FeeSponsorship)
+      case _                           => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }
 
@@ -128,18 +133,13 @@ object CommonValidation {
     }
 
   def checkFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
-    def hasScript: Boolean = tx match {
-      case tx: Transaction with Authorized => blockchain.accountScript(tx.sender).isDefined
-      case _                               => false
-    }
     def feeInUnits: Either[ValidationError, Int] = tx match {
       case _: GenesisTransaction       => Right(0)
       case _: PaymentTransaction       => Right(1)
-      case _: IssueTransactionV1       => Right(1000)
-      case _: IssueTransactionV2       => Right(1000)
+      case _: IssueTransaction         => Right(1000)
       case _: ReissueTransaction       => Right(1000)
       case _: BurnTransaction          => Right(1)
-      case _: TransferTransactionV1    => Right(1)
+      case _: TransferTransaction      => Right(1)
       case tx: MassTransferTransaction => Right(1 + (tx.transfers.size + 1) / 2)
       case _: LeaseTransaction         => Right(1)
       case _: LeaseCancelTransaction   => Right(1)
@@ -147,53 +147,77 @@ object CommonValidation {
       case _: CreateAliasTransaction   => Right(1)
       case tx: DataTransaction         => Right(1 + (tx.bytes().length - 1) / 1024)
       case _: SetScriptTransaction     => Right(1)
-      case _: TransferTransactionV2    => Right(1)
       case _: SponsorFeeTransaction    => Right(1000)
       case _                           => Left(UnsupportedTransactionType)
     }
-    if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs))
-      for {
-        feeInUnits <- feeInUnits
-        txWavesFee <- tx.assetFee._1 match {
-          case None => Right(tx.assetFee._2)
-          case Some(assetId) =>
-            for {
-              assetInfo <- blockchain.assetDescription(assetId).toRight(GenericError(s"Asset $assetId does not exist, cannot be used to pay fees"))
-              wavesFee <- Either.cond(
-                assetInfo.sponsorship > 0,
-                Sponsorship.toWaves(tx.assetFee._2, assetInfo.sponsorship),
-                GenericError(s"Asset $assetId is not sponsored, cannot be used to pay fees")
-              )
-            } yield wavesFee
-        }
-        minimumFee = feeInUnits * Sponsorship.FeeUnit
-        _ <- Either.cond(
-          txWavesFee >= minimumFee,
-          (),
-          GenericError(
-            s"Fee in ${tx.assetFee._1.fold("WAVES")(_.toString)} for ${tx.builder.classTag} does not exceed minimal value of $minimumFee WAVES: $txWavesFee")
-        )
-        totalRequiredFee = minimumFee + (if (hasScript) ScriptExtraFee else 0L)
-        _ <- Either.cond(
-          txWavesFee >= totalRequiredFee,
-          (),
-          InsufficientFee(s"Scripted account requires $totalRequiredFee fee for this transaction, but given: $txWavesFee")
-        )
-      } yield ()
-    else if (hasScript)
-      for {
-        feeInUnits <- feeInUnits
-        txWavesFee <- tx.assetFee._1 match {
-          case None    => Right(tx.assetFee._2)
-          case Some(_) => Left(GenericError("Scripted accounts can accept transactions with Waves as fee only"))
-        }
-        totalRequiredFee = feeInUnits * Sponsorship.FeeUnit + ScriptExtraFee
-        _ <- Either.cond(
-          txWavesFee >= totalRequiredFee,
-          (),
-          InsufficientFee(s"Scripted account requires $totalRequiredFee fee for this transaction, but given: $txWavesFee")
-        )
-      } yield ()
-    else Right(())
+
+    def restFeeAfterSponsorship(inputFee: (Option[AssetId], Long)): Either[ValidationError, (Option[AssetId], Long)] =
+      if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) Right(inputFee)
+      else {
+        val (feeAssetId, feeAmount) = inputFee
+        for {
+          feeInUnits <- feeInUnits
+          feeAmount <- feeAssetId match {
+            case None => Right(feeAmount)
+            case Some(x) =>
+              for {
+                assetInfo <- blockchain.assetDescription(x).toRight(GenericError(s"Asset $x does not exist, cannot be used to pay fees"))
+                wavesFee <- Either.cond(
+                  assetInfo.sponsorship > 0,
+                  Sponsorship.toWaves(feeAmount, assetInfo.sponsorship),
+                  GenericError(s"Asset $x is not sponsored, cannot be used to pay fees")
+                )
+              } yield wavesFee
+          }
+          minimumFee    = feeInUnits * Sponsorship.FeeUnit
+          restFeeAmount = feeAmount - minimumFee
+          _ <- Either.cond(
+            restFeeAmount >= 0,
+            (),
+            GenericError(
+              s"Fee in ${feeAssetId.fold("WAVES")(_.toString)} for ${tx.builder.classTag} does not exceed minimal value of $minimumFee WAVES: $feeAmount")
+          )
+        } yield (None, restFeeAmount)
+      }
+
+    def isSmartToken: Boolean = tx.assetFee._1.flatMap(blockchain.assetDescription).exists(_.script.isDefined)
+
+    def restFeeAfterSmartTokens(inputFee: (Option[AssetId], Long)): Either[ValidationError, (Option[AssetId], Long)] =
+      if (isSmartToken) {
+        val (feeAssetId, feeAmount) = inputFee
+        for {
+          _ <- Either.cond(feeAssetId.isEmpty, (), GenericError("Transactions with smart tokens require Waves as fee"))
+          restFeeAmount = feeAmount - ScriptExtraFee
+          _ <- Either.cond(
+            restFeeAmount >= 0,
+            (),
+            InsufficientFee(s"This transaction with a smart token requires ${-restFeeAmount} additional fee")
+          )
+        } yield (feeAssetId, restFeeAmount)
+      } else Right(inputFee)
+
+    def hasSmartAccountScript: Boolean = tx match {
+      case tx: Transaction with Authorized => blockchain.accountScript(tx.sender).isDefined
+      case _                               => false
+    }
+
+    def restFeeAfterSmartAccounts(inputFee: (Option[AssetId], Long)): Either[ValidationError, (Option[AssetId], Long)] =
+      if (hasSmartAccountScript) {
+        val (feeAssetId, feeAmount) = inputFee
+        for {
+          _ <- Either.cond(feeAssetId.isEmpty, (), GenericError("Transactions from scripted accounts require Waves as fee"))
+          restFeeAmount = feeAmount - ScriptExtraFee
+          _ <- Either.cond(
+            restFeeAmount >= 0,
+            (),
+            InsufficientFee(s"Scripted account requires ${-restFeeAmount} additional fee for this transaction")
+          )
+        } yield (feeAssetId, restFeeAmount)
+      } else Right(inputFee)
+
+    restFeeAfterSponsorship(tx.assetFee)
+      .flatMap(restFeeAfterSmartTokens)
+      .flatMap(restFeeAfterSmartAccounts)
+      .map(_ => ())
   }
 }

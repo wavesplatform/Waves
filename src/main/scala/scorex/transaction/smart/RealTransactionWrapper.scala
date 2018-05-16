@@ -6,6 +6,7 @@ import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.transfer._
+import com.wavesplatform.lang.v1.traits.Transfer
 
 case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lang.v1.traits.Transaction {
   override def bodyBytes: Either[String, ByteVector] = tx match {
@@ -20,10 +21,17 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
     case _              => Left("Transaction doesn't contain sender public key")
   }
 
-  override def assetId: Either[String, Option[ByteVector]] = tx match {
+  override def assetId: Either[String, ByteVector] = tx match {
+    case stt: ReissueTransaction    => Right(ByteVector(stt.assetId.arr))
+    case stt: BurnTransaction       => Right(ByteVector(stt.assetId.arr))
+    case stt: SponsorFeeTransaction => Right(ByteVector(stt.assetId.arr))
+    case _                          => Left("Transaction doesn't contain asset id")
+  }
+
+  override def transferAssetId: Either[String, Option[ByteVector]] = tx match {
     case tt: TransferTransaction      => Right(tt.assetId.map(x => ByteVector(x.arr)))
     case mtt: MassTransferTransaction => Right(mtt.assetId.map(x => ByteVector(x.arr)))
-    case _                            => Left("Transaction doesn't contain asset id")
+    case _                            => Left("Transaction doesn't transfer any asset")
   }
 
   override def recipient: Either[String, ByteVector] = tx match {
@@ -36,6 +44,11 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
   override def proofs: Either[String, IndexedSeq[ByteVector]] = tx match {
     case pt: ProvenTransaction => Right(pt.proofs.proofs.map(pf => ByteVector(pf.arr)).toIndexedSeq)
     case _                     => Left("Transaction doesn't contain proofs")
+  }
+
+  override def transfers: Either[String, IndexedSeq[Transfer]] = tx match {
+    case ms: MassTransferTransaction => Right(ms.transfers.toIndexedSeq)
+    case _                           => Left("Transaction doesn't contain transfers")
   }
 
   override def id: ByteVector = ByteVector(tx.id().arr)
@@ -107,6 +120,12 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
     case g: SetScriptTransaction    => Right(g.version)
     case g: IssueTransactionV2      => Right(g.version)
     case g: DataTransaction         => Right(g.version)
+    case g: SponsorFeeTransaction   => Right(g.version)
     case _                          => Left("Transaction doesn't contain version")
+  }
+
+  override def minSponsoredAssetFee: Either[String, Option[Long]] = tx match {
+    case g: SponsorFeeTransaction => Right(g.minSponsoredAssetFee)
+    case _                        => Left("Transaction doesn't contain minSponsoredAssetFee")
   }
 }

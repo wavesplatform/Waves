@@ -81,12 +81,20 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
       _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: $fee"))
     } yield new SetScriptTransaction(version, networkByte, sender, script, fee, timestamp, proofs)
 
+  def signed(version: Byte,
+             sender: PublicKeyAccount,
+             script: Option[Script],
+             fee: Long,
+             timestamp: Long,
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
+    create(version, sender, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
+      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
+    }
+
   def selfSigned(version: Byte,
                  sender: PrivateKeyAccount,
                  script: Option[Script],
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] =
-    create(version, sender, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
-      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes())))).explicitGet())
-    }
+    signed(version, sender, script, fee, timestamp, sender)
 }

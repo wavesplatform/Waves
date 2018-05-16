@@ -8,7 +8,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.state.Sponsorship
 import org.scalatest.CancelAfterFailure
 import scorex.account.PrivateKeyAccount
-import scorex.api.http.assets.SignedIssueRequest
+import scorex.api.http.assets.SignedIssueV1Request
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.IssueTransactionV1
 
@@ -76,7 +76,7 @@ object CustomFeeTransactionSuite {
   private val seed = Default(3).getString("account-seed")
   private val pk   = PrivateKeyAccount.fromSeed(seed).right.get
   val assetTx = IssueTransactionV1
-    .create(
+    .selfSigned(
       sender = pk,
       name = "asset".getBytes(),
       description = "asset description".getBytes(),
@@ -108,9 +108,9 @@ object CustomFeeTransactionSuite {
     notMinerConfig.withFallback(Default(3))
   )
 
-  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueRequest = {
+  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
     import tx._
-    SignedIssueRequest(
+    SignedIssueV1Request(
       Base58.encode(tx.sender.publicKey),
       new String(name),
       new String(description),

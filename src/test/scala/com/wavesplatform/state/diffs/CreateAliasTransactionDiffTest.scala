@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats._
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -8,10 +9,16 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock
+import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.{CreateAliasTransaction, GenesisTransaction}
+import scorex.transaction.{CreateAliasTransaction, CreateAliasTransactionV1, GenesisTransaction}
 
 class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+
+  val fs =
+    TestFunctionalitySettings.Enabled.copy(
+      preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0)
+    )
 
   val preconditionsAndAliasCreations
     : Gen[(GenesisTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction)] = for {
@@ -22,16 +29,16 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
     alias2                   <- aliasGen suchThat (_.name != alias.name)
     fee                      <- smallFeeGen
     other: PrivateKeyAccount <- accountGen
-    aliasTx                = CreateAliasTransaction.create(master, alias, fee, ts).right.get
-    sameAliasTx            = CreateAliasTransaction.create(master, alias, fee + 1, ts).right.get
-    sameAliasOtherSenderTx = CreateAliasTransaction.create(other, alias, fee + 2, ts).right.get
-    anotherAliasTx         = CreateAliasTransaction.create(master, alias2, fee + 3, ts).right.get
+    aliasTx                  <- createAliasGen(master, alias, fee, ts)
+    sameAliasTx              <- createAliasGen(master, alias, fee + 1, ts)
+    sameAliasOtherSenderTx   <- createAliasGen(other, alias, fee + 2, ts)
+    anotherAliasTx           <- createAliasGen(master, alias2, fee + 3, ts)
   } yield (genesis, aliasTx, sameAliasTx, sameAliasOtherSenderTx, anotherAliasTx)
 
   property("can create and resolve aliases preserving waves invariant") {
     forAll(preconditionsAndAliasCreations) {
       case (gen, aliasTx, _, _, anotherAliasTx) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(anotherAliasTx))) {
+        assertDiffAndState(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(anotherAliasTx)), fs) {
           case (blockDiff, newState) =>
             val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
             totalPortfolioDiff.balance shouldBe 0
@@ -50,11 +57,11 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
   property("cannot recreate existing alias") {
     forAll(preconditionsAndAliasCreations) {
       case (gen, aliasTx, sameAliasTx, sameAliasOtherSenderTx, _) =>
-        assertDiffEi(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(sameAliasTx))) { blockDiffEi =>
+        assertDiffEi(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(sameAliasTx)), fs) { blockDiffEi =>
           blockDiffEi should produce("AlreadyInTheState")
         }
 
-        assertDiffEi(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(sameAliasOtherSenderTx))) { blockDiffEi =>
+        assertDiffEi(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(sameAliasOtherSenderTx)), fs) { blockDiffEi =>
           blockDiffEi should produce("AlreadyInTheState")
         }
     }
@@ -73,7 +80,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
     maybeFeeAsset            <- Gen.oneOf(maybeAsset, maybeAsset2)
     alias                    <- aliasGen
     fee                      <- smallFeeGen
-    aliasTx = CreateAliasTransaction.create(aliasedRecipient, alias, fee, ts).right.get
+    aliasTx = CreateAliasTransactionV1.selfSigned(aliasedRecipient, alias, fee, ts).right.get
     transfer <- transferGeneratorP(master, alias, maybeAsset.map(_.id()), maybeFeeAsset.map(_.id()))
     lease    <- leaseAndCancelGeneratorP(master, alias, master).map(_._1)
   } yield (gen, gen2, issue1, issue2, aliasTx, transfer, lease)

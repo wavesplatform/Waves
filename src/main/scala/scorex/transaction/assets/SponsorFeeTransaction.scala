@@ -26,6 +26,7 @@ case class SponsorFeeTransaction private (version: Byte,
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(
       Array(builder.typeId),
+      Array(version),
       sender.publicKey,
       assetId.arr,
       Longs.toByteArray(minSponsoredAssetFee.getOrElse(0)),
@@ -54,9 +55,11 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
     Try {
       val txId = bytes(0)
       require(txId == typeId, s"Signed tx id is not match")
-      val sender      = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
-      val assetId     = ByteStr(bytes.slice(KeyLength + 1, KeyLength + AssetIdLength + 1))
-      val minFeeStart = KeyLength + AssetIdLength + 1
+      val bodyVersion = bytes(1)
+      require(version == bodyVersion, s"versions are not match ($version, $bodyVersion)")
+      val sender      = PublicKeyAccount(bytes.slice(2, KeyLength + 2))
+      val assetId     = ByteStr(bytes.slice(KeyLength + 2, KeyLength + AssetIdLength + 2))
+      val minFeeStart = KeyLength + AssetIdLength + 2
 
       val minFee    = Longs.fromByteArray(bytes.slice(minFeeStart, minFeeStart + 8))
       val fee       = Longs.fromByteArray(bytes.slice(minFeeStart + 8, minFeeStart + 16))
@@ -87,13 +90,22 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
       Right(SponsorFeeTransaction(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs))
     }
 
-  def create(version: Byte,
-             sender: PrivateKeyAccount,
+  def signed(version: Byte,
+             sender: PublicKeyAccount,
              assetId: ByteStr,
              minSponsoredAssetFee: Option[Long],
              fee: Long,
-             timestamp: Long): Either[ValidationError, TransactionT] =
+             timestamp: Long,
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
     create(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, Proofs.empty).right.map { unsigned =>
-      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes())))).explicitGet())
+      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
+
+  def selfSigned(version: Byte,
+                 sender: PrivateKeyAccount,
+                 assetId: ByteStr,
+                 minSponsoredAssetFee: Option[Long],
+                 fee: Long,
+                 timestamp: Long): Either[ValidationError, TransactionT] =
+    signed(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, sender)
 }

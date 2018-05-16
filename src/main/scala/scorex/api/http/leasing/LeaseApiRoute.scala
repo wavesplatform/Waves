@@ -11,10 +11,10 @@ import play.api.libs.json.JsNumber
 import scorex.BroadcastRoute
 import scorex.account.Address
 import scorex.api.http._
-import scorex.api.http.leasing.LeaseCancelRequest.leaseCancelRequestFormat
-import scorex.api.http.leasing.LeaseRequest.leaseCancelRequestFormat
+import scorex.api.http.leasing.LeaseCancelV1Request.leaseCancelRequestFormat
+import scorex.api.http.leasing.LeaseV1Request.leaseCancelRequestFormat
 import scorex.transaction._
-import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
@@ -37,13 +37,13 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.leasing.LeaseRequest",
+        dataType = "scorex.api.http.leasing.LeaseV1Request",
         defaultValue =
           "{\n\t\"amount\": 100000000,\n\t\"recipient\": \"3NBsppTVpai9jq6agi9wXXrWhaMPPig48Aw\",\n\t\"sender\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n\t\"fee\": 100000\n}"
       )
     ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def lease: Route = processRequest("lease", (t: LeaseRequest) => doBroadcast(TransactionFactory.lease(t, wallet, time)))
+  def lease: Route = processRequest("lease", (t: LeaseV1Request) => doBroadcast(TransactionFactory.leaseV1(t, wallet, time)))
 
   @Path("/cancel")
   @ApiOperation(value = "Interrupt a lease", httpMethod = "POST", produces = "application/json", consumes = "application/json")
@@ -54,12 +54,12 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.leasing.LeaseCancelRequest",
+        dataType = "scorex.api.http.leasing.LeaseCancelV1Request",
         defaultValue =
           "{\n\t\"sender\": \"3Myss6gmMckKYtka3cKCM563TBJofnxvfD7\",\n\t\"txId\": \"ABMZDPY4MyQz7kKNAevw5P9eNmRErMutJoV9UNeCtqRV\",\n\t\"fee\": 10000000\n}"
       )
     ))
-  def cancel: Route = processRequest("cancel", (t: LeaseCancelRequest) => doBroadcast(TransactionFactory.leaseCancel(t, wallet, time)))
+  def cancel: Route = processRequest("cancel", (t: LeaseCancelV1Request) => doBroadcast(TransactionFactory.leaseCancelV1(t, wallet, time)))
 
   @Path("/active/{address}")
   @ApiOperation(value = "Get all active leases for an address", httpMethod = "GET")
@@ -73,7 +73,7 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
         case Left(e) => ApiError.fromValidationError(e)
         case Right(a) =>
           blockchain
-            .addressTransactions(a, Set(LeaseTransaction.typeId), Int.MaxValue, 0)
+            .addressTransactions(a, Set(LeaseTransactionV1.typeId), Int.MaxValue, 0)
             .collect {
               case (h, lt: LeaseTransaction) if blockchain.leaseDetails(lt.id()).exists(_.isActive) =>
                 lt.json() + ("height" -> JsNumber(h))

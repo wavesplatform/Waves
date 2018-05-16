@@ -17,6 +17,7 @@ import scorex.api.http._
 import scorex.api.http.leasing.LeaseBroadcastApiRoute
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.Transaction
+import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 
 class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
   private val settings    = RestAPISettings.fromConfig(ConfigFactory.load())
@@ -30,8 +31,8 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
 
     val vt = Table[String, G[_ <: Transaction], (JsValue) => JsValue](
       ("url", "generator", "transform"),
-      ("lease", leaseGen, identity),
-      ("cancel", leaseCancelGen, {
+      ("lease", leaseGen.retryUntil(_.isInstanceOf[LeaseTransactionV1]), identity),
+      ("cancel", leaseCancelGen.retryUntil(_.isInstanceOf[LeaseCancelTransactionV1]), {
         case o: JsObject => o ++ Json.obj("txId" -> o.value("leaseId"))
         case other       => other
       })

@@ -9,7 +9,6 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
     val config = ConfigFactory.parseString("""waves {
         |  network.file = "xxx"
         |  fees {
-        |    smart-account.extra-fee = 100
         |    payment.WAVES = 100000
         |    issue.WAVES = 100000000
         |    transfer.WAVES = 100000
@@ -22,7 +21,6 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
       """.stripMargin).resolve()
 
     val settings = FeesSettings.fromConfig(config)
-    settings.smartAccount shouldBe SmartAccountSettings(100)
     settings.fees.size should be(6)
     settings.fees(2) should be(List(FeeSettings("WAVES", 100000)))
     settings.fees(3) should be(List(FeeSettings("WAVES", 100000000)))
@@ -34,7 +32,6 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
 
   it should "combine read few fees for one transaction type" in {
     val config = ConfigFactory.parseString("""waves.fees {
-        |  smart-account.extra-fee = 100
         |  payment {
         |    WAVES0 = 0
         |  }
@@ -57,9 +54,7 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
   }
 
   it should "allow empty list" in {
-    val config = ConfigFactory.parseString("""waves.fees.smart-account {
-        |  extra-fee = 100
-        |}""".stripMargin).resolve()
+    val config = ConfigFactory.parseString("waves.fees {}".stripMargin).resolve()
 
     val settings = FeesSettings.fromConfig(config)
     settings.fees.size should be(0)
@@ -68,14 +63,12 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
   it should "override values" in {
     val config = ConfigFactory
       .parseString("""waves.fees {
-        |  smart-account.extra-fee = 100
         |  payment.WAVES1 = 1111
         |  reissue.WAVES5 = 0
         |}
       """.stripMargin)
       .withFallback(
         ConfigFactory.parseString("""waves.fees {
-          |  smart-account.extra-fee = 10
           |  payment.WAVES = 100000
           |  issue.WAVES = 100000000
           |  transfer.WAVES = 100000
@@ -88,7 +81,6 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
       .resolve()
 
     val settings = FeesSettings.fromConfig(config)
-    settings.smartAccount shouldBe SmartAccountSettings(100)
     settings.fees.size should be(6)
     settings.fees(2).toSet should equal(Set(FeeSettings("WAVES", 100000), FeeSettings("WAVES1", 1111)))
     settings.fees(5).toSet should equal(Set(FeeSettings("WAVES", 100000), FeeSettings("WAVES5", 0)))
@@ -96,7 +88,6 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
 
   it should "fail on incorrect long values" in {
     val config = ConfigFactory.parseString("""waves.fees {
-        |  smart-account.extra-fee = 10
         |  payment.WAVES=N/A
         |}""".stripMargin).resolve()
     intercept[WrongType] {
@@ -106,7 +97,6 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
 
   it should "not fail on long values as strings" in {
     val config   = ConfigFactory.parseString("""waves.fees {
-        |  smart-account.extra-fee = 10
         |  transfer.WAVES="1000"
         |}""".stripMargin).resolve()
     val settings = FeesSettings.fromConfig(config)
@@ -115,7 +105,6 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
 
   it should "fail on unknown transaction type" in {
     val config = ConfigFactory.parseString("""waves.fees {
-        |  smart-account.extra-fee = 10
         |  shmayment.WAVES=100
         |}""".stripMargin).resolve()
     intercept[NoSuchElementException] {
@@ -127,7 +116,6 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
     val defaultConfig = ConfigFactory.load()
     val config        = ConfigFactory.parseString("""
         |waves.fees {
-        |  smart-account.extra-fee = 331
         |  issue {
         |    WAVES = 200000000
         |  }
@@ -169,7 +157,6 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
       """.stripMargin).withFallback(defaultConfig).resolve()
     val settings      = FeesSettings.fromConfig(config)
     settings.fees.size should be(12)
-    settings.smartAccount shouldBe SmartAccountSettings(331)
     settings.fees(3).toSet should equal(Set(FeeSettings("WAVES", 200000000)))
     settings.fees(4).toSet should equal(Set(FeeSettings("WAVES", 300000), FeeSettings("6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL", 1)))
     settings.fees(5).toSet should equal(Set(FeeSettings("WAVES", 400000)))

@@ -4,6 +4,7 @@ import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.BlockGen
 import com.wavesplatform.db.WithState
+import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, Diff}
 import org.scalatest.{FreeSpecLike, Matchers}
@@ -134,7 +135,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
   private def assertDiffEiWithPrev(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings)(assertion: (Diff, Blockchain) => Unit): Unit =
     withStateAndHistory(fs) { bc =>
       def differ(prev: Option[Block], b: Block): Either[ValidationError, Diff] =
-        BlockDiffer.fromBlock(fs, bc, prev, b)
+        BlockDiffer.fromBlock(fs, bc, prev, b, MiningConstraint.Unlimited).map(_._1)
 
       zipWithPrev(preconditions).foreach {
         case (prev, b) =>

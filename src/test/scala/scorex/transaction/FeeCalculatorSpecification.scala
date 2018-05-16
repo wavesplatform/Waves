@@ -3,8 +3,7 @@ package scorex.transaction
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.FeesSettings
-import com.wavesplatform.state.ByteStr
-import com.wavesplatform.state._
+import com.wavesplatform.state.{ByteStr, _}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Assertion, Matchers, PropSpec}
@@ -19,7 +18,6 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
   private val configString =
     """waves {
       |  fees {
-      |    smart-account.extra-fee = 10
       |    payment {
       |      WAVES = 100000
       |    }
@@ -70,7 +68,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
 
   property("Transfer transaction ") {
     val feeCalc = new FeeCalculator(mySettings, noScriptBlockchain)
-    forAll(transferGen) { tx: TransferTransactionV1 =>
+    forAll(transferV1Gen) { tx: TransferTransactionV1 =>
       if (tx.feeAssetId.isEmpty) {
         feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 100000)
       } else {
@@ -84,11 +82,11 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
     val sender        = PrivateKeyAccount(Array.emptyByteArray)
     val recipient     = Address.fromString("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8").right.get
     val tx1: TransferTransactionV1 = TransferTransactionV1
-      .create(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000, Some(WhitelistedAsset), 12, Array.emptyByteArray)
+      .selfSigned(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000, Some(WhitelistedAsset), 12, Array.emptyByteArray)
       .right
       .get
     val tx2: TransferTransactionV1 = TransferTransactionV1
-      .create(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000, Some(WhitelistedAsset), 1, Array.emptyByteArray)
+      .selfSigned(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000, Some(WhitelistedAsset), 1, Array.emptyByteArray)
       .right
       .get
 
@@ -105,7 +103,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
 
   property("Issue transaction ") {
     val feeCalc = new FeeCalculator(mySettings, noScriptBlockchain)
-    forAll(issueV1Gen) { tx: IssueTransaction =>
+    forAll(issueGen) { tx: IssueTransaction =>
       feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 100000000)
     }
   }

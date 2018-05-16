@@ -4,7 +4,8 @@ import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.v1.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import org.scalatest.CancelAfterFailure
@@ -60,13 +61,13 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
         let A = base58'${ByteStr(acc1.publicKey)}'
         let B = base58'${ByteStr(acc2.publicKey)}'
 
-        let AC = if(sigVerify(tx.bodyBytes,tx.proof0,A)) then 1 else 0
-        let BC = if(sigVerify(tx.bodyBytes,tx.proof1,B)) then 1 else 0
+        let AC = sigVerify(tx.bodyBytes,tx.proof0,A)
+        let BC = sigVerify(tx.bodyBytes,tx.proof1,B)
 
-         AC + BC == 2
+         AC && BC
 
       """.stripMargin).get.value
-      TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
+      CompilerV1(dummyTypeCheckerContext, untyped).explicitGet()
     }
 
     val script = ScriptV1(scriptText).explicitGet()
@@ -179,12 +180,12 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       val untyped = Parser(s"""
         let A = base58'${ByteStr(acc3.publicKey)}'
 
-        let AC = if(sigVerify(tx.bodyBytes,tx.proof0,A)) then true else false
+        let AC = sigVerify(tx.bodyBytes,tx.proof0,A)
         let heightVerification = if (height > $heightBefore + 10) then true else false
 
         AC && heightVerification
         """.stripMargin).get.value
-      TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
+      CompilerV1(dummyTypeCheckerContext, untyped).explicitGet()
     }
 
     val script = ScriptV1(scriptText).explicitGet()
@@ -203,7 +204,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val transfers =
       MassTransferTransaction.parseTransfersList(List(Transfer(thirdAddress, transferAmount), Transfer(secondAddress, transferAmount))).right.get
 
-    val massTransferFee = 0.001.waves + 0.0005.waves * 3
+    val massTransferFee = 0.004.waves + 0.0005.waves * 4
 
     val unsigned =
       MassTransferTransaction

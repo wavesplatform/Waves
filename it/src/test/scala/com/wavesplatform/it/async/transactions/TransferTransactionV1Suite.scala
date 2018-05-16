@@ -66,7 +66,7 @@ class TransferTransactionV1Suite extends BaseTransactionSuite with TransferSendi
   test("invalid signed waves transfer should not be in UTX or blockchain") {
     def invalidByTsTx(ts: Long) =
       TransferTransactionV1
-        .create(None, sender.privateKey, AddressOrAlias.fromString(sender.address).right.get, 1, ts, None, 1.waves, Array.emptyByteArray)
+        .selfSigned(None, sender.privateKey, AddressOrAlias.fromString(sender.address).right.get, 1, ts, None, 1.waves, Array.emptyByteArray)
         .right
         .get
 

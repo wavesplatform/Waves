@@ -1,6 +1,5 @@
 package com.wavesplatform.database
 
-import com.wavesplatform.database.LevelDBWriter.Key
 import org.iq80.leveldb.{DB, ReadOptions}
 
 class RW(db: DB) extends AutoCloseable {

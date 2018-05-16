@@ -26,14 +26,14 @@ case class LeaseBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allCh
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.leasing.SignedLeaseRequest",
+        dataType = "scorex.api.http.leasing.SignedLeaseV1Request",
         defaultValue =
           "{\n\t\"amount\": 100000000,\n\t\"recipient\": \"3NBsppTVpai9jq6agi9wXXrWhaMPPig48Aw\",\n\t\"senderPublicKey\": \"11111\",\n\t\"fee\": 100000\n\t\"timestamp\": 12345678,\n\t\"signature\": \"asdasdasd\"\n}"
       )
     ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def signedLease: Route = (path("lease") & post) {
-    json[SignedLeaseRequest] { leaseReq =>
+    json[SignedLeaseV1Request] { leaseReq =>
       doBroadcast(leaseReq.toTx)
     }
   }
@@ -50,13 +50,13 @@ case class LeaseBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allCh
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.api.http.leasing.SignedLeaseCancelRequest",
+        dataType = "scorex.api.http.leasing.SignedLeaseCancelV1Request",
         defaultValue =
           "{\n\t\"sender\": \"3Myss6gmMckKYtka3cKCM563TBJofnxvfD7\",\n\t\"txId\": \"ABMZDPY4MyQz7kKNAevw5P9eNmRErMutJoV9UNeCtqRV\",\n\t\"fee\": 10000000\n\t\"timestamp\": 12345678,\n\t\"signature\": \"asdasdasd\"\n}"
       )
     ))
   def signedLeaseCancel: Route = (path("cancel") & post) {
-    json[SignedLeaseCancelRequest] { leaseCancelReq =>
+    json[SignedLeaseCancelV1Request] { leaseCancelReq =>
       doBroadcast(leaseCancelReq.toTx)
     }
   }
