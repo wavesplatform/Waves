@@ -30,7 +30,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       bool <- booleanEntryGen(dataAsciiKeyGen).filter(_.key != long.key)
       bin  <- binaryEntryGen(dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key)
       str <- stringEntryGen(dataAsciiKeyGen).filter(e =>
-        e.key != long.key && e.key != bool.key && e.key != bin.key && e.value.length <= MaxValueSize / 3)
+        e.key != long.key && e.key != bool.key && e.key != bin.key && e.value.length <= MaxValueSize / 5)
       dataTransaction <- dataTransactionGenP(oracle, List(long, bool, bin, str))
       allFieldsRequiredScript        = s"""
                     |
