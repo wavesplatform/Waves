@@ -18,6 +18,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   def parse(x: String): EXPR = Parser(x) match {
     case Success(r, _) => r
     case e @ Failure(_, i, _) =>
+      println(x)
       println(
         s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${e.extra.traced.fullStack
           .mkString("\n")}")
@@ -278,9 +279,9 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     isParsed("match tx { case => } ") shouldBe false
     isParsed("match tx { case => 1} ") shouldBe false
     isParsed("match tx { case TypeA => } ") shouldBe false
-    isParsed("match tx { case TypeA => 1 } ") shouldBe false
     isParsed("match tx { case  :TypeA => 1 } ") shouldBe false
-    isParsed("match tx { case  x => 1 } ") shouldBe false
+    isParsed("match tx { case  x => 1 } ") shouldBe true
+    isParsed("match tx { case  _:TypeA => 1 } ") shouldBe true
     isParsed("match tx { case  _: | => 1 } ") shouldBe false
     isParsed("match tx { case  _: |||| => 1 } ") shouldBe false
   }

@@ -208,22 +208,28 @@ object CompilerV1 {
         case _        => EitherT.fromEither[Coeval](Left("Only union type can be matched"))
       }
       matchingTypes = cases.flatMap(_.types)
-      _ <- EitherT.cond[Coeval](UNION.eq(u, UNION(matchingTypes.toList.map(CASETYPEREF))),
+      val lastEmpty = cases.last.types.isEmpty
+      _ <- EitherT.cond[Coeval](lastEmpty || UNION.eq(u, UNION(matchingTypes.toList.map(CASETYPEREF))),
                                 (),
                                 s"Matching not exhaustive: possibleTypes are ${u.l}, while matched are $matchingTypes")
+      refTmp = Expressions.REF(rootMatchTmpArg)
       ifBasedCases: Expressions.EXPR = cases.foldRight(Expressions.REF("???"): Expressions.EXPR) {
         case (mc, further) =>
           val typeSwarma = mc.types.foldLeft(Expressions.FALSE: Expressions.EXPR) {
             case (other, matchType) =>
-              BINARY_OP(Expressions.FUNCTION_CALL("_isInstanceOf", List(Expressions.REF(rootMatchTmpArg), Expressions.CONST_STRING(matchType))),
+              BINARY_OP(Expressions.FUNCTION_CALL("_isInstanceOf", List(refTmp, Expressions.CONST_STRING(matchType))),
                         BinaryOperation.OR_OP,
                         other)
           }
           val blockWithNewVar = mc.newVarName match {
-            case Some(nweVal) => Expressions.BLOCK(Expressions.LET(nweVal, Expressions.REF(rootMatchTmpArg), mc.types), mc.expr)
+            case Some(nweVal) => Expressions.BLOCK(Expressions.LET(nweVal, refTmp, mc.types), mc.expr)
             case None         => mc.expr
           }
-          Expressions.IF(typeSwarma, blockWithNewVar, further)
+          if(typeSwarma == Expressions.FALSE) {
+            blockWithNewVar
+          } else {
+            Expressions.IF(typeSwarma, blockWithNewVar, further)
+          }
 
       }
       compiled <- compileBlock(updatedCtx, Expressions.BLOCK(Expressions.LET(rootMatchTmpArg, expr), ifBasedCases))
