@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.data.EitherT
-//import com.wavesplatform.lang.v1.EnvironmentFunctions
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.traits.{DataType, Environment, Transaction, Transfer, AddressOrAlias}
@@ -71,13 +70,11 @@ object WavesContext {
     )
   )
 
-  class IndexedSeqWithDefault[T](content: IndexedSeq[T], default: T) extends IndexedSeq[T] {
+  class DefaultBoundIndexSeq[T](content: IndexedSeq[T], default: T, total: Int) extends IndexedSeq[T] {
     override def apply(idx: Int): T = {
-       if(idx < content.length) {
-          content(idx)
-       } else {
-          default
-       }
+      if (idx >= total) throw new IndexOutOfBoundsException(s"idx=$idx, total = $total")
+      else if (idx < content.length) content(idx)
+      else default
     }
     override def length: Int = content.length
   }
@@ -108,8 +105,11 @@ object WavesContext {
         "minSponsoredAssetFee" -> LazyVal(optionLong)(EitherT.fromEither(tx.minSponsoredAssetFee.map(_.asInstanceOf[optionLong.Underlying]))),
         "transfers" -> LazyVal(listTransfers)(EitherT.fromEither(tx.transfers.map(tl =>
           tl.map(t => transferObject(t.asInstanceOf[listTransfers.innerType.Underlying])).asInstanceOf[listTransfers.Underlying]))),
-        "proofs"           -> LazyVal(listByteVector)(EitherT.fromEither(tx.proofs.map(p =>
-                                     new IndexedSeqWithDefault(p.asInstanceOf[listByteVector.Underlying], ByteVector.empty.asInstanceOf[listByteVector.innerType.Underlying]))))
+        "proofs" -> LazyVal(listByteVector)(
+          EitherT.fromEither(tx.proofs.map(p =>
+            new DefaultBoundIndexSeq(p.asInstanceOf[listByteVector.Underlying],
+                                     ByteVector.empty.asInstanceOf[listByteVector.innerType.Underlying],
+                                     8))))
       ))
 
   def build(env: Environment): EvaluationContext = {
