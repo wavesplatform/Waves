@@ -6,16 +6,8 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.state.Blockchain
 
 trait PoSCalculator {
-  protected val HitSize: Int              = 8
-  protected val MeanCalculationDepth: Int = 3
-
-  // Min BaseTarget value is 9 because only in this case it is possible to get to next integer value (10)
-  // then increasing base target by 11% and casting it to Long afterward (see lines 55 and 59)
+  protected val HitSize: Int        = 8
   protected val MinBaseTarget: Long = 9
-
-  protected val MinBlockDelaySeconds = 53
-  protected val MaxBlockDelaySeconds = 67
-  protected val BaseTargetGamma      = 64
 
   def generatorSignature(signature: Array[Byte], publicKey: Array[Byte]): Array[Byte] = {
     val s = new Array[Byte](crypto.DigestSize * 2)
@@ -47,8 +39,9 @@ trait PoSCalculator {
     value * targetBlockDelaySeconds / (60: Double)
 
   protected def normalizeBaseTarget(baseTarget: Long, targetBlockDelaySeconds: Long): Long = {
-    val maxBaseTarget = Long.MaxValue / targetBlockDelaySeconds
-    if (baseTarget < MinBaseTarget) MinBaseTarget else if (baseTarget > maxBaseTarget) maxBaseTarget else baseTarget
+    baseTarget
+      .max(MinBaseTarget)
+      .min(Long.MaxValue / targetBlockDelaySeconds)
   }
 
 }
@@ -68,13 +61,18 @@ class PoSSelector(val blockchain: Blockchain) extends PoSCalculator {
     pos.baseTarget(targetBlockDelaySeconds, prevHeight, prevBaseTarget, parentTimestamp, maybeGreatGrandParentTimestamp, timestamp)
   }
 
-  def calculateDelay(hit: BigInt, bt: Long, balance: Long) =
+  def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long =
     pos.calculateDelay(hit, bt, balance)
 
   private def fair(height: Int): Boolean = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.FairPoS.id)
 }
 
 object NxtPoSCalculator extends PoSCalculator {
+  protected val MinBlockDelaySeconds = 53
+  protected val MaxBlockDelaySeconds = 67
+  protected val BaseTargetGamma      = 64
+  protected val MeanCalculationDepth = 3
+
   def baseTarget(targetBlockDelaySeconds: Long,
                  prevHeight: Int,
                  prevBaseTarget: Long,

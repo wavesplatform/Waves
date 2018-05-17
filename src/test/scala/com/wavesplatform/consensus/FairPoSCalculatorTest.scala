@@ -15,7 +15,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
     arr
   }
 
-  property("") {
+  property("Correct consensus parameters of blocks generated with FairPoS") {
 
     val balance = 50000000L * 100000000L
 
