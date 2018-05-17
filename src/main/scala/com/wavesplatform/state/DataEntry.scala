@@ -49,7 +49,7 @@ object DataEntry {
 
       case t if t == Type.String.id =>
         val (blob, p1) = Deser.parseArraySize(bytes, p + 1)
-        (StringDataEntry(key, new String(blob, "UTF-8")), p1)
+        (StringDataEntry(key, new String(blob, UTF_8)), p1)
       case t => throw new Exception(s"Unknown type $t")
     }
   }
@@ -114,9 +114,9 @@ case class BinaryDataEntry(override val key: String, override val value: ByteStr
 }
 
 case class StringDataEntry(override val key: String, override val value: String) extends DataEntry[String](key, value) {
-  override def valueBytes: Array[Byte] = Type.String.id.toByte +: Deser.serializeArray(value.getBytes("UTF-8"))
+  override def valueBytes: Array[Byte] = Type.String.id.toByte +: Deser.serializeArray(value.getBytes(UTF_8))
 
   override def toJson: JsObject = super.toJson + ("type" -> JsString("string")) + ("value" -> JsString(value))
 
-  override def valid: Boolean = super.valid && value.getBytes("UTF-8").length <= MaxValueSize
+  override def valid: Boolean = super.valid && value.getBytes(UTF_8).length <= MaxValueSize
 }
