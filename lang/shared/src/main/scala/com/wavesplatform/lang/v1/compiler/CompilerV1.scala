@@ -208,8 +208,8 @@ object CompilerV1 {
         case _        => EitherT.fromEither[Coeval](Left("Only union type can be matched"))
       }
       matchingTypes = cases.flatMap(_.types)
-      val lastEmpty = cases.last.types.isEmpty
-      _ <- EitherT.cond[Coeval](lastEmpty || UNION.eq(u, UNION(matchingTypes.toList.map(CASETYPEREF))),
+      lastEmpty = cases.last.types.isEmpty
+      _ <- EitherT.cond[Coeval]((lastEmpty && UNION.>=(u,UNION(matchingTypes.toList.map(CASETYPEREF)))) || UNION.eq(u, UNION(matchingTypes.toList.map(CASETYPEREF))),
                                 (),
                                 s"Matching not exhaustive: possibleTypes are ${u.l}, while matched are $matchingTypes")
       refTmp = Expressions.REF(rootMatchTmpArg)
