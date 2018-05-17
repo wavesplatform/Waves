@@ -1,15 +1,17 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSCalculator}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
 import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
+import scorex.transaction.PoSCalc._
 import scorex.transaction.ValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
@@ -47,10 +49,20 @@ package object appender extends ScorexLogging {
     }
   }
 
+  private def validateEffectiveBalance(blockchain: Blockchain, fs: FunctionalitySettings, block: Block, baseHeight: Int)(
+      effectiveBalance: Long): Either[String, Long] =
+    Either.cond(
+      block.timestamp < fs.minimalGeneratingBalanceAfter ||
+        (block.timestamp >= fs.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
+        blockchain.featureActivationHeight(BlockchainFeatures.SmallerMinimalGeneratingBalance.id).exists(baseHeight >= _)
+          && effectiveBalance >= MinimalEffectiveBalanceForGenerator2,
+      effectiveBalance,
+      s"generator's effective balance $effectiveBalance is less that required for generation"
+    )
+
   private[appender] def appendBlock(checkpoint: CheckpointService,
                                     blockchainUpdater: BlockchainUpdater with Blockchain,
                                     utxStorage: UtxPool,
-                                    pos: PoSCalculator,
                                     time: Time,
                                     settings: WavesSettings)(block: Block): Either[ValidationError, Option[Int]] =
     for {
@@ -64,17 +76,9 @@ package object appender extends ScorexLogging {
         (),
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
-      _ <- blockConsensusValidation(blockchainUpdater, settings, pos, time.correctedTime(), block) { height =>
-        val balance = GeneratingBalanceProvider.balance(blockchainUpdater, settings.blockchainSettings.functionalitySettings, height, block.sender)
-        Either.cond(
-          GeneratingBalanceProvider.isEffectiveBalanceValid(blockchainUpdater,
-                                                            settings.blockchainSettings.functionalitySettings,
-                                                            height,
-                                                            block,
-                                                            balance),
-          balance,
-          s"generator's effective balance $balance is less that required for generation"
-        )
+      _ <- blockConsensusValidation(blockchainUpdater, settings, time.correctedTime(), block) { height =>
+        val balance = PoSCalc.generatingBalance(blockchainUpdater, settings.blockchainSettings.functionalitySettings, block.sender, height)
+        validateEffectiveBalance(blockchainUpdater, settings.blockchainSettings.functionalitySettings, block, height)(balance)
       }
       baseHeight = blockchainUpdater.height
       maybeDiscardedTxs <- blockchainUpdater.processBlock(block)
@@ -86,7 +90,7 @@ package object appender extends ScorexLogging {
       maybeDiscardedTxs.map(_ => baseHeight)
     }
 
-  private def blockConsensusValidation(blockchain: Blockchain, settings: WavesSettings, pos: PoSCalculator, currentTs: Long, block: Block)(
+  private def blockConsensusValidation(blockchain: Blockchain, settings: WavesSettings, currentTs: Long, block: Block)(
       genBalance: Int => Either[String, Long]): Either[ValidationError, Unit] = {
 
     val bcs       = settings.blockchainSettings
@@ -115,7 +119,7 @@ package object appender extends ScorexLogging {
       prevBlockData = parent.consensusData
       blockData     = block.consensusData
       ggp           = blockchain.parent(parent, 2)
-      cbt = pos.baseTarget(bcs.genesisSettings.averageBlockDelay.toSeconds,
+      cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay,
                            height,
                            parent.consensusData.baseTarget,
                            parent.timestamp,
@@ -123,7 +127,7 @@ package object appender extends ScorexLogging {
                            blockTime)
       bbt = blockData.baseTarget
       _ <- Either.cond(cbt == bbt, (), GenericError(s"declared baseTarget $bbt does not match calculated baseTarget $cbt"))
-      calcGs  = pos.generatorSignature(prevBlockData.generationSignature.arr, generator.publicKey)
+      calcGs  = calcGeneratorSignature(prevBlockData, generator)
       blockGs = blockData.generationSignature.arr
       _ <- Either.cond(
         calcGs.sameElements(blockGs),
@@ -132,12 +136,12 @@ package object appender extends ScorexLogging {
           s"declared generation signature ${blockData.generationSignature.base58} does not match calculated generation signature ${ByteStr(calcGs).base58}")
       )
       effectiveBalance <- genBalance(height).left.map(GenericError(_))
-      minValidBlockTime = parent.timestamp + pos.validBlockDelay(blockGs, parent.consensusData.baseTarget, effectiveBalance)
+      hit    = calcHit(prevBlockData, generator)
+      target = calcTarget(parent.timestamp, parent.consensusData.baseTarget, blockTime, effectiveBalance)
       _ <- Either.cond(
-        blockTime > minValidBlockTime
-          || (height == height1 && block.uniqueId == correctBlockId1) || (height == height2 && block.uniqueId == correctBlockId2),
+        hit < target || (height == height1 && block.uniqueId == correctBlockId1) || (height == height2 && block.uniqueId == correctBlockId2),
         (),
-        GenericError(s"calculated time $minValidBlockTime < block time $blockTime")
+        GenericError(s"calculated hit $hit >= calculated target $target")
       )
     } yield ()
 
