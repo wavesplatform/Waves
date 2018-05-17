@@ -46,8 +46,8 @@ object TypeInferrer {
       case (tp @ TYPEPARAM(char), _) =>
         Right(Some(MatchResult(actual, tp)))
       case (tp @ OPTIONTYPEPARAM(innerTypeParam), OPTION(t)) => matchTypes(t, innerTypeParam)
-      case (tp @ LISTTYPEPARAM(innerTypeParam), LIST(t)) => matchTypes(t, innerTypeParam)
-      case _         => Left(err)
+      case (tp @ LISTTYPEPARAM(innerTypeParam), LIST(t))     => matchTypes(t, innerTypeParam)
+      case _                                                 => Left(err)
     }
   }
 
@@ -56,11 +56,11 @@ object TypeInferrer {
       case plainType: TYPE => Right(plainType)
       case tp @ TYPEPARAM(_) =>
         resolved.get(tp) match {
-          case None    => Left(s"Unknown functon return type $tp")
+          case None    => Left(s"Unknown function return type $tp")
           case Some(r) => Right(r)
         }
       case OPTIONTYPEPARAM(t) => inferResultType(t, resolved).map(OPTION)
-      case LISTTYPEPARAM(t) => inferResultType(t, resolved).map(LIST)
+      case LISTTYPEPARAM(t)   => inferResultType(t, resolved).map(LIST)
     }
   }
 
@@ -83,8 +83,8 @@ object TypeInferrer {
       (required, actual) match {
         case (OPTION(it1), OPTION(it2)) => findCommonType(it1, it2, biDirectional).map(OPTION)
         case (r: UNION, a: UNION) =>
-          if (biDirectional && UNION.eq(r, a)) Some(r)
-          else if (!biDirectional && UNION.>=(r, a)) Some(r)
+          if (biDirectional && (r equivalent a)) Some(r)
+          else if (!biDirectional && (r >= a)) Some(r)
           else None
         case _ => None
       }

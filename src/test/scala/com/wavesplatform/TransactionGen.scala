@@ -604,14 +604,14 @@ trait TransactionGenBase extends ScriptGen {
   def binaryEntryGen(maxSize: Int, keyGen: Gen[String] = dataKeyGen) =
     for {
       key   <- keyGen
-      size  <- Gen.choose(0, maxSize - key.length * 4 - 5)
+      size  <- Gen.choose(0, maxSize)
       value <- byteArrayGen(size)
     } yield BinaryDataEntry(key, ByteStr(value))
 
   def stringEntryGen(maxSize: Int, keyGen: Gen[String] = dataKeyGen) =
     for {
       key   <- keyGen
-      size  <- Gen.choose(0, maxSize - key.length * 4 - 5)
+      size  <- Gen.choose(0, maxSize)
       value <- Gen.listOfN(size, aliasAlphabetGen)
     } yield StringDataEntry(key, value.mkString)
 

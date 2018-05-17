@@ -48,7 +48,7 @@ object Parser {
   private case class ListIndex(index: EXPR) extends Accessor
 
   private val typesP: P[Seq[String]]    = varName.rep(min = 1, sep = "|")
-  private val matchCaseP: P[MATCH_CASE] = P("case" ~ varName ~ ":" ~ typesP ~ "=>" ~ expr).map { case (v, types, e) => MATCH_CASE(Some(v), types, e) }
+  private val matchCaseP: P[MATCH_CASE] = P("case" ~ (varName.map(Some.apply) | P("_").map(_ => None)) ~ (P(":" ~ typesP) | P("").map(_ => List())) ~ "=>" ~ expr).map { case (v, types, e) => MATCH_CASE(v, types, e) }
   private lazy val matchP: P[MATCH]     = P("match" ~ expr ~ "{" ~ matchCaseP.rep(min = 1) ~ "}").map { case (e, cases) => MATCH(e, cases.toList) }
 
   private val accessP: P[Accessor] = P(("." ~~ varName).map(Getter.apply) | ("(" ~/ functionCallArgs.map(Args.apply) ~ ")")) | ("[" ~/ expr.map(
