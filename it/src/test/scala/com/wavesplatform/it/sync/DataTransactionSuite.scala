@@ -78,11 +78,10 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("max transaction size") {
-    import DataEntry.{MaxKeySize, MaxValueSize}
-    import DataTransaction.MaxEntryCount
+    import DataEntry.MaxKeySize
 
     val maxKey = "\u6fae" * MaxKeySize
-    val data   = List.tabulate(MaxEntryCount)(n => BinaryDataEntry(maxKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
+    val data   = List.tabulate(26)(n => BinaryDataEntry("\u6fae" * MaxKeySize, ByteStr(Array.fill(5598)(n.toByte))))
     val fee    = calcDataFee(data)
     val txId   = sender.putData(firstAddress, data, fee).id
 
@@ -215,8 +214,11 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue)), "value is missing or not a string")
 
-    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("NOTaBase58")))),
-                                "Wrong char in Base58 string")
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("base64:not a base64")))),
+                                "Illegal base64 character")
+
+    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("yomp")))),
+                                "Base64 encoding expected")
   }
 
   test("transaction requires a valid proof") {
@@ -262,12 +264,16 @@ class DataTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, calcDataFee(extraValueData)), message)
     nodes.waitForHeightArise()
 
-    val extraSizedData = List.tabulate(MaxEntryCount + 1)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
-    assertBadRequestAndResponse(sender.putData(firstAddress, extraSizedData, calcDataFee(extraSizedData)), message)
+    val largeBinData = List.tabulate(5)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
+    assertBadRequestAndResponse(sender.putData(firstAddress, largeBinData, calcDataFee(largeBinData)), message)
     nodes.waitForHeightArise()
 
-    val extraSizedData2 = List.tabulate(MaxEntryCount + 1)(n => StringDataEntry(extraKey, "A" * MaxValueSize))
-    assertBadRequestAndResponse(sender.putData(firstAddress, extraSizedData2, calcDataFee(extraSizedData2)), message)
+    val largeStrData = List.tabulate(5)(n => StringDataEntry(extraKey, "A" * MaxValueSize))
+    assertBadRequestAndResponse(sender.putData(firstAddress, largeStrData, calcDataFee(largeStrData)), message)
+    nodes.waitForHeightArise()
+
+    val tooManyEntriesData = List.tabulate(MaxEntryCount + 1)(n => LongDataEntry("key", 88))
+    assertBadRequestAndResponse(sender.putData(firstAddress, tooManyEntriesData, calcDataFee(tooManyEntriesData)), message)
     nodes.waitForHeightArise()
   }
 
