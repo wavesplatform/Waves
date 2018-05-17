@@ -602,17 +602,17 @@ trait TransactionGenBase extends ScriptGen {
       value <- Gen.oneOf(true, false)
     } yield BooleanDataEntry(key, value)
 
-  def binaryEntryGen(keyGen: Gen[String] = dataKeyGen) =
+  def binaryEntryGen(keyGen: Gen[String] = dataKeyGen, max: Int = MaxValueSize) =
     for {
       key   <- keyGen
-      size  <- Gen.choose(0, MaxValueSize)
+      size  <- Gen.choose(0, max)
       value <- byteArrayGen(size)
     } yield BinaryDataEntry(key, ByteStr(value))
 
-  def stringEntryGen(keyGen: Gen[String] = dataKeyGen) =
+  def stringEntryGen(keyGen: Gen[String] = dataKeyGen, max: Int = MaxValueSize) =
     for {
       key   <- keyGen
-      size  <- Gen.choose(0, MaxValueSize)
+      size  <- Gen.choose(0, max)
       value <- Gen.listOfN(size, aliasAlphabetGen)
     } yield StringDataEntry(key, value.mkString)
 
