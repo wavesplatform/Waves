@@ -621,7 +621,7 @@ trait TransactionGenBase extends ScriptGen {
     (for {
       sender    <- accountGen
       timestamp <- timestampGen
-      size      <- Gen.choose(0, 300)
+      size      <- Gen.choose(0, DataTransaction.MaxEntryCount)
       maxEntrySize = (DataTransaction.MaxBytes - 122) / (size max 1) min DataEntry.MaxValueSize
       data    <- Gen.listOfN(size, dataEntryGen(maxEntrySize))
       version <- Gen.oneOf(DataTransaction.supportedVersions.toSeq)

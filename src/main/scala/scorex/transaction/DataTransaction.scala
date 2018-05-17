@@ -46,7 +46,7 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
   override val supportedVersions: Set[Byte] = Set(1)
 
   val MaxBytes      = 150 * 1024
-  val MaxEntryCount = Short.MaxValue
+  val MaxEntryCount = 100
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {

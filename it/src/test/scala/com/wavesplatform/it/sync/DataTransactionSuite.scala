@@ -251,6 +251,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
   test("try to send tx above limits of key, value and size") {
     import DataEntry.{MaxKeySize, MaxValueSize}
+    import DataTransaction.MaxEntryCount
 
     val message  = "Too big sequences requested"
     val extraKey = "a" * (MaxKeySize + 1)
@@ -263,12 +264,16 @@ class DataTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, calcDataFee(extraValueData)), message)
     nodes.waitForHeightArise()
 
-    val extraSizedData = List.tabulate(5)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
-    assertBadRequestAndResponse(sender.putData(firstAddress, extraSizedData, calcDataFee(extraSizedData)), message)
+    val largeBinData = List.tabulate(5)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
+    assertBadRequestAndResponse(sender.putData(firstAddress, largeBinData, calcDataFee(largeBinData)), message)
     nodes.waitForHeightArise()
 
-    val extraSizedData2 = List.tabulate(5)(n => StringDataEntry(extraKey, "A" * MaxValueSize))
-    assertBadRequestAndResponse(sender.putData(firstAddress, extraSizedData2, calcDataFee(extraSizedData2)), message)
+    val largeStrData = List.tabulate(5)(n => StringDataEntry(extraKey, "A" * MaxValueSize))
+    assertBadRequestAndResponse(sender.putData(firstAddress, largeStrData, calcDataFee(largeStrData)), message)
+    nodes.waitForHeightArise()
+
+    val tooManyEntriesData = List.tabulate(MaxEntryCount + 1)(n => LongDataEntry("key", 88))
+    assertBadRequestAndResponse(sender.putData(firstAddress, tooManyEntriesData, calcDataFee(tooManyEntriesData)), message)
     nodes.waitForHeightArise()
   }
 
