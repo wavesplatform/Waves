@@ -53,10 +53,10 @@ object PureContext {
 
 
   val getElement = PredefFunction("getElement", 2, TYPEPARAM('T'), List("arr" -> LISTTYPEPARAM(TYPEPARAM('T')), "pos" -> LONG)) {
-    case (arr: IndexedSeq[_]) :: (pos: Long) :: Nil => if(pos < arr.size && 0 <= pos) {
+    case (arr: IndexedSeq[_]) :: (pos: Long) :: Nil => try {
                                                      Right(arr(pos.toInt))
-                                                  } else {
-                                                     Left(s"Missing element at position $pos")
+                                                  } catch {
+                                                    case e: Throwable => Left(s"Missing element at position $pos")
                                                   }
     case _               => ???
   }
