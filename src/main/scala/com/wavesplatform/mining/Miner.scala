@@ -62,7 +62,7 @@ class MinerImpl(allChannels: ChannelGroup,
                 pos: PoSCalculator,
                 val minerScheduler: SchedulerService,
                 val appenderScheduler: SchedulerService)
-    extends Miner
+  extends Miner
     with MinerDebugInfo
     with ScorexLogging
     with Instrumented {
@@ -96,12 +96,12 @@ class MinerImpl(allChannels: ChannelGroup,
           blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed,
           (),
           s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
-      ))
+        ))
 
   private def ngEnabled: Boolean = blockchainUpdater.featureActivationHeight(BlockchainFeatures.NG.id).exists(blockchainUpdater.height > _ + 1)
 
   private def generateOneBlockTask(account: PrivateKeyAccount, balance: Long)(
-      delay: FiniteDuration): Task[Either[String, (MiningConstraints, Block, MiningConstraint)]] = {
+    delay: FiniteDuration): Task[Either[String, (MiningConstraints, Block, MiningConstraint)]] = {
     Task {
       forgeBlock(account, balance)
     }.delayExecution(delay)
@@ -113,12 +113,16 @@ class MinerImpl(allChannels: ChannelGroup,
     val version                   = if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion else NgBlockVersion
     val lastBlock                 = blockchainUpdater.lastBlock.get
     val greatGrandParentTimestamp = blockchainUpdater.parent(lastBlock, 2).map(_.timestamp)
-    val referencedBlockInfo       = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
-    val pc                        = allChannels.size()
-    lazy val currentTime          = timeService.correctedTime()
-    lazy val blockDelay           = currentTime - lastBlock.timestamp
+    val generationSignature = blockchainUpdater
+      .blockAt(height - 100)
+      .map(_.consensusData.generationSignature.arr)
+      .getOrElse(lastBlock.consensusData.generationSignature.arr)
+    val referencedBlockInfo = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
+    val pc                  = allChannels.size()
+    lazy val currentTime    = timeService.correctedTime()
+    lazy val blockDelay     = currentTime - lastBlock.timestamp
     lazy val validBlockDelay = pos.validBlockDelay(
-      referencedBlockInfo.consensus.generationSignature.arr,
+      generationSignature,
       account.publicKey,
       referencedBlockInfo.consensus.baseTarget,
       balance
@@ -127,8 +131,8 @@ class MinerImpl(allChannels: ChannelGroup,
       blockBuildTimeStats,
       for {
         _ <- Either.cond(pc >= minerSettings.quorum,
-                         (),
-                         s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
+          (),
+          s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
         _ <- Either.cond(
           blockDelay > validBlockDelay,
           (),
@@ -140,12 +144,12 @@ class MinerImpl(allChannels: ChannelGroup,
         block <- {
           val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
           val btg = pos.baseTarget(avgBlockDelay.toSeconds,
-                                   height,
-                                   referencedBlockInfo.consensus.baseTarget,
-                                   referencedBlockInfo.timestamp,
-                                   greatGrandParentTimestamp,
-                                   currentTime)
-          val gs            = pos.generatorSignature(referencedBlockInfo.consensus.generationSignature.arr, account.publicKey)
+            height,
+            referencedBlockInfo.consensus.baseTarget,
+            referencedBlockInfo.timestamp,
+            greatGrandParentTimestamp,
+            currentTime)
+          val gs            = pos.generatorSignature(generationSignature, account.publicKey)
           val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
           val sortInBlock   = blockchainUpdater.height <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
 
@@ -277,14 +281,14 @@ class MinerImpl(allChannels: ChannelGroup,
 
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = {
     {
-      val height      = blockchainUpdater.height
-      val blockForHit = (blockchainUpdater.blockAt(height - 100) orElse blockchainUpdater.lastBlock).get
+      val height    = blockchainUpdater.height
+      val lastBlock = blockchainUpdater.lastBlock.get
       for {
         _ <- checkAge(height, blockchainUpdater.lastBlockTimestamp.get)
         _ <- Either.cond(blockchainUpdater.accountScript(account).isEmpty,
-                         (),
-                         s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
-        balanceAndTs <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, blockForHit, account)
+          (),
+          s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
+        balanceAndTs <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, lastBlock, account)
         (balance, ts) = balanceAndTs
         offset        = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
       } yield (offset, balance)

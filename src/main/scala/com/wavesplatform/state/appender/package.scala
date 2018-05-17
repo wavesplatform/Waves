@@ -26,13 +26,13 @@ package object appender extends ScorexLogging {
   private val height2         = 813207
 
   private[appender] def processAndBlacklistOnFailure[A, B](
-      ch: Channel,
-      peerDatabase: PeerDatabase,
-      miner: Miner,
-      allChannels: ChannelGroup,
-      start: => String,
-      success: => String,
-      errorPrefix: String)(f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
+                                                            ch: Channel,
+                                                            peerDatabase: PeerDatabase,
+                                                            miner: Miner,
+                                                            allChannels: ChannelGroup,
+                                                            start: => String,
+                                                            success: => String,
+                                                            errorPrefix: String)(f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
 
     log.debug(start)
     f map {
@@ -68,10 +68,10 @@ package object appender extends ScorexLogging {
         val balance = GeneratingBalanceProvider.balance(blockchainUpdater, settings.blockchainSettings.functionalitySettings, height, block.sender)
         Either.cond(
           GeneratingBalanceProvider.isEffectiveBalanceValid(blockchainUpdater,
-                                                            settings.blockchainSettings.functionalitySettings,
-                                                            height,
-                                                            block,
-                                                            balance),
+            settings.blockchainSettings.functionalitySettings,
+            height,
+            block,
+            balance),
           balance,
           s"generator's effective balance $balance is less that required for generation"
         )
@@ -87,12 +87,16 @@ package object appender extends ScorexLogging {
     }
 
   private def blockConsensusValidation(blockchain: Blockchain, settings: WavesSettings, pos: PoSCalculator, currentTs: Long, block: Block)(
-      genBalance: Int => Either[String, Long]): Either[ValidationError, Unit] = {
+    genBalance: Int => Either[String, Long]): Either[ValidationError, Unit] = {
 
     val bcs       = settings.blockchainSettings
     val fs        = bcs.functionalitySettings
     val blockTime = block.timestamp
     val generator = block.signerData.generator
+    val generatorSignature =
+      (blockchain.blockAt(blockchain.height - 100) orElse blockchain.lastBlock)
+        .map(_.consensusData.generationSignature.arr)
+        .get
 
     val r: Either[ValidationError, Unit] = for {
       height <- blockchain.heightOf(block.reference).toRight(GenericError(s"height: history does not contain parent ${block.reference}"))
@@ -116,14 +120,14 @@ package object appender extends ScorexLogging {
       blockData     = block.consensusData
       ggp           = blockchain.parent(parent, 2)
       cbt = pos.baseTarget(bcs.genesisSettings.averageBlockDelay.toSeconds,
-                           height,
-                           parent.consensusData.baseTarget,
-                           parent.timestamp,
-                           ggp.map(_.timestamp),
-                           blockTime)
+        height,
+        parent.consensusData.baseTarget,
+        parent.timestamp,
+        ggp.map(_.timestamp),
+        blockTime)
       bbt = blockData.baseTarget
       _ <- Either.cond(cbt == bbt, (), GenericError(s"declared baseTarget $bbt does not match calculated baseTarget $cbt"))
-      calcGs  = pos.generatorSignature(prevBlockData.generationSignature.arr, generator.publicKey)
+      calcGs  = pos.generatorSignature(generatorSignature, generator.publicKey)
       blockGs = blockData.generationSignature.arr
       _ <- Either.cond(
         calcGs.sameElements(blockGs),
