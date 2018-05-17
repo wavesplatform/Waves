@@ -1,9 +1,12 @@
 package scorex.transaction
 
 import com.wavesplatform.{TransactionGen, WithDB}
-import com.wavesplatform.state.HistoryTest
+import com.wavesplatform.state.{ByteStr, HistoryTest}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
+import play.api.libs.json.Json
+import scorex.account.PublicKeyAccount
+import scorex.crypto.encode.Base58
 import scorex.transaction.assets.IssueTransactionV2
 
 class IssueTransactionV2Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithDB with HistoryTest {
@@ -24,4 +27,47 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
       tx.bytes() shouldEqual recovered.bytes()
     }
   }
+
+  property("JSON format validation") {
+    val js = Json.parse("""{
+                       "type": 3,
+                       "id": "2ykNAo5JrvNCcL8PtCmc9pTcNtKUy2PjJkrFdRvTfUf4",
+                       "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+                       "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+                       "fee": 100000000,
+                       "timestamp": 1526287561757,
+                       "proofs": [
+                       "43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g"
+                       ],
+                       "version": 2,
+                       "name": "Gigacoin",
+                       "quantity": 10000000000,
+                       "reissuable": true,
+                       "decimals": 8,
+                       "description": "Gigacoin",
+                       "script": null
+                       }
+    """)
+
+    val tx = IssueTransactionV2
+      .create(
+        2,
+        'T',
+        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        "Gigacoin".getBytes,
+        "Gigacoin".getBytes,
+        10000000000L,
+        8,
+        true,
+        None,
+        100000000,
+        1526287561757L,
+        Proofs(Seq(ByteStr(Base58.decode("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get)))
+      )
+      .right
+      .get
+
+    js shouldEqual tx.json()
+  }
+
 }

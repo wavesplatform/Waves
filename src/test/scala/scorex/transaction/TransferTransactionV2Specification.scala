@@ -5,6 +5,9 @@ import com.wavesplatform.state._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
+import play.api.libs.json.Json
+import scorex.account.{Address, PublicKeyAccount}
+import scorex.crypto.encode.Base58
 import scorex.transaction.transfer._
 
 class TransferTransactionV2Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -45,5 +48,43 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
     first.feeAssetId shouldEqual second.feeAssetId
     first.proofs shouldEqual second.proofs
     first.bytes() shouldEqual second.bytes()
+  }
+
+  property("JSON format validation") {
+    val js = Json.parse("""{
+                       "type": 4,
+                       "id": "2qMiGUpNMuRpeyTnXLa1mLuVP1cYEtxys55cQbDaXd5g",
+                       "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+                       "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+                       "fee": 100000000,
+                       "timestamp": 1526641218066,
+                       "proofs": [
+                       "4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi"
+                       ],
+                       "version": 2,
+                       "recipient": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8",
+                       "assetId": null,
+                       "feeAssetId": null,
+                       "amount": 100000000,
+                       "attachment": "4t2Xazb2SX"}
+    """)
+
+    val tx = TransferTransactionV2
+      .create(
+        2,
+        None,
+        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get,
+        100000000,
+        1526641218066L,
+        None,
+        100000000,
+        Base58.decode("4t2Xazb2SX").get,
+        Proofs(Seq(ByteStr(Base58.decode("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)))
+      )
+      .right
+      .get
+
+    js shouldEqual tx.json()
   }
 }

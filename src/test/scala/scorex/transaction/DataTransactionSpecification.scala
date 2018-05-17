@@ -8,6 +8,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{Format, Json}
+import scorex.account.{Alias, PublicKeyAccount}
 import scorex.api.http.SignedDataRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.DataTransaction.MaxEntryCount
@@ -130,4 +131,55 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         negativeFeeEi shouldBe Left(ValidationError.InsufficientFee())
     }
   }
+
+  property(testName = "JSON format validation") {
+    val js = Json.parse("""{
+                       "type": 12,
+                       "id": "87SfuGJXH1cki2RGDH7WMTGnTXeunkc5mEjNKmmMdRzM",
+                       "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+                       "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+                       "fee": 100000,
+                       "timestamp": 1526911531530,
+                       "proofs": [
+                       "32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94"
+                       ],
+                       "version": 1,
+                       "data": [
+                       {
+                       "key": "int",
+                       "type": "integer",
+                       "value": 24
+                       },
+                       {
+                       "key": "bool",
+                       "type": "boolean",
+                       "value": true
+                       },
+                       {
+                       "key": "blob",
+                       "type": "binary",
+                       "value": "BzWHaQU"
+                       }
+                       ]
+                       }
+  """)
+
+    val entry1 = LongDataEntry("int", 24)
+    val entry2 = BooleanDataEntry("bool", true)
+    val entry3 = BinaryDataEntry("blob", ByteStr(Base58.decode("BzWHaQU").get))
+    val tx = DataTransaction
+      .create(
+        1,
+        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        List(entry1, entry2, entry3),
+        100000,
+        1526911531530L,
+        Proofs(Seq(ByteStr(Base58.decode("32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94").get)))
+      )
+      .right
+      .get
+
+    js shouldEqual tx.json()
+  }
+
 }
