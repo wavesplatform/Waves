@@ -2,7 +2,6 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.state.DataEntry.MaxValueSize
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
