@@ -61,6 +61,9 @@ object SyncHttpApi extends Assertions {
     def postJsonWithApiKey[A: Writes](path: String, body: A): Response =
       Await.result(async(n).postJsonWithApiKey(path, body), RequestAwaitTime)
 
+    def accountBalance(acc: String): Long =
+      Await.result(async(n).accountBalance(acc), RequestAwaitTime)
+
     def accountBalances(acc: String): (Long, Long) =
       Await.result(async(n).accountBalances(acc), RequestAwaitTime)
 
@@ -164,6 +167,9 @@ object SyncHttpApi extends Assertions {
 
     def height: Int =
       Await.result(async(n).height, RequestAwaitTime)
+
+    def blockHeadersSeq(from: Int, to: Int): Seq[BlockHeaders] =
+      Await.result(async(n).blockHeadersSeq(from, to), RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
