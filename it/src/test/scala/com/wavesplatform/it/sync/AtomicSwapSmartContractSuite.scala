@@ -47,7 +47,6 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val untyped = Parser(s"""
     let Bob = extract(addressFromString("${BobBC1}")).bytes
     let Alice = extract(addressFromString("${AliceBC1}")).bytes
-    let swapBC1 = extract(addressFromString("${swapBC1}")).bytes
     let AlicesPK = base58'${ByteStr(AlicesPK.publicKey)}'
 
     let txRecipient = addressFromRecipient(tx.recipient).bytes
@@ -122,7 +121,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           assetId = None,
           sender = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).right.get,
           recipient = PrivateKeyAccount.fromSeed(sender.seed(AliceBC1)).right.get,
-          amount = transferAmount + fee + 0.004.waves,
+          amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
           feeAmount = fee + 0.04.waves,
@@ -165,7 +164,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           assetId = None,
           sender = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).right.get,
           recipient = PrivateKeyAccount.fromSeed(sender.seed(AliceBC1)).right.get,
-          amount = transferAmount + fee + 0.004.waves,
+          amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
           feeAmount = fee + 0.04.waves,
