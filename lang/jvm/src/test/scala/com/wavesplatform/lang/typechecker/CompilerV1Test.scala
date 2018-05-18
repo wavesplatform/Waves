@@ -52,7 +52,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
     ),
     expectedResult = Right(
       GETTER(
-        ref = REF("p", TYPEREF("Point")),
+        expr = REF("p", TYPEREF("Point")),
         field = "x",
         tpe = LONG
       ))

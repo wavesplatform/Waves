@@ -107,6 +107,7 @@ object ExtractInfo extends App with ScorexLogging {
               case x: LongDataEntry    => DataTestData(addr, x.key, DataType.Long)
               case x: BooleanDataEntry => DataTestData(addr, x.key, DataType.Boolean)
               case x: BinaryDataEntry  => DataTestData(addr, x.key, DataType.ByteArray)
+              case x: StringDataEntry  => DataTestData(addr, x.key, DataType.String)
             }
         }
         .take(50)

@@ -4,7 +4,7 @@ import scodec.bits.ByteVector
 
 object Expressions {
 
-  case class LET(name: String, value: EXPR)
+  case class LET(name: String, value: EXPR, types: Seq[String] = Seq.empty)
   sealed trait EXPR
   case class CONST_LONG(value: Long)                            extends EXPR
   case class GETTER(ref: EXPR, field: String)                   extends EXPR
@@ -17,5 +17,7 @@ object Expressions {
   case object TRUE                                              extends EXPR
   case object FALSE                                             extends EXPR
   case class FUNCTION_CALL(name: String, args: List[EXPR])      extends EXPR
+  case class MATCH_CASE(newVarName: Option[String], types: Seq[String], expr: EXPR)
+  case class MATCH(expr: EXPR, cases: Seq[MATCH_CASE]) extends EXPR
 
 }
