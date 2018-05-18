@@ -8,7 +8,7 @@ import com.wavesplatform.state.{Blockchain, ByteStr}
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
-import monix.eval.{Coeval, Task}
+import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 import play.api.libs.json._
 import scorex.block.BlockHeader
@@ -21,7 +21,6 @@ import scala.util.Try
 @Api(value = "/blocks")
 case class BlocksApiRoute(settings: RestAPISettings,
                           blockchain: Blockchain,
-                          blockchainUpdater: BlockchainUpdater,
                           allChannels: ChannelGroup,
                           checkpointProc: Checkpoint => Task[Either[ValidationError, Option[BigInt]]])
     extends ApiRoute {
@@ -29,8 +28,6 @@ case class BlocksApiRoute(settings: RestAPISettings,
   // todo: make this configurable and fix integration tests
   val MaxBlocksPerRequest = 100
   val rollbackExecutor    = monix.execution.Scheduler.singleThread(name = "debug-rollback")
-
-  private val lastHeight: Coeval[Option[Int]] = lastObserved(blockchainUpdater.lastBlockInfo.map(_.height))
 
   override lazy val route =
     pathPrefix("blocks") {
@@ -128,8 +125,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
   @Path("/height")
   @ApiOperation(value = "Height", notes = "Get blockchain height", httpMethod = "GET")
   def height: Route = (path("height") & get) {
-    val x = lastHeight().getOrElse(0)
-    complete(Json.obj("height" -> x))
+    complete(Json.obj("height" -> blockchain.height))
   }
 
   @Path("/at/{height}")
@@ -152,7 +148,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
     (if (includeTransactions) {
        blockchain.blockAt(height).map(_.json())
      } else {
-       blockchain.blockHeaderAndSize(height).map { case ((bh, s)) => BlockHeader.json(bh, s) }
+       blockchain.blockHeaderAndSize(height).map { case (bh, s) => BlockHeader.json(bh, s) }
      }) match {
       case Some(json) => complete(json + ("height" -> JsNumber(height)))
       case None       => complete(Json.obj("status" -> "error", "details" -> "No block for this height"))
@@ -187,7 +183,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
         (if (includeTransactions) {
            blockchain.blockAt(height).map(_.json())
          } else {
-           blockchain.blockHeaderAndSize(height).map { case ((bh, s)) => BlockHeader.json(bh, s) }
+           blockchain.blockHeaderAndSize(height).map { case (bh, s) => BlockHeader.json(bh, s) }
          }).map(_ + ("height" -> Json.toJson(height)))
       })
       complete(blocks)
