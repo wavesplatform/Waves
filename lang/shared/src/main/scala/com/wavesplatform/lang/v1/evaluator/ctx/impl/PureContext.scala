@@ -67,6 +67,20 @@ object PureContext {
     case _ => ???
   }
 
+  val uMinus = PredefFunction("-", 1, LONG, List("n" -> LONG)) {
+    case (n: Long) :: Nil => {
+      Right(-n)
+    }
+    case _ => ???
+  }
+
+  val uNot = PredefFunction("!", 1, BOOLEAN, List("p" -> BOOLEAN)) {
+    case (p: Boolean) :: Nil => {
+      Right(!p)
+    }
+    case _ => ???
+  }
+
   private def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
     PredefFunction(opsToFunctions(op), 1, r, List("a" -> t, "b" -> t)) {
       case a :: b :: Nil =>
@@ -89,7 +103,7 @@ object PureContext {
   val ge            = createOp(GE_OP, LONG, BOOLEAN)(_ >= _)
   val gt            = createOp(GT_OP, LONG, BOOLEAN)(_ > _)
 
-  val operators: Seq[PredefFunction] = Seq(sumLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt, getElement, getListSize)
+  val operators: Seq[PredefFunction] = Seq(sumLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt, getElement, getListSize, uMinus, uNot)
 
   lazy val instance =
     EvaluationContext.build(types = Seq.empty,

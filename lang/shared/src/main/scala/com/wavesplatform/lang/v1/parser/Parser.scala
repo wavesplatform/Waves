@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1.parser
 
 import Expressions._
 import BinaryOperation._
+import UnaryOperation._
 import fastparse.{WhitespaceApi, core}
 import scodec.bits.ByteVector
 
@@ -86,8 +87,14 @@ object Parser {
 
   private val atom = P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP)
 
+  def unaryOp(ops: Seq[(P[Any], EXPR => EXPR)]): P[EXPR] = {
+    ops.foldRight(atom) {
+       (op, acc) => (op._1.map(_ => ()) ~ P(unaryOp(ops))).map(op._2) | acc
+    }
+  }
+
   private def binaryOp(rest: List[(String, BinaryOperation)]): P[EXPR] = rest match {
-    case Nil => atom
+    case Nil => unaryOp(unaryOps)
     case (lessPriorityOp, kind) :: restOps =>
       val operand = binaryOp(restOps)
       P(operand ~ (lessPriorityOp.!.map(_ => kind) ~ operand).rep()).map {

@@ -20,7 +20,7 @@ trait ScriptGen {
       if((BigInt(v1) + BigInt(v2)).isValidLong)
     } yield (BINARY_OP(i1, SUM_OP, i2), (v1 + v2))
 
-  def INTGen(gas: Int): Gen[(EXPR, Long)] = if (gas > 0) Gen.oneOf(CONST_LONGgen, SUMgen(gas - 1), IF_INTgen(gas - 1)) else CONST_LONGgen
+  def INTGen(gas: Int): Gen[(EXPR, Long)] = if (gas > 0) Gen.oneOf(CONST_LONGgen, SUMgen(gas - 1), IF_INTgen(gas - 1), INTGen(gas-1).map(e => (FUNCTION_CALL("-",List(e._1)), -e._2))) else CONST_LONGgen
 
   def GEgen(gas: Int): Gen[(EXPR, Boolean)] =
     for {
@@ -104,6 +104,8 @@ trait ScriptGen {
     case CONST_STRING(x) => withWhitespaces(s"""\"$x\"""")
     case TRUE            => withWhitespaces("true")
     case FALSE           => withWhitespaces("false")
+    case FUNCTION_CALL("-", List(CONST_LONG(v))) if (v>=0) => s"-($v)"
+    case FUNCTION_CALL(op, List(e)) => toString(e).map(e => s"$op$e")
     case BINARY_OP(x, op: BinaryOperation, y) =>
       for {
         arg1 <- toString(x)
@@ -126,7 +128,7 @@ trait ScriptGen {
 
 trait ScriptGenParser extends ScriptGen {
   override def BOOLgen(gas: Int): Gen[(EXPR, Boolean)] = {
-    if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1), REFgen.map(r => (r, false)))
+    if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1), REFgen.map(r => (r, false)), BOOLgen(gas-1).map(e => (FUNCTION_CALL("!", List(e._1)), !e._2)))
     else Gen.const((TRUE, true))
   }
 
