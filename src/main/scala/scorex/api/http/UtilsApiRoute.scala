@@ -9,7 +9,7 @@ import com.wavesplatform.state.diffs.CommonValidation
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.Json
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.smart.script.{Script, ScriptCompiler}
 import scorex.utils.Time
 

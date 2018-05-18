@@ -9,7 +9,7 @@ import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json._
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http.assets.{SignedTransferV1Request}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
 
 import scala.util.Random

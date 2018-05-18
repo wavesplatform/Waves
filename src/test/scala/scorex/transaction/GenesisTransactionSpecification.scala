@@ -4,7 +4,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 
 class GenesisTransactionSpecification extends PropSpec with PropertyChecks with Matchers {
 

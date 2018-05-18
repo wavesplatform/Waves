@@ -7,7 +7,7 @@ import org.scalatest.matchers.{HavePropertyMatchResult, HavePropertyMatcher}
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import scorex.account.{AddressOrAlias, PublicKeyAccount}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.{AssetId, Proofs}
 import scorex.transaction.transfer._
 import shapeless.{:+:, CNil, Coproduct}

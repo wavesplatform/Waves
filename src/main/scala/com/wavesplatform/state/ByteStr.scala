@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import play.api.libs.json._
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 
 import scala.util.Try
 

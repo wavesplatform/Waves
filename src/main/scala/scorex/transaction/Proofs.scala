@@ -3,7 +3,7 @@ package scorex.transaction
 import com.wavesplatform.state._
 import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.serialization.Deser
 import scorex.transaction.ValidationError.GenericError
 
