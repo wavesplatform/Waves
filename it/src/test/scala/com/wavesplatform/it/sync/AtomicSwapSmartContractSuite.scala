@@ -53,11 +53,10 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     let txRecipient = addressFromRecipient(tx.recipient).bytes
     let txSender = addressFromPublicKey(tx.senderPk).bytes
 
-    let txFromAlice = ((txSender == Alice) && (tx.type == 4) && (txRecipient == swapBC1))
     let txToBob = ((txRecipient == Bob) && (sha256(tx.proof0) == base58'$shaSecret') && (20 >= height) && sigVerify(tx.bodyBytes,tx.proof1,AlicesPK))
     let backToAliceAfterHeight = ((height >= 21) && (txRecipient == Alice))
 
-    txFromAlice || txToBob || backToAliceAfterHeight
+    txToBob || backToAliceAfterHeight
       """.stripMargin).get.value
     TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
   }
