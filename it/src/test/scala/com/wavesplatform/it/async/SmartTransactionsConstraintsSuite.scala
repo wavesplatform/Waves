@@ -11,7 +11,7 @@ import org.scalatest._
 import play.api.libs.json.{JsNumber, Json}
 import scorex.account.PrivateKeyAccount
 import scorex.api.http.assets.SignedSetScriptRequest
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
 

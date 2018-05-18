@@ -19,7 +19,7 @@ import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.PublicKeyAccount
 import scorex.api.http._
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.NTP

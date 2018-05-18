@@ -3,7 +3,7 @@ package scorex.transaction.api.http.assets
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
 import scorex.api.http.assets._
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 
 class SignedRequestsTest extends FunSuite with Matchers {
 

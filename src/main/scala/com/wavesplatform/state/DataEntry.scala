@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets
 import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.state.DataEntry._
 import play.api.libs.json._
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.serialization.Deser
 
 import scala.util.Success

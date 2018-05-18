@@ -9,7 +9,7 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{Format, Json}
 import scorex.api.http.SignedDataRequest
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.DataTransaction.MaxEntryCount
 
 class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {

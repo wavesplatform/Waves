@@ -15,7 +15,7 @@ import javax.ws.rs.Path
 import play.api.libs.json._
 import scorex.BroadcastRoute
 import scorex.account.{Address, PublicKeyAccount}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.smart.script.ScriptCompiler
 import scorex.transaction.{PoSCalc, TransactionFactory, ValidationError}

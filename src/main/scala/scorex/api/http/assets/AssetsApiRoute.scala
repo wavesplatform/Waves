@@ -13,7 +13,7 @@ import play.api.libs.json._
 import scorex.BroadcastRoute
 import scorex.account.Address
 import scorex.api.http._
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._

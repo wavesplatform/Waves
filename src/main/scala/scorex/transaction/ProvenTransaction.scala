@@ -2,7 +2,7 @@ package scorex.transaction
 
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 
 trait ProvenTransaction extends Transaction with Proven {
 

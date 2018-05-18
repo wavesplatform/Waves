@@ -7,7 +7,7 @@ import scorex.account.Alias
 import scorex.api.http.alias.SignedCreateAliasV1Request
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{SignedLeaseCancelV1Request, SignedLeaseV1Request}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.crypto.signatures.Curve25519.SignatureLength
 import scorex.transaction.assets._
 import scorex.transaction.transfer._

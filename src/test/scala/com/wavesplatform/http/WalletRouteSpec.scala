@@ -4,7 +4,7 @@ import com.wavesplatform.TestWallet
 import com.wavesplatform.http.ApiMarshallers._
 import play.api.libs.json.JsObject
 import scorex.api.http.{ApiKeyNotValid, WalletApiRoute}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 
 class WalletRouteSpec extends RouteSpec("/wallet") with RestAPISettingsHelper with TestWallet {
   private val route = WalletApiRoute(restAPISettings, testWallet).route

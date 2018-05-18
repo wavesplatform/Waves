@@ -6,7 +6,7 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json._
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.assets.exchange.OrderJson._
 
 class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {

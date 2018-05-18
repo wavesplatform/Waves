@@ -9,7 +9,7 @@ import org.asynchttpclient.Dsl.{config => clientConfig, _}
 import org.asynchttpclient._
 import org.slf4j.LoggerFactory
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration.FiniteDuration
