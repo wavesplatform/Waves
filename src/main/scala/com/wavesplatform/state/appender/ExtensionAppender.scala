@@ -1,6 +1,6 @@
 package com.wavesplatform.state.appender
 
-import com.wavesplatform.consensus.PoSCalculator
+import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.metrics.{BlockStats, Instrumented, Metrics}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase, formatBlocks, id}
@@ -24,7 +24,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
   def apply(checkpoint: CheckpointService,
             blockchainUpdater: BlockchainUpdater with Blockchain,
             utxStorage: UtxPool,
-            pos: PoSCalculator,
+            pos: PoSSelector,
             time: Time,
             settings: WavesSettings,
             invalidBlocks: InvalidBlockStorage,

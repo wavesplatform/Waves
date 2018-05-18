@@ -2,6 +2,7 @@ package scorex.consensus.nxt.api.http
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import io.swagger.annotations._
@@ -78,6 +79,11 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
   @Path("/algo")
   @ApiOperation(value = "Consensus algo", notes = "Shows which consensus algo being using", httpMethod = "GET")
   def algo: Route = (path("algo") & get) {
-    complete(Json.obj("consensusAlgo" -> "proof-of-stake (PoS)"))
+    complete(
+      if (blockchain.activatedFeatures.contains(BlockchainFeatures.FairPoS.id))
+        Json.obj("consensusAlgo" -> "Fair Proof-of-Stake (FairPoS)")
+      else
+        Json.obj("consensusAlgo" -> "proof-of-stake (PoS)")
+    )
   }
 }

@@ -1,7 +1,7 @@
 package com.wavesplatform.state.appender
 
 import cats.data.EitherT
-import com.wavesplatform.consensus.PoSCalculator
+import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network._
@@ -26,7 +26,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
             blockchainUpdater: BlockchainUpdater with Blockchain,
             time: Time,
             utxStorage: UtxPool,
-            pos: PoSCalculator,
+            pos: PoSSelector,
             settings: WavesSettings,
             scheduler: Scheduler)(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
@@ -49,7 +49,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
             blockchainUpdater: BlockchainUpdater with Blockchain,
             time: Time,
             utxStorage: UtxPool,
-            pos: PoSCalculator,
+            pos: PoSSelector,
             settings: WavesSettings,
             allChannels: ChannelGroup,
             peerDatabase: PeerDatabase,

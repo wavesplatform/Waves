@@ -1,9 +1,6 @@
 package com.wavesplatform.consensus
 
 import com.wavesplatform.crypto
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
-import com.wavesplatform.state.Blockchain
 
 trait PoSCalculator {
   protected val HitSize: Int        = 8
@@ -23,7 +20,7 @@ trait PoSCalculator {
                  maybeGreatGrandParentTimestamp: Option[Long],
                  timestamp: Long): Long
 
-  protected def hit(generatorSignature: Array[Byte]): BigInt = BigInt(1, generatorSignature.take(HitSize).reverse)
+  def hit(generatorSignature: Array[Byte]): BigInt = BigInt(1, generatorSignature.take(HitSize).reverse)
 
   def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long
 
@@ -35,36 +32,15 @@ trait PoSCalculator {
     calculateDelay(hit(generatorSignature(genSig, publicKey)), baseTarget, balance)
   }
 
-  protected def normalize(value: Long, targetBlockDelaySeconds: Long): Double =
+  def normalize(value: Long, targetBlockDelaySeconds: Long): Double =
     value * targetBlockDelaySeconds / (60: Double)
 
-  protected def normalizeBaseTarget(baseTarget: Long, targetBlockDelaySeconds: Long): Long = {
+  def normalizeBaseTarget(baseTarget: Long, targetBlockDelaySeconds: Long): Long = {
     baseTarget
       .max(MinBaseTarget)
       .min(Long.MaxValue / targetBlockDelaySeconds)
   }
 
-}
-
-class PoSSelector(val blockchain: Blockchain) extends PoSCalculator {
-
-  protected def pos: PoSCalculator =
-    if (fair(blockchain.height)) FairPoSCalculator
-    else NxtPoSCalculator
-
-  override def baseTarget(targetBlockDelaySeconds: Long,
-                          prevHeight: Int,
-                          prevBaseTarget: Long,
-                          parentTimestamp: Long,
-                          maybeGreatGrandParentTimestamp: Option[Long],
-                          timestamp: Long): Long = {
-    pos.baseTarget(targetBlockDelaySeconds, prevHeight, prevBaseTarget, parentTimestamp, maybeGreatGrandParentTimestamp, timestamp)
-  }
-
-  def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long =
-    pos.calculateDelay(hit, bt, balance)
-
-  private def fair(height: Int): Boolean = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.FairPoS.id)
 }
 
 object NxtPoSCalculator extends PoSCalculator {

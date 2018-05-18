@@ -25,7 +25,7 @@ object BaseTargetChecker {
     val genesisBlock = Block.genesis(settings.blockchainSettings.genesisSettings).explicitGet()
     val db           = openDB("/tmp/tmp-db", 1024)
     val bu           = StorageFactory(settings, db, NTP)
-    val pos          = new PoSSelector(bu)
+    val pos          = new PoSSelector(bu, settings.blockchainSettings)
     bu.processBlock(genesisBlock)
 
     println(s"Genesis TS = ${Instant.ofEpochMilli(genesisBlock.timestamp)}")
@@ -36,7 +36,9 @@ object BaseTargetChecker {
         val address   = account.toAddress
         val balance   = bu.balance(address, None)
         val consensus = genesisBlock.consensusData
-        val timeDelay = pos.validBlockDelay(consensus.generationSignature.arr, account.publicKey, consensus.baseTarget, balance)
+        val timeDelay = pos
+          .getValidBlockDelay(bu.height, account.publicKey, consensus.baseTarget, balance)
+          .explicitGet()
 
         f"$address: ${timeDelay * 1e-3}%10.3f s"
     }
