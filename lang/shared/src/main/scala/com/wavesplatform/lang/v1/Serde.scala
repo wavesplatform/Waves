@@ -21,7 +21,7 @@ object Serde {
   implicit def d0TypeRef     = d0.bind[FunctionHeaderType.TYPEREF](8)
   implicit def d0String      = d0.bind[FunctionHeaderType.STRING.type](9)
   implicit def d0List      = d0.bind[FunctionHeaderType.LIST](10)
-  implicit def dListTypeParam = d0.bind[FunctionHeaderType.LISTTYPEPARAM](1)
+  implicit def dListTypeParam = d0.bind[FunctionHeaderType.LISTTYPEPARAM](11)
 
   implicit def d                = Discriminated[EXPR, Int](uint8)
   implicit def dConstInt        = d.bind[CONST_LONG](0)
