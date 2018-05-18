@@ -5,10 +5,10 @@ import cats.implicits._
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang._
-import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.{funcs, lets}
-import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, LET, _}
-import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, LET, _}
+import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.{funcs, lets}
+import com.wavesplatform.lang.v1.evaluator.ctx._
 import monix.eval.Coeval
 
 object EvaluatorV1 extends ExprEvaluator {
@@ -21,12 +21,14 @@ object EvaluatorV1 extends ExprEvaluator {
 
   private def getContext: FF[LoggedEvaluationContext] =
     EitherT.apply[F0, ExecutionError, LoggedEvaluationContext](StateT.get[Coeval, LoggedEvaluationContext].map(_.asRight[ExecutionError]))
+
   private def updateContext(f: LoggedEvaluationContext => LoggedEvaluationContext): FF[Unit] =
     EitherT.apply[F0, ExecutionError, Unit](StateT.modify[Coeval, LoggedEvaluationContext](f).map(_.asRight[ExecutionError]))
 
   private def writeLog(l: String): FF[Unit] = updateContext(_.logAppend(l))
 
-  private def liftR[A](x: A): FF[A]                = EitherT.apply[F0, ExecutionError, A](StateT(s => Coeval.evalOnce((s, Right(x)))))
+  private def liftR[A](x: A): FF[A] = EitherT.apply[F0, ExecutionError, A](StateT(s => Coeval.evalOnce((s, Right(x)))))
+
   private def liftL[A](err: ExecutionError): FF[A] = EitherT.apply[F0, ExecutionError, A](StateT(s => Coeval.evalOnce((s, Left(err)))))
 
   private def liftCE[A](ei: Coeval[ExecutionError Either A]): FF[A] = EitherT.apply[F0, ExecutionError, A](StateT(s => ei.map(v => (s, v))))
@@ -79,11 +81,20 @@ object EvaluatorV1 extends ExprEvaluator {
 
   private def evalGetter(expr: EXPR, field: String) = {
     for {
-      obj <- evalExpr[Obj](expr)
-      result <- obj.fields.get(field) match {
-        case Some(lzy) => liftCE[Any](lzy.value.value)
-        case None      => liftL[Any](s"field '$field' not found")
+      obj <- evalExpr[AnyObj](expr)
+      result <- obj match {
+        case Obj(fields) =>
+          fields.get(field) match {
+            case Some(lzy) => liftCE[Any](lzy.value.value)
+            case None      => liftL[Any](s"field '$field' not found")
+          }
+        case CaseObj(_, fields) =>
+          fields.get(field) match {
+            case Some(eager) => liftR[Any](eager.value)
+            case None        => liftL[Any](s"field '$field' not found")
+          }
       }
+
     } yield result
   }
 
@@ -121,9 +132,10 @@ object EvaluatorV1 extends ExprEvaluator {
       case FUNCTION_CALL(header, args, _) =>
         writeLog(s"Evaluating FUNCTION_CALL") *> evalFunctionCall(header, args) <* writeLog("FINISHED")
     }).flatMap(v => {
-      val ti = typeInfo[T]
-      if (t.tpe.typeInfo <:< ti) liftR(v.asInstanceOf[T])
-      else liftL(s"Bad type: expected: ${ti} actual: ${t.tpe.typeInfo}")
+      liftR(v.asInstanceOf[T])
+      //      val ti = typeInfo[T]
+      //      if (t.tpe.typeInfo <:< ti) liftR(v.asInstanceOf[T])
+      //      else liftL(s"Bad type: expected: ${ti} actual: ${t.tpe.typeInfo}")
     })
 
   }

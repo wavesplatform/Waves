@@ -198,7 +198,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
         }
     }
 
-    "data transaction" in pendingUntilFixed(forAll(accountGen, positiveLongGen, dataEntryGen) {
+    "data transaction" in pendingUntilFixed(forAll(accountGen, positiveLongGen, dataEntryGen(1000)) {
       case (sender, initialBalance, dataEntry) =>
         withDomain() { d =>
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
@@ -253,5 +253,84 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
             d.blockchainUpdater.accountScript(sender) shouldBe 'empty
         }
     })
+
+    import com.wavesplatform.features._
+    import scorex.settings.TestFunctionalitySettings
+    import com.wavesplatform.settings.FunctionalitySettings
+    import com.wavesplatform.history
+
+    def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): FunctionalitySettings =
+      TestFunctionalitySettings.Enabled
+        .copy(
+          preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }(collection.breakOut),
+          blocksForFeatureActivation = 1,
+          featureCheckBlocksPeriod = 1
+        )
+
+    "asset sponsorship" in forAll(for {
+      sender      <- accountGen
+      sponsorship <- sponsorFeeCancelSponsorFeeGen(sender)
+    } yield {
+      (sender, sponsorship)
+    }) {
+      case (sender, (issueTransaction, sponsor1, sponsor2, cancel)) =>
+        val ts       = issueTransaction.timestamp
+        val settings = createSettings(BlockchainFeatures.FeeSponsorship -> 0)
+        val wavesSettings = history.DefaultWavesSettings.copy(
+          blockchainSettings = history.DefaultWavesSettings.blockchainSettings.copy(functionalitySettings = settings))
+        withDomain(wavesSettings) { d =>
+          d.appendBlock(genesisBlock(ts, sender, Long.MaxValue / 3))
+          val genesisBlockId = d.lastBlockId
+
+          d.appendBlock(
+            TestBlock.create(
+              ts,
+              genesisBlockId,
+              Seq(issueTransaction)
+            ))
+
+          val blockIdWithIssue = d.lastBlockId
+
+          d.appendBlock(
+            TestBlock.create(
+              ts + 2,
+              d.lastBlockId,
+              Seq(sponsor1)
+            ))
+
+          val blockIdWithSponsor = d.lastBlockId
+
+          d.blockchainUpdater.assetDescription(sponsor1.assetId).get.sponsorship shouldBe sponsor1.minSponsoredAssetFee.get
+          d.portfolio(sender).assets.get(issueTransaction.id()) should contain(issueTransaction.quantity)
+
+          d.appendBlock(
+            TestBlock.create(
+              ts + 2,
+              d.lastBlockId,
+              Seq(cancel)
+            ))
+
+          d.blockchainUpdater.assetDescription(sponsor1.assetId).get.sponsorship shouldBe 0
+
+          d.removeAfter(blockIdWithSponsor)
+
+          d.blockchainUpdater.assetDescription(sponsor1.assetId).get.sponsorship shouldBe sponsor1.minSponsoredAssetFee.get
+          d.portfolio(sender).assets.get(issueTransaction.id()) should contain(issueTransaction.quantity)
+
+          d.appendBlock(
+            TestBlock.create(
+              ts + 2,
+              d.lastBlockId,
+              Seq(sponsor2)
+            ))
+
+          d.portfolio(sender).assets.get(issueTransaction.id()) should contain(issueTransaction.quantity)
+          d.blockchainUpdater.assetDescription(sponsor1.assetId).get.sponsorship shouldBe sponsor2.minSponsoredAssetFee.get
+
+          d.removeAfter(blockIdWithIssue)
+
+          d.blockchainUpdater.assetDescription(sponsor1.assetId).get.sponsorship shouldBe 0
+        }
+    }
   }
 }
