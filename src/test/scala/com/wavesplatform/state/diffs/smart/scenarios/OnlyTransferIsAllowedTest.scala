@@ -19,7 +19,7 @@ class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matche
       s"""
          |
          | if (tx.type == 4 || tx.type == 11)
-         |  then sigVerify(tx.bodyBytes,tx.proof0,tx.senderPk)
+         |  then sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)
          |  else false
          |
       """.stripMargin

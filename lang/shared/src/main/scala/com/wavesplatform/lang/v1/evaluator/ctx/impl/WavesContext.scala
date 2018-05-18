@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.data.EitherT
-//import com.wavesplatform.lang.v1.EnvironmentFunctions
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.traits.{DataType, Environment, Transaction, Transfer, AddressOrAlias}
@@ -62,14 +61,6 @@ object WavesContext {
       "chainId"              -> LONG,
       "version"              -> LONG,
       "reissuable"           -> BOOLEAN,
-      "proof0"               -> BYTEVECTOR,
-      "proof1"               -> BYTEVECTOR,
-      "proof2"               -> BYTEVECTOR,
-      "proof3"               -> BYTEVECTOR,
-      "proof4"               -> BYTEVECTOR,
-      "proof5"               -> BYTEVECTOR,
-      "proof6"               -> BYTEVECTOR,
-      "proof7"               -> BYTEVECTOR,
       "proofs"               -> listByteVector,
       "transferAssetId"      -> optionByteVector,
       "assetId"              -> BYTEVECTOR,
@@ -78,12 +69,6 @@ object WavesContext {
       "transfers"            -> LIST(transferType.typeRef)
     )
   )
-  private def proofBinding(tx: Transaction, x: Int): LazyVal =
-    LazyVal(BYTEVECTOR)(EitherT.fromEither(tx.proofs map { pfs =>
-      if (x >= pfs.size)
-        ByteVector.empty
-      else pfs(x)
-    }))
 
   private def transactionObject(tx: Transaction): Obj =
     Obj(
@@ -111,15 +96,8 @@ object WavesContext {
         "minSponsoredAssetFee" -> LazyVal(optionLong)(EitherT.fromEither(tx.minSponsoredAssetFee.map(_.asInstanceOf[optionLong.Underlying]))),
         "transfers" -> LazyVal(listTransfers)(EitherT.fromEither(tx.transfers.map(tl =>
           tl.map(t => transferObject(t.asInstanceOf[listTransfers.innerType.Underlying])).asInstanceOf[listTransfers.Underlying]))),
-        "proof0" -> proofBinding(tx, 0),
-        "proof1" -> proofBinding(tx, 1),
-        "proof2" -> proofBinding(tx, 2),
-        "proof3" -> proofBinding(tx, 3),
-        "proof4" -> proofBinding(tx, 4),
-        "proof5" -> proofBinding(tx, 5),
-        "proof6" -> proofBinding(tx, 6),
-        "proof7" -> proofBinding(tx, 7),
-        "proofs" -> LazyVal(listByteVector)(EitherT.fromEither(tx.proofs.map(_.asInstanceOf[listByteVector.Underlying])))
+        "proofs" -> LazyVal(listByteVector)(EitherT.fromEither(tx.proofs.map(p =>
+          (p ++ Seq.fill(8 - p.size)(ByteVector.empty)).asInstanceOf[listByteVector.Underlying])))
       ))
 
   def build(env: Environment): EvaluationContext = {

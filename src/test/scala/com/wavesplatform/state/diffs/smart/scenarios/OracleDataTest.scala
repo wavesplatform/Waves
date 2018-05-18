@@ -2,7 +2,6 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.state.DataEntry.MaxValueSize
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
@@ -26,11 +25,10 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       ts     <- positiveIntGen
       genesis  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       genesis2 = GenesisTransaction.create(oracle, ENOUGH_AMT, ts).explicitGet()
-      long <- longEntryGen(dataAsciiKeyGen)
-      bool <- booleanEntryGen(dataAsciiKeyGen).filter(_.key != long.key)
-      bin  <- binaryEntryGen(dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key)
-      str <- stringEntryGen(dataAsciiKeyGen).filter(e =>
-        e.key != long.key && e.key != bool.key && e.key != bin.key && e.value.length <= MaxValueSize / 5)
+      long            <- longEntryGen(dataAsciiKeyGen)
+      bool            <- booleanEntryGen(dataAsciiKeyGen).filter(_.key != long.key)
+      bin             <- binaryEntryGen(500, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key)
+      str             <- stringEntryGen(500, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key && e.key != bin.key)
       dataTransaction <- dataTransactionGenP(oracle, List(long, bool, bin, str))
       allFieldsRequiredScript        = s"""
                     |

@@ -45,7 +45,8 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
   override val typeId: Byte                 = 12
   override val supportedVersions: Set[Byte] = Set(1)
 
-  val MaxEntryCount: Byte = 100
+  val MaxBytes      = 150 * 1024
+  val MaxEntryCount = 100
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
@@ -81,7 +82,8 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
     } else if (feeAmount <= 0) {
       Left(ValidationError.InsufficientFee())
     } else {
-      Right(DataTransaction(version, sender, data, feeAmount, timestamp, proofs))
+      val tx = DataTransaction(version, sender, data, feeAmount, timestamp, proofs)
+      Either.cond(tx.bytes().length <= MaxBytes, tx, ValidationError.TooBigArray)
     }
   }
 
