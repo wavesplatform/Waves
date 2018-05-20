@@ -13,7 +13,15 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
   property("extract should transaction transfer assetId if exists") {
     forAll(transferV1Gen) {
       case (transfer) =>
-        val result = runScript[ByteVector]("extract(tx.transferAssetId)", transfer)
+        val result = runScript[ByteVector](
+          """
+            |match tx {
+            | case ttx : TransferTransaction  =>  extract(ttx.transferAssetId)
+            | case other => throw
+            | }
+            |""".stripMargin,
+          transfer
+        )
         transfer.assetId match {
           case Some(v) => result.explicitGet().toArray sameElements v.arr
           case None    => result should produce("from empty option")
@@ -24,7 +32,15 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
   property("isDefined should return true if transfer assetId exists") {
     forAll(transferV1Gen) {
       case (transfer) =>
-        val result = runScript[Boolean]("isDefined(tx.transferAssetId)", transfer)
+        val result = runScript[Boolean](
+          """
+                                          |match tx {
+                                          | case ttx : TransferTransaction  =>  isDefined(ttx.transferAssetId)
+                                          | case other => throw
+                                          | }
+                                          |""".stripMargin,
+          transfer
+        )
         transfer.assetId.isDefined shouldEqual result.right.get
     }
   }
@@ -49,11 +65,35 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
     //import com.wavesplatform.lang.v1.ctx.Obj
     forAll(massTransferGen.filter(_.transfers.size > 0)) {
       case (massTransfer) =>
-        val resultAmount = runScript[Long]("tx.transfers[0].amount", massTransfer)
+        val resultAmount = runScript[Long](
+          """
+            |match tx {
+            | case mttx : MassTransferTransaction  =>  size(mttx.transfers[0])
+            | case other => throw
+            | }
+            |""".stripMargin,
+          massTransfer
+        )
         resultAmount shouldBe Right(massTransfer.transfers(0).amount)
-        val resultAddress = runScript[ByteVector]("tx.transfers[0].address.bytes", massTransfer)
+        val resultAddress = runScript[ByteVector](
+          """
+                                                      |match tx {
+                                                      | case mttx : MassTransferTransaction  =>  mttx.transfers[0].bytes
+                                                      | case other => throw
+                                                      | }
+                                                      |""".stripMargin,
+          massTransfer
+        )
         resultAddress shouldBe Right(ByteVector(massTransfer.transfers(0).address.bytes.arr))
-        val resultLen = runScript[Long]("size(tx.transfers)", massTransfer)
+        val resultLen = runScript[Long](
+          """
+                                           |match tx {
+                                           | case mttx : MassTransferTransaction  =>  size(mttx.transfers)
+                                           | case other => throw
+                                           | }
+                                           |""".stripMargin,
+          massTransfer
+        )
         resultLen shouldBe Right(massTransfer.transfers.size.toLong)
     }
   }

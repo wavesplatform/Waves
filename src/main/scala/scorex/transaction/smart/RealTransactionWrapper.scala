@@ -115,12 +115,14 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
   }
 
   override def version: Either[String, Byte] = tx match {
-    case g: TransferTransactionV2   => Right(g.version)
+    case g: TransferTransaction     => Right(g.version)
     case g: MassTransferTransaction => Right(g.version)
     case g: SetScriptTransaction    => Right(g.version)
-    case g: IssueTransactionV2      => Right(g.version)
+    case g: IssueTransaction        => Right(g.version)
     case g: DataTransaction         => Right(g.version)
     case g: SponsorFeeTransaction   => Right(g.version)
+    case g: LeaseCancelTransaction  => Right(g.version)
+    case g: LeaseTransaction        => Right(g.version)
     case _                          => Left("Transaction doesn't contain version")
   }
 

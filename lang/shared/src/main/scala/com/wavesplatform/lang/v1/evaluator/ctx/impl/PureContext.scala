@@ -17,7 +17,7 @@ object PureContext {
 
   val none: LazyVal = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval).subflatMap(Right(_: Option[Nothing]))) // IDEA HACK
   val err           = LazyVal(NOTHING)(EitherT(nothingCoeval))
-  val errRef        = "???"
+  val errRef        = "throw"
 
   val extract: PredefFunction = PredefFunction("extract", 1, TYPEPARAM('T'), List(("opt", optionT))) {
     case Some(v) :: Nil => Right(v)
