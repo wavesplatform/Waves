@@ -14,7 +14,7 @@ trait Transaction {
   def transferAssetId: Either[String, Option[ByteVector]]
   def assetId: Either[String, ByteVector]
   def proofs: Either[String, IndexedSeq[ByteVector]]
-  def recipient: Either[String, ByteVector]
+  def recipient: Either[String, Recipient]
   def aliasText: Either[String, String]
   def reissuable: Either[String, Boolean]
   def decimals: Either[String, Byte]
@@ -26,3 +26,10 @@ trait Transaction {
   def minSponsoredAssetFee: Either[String, Option[Long]]
   def transfers: Either[String, IndexedSeq[Transfer]]
 }
+
+trait Recipient
+object Recipient {
+  case class Address(bytes: ByteVector) extends Recipient
+  case class Alias(name: String)        extends Recipient
+}
+case class Transfer(recipient: Recipient, amount: Long)

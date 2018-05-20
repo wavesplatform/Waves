@@ -1,12 +1,13 @@
 package scorex.transaction.smart
 
+import com.wavesplatform.lang.v1.traits.Recipient
 import scodec.bits.ByteVector
+import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.transfer._
-import com.wavesplatform.lang.v1.traits.Transfer
 
 case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lang.v1.traits.Transaction {
   override def bodyBytes: Either[String, ByteVector] = tx match {
@@ -34,10 +35,15 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
     case _                            => Left("Transaction doesn't transfer any asset")
   }
 
-  override def recipient: Either[String, ByteVector] = tx match {
-    case pt: PaymentTransaction  => Right(ByteVector(pt.recipient.bytes.arr))
-    case tt: TransferTransaction => Right(ByteVector(tt.recipient.bytes.arr))
-    case lt: LeaseTransaction    => Right(ByteVector(lt.recipient.bytes.arr))
+  def aoaToRecipient(aoa: AddressOrAlias): Recipient = aoa match {
+    case a: Address => Recipient.Address(ByteVector(a.bytes.arr))
+    case a: Alias   => Recipient.Alias(a.name)
+  }
+
+  override def recipient: Either[String, Recipient] = tx match {
+    case pt: PaymentTransaction  => Right(aoaToRecipient(pt.recipient))
+    case tt: TransferTransaction => Right(aoaToRecipient(tt.recipient))
+    case lt: LeaseTransaction    => Right(aoaToRecipient(lt.recipient))
     case _                       => Left("Transaction doesn't contain recipient")
   }
 
@@ -46,9 +52,11 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
     case _                     => Left("Transaction doesn't contain proofs")
   }
 
-  override def transfers: Either[String, IndexedSeq[Transfer]] = tx match {
-    case ms: MassTransferTransaction => Right(ms.transfers.toIndexedSeq)
-    case _                           => Left("Transaction doesn't contain transfers")
+  override def transfers: Either[String, IndexedSeq[com.wavesplatform.lang.v1.traits.Transfer]] = tx match {
+    case ms: MassTransferTransaction =>
+      val transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.Transfer(aoaToRecipient(r.address), r.amount))
+      Right(transfers.toIndexedSeq)
+    case _ => Left("Transaction doesn't contain transfers")
   }
 
   override def id: ByteVector = ByteVector(tx.id().arr)
