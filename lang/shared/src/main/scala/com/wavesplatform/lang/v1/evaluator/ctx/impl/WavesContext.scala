@@ -71,13 +71,6 @@ object WavesContext {
   private val transactionType =
     UNION(transferTransactionType.typeRef, leaseTransactionType.typeRef, issueTransactionType.typeRef, reissueTransactionType.typeRef)
 
-  private def proofBinding(tx: Transaction, x: Int): Val =
-    Val(BYTEVECTOR)(
-      if (x >= tx.proofs.right.get.size)
-        ByteVector.empty
-      else tx.proofs.right.get(x)
-    )
-
   private def commonTxPart(tx: Transaction): Map[String, Val] = Map(
     "id"        -> Val(BYTEVECTOR)(tx.id),
     "fee"       -> Val(LONG)(tx.fee),
@@ -89,7 +82,11 @@ object WavesContext {
   private def provenTxPart(tx: Transaction): Map[String, Val] = Map(
     "senderPk"  -> Val(BYTEVECTOR)(tx.senderPk.right.get),
     "bodyBytes" -> Val(BYTEVECTOR)(tx.bodyBytes.right.get),
-    "proofs"    -> Val(listByteVector)(tx.proofs.right.get.toList.asInstanceOf[listByteVector.Underlying])
+    "proofs" -> Val(listByteVector) {
+      val existingProofs = tx.proofs.right.get
+      val allProofs      = existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteVector.empty)
+      allProofs.toList.asInstanceOf[listByteVector.Underlying]
+    }
   )
 
   private def transactionObject(tx: Transaction): CaseObj =
@@ -148,6 +145,7 @@ object WavesContext {
     val getLongF: PredefFunction      = getdataF("getLong", DataType.Long)
     val getBooleanF: PredefFunction   = getdataF("getBoolean", DataType.Boolean)
     val getByteArrayF: PredefFunction = getdataF("getByteArray", DataType.ByteArray)
+    val getStringF: PredefFunction    = getdataF("getString", DataType.String)
 
     val addressFromPublicKeyF: PredefFunction = PredefFunction("addressFromPublicKey", 100, addressType.typeRef, List(("publicKey", BYTEVECTOR))) {
       case (pk: ByteVector) :: Nil =>
@@ -217,6 +215,7 @@ object WavesContext {
         getLongF,
         getBooleanF,
         getByteArrayF,
+        getStringF,
         addressFromPublicKeyF,
         addressFromStringF,
         addressFromRecipientF,

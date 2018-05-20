@@ -7,7 +7,7 @@ import scorex.api.http.DataRequest
 import scorex.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request}
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelV1Request, LeaseCancelV2Request, LeaseV1Request, LeaseV2Request}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}

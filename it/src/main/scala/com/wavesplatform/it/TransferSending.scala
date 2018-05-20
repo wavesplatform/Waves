@@ -9,7 +9,7 @@ import com.wavesplatform.it.api.Transaction
 import org.scalatest.Suite
 import scorex.account.{Address, AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import scorex.api.http.assets.SignedTransferV1Request
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.transfer._
 import scorex.utils.ScorexLogging
 

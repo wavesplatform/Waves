@@ -51,7 +51,7 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
     } yield (genesis, setScript, transfers, scriptTransfers)
 
   ignore("parallel native signature verification vs sequential scripted signature verification") {
-    val textScript    = "sigVerify(tx.bodyBytes,tx.proof0,tx.senderPk)"
+    val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)"
     val untypedScript = Parser(textScript).get.value
     val typedScript   = CompilerV1(dummyTypeCheckerContext, untypedScript).explicitGet()
 

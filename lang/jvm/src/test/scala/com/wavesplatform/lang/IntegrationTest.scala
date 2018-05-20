@@ -29,6 +29,32 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
   }
 
+  property("patternMatching _") {
+    val sampleScript =
+      """|
+         |match p {
+         |  case _: PointA => 0
+         |  case _: PointB  => 1
+         |}
+         |
+      """.stripMargin
+    eval[Long](sampleScript, withUnion(pointAInstance)) shouldBe Right(0)
+    eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
+  }
+
+  property("patternMatching any type") {
+    val sampleScript =
+      """|
+         |match p {
+         |  case _: PointA => 0
+         |  case _  => 1
+         |}
+         |
+      """.stripMargin
+    eval[Long](sampleScript, withUnion(pointAInstance)) shouldBe Right(0)
+    eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
+  }
+
   private def eval[T: TypeInfo](code: String, ctx: EvaluationContext = PureContext.instance) = {
     val untyped = Parser(code).get.value
     val typed   = CompilerV1(CompilerContext.fromEvaluationContext(ctx), untyped)

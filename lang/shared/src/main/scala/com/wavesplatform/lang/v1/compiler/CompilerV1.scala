@@ -9,6 +9,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction.FunctionTypeSignature
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions.BINARY_OP
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
@@ -128,7 +129,7 @@ object CompilerV1 {
       else {
         val typedExpressionArgumentsAndTypedPlaceholders: List[(EXPR, TYPEPLACEHOLDER)] = resolvedArgs.zip(argTypes)
 
-        val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case ((typedExpr, tph)) => (typedExpr.tpe, tph) }
+        val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case (typedExpr, tph) => (typedExpr.tpe, tph) }
         for {
           resolvedTypeParams <- TypeInferrer(typePairs)
           resolvedResultType <- TypeInferrer.inferResultType(resultType, resolvedTypeParams)
@@ -202,28 +203,34 @@ object CompilerV1 {
 
     for {
       typedExpr <- compile(ctx, EitherT.pure(expr))
-      u <- typedExpr.tpe match {
+      possibleExpressionTypes <- typedExpr.tpe match {
         case u: UNION => EitherT.fromEither[Coeval](Right(u))
         case _        => EitherT.fromEither[Coeval](Left("Only union type can be matched"))
       }
       matchingTypes = cases.flatMap(_.types)
-      _ <- EitherT.cond[Coeval](UNION.eq(u, UNION(matchingTypes.toList.map(CASETYPEREF))),
-                                (),
-                                s"Matching not exhaustive: possibleTypes are ${u.l}, while matched are $matchingTypes")
-      ifBasedCases: Expressions.EXPR = cases.foldRight(Expressions.REF("???"): Expressions.EXPR) {
+      matchedTypes  = UNION(matchingTypes.toList.map(CASETYPEREF))
+      lastEmpty     = cases.last.types.isEmpty
+      _ <- EitherT.cond[Coeval](
+        lastEmpty && (possibleExpressionTypes >= matchedTypes) || (possibleExpressionTypes equivalent matchedTypes),
+        (),
+        s"Matching not exhaustive: possibleTypes are ${possibleExpressionTypes.l}, while matched are $matchingTypes"
+      )
+      refTmp = Expressions.REF(rootMatchTmpArg)
+      ifBasedCases: Expressions.EXPR = cases.foldRight(Expressions.REF(PureContext.errRef): Expressions.EXPR) {
         case (mc, further) =>
           val typeSwarma = mc.types.foldLeft(Expressions.FALSE: Expressions.EXPR) {
             case (other, matchType) =>
-              BINARY_OP(Expressions.FUNCTION_CALL("_isInstanceOf", List(Expressions.REF(rootMatchTmpArg), Expressions.CONST_STRING(matchType))),
+              BINARY_OP(Expressions.FUNCTION_CALL(PureContext._isInstanceOf.name, List(refTmp, Expressions.CONST_STRING(matchType))),
                         BinaryOperation.OR_OP,
                         other)
           }
           val blockWithNewVar = mc.newVarName match {
-            case Some(nweVal) => Expressions.BLOCK(Expressions.LET(nweVal, Expressions.REF(rootMatchTmpArg), mc.types), mc.expr)
+            case Some(nweVal) => Expressions.BLOCK(Expressions.LET(nweVal, refTmp, mc.types), mc.expr)
             case None         => mc.expr
           }
-          Expressions.IF(typeSwarma, blockWithNewVar, further)
-
+          if (typeSwarma == Expressions.FALSE)
+            blockWithNewVar
+          else Expressions.IF(typeSwarma, blockWithNewVar, further)
       }
       compiled <- compileBlock(updatedCtx, Expressions.BLOCK(Expressions.LET(rootMatchTmpArg, expr), ifBasedCases))
     } yield compiled

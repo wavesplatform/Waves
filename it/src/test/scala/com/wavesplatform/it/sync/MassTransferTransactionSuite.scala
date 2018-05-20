@@ -6,7 +6,7 @@ import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json._
 import scorex.api.http.assets.{MassTransferRequest, SignedMassTransferRequest}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
 import scorex.transaction.transfer.MassTransferTransaction.MaxTransferCount
 import scorex.transaction.transfer.TransferTransaction.MaxAttachmentSize

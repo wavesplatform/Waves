@@ -27,15 +27,17 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       genesis2 = GenesisTransaction.create(oracle, ENOUGH_AMT, ts).explicitGet()
       long            <- longEntryGen(dataAsciiKeyGen)
       bool            <- booleanEntryGen(dataAsciiKeyGen).filter(_.key != long.key)
-      bin             <- binaryEntryGen(dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key)
-      dataTransaction <- dataTransactionGenP(oracle, List(long, bool, bin))
+      bin             <- binaryEntryGen(500, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key)
+      str             <- stringEntryGen(500, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key && e.key != bin.key)
+      dataTransaction <- dataTransactionGenP(oracle, List(long, bool, bin, str))
       allFieldsRequiredScript        = s"""
                     |
                     | let oracle = extract(addressFromString("${oracle.address}"))
                     | let long = extract(getLong(oracle,"${long.key}")) == ${long.value}
                     | let bool = extract(getBoolean(oracle,"${bool.key}")) == ${bool.value}
                     | let bin = extract(getByteArray(oracle,"${bin.key}")) == base58'${bin.value.base58}'
-                    | long && bool && bin
+                    | let str = extract(getString(oracle,"${str.key}")) == "${str.value}"
+                    | long && bool && bin && str
                     |
                     |
                     |

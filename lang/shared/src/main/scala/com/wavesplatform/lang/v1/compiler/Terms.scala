@@ -37,11 +37,15 @@ object Terms {
   case class CASETYPEREF(name: String)   extends AUTO_TAGGED_TYPE[CaseObj]
   case class UNION(l: List[CASETYPEREF]) extends AUTO_TAGGED_TYPE[CaseObj]
   object UNION {
-    def apply(l: CASETYPEREF*): UNION     = new UNION(l.toList)
-    def eq(l1: UNION, l2: UNION): Boolean = l1.l.toSet == l2.l.toSet
-    def >=(l1: UNION, l2: UNION): Boolean = {
-      val bigger = l1.l.toSet
-      l2.l.forall(bigger.contains)
+    def apply(l: CASETYPEREF*): UNION = new UNION(l.toList)
+
+    implicit class UnionExt(l1: UNION) {
+      def equivalent(l2: UNION): Boolean = l1.l.toSet == l2.l.toSet
+
+      def >=(l2: UNION): Boolean = {
+        val bigger = l1.l.toSet
+        l2.l.forall(bigger.contains)
+      }
     }
   }
 

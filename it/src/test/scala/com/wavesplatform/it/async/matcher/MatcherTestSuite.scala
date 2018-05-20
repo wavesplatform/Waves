@@ -12,7 +12,7 @@ import com.wavesplatform.state.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.api.http.assets.SignedTransferV1Request
 import scorex.api.http.leasing.{SignedLeaseCancelV1Request, SignedLeaseV1Request}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import scorex.transaction.transfer._

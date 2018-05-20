@@ -5,7 +5,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state._
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.lagonaki.mocks.TestBlock.{create => block}
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction

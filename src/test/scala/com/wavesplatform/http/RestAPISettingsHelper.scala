@@ -3,7 +3,7 @@ package com.wavesplatform.http
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.RestAPISettings
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 
 trait RestAPISettingsHelper {
   def apiKey: String = "test_api_key"

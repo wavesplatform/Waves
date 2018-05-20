@@ -5,7 +5,7 @@ import com.wavesplatform.lang.Versioned
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.ValidationError.ScriptParseError
 
 trait Script extends Versioned {

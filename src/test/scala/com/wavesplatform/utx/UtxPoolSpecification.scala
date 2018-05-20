@@ -40,7 +40,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
       TransferTransactionV1,
       MassTransferTransaction,
       SetScriptTransaction
-    ).map(_.typeId.toInt -> List(FeeSettings("", 0))).toMap
+    ).map(_.typeId.toInt -> List(FeeSettings("WAVES", 0))).toMap
   )
   import CommonValidation.{ScriptExtraFee => extraFee}
 

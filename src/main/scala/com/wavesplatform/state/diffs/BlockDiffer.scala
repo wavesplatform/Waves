@@ -130,7 +130,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
           case (Right((currDiff, currConstraint)), tx) =>
             val updatedBlockchain = composite(blockchain, currDiff)
             val updatedConstraint = updateConstraint(currConstraint, updatedBlockchain, tx)
-            if (updatedConstraint.isOverfilled) Left(ValidationError.GenericError("Limit of txs was reached"))
+            if (updatedConstraint.isOverfilled) Left(ValidationError.GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint"))
             else
               txDiffer(updatedBlockchain, tx).map { newDiff =>
                 (currDiff.combine(newDiff), updatedConstraint)
@@ -142,7 +142,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
           case (Right((currDiff, currConstraint)), tx) =>
             val updatedBlockchain = composite(blockchain, currDiff)
             val updatedConstraint = updateConstraint(currConstraint, updatedBlockchain, tx)
-            if (updatedConstraint.isOverfilled) Left(ValidationError.GenericError("Limit of txs was reached"))
+            if (updatedConstraint.isOverfilled) Left(ValidationError.GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint"))
             else
               txDiffer(updatedBlockchain, tx).map { newDiff =>
                 val updatedPortfolios = newDiff.portfolios.combine(
