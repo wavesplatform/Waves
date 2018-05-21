@@ -3,6 +3,7 @@ package scorex.transaction.smart
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.crypto
 import com.wavesplatform.state._
+import com.wavesplatform.utils.Base64
 import monix.eval.Coeval
 import play.api.libs.json.Json
 import scorex.account._
@@ -36,7 +37,7 @@ case class SetScriptTransaction private (version: Byte,
     ))
 
   override val assetFee = (None, fee)
-  override val json     = Coeval.evalOnce(jsonBase() ++ Json.obj("version" -> version, "script" -> script.map(_.bytes())))
+  override val json     = Coeval.evalOnce(jsonBase() ++ Json.obj("version" -> version, "script" -> script.map(s => Base64.encode(s.bytes().arr))))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 }

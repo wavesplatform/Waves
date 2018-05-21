@@ -94,7 +94,7 @@ object TransactionFactory {
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       script <- request.script match {
         case None    => Right(None)
-        case Some(s) => Script.fromBase58String(s).map(Some(_))
+        case Some(s) => Script.fromBase64String(s).map(Some(_))
       }
       tx <- SetScriptTransaction.signed(
         request.version,
@@ -115,7 +115,7 @@ object TransactionFactory {
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       s <- request.script match {
         case None    => Right(None)
-        case Some(s) => Script.fromBase58String(s).map(Some(_))
+        case Some(s) => Script.fromBase64String(s).map(Some(_))
       }
       tx <- IssueTransactionV2.signed(
         version = request.version,

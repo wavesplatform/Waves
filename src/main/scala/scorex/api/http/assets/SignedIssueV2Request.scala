@@ -44,7 +44,7 @@ case class SignedIssueV2Request(@ApiModelProperty(required = true)
       _proofs     <- Proofs.create(_proofBytes)
       _script <- script match {
         case None    => Right(None)
-        case Some(s) => Script.fromBase58String(s).map(Some(_))
+        case Some(s) => Script.fromBase64String(s).map(Some(_))
       }
       t <- IssueTransactionV2.create(
         version,

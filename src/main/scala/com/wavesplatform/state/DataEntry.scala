@@ -4,11 +4,9 @@ import java.nio.charset.StandardCharsets.UTF_8
 
 import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.state.DataEntry._
+import com.wavesplatform.utils.Base64
 import play.api.libs.json._
-import scorex.crypto.encode.Base64
 import scorex.serialization.Deser
-
-import scala.util.Try
 
 sealed abstract class DataEntry[T](val key: String, val value: T) {
   def valueBytes: Array[Byte]
@@ -72,9 +70,7 @@ object DataEntry {
             case JsDefined(JsString("binary")) =>
               jsv \ "value" match {
                 case JsDefined(JsString(enc)) =>
-                  if (enc.startsWith("base64:"))
-                    Try(Base64.decode(enc.substring(7))).fold(ex => JsError(ex.getMessage), arr => JsSuccess(BinaryDataEntry(key, ByteStr(arr))))
-                  else JsError("Base64 encoding expected")
+                  Base64.decode(enc).fold(ex => JsError(ex.getMessage), arr => JsSuccess(BinaryDataEntry(key, ByteStr(arr))))
                 case _ => JsError("value is missing or not a string")
               }
             case JsDefined(JsString("string")) =>
@@ -108,7 +104,7 @@ case class BooleanDataEntry(override val key: String, override val value: Boolea
 case class BinaryDataEntry(override val key: String, override val value: ByteStr) extends DataEntry[ByteStr](key, value) {
   override def valueBytes: Array[Byte] = Type.Binary.id.toByte +: Deser.serializeArray(value.arr)
 
-  override def toJson: JsObject = super.toJson + ("type" -> JsString("binary")) + ("value" -> JsString("base64:" + Base64.encode(value.arr)))
+  override def toJson: JsObject = super.toJson + ("type" -> JsString("binary")) + ("value" -> JsString(Base64.encode(value.arr)))
 
   override def valid: Boolean = super.valid && value.arr.length <= MaxValueSize
 }

@@ -8,8 +8,9 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.CommonValidation
 import io.swagger.annotations._
 import javax.ws.rs.Path
+
 import play.api.libs.json.Json
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.utils.{Base58, Base64}
 import scorex.transaction.smart.script.{Script, ScriptCompiler}
 import scorex.utils.Time
 
@@ -30,14 +31,14 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   }
 
   @Path("/script/compile")
-  @ApiOperation(value = "Compile", notes = "Compiles string code to base58 script representation", httpMethod = "POST")
+  @ApiOperation(value = "Compile", notes = "Compiles string code to base64 script representation", httpMethod = "POST")
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "code", required = true, dataType = "string", paramType = "body", value = "Script code")
     ))
   @ApiResponses(
     Array(
-      new ApiResponse(code = 200, message = "base58 or error")
+      new ApiResponse(code = 200, message = "base64 or error")
     ))
   def compile: Route = path("script" / "compile") {
     (post & entity(as[String])) { code =>
@@ -46,7 +47,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
           e => Json.obj("error" -> e), {
             case (script, complexity) =>
               Json.obj(
-                "script"     -> script.bytes().base58,
+                "script"     -> Base64.encode(script.bytes().arr),
                 "complexity" -> complexity,
                 "extraFee"   -> CommonValidation.ScriptExtraFee
               )
@@ -57,20 +58,20 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   }
 
   @Path("/script/estimate")
-  @ApiOperation(value = "Estimate", notes = "Estimates compiled code in Base58 representation", httpMethod = "POST")
+  @ApiOperation(value = "Estimate", notes = "Estimates compiled code in Base64 representation", httpMethod = "POST")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "code", required = true, dataType = "string", paramType = "body", value = "A compiled Base58 code")
+      new ApiImplicitParam(name = "code", required = true, dataType = "string", paramType = "body", value = "A compiled Base64 code")
     ))
   @ApiResponses(
     Array(
-      new ApiResponse(code = 200, message = "base58 or error")
+      new ApiResponse(code = 200, message = "base64 or error")
     ))
   def estimate: Route = path("script" / "estimate") {
     (post & entity(as[String])) { code =>
       complete(
         Script
-          .fromBase58String(code)
+          .fromBase64String(code)
           .left
           .map(_.m)
           .flatMap { script =>
