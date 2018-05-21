@@ -106,7 +106,7 @@ object PureContext {
   val bge            = createOp(GE_OP, BOOLEAN, BOOLEAN)(_ >= _)
   val bgt            = createOp(GT_OP, BOOLEAN, BOOLEAN)(_ > _)
 
-  val operators: Seq[PredefFunction] = Seq(sumLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt, bge, bgt, getElement, getListSize, uMinus, uNot)
+  val operators: Seq[PredefFunction] = Seq(sumLong, subLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt, bge, bgt, getElement, getListSize, uMinus, uNot)
 
   lazy val instance =
     EvaluationContext.build(types = Seq.empty,
