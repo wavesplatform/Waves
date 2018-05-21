@@ -69,7 +69,7 @@ object PureContext {
 
   val uMinus = PredefFunction("-", 1, LONG, List("n" -> LONG)) {
     case (n: Long) :: Nil => {
-      Right(-n)
+      Right(Math.negateExact(n))
     }
     case _ => ???
   }
@@ -94,6 +94,7 @@ object PureContext {
   }
 
   val sumLong       = createTryOp(SUM_OP, LONG, LONG)(Math.addExact)
+  val subLong       = createTryOp(SUB_OP, LONG, LONG)(Math.subtractExact)
   val sumString     = createOp(SUM_OP, STRING, STRING)(_ + _)
   val sumByteVector = createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR)((a, b) => ByteVector(a.toArray ++ b.toArray))
   val eqLong        = createOp(EQ_OP, LONG, BOOLEAN)(_ == _)
@@ -102,8 +103,10 @@ object PureContext {
   val eqString      = createOp(EQ_OP, STRING, BOOLEAN)(_ == _)
   val ge            = createOp(GE_OP, LONG, BOOLEAN)(_ >= _)
   val gt            = createOp(GT_OP, LONG, BOOLEAN)(_ > _)
+  val bge            = createOp(GE_OP, BOOLEAN, BOOLEAN)(_ >= _)
+  val bgt            = createOp(GT_OP, BOOLEAN, BOOLEAN)(_ > _)
 
-  val operators: Seq[PredefFunction] = Seq(sumLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt, getElement, getListSize, uMinus, uNot)
+  val operators: Seq[PredefFunction] = Seq(sumLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt, bge, bgt, getElement, getListSize, uMinus, uNot)
 
   lazy val instance =
     EvaluationContext.build(types = Seq.empty,

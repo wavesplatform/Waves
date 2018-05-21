@@ -93,13 +93,13 @@ object Parser {
     }
   }
 
-  private def binaryOp(rest: List[(String, BinaryOperation)]): P[EXPR] = rest match {
+  private def binaryOp(rest: List[(BinaryOperation)]): P[EXPR] = rest match {
     case Nil => unaryOp(unaryOps)
-    case (lessPriorityOp, kind) :: restOps =>
+    case kind :: restOps =>
       val operand = binaryOp(restOps)
-      P(operand ~ (lessPriorityOp.!.map(_ => kind) ~ operand).rep()).map {
+      P(operand ~ (kind.parser.!.map(_ => kind) ~ operand).rep()).map {
         case (left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
-          r.foldLeft(left) { case (acc, (currKind, currOperand)) => BINARY_OP(acc, currKind, currOperand) }
+          r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(acc)(currOperand) }
       }
   }
 

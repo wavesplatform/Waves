@@ -10,7 +10,7 @@ trait ScriptGen {
   def CONST_LONGgen: Gen[(EXPR, Long)] = Gen.choose(Long.MinValue, Long.MaxValue).map(v => (CONST_LONG(v), v))
 
   def BOOLgen(gas: Int): Gen[(EXPR,Boolean)] =
-    if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1))
+    if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), BGEgen(gas - 1), BGTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1))
     else Gen.const((TRUE, true))
 
   def SUMgen(gas: Int): Gen[(EXPR, Long)] =
@@ -20,19 +20,58 @@ trait ScriptGen {
       if((BigInt(v1) + BigInt(v2)).isValidLong)
     } yield (BINARY_OP(i1, SUM_OP, i2), (v1 + v2))
 
-  def INTGen(gas: Int): Gen[(EXPR, Long)] = if (gas > 0) Gen.oneOf(CONST_LONGgen, SUMgen(gas - 1), IF_INTgen(gas - 1), INTGen(gas-1).map(e => (FUNCTION_CALL("-",List(e._1)), -e._2))) else CONST_LONGgen
+  def SUBgen(gas: Int): Gen[(EXPR, Long)] =
+    for {
+      (i1, v1) <- INTGen((gas - 2) / 2)
+      (i2, v2) <- INTGen((gas - 2) / 2)
+      if((BigInt(v1) - BigInt(v2)).isValidLong)
+    } yield (BINARY_OP(i1, SUB_OP, i2), (v1 + v2))
+
+  def INTGen(gas: Int): Gen[(EXPR, Long)] = if (gas > 0) Gen.oneOf(CONST_LONGgen, SUMgen(gas - 1), IF_INTgen(gas - 1), INTGen(gas-1).filter(v => (-BigInt(v._2)).isValidLong).map(e => (FUNCTION_CALL("-",List(e._1)), -e._2))) else CONST_LONGgen
+
+  def BGEgen(gas: Int): Gen[(EXPR, Boolean)] =
+    for {
+      dir <- Gen.oneOf(true, false)
+      (i1, v1) <- BOOLgen((gas - 2) / 2)
+      (i2, v2) <- BOOLgen((gas - 2) / 2)
+    } yield if(dir) {
+       (BINARY_OP(i1, GE_OP, i2), (v1 >= v2))
+      } else {
+       (BINARY_OP(i2, LE_OP, i1), (v1 <= v2))
+      } 
+
+  def BGTgen(gas: Int): Gen[(EXPR, Boolean)] =
+    for {
+      dir <- Gen.oneOf(true, false)
+      (i1, v1) <- BOOLgen((gas - 2) / 2)
+      (i2, v2) <- BOOLgen((gas - 2) / 2)
+    } yield if(dir) {
+       (BINARY_OP(i1, GE_OP, i2), (v1 > v2))
+      } else {
+       (BINARY_OP(i2, LE_OP, i1), (v1 < v2))
+      } 
 
   def GEgen(gas: Int): Gen[(EXPR, Boolean)] =
     for {
+      dir <- Gen.oneOf(true, false)
       (i1, v1) <- INTGen((gas - 2) / 2)
       (i2, v2) <- INTGen((gas - 2) / 2)
-    } yield (BINARY_OP(i1, GE_OP, i2), (v1 >= v2))
+    } yield if(dir) {
+       (BINARY_OP(i1, GE_OP, i2), (v1 >= v2))
+      } else {
+       (BINARY_OP(i2, LE_OP, i1), (v1 <= v2))
+      } 
 
   def GTgen(gas: Int): Gen[(EXPR, Boolean)] =
     for {
+      dir <- Gen.oneOf(true, false)
       (i1, v1) <- INTGen((gas - 2) / 2)
       (i2, v2) <- INTGen((gas - 2) / 2)
-    } yield (BINARY_OP(i1, GT_OP, i2), (v1 > v2))
+    } yield if(dir) {
+       (BINARY_OP(i1, GT_OP, i2), (v1 > v2))
+      } else {
+       (BINARY_OP(i2, LT_OP, i1), (v1 < v2))
+      }
 
   def EQ_INTgen(gas: Int): Gen[(EXPR, Boolean)] =
     for {
@@ -96,7 +135,7 @@ trait ScriptGen {
     for {
       pred <- whitespaces
       post <- whitespaces
-    } yield pred + expr + post
+    } yield s" $expr " //pred + expr + post
 
   def toString(expr: EXPR): Gen[String] = expr match {
     case CONST_LONG(x)   => withWhitespaces(s"$x")
@@ -106,6 +145,16 @@ trait ScriptGen {
     case FALSE           => withWhitespaces("false")
     case FUNCTION_CALL("-", List(CONST_LONG(v))) if (v>=0) => s"-($v)"
     case FUNCTION_CALL(op, List(e)) => toString(e).map(e => s"$op$e")
+    case BINARY_OP(x, LE_OP, y) =>
+      for {
+        arg2 <- toString(x)
+        arg1 <- toString(y)
+      } yield s"($arg1<=$arg2)"
+    case BINARY_OP(x, LT_OP, y) =>
+      for {
+        arg2 <- toString(x)
+        arg1 <- toString(y)
+      } yield s"($arg1<$arg2)"
     case BINARY_OP(x, op: BinaryOperation, y) =>
       for {
         arg1 <- toString(x)
