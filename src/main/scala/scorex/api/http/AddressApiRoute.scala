@@ -12,10 +12,11 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
+
 import play.api.libs.json._
 import scorex.BroadcastRoute
 import scorex.account.{Address, PublicKeyAccount}
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.utils.{Base58, Base64}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.smart.script.ScriptCompiler
 import scorex.transaction.{PoSCalc, TransactionFactory, ValidationError}
@@ -371,7 +372,7 @@ case class AddressApiRoute(settings: RestAPISettings,
     } yield
       AddressScriptInfo(
         address = account.address,
-        script = script.map(_.bytes().base58),
+        script = script.map(s => Base64.encode(s.bytes().arr)),
         scriptText = script.map(_.text),
         complexity = complexity,
         extraFee = if (script.isEmpty) 0 else CommonValidation.ScriptExtraFee

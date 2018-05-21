@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json.JsNumber
+import play.api.libs.json.{JsNumber, Json}
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.Proofs
 import scorex.transaction.transfer._
@@ -85,6 +85,10 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
     acc0ScriptInfo.script.isEmpty shouldBe false
     acc0ScriptInfo.scriptText.isEmpty shouldBe false
+    acc0ScriptInfo.script.get.startsWith("base64:") shouldBe true
+
+    val json = Json.parse(sender.get(s"/transactions/info/$setScriptId").getResponseBody)
+    (json \ "script").as[String].startsWith("base64:") shouldBe true
   }
 
   test("can't send from acc0 using old pk") {
