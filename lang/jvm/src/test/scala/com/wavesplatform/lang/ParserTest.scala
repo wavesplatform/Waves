@@ -38,8 +38,6 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
     forAll(testGen) {
       case ((expr, str)) =>
-        println(expr)
-        println(play.api.libs.json.Json.toJson(str.filter(e => !"\r\t".contains(e))))
         parse(str) shouldBe expr
     }
   }
