@@ -48,23 +48,23 @@ object CompilerV1 {
 
   private def compile(ctx: CompilerContext, t: SetTypeResult[Expressions.EXPR]): SetTypeResult[EXPR] = t.flatMap {
     case x: Expressions.CONST_LONG       => EitherT.pure(CONST_LONG(x.value))
-    case Expressions.CONST_BYTEVECTOR(p) => handlePart(p)(CONST_BYTEVECTOR)
-    case Expressions.CONST_STRING(p)     => handlePart(p)(CONST_STRING)
-    case Expressions.TRUE                => EitherT.pure(TRUE)
-    case Expressions.FALSE               => EitherT.pure(FALSE)
+    case x: Expressions.CONST_BYTEVECTOR => handlePart(x.value)(CONST_BYTEVECTOR)
+    case x: Expressions.CONST_STRING     => handlePart(x.value)(CONST_STRING)
+    case _: Expressions.TRUE             => EitherT.pure(TRUE)
+    case _: Expressions.FALSE            => EitherT.pure(FALSE)
     case getter: Expressions.GETTER      => compileGetter(ctx, getter)
     case fc: Expressions.FUNCTION_CALL   => compileFunctionCall(ctx, fc)
     case block: Expressions.BLOCK        => compileBlock(ctx, block)
     case ifExpr: Expressions.IF          => compileIf(ctx, ifExpr)
     case ref: Expressions.REF            => compileRef(ctx, ref)
     case m: Expressions.MATCH            => compileMatch(ctx, m)
-    case Expressions.BINARY_OP(a, op, b) =>
+    case Expressions.BINARY_OP(start, end, a, op, b) =>
       op match {
-        case AND_OP => compileIf(ctx, Expressions.IF(a, b, Expressions.FALSE))
-        case OR_OP  => compileIf(ctx, Expressions.IF(a, Expressions.TRUE, b))
-        case _      => compileFunctionCall(ctx, Expressions.FUNCTION_CALL(opsToFunctions(op), List(a, b)))
+        case AND_OP => compileIf(ctx, Expressions.IF(start, end, a, b, Expressions.FALSE(start, end)))
+        case OR_OP  => compileIf(ctx, Expressions.IF(start, end, a, Expressions.TRUE(start, end), b))
+        case _      => compileFunctionCall(ctx, Expressions.FUNCTION_CALL(start, end, PART.VALID(start, end, opsToFunctions(op)), List(a, b)))
       }
-    case Expressions.INVALID(message, _) => EitherT.leftT[Coeval, EXPR](message)
+    case Expressions.INVALID(_, _, message, _) => EitherT.leftT[Coeval, EXPR](message)
   }
 
   private def compileGetter(ctx: CompilerContext, getter: Expressions.GETTER): SetTypeResult[EXPR] =
@@ -124,7 +124,7 @@ object CompilerV1 {
       }
 
   private def compileFunctionCall(ctx: CompilerContext, fc: Expressions.FUNCTION_CALL): SetTypeResult[EXPR] = {
-    val Expressions.FUNCTION_CALL(name, args) = fc
+    val Expressions.FUNCTION_CALL(_, _, name, args) = fc
     for {
       name <- EitherT.fromEither[Coeval](name.toEither)
       r <- ctx.functionTypeSignaturesByName(name) match {
@@ -185,9 +185,9 @@ object CompilerV1 {
   }
 
   private def compileMatch(ctx: CompilerContext, m: Expressions.MATCH): SetTypeResult[EXPR] = {
-    val Expressions.MATCH(expr, cases) = m
-    val rootMatchTmpArg                = "$match" + ctx.tmpArgsIdx
-    val updatedCtx                     = ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1)
+    val Expressions.MATCH(_, _, expr, cases) = m
+    val rootMatchTmpArg                      = "$match" + ctx.tmpArgsIdx
+    val updatedCtx                           = ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1)
 
     for {
       typedExpr <- compile(ctx, EitherT.pure(expr))
@@ -203,24 +203,32 @@ object CompilerV1 {
         (),
         s"Matching not exhaustive: possibleTypes are ${possibleExpressionTypes.l}, while matched are $matchingTypes"
       )
-      refTmp = Expressions.REF(rootMatchTmpArg)
-      ifBasedCases: Expressions.EXPR = cases.foldRight(Expressions.REF(PureContext.errRef): Expressions.EXPR) {
+      refTmp = Expressions.REF(1, 1, PART.VALID(1, 1, rootMatchTmpArg))
+      ifBasedCases: Expressions.EXPR = cases.foldRight(Expressions.REF(1, 1, PART.VALID(1, 1, PureContext.errRef)): Expressions.EXPR) {
         case (mc, further) =>
-          val typeSwarma = mc.types.foldLeft(Expressions.FALSE: Expressions.EXPR) {
+          val typeSwarma = mc.types.foldLeft(Expressions.FALSE(1, 1): Expressions.EXPR) {
             case (other, matchType) =>
-              BINARY_OP(Expressions.FUNCTION_CALL(PureContext._isInstanceOf.name, List(refTmp, Expressions.CONST_STRING(matchType))),
-                        BinaryOperation.OR_OP,
-                        other)
+              BINARY_OP(
+                1,
+                1,
+                Expressions.FUNCTION_CALL(1,
+                                          1,
+                                          PART.VALID(1, 1, PureContext._isInstanceOf.name),
+                                          List(refTmp, Expressions.CONST_STRING(1, 1, matchType))),
+                BinaryOperation.OR_OP,
+                other
+              )
           }
           val blockWithNewVar = mc.newVarName match {
-            case Some(newVal) => Expressions.BLOCK(Expressions.LET(newVal, refTmp, mc.types), mc.expr)
+            case Some(newVal) => Expressions.BLOCK(1, 1, Expressions.LET(1, 1, newVal, refTmp, mc.types), mc.expr)
             case None         => mc.expr
           }
-          if (typeSwarma == Expressions.FALSE)
+          if (typeSwarma.isInstanceOf[Expressions.FALSE])
             blockWithNewVar
-          else Expressions.IF(typeSwarma, blockWithNewVar, further)
+          else Expressions.IF(1, 1, typeSwarma, blockWithNewVar, further)
       }
-      compiled <- compileBlock(updatedCtx, Expressions.BLOCK(Expressions.LET(rootMatchTmpArg, expr, Seq.empty), ifBasedCases))
+      compiled <- compileBlock(updatedCtx,
+                               Expressions.BLOCK(1, 1, Expressions.LET(1, 1, PART.VALID(1, 1, rootMatchTmpArg), expr, Seq.empty), ifBasedCases))
     } yield compiled
   }
 
@@ -255,8 +263,8 @@ object CompilerV1 {
   }
 
   private def handlePart[T](part: PART[T])(f: T => EXPR): SetTypeResult[EXPR] = part match {
-    case PART.VALID(x)            => EitherT.pure(f(x))
-    case PART.INVALID(x, message) => EitherT.leftT[Coeval, EXPR](s"$message: $x")
+    case PART.VALID(_, _, x)               => EitherT.pure(f(x))
+    case PART.INVALID(start, end, message) => EitherT.leftT[Coeval, EXPR](s"$message at $start-$end")
   }
 
   def apply(c: CompilerContext, expr: Expressions.EXPR): CompilationResult[EXPR] = {
