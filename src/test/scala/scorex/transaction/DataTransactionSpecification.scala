@@ -8,7 +8,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{Format, Json}
-import scorex.account.{Alias, PublicKeyAccount}
+import scorex.account.PublicKeyAccount
 import scorex.api.http.SignedDataRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.DataTransaction.MaxEntryCount
