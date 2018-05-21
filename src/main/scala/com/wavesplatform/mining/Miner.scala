@@ -294,8 +294,8 @@ class MinerImpl(allChannels: ChannelGroup,
 
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = {
     {
-      val height      = blockchainUpdater.height
-      val blockForHit = (blockchainUpdater.blockAt(height - 100) orElse blockchainUpdater.lastBlock).get
+      val height    = blockchainUpdater.height
+      val lastBlock = blockchainUpdater.lastBlock.get
       for {
         _            <- checkAge(height, blockchainUpdater.lastBlockTimestamp.get)
         _            <- checkScript(account)

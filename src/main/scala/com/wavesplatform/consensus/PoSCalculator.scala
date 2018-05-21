@@ -24,14 +24,6 @@ trait PoSCalculator {
 
   def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long
 
-  def validBlockDelay(genSig: Array[Byte], baseTarget: Long, balance: Long): Long = {
-    calculateDelay(hit(genSig), baseTarget, balance)
-  }
-
-  def validBlockDelay(genSig: Array[Byte], publicKey: Array[Byte], baseTarget: Long, balance: Long): Long = {
-    calculateDelay(hit(generatorSignature(genSig, publicKey)), baseTarget, balance)
-  }
-
   def normalize(value: Long, targetBlockDelaySeconds: Long): Double =
     value * targetBlockDelaySeconds / (60: Double)
 
