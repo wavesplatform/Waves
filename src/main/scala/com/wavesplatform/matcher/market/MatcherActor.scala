@@ -15,7 +15,7 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.account.Address
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}

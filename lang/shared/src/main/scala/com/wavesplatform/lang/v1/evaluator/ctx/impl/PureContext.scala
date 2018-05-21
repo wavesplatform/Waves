@@ -8,6 +8,8 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 
+import scala.util.Try
+
 object PureContext {
   private val optionT                                             = OPTIONTYPEPARAM(TYPEPARAM('T'))
   private val noneCoeval: Coeval[Either[String, Option[Nothing]]] = Coeval.evalOnce(Right(None))
@@ -15,6 +17,7 @@ object PureContext {
 
   val none: LazyVal = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval).subflatMap(Right(_: Option[Nothing]))) // IDEA HACK
   val err           = LazyVal(NOTHING)(EitherT(nothingCoeval))
+  val errRef        = "???"
 
   val extract: PredefFunction = PredefFunction("extract", 1, TYPEPARAM('T'), List(("opt", optionT))) {
     case Some(v) :: Nil => Right(v)
@@ -51,22 +54,17 @@ object PureContext {
     }
   }
 
-
   val getElement = PredefFunction("getElement", 2, TYPEPARAM('T'), List("arr" -> LISTTYPEPARAM(TYPEPARAM('T')), "pos" -> LONG)) {
-    case (arr: IndexedSeq[_]) :: (pos: Long) :: Nil => if(pos < arr.size && 0 <= pos) {
-                                                     Right(arr(pos.toInt))
-                                                  } else {
-                                                     Left(s"Missing element at position $pos")
-                                                  }
-    case _               => ???
+    case (arr: IndexedSeq[_]) :: (pos: Long) :: Nil => Try(arr(pos.toInt)).toEither.left.map(_.toString)
+    case _                                          => ???
   }
 
   val getListSize = PredefFunction("size", 2, LONG, List("arr" -> LISTTYPEPARAM(TYPEPARAM('T')))) {
     case (arr: IndexedSeq[_]) :: Nil => {
-      
+
       Right(arr.size.toLong)
     }
-    case _               => ???
+    case _ => ???
   }
 
   private def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
@@ -96,7 +94,7 @@ object PureContext {
   lazy val instance =
     EvaluationContext.build(types = Seq.empty,
                             caseTypes = Seq.empty,
-                            letDefs = Map(("None", none), ("???", err)),
+                            letDefs = Map(("None", none), (errRef, err)),
                             functions = Seq(extract, isDefined, some, size, _isInstanceOf) ++ operators)
 
 }

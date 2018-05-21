@@ -10,7 +10,7 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue}
 import scorex.api.http.{TooBigArrayAllocation, UtilsApiRoute}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.utils.Time
