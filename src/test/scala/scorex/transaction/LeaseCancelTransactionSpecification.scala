@@ -47,9 +47,6 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
                        }
     """)
 
-    /**
-      * sender: PublicKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long, signature: ByteStr
-      */
     val tx = LeaseCancelTransactionV1
       .create(
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
