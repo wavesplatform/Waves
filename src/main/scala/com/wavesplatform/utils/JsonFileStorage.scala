@@ -5,7 +5,7 @@ import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
 import play.api.libs.json.{Json, Reads, Writes}
-import scorex.crypto.encode.Base64
+import scorex.crypto.encode.{Base64 => ScorexBase64}
 
 import scala.io.{BufferedSource, Source}
 
@@ -47,7 +47,7 @@ object JsonFileStorage {
   private def decrypt(key: SecretKeySpec, encryptedValue: String): String = {
     val cipher: Cipher = Cipher.getInstance(algorithm)
     cipher.init(Cipher.DECRYPT_MODE, key)
-    new String(cipher.doFinal(Base64.decode(encryptedValue)))
+    new String(cipher.doFinal(ScorexBase64.decode(encryptedValue)))
   }
 
   def save[T](value: T, path: String, key: Option[SecretKeySpec])(implicit w: Writes[T]): Unit = {
