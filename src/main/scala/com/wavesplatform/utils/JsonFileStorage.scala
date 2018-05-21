@@ -41,7 +41,7 @@ object JsonFileStorage {
   private def encrypt(key: SecretKeySpec, value: String): String = {
     val cipher: Cipher = Cipher.getInstance(algorithm)
     cipher.init(Cipher.ENCRYPT_MODE, key)
-    Base64.encode(cipher.doFinal(value.getBytes(encoding)))
+    ScorexBase64.encode(cipher.doFinal(value.getBytes(encoding)))
   }
 
   private def decrypt(key: SecretKeySpec, encryptedValue: String): String = {
