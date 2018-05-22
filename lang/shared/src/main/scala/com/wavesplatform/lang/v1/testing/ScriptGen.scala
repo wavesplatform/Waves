@@ -11,7 +11,7 @@ trait ScriptGen {
   def CONST_LONGgen: Gen[(EXPR, Long)] = Gen.choose(Long.MinValue, Long.MaxValue).map(v => (CONST_LONG(v), v))
 
   def BOOLgen(gas: Int): Gen[(EXPR,Boolean)] =
-    if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1))
+    if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), NE_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1))
     else Gen.const((TRUE, true))
 
   def SUMgen(gas: Int): Gen[(EXPR, Long)] =
@@ -57,6 +57,12 @@ trait ScriptGen {
       (i1, v1) <- INTGen((gas - 2) / 2)
       (i2, v2) <- INTGen((gas - 2) / 2)
     } yield (BINARY_OP(i1, EQ_OP, i2), (v1 == v2))
+
+  def NE_INTgen(gas: Int): Gen[(EXPR, Boolean)] =
+    for {
+      (i1, v1) <- INTGen((gas - 2) / 2)
+      (i2, v2) <- INTGen((gas - 2) / 2)
+    } yield (BINARY_OP(i1, NE_OP, i2), (v1 != v2))
 
   def ANDgen(gas: Int): Gen[(EXPR, Boolean)] =
     for {
