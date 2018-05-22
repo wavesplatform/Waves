@@ -1,9 +1,12 @@
 package scorex.transaction
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.state.ByteStr
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
+import play.api.libs.json.Json
 import scorex.account.{Alias, PrivateKeyAccount}
+import scorex.account.PublicKeyAccount
 
 class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -29,4 +32,64 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
         tx1.id() shouldBe tx2.id()
     }
   }
+
+  property("JSON format validation for CreateAliasTransactionV1") {
+    val js = Json.parse("""{
+                         "type": 10,
+                         "id": "7acjQQWJAharrgzb4Z6jo3eeAKAGPmLkHTPtvBTKaiug",
+                         "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+                         "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+                         "fee": 100000,
+                         "timestamp": 1526910778245,
+                         "signature": "CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T",
+                         "version": 1,
+                         "alias": "myalias"
+                        }
+    """)
+
+    val tx = CreateAliasTransactionV1
+      .create(
+        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        Alias.buildWithCurrentNetworkByte("myalias").right.get,
+        100000,
+        1526910778245L,
+        ByteStr.decodeBase58("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").get
+      )
+      .right
+      .get
+
+    js shouldEqual tx.json()
+  }
+
+  property("JSON format validation for CreateAliasTransactionV2") {
+    val js = Json.parse("""{
+                       "type": 10,
+                       "id": "7acjQQWJAharrgzb4Z6jo3eeAKAGPmLkHTPtvBTKaiug",
+                       "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+                       "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+                       "fee": 100000,
+                       "timestamp": 1526910778245,
+                       "proofs": [
+                       "26U7rQTwpdma5GYSZb5bNygVCtSuWL6DKet1Nauf5J57v19mmfnq434YrkKYJqvYt2ydQBUT3P7Xgj5ZVDVAcc5k"
+                       ],
+                       "version": 2,
+                       "alias": "myalias"
+                        }
+    """)
+
+    val tx = CreateAliasTransactionV2
+      .create(
+        2,
+        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        Alias.buildWithCurrentNetworkByte("myalias").right.get,
+        100000,
+        1526910778245L,
+        Proofs(Seq(ByteStr.decodeBase58("26U7rQTwpdma5GYSZb5bNygVCtSuWL6DKet1Nauf5J57v19mmfnq434YrkKYJqvYt2ydQBUT3P7Xgj5ZVDVAcc5k").get))
+      )
+      .right
+      .get
+
+    js shouldEqual tx.json()
+  }
+
 }

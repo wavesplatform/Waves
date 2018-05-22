@@ -1,6 +1,6 @@
 package com.wavesplatform.it.async
 
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{NodeConfigs, TransferSending}
@@ -11,52 +11,13 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 class BlockSizeConstraintsSuite extends FreeSpec with Matchers with TransferSending with NodesFromDocker {
+  import BlockSizeConstraintsSuite._
 
-  private val maxTxs          = 5000 // More, than 1mb of block
-  private val txsInMicroBlock = 500
-
-  override protected val nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
-    .overrideBase(
-      _.raw(
-        s"""akka.http.server {
-         |  parsing.max-content-length = 3737439
-         |  request-timeout = 60s
-         |}
-         |
-         |waves {
-         |  network.enable-peers-exchange = no
-         |
-         |  miner {
-         |    quorum = 0
-         |    minimal-block-generation-offset = 60000ms
-         |    micro-block-interval = 3s
-         |    max-transactions-in-key-block = 0
-         |    max-transactions-in-micro-block = $txsInMicroBlock
-         |  }
-         |
-         |  blockchain.custom {
-         |    functionality {
-         |      feature-check-blocks-period = 1
-         |      blocks-for-feature-activation = 1
-         |
-         |      pre-activated-features {
-         |        2: 0
-         |        3: 2
-         |      }
-         |    }
-         |
-         |    store-transactions-in-state = false
-         |  }
-         |
-         |  features.supported = [2, 3]
-         |}""".stripMargin
-      ))
-    .withDefault(1)
-    .build()
+  override protected val nodeConfigs: Seq[Config] =
+    Seq(ConfigOverrides.withFallback(NodeConfigs.randomMiner))
 
   private val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet
-
-  private def miner = nodes.head
+  private val miner         = nodes.head
 
   s"Block is limited by size after activation" in result(
     for {
@@ -75,5 +36,43 @@ class BlockSizeConstraintsSuite extends FreeSpec with Matchers with TransferSend
     },
     6.minutes
   )
+
+}
+
+object BlockSizeConstraintsSuite {
+  private val maxTxs          = 5000 // More, than 1mb of block
+  private val txsInMicroBlock = 500
+  private val ConfigOverrides = ConfigFactory.parseString(s"""akka.http.server {
+                                                             |  parsing.max-content-length = 3737439
+                                                             |  request-timeout = 60s
+                                                             |}
+                                                             |
+                                                             |waves {
+                                                             |  network.enable-peers-exchange = no
+                                                             |
+                                                             |  miner {
+                                                             |    quorum = 0
+                                                             |    minimal-block-generation-offset = 60000ms
+                                                             |    micro-block-interval = 3s
+                                                             |    max-transactions-in-key-block = 0
+                                                             |    max-transactions-in-micro-block = $txsInMicroBlock
+                                                             |  }
+                                                             |
+                                                             |  blockchain.custom {
+                                                             |    functionality {
+                                                             |      feature-check-blocks-period = 1
+                                                             |      blocks-for-feature-activation = 1
+                                                             |
+                                                             |      pre-activated-features {
+                                                             |        2: 0
+                                                             |        3: 2
+                                                             |      }
+                                                             |    }
+                                                             |
+                                                             |    store-transactions-in-state = false
+                                                             |  }
+                                                             |
+                                                             |  features.supported = [2, 3]
+                                                             |}""".stripMargin)
 
 }

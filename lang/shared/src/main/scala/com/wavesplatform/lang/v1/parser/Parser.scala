@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1.parser
 
 import Expressions._
 import BinaryOperation._
+import UnaryOperation._
 import fastparse.{WhitespaceApi, core}
 import scodec.bits.ByteVector
 
@@ -17,7 +18,7 @@ object Parser {
   import White._
   import fastparse.noApi._
   private val Base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-  private val keywords    = Set("let", "base58", "true", "false", "if", "then", "else", "match", "case")
+  val keywords    = Set("let", "base58", "true", "false", "if", "then", "else", "match", "case")
 
   private val lowerChar             = CharIn('a' to 'z')
   private val upperChar             = CharIn('A' to 'Z')
@@ -86,13 +87,19 @@ object Parser {
 
   private val atom = P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP)
 
-  private def binaryOp(rest: List[(String, BinaryOperation)]): P[EXPR] = rest match {
-    case Nil => atom
-    case (lessPriorityOp, kind) :: restOps =>
+  def unaryOp(ops: Seq[(P[Any], EXPR => EXPR)]): P[EXPR] = {
+    ops.foldRight(atom) {
+       (op, acc) => (op._1.map(_ => ()) ~ P(unaryOp(ops))).map(op._2) | acc
+    }
+  }
+
+  private def binaryOp(rest: List[(BinaryOperation)]): P[EXPR] = rest match {
+    case Nil => unaryOp(unaryOps)
+    case kind :: restOps =>
       val operand = binaryOp(restOps)
-      P(operand ~ (lessPriorityOp.!.map(_ => kind) ~ operand).rep()).map {
+      P(operand ~ (kind.parser.!.map(_ => kind) ~ operand).rep()).map {
         case (left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
-          r.foldLeft(left) { case (acc, (currKind, currOperand)) => BINARY_OP(acc, currKind, currOperand) }
+          r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(acc)(currOperand) }
       }
   }
 
