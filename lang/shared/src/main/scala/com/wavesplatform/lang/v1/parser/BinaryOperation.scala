@@ -17,6 +17,7 @@ object BinaryOperation {
     OR_OP,
     AND_OP,
     EQ_OP,
+    NE_OP,
     GE_OP,
     GT_OP,
     LE_OP,
@@ -35,6 +36,9 @@ object BinaryOperation {
   }
   case object EQ_OP  extends BinaryOperation {
     val func = "=="
+  }
+  case object NE_OP  extends BinaryOperation {
+    val func = "!="
   }
   case object GE_OP  extends BinaryOperation {
     val func = ">="
