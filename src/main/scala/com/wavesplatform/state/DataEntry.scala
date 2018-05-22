@@ -104,7 +104,7 @@ case class BooleanDataEntry(override val key: String, override val value: Boolea
 case class BinaryDataEntry(override val key: String, override val value: ByteStr) extends DataEntry[ByteStr](key, value) {
   override def valueBytes: Array[Byte] = Type.Binary.id.toByte +: Deser.serializeArray(value.arr)
 
-  override def toJson: JsObject = super.toJson + ("type" -> JsString("binary")) + ("value" -> JsString(Base64.encode(value.arr)))
+  override def toJson: JsObject = super.toJson + ("type" -> JsString("binary")) + ("value" -> JsString(value.base64))
 
   override def valid: Boolean = super.valid && value.arr.length <= MaxValueSize
 }

@@ -10,7 +10,7 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue}
 import scorex.api.http.{TooBigArrayAllocation, UtilsApiRoute}
-import com.wavesplatform.utils.{Base58, Base64}
+import com.wavesplatform.utils.Base58
 import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.utils.Time
@@ -42,7 +42,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   routePath("/script/estimate") in {
-    val base64 = Base64.encode(ScriptV1(script).explicitGet().bytes().arr)
+    val base64 = ScriptV1(script).explicitGet().bytes().base64
 
     Post(routePath("/script/estimate"), base64) ~> route ~> check {
       val json = responseAs[JsValue]

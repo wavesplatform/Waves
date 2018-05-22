@@ -1,16 +1,15 @@
 package scorex.api.http
 
 import java.security.SecureRandom
+import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.utils.Base58
 import io.swagger.annotations._
-import javax.ws.rs.Path
-
 import play.api.libs.json.Json
-import com.wavesplatform.utils.{Base58, Base64}
 import scorex.transaction.smart.script.{Script, ScriptCompiler}
 import scorex.utils.Time
 
@@ -47,7 +46,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
           e => Json.obj("error" -> e), {
             case (script, complexity) =>
               Json.obj(
-                "script"     -> Base64.encode(script.bytes().arr),
+                "script"     -> script.bytes().base64,
                 "complexity" -> complexity,
                 "extraFee"   -> CommonValidation.ScriptExtraFee
               )
