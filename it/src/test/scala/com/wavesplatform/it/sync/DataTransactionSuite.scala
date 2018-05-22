@@ -276,11 +276,4 @@ class DataTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndResponse(sender.putData(firstAddress, tooManyEntriesData, calcDataFee(tooManyEntriesData)), message)
     nodes.waitForHeightArise()
   }
-
-  private def calcDataFee(data: List[DataEntry[_]]): Long = {
-    val dataSize = data.map(_.toBytes.length).sum + 128
-    if (dataSize > 1024) {
-      fee * (dataSize / 1024 + 1)
-    } else fee
-  }
 }

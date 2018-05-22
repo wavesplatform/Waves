@@ -179,10 +179,4 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     nodes.waitForHeightAriseAndTxPresent(versionedTransferId)
   }
 
-  protected def calcDataFee(data: List[DataEntry[_]]): Long = {
-    val dataSize = data.map(_.toBytes.length).sum + 128
-    if (dataSize > 1024) {
-      fee * (dataSize / 1024 + 1)
-    } else fee
-  }
 }

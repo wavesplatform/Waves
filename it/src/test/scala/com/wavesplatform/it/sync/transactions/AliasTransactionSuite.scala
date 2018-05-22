@@ -4,15 +4,11 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import org.scalatest.prop.TableDrivenPropertyChecks
+import com.wavesplatform.it.sync._
 
 import scala.util.Random
 
 class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
-
-  private val transferFee    = 1.waves
-  private val leasingFee     = 0.001.waves
-  private val transferAmount = 1.waves
-
   test("Able to send money to an alias") {
     val alias            = randomAlias()
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
@@ -113,8 +109,9 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
   //previous test should not be commented to run this one
   test("Not able to create alias when insufficient funds") {
-    val alias = randomAlias()
-    assertBadRequestAndMessage(sender.createAlias(firstAddress, alias, transferFee), "State check failed. Reason: negative effective balance")
+    val balance = notMiner.accountBalances(firstAddress)._1
+    val alias   = randomAlias()
+    assertBadRequestAndMessage(sender.createAlias(firstAddress, alias, balance + transferFee), "State check failed. Reason: negative waves balance")
   }
 
   private def calcAliasFee(address: String, alias: String): Long = {
