@@ -90,21 +90,21 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("equals works on elements from Gens") {
-    List(CONST_LONGgen.map(_._1), SUMgen(50).map(_._1), INTGen(50).map(_._1)).foreach(gen =>
+    List(CONST_LONGgen, SUMgen(50), INTGen(50)).foreach(gen =>
       forAll(for {
-        expr <- gen
-        str  <- toString(expr)
-      } yield str) {
-        case str =>
-          eval[Boolean](s"$str == 0 || true") shouldBe Right(true)
+        (expr, res) <- gen
+        str         <- toString(expr)
+      } yield (str, res)) {
+        case (str, res) =>
+          eval[Long](str) shouldBe Right(res)
     })
 
     forAll(for {
-      (expr, _) <- BOOLgen(50)
-      str       <- toString(expr)
-    } yield str) {
-      case str =>
-        eval[Boolean](s"$str || true") shouldBe Right(true)
+      (expr, res) <- BOOLgen(50)
+      str         <- toString(expr)
+    } yield (str, res)) {
+      case (str, res) =>
+        eval[Boolean](str) shouldBe Right(res)
     }
   }
 

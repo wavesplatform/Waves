@@ -44,11 +44,10 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
         let txToUsers = (massTransferType && totalAmountToUsers)
 
-        let massTransferTx = getTransactionById(tx.proofs[1])
-        let massTransferTime = if(isDefined(massTransferTx)) then Some(extract(massTransferTx).timestamp) else None
+        let mTx = getTransactionById(tx.proofs[1])
 
         let txToGov = (massTransferType && totalAmountToGov)
-        let txToGovComplete = if(isDefined(massTransferTime)) then (tx.timestamp > (extract(massTransferTime) + 30000))  else false
+        let txToGovComplete = if(isDefined(mTx)) then (((tx.timestamp > (extract(mTx).timestamp) + 30000)) && sigVerify(extract(mTx).bodyBytes,extract(mTx).proofs[0],accountPK)) else false
 
         (txToGovComplete && accSig && txToGov)  || (txToUsers && accSig)
         """.stripMargin).get.value

@@ -30,15 +30,13 @@ object BlockAppender extends ScorexLogging with Instrumented {
     Task {
       measureSuccessful(
         blockProcessingTimeStats, {
-          if (blockchainUpdater.contains(newBlock)) Right(None)
-          else
-            for {
-              _ <- Either.cond(blockchainUpdater.heightOf(newBlock.reference).exists(_ >= blockchainUpdater.height - 1),
-                               (),
-                               BlockAppendError("Irrelevant block", newBlock))
-              _ = log.debug(s"Appending $newBlock")
-              maybeBaseHeight <- appendBlock(checkpoint, blockchainUpdater, utxStorage, time, settings)(newBlock)
-            } yield maybeBaseHeight map (_ => blockchainUpdater.score)
+          if (blockchainUpdater.isLastBlockId(newBlock.reference)) {
+            appendBlock(checkpoint, blockchainUpdater, utxStorage, time, settings)(newBlock).map(_ => Some(blockchainUpdater.score))
+          } else if (blockchainUpdater.contains(newBlock.uniqueId)) {
+            Right(None)
+          } else {
+            Left(BlockAppendError("Block is not a child of the last block", newBlock))
+          }
         }
       )
     }.executeOn(scheduler)

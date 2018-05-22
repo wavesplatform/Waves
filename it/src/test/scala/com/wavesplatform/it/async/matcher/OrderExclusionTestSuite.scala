@@ -87,7 +87,7 @@ class OrderExclusionTestSuite
     val signature = ByteStr(crypto.sign(privateKey, pk ++ Longs.toByteArray(ts)))
 
     val orderhistory = Await.result(matcherNode.getOrderbookByPublicKey(node.publicKeyStr, ts, signature), 1.minute)
-    orderhistory.seq(0).status
+    orderhistory.head.status
   }
 
 }
@@ -98,28 +98,27 @@ object OrderExclusionTestSuite {
   import NodeConfigs.Default
 
   private val matcherConfig = ConfigFactory.parseString(s"""
-       |waves.matcher {
-       |  enable=yes
-       |  account="3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC"
-       |  bind-address="0.0.0.0"
-       |  order-match-tx-fee = 300000
-       |  blacklisted-assets = [$ForbiddenAssetId]
-       |  order-cleanup-interval = 20s
-       |}
-       |waves.rest-api {
+       |waves {
+       |  matcher {
+       |    enable = yes
+       |    account = 3HmFkAoQRs4Y3PE2uR6ohN7wS4VqPBGKv7k
+       |    bind-address = "0.0.0.0"
+       |    order-match-tx-fee = 300000
+       |    blacklisted-assets = [$ForbiddenAssetId]
+       |    order-cleanup-interval = 20s
+       |  }
+       |  rest-api {
        |    enable = yes
        |    api-key-hash = 7L6GpLHhA5KyJTAVc8WFHwEcyTY8fC8rRbyMCiFnM4i
-       |}
-       |waves.miner.enable=no
-      """.stripMargin)
+       |  }
+       |  miner.enable=no
+       |}""".stripMargin)
 
   private val nonGeneratingPeersConfig = ConfigFactory.parseString(
-    """
-      |waves.matcher {
-      | order-cleanup-interval = 30s
-      |}
-      |waves.miner.enable=no
-    """.stripMargin
+    """waves {
+      | matcher.order-cleanup-interval = 30s
+      | miner.enable=no
+      |}""".stripMargin
   )
 
   val AssetQuantity: Long = 1000
@@ -129,7 +128,9 @@ object OrderExclusionTestSuite {
 
   val Waves: Long = 100000000L
 
-  val Configs: Seq[Config] = Seq(matcherConfig.withFallback(Default.head)) ++
-    Random.shuffle(Default.tail.init).take(2).map(nonGeneratingPeersConfig.withFallback(_)) ++
-    Random.shuffle(Default.tail.init).headOption
+  private val Configs: Seq[Config] = {
+    val notMatchingNodes = Random.shuffle(Default.init).take(3)
+    Seq(matcherConfig.withFallback(Default.last), notMatchingNodes.head) ++
+      notMatchingNodes.tail.map(nonGeneratingPeersConfig.withFallback)
+  }
 }
