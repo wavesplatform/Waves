@@ -103,10 +103,10 @@ object PureContext {
   val eqString      = createOp(EQ_OP, STRING, BOOLEAN)(_ == _)
   val ge            = createOp(GE_OP, LONG, BOOLEAN)(_ >= _)
   val gt            = createOp(GT_OP, LONG, BOOLEAN)(_ > _)
-  val bge            = createOp(GE_OP, BOOLEAN, BOOLEAN)(_ >= _)
-  val bgt            = createOp(GT_OP, BOOLEAN, BOOLEAN)(_ > _)
+  val sge            = createOp(GE_OP, STRING, BOOLEAN)(_ >= _)
+  val sgt            = createOp(GT_OP, STRING, BOOLEAN)(_ > _)
 
-  val operators: Seq[PredefFunction] = Seq(sumLong, subLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt, bge, bgt, getElement, getListSize, uMinus, uNot)
+  val operators: Seq[PredefFunction] = Seq(sumLong, subLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt, sge, sgt, getElement, getListSize, uMinus, uNot)
 
   lazy val instance =
     EvaluationContext.build(types = Seq.empty,

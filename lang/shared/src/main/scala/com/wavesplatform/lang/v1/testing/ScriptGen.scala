@@ -11,7 +11,7 @@ trait ScriptGen {
   def CONST_LONGgen: Gen[(EXPR, Long)] = Gen.choose(Long.MinValue, Long.MaxValue).map(v => (CONST_LONG(v), v))
 
   def BOOLgen(gas: Int): Gen[(EXPR,Boolean)] =
-    if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), BGEgen(gas - 1), BGTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1))
+    if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1))
     else Gen.const((TRUE, true))
 
   def SUMgen(gas: Int): Gen[(EXPR, Long)] =
@@ -29,28 +29,6 @@ trait ScriptGen {
     } yield (BINARY_OP(i1, SUB_OP, i2), (v1 - v2))
 
   def INTGen(gas: Int): Gen[(EXPR, Long)] = if (gas > 0) Gen.oneOf(CONST_LONGgen, SUMgen(gas - 1), SUBgen(gas - 1), IF_INTgen(gas - 1), INTGen(gas-1).filter(v => (-BigInt(v._2)).isValidLong).map(e => (FUNCTION_CALL("-",List(e._1)), -e._2))) else CONST_LONGgen
-
-  def BGEgen(gas: Int): Gen[(EXPR, Boolean)] =
-    for {
-      dir <- Gen.oneOf(true, false)
-      (i1, v1) <- BOOLgen((gas - 2) / 2)
-      (i2, v2) <- BOOLgen((gas - 2) / 2)
-    } yield if(dir) {
-       (BINARY_OP(i1, GE_OP, i2), (v1 >= v2))
-      } else {
-       (BINARY_OP(i2, LE_OP, i1), (v1 <= v2))
-      } 
-
-  def BGTgen(gas: Int): Gen[(EXPR, Boolean)] =
-    for {
-      dir <- Gen.oneOf(true, false)
-      (i1, v1) <- BOOLgen((gas - 2) / 2)
-      (i2, v2) <- BOOLgen((gas - 2) / 2)
-    } yield if(dir) {
-       (BINARY_OP(i1, GT_OP, i2), (v1 > v2))
-      } else {
-       (BINARY_OP(i2, LT_OP, i1), (v1 < v2))
-      } 
 
   def GEgen(gas: Int): Gen[(EXPR, Boolean)] =
     for {
