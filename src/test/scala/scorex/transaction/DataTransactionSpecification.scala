@@ -41,7 +41,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   }
 
   property("unknown type handing") {
-    val badTypeIdGen = Gen.choose[Byte](3, Byte.MaxValue)
+    val badTypeIdGen = Gen.choose[Int](DataEntry.Type.maxId + 1, Byte.MaxValue)
     forAll(dataTransactionGen, badTypeIdGen) {
       case (tx, badTypeId) =>
         val bytes      = tx.bytes()
@@ -49,7 +49,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         if (entryCount > 0) {
           val key1Length = Shorts.fromByteArray(bytes.drop(37))
           val p          = 39 + key1Length
-          bytes(p) = badTypeId
+          bytes(p) = badTypeId.toByte
           val parsed = DataTransaction.parseBytes(bytes)
           parsed.isFailure shouldBe true
           parsed.failed.get.getMessage shouldBe s"Unknown type $badTypeId"
