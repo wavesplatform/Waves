@@ -4,7 +4,8 @@ import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.v1.{Parser, TypeChecker}
+import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.utils.dummyTypeCheckerContext
 import org.scalatest.CancelAfterFailure
@@ -14,7 +15,7 @@ import scorex.transaction.Proofs
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.transfer._
-import scorex.crypto.encode.{Base58 => ScorexBase58}
+
 import scala.util.Random
 import scala.concurrent.duration._
 
@@ -40,7 +41,6 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
   private val AlicesPK = PrivateKeyAccount.fromSeed(sender.seed(AliceBC1)).right.get
 
   private val secretText = "some secret message from Alice"
-  private val secretHash = ScorexBase58.encode(secretText.getBytes)
   private val shaSecret  = "BN6RTYGWcwektQfSFzH8raYo9awaLgQ7pLyWLQY4S4F5"
 
   private val sc1 = {
@@ -52,12 +52,12 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     let txRecipient = addressFromRecipient(tx.recipient).bytes
     let txSender = addressFromPublicKey(tx.senderPk).bytes
 
-    let txToBob = ((txRecipient == Bob) && (sha256(tx.proof0) == base58'$shaSecret') && (20 >= height) && sigVerify(tx.bodyBytes,tx.proof1,AlicesPK))
+    let txToBob = ((txRecipient == Bob) && (sha256(tx.proofs[0]) == base58'$shaSecret') && (20 >= height) && sigVerify(tx.bodyBytes,tx.proofs[1],AlicesPK))
     let backToAliceAfterHeight = ((height >= 21) && (txRecipient == Alice))
 
     txToBob || backToAliceAfterHeight
       """.stripMargin).get.value
-    TypeChecker(dummyTypeCheckerContext, untyped).explicitGet()
+    CompilerV1(dummyTypeCheckerContext, untyped).explicitGet()
   }
 
   test("step1: Balances initialization") {
@@ -102,7 +102,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount + fee + 0.004.waves,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = fee + 0.04.waves,
+          feeAmount = fee + 0.004.waves,
           attachment = Array.emptyByteArray
         )
         .explicitGet()
@@ -124,7 +124,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = fee + 0.04.waves,
+          feeAmount = fee + 0.004.waves,
           attachment = Array.emptyByteArray
         )
         .explicitGet()
@@ -167,7 +167,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = fee + 0.04.waves,
+          feeAmount = fee + 0.004.waves,
           attachment = Array.emptyByteArray
         )
         .explicitGet()

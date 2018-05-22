@@ -97,7 +97,7 @@ variable before starting a container.
 
 You can run integration test suites from your preferred IDE. The only requirement is to have Docker image pre-built and
 have `docker.imageId` system property defined for the run configuration. The easiest way to build an image is to issue
-`sbt docker` command. You'll find the image ID in the SBT output:
+`sbt it/docker` command. You'll find the image ID in the SBT output:
 
 ```
 ...

@@ -97,9 +97,9 @@ package object appender extends ScorexLogging {
     val fs        = bcs.functionalitySettings
     val blockTime = block.timestamp
     val generator = block.signerData.generator
+    val height    = blockchain.height
 
     val r: Either[ValidationError, Unit] = for {
-      height <- blockchain.heightOf(block.reference).toRight(GenericError(s"height: history does not contain parent ${block.reference}"))
       _ <- Either.cond(
         height > fs.blockVersion3AfterHeight
           || block.version == Block.GenesisBlockVersion
