@@ -34,7 +34,7 @@ object EvalM {
 
   implicit val monadInstance: Monad[EvalM] = new Monad[EvalM] {
     override def pure[A](x: A): EvalM[A] =
-      EvalM(Kleisli.pure[Coeval, CoevalRef[EvaluationContext], Either[ExecutionError, A]](x.asRight[ExecutionError]))
+      EvalM(Kleisli.liftF[Coeval, CoevalRef[EvaluationContext], Either[ExecutionError, A]](Coeval.evalOnce(Right(x))))
 
     override def flatMap[A, B](fa: EvalM[A])(f: A => EvalM[B]): EvalM[B] = {
       EvalM(fa.inner.flatMap({
@@ -64,8 +64,7 @@ object EvalM {
 
   def updateContext(f: EvaluationContext => EvaluationContext): EvalM[Unit] = getContext >>= (f andThen setContext)
 
-  def liftValue[A](a: A): EvalM[A] =
-    monadInstance.pure(a)
+  def liftValue[A](a: A): EvalM[A] = monadInstance.pure(a)
 
   def liftError[A](err: ExecutionError): EvalM[A] =
     EvalM(Kleisli[Coeval, CoevalRef[EvaluationContext], Either[ExecutionError, A]](_ => Coeval.delay(err.asLeft[A])))
