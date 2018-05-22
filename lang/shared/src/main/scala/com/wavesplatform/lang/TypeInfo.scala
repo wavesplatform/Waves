@@ -1,7 +1,7 @@
 package com.wavesplatform.lang
 
 import cats.implicits._
-import com.wavesplatform.lang.v1.evaluator.ctx.Obj
+import com.wavesplatform.lang.v1.evaluator.ctx.{AnyObj, CaseObj, Obj}
 import scodec.bits.ByteVector
 
 import scala.reflect.ClassTag
@@ -86,6 +86,12 @@ object TypeInfo {
     fromAnyVal(interfaces = Set(serializableTypeInfo))
 
   implicit val objTypeInfo: TypeInfo[Obj] =
+    fromAny(interfaces = Set(productTypeInfo, serializableTypeInfo))
+
+  implicit val caseObjTypeInfo: TypeInfo[CaseObj] =
+    fromAny(interfaces = Set(productTypeInfo, serializableTypeInfo))
+
+  implicit val anyObjTypeInfo: TypeInfo[AnyObj] =
     fromAny(interfaces = Set(productTypeInfo, serializableTypeInfo))
 
   implicit def optionTypeInfo[A](implicit tia: TypeInfo[A]): TypeInfo[Option[A]] =

@@ -40,6 +40,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
   private val service               = monix.execution.Scheduler.singleThread("last-block-info-publisher")
   private val internalLastBlockInfo = ConcurrentSubject.publish[LastBlockInfo](service)
 
+  override def isLastBlockId(id: ByteStr): Boolean = ngState.exists(_.contains(id)) || lastBlock.exists(_.uniqueId == id)
+
   override val lastBlockInfo: Observable[LastBlockInfo] = internalLastBlockInfo.cache(1)
   lastBlockInfo.subscribe()(monix.execution.Scheduler.global) // Start caching
 
@@ -116,7 +118,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                   s" ${if (blockchain.contains(block.reference)) "exits, it's not last persisted" else "doesn't exist"}"
                 Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
               case lastBlockId =>
-                val height            = lastBlockId.flatMap(blockchain.heightOf).getOrElse(0)
+                val height            = lastBlockId.fold(0)(blockchain.unsafeHeightOf)
                 val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
                 BlockDiffer
                   .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
@@ -125,7 +127,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
           case Some(ng) =>
             if (ng.base.reference == block.reference) {
               if (block.blockScore() > ng.base.blockScore()) {
-                val height            = blockchain.heightOf(ng.base.reference).getOrElse(0)
+                val height            = blockchain.unsafeHeightOf(ng.base.reference)
                 val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
 
                 BlockDiffer
@@ -141,8 +143,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                   Right(None)
                 } else {
                   log.trace(s"New liquid block is better version of existing, swapping")
-
-                  val height            = blockchain.heightOf(ng.base.reference).getOrElse(0)
+                  val height            = blockchain.unsafeHeightOf(ng.base.reference)
                   val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
 
                   BlockDiffer
@@ -164,7 +165,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                     }
 
                     val constraint: MiningConstraint = {
-                      val height            = blockchain.heightOf(referencedForgedBlock.uniqueId).getOrElse(0)
+                      val height            = blockchain.heightOf(referencedForgedBlock.reference).getOrElse(0)
                       val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
                       miningConstraints.total
                     }
@@ -495,14 +496,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
         } yield address -> f(address)
       }
 
-  override def assetDistribution(height: Int, assetId: AssetId): Map[Address, Long] = ngState.fold(blockchain.assetDistribution(height, assetId)) {
-    ng =>
-      val innerDistribution = blockchain.assetDistribution(height, assetId)
-      if (height < this.height) innerDistribution
-      else {
-        innerDistribution ++ changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
-      }
-  }
+  override def assetDistribution(assetId: AssetId): Map[Address, Long] =
+    blockchain.assetDistribution(assetId) ++ changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
 
   override def wavesDistribution(height: Int): Map[Address, Long] = ngState.fold(blockchain.wavesDistribution(height)) { ng =>
     val innerDistribution = blockchain.wavesDistribution(height)

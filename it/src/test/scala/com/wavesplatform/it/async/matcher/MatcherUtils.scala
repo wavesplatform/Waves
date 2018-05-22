@@ -8,7 +8,7 @@ import com.wavesplatform.it.api.{AssetBalance, MatcherStatusResponse, OrderBookR
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
 import scorex.account.PrivateKeyAccount
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.assets.exchange.Order
 
 import scala.concurrent.ExecutionContext.Implicits.global

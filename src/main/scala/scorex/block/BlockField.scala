@@ -5,7 +5,7 @@ import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.serialization.{BytesSerializable, JsonSerializable}
 import scorex.transaction.Transaction
 

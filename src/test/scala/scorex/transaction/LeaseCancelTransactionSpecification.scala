@@ -6,7 +6,6 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
-import scorex.crypto.encode.Base58
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseCancelTransactionV2}
 
 class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -50,10 +49,10 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
     val tx = LeaseCancelTransactionV1
       .create(
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
-        ByteStr(Base58.decode("EXhjYjy8a1dURbttrGzfcft7cddDnPnoa3vqaBLCTFVY").get),
+        ByteStr.decodeBase58("EXhjYjy8a1dURbttrGzfcft7cddDnPnoa3vqaBLCTFVY").get,
         1000000,
         1526646300260L,
-        ByteStr(Base58.decode("4T76AXcksn2ixhyMNu4m9UyY54M3HDTw5E2HqUsGV4phogs2vpgBcN5oncu4sbW4U3KU197yfHMxrc3kZ7e6zHG3").get)
+        ByteStr.decodeBase58("4T76AXcksn2ixhyMNu4m9UyY54M3HDTw5E2HqUsGV4phogs2vpgBcN5oncu4sbW4U3KU197yfHMxrc3kZ7e6zHG3").get
       )
       .right
       .get
@@ -83,10 +82,10 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
         2,
         'T',
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
-        ByteStr(Base58.decode("DJWkQxRyJNqWhq9qSQpK2D4tsrct6eZbjSv3AH4PSha6").get),
+        ByteStr.decodeBase58("DJWkQxRyJNqWhq9qSQpK2D4tsrct6eZbjSv3AH4PSha6").get,
         1000000,
         1526646300260L,
-        Proofs(Seq(ByteStr(Base58.decode("3h5SQLbCzaLoTHUeoCjXUHB6qhNUfHZjQQVsWTRAgTGMEdK5aeULMVUfDq63J56kkHJiviYTDT92bLGc8ELrUgvi").get)))
+        Proofs(Seq(ByteStr.decodeBase58("3h5SQLbCzaLoTHUeoCjXUHB6qhNUfHZjQQVsWTRAgTGMEdK5aeULMVUfDq63J56kkHJiviYTDT92bLGc8ELrUgvi").get))
       )
       .right
       .get

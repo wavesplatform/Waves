@@ -9,7 +9,7 @@ import com.wavesplatform.state.Sponsorship
 import org.scalatest.CancelAfterFailure
 import scorex.account.PrivateKeyAccount
 import scorex.api.http.assets.SignedIssueV1Request
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.assets.IssueTransactionV1
 
 class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {

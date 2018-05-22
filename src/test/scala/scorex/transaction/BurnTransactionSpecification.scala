@@ -7,7 +7,6 @@ import play.api.libs.json.Json
 import scorex.transaction.assets.{BurnTransaction, BurnTransactionV1, BurnTransactionV2}
 import scorex.account.PublicKeyAccount
 import com.wavesplatform.state.ByteStr
-import scorex.crypto.encode.Base58
 
 class BurnTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -44,11 +43,11 @@ class BurnTransactionSpecification extends PropSpec with PropertyChecks with Mat
     val tx = BurnTransactionV1
       .create(
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
-        ByteStr(Base58.decode("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
+        ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
         10000000000L,
         100000000L,
         1526287561757L,
-        ByteStr(Base58.decode("uapJcAJQryBhWThU43rYgMNmvdT7kY747vx5BBgxr2KvaeTRx8Vsuh4yu1JxBymU9LnAoo1zjQcPrWSuhi6dVPE").get)
+        ByteStr.decodeBase58("uapJcAJQryBhWThU43rYgMNmvdT7kY747vx5BBgxr2KvaeTRx8Vsuh4yu1JxBymU9LnAoo1zjQcPrWSuhi6dVPE").get
       )
       .right
       .get
@@ -78,11 +77,11 @@ class BurnTransactionSpecification extends PropSpec with PropertyChecks with Mat
         2,
         'T',
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
-        ByteStr(Base58.decode("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
+        ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
         10000000000L,
         100000000L,
         1526287561757L,
-        Proofs(Seq(ByteStr(Base58.decode("3NcEv6tcVMuXkTJwiqW4J3GMCTe8iSLY7neEfNZonp59eTQEZXYPQWs565CRUctDrvcbtmsRgWvnN7BnFZ1AVZ1H").get)))
+        Proofs(Seq(ByteStr.decodeBase58("3NcEv6tcVMuXkTJwiqW4J3GMCTe8iSLY7neEfNZonp59eTQEZXYPQWs565CRUctDrvcbtmsRgWvnN7BnFZ1AVZ1H").get))
       )
       .right
       .get

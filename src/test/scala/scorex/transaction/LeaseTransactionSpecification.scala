@@ -6,7 +6,6 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
 import scorex.account.{Address, PublicKeyAccount}
-import scorex.crypto.encode.Base58
 import scorex.transaction.lease.{LeaseTransaction, LeaseTransactionV1, LeaseTransactionV2}
 
 class LeaseTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -56,7 +55,7 @@ class LeaseTransactionSpecification extends PropSpec with PropertyChecks with Ma
         1000000,
         1526646300260L,
         Address.fromString("3NCBMxgdghg4tUhEEffSXy11L6hUi6fcBpd").right.get,
-        ByteStr(Base58.decode("iy3TmfbFds7pc9cDDqfjEJhfhVyNtm3GcxoVz8L3kJFvgRPUmiqqKLMeJGYyN12AhaQ6HvE7aF1tFgaAoCCgNJJ").get)
+        ByteStr.decodeBase58("iy3TmfbFds7pc9cDDqfjEJhfhVyNtm3GcxoVz8L3kJFvgRPUmiqqKLMeJGYyN12AhaQ6HvE7aF1tFgaAoCCgNJJ").get
       )
       .right
       .get
@@ -89,7 +88,7 @@ class LeaseTransactionSpecification extends PropSpec with PropertyChecks with Ma
         1000000,
         1526646497465L,
         Address.fromString("3NCBMxgdghg4tUhEEffSXy11L6hUi6fcBpd").right.get,
-        Proofs(Seq(ByteStr(Base58.decode("5Fr3yLwvfKGDsFLi8A8JbHqToHDojrPbdEGx9mrwbeVWWoiDY5pRqS3rcX1rXC9ud52vuxVdBmGyGk5krcgwFu9q").get)))
+        Proofs(Seq(ByteStr.decodeBase58("5Fr3yLwvfKGDsFLi8A8JbHqToHDojrPbdEGx9mrwbeVWWoiDY5pRqS3rcX1rXC9ud52vuxVdBmGyGk5krcgwFu9q").get))
       )
       .right
       .get

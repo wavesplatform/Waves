@@ -62,7 +62,7 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
         None,
         100000,
         Base58.decode("4t2Xazb2SX").get,
-        ByteStr(Base58.decode("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get)
+        ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get
       )
       .right
       .get

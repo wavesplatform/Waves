@@ -4,6 +4,7 @@ import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.state.{Blockchain, EitherExt2}
+import com.wavesplatform.utils.Base58
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
 import io.netty.channel.group.ChannelGroup
@@ -12,8 +13,7 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
 import scorex.account.Address
-import scorex.api.http.{AddressApiRoute, ApiKeyNotValid, InvalidMessage}
-import scorex.crypto.encode.Base58
+import scorex.api.http.{AddressApiRoute, ApiKeyNotValid}
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.smart.script.v1.ScriptV1
 
@@ -122,7 +122,9 @@ class AddressRouteSpec
           Json.obj("message" -> JsString(""), "publickey" -> JsString(Base58.encode(account.publicKey)), "signature" -> JsString(""))
 
         Post(uri, validBody) ~> route should produce(ApiKeyNotValid)
-        Post(uri, emptySignature) ~> api_key(apiKey) ~> route should produce(InvalidMessage)
+        Post(uri, emptySignature) ~> api_key(apiKey) ~> route ~> check {
+          (responseAs[JsObject] \ "valid").as[Boolean] shouldBe false
+        }
         Post(uri, validBody) ~> api_key(apiKey) ~> route ~> check {
           (responseAs[JsObject] \ "valid").as[Boolean] shouldBe true
         }
@@ -150,7 +152,7 @@ class AddressRouteSpec
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1)
-      (response \ "script").as[String] shouldBe "WpgBYoY"
+      (response \ "script").as[String] shouldBe "We8Dksx"
       (response \ "scriptText").as[String] shouldBe "TRUE"
       (response \ "complexity").as[Long] shouldBe 1
       (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee

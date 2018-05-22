@@ -6,7 +6,6 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
-import scorex.crypto.encode.Base58
 import scorex.transaction.assets.{ReissueTransactionV1, ReissueTransaction}
 
 class ReissueTransactionV1Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -45,12 +44,12 @@ class ReissueTransactionV1Specification extends PropSpec with PropertyChecks wit
     val tx = ReissueTransactionV1
       .create(
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
-        ByteStr(Base58.decode("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
+        ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
         100000000L,
         true,
         100000000L,
         1526287561757L,
-        ByteStr(Base58.decode("3LnRMrjkk7RoV35PTwcdB4yW2rqUqXaKAh8DnPk5tNWABvhVQ9oqdTk3zM8b9AbGtry7WEcQZtevfK92DCFaa6hA").get)
+        ByteStr.decodeBase58("3LnRMrjkk7RoV35PTwcdB4yW2rqUqXaKAh8DnPk5tNWABvhVQ9oqdTk3zM8b9AbGtry7WEcQZtevfK92DCFaa6hA").get
       )
       .right
       .get

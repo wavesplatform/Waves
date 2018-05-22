@@ -1,20 +1,20 @@
 package com.wavesplatform.state
 
-import java.nio.charset.StandardCharsets
+import java.nio.charset.StandardCharsets.UTF_8
 
 import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.state.DataEntry._
 import play.api.libs.json._
-import scorex.crypto.encode.Base58
+import scorex.crypto.encode.Base64
 import scorex.serialization.Deser
 
-import scala.util.Success
+import scala.util.Try
 
 sealed abstract class DataEntry[T](val key: String, val value: T) {
   def valueBytes: Array[Byte]
 
   def toBytes: Array[Byte] = {
-    val keyBytes = key.getBytes(UTF8)
+    val keyBytes = key.getBytes(UTF_8)
     Array.concat(Shorts.toByteArray(keyBytes.length.toShort), keyBytes, valueBytes)
   }
 
@@ -24,19 +24,18 @@ sealed abstract class DataEntry[T](val key: String, val value: T) {
 
 object DataEntry {
   val MaxKeySize: Byte = 100
-  val MaxValueSize     = 1024
-
-  private val UTF8 = StandardCharsets.UTF_8
+  val MaxValueSize     = Short.MaxValue
 
   object Type extends Enumeration {
     val Integer = Value(0)
     val Boolean = Value(1)
     val Binary  = Value(2)
+    val String  = Value(3)
   }
 
   def parse(bytes: Array[Byte], p: Int): (DataEntry[_], Int) = {
     val keyLength = Shorts.fromByteArray(bytes.drop(p))
-    val key       = new String(bytes, p + 2, keyLength, UTF8)
+    val key       = new String(bytes, p + 2, keyLength, UTF_8)
     parseValue(key, bytes, p + 2 + keyLength)
   }
 
@@ -47,6 +46,10 @@ object DataEntry {
       case t if t == Type.Binary.id =>
         val (blob, p1) = Deser.parseArraySize(bytes, p + 1)
         (BinaryDataEntry(key, ByteStr(blob)), p1)
+
+      case t if t == Type.String.id =>
+        val (blob, p1) = Deser.parseArraySize(bytes, p + 1)
+        (StringDataEntry(key, new String(blob, UTF_8)), p1)
       case t => throw new Exception(s"Unknown type $t")
     }
   }
@@ -68,10 +71,16 @@ object DataEntry {
               }
             case JsDefined(JsString("binary")) =>
               jsv \ "value" match {
-                case JsDefined(JsString(base58)) =>
-                  val t = if (base58.isEmpty) Success(Array.emptyByteArray) else Base58.decode(base58) /// Base58 bug
-                  t.fold(ex => JsError(ex.getMessage), arr => JsSuccess(BinaryDataEntry(key, ByteStr(arr))))
+                case JsDefined(JsString(enc)) =>
+                  if (enc.startsWith("base64:"))
+                    Try(Base64.decode(enc.substring(7))).fold(ex => JsError(ex.getMessage), arr => JsSuccess(BinaryDataEntry(key, ByteStr(arr))))
+                  else JsError("Base64 encoding expected")
                 case _ => JsError("value is missing or not a string")
+              }
+            case JsDefined(JsString("string")) =>
+              jsv \ "value" match {
+                case JsDefined(JsString(str)) => JsSuccess(StringDataEntry(key, str))
+                case _                        => JsError("value is missing or not a string")
               }
             case JsDefined(JsString(t)) => JsError(s"unknown type $t")
             case _                      => JsError("type is missing")
@@ -99,7 +108,15 @@ case class BooleanDataEntry(override val key: String, override val value: Boolea
 case class BinaryDataEntry(override val key: String, override val value: ByteStr) extends DataEntry[ByteStr](key, value) {
   override def valueBytes: Array[Byte] = Type.Binary.id.toByte +: Deser.serializeArray(value.arr)
 
-  override def toJson: JsObject = super.toJson + ("type" -> JsString("binary")) + ("value" -> JsString(value.base58))
+  override def toJson: JsObject = super.toJson + ("type" -> JsString("binary")) + ("value" -> JsString("base64:" + Base64.encode(value.arr)))
 
   override def valid: Boolean = super.valid && value.arr.length <= MaxValueSize
+}
+
+case class StringDataEntry(override val key: String, override val value: String) extends DataEntry[String](key, value) {
+  override def valueBytes: Array[Byte] = Type.String.id.toByte +: Deser.serializeArray(value.getBytes(UTF_8))
+
+  override def toJson: JsObject = super.toJson + ("type" -> JsString("string")) + ("value" -> JsString(value))
+
+  override def valid: Boolean = super.valid && value.getBytes(UTF_8).length <= MaxValueSize
 }

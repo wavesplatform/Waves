@@ -7,7 +7,6 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
 import scorex.account.{Alias, PrivateKeyAccount}
 import scorex.account.PublicKeyAccount
-import scorex.crypto.encode.Base58
 
 class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -54,7 +53,7 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
         Alias.buildWithCurrentNetworkByte("myalias").right.get,
         100000,
         1526910778245L,
-        ByteStr(Base58.decode("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").get)
+        ByteStr.decodeBase58("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").get
       )
       .right
       .get
@@ -85,7 +84,7 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
         Alias.buildWithCurrentNetworkByte("myalias").right.get,
         100000,
         1526910778245L,
-        Proofs(Seq(ByteStr(Base58.decode("26U7rQTwpdma5GYSZb5bNygVCtSuWL6DKet1Nauf5J57v19mmfnq434YrkKYJqvYt2ydQBUT3P7Xgj5ZVDVAcc5k").get)))
+        Proofs(Seq(ByteStr.decodeBase58("26U7rQTwpdma5GYSZb5bNygVCtSuWL6DKet1Nauf5J57v19mmfnq434YrkKYJqvYt2ydQBUT3P7Xgj5ZVDVAcc5k").get))
       )
       .right
       .get

@@ -6,7 +6,6 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
-import scorex.crypto.encode.Base58
 import scorex.transaction.assets.IssueTransactionV2
 
 class IssueTransactionV2Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithDB with HistoryTest {
@@ -62,7 +61,7 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
         None,
         100000000,
         1526287561757L,
-        Proofs(Seq(ByteStr(Base58.decode("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get)))
+        Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get))
       )
       .right
       .get
