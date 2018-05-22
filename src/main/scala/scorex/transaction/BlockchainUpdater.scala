@@ -14,6 +14,8 @@ trait BlockchainUpdater {
 
   def lastBlockInfo: Observable[LastBlockInfo]
 
+  def isLastBlockId(id: ByteStr): Boolean
+
   def shutdown(): Unit
 }
 
