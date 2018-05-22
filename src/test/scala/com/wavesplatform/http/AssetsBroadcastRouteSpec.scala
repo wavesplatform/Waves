@@ -16,7 +16,7 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import scorex.api.http._
 import scorex.api.http.assets._
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.transfer._
 import scorex.transaction.{Proofs, Transaction, ValidationError}

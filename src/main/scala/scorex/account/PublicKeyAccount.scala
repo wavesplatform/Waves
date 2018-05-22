@@ -1,7 +1,7 @@
 package scorex.account
 
 import com.wavesplatform.utils.base58Length
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.crypto.signatures.Curve25519
 import scorex.transaction.ValidationError.InvalidAddress
 

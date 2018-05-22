@@ -9,7 +9,7 @@ import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.ByteStr
 import org.slf4j.bridge.SLF4JBridgeHandler
 import scorex.account.{Address, AddressScheme}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.utils.ScorexLogging
 
 import scala.util.Try

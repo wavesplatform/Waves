@@ -116,7 +116,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                   s" ${if (blockchain.contains(block.reference)) "exits, it's not last persisted" else "doesn't exist"}"
                 Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
               case lastBlockId =>
-                val height            = lastBlockId.flatMap(blockchain.heightOf).getOrElse(0)
+                val height            = lastBlockId.fold(0)(blockchain.unsafeHeightOf)
                 val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
                 BlockDiffer
                   .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
@@ -125,7 +125,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
           case Some(ng) =>
             if (ng.base.reference == block.reference) {
               if (block.blockScore() > ng.base.blockScore()) {
-                val height            = blockchain.heightOf(ng.base.reference).getOrElse(0)
+                val height            = blockchain.unsafeHeightOf(ng.base.reference)
                 val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
 
                 BlockDiffer
@@ -141,8 +141,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                   Right(None)
                 } else {
                   log.trace(s"New liquid block is better version of existing, swapping")
-
-                  val height            = blockchain.heightOf(ng.base.reference).getOrElse(0)
+                  val height            = blockchain.unsafeHeightOf(ng.base.reference)
                   val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
 
                   BlockDiffer
@@ -164,7 +163,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                     }
 
                     val constraint: MiningConstraint = {
-                      val height            = blockchain.heightOf(referencedForgedBlock.uniqueId).getOrElse(0)
+                      val height            = blockchain.heightOf(referencedForgedBlock.reference).getOrElse(0)
                       val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
                       miningConstraints.total
                     }

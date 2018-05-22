@@ -3,14 +3,13 @@ package scorex.transaction
 import com.google.common.primitives.Shorts
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state.DataEntry._
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, LongDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, ByteStr, DataEntry, StringDataEntry}
+import com.wavesplatform.utils.Base58
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{Format, Json}
 import scorex.api.http.SignedDataRequest
-import scorex.crypto.encode.Base58
-import scorex.transaction.DataTransaction.MaxEntryCount
 
 class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -85,22 +84,27 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   }
 
   property("positive validation cases") {
+    import DataTransaction.MaxEntryCount
+    import com.wavesplatform.state._
     val keyRepeatCountGen = Gen.choose(2, MaxEntryCount)
-    forAll(dataTransactionGen, dataEntryGen, keyRepeatCountGen) {
+    forAll(dataTransactionGen, dataEntryGen(500), keyRepeatCountGen) {
       case (DataTransaction(version, sender, data, fee, timestamp, proofs), entry, keyRepeatCount) =>
         def check(data: List[DataEntry[_]]): Assertion = {
           val txEi = DataTransaction.create(version, sender, data, fee, timestamp, proofs)
           txEi shouldBe Right(DataTransaction(version, sender, data, fee, timestamp, proofs))
-          checkSerialization(txEi.right.get)
+          checkSerialization(txEi.explicitGet())
         }
 
-        check(List.empty)                                                      // no data
-        check(List.tabulate(MaxEntryCount)(n => LongDataEntry(n.toString, n))) // maximal data
-        check(List.fill[DataEntry[_]](keyRepeatCount)(entry))                  // repeating keys
-        check(List(BooleanDataEntry("", false)))                               // empty key
-        check(List(LongDataEntry("a" * MaxKeySize, 0xa)))                      // max key size
-        check(List(BinaryDataEntry("bin", ByteStr.empty)))                     // empty binary
+        check(List.empty)                                                               // no data
+        check(List.tabulate(MaxEntryCount)(n => LongDataEntry(n.toString, n)))          // maximal data
+        check(List.tabulate(30)(n => StringDataEntry(n.toString, "a" * 5109)))          // maximal data
+        check(List.fill[DataEntry[_]](keyRepeatCount)(entry))                           // repeating keys
+        check(List(BooleanDataEntry("", false)))                                        // empty key
+        check(List(LongDataEntry("a" * MaxKeySize, 0xa)))                               // max key size
+        check(List(BinaryDataEntry("bin", ByteStr.empty)))                              // empty binary
         check(List(BinaryDataEntry("bin", ByteStr(Array.fill(MaxValueSize)(1: Byte))))) // max binary value size
+        check(List(StringDataEntry("str", "")))                                         // empty string
+        check(List(StringDataEntry("str", "A" * MaxValueSize))) // max string size
     }
   }
 
@@ -111,7 +115,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         val badVersionEi = DataTransaction.create(badVersion, sender, data, fee, timestamp, proofs)
         badVersionEi shouldBe Left(ValidationError.UnsupportedVersion(badVersion))
 
-        val dataTooBig   = List.fill(MaxEntryCount + 1)(LongDataEntry("key", 4))
+        val dataTooBig   = List.fill(100)(StringDataEntry("key", "a" * 1527))
         val dataTooBigEi = DataTransaction.create(version, sender, dataTooBig, fee, timestamp, proofs)
         dataTooBigEi shouldBe Left(ValidationError.TooBigArray)
 

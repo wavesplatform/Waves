@@ -9,7 +9,7 @@ import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json._
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http.assets.{SignedTransferV1Request}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
 
 import scala.util.Random
@@ -190,9 +190,12 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
         "type"    -> 12,
         "version" -> 1,
         "sender"  -> firstAddress,
-        "data" -> List(LongDataEntry("int", 923275292849183L),
-                       BooleanDataEntry("bool", true),
-                       BinaryDataEntry("blob", ByteStr(Array.tabulate(445)(_.toByte)))),
+        "data" -> List(
+          LongDataEntry("int", 923275292849183L),
+          BooleanDataEntry("bool", true),
+          BinaryDataEntry("blob", ByteStr(Array.tabulate(445)(_.toByte))),
+          StringDataEntry("str", "AAA-AAA")
+        ),
         "fee" -> 100000
       ),
       usesProofs = true

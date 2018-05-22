@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.wallet.Wallet
 
 @Path("/wallet")
