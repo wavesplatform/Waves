@@ -77,9 +77,8 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
     val sigLeasingA = ByteStr(crypto.sign(acc0, unsignedLeasing.bodyBytes()))
     val sigLeasingC = ByteStr(crypto.sign(acc2, unsignedLeasing.bodyBytes()))
 
-    /* issue https://wavesplatform.atlassian.net/browse/NODE-725 */
     val signedLeasing =
-      unsignedLeasing.copy(proofs = Proofs(Seq(sigLeasingA, ByteStr("0".getBytes()), sigLeasingC)))
+      unsignedLeasing.copy(proofs = Proofs(Seq(sigLeasingA, ByteStr.empty, sigLeasingC)))
 
     val leasingId =
       sender.signedBroadcast(signedLeasing.json() + ("type" -> JsNumber(LeaseTransactionV2.typeId.toInt))).id
@@ -105,9 +104,8 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
     val sigLeasingCancelA = ByteStr(crypto.sign(acc0, unsignedCancelLeasing.bodyBytes()))
     val sigLeasingCancelB = ByteStr(crypto.sign(acc1, unsignedCancelLeasing.bodyBytes()))
 
-    /* issue https://wavesplatform.atlassian.net/browse/NODE-725 */
     val signedLeasingCancel =
-      unsignedCancelLeasing.copy(proofs = Proofs(Seq(ByteStr("0".getBytes()), sigLeasingCancelA, sigLeasingCancelB)))
+      unsignedCancelLeasing.copy(proofs = Proofs(Seq(ByteStr.empty, sigLeasingCancelA, sigLeasingCancelB)))
 
     val leasingCancelId =
       sender.signedBroadcast(signedLeasingCancel.json() + ("type" -> JsNumber(LeaseCancelTransactionV2.typeId.toInt))).id
