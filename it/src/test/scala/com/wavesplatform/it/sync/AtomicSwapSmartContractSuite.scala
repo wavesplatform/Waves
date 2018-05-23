@@ -43,23 +43,6 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
   private val secretText = "some secret message from Alice"
   private val shaSecret  = "BN6RTYGWcwektQfSFzH8raYo9awaLgQ7pLyWLQY4S4F5"
 
-  private val sc1 = {
-    val untyped = Parser(s"""
-    let Bob = extract(addressFromString("${BobBC1}")).bytes
-    let Alice = extract(addressFromString("${AliceBC1}")).bytes
-    let AlicesPK = base58'${ByteStr(AlicesPK.publicKey)}'
-
-    let txRecipient = addressFromRecipient(tx.recipient).bytes
-    let txSender = addressFromPublicKey(tx.senderPk).bytes
-
-    let txToBob = ((txRecipient == Bob) && (sha256(tx.proofs[0]) == base58'$shaSecret') && (20 >= height) && sigVerify(tx.bodyBytes,tx.proofs[1],AlicesPK))
-    let backToAliceAfterHeight = ((height >= 21) && (txRecipient == Alice))
-
-    txToBob || backToAliceAfterHeight
-      """.stripMargin).get.value
-    CompilerV1(dummyTypeCheckerContext, untyped).explicitGet()
-  }
-
   test("step1: Balances initialization") {
     val toAliceBC1TxId = sender.transfer(sender.address, AliceBC1, 10 * transferAmount, fee).id
     nodes.waitForHeightAriseAndTxPresent(toAliceBC1TxId)
@@ -69,6 +52,24 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("step2: Create and setup smart contract for swapBC1") {
+    val beforeHeight = sender.height
+    val sc1 = {
+      val untyped = Parser(s"""
+    let Bob = extract(addressFromString("${BobBC1}")).bytes
+    let Alice = extract(addressFromString("${AliceBC1}")).bytes
+    let AlicesPK = base58'${ByteStr(AlicesPK.publicKey)}'
+
+    let txRecipient = addressFromRecipient(tx.recipient).bytes
+    let txSender = addressFromPublicKey(tx.senderPk).bytes
+
+    let txToBob = (txRecipient == Bob) && (sha256(tx.proofs[0]) == base58'$shaSecret') && ((20 + $beforeHeight) >= height)
+    let backToAliceAfterHeight = ((height >= (21 + $beforeHeight)) && (txRecipient == Alice))
+
+    txToBob || backToAliceAfterHeight
+      """.stripMargin).get.value
+      CompilerV1(dummyTypeCheckerContext, untyped).explicitGet()
+    }
+
     val pkSwapBC1 = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).right.get
     val script    = ScriptV1(sc1).explicitGet()
     val sc1SetTx = SetScriptTransaction
@@ -113,7 +114,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     nodes.waitForHeightAriseAndTxPresent(transferId)
   }
 
-  test("step4: Alice cannot make transfer from swapBC1") {
+  test("step4: Alice cannot make transfer from swapBC1 if height is incorrect") {
     val txToSwapBC1 =
       TransferTransactionV2
         .selfSigned(
@@ -156,7 +157,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
       val sigAlice = ByteStr(crypto.sign(AlicesPK, unsigned.bodyBytes()))
       unsigned.copy(proofs = Proofs(Seq(proof, sigAlice)))
     } else {
-      sender.waitForHeight(sender.height + 11, 2.minutes)
+      sender.waitForHeight(sender.height + 20, 3.minutes)
 
       TransferTransactionV2
         .selfSigned(
@@ -179,10 +180,4 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     nodes.waitForHeightAriseAndTxPresent(versionedTransferId)
   }
 
-  protected def calcDataFee(data: List[DataEntry[_]]): Long = {
-    val dataSize = data.map(_.toBytes.length).sum + 128
-    if (dataSize > 1024) {
-      fee * (dataSize / 1024 + 1)
-    } else fee
-  }
 }
