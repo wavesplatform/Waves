@@ -25,10 +25,7 @@ class RollbackSpecSuite
     with WaitForHeight2
     with NodesFromDocker {
 
-  override protected val nodeConfigs: Seq[Config] = Seq(
-    Random.shuffle(NodeConfigs.Default.init).head,
-    NodeConfigs.NotMiner
-  )
+  override protected val nodeConfigs: Seq[Config] = Seq(NodeConfigs.randomMiner, NodeConfigs.NotMiner)
 
   private val nodeAddresses     = nodeConfigs.map(_.getString("address")).toSet
   private val transactionsCount = 190

@@ -34,7 +34,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |      {amountAsset = "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J", priceAsset = "WAVES"},
         |      {amountAsset = "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J", priceAsset = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"},
         |    ]
-        |    max-timestamp-diff = 3h
+        |    max-timestamp-diff = 30d
         |    blacklisted-assets: ["a"]
         |    blacklisted-names: ["b"]
         |    blacklisted-addresses: ["c"]

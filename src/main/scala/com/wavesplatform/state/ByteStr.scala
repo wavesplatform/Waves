@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import play.api.libs.json._
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.utils.{Base58, Base64}
 
 import scala.util.Try
 
@@ -14,6 +14,8 @@ case class ByteStr(arr: Array[Byte]) {
   override def hashCode(): Int = java.util.Arrays.hashCode(arr)
 
   lazy val base58: String = Base58.encode(arr)
+
+  lazy val base64: String = Base64.encode(arr)
 
   lazy val trim: String = base58.toString.take(7) + "..."
 
