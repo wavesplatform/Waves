@@ -4,10 +4,9 @@ import java.nio.ByteBuffer
 
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
-import com.google.common.primitives.{Ints, Shorts}
+import com.google.common.primitives.Ints
 import com.wavesplatform.state._
 import scorex.transaction.smart.script.{Script, ScriptReader}
-import com.google.common.base.Charsets.UTF_8
 import scorex.transaction.{Transaction, TransactionParsers}
 
 package object database {
@@ -81,27 +80,6 @@ package object database {
               case crypto.SignatureLength => crypto.SignatureLength.toByte
             })
             .put(id.arr)
-      }
-      .array()
-
-  def readStrings(data: Array[Byte]): Seq[String] = Option(data).fold(Seq.empty[String]) { _ =>
-    var i = 0
-    val s = Seq.newBuilder[String]
-
-    while (i < data.length) {
-      val len = Shorts.fromByteArray(data.drop(i))
-      s += new String(data, i + 2, len, UTF_8)
-      i += (2 + len)
-    }
-    s.result()
-  }
-
-  def writeStrings(strings: Seq[String]): Array[Byte] =
-    strings
-      .foldLeft(ByteBuffer.allocate(strings.map(_.getBytes(UTF_8).length + 2).sum)) {
-        case (b, s) =>
-          val bytes = s.getBytes(UTF_8)
-          b.putShort(bytes.length.toShort).put(bytes)
       }
       .array()
 

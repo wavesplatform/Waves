@@ -96,7 +96,9 @@ object Keys {
   def approvedFeatures: Key[Map[Short, Int]]  = Key(Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
   def activatedFeatures: Key[Map[Short, Int]] = Key(Array[Byte](0, 30), readFeatureMap, writeFeatureMap)
 
-  def dataKeyList(addressId: BigInt) = Key[Set[String]](addr(31, addressId), readStrings(_).toSet, keys => writeStrings(keys.toSeq))
+  def dataKeyCount(addressId: BigInt): Key[Int] = Key(addr(31, addressId), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
+  def dataKey(addressId: BigInt, keyNo: Int): Key[Option[String]] =
+    Key.opt(addr(31, addressId) ++ Ints.toByteArray(keyNo), new String(_, UTF_8), _.getBytes(UTF_8))
 
   def dataHistory(addressId: BigInt, key: String): Key[Seq[Int]] = historyKey(32, addressId.toByteArray ++ key.getBytes(UTF_8))
   def data(height: Int, addressId: BigInt, key: String): Key[Option[DataEntry[_]]] =
