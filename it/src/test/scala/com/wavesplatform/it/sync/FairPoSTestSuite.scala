@@ -24,7 +24,7 @@ class FairPoSTestSuite extends FunSuite with CancelAfterFailure with NodesFromDo
 
     val heightAfterTransfer = nodes.head.height
 
-    nodes.head.waitForHeight(heightAfterTransfer + 20, 5.minutes)
+    nodes.head.waitForHeight(heightAfterTransfer + 20, 10.minutes)
   }
 }
 
