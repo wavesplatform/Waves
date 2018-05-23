@@ -9,6 +9,8 @@ import scala.util.Random
 
 class FairPoSCalculatorTest extends PropSpec with Matchers {
 
+  import PoSCalculator._
+
   val pos: PoSCalculator = FairPoSCalculator
 
   case class Block(height: Int, baseTarget: Long, miner: PrivateKeyAccount, timestamp: Long, delay: Long)
@@ -52,21 +54,19 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
       """.stripMargin
     )
 
-    val perfomances = calcPerfomance(chain, miners)
+    val minersPerfomance = calcPerfomance(chain, miners)
 
-    println(perfomances.toList.sortBy(_._1).mkString("\n"))
-
-    assert(perfomances.forall(p => p._2 < 1.1 && p._2 > 0.9))
+    assert(minersPerfomance.forall(p => p._2 < 1.1 && p._2 > 0.9))
     assert(avgDelay < 80000 && avgDelay > 40000)
     assert(avgBT < 200 && avgBT > 20)
   }
 
   def mineBlock(prev: Block, grand: Option[Block], minerWithBalance: (PrivateKeyAccount, Long)): Block = {
     val (miner, balance) = minerWithBalance
-    val gs               = pos.generatorSignature(generationSignature, miner.publicKey)
-    val hit              = pos.hit(gs)
-    val delay            = pos.calculateDelay(hit, prev.baseTarget, balance)
-    val bt = pos.baseTarget(
+    val gs               = generatorSignature(generationSignature, miner.publicKey)
+    val h                = hit(gs)
+    val delay            = pos.calculateDelay(h, prev.baseTarget, balance)
+    val bt = pos.calculateBaseTarget(
       blockDelaySeconds,
       prev.height + 1,
       prev.baseTarget,

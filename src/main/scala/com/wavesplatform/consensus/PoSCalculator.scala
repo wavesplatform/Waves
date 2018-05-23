@@ -3,36 +3,37 @@ package com.wavesplatform.consensus
 import com.wavesplatform.crypto
 
 trait PoSCalculator {
-  protected val HitSize: Int        = 8
-  protected val MinBaseTarget: Long = 9
+  def calculateBaseTarget(targetBlockDelaySeconds: Long,
+                          prevHeight: Int,
+                          prevBaseTarget: Long,
+                          parentTimestamp: Long,
+                          maybeGreatGrandParentTimestamp: Option[Long],
+                          timestamp: Long): Long
 
-  def generatorSignature(signature: Array[Byte], publicKey: Array[Byte]): Array[Byte] = {
+  def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long
+}
+
+object PoSCalculator {
+  private[consensus] val HitSize: Int        = 8
+  private[consensus] val MinBaseTarget: Long = 9
+
+  private[consensus] def generatorSignature(signature: Array[Byte], publicKey: Array[Byte]): Array[Byte] = {
     val s = new Array[Byte](crypto.DigestSize * 2)
     System.arraycopy(signature, 0, s, 0, crypto.DigestSize)
     System.arraycopy(publicKey, 0, s, crypto.DigestSize, crypto.DigestSize)
     crypto.fastHash(s)
   }
 
-  def baseTarget(targetBlockDelaySeconds: Long,
-                 prevHeight: Int,
-                 prevBaseTarget: Long,
-                 parentTimestamp: Long,
-                 maybeGreatGrandParentTimestamp: Option[Long],
-                 timestamp: Long): Long
+  private[consensus] def hit(generatorSignature: Array[Byte]): BigInt = BigInt(1, generatorSignature.take(HitSize).reverse)
 
-  def hit(generatorSignature: Array[Byte]): BigInt = BigInt(1, generatorSignature.take(HitSize).reverse)
-
-  def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long
-
-  def normalize(value: Long, targetBlockDelaySeconds: Long): Double =
+  private[consensus] def normalize(value: Long, targetBlockDelaySeconds: Long): Double =
     value * targetBlockDelaySeconds / (60: Double)
 
-  def normalizeBaseTarget(baseTarget: Long, targetBlockDelaySeconds: Long): Long = {
+  private[consensus] def normalizeBaseTarget(baseTarget: Long, targetBlockDelaySeconds: Long): Long = {
     baseTarget
       .max(MinBaseTarget)
       .min(Long.MaxValue / targetBlockDelaySeconds)
   }
-
 }
 
 object NxtPoSCalculator extends PoSCalculator {
@@ -41,12 +42,14 @@ object NxtPoSCalculator extends PoSCalculator {
   protected val BaseTargetGamma      = 64
   protected val MeanCalculationDepth = 3
 
-  def baseTarget(targetBlockDelaySeconds: Long,
-                 prevHeight: Int,
-                 prevBaseTarget: Long,
-                 parentTimestamp: Long,
-                 maybeGreatGrandParentTimestamp: Option[Long],
-                 timestamp: Long): Long = {
+  import PoSCalculator._
+
+  def calculateBaseTarget(targetBlockDelaySeconds: Long,
+                          prevHeight: Int,
+                          prevBaseTarget: Long,
+                          parentTimestamp: Long,
+                          maybeGreatGrandParentTimestamp: Option[Long],
+                          timestamp: Long): Long = {
 
     if (prevHeight % 2 == 0) {
       val meanBlockDelay  = maybeGreatGrandParentTimestamp.fold(timestamp - parentTimestamp)(ts => (timestamp - ts) / MeanCalculationDepth) / 1000
@@ -72,6 +75,9 @@ object NxtPoSCalculator extends PoSCalculator {
 }
 
 object FairPoSCalculator extends PoSCalculator {
+
+  import PoSCalculator._
+
   private val MaxSignature: Array[Byte] = Array.fill[Byte](HitSize)(-1)
   private val MaxHit: BigDecimal        = BigDecimal(BigInt(1, MaxSignature))
   private val C1                        = 70000
@@ -84,12 +90,12 @@ object FairPoSCalculator extends PoSCalculator {
     a.toLong
   }
 
-  def baseTarget(targetBlockDelaySeconds: Long,
-                 prevHeight: Int,
-                 prevBaseTarget: Long,
-                 parentTimestamp: Long,
-                 maybeGreatGrandParentTimestamp: Option[Long],
-                 timestamp: Long): Long = {
+  def calculateBaseTarget(targetBlockDelaySeconds: Long,
+                          prevHeight: Int,
+                          prevBaseTarget: Long,
+                          parentTimestamp: Long,
+                          maybeGreatGrandParentTimestamp: Option[Long],
+                          timestamp: Long): Long = {
     val maxDelay = normalize(90, targetBlockDelaySeconds)
     val minDelay = normalize(30, targetBlockDelaySeconds)
 
