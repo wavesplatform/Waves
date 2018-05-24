@@ -43,7 +43,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     (post & entity(as[String])) { code =>
       complete(
         ScriptCompiler(code).fold(
-          e => Json.obj("error" -> e), {
+          e => ScriptCompilerError(e), {
             case (script, complexity) =>
               Json.obj(
                 "script"     -> script.bytes().base64,
@@ -77,7 +77,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
             ScriptCompiler.estimate(script).map((script, _))
           }
           .fold(
-            e => Json.obj("error" -> e), {
+            e => ScriptCompilerError(e), {
               case (script, complexity) =>
                 Json.obj(
                   "script"     -> code,
