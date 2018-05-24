@@ -15,7 +15,6 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Random, Try}
 
 class DataTransactionSuite extends BaseTransactionSuite {
-  private val fee = 100000
 
   test("sender's waves balance is decreased by fee.") {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
@@ -36,13 +35,12 @@ class DataTransactionSuite extends BaseTransactionSuite {
     notMiner.assertBalances(firstAddress, balance1, eff1)
 
     val leaseAmount = 1.waves
-    val leaseFee    = 100000
-    val leaseId     = sender.lease(firstAddress, secondAddress, leaseAmount, leaseFee).id
+    val leaseId     = sender.lease(firstAddress, secondAddress, leaseAmount, fee).id
     nodes.waitForHeightAriseAndTxPresent(leaseId)
 
     assertBadRequestAndResponse(sender.putData(firstAddress, data, balance1 - leaseAmount), "negative effective balance")
     nodes.waitForHeightArise()
-    notMiner.assertBalances(firstAddress, balance1 - leaseFee, eff1 - leaseAmount - leaseFee)
+    notMiner.assertBalances(firstAddress, balance1 - fee, eff1 - leaseAmount - fee)
   }
 
   test("invalid transaction should not be in UTX or blockchain") {
@@ -144,6 +142,9 @@ class DataTransactionSuite extends BaseTransactionSuite {
     sender.getData(secondAddress).equals(dataAllTypes)
 
     notMiner.assertBalances(secondAddress, balance2 - fee, eff2 - fee)
+
+    val json = Json.parse(sender.get(s"/transactions/info/$txId").getResponseBody)
+    ((json \ "data")(2) \ "value").as[String].startsWith("base64:") shouldBe true
   }
 
   test("queries for nonexistent data") {
@@ -218,7 +219,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
                                 "Illegal base64 character")
 
     assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("yomp")))),
-                                "Base64 encoding expected")
+                                "base64:chars expected")
   }
 
   test("transaction requires a valid proof") {

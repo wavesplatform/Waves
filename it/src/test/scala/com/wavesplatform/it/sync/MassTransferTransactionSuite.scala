@@ -17,12 +17,6 @@ import scala.util.Random
 
 class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private val assetQuantity  = 100.waves
-  private val transferAmount = 5.waves
-  private val leasingAmount  = 5.waves
-  private val leasingFee     = 0.003.waves
-  private val issueFee       = 1.waves
-
   private def fakeSignature = Base58.encode(Array.fill(64)(Random.nextInt.toByte))
 
   test("asset mass transfer changes asset balances and sender's.waves balance is decreased by fee.") {
@@ -31,7 +25,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
 
     val transfers = List(Transfer(secondAddress, transferAmount))
-    val assetId   = sender.issue(firstAddress, "name", "description", assetQuantity, 8, reissuable = false, issueFee).id
+    val assetId   = sender.issue(firstAddress, "name", "description", issueAmount, 8, reissuable = false, issueFee).id
     nodes.waitForHeightAriseAndTxPresent(assetId)
 
     val massTransferTransactionFee = calcMassTransferFee(transfers.size)
@@ -39,7 +33,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     nodes.waitForHeightAriseAndTxPresent(transferId)
 
     notMiner.assertBalances(firstAddress, balance1 - massTransferTransactionFee - issueFee, eff1 - massTransferTransactionFee - issueFee)
-    notMiner.assertAssetBalance(firstAddress, assetId, assetQuantity - transferAmount)
+    notMiner.assertAssetBalance(firstAddress, assetId, issueAmount - transferAmount)
     notMiner.assertBalances(secondAddress, balance2, eff2)
     notMiner.assertAssetBalance(secondAddress, assetId, transferAmount)
   }
@@ -89,14 +83,14 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   test("can not make mass transfer without having enough of effective balance") {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
-    val transfers        = List(Transfer(secondAddress, balance1 - leasingFee - fee))
+    val transfers        = List(Transfer(secondAddress, balance1 - 2 * fee))
 
-    val leaseTxId = sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee).id
+    val leaseTxId = sender.lease(firstAddress, secondAddress, leasingAmount, fee).id
     nodes.waitForHeightAriseAndTxPresent(leaseTxId)
 
     assertBadRequestAndResponse(sender.massTransfer(firstAddress, transfers, calcMassTransferFee(transfers.size)), "negative waves balance")
     nodes.waitForHeightArise()
-    notMiner.assertBalances(firstAddress, balance1 - leasingFee, eff1 - leasingAmount - leasingFee)
+    notMiner.assertBalances(firstAddress, balance1 - fee, eff1 - leasingAmount - fee)
     notMiner.assertBalances(secondAddress, balance2, eff2 + leasingAmount)
   }
 

@@ -14,7 +14,6 @@ class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFro
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  private val transferFee    = 0.001.waves
   private val transferAmount = 1000.waves
 
   private def miner               = nodes.head
@@ -25,7 +24,7 @@ class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFro
     val (balance1, eff1)    = nodeWithZeroBalance.accountBalances(newMinerAddress)
     val nodeMinerInfoBefore = nodeWithZeroBalance.debugMinerInfo()
     all(nodeMinerInfoBefore) shouldNot matchPattern { case State(`newMinerAddress`, _, ts) if ts > 0 => }
-    val txId = miner.transfer(miner.address, newMinerAddress, transferAmount, transferFee).id
+    val txId = miner.transfer(miner.address, newMinerAddress, transferAmount, fee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
     val heightAfterTransfer = miner.height

@@ -215,3 +215,9 @@ case object DataKeyNotExists extends ApiError {
   override val code            = StatusCodes.NotFound
   override val message: String = "no data for this key"
 }
+
+case class ScriptCompilerError(errorMessage: String) extends ApiError {
+  override val id: Int          = 305
+  override val code: StatusCode = StatusCodes.BadRequest
+  override val message: String  = errorMessage
+}

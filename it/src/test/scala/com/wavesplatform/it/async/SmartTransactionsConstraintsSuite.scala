@@ -93,7 +93,7 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
   private def toRequest(tx: SetScriptTransaction): SignedSetScriptRequest = SignedSetScriptRequest(
     version = tx.version,
     senderPublicKey = Base58.encode(tx.sender.publicKey),
-    script = tx.script.map(_.bytes().base58),
+    script = tx.script.map(_.bytes().base64),
     fee = tx.fee,
     timestamp = tx.timestamp,
     proofs = tx.proofs.proofs.map(_.base58)(collection.breakOut)

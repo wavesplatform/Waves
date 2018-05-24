@@ -32,7 +32,7 @@ case class SignedSetScriptRequest(@ApiModelProperty(required = true)
       _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _script <- script match {
         case None    => Right(None)
-        case Some(s) => Script.fromBase58String(s).map(Some(_))
+        case Some(s) => Script.fromBase64String(s).map(Some(_))
       }
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)

@@ -202,6 +202,19 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
     )
   }
 
+  test("/transactions/sign should produce script transaction that is good for /transactions/broadcast") {
+    signAndBroadcast(
+      Json.obj(
+        "type"    -> 13,
+        "version" -> 1,
+        "sender"  -> firstAddress,
+        "script"  -> None,
+        "fee"     -> 100000
+      ),
+      usesProofs = true
+    )
+  }
+
   test("/transactions/sign should produce sponsor transactions that are good for /transactions/broadcast") {
     for (v <- supportedVersions) {
       val isProof = Option(v).nonEmpty
