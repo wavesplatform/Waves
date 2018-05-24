@@ -18,15 +18,23 @@ trait ScriptGen {
     for {
       (i1, v1) <- INTGen((gas - 2) / 2)
       (i2, v2) <- INTGen((gas - 2) / 2)
-      if((BigInt(v1) + BigInt(v2)).isValidLong)
-    } yield (BINARY_OP(i1, SUM_OP, i2), (v1 + v2))
+    } yield 
+      if((BigInt(v1) + BigInt(v2)).isValidLong) {
+        (BINARY_OP(i1, SUM_OP, i2), (v1 + v2))
+      } else {
+        (BINARY_OP(i1, SUB_OP, i2), (v1 - v2))
+      }
 
   def SUBgen(gas: Int): Gen[(EXPR, Long)] =
     for {
       (i1, v1) <- INTGen((gas - 2) / 2)
       (i2, v2) <- INTGen((gas - 2) / 2)
-      if((BigInt(v1) - BigInt(v2)).isValidLong)
-    } yield (BINARY_OP(i1, SUB_OP, i2), (v1 - v2))
+    } yield
+      if((BigInt(v1) - BigInt(v2)).isValidLong) {
+        (BINARY_OP(i1, SUB_OP, i2), (v1 - v2))
+      } else {
+        (BINARY_OP(i1, SUM_OP, i2), (v1 + v2))
+      }
 
   def INTGen(gas: Int): Gen[(EXPR, Long)] = if (gas > 0) Gen.oneOf(CONST_LONGgen, SUMgen(gas - 1), SUBgen(gas - 1), IF_INTgen(gas - 1), INTGen(gas-1).filter(v => (-BigInt(v._2)).isValidLong).map(e => (FUNCTION_CALL("-",List(e._1)), -e._2))) else CONST_LONGgen
 

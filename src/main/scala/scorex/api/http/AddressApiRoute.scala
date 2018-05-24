@@ -5,6 +5,7 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
@@ -18,7 +19,7 @@ import scorex.BroadcastRoute
 import scorex.account.{Address, PublicKeyAccount}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.smart.script.ScriptCompiler
-import scorex.transaction.{PoSCalc, TransactionFactory, ValidationError}
+import scorex.transaction.{TransactionFactory, ValidationError}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
@@ -358,7 +359,7 @@ case class AddressApiRoute(settings: RestAPISettings,
     BalanceDetails(
       account.address,
       portfolio.balance,
-      PoSCalc.generatingBalance(blockchain, functionalitySettings, account, blockchain.height),
+      GeneratingBalanceProvider.balance(blockchain, functionalitySettings, blockchain.height, account),
       portfolio.balance - portfolio.lease.out,
       portfolio.effectiveBalance
     )
