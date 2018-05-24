@@ -110,10 +110,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
   override def accountData(address: Address): AccountDataInfo = readOnly { db =>
     val data = for {
       addressId <- addressIdCache.get(address).toSeq
-      keyCount = db.get(Keys.dataKeyCount(addressId))
-      keyNo <- Range(0, keyCount)
-      key   <- db.get(Keys.dataKey(addressId, keyNo))
-      value <- accountData(address, key)
+      keyChunkCount = db.get(Keys.dataKeyChunkCount(addressId))
+      chunkNo <- Range(0, keyChunkCount)
+      key     <- db.get(Keys.dataKeyChunk(addressId, chunkNo))
+      value   <- accountData(address, key)
     } yield key -> value
     AccountDataInfo(data.toMap)
   }
@@ -298,13 +298,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
         } yield newKey
       ).toSeq
       if (newKeys.nonEmpty) {
-        println(s"Adding ${newKeys.size} new keys") ///
-        val keyCountKey = Keys.dataKeyCount(addressId)
-        val keyCount    = rw.get(keyCountKey)
-        rw.put(keyCountKey, keyCount + newKeys.size)
-        for ((key, i) <- newKeys.zipWithIndex) {
-          rw.put(Keys.dataKey(addressId, keyCount + i), Some(key))
-        }
+        val chunkCountKey = Keys.dataKeyChunkCount(addressId)
+        val chunkCount    = rw.get(chunkCountKey)
+        rw.put(Keys.dataKeyChunk(addressId, chunkCount), newKeys)
+        rw.put(chunkCountKey, chunkCount + 1)
       }
     }
 
