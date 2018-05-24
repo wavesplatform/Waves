@@ -37,7 +37,12 @@ object CompiledScript {
   implicit val compiledScriptFormat: Format[CompiledScript] = Json.format
 }
 
-case class FullAssetInfo(assetId: String, balance: Long, reissuable: Boolean, quantity: Long)
+case class FullAssetInfo(assetId: String,
+                         balance: Long,
+                         reissuable: Boolean,
+                         minSponsoredAssetFee: Option[Long],
+                         sponsorBalance: Option[Long],
+                         quantity: Long)
 object FullAssetInfo {
   implicit val fullAssetInfoFormat: Format[FullAssetInfo] = Json.format
 }

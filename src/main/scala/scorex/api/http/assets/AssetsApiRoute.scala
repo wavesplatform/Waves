@@ -246,10 +246,13 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
             }
           } yield
             Json.obj(
-              "assetId"          -> assetId.base58,
-              "balance"          -> balance,
-              "reissuable"       -> assetInfo.reissuable,
-              "sponsorship"      -> assetInfo.sponsorship,
+              "assetId"    -> assetId.base58,
+              "balance"    -> balance,
+              "reissuable" -> assetInfo.reissuable,
+              "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
+                case 0           => JsNull
+                case sponsorship => JsNumber(sponsorship)
+              }),
               "sponsorBalance"   -> sponsorBalance,
               "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
               "issueTransaction" -> issueTransaction.json()
