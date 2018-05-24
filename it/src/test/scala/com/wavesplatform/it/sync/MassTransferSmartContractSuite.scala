@@ -51,7 +51,8 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
         (txToGovComplete && accSig && txToGov)  || (txToUsers && accSig)
         """.stripMargin).get.value
-      CompilerV1(dummyTypeCheckerContext, untyped).explicitGet()
+      assert(untyped.size == 1)
+      CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()
     }
 
     // set script

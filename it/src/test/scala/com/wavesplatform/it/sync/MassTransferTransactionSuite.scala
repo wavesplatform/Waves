@@ -3,12 +3,11 @@ package com.wavesplatform.it.sync
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.utils.Base58
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json._
 import scorex.api.http.assets.{MassTransferRequest, SignedMassTransferRequest}
-import com.wavesplatform.utils.Base58
-import scorex.transaction.transfer.MassTransferTransaction.Transfer
-import scorex.transaction.transfer.MassTransferTransaction.MaxTransferCount
+import scorex.transaction.transfer.MassTransferTransaction.{MaxTransferCount, Transfer}
 import scorex.transaction.transfer.TransferTransaction.MaxAttachmentSize
 import scorex.transaction.transfer._
 

@@ -1,10 +1,10 @@
 package com.wavesplatform.lang.typechecker
 
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.compiler.CompilerV1.CompilationResult
+import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions
@@ -102,6 +102,48 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
         UNIT
       )
     )
+  )
+
+  treeTypeTest("Invalid LET")(
+    ctx = typeCheckerContext,
+    expr = Expressions.BLOCK(Expressions.LET(Expressions.PART.INVALID("###", "it is invalid!"), Expressions.TRUE, Seq.empty), Expressions.REF("x")),
+    expectedResult = Left("Typecheck failed: it is invalid!: ###")
+  )
+
+  treeTypeTest("Invalid GETTER")(
+    ctx = typeCheckerContext,
+    expr = Expressions.GETTER(Expressions.REF("x"), Expressions.PART.INVALID("###", "it is invalid!")),
+    expectedResult = Left("Typecheck failed: it is invalid!: ###")
+  )
+
+  treeTypeTest("Invalid BYTEVECTOR")(
+    ctx = typeCheckerContext,
+    expr = Expressions.CONST_BYTEVECTOR(Expressions.PART.INVALID("foo", "it is invalid!")),
+    expectedResult = Left("Typecheck failed: it is invalid!: foo")
+  )
+
+  treeTypeTest("Invalid STRING")(
+    ctx = typeCheckerContext,
+    expr = Expressions.CONST_STRING(Expressions.PART.INVALID("\\u1", "it is invalid!")),
+    expectedResult = Left("Typecheck failed: it is invalid!: \\u1")
+  )
+
+  treeTypeTest("Invalid REF")(
+    ctx = typeCheckerContext,
+    expr = Expressions.REF(Expressions.PART.INVALID("###", "it is invalid!")),
+    expectedResult = Left("Typecheck failed: it is invalid!: ###")
+  )
+
+  treeTypeTest("Invalid FUNCTION_CALL")(
+    ctx = typeCheckerContext,
+    expr = Expressions.FUNCTION_CALL(Expressions.PART.INVALID("###", "it is invalid!"), List.empty),
+    expectedResult = Left("Typecheck failed: it is invalid!: ###")
+  )
+
+  treeTypeTest("INVALID")(
+    ctx = typeCheckerContext,
+    expr = Expressions.INVALID("###", None),
+    expectedResult = Left("Typecheck failed: ###")
   )
 
   private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: CompilationResult[EXPR], ctx: CompilerContext): Unit =

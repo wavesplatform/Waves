@@ -30,7 +30,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       bin             <- binaryEntryGen(500, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key)
       str             <- stringEntryGen(500, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key && e.key != bin.key)
       dataTransaction <- dataTransactionGenP(oracle, List(long, bool, bin, str))
-      allFieldsRequiredScript        = s"""
+      allFieldsRequiredScript = s"""
                     |
                     | let oracle = extract(addressFromString("${oracle.address}"))
                     | let long = extract(getLong(oracle,"${long.key}")) == ${long.value}
@@ -42,16 +42,19 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
                     |
                     |
         """.stripMargin
-      untypedAllFieldsRequiredScript = Parser(allFieldsRequiredScript).get.value
-      typedAllFieldsRequiredScript   = CompilerV1(dummyTypeCheckerContext, untypedAllFieldsRequiredScript).explicitGet()
-      setScript            <- selfSignedSetScriptTransactionGenP(master, ScriptV1(typedAllFieldsRequiredScript).explicitGet())
+      setScript <- {
+        val untypedAllFieldsRequiredScript = Parser(allFieldsRequiredScript).get.value
+        assert(untypedAllFieldsRequiredScript.size == 1)
+        val typedAllFieldsRequiredScript = CompilerV1(dummyTypeCheckerContext, untypedAllFieldsRequiredScript.head).explicitGet()
+        selfSignedSetScriptTransactionGenP(master, ScriptV1(typedAllFieldsRequiredScript).explicitGet())
+      }
       transferFromScripted <- versionedTransferGenP(master, alice, Proofs.empty)
 
     } yield (genesis, genesis2, setScript, dataTransaction, transferFromScripted)
 
   property("simple oracle value required to transfer") {
     forAll(preconditions) {
-      case ((genesis, genesis2, setScript, dataTransaction, transferFromScripted)) =>
+      case (genesis, genesis2, setScript, dataTransaction, transferFromScripted) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, genesis2, setScript, dataTransaction))),
                            TestBlock.create(Seq(transferFromScripted)),
                            smartEnabledFS) { case _ => () }

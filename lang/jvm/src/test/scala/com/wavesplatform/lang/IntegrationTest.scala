@@ -18,13 +18,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("patternMatching") {
     val sampleScript =
-      """|
-         |match p {
-         |  case pa: PointA => 0
-         |  case pb: PointB => 1
-         |}
-         |
-      """.stripMargin
+      """match p {
+        |  case pa: PointA => 0
+        |  case pb: PointB => 1
+        |}""".stripMargin
     eval[Long](sampleScript, withUnion(pointAInstance)) shouldBe Right(0)
     eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
   }
@@ -57,7 +54,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   private def eval[T: TypeInfo](code: String, ctx: EvaluationContext = PureContext.instance) = {
     val untyped = Parser(code).get.value
-    val typed   = CompilerV1(CompilerContext.fromEvaluationContext(ctx), untyped)
+    require(untyped.size == 1)
+    val typed = CompilerV1(CompilerContext.fromEvaluationContext(ctx), untyped.head)
     typed.flatMap(EvaluatorV1[T](ctx, _))
   }
 
