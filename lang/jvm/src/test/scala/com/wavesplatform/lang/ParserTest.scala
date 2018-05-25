@@ -21,21 +21,52 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         println(s"Can't parse (len=${x.length}): <START>\n$x\n<END>")
         throw new TestFailedException(s"Expected 1 expression, but got ${r.size}: $r", 0)
       } else r.head
-    case e @ Failure(_, i, _) =>
-      println(
-        s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${e.extra.traced.fullStack
-          .mkString("\n")}")
-      throw new TestFailedException("Test failed", 0)
+    case e: Failure[Char, String] => catchParseError(x, e)
   }
 
   private def parseAll(x: String): Seq[EXPR] = Parser(x) match {
-    case Success(r, _) => r
-    case e @ Failure(_, i, _) =>
-      println(x)
-      println(
-        s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${e.extra.traced.fullStack
-          .mkString("\n")}")
-      throw new TestFailedException("Test failed", 0)
+    case Success(r, _)            => r
+    case e: Failure[Char, String] => catchParseError(x, e)
+  }
+
+  private def catchParseError(x: String, e: Failure[Char, String]): Nothing = {
+    import e.{index => i}
+    println(s"val codeInBytes = new String(Array[Byte](${x.getBytes.mkString(",")}))")
+    println(s"""val codeInStr = "${escapedCode(x)}"""")
+    println(s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${e.extra.traced.fullStack
+      .mkString("\n")}")
+    throw new TestFailedException("Test failed", 0)
+  }
+
+  private def escapedCode(s: String): String =
+    s.flatMap {
+      case '"'  => "\\\""
+      case '\n' => "\\n"
+      case '\r' => "\\r"
+      case '\t' => "\\t"
+      case x    => x.toChar.toString
+    }.mkString
+
+  private def cleanOffsets(l: LET): LET =
+    l.copy(start = 0, end = 0, name = cleanOffsets(l.name), value = cleanOffsets(l.value), types = l.types.map(cleanOffsets(_)))
+
+  private def cleanOffsets[T](p: PART[T]): PART[T] = p match {
+    case PART.VALID(_, _, x)   => PART.VALID(0, 0, x)
+    case PART.INVALID(_, _, x) => PART.INVALID(0, 0, x)
+  }
+
+  private def cleanOffsets(expr: EXPR): EXPR = expr match {
+    case x: CONST_LONG       => x.copy(start = 0, end = 0)
+    case x: REF              => x.copy(start = 0, end = 0, key = cleanOffsets(x.key))
+    case x: CONST_STRING     => x.copy(start = 0, end = 0, value = cleanOffsets(x.value))
+    case x: CONST_BYTEVECTOR => x.copy(start = 0, end = 0, value = cleanOffsets(x.value))
+    case x: TRUE             => x.copy(start = 0, end = 0)
+    case x: FALSE            => x.copy(start = 0, end = 0)
+    case x: BINARY_OP        => x.copy(start = 0, end = 0, a = cleanOffsets(x.a), b = cleanOffsets(x.b))
+    case x: IF               => x.copy(start = 0, end = 0, cond = cleanOffsets(x.cond), ifTrue = cleanOffsets(x.ifTrue), ifFalse = cleanOffsets(x.ifFalse))
+    case x: BLOCK            => x.copy(start = 0, end = 0, let = cleanOffsets(x.let), body = cleanOffsets(x.body))
+    case x: FUNCTION_CALL    => x.copy(start = 0, end = 0, name = cleanOffsets(x.name), args = x.args.map(cleanOffsets(_)))
+    case _                   => ???
   }
 
   private def genElementCheck(gen: Gen[EXPR]): Unit = {
@@ -47,7 +78,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     forAll(testGen) {
       case (expr, str) =>
         withClue(str) {
-          parseOne(str) shouldBe expr
+          cleanOffsets(parseOne(str)) shouldBe expr
         }
     }
   }
@@ -173,6 +204,62 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
   property("should parse incomplete special symbols") {
     parseOne("\"foo \\\"") shouldBe CONST_STRING(0, 7, PART.INVALID(1, 6, "invalid escaped symbol: '\\'. The valid are \b, \f, \n, \r, \t"))
+  }
+
+  property("block: multiline without ;") {
+    val s =
+      """let q = 1
+        |c""".stripMargin
+    parseOne(s) shouldBe BLOCK(
+      0,
+      11,
+      LET(0, 9, PART.VALID(4, 5, "q"), CONST_LONG(8, 9, 1), List.empty),
+      REF(10, 11, PART.VALID(10, 11, "c"))
+    )
+  }
+
+  property("block: multiline with ; at end of let") {
+    val s =
+      """let q = 1;
+        |c""".stripMargin
+    parseOne(s) shouldBe BLOCK(
+      0,
+      12,
+      LET(0, 9, PART.VALID(4, 5, "q"), CONST_LONG(8, 9, 1), List.empty),
+      REF(11, 12, PART.VALID(11, 12, "c"))
+    )
+  }
+
+  property("block: multiline with ; at start of body") {
+    val s =
+      """let q = 1
+        |; c""".stripMargin
+    parseOne(s) shouldBe BLOCK(
+      0,
+      13,
+      LET(0, 9, PART.VALID(4, 5, "q"), CONST_LONG(8, 9, 1), List.empty),
+      REF(12, 13, PART.VALID(12, 13, "c"))
+    )
+  }
+
+  property("block: oneline") {
+    val s = "let q = 1; c"
+    parseOne(s) shouldBe BLOCK(
+      0,
+      12,
+      LET(0, 9, PART.VALID(4, 5, "q"), CONST_LONG(8, 9, 1), List.empty),
+      REF(11, 12, PART.VALID(11, 12, "c"))
+    )
+  }
+
+  property("block: invalid") {
+    val s = "let q = 1 c"
+    parseOne(s) shouldBe BLOCK(
+      0,
+      11,
+      LET(0, 9, PART.VALID(4, 5, "q"), CONST_LONG(8, 9, 1), List.empty),
+      INVALID(9, 9, "can't find a separator. Did you mean ';' or '\\n' ?", Some(REF(10, 11, PART.VALID(10, 11, "c"))))
+    )
   }
 
   property("reserved keywords are invalid variable names in block: if") {
@@ -383,7 +470,19 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     )
   }
 
-  // multiple getters
+  property("braces in block's let and body") {
+    val text =
+      """let a = (foo)
+        |(bar)""".stripMargin
+    parseOne(text) shouldBe BLOCK(
+      0,
+      19,
+      LET(0, 13, PART.VALID(4, 5, "a"), REF(9, 12, PART.VALID(9, 12, "foo")), List.empty),
+      REF(15, 18, PART.VALID(15, 18, "bar"))
+    )
+  }
+
+  // @TODO multiple getters test
 
   property("crypto functions: sha256") {
     val text        = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD=test message"

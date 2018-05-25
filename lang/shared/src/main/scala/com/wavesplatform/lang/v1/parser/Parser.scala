@@ -8,11 +8,12 @@ import scodec.bits.ByteVector
 
 object Parser {
 
-  private val Global = com.wavesplatform.lang.hacks.Global // Hack for IDEA
+  private val Global                 = com.wavesplatform.lang.hacks.Global // Hack for IDEA
+  private val Whitespaces: Set[Char] = " \t\r\n".toSet
 
   private val White = WhitespaceApi.Wrapper {
     import fastparse.all._
-    NoTrace(CharIn(" ", "\t", "\r", "\n").rep)
+    NoTrace(CharIn(Whitespaces.toSeq).rep)
   }
 
   import White._
@@ -97,14 +98,14 @@ object Parser {
     case x                                              => INVALID(start, end, xs, x)
   }
 
-  private val numberP: P[CONST_LONG] = P(Index ~~ (CharIn("+-").? ~ digit.repX(min = 1)).! ~~ Index).map {
+  private val numberP: P[CONST_LONG] = P(Index ~~ (CharIn("+-").? ~~ digit.repX(min = 1)).! ~~ Index).map {
     case (start, x, end) => CONST_LONG(start, end, x.toLong)
   }
   private val trueP: P[TRUE]        = P(Index ~~ "true".! ~~ Index).map { case (start, _, end) => TRUE(start, end) }
   private val falseP: P[FALSE]      = P(Index ~~ "false".! ~~ Index).map { case (start, _, end) => FALSE(start, end) }
   private val bracesP: P[EXPR]      = P("(" ~ fallBackExpr ~ ")")
   private val curlyBracesP: P[EXPR] = P("{" ~ fallBackExpr ~ "}")
-  private val letP: P[LET] = P(Index ~~ "let" ~ varName ~ "=" ~ fallBackExpr ~~ Index).map {
+  private val letP: P[LET] = P(Index ~~ "let" ~ varName ~ "=" ~/ fallBackExpr ~~ Index).map {
     case (start, v, e, end) => LET(start, end, v, e, Seq.empty)
   }
   private val refP: P[REF] = P(varName).map { x =>
@@ -164,11 +165,14 @@ object Parser {
       case (start, e, cases, end) => MATCH(start, end, e, cases.toList)
     }
 
-  private val accessP
-    : P[Accessor] = P(("." ~/ varName).map(Getter) | ("(" ~/ functionCallArgs.map(Args) ~ ")")) | ("[" ~/ fallBackExpr.map(ListIndex) ~ "]")
+  private val accessP: P[(Int, Accessor, Int)] = P(
+    ("" ~ Index ~ "." ~/ varName.map(Getter) ~~ Index) |
+      (Index ~~ "(" ~/ functionCallArgs.map(Args) ~ ")" ~~ Index) |
+      (Index ~~ "[" ~/ fallBackExpr.map(ListIndex) ~ "]" ~~ Index)
+  )
 
   private val maybeAccessP: P[EXPR] =
-    P(Index ~~ extractableAtom ~~ Index ~ (Index ~~ NoCut(accessP) ~~ Index).rep)
+    P(Index ~~ extractableAtom ~~ Index ~~ NoCut(accessP).rep)
       .map {
         case (start, obj, objEnd, accessors) =>
           accessors.foldLeft(obj) {
@@ -198,8 +202,30 @@ object Parser {
           }
       }
 
-  private val block: P[EXPR] = P(Index ~~ letP ~ fallBackExpr ~~ Index).map {
-    case (start, l, e, end) => BLOCK(start, end, l, e)
+  private val block: P[EXPR] = {
+    // Hack to force parse of "\n". Otherwise it is treated as a separator
+    val newLineSep = {
+      val rawSep = '\n'
+      val white = WhitespaceApi.Wrapper {
+        import fastparse.all._
+        NoTrace(CharIn((Whitespaces - rawSep).toSeq).rep)
+      }
+
+      import white._
+      P("" ~ rawSep.toString.rep(min = 1))
+    }
+
+    P(
+      Index ~~
+        letP ~~
+        Index ~~ (("" ~ ";").!.map(_ => true) | newLineSep.!.map(_ => true) | "".!.map(_ => false)) ~~ Index ~
+        fallBackExpr ~~
+        Index)
+      .map {
+        case (start, l, sepStart, sep, sepEnd, e, end) =>
+          if (sep) BLOCK(start, end, l, e)
+          else BLOCK(start, end, l, INVALID(sepStart, sepEnd, "can't find a separator. Did you mean ';' or '\\n' ?", Some(e)))
+      }
   }
 
   private val baseAtom      = P(ifP | NoCut(matchP) | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP)
@@ -227,5 +253,5 @@ object Parser {
       } | acc
   }
 
-  def apply(str: String): core.Parsed[Seq[EXPR], Char, String] = P(Start ~ fallBackExpr.rep(min = 1) ~ End).parse(str)
+  def apply(str: String): core.Parsed[Seq[EXPR], Char, String] = P(Start ~ (!End ~ fallBackExpr).rep(min = 1)).parse(str)
 }

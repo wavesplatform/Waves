@@ -152,9 +152,11 @@ trait ScriptGen {
       } yield s"(if ($c) then $t else $f)"
     case BLOCK(_, _, let, body) =>
       for {
-        v <- toString(let.value)
-        b <- toString(body)
-      } yield s"let ${toString(let.name)} = $v $b\n"
+        v         <- toString(let.value)
+        b         <- toString(body)
+        isNewLine <- Arbitrary.arbBool.arbitrary
+        sep       <- if (isNewLine) Gen.const("\n") else withWhitespaces(";")
+      } yield s"let ${toString(let.name)} = $v$sep$b"
     case _ => ???
   }
 }
