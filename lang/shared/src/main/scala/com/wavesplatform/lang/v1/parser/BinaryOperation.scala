@@ -6,8 +6,8 @@ import fastparse.all._
 sealed abstract class BinaryOperation {
   val func: String
   val parser: P[Any] = P(func)
-  def expr(op1: EXPR)(op2: EXPR): EXPR = {
-    BINARY_OP(op1, this, op2)
+  def expr(start: Int, end: Int, op1: EXPR, op2: EXPR): EXPR = {
+    BINARY_OP(start, end, op1, this, op2)
   }
 }
 
@@ -55,15 +55,15 @@ object BinaryOperation {
   case object LE_OP extends BinaryOperation {
     val func            = ">="
     override val parser = P("<=")
-    override def expr(op1: EXPR)(op2: EXPR): EXPR = {
-      BINARY_OP(op2, LE_OP, op1)
+    override def expr(start: Int, end: Int, op1: EXPR, op2: EXPR): EXPR = {
+      BINARY_OP(start, end, op2, LE_OP, op1)
     }
   }
   case object LT_OP extends BinaryOperation {
     val func            = ">"
     override val parser = P("<")
-    override def expr(op1: EXPR)(op2: EXPR): EXPR = {
-      BINARY_OP(op2, LT_OP, op1)
+    override def expr(start: Int, end: Int, op1: EXPR, op2: EXPR): EXPR = {
+      BINARY_OP(start, end, op2, LT_OP, op1)
     }
   }
 

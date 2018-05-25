@@ -79,8 +79,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("equals some lang structure") {
-    eval[Boolean]("let x = (-7763390488025868909>-1171895536391400041) let v = false (v&&true)") shouldBe Right(false)
-    eval[Boolean]("let mshUmcl = (if(true) then true else true) true || mshUmcl") shouldBe Right(true)
+    eval[Boolean]("let x = (-7763390488025868909>-1171895536391400041); let v = false; (v&&true)") shouldBe Right(false)
+    eval[Boolean]("let mshUmcl = (if(true) then true else true); true || mshUmcl") shouldBe Right(true)
     eval[Long]("""if(((1+-1)==-1)) then 1 else (1+1)""") shouldBe Right(2)
     eval[Boolean]("""((((if(true) then 1 else 1)==2)||((if(true)
                     |then true else true)&&(true||true)))||(if(((1>1)||(-1>=-1)))
@@ -94,7 +94,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         str         <- toString(expr)
       } yield (str, res)) {
         case (str, res) =>
-          eval[Long](str) shouldBe Right(res)
+          withClue(str) {
+            eval[Long](str) shouldBe Right(res)
+          }
     })
 
     forAll(for {
@@ -102,7 +104,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       str         <- toString(expr)
     } yield (str, res)) {
       case (str, res) =>
-        eval[Boolean](str) shouldBe Right(res)
+        withClue(str) {
+          eval[Boolean](str) shouldBe Right(res)
+        }
     }
   }
 
