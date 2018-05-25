@@ -300,8 +300,9 @@ class MinerImpl(allChannels: ChannelGroup,
         _            <- checkAge(height, blockchainUpdater.lastBlockTimestamp.get)
         _            <- checkScript(account)
         balanceAndTs <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, lastBlock, account)
-        (balance, ts) = balanceAndTs
-        offset        = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
+        (balance, ts)    = balanceAndTs
+        calculatedOffset = ts - timeService.correctedTime()
+        offset           = Math.max(calculatedOffset, minerSettings.minimalBlockGenerationOffset.toMillis).millis
       } yield (offset, balance)
     } match {
       case Right((offset, balance)) =>
@@ -366,12 +367,6 @@ object Miner {
     override def collectNextBlockGenerationTimes: List[(Address, Long)] = List.empty
 
     override val state = MinerDebugInfo.Disabled
-  }
-
-  def calcOffset(timeService: Time, calculatedTimestamp: Long, minimalBlockGenerationOffset: FiniteDuration): FiniteDuration = {
-    val calculatedGenerationTimestamp = (Math.ceil(calculatedTimestamp / 1000.0) * 1000).toLong
-    val calculatedOffset              = calculatedGenerationTimestamp - timeService.correctedTime()
-    Math.max(minimalBlockGenerationOffset.toMillis, calculatedOffset).millis
   }
 
   sealed trait MicroblockMiningResult

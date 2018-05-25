@@ -44,17 +44,18 @@ class PoSSelector(blockchain: Blockchain, settings: BlockchainSettings) {
 
   def validateBlockDelay(height: Int, block: Block, parent: Block, effectiveBalance: Long): Either[ValidationError, Unit] = {
     getValidBlockDelay(height, block.signerData.generator.publicKey, parent.consensusData.baseTarget, effectiveBalance)
-      .map(_ + parent.timestamp < block.timestamp)
-      .ensure(GenericError(s"Block time ${block.timestamp} less than expected"))(identity)
+      .map(_ + parent.timestamp)
+      .ensureOr(mvt => GenericError(s"Block timestamp ${block.timestamp} less than min valid timestamp $mvt"))(ts => ts <= block.timestamp)
       .map(_ => ())
   }
 
   def validateGeneratorSignature(height: Int, block: Block): Either[ValidationError, Unit] = {
+    val blockGS = block.consensusData.generationSignature.arr
     blockchain.lastBlock
       .map(b => generatorSignature(b.consensusData.generationSignature.arr, block.signerData.generator.publicKey))
-      .toRight(GenericError("No blocks in blockchain T.T"))
-      .ensure(GenericError("Generation signatures doesnot match"))(_ sameElements block.consensusData.generationSignature.arr)
+      .ensureOr(vgs => GenericError(s"Generation signatures does not match: Expected = $vgs; Found = $blockGS"))(_ sameElements blockGS)
       .map(_ => ())
+      .toRight(GenericError("No blocks in blockchain"))
   }
 
   def validateBaseTarget(height: Int, block: Block, parent: Block, grandParent: Option[Block]): Either[ValidationError, Unit] = {
