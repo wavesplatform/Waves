@@ -13,12 +13,19 @@ import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
+import cats.implicits._
 
 import scala.util.{Left, Right}
 
 package object appender extends ScorexLogging {
 
   private val MaxTimeDrift: Long = 100 // millis
+
+  // Invalid blocks, that are already in blockchain
+  private val exceptions = List(
+    812608 -> ByteStr.decodeBase58("2GNCYVy7k3kEPXzz12saMtRDeXFKr8cymVsG8Yxx3sZZ75eHj9csfXnGHuuJe7XawbcwjKdifUrV1uMq4ZNCWPf1").get,
+    813207 -> ByteStr.decodeBase58("5uZoDnRKeWZV9Thu2nvJVZ5dBvPB7k2gvpzFD618FMXCbBVBMN2rRyvKBZBhAGnGdgeh2LXEeSr9bJqruJxngsE7").get
+  )
 
   private[appender] def processAndBlacklistOnFailure[A, B](
       ch: Channel,
@@ -96,11 +103,20 @@ package object appender extends ScorexLogging {
       _                <- validateTransactionSorting(height, block, settings.blockchainSettings.functionalitySettings)
       _                <- pos.validateBaseTarget(height, block, parent, grandParent)
       _                <- pos.validateGeneratorSignature(height, block)
-      _                <- pos.validateBlockDelay(height, block, parent, effectiveBalance)
+      _                <- pos.validateBlockDelay(height, block, parent, effectiveBalance).orElse(checkExceptions(height, block))
     } yield ()
   }.left.map {
     case GenericError(x) => GenericError(s"Block $block is invalid: $x")
     case x               => x
+  }
+
+  private def checkExceptions(height: Int, block: Block): Either[ValidationError, Unit] = {
+    Either
+      .cond(
+        exceptions.contains((height, block.uniqueId)),
+        (),
+        GenericError(s"Block time ${block.timestamp} less than expected")
+      )
   }
 
   private def validateBlockVersion(height: Int, block: Block, fs: FunctionalitySettings): Either[ValidationError, Unit] = {

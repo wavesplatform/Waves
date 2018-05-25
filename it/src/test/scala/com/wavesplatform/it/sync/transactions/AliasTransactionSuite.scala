@@ -4,15 +4,11 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import org.scalatest.prop.TableDrivenPropertyChecks
+import com.wavesplatform.it.sync._
 
 import scala.util.Random
 
 class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
-
-  private val transferFee    = 1.waves
-  private val leasingFee     = 0.001.waves
-  private val transferAmount = 1.waves
-
   test("Able to send money to an alias") {
     val alias            = randomAlias()
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
@@ -22,9 +18,9 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
     val aliasFull = fullAliasByAddress(firstAddress, alias)
 
-    val transferId = sender.transfer(firstAddress, aliasFull, transferAmount, transferFee).id
+    val transferId = sender.transfer(firstAddress, aliasFull, transferAmount, fee).id
     nodes.waitForHeightAriseAndTxPresent(transferId)
-    notMiner.assertBalances(firstAddress, balance1 - transferFee - aliasFee, eff1 - transferFee - aliasFee)
+    notMiner.assertBalances(firstAddress, balance1 - fee - aliasFee, eff1 - fee - aliasFee)
   }
 
   test("Not able to create same aliases to same address") {
@@ -33,7 +29,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val aliasFee         = calcAliasFee(firstAddress, alias)
     notMiner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
 
-    assertBadRequest(sender.createAlias(firstAddress, alias, transferFee))
+    assertBadRequest(sender.createAlias(firstAddress, alias, fee))
     notMiner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
   }
 
@@ -42,7 +38,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val aliasFee         = calcAliasFee(firstAddress, alias)
-    assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, transferFee), "already in the state")
+    assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, fee), "already in the state")
     notMiner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
   }
 
@@ -88,7 +84,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
   forAll(invalid_aliases_names) { (alias: String, message: String) =>
     test(s"Not able to create alias named $alias") {
-      assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, transferFee), message)
+      assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, fee), message)
     }
   }
 
@@ -101,27 +97,28 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val aliasFee  = calcAliasFee(thirdAddress, thirdAddressAlias)
     val aliasFull = fullAliasByAddress(thirdAddress, thirdAddressAlias)
     //lease maximum value, to pass next thirdAddress
-    val leasingAmount = balance1 - leasingFee - 0.5.waves
+    val leasingAmount = balance1 - fee - 0.5.waves
 
-    val leasingTx = sender.lease(firstAddress, aliasFull, leasingAmount, leasingFee).id
+    val leasingTx = sender.lease(firstAddress, aliasFull, leasingAmount, fee).id
     nodes.waitForHeightAriseAndTxPresent(leasingTx)
 
-    notMiner.assertBalances(firstAddress, balance1 - leasingFee, eff1 - leasingAmount - leasingFee)
+    notMiner.assertBalances(firstAddress, balance1 - fee, eff1 - leasingAmount - fee)
     notMiner.assertBalances(thirdAddress, balance3 - aliasFee, eff3 - aliasFee + leasingAmount)
 
   }
 
   //previous test should not be commented to run this one
   test("Not able to create alias when insufficient funds") {
-    val alias = randomAlias()
-    assertBadRequestAndMessage(sender.createAlias(firstAddress, alias, transferFee), "State check failed. Reason: negative effective balance")
+    val balance = notMiner.accountBalances(firstAddress)._1
+    val alias   = randomAlias()
+    assertBadRequestAndMessage(sender.createAlias(firstAddress, alias, balance + fee), "State check failed. Reason: negative waves balance")
   }
 
   private def calcAliasFee(address: String, alias: String): Long = {
     if (!sender.aliasByAddress(address).exists(_.endsWith(alias))) {
-      val aliasId = sender.createAlias(address, alias, transferFee).id
+      val aliasId = sender.createAlias(address, alias, fee).id
       nodes.waitForHeightAriseAndTxPresent(aliasId)
-      transferFee
+      fee
     } else 0
   }
 

@@ -23,11 +23,12 @@ class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matche
          |  else false
          |
       """.stripMargin
-    val untyped         = Parser(scriptText).get.value
-    val transferAllowed = CompilerV1(dummyTypeCheckerContext, untyped).explicitGet()
+    val untyped = Parser(scriptText).get.value
+    assert(untyped.size == 1)
+    val transferAllowed = CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()
 
     forAll(preconditionsTransferAndLease(transferAllowed)) {
-      case ((genesis, script, lease, transfer)) =>
+      case (genesis, script, lease, transfer) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(totalDiffEi =>
           totalDiffEi should produce("TransactionNotAllowedByScript"))

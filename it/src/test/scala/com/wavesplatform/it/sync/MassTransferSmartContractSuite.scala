@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
@@ -23,20 +22,20 @@ Scenario:
 every month a foundation makes payments from two MassTransactions(type == 11):
 1) 80% to users
 2) 10% as tax and 10% to bank go after 30sec of payment from step 1)
+
+TODO: AFTER NODE-745 fix change to:
+let txToGovComplete = isDefined(mTx) && ((tx.timestamp > (extract(mTx).timestamp) + 30000)) && sigVerify(extract(mTx).bodyBytes,extract(mTx).proofs[0],accountPK)
  */
 
 class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val fourthAddress: String = sender.createAddress()
-  private val transferAmount: Long  = 1.waves
-  private val fee: Long             = 0.001.waves
-  private val massTransferFee       = 0.004.waves + 0.0005.waves * 4
 
   test("airdrop emulation via MassTransfer") {
     val scriptText = {
       val untyped = Parser(s"""
         let commonAmount = (tx.transfers[0].amount + tx.transfers[1].amount)
-        let totalAmountToUsers = commonAmount == 800000000
-        let totalAmountToGov = commonAmount == 200000000
+        let totalAmountToUsers = commonAmount == 8000000000
+        let totalAmountToGov = commonAmount == 2000000000
         let massTransferType = ((tx.type == 11) && (size(tx.transfers) == 2))
 
         let accountPK = base58'${ByteStr(sender.publicKey.publicKey)}'
@@ -47,11 +46,13 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
         let mTx = getTransactionById(tx.proofs[1])
 
         let txToGov = (massTransferType && totalAmountToGov)
+
         let txToGovComplete = if(isDefined(mTx)) then (((tx.timestamp > (extract(mTx).timestamp) + 30000)) && sigVerify(extract(mTx).bodyBytes,extract(mTx).proofs[0],accountPK)) else false
 
         (txToGovComplete && accSig && txToGov)  || (txToUsers && accSig)
         """.stripMargin).get.value
-      CompilerV1(dummyTypeCheckerContext, untyped).explicitGet()
+      assert(untyped.size == 1)
+      CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()
     }
 
     // set script
@@ -80,7 +81,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     val unsigned =
       MassTransferTransaction
-        .create(1, None, sender.publicKey, transfers, currTime, massTransferFee, Array.emptyByteArray, Proofs.empty)
+        .create(1, None, sender.publicKey, transfers, currTime, calcMassTransferFee(2) + smartFee, Array.emptyByteArray, Proofs.empty)
         .explicitGet()
 
     val accountSig = ByteStr(crypto.sign(sender.privateKey, unsigned.bodyBytes()))
@@ -97,7 +98,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     val unsignedToGov =
       MassTransferTransaction
-        .create(1, None, sender.publicKey, transfersToGov, currTime, massTransferFee, Array.emptyByteArray, Proofs.empty)
+        .create(1, None, sender.publicKey, transfersToGov, currTime, calcMassTransferFee(2) + smartFee, Array.emptyByteArray, Proofs.empty)
         .explicitGet()
     val accountSigToGovFail = ByteStr(crypto.sign(sender.privateKey, unsignedToGov.bodyBytes()))
     val signedToGovFail     = unsignedToGov.copy(proofs = Proofs(Seq(accountSigToGovFail)))
@@ -106,11 +107,18 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
                                 "Reason: TransactionNotAllowedByScript")
 
     //make correct transfer to government after some time
-    sender.waitForHeight(heightBefore + 5, 1.minutes)
+    sender.waitForHeight(heightBefore + 10, 2.minutes)
 
     val unsignedToGovSecond =
       MassTransferTransaction
-        .create(1, None, sender.publicKey, transfersToGov, System.currentTimeMillis(), massTransferFee, Array.emptyByteArray, Proofs.empty)
+        .create(1,
+                None,
+                sender.publicKey,
+                transfersToGov,
+                System.currentTimeMillis(),
+                calcMassTransferFee(2) + smartFee,
+                Array.emptyByteArray,
+                Proofs.empty)
         .explicitGet()
 
     val accountSigToGov = ByteStr(crypto.sign(sender.privateKey, unsignedToGovSecond.bodyBytes()))

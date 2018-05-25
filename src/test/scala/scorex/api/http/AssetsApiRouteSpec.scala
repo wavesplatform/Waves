@@ -92,8 +92,8 @@ class AssetsApiRouteSpec
       (response \ "decimals").as[Int] shouldBe sillyAssetTx.decimals
       (response \ "reissuable").as[Boolean] shouldBe sillyAssetTx.reissuable
       (response \ "quantity").as[BigDecimal] shouldBe sillyAssetDesc.totalVolume
-      (response \ "script").as[String] shouldBe sillyAssetDesc.script.fold("")(_.bytes().base58)
-      (response \ "scriptText").as[String] shouldBe ""
+      (response \ "script").asOpt[String] shouldBe None
+      (response \ "scriptText").asOpt[String] shouldBe None
       (response \ "complexity").as[Long] shouldBe 0L
       (response \ "extraFee").as[Long] shouldBe 0
       (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty

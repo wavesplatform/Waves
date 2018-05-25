@@ -70,7 +70,7 @@ object NxtPoSCalculator extends PoSCalculator {
     }
   }
 
-  def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long = ((hit * 1000) / (BigInt(bt) * balance)).toLong
+  def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long = Math.ceil((BigDecimal(hit) / (BigDecimal(bt) * balance)).toDouble).toLong * 1000
 
 }
 

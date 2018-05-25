@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
@@ -16,8 +15,8 @@ import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.transfer._
 
-import scala.util.Random
 import scala.concurrent.duration._
+import scala.util.Random
 
 /*
 Scenario:
@@ -26,7 +25,6 @@ Scenario:
 3. Alice funds swapBC1t
 4. Alice can't take money from swapBC1
 5.1 Bob takes funds because he knows secret hash OR 5.2 Wait height and Alice takes funds back
-
  */
 
 class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -34,9 +32,6 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
   private val BobBC1: String   = sender.createAddress()
   private val AliceBC1: String = sender.createAddress()
   private val swapBC1: String  = sender.createAddress()
-
-  private val transferAmount: Long = 1.waves
-  private val fee: Long            = 0.001.waves
 
   private val AlicesPK = PrivateKeyAccount.fromSeed(sender.seed(AliceBC1)).right.get
 
@@ -55,8 +50,8 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val beforeHeight = sender.height
     val sc1 = {
       val untyped = Parser(s"""
-    let Bob = extract(addressFromString("${BobBC1}")).bytes
-    let Alice = extract(addressFromString("${AliceBC1}")).bytes
+    let Bob = extract(addressFromString("$BobBC1")).bytes
+    let Alice = extract(addressFromString("$AliceBC1")).bytes
     let AlicesPK = base58'${ByteStr(AlicesPK.publicKey)}'
 
     let txRecipient = addressFromRecipient(tx.recipient).bytes
@@ -67,7 +62,8 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
 
     txToBob || backToAliceAfterHeight
       """.stripMargin).get.value
-      CompilerV1(dummyTypeCheckerContext, untyped).explicitGet()
+      assert(untyped.size == 1)
+      CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()
     }
 
     val pkSwapBC1 = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).right.get
@@ -100,10 +96,10 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           assetId = None,
           sender = PrivateKeyAccount.fromSeed(sender.seed(AliceBC1)).right.get,
           recipient = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).right.get,
-          amount = transferAmount + fee + 0.004.waves,
+          amount = transferAmount + fee + smartFee,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = fee + 0.004.waves,
+          feeAmount = fee + smartFee,
           attachment = Array.emptyByteArray
         )
         .explicitGet()
@@ -125,7 +121,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = fee + 0.004.waves,
+          feeAmount = fee + smartFee,
           attachment = Array.emptyByteArray
         )
         .explicitGet()
@@ -147,7 +143,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
             amount = transferAmount,
             timestamp = System.currentTimeMillis(),
             feeAssetId = None,
-            feeAmount = fee + 0.004.waves,
+            feeAmount = fee + smartFee,
             attachment = Array.emptyByteArray,
             proofs = Proofs.empty
           )
@@ -168,7 +164,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = fee + 0.004.waves,
+          feeAmount = fee + smartFee,
           attachment = Array.emptyByteArray
         )
         .explicitGet()
