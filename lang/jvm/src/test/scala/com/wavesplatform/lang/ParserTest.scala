@@ -66,7 +66,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     case x: IF               => x.copy(start = 0, end = 0, cond = cleanOffsets(x.cond), ifTrue = cleanOffsets(x.ifTrue), ifFalse = cleanOffsets(x.ifFalse))
     case x: BLOCK            => x.copy(start = 0, end = 0, let = cleanOffsets(x.let), body = cleanOffsets(x.body))
     case x: FUNCTION_CALL    => x.copy(start = 0, end = 0, name = cleanOffsets(x.name), args = x.args.map(cleanOffsets(_)))
-    case _                   => ???
+    case _                   => throw new NotImplementedError(s"toString for ${expr.getClass.getSimpleName}")
   }
 
   private def genElementCheck(gen: Gen[EXPR]): Unit = {

@@ -264,7 +264,7 @@ object CompilerV1 {
 
   private def handlePart[T](part: PART[T])(f: T => EXPR): SetTypeResult[EXPR] = part match {
     case PART.VALID(_, _, x)               => EitherT.pure(f(x))
-    case PART.INVALID(start, end, message) => EitherT.leftT[Coeval, EXPR](s"$message at $start-$end")
+    case PART.INVALID(start, end, message) => EitherT.leftT[Coeval, EXPR](s"$message in $start-$end")
   }
 
   def apply(c: CompilerContext, expr: Expressions.EXPR): CompilationResult[EXPR] = {

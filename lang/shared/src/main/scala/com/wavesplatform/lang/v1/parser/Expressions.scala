@@ -39,7 +39,7 @@ object Expressions {
   implicit class PartOps[T](val self: PART[T]) extends AnyVal {
     def toEither: Either[String, T] = self match {
       case Expressions.PART.VALID(_, _, x)         => Right(x)
-      case Expressions.PART.INVALID(_, _, message) => Left(message)
+      case Expressions.PART.INVALID(s, e, message) => Left(s"Can't compile an invalid instruction: $message in $s-$e")
     }
   }
 

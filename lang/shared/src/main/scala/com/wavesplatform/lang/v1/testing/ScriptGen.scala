@@ -157,7 +157,12 @@ trait ScriptGen {
         isNewLine <- Arbitrary.arbBool.arbitrary
         sep       <- if (isNewLine) Gen.const("\n") else withWhitespaces(";")
       } yield s"let ${toString(let.name)} = $v$sep$b"
-    case _ => ???
+
+    case FUNCTION_CALL(_, _, PART.VALID(_, _, "-"), List(CONST_LONG(_, _, v))) if v >= 0 =>
+      s"-($v)"
+    case FUNCTION_CALL(_, _, op, List(e)) => toString(e).map(e => s"${toString(op)}$e")
+
+    case x => throw new NotImplementedError(s"toString for ${x.getClass.getSimpleName}")
   }
 }
 

@@ -30,7 +30,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
     v.tpe shouldBe LONG
   }
 
-  treeTypeTest(s"unitOnNone(NONE)")(
+  treeTypeTest("unitOnNone(NONE)")(
     ctx = typeCheckerContext,
     expr = Expressions.FUNCTION_CALL(0,
                                      0,
@@ -90,7 +90,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
     expectedResult = Right(FUNCTION_CALL(multiplierFunction.header, List(CONST_LONG(1), CONST_LONG(2)), LONG))
   )
 
-  treeTypeTest(s"idOptionLong(NONE)")(
+  treeTypeTest("idOptionLong(NONE)")(
     ctx = typeCheckerContext,
     expr = Expressions.FUNCTION_CALL(
       0,
@@ -101,7 +101,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
     expectedResult = Right(FUNCTION_CALL(idOptionLong.header, List(REF("None", OPTION(NOTHING))), UNIT))
   )
 
-  treeTypeTest(s"idOptionLong(SOME(NONE))")(
+  treeTypeTest("idOptionLong(SOME(NONE))")(
     ctx = typeCheckerContext,
     expr = Expressions.FUNCTION_CALL(
       0,
@@ -112,7 +112,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
           0,
           0,
           Expressions.PART.VALID(0, 0, "Some"),
-          List(Expressions.REF(0, 0, Expressions.PART.INVALID(0, 0, "None")))
+          List(Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "None")))
         )
       )
     ),
@@ -120,7 +120,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
       Right(FUNCTION_CALL(idOptionLong.header, List(FUNCTION_CALL(some.header, List(REF("None", OPTION(NOTHING))), OPTION(OPTION(NOTHING)))), UNIT))
   )
 
-  treeTypeTest(s"idOptionLong(SOME(CONST_LONG(3)))")(
+  treeTypeTest("idOptionLong(SOME(CONST_LONG(3)))")(
     ctx = typeCheckerContext,
     expr = Expressions.FUNCTION_CALL(
       0,
@@ -149,40 +149,40 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
     expr = Expressions.BLOCK(
       0,
       0,
-      Expressions.LET(0, 0, Expressions.PART.INVALID(0, 0, "it is invalid!"), Expressions.TRUE(0, 0), Seq.empty),
+      Expressions.LET(0, 0, Expressions.PART.INVALID(0, 1, "can't parse"), Expressions.TRUE(0, 0), Seq.empty),
       Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "x"))
     ),
-    expectedResult = Left("Typecheck failed: it is invalid!: ###")
+    expectedResult = Left("Typecheck failed: Can't compile an invalid instruction: can't parse in 0-1")
   )
 
   treeTypeTest("Invalid GETTER")(
     ctx = typeCheckerContext,
-    expr = Expressions.GETTER(0, 0, Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "x")), Expressions.PART.INVALID(0, 0, "it is invalid!")),
-    expectedResult = Left("Typecheck failed: it is invalid!: ###")
+    expr = Expressions.GETTER(0, 0, Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "x")), Expressions.PART.INVALID(2, 3, "can't parse")),
+    expectedResult = Left("Typecheck failed: Can't compile an invalid instruction: can't parse in 2-3")
   )
 
   treeTypeTest("Invalid BYTEVECTOR")(
     ctx = typeCheckerContext,
-    expr = Expressions.CONST_BYTEVECTOR(0, 0, Expressions.PART.INVALID(0, 0, "it is invalid!")),
-    expectedResult = Left("Typecheck failed: it is invalid!: foo")
+    expr = Expressions.CONST_BYTEVECTOR(0, 0, Expressions.PART.INVALID(0, 0, "can't parse")),
+    expectedResult = Left("Typecheck failed: can't parse in 0-0")
   )
 
   treeTypeTest("Invalid STRING")(
     ctx = typeCheckerContext,
-    expr = Expressions.CONST_STRING(0, 0, Expressions.PART.INVALID(0, 0, "it is invalid!")),
-    expectedResult = Left("Typecheck failed: it is invalid!: \\u1")
+    expr = Expressions.CONST_STRING(0, 0, Expressions.PART.INVALID(0, 0, "can't parse")),
+    expectedResult = Left("Typecheck failed: can't parse in 0-0")
   )
 
   treeTypeTest("Invalid REF")(
     ctx = typeCheckerContext,
-    expr = Expressions.REF(0, 0, Expressions.PART.INVALID(0, 0, "it is invalid!")),
-    expectedResult = Left("Typecheck failed: it is invalid!: ###")
+    expr = Expressions.REF(0, 0, Expressions.PART.INVALID(0, 0, "can't parse")),
+    expectedResult = Left("Typecheck failed: Can't compile an invalid instruction: can't parse in 0-0")
   )
 
   treeTypeTest("Invalid FUNCTION_CALL")(
     ctx = typeCheckerContext,
-    expr = Expressions.FUNCTION_CALL(0, 0, Expressions.PART.INVALID(0, 0, "it is invalid!"), List.empty),
-    expectedResult = Left("Typecheck failed: it is invalid!: ###")
+    expr = Expressions.FUNCTION_CALL(0, 0, Expressions.PART.INVALID(0, 0, "can't parse"), List.empty),
+    expectedResult = Left("Typecheck failed: Can't compile an invalid instruction: can't parse in 0-0")
   )
 
   treeTypeTest("INVALID")(
