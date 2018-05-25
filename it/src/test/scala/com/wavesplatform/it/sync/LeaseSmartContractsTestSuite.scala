@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import org.scalatest.CancelAfterFailure
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
@@ -23,9 +22,6 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
   private val acc0 = pkFromAddress(firstAddress)
   private val acc1 = pkFromAddress(secondAddress)
   private val acc2 = pkFromAddress(thirdAddress)
-
-  private val transferAmount: Long = 1.waves
-  private val fee: Long            = 0.001.waves
 
   test("set contract, make leasing and cancel leasing") {
     val (balance1, eff1) = notMiner.accountBalances(acc0.address)

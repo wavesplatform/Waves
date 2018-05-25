@@ -15,7 +15,6 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Random, Try}
 
 class DataTransactionSuite extends BaseTransactionSuite {
-  private val fee = 100000
 
   test("sender's waves balance is decreased by fee.") {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
@@ -36,13 +35,12 @@ class DataTransactionSuite extends BaseTransactionSuite {
     notMiner.assertBalances(firstAddress, balance1, eff1)
 
     val leaseAmount = 1.waves
-    val leaseFee    = 100000
-    val leaseId     = sender.lease(firstAddress, secondAddress, leaseAmount, leaseFee).id
+    val leaseId     = sender.lease(firstAddress, secondAddress, leaseAmount, fee).id
     nodes.waitForHeightAriseAndTxPresent(leaseId)
 
     assertBadRequestAndResponse(sender.putData(firstAddress, data, balance1 - leaseAmount), "negative effective balance")
     nodes.waitForHeightArise()
-    notMiner.assertBalances(firstAddress, balance1 - leaseFee, eff1 - leaseAmount - leaseFee)
+    notMiner.assertBalances(firstAddress, balance1 - fee, eff1 - leaseAmount - fee)
   }
 
   test("invalid transaction should not be in UTX or blockchain") {
@@ -278,12 +276,5 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val tooManyEntriesData = List.tabulate(MaxEntryCount + 1)(n => LongDataEntry("key", 88))
     assertBadRequestAndResponse(sender.putData(firstAddress, tooManyEntriesData, calcDataFee(tooManyEntriesData)), message)
     nodes.waitForHeightArise()
-  }
-
-  private def calcDataFee(data: List[DataEntry[_]]): Long = {
-    val dataSize = data.map(_.toBytes.length).sum + 128
-    if (dataSize > 1024) {
-      fee * (dataSize / 1024 + 1)
-    } else fee
   }
 }
