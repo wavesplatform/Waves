@@ -476,6 +476,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     }
   }
 
+  override def hasScript(address: Address): Boolean = ngState.fold(blockchain.hasScript(address)) { ng =>
+    ng.bestLiquidDiff.scripts.contains(address)
+  }
+
   override def accountData(acc: Address): AccountDataInfo = ngState.fold(blockchain.accountData(acc)) { ng =>
     val fromInner = blockchain.accountData(acc)
     val fromDiff  = ng.bestLiquidDiff.accountData.get(acc).orEmpty

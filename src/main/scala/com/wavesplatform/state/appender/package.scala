@@ -62,7 +62,7 @@ package object appender extends ScorexLogging {
         BlockAppendError(s"Block $block at height ${blockchainUpdater.height + 1} is not valid w.r.t. checkpoint", block)
       )
       _ <- Either.cond(
-        blockchainUpdater.accountScript(block.sender).isEmpty,
+        !blockchainUpdater.hasScript(block.sender),
         (),
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )

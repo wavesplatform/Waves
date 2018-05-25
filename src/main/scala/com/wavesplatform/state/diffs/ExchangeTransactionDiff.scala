@@ -23,10 +23,10 @@ object ExchangeTransactionDiff {
       _ <- Either.cond(!assets.exists(blockchain.assetDescription(_).flatMap(_.script).isDefined),
                        (),
                        GenericError(s"Smart assets can't participate in ExchangeTransactions"))
-      _ <- Either.cond(blockchain.accountScript(buyer).isEmpty,
+      _ <- Either.cond(!blockchain.hasScript(buyer),
                        (),
                        GenericError(s"Buyer $buyer can't participate in ExchangeTransaction because it has assigned Script"))
-      _ <- Either.cond(blockchain.accountScript(seller).isEmpty,
+      _ <- Either.cond(!blockchain.hasScript(seller),
                        (),
                        GenericError(s"Seller $seller can't participate in ExchangeTransaction because it has assigned Script"))
       t                     <- enoughVolume(tx, blockchain)
