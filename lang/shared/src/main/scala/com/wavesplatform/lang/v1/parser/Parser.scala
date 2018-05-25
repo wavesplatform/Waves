@@ -184,7 +184,7 @@ object Parser {
                     case REF(_, _, functionName) => FUNCTION_CALL(start, accessEnd, functionName, args.toList)
                     case _                       => FUNCTION_CALL(start, accessEnd, PART.INVALID(start, objEnd, s"'$obj' is not a function name"), args.toList)
                   }
-                case ListIndex(index) => FUNCTION_CALL(start, objEnd, PART.VALID(start, accessStart, "getElement"), List(e, index))
+                case ListIndex(index) => FUNCTION_CALL(start, accessEnd, PART.VALID(accessStart, accessEnd, "getElement"), List(e, index))
               }
           }
       }

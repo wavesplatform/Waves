@@ -470,6 +470,59 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     )
   }
 
+  property("multiple getters") {
+    parseOne("x.y.z") shouldBe GETTER(0, 5, GETTER(0, 3, REF(0, 1, PART.VALID(0, 1, "x")), PART.VALID(2, 3, "y")), PART.VALID(4, 5, "z"))
+  }
+
+  property("array accessor") {
+    parseOne("x[0]") shouldBe FUNCTION_CALL(0, 4, PART.VALID(1, 4, "getElement"), List(REF(0, 1, PART.VALID(0, 1, "x")), CONST_LONG(2, 3, 0)))
+  }
+
+  property("multiple array accessors") {
+    parseOne("x[0][1]") shouldBe FUNCTION_CALL(
+      0,
+      7,
+      PART.VALID(4, 7, "getElement"),
+      List(
+        FUNCTION_CALL(0, 4, PART.VALID(1, 4, "getElement"), List(REF(0, 1, PART.VALID(0, 1, "x")), CONST_LONG(2, 3, 0))),
+        CONST_LONG(5, 6, 1)
+      )
+    )
+  }
+
+  property("accessor and getter") {
+    parseOne("x[0].y") shouldBe GETTER(
+      0,
+      6,
+      FUNCTION_CALL(0, 4, PART.VALID(1, 4, "getElement"), List(REF(0, 1, PART.VALID(0, 1, "x")), CONST_LONG(2, 3, 0))),
+      PART.VALID(5, 6, "y")
+    )
+  }
+
+  property("getter and accessor") {
+    parseOne("x.y[0]") shouldBe FUNCTION_CALL(
+      0,
+      6,
+      PART.VALID(3, 6, "getElement"),
+      List(
+        GETTER(0, 3, REF(0, 1, PART.VALID(0, 1, "x")), PART.VALID(2, 3, "y")),
+        CONST_LONG(4, 5, 0)
+      )
+    )
+  }
+
+  property("function call and accessor") {
+    parseOne("x(y)[0]") shouldBe FUNCTION_CALL(
+      0,
+      7,
+      PART.VALID(4, 7, "getElement"),
+      List(
+        FUNCTION_CALL(0, 4, PART.VALID(0, 1, "x"), List(REF(2, 3, PART.VALID(2, 3, "y")))),
+        CONST_LONG(5, 6, 0)
+      )
+    )
+  }
+
   property("braces in block's let and body") {
     val text =
       """let a = (foo)
@@ -481,8 +534,6 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       REF(15, 18, PART.VALID(15, 18, "bar"))
     )
   }
-
-  // @TODO multiple getters test
 
   property("crypto functions: sha256") {
     val text        = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD=test message"
