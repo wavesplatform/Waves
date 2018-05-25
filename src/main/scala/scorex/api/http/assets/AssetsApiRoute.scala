@@ -273,8 +273,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           "decimals"       -> JsNumber(tx.decimals.toInt),
           "reissuable"     -> JsBoolean(description.reissuable),
           "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
-          "script"         -> JsString(description.script.fold("")(_.bytes().base58)),
-          "scriptText"     -> JsString(description.script.fold("")(_.text)),
+          "script"         -> Json.toJson(description.script.map(_.bytes().base58)),
+          "scriptText"     -> Json.toJson(description.script.map(_.text)),
           "complexity"     -> JsNumber(complexity),
           "extraFee"       -> JsNumber(if (description.script.isEmpty) 0 else CommonValidation.ScriptExtraFee),
           "minSponsoredAssetFee" -> (description.sponsorship match {
