@@ -77,6 +77,9 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       miner.assertBalances(sponsor.address, sponsorWavesBalance - 2.waves - minWavesFee)
       miner.assertAssetBalance(alice.address, sponsorAssetId, sponsorAssetTotal / 2)
 
+      val assetInfo = alice.assetsBalance(alice.address).balances.filter(_.assetId == sponsorAssetId).head
+      assetInfo.minSponsoredAssetFee shouldBe Some(Token)
+      assetInfo.sponsorBalance shouldBe Some(sponsor.accountBalances(sponsor.address)._2)
     }
 
     "invalid tx if fee less then minimal" in {
@@ -120,6 +123,11 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
     "cancel sponsorship, cannot pay fees in non sponsored assets " in {
       val cancelSponsorshipTxId = sponsor.cancelSponsorship(sponsor.address, sponsorAssetId, fee = 1.waves).id
       nodes.waitForHeightAriseAndTxPresent(cancelSponsorshipTxId)
+
+      val assetInfo = alice.assetsBalance(alice.address).balances.filter(_.assetId == sponsorAssetId).head
+      assetInfo.minSponsoredAssetFee shouldBe None
+      assetInfo.sponsorBalance shouldBe None
+
       assert(!cancelSponsorshipTxId.isEmpty)
       assertSponsorship(sponsorAssetId, 0L)
       assertBadRequestAndResponse(

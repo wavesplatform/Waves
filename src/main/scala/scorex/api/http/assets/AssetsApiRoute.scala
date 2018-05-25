@@ -237,15 +237,25 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           (for {
             (assetId, balance) <- blockchain.portfolio(acc).assets
             if balance > 0
-            assetInfo        <- blockchain.assetDescription(assetId)
-            issueTransaction <- blockchain.transactionInfo(assetId)
+            assetInfo                                 <- blockchain.assetDescription(assetId)
+            (_, (issueTransaction: IssueTransaction)) <- blockchain.transactionInfo(assetId)
+            sponsorBalance = if (assetInfo.sponsorship != 0) {
+              Some(blockchain.portfolio(issueTransaction.sender).balance)
+            } else {
+              None
+            }
           } yield
             Json.obj(
-              "assetId"          -> assetId.base58,
-              "balance"          -> balance,
-              "reissuable"       -> assetInfo.reissuable,
+              "assetId"    -> assetId.base58,
+              "balance"    -> balance,
+              "reissuable" -> assetInfo.reissuable,
+              "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
+                case 0           => JsNull
+                case sponsorship => JsNumber(sponsorship)
+              }),
+              "sponsorBalance"   -> sponsorBalance,
               "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
-              "issueTransaction" -> issueTransaction._2.json()
+              "issueTransaction" -> issueTransaction.json()
             )).toSeq)
       )
     }).left.map(ApiError.fromValidationError)
