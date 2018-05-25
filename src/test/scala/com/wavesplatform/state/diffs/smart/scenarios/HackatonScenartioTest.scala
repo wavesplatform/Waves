@@ -55,8 +55,13 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
                     |
         """.stripMargin
 
-      untypedScript = Parser(assetScript).get.value
-      typedScript   = ScriptV1(CompilerV1(dummyTypeCheckerContext, untypedScript).explicitGet()).explicitGet()
+      untypedScript = {
+        val r = Parser(assetScript).get.value
+        assert(r.size == 1)
+        r.head
+      }
+
+      typedScript = ScriptV1(CompilerV1(dummyTypeCheckerContext, untypedScript).explicitGet()).explicitGet()
 
       issueTransaction = IssueTransactionV2
         .selfSigned(
@@ -106,7 +111,8 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
 
   private def eval[T: TypeInfo](code: String) = {
     val untyped = Parser(code).get.value
-    val typed   = CompilerV1(dummyTypeCheckerContext, untyped)
+    assert(untyped.size == 1)
+    val typed = CompilerV1(dummyTypeCheckerContext, untyped.head)
     typed.flatMap(EvaluatorV1[T](dummyContext, _))
   }
 

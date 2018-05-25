@@ -30,28 +30,25 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       bin             <- binaryEntryGen(500, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key)
       str             <- stringEntryGen(500, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key && e.key != bin.key)
       dataTransaction <- dataTransactionGenP(oracle, List(long, bool, bin, str))
-      allFieldsRequiredScript        = s"""
-                    |
-                    | let oracle = extract(addressFromString("${oracle.address}"))
-                    | let long = extract(getLong(oracle,"${long.key}")) == ${long.value}
-                    | let bool = extract(getBoolean(oracle,"${bool.key}")) == ${bool.value}
-                    | let bin = extract(getByteArray(oracle,"${bin.key}")) == base58'${bin.value.base58}'
-                    | let str = extract(getString(oracle,"${str.key}")) == "${str.value}"
-                    | long && bool && bin && str
-                    |
-                    |
-                    |
-        """.stripMargin
-      untypedAllFieldsRequiredScript = Parser(allFieldsRequiredScript).get.value
-      typedAllFieldsRequiredScript   = CompilerV1(dummyTypeCheckerContext, untypedAllFieldsRequiredScript).explicitGet()
-      setScript            <- selfSignedSetScriptTransactionGenP(master, ScriptV1(typedAllFieldsRequiredScript).explicitGet())
+      allFieldsRequiredScript = s"""let oracle = extract(addressFromString("${oracle.address}"))
+                                   |let long = extract(getLong(oracle,"${long.key}")) == ${long.value}
+                                   |let bool = extract(getBoolean(oracle,"${bool.key}")) == ${bool.value}
+                                   |let bin = extract(getByteArray(oracle,"${bin.key}")) == base58'${bin.value.base58}'
+                                   |let str = extract(getString(oracle,"${str.key}")) == "${str.value}"
+                                   |long && bool && bin && str""".stripMargin
+      setScript <- {
+        val untypedAllFieldsRequiredScript = Parser(allFieldsRequiredScript).get.value
+        assert(untypedAllFieldsRequiredScript.size == 1)
+        val typedAllFieldsRequiredScript = CompilerV1(dummyTypeCheckerContext, untypedAllFieldsRequiredScript.head).explicitGet()
+        selfSignedSetScriptTransactionGenP(master, ScriptV1(typedAllFieldsRequiredScript).explicitGet())
+      }
       transferFromScripted <- versionedTransferGenP(master, alice, Proofs.empty)
 
     } yield (genesis, genesis2, setScript, dataTransaction, transferFromScripted)
 
   property("simple oracle value required to transfer") {
     forAll(preconditions) {
-      case ((genesis, genesis2, setScript, dataTransaction, transferFromScripted)) =>
+      case (genesis, genesis2, setScript, dataTransaction, transferFromScripted) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, genesis2, setScript, dataTransaction))),
                            TestBlock.create(Seq(transferFromScripted)),
                            smartEnabledFS) { case _ => () }

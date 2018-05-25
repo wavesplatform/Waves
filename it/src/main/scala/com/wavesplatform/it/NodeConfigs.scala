@@ -10,7 +10,9 @@ object NodeConfigs {
   private val NonConflictingNodes = Set(1, 4, 6, 7)
 
   val Default: Seq[Config] = ConfigFactory.parseResources("nodes.conf").getConfigList("nodes").asScala
-  val NotMiner             = Default.last
+  val Miners: Seq[Config]  = Default.init
+  val NotMiner: Config     = Default.last
+  def randomMiner: Config  = Random.shuffle(Miners).head
 
   def newBuilder: Builder = Builder(Default, Default.size, Seq.empty)
 

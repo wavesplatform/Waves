@@ -125,8 +125,8 @@ case class DebugApiRoute(ws: WavesSettings,
       )
     ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json portfolio")))
-  def portfolios: Route = path("portfolios" / Segment) { (rawAddress) =>
-    (get & withAuth & parameter('considerUnspent.as[Boolean])) { (considerUnspent) =>
+  def portfolios: Route = path("portfolios" / Segment) { rawAddress =>
+    (get & withAuth & parameter('considerUnspent.as[Boolean])) { considerUnspent =>
       Address.fromString(rawAddress) match {
         case Left(_) => complete(InvalidAddress)
         case Right(address) =>

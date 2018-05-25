@@ -40,6 +40,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
   private val service               = monix.execution.Scheduler.singleThread("last-block-info-publisher")
   private val internalLastBlockInfo = ConcurrentSubject.publish[LastBlockInfo](service)
 
+  override def isLastBlockId(id: ByteStr): Boolean = ngState.exists(_.contains(id)) || lastBlock.exists(_.uniqueId == id)
+
   override val lastBlockInfo: Observable[LastBlockInfo] = internalLastBlockInfo.cache(1)
   lastBlockInfo.subscribe()(monix.execution.Scheduler.global) // Start caching
 
@@ -494,14 +496,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
         } yield address -> f(address)
       }
 
-  override def assetDistribution(height: Int, assetId: AssetId): Map[Address, Long] = ngState.fold(blockchain.assetDistribution(height, assetId)) {
-    ng =>
-      val innerDistribution = blockchain.assetDistribution(height, assetId)
-      if (height < this.height) innerDistribution
-      else {
-        innerDistribution ++ changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
-      }
-  }
+  override def assetDistribution(assetId: AssetId): Map[Address, Long] =
+    blockchain.assetDistribution(assetId) ++ changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
 
   override def wavesDistribution(height: Int): Map[Address, Long] = ngState.fold(blockchain.wavesDistribution(height)) { ng =>
     val innerDistribution = blockchain.wavesDistribution(height)

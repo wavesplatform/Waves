@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import org.scalatest.CancelAfterFailure
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
@@ -23,9 +22,6 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
   private val acc0 = pkFromAddress(firstAddress)
   private val acc1 = pkFromAddress(secondAddress)
   private val acc2 = pkFromAddress(thirdAddress)
-
-  private val transferAmount: Long = 1.waves
-  private val fee: Long            = 0.001.waves
 
   test("set contract, make leasing and cancel leasing") {
     val (balance1, eff1) = notMiner.accountBalances(acc0.address)
@@ -47,7 +43,8 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
 
         leaseTx || leaseCancelTx
         """.stripMargin).get.value
-      CompilerV1(dummyTypeCheckerContext, sc).explicitGet()
+      assert(sc.size == 1)
+      CompilerV1(dummyTypeCheckerContext, sc.head).explicitGet()
     }
 
     val script = ScriptV1(scriptText).explicitGet()
@@ -77,9 +74,8 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
     val sigLeasingA = ByteStr(crypto.sign(acc0, unsignedLeasing.bodyBytes()))
     val sigLeasingC = ByteStr(crypto.sign(acc2, unsignedLeasing.bodyBytes()))
 
-    /* issue https://wavesplatform.atlassian.net/browse/NODE-725 */
     val signedLeasing =
-      unsignedLeasing.copy(proofs = Proofs(Seq(sigLeasingA, ByteStr("0".getBytes()), sigLeasingC)))
+      unsignedLeasing.copy(proofs = Proofs(Seq(sigLeasingA, ByteStr.empty, sigLeasingC)))
 
     val leasingId =
       sender.signedBroadcast(signedLeasing.json() + ("type" -> JsNumber(LeaseTransactionV2.typeId.toInt))).id
@@ -105,9 +101,8 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
     val sigLeasingCancelA = ByteStr(crypto.sign(acc0, unsignedCancelLeasing.bodyBytes()))
     val sigLeasingCancelB = ByteStr(crypto.sign(acc1, unsignedCancelLeasing.bodyBytes()))
 
-    /* issue https://wavesplatform.atlassian.net/browse/NODE-725 */
     val signedLeasingCancel =
-      unsignedCancelLeasing.copy(proofs = Proofs(Seq(ByteStr("0".getBytes()), sigLeasingCancelA, sigLeasingCancelB)))
+      unsignedCancelLeasing.copy(proofs = Proofs(Seq(ByteStr.empty, sigLeasingCancelA, sigLeasingCancelB)))
 
     val leasingCancelId =
       sender.signedBroadcast(signedLeasingCancel.json() + ("type" -> JsNumber(LeaseCancelTransactionV2.typeId.toInt))).id

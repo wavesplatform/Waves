@@ -12,7 +12,7 @@ val versionSource = Def.task {
   // Please, update the fallback version every major and minor releases.
   // This version is used then building from sources without Git repository
   // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-  val FallbackVersion = (0, 11, 0)
+  val FallbackVersion = (0, 13, 0)
 
   val versionFile      = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
@@ -43,7 +43,7 @@ logBuffered := false
 
 inThisBuild(
   Seq(
-    scalaVersion := "2.12.4",
+    scalaVersion := "2.12.6",
     organization := "com.wavesplatform",
     crossPaths := false,
     scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds", "-language:implicitConversions", "-Ywarn-unused:-implicits", "-Xlint")
@@ -180,6 +180,8 @@ lazy val lang =
     .withoutSuffixFor(JVMPlatform)
     .settings(
       version := "0.0.1",
+      // the following line forces scala version across all dependencies
+      scalaModuleInfo ~= (_.map(_.withOverrideScalaVersion(true))),
       test in assembly := {},
       addCompilerPlugin(Dependencies.kindProjector),
       libraryDependencies ++=
