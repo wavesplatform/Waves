@@ -29,6 +29,7 @@ trait TransferTransaction extends ProvenTransaction {
       "recipient"  -> recipient.stringRepr,
       "assetId"    -> assetId.map(_.base58),
       "feeAssetId" -> feeAssetId.map(_.base58),
+      "feeAsset"   -> feeAssetId.map(_.base58), // legacy v0.11.1 compat
       "amount"     -> amount,
       "attachment" -> Base58.encode(attachment)
     ))

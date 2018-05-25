@@ -39,6 +39,7 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
                        "43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g"
                        ],
                        "version": 2,
+                       "assetId": "2ykNAo5JrvNCcL8PtCmc9pTcNtKUy2PjJkrFdRvTfUf4",
                        "name": "Gigacoin",
                        "quantity": 10000000000,
                        "reissuable": true,
@@ -66,7 +67,7 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
       .right
       .get
 
-    js shouldEqual tx.json()
+    tx.json() shouldEqual js
   }
 
 }

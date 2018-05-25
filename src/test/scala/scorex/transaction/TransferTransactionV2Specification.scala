@@ -65,6 +65,7 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
                        "recipient": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8",
                        "assetId": null,
                        "feeAssetId": null,
+                       "feeAsset": null,
                        "amount": 100000000,
                        "attachment": "4t2Xazb2SX"}
     """)
@@ -85,6 +86,6 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
       .right
       .get
 
-    js shouldEqual tx.json()
+    tx.json() shouldEqual js
   }
 }
