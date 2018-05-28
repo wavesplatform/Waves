@@ -292,10 +292,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
       val newKeys = (
         for {
           (key, value) <- addressData.data
-          kdh    = Keys.dataHistory(addressId, key)
-          isNew  = rw.get(kdh).isEmpty
-          _      = rw.put(Keys.data(height, addressId, key), Some(value))
-          _      = expiredKeys ++= updateHistory(rw, kdh, threshold, Keys.data(_, addressId, key))
+          kdh   = Keys.dataHistory(addressId, key)
+          isNew = rw.get(kdh).isEmpty
+          _     = rw.put(Keys.data(height, addressId, key), Some(value))
+          _     = expiredKeys ++= updateHistory(rw, kdh, threshold, Keys.data(_, addressId, key))
           if isNew
         } yield key
       ).toSeq
