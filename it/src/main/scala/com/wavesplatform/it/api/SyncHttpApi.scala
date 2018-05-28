@@ -52,6 +52,10 @@ object SyncHttpApi extends Assertions {
     def get(path: String): Response =
       Await.result(async(n).get(path), RequestAwaitTime)
 
+    def utx = Await.result(async(n).utx, RequestAwaitTime)
+
+    def utxSize = Await.result(async(n).utxSize, RequestAwaitTime)
+
     def seed(address: String): String =
       Await.result(async(n).seed(address), RequestAwaitTime)
 
@@ -162,8 +166,13 @@ object SyncHttpApi extends Assertions {
     def debugMinerInfo(): Seq[State] =
       Await.result(async(n).debugMinerInfo(), RequestAwaitTime)
 
+    def debugStateAt(height: Long): Map[String, Long] = Await.result(async(n).debugStateAt(height), RequestAwaitTime)
+
     def height: Int =
       Await.result(async(n).height, RequestAwaitTime)
+
+    def rollback(to: Int, returnToUTX: Boolean = true): Unit =
+      Await.result(async(n).rollback(to, returnToUTX), RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
