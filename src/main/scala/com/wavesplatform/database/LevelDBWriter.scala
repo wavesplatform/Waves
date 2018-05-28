@@ -110,8 +110,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
   override def accountData(address: Address): AccountDataInfo = readOnly { db =>
     val data = for {
       addressId <- addressIdCache.get(address).toSeq
-      key       <- db.get(Keys.dataKeyList(addressId))
-      value     <- accountData(address, key)
+      keyChunkCount = db.get(Keys.dataKeyChunkCount(addressId))
+      chunkNo <- Range(0, keyChunkCount)
+      key     <- db.get(Keys.dataKeyChunk(addressId, chunkNo))
+      value   <- accountData(address, key)
     } yield key -> value
     AccountDataInfo(data.toMap)
   }
@@ -287,10 +289,21 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
     }
 
     for ((addressId, addressData) <- data) {
-      rw.put(Keys.dataKeyList(addressId), rw.get(Keys.dataKeyList(addressId)) ++ addressData.data.keySet)
-      for ((key, value) <- addressData.data) {
-        rw.put(Keys.data(height, addressId, key), Some(value))
-        expiredKeys ++= updateHistory(rw, Keys.dataHistory(addressId, key), threshold, Keys.data(_, addressId, key))
+      val newKeys = (
+        for {
+          (key, value) <- addressData.data
+          kdh   = Keys.dataHistory(addressId, key)
+          isNew = rw.get(kdh).isEmpty
+          _     = rw.put(Keys.data(height, addressId, key), Some(value))
+          _     = expiredKeys ++= updateHistory(rw, kdh, threshold, Keys.data(_, addressId, key))
+          if isNew
+        } yield key
+      ).toSeq
+      if (newKeys.nonEmpty) {
+        val chunkCountKey = Keys.dataKeyChunkCount(addressId)
+        val chunkCount    = rw.get(chunkCountKey)
+        rw.put(Keys.dataKeyChunk(addressId, chunkCount), newKeys)
+        rw.put(chunkCountKey, chunkCount + 1)
       }
     }
 

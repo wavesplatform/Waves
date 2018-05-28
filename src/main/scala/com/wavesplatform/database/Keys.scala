@@ -96,18 +96,20 @@ object Keys {
   def approvedFeatures: Key[Map[Short, Int]]  = Key(Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
   def activatedFeatures: Key[Map[Short, Int]] = Key(Array[Byte](0, 30), readFeatureMap, writeFeatureMap)
 
-  def dataKeyList(addressId: BigInt) = Key[Set[String]](addr(31, addressId), readStrings(_).toSet, keys => writeStrings(keys.toSeq))
+  def dataKeyChunkCount(addressId: BigInt): Key[Int] = Key(addr(31, addressId), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
+  def dataKeyChunk(addressId: BigInt, chunkNo: Int): Key[Seq[String]] =
+    Key(addr(32, addressId) ++ Ints.toByteArray(chunkNo), readStrings, writeStrings)
 
-  def dataHistory(addressId: BigInt, key: String): Key[Seq[Int]] = historyKey(32, addressId.toByteArray ++ key.getBytes(UTF_8))
+  def dataHistory(addressId: BigInt, key: String): Key[Seq[Int]] = historyKey(33, addressId.toByteArray ++ key.getBytes(UTF_8))
   def data(height: Int, addressId: BigInt, key: String): Key[Option[DataEntry[_]]] =
-    Key.opt(hBytes(33, height, addressId.toByteArray ++ key.getBytes(UTF_8)), DataEntry.parseValue(key, _, 0)._1, _.valueBytes)
+    Key.opt(hBytes(34, height, addressId.toByteArray ++ key.getBytes(UTF_8)), DataEntry.parseValue(key, _, 0)._1, _.valueBytes)
 
-  def sponsorshipHistory(assetId: ByteStr): Key[Seq[Int]]               = historyKey(34, assetId.arr)
-  def sponsorship(height: Int, assetId: ByteStr): Key[SponsorshipValue] = Key(hBytes(35, height, assetId.arr), readSponsorship, writeSponsorship)
+  def sponsorshipHistory(assetId: ByteStr): Key[Seq[Int]]               = historyKey(35, assetId.arr)
+  def sponsorship(height: Int, assetId: ByteStr): Key[SponsorshipValue] = Key(hBytes(36, height, assetId.arr), readSponsorship, writeSponsorship)
 
-  val addressesForWavesSeqNr: Key[Int]                = intKey(36)
-  def addressesForWaves(seqNr: Int): Key[Seq[BigInt]] = Key(h(37, seqNr), readBigIntSeq, writeBigIntSeq)
+  val addressesForWavesSeqNr: Key[Int]                = intKey(37)
+  def addressesForWaves(seqNr: Int): Key[Seq[BigInt]] = Key(h(38, seqNr), readBigIntSeq, writeBigIntSeq)
 
-  def addressesForAssetSeqNr(assetId: ByteStr): Key[Int]                = intKey(38)
-  def addressesForAsset(assetId: ByteStr, seqNr: Int): Key[Seq[BigInt]] = Key(hBytes(39, seqNr, assetId.arr), readBigIntSeq, writeBigIntSeq)
+  def addressesForAssetSeqNr(assetId: ByteStr): Key[Int]                = intKey(39)
+  def addressesForAsset(assetId: ByteStr, seqNr: Int): Key[Seq[BigInt]] = Key(hBytes(40, seqNr, assetId.arr), readBigIntSeq, writeBigIntSeq)
 }
