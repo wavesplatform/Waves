@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1.testing
 
+import com.wavesplatform.lang.v1.parser.Parser.keywords
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions._
@@ -104,7 +105,7 @@ trait ScriptGen {
     } yield LET(0, 0, PART.VALID(0, 0, name), value, Seq.empty)
 
   def REFgen: Gen[EXPR] =
-    Gen.identifier.map(PART.VALID[String](0, 0, _)).map(REF(0, 0, _))
+    Gen.identifier.filter(!keywords(_)).map(PART.VALID[String](0, 0, _)).map(REF(0, 0, _))
 
   def BLOCKgen(gas: Int): Gen[EXPR] =
     for {
