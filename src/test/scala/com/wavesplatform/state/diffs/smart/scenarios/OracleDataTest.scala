@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
+import com.wavesplatform.lang.Global.MaxBase58Bytes
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
@@ -27,7 +28,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       genesis2 = GenesisTransaction.create(oracle, ENOUGH_AMT, ts).explicitGet()
       long            <- longEntryGen(dataAsciiKeyGen)
       bool            <- booleanEntryGen(dataAsciiKeyGen).filter(_.key != long.key)
-      bin             <- binaryEntryGen(500, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key)
+      bin             <- binaryEntryGen(MaxBase58Bytes, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key)
       str             <- stringEntryGen(500, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key && e.key != bin.key)
       dataTransaction <- dataTransactionGenP(oracle, List(long, bool, bin, str))
       allFieldsRequiredScript = s"""let oracle = extract(addressFromString("${oracle.address}"))
