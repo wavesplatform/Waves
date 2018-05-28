@@ -19,6 +19,7 @@ object Expressions {
 
   sealed trait EXPR                                                                   extends Positioned
   case class CONST_LONG(start: Int, end: Int, value: Long)                            extends EXPR
+  case class CONST_RAT(start: Int, end: Int, nom: Long, denom:Long)                   extends EXPR
   case class GETTER(start: Int, end: Int, ref: EXPR, field: PART[String])             extends EXPR
   case class CONST_BYTEVECTOR(start: Int, end: Int, value: PART[ByteVector])          extends EXPR
   case class CONST_STRING(start: Int, end: Int, value: PART[String])                  extends EXPR

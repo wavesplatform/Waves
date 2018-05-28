@@ -23,7 +23,9 @@ object BinaryOperation {
     LT_OP,
     LE_OP,
     SUM_OP,
-    SUB_OP
+    SUB_OP,
+    DIV_OP,
+    MUL_OP
   )
 
   def opsToFunctions(op: BinaryOperation): String = op.func
@@ -45,6 +47,12 @@ object BinaryOperation {
   }
   case object GT_OP extends BinaryOperation {
     val func = ">"
+  }
+  case object MUL_OP extends BinaryOperation {
+    val func = "*"
+  }
+  case object DIV_OP extends BinaryOperation {
+    val func = "/"
   }
   case object SUM_OP extends BinaryOperation {
     val func = "+"
