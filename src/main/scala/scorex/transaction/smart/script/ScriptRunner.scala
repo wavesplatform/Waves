@@ -20,7 +20,7 @@ object ScriptRunner {
           Coeval.evalOnce(height),
           blockchain
         )
-        EvaluatorV1[A](ctx, expr).left.map(_._3)
+        EvaluatorV1[A](ctx, expr).left.map(_._2)
 
       case _ => "Unsupported script version".asLeft[A]
     }

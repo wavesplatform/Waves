@@ -183,6 +183,7 @@ lazy val lang =
       // the following line forces scala version across all dependencies
       scalaModuleInfo ~= (_.map(_.withOverrideScalaVersion(true))),
       test in assembly := {},
+      addCompilerPlugin(Dependencies.kindProjector),
       libraryDependencies ++=
         Dependencies.cats ++
           Dependencies.scalacheck ++
@@ -211,6 +212,7 @@ lazy val langJVM = lang.jvm
 lazy val node = project
   .in(file("."))
   .settings(
+    addCompilerPlugin(Dependencies.kindProjector),
     libraryDependencies ++=
       Dependencies.network ++
         Dependencies.db ++
