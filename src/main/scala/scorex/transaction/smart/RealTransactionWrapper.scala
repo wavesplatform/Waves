@@ -60,7 +60,7 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
     case g: PaymentTransaction      => Right(g.amount)
     case g: IssueTransaction        => Right(g.quantity)
     case g: ReissueTransaction      => Right(g.quantity)
-    case g: BurnTransaction         => Right(g.amount)
+    case g: BurnTransaction         => Right(g.quantity)
     case g: LeaseTransaction        => Right(g.amount)
     case g: TransferTransaction     => Right(g.amount)
     case g: ExchangeTransaction     => Right(g.amount)

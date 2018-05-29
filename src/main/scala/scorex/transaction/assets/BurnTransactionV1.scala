@@ -10,7 +10,7 @@ import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
-case class BurnTransactionV1 private (sender: PublicKeyAccount, assetId: ByteStr, amount: Long, fee: Long, timestamp: Long, signature: ByteStr)
+case class BurnTransactionV1 private (sender: PublicKeyAccount, assetId: ByteStr, quantity: Long, fee: Long, timestamp: Long, signature: ByteStr)
     extends BurnTransaction
     with SignedTransaction
     with FastHashId {

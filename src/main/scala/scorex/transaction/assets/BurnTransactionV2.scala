@@ -14,7 +14,7 @@ final case class BurnTransactionV2 private (version: Byte,
                                             chainId: Byte,
                                             sender: PublicKeyAccount,
                                             assetId: ByteStr,
-                                            amount: Long,
+                                            quantity: Long,
                                             fee: Long,
                                             timestamp: Long,
                                             proofs: Proofs)
