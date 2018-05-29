@@ -109,7 +109,9 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
 
   override def hasScript(address: Address): Boolean = readOnly { db =>
     addressIdCache.get(address).fold[Boolean](false) { addressId =>
-      hasInHistory(db, addressId, Keys.addressScriptHistory, Keys.addressScript)
+      Option(scriptCache.asMap().get(address))
+        .map(_.isDefined)
+        .getOrElse(hasInHistory(db, addressId, Keys.addressScriptHistory, Keys.addressScript))
     }
   }
 
