@@ -197,7 +197,7 @@ lazy val lang =
     )
     .jsSettings(
       scalaJSLinkerConfig ~= {
-        _.withModuleKind(ModuleKind.CommonJSModule)
+        _.withModuleKind(ModuleKind.NoModule)
       }
     )
     .jvmSettings(
