@@ -36,6 +36,7 @@ object Serde {
   implicit def dFalse           = d.bind[FALSE.type](7)
   implicit def dGetter          = d.bind[GETTER](8)
   implicit def dFunctionCall    = d.bind[FUNCTION_CALL](9)
+  implicit def dTypeList        = d.bind[TYPELIST](10)
 
   implicit def tD            = Discriminated[TYPE, Int](uint8)
   implicit def tDNothing     = tD.bind[NOTHING.type](0)

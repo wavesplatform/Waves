@@ -13,8 +13,10 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, PART}
-import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
+//import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, PART}
+//import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
+import com.wavesplatform.lang.v1.parser.Expressions.PART
+import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import monix.eval.Coeval
 
 import scala.util.Try
@@ -58,6 +60,7 @@ object CompilerV1 {
     case ifExpr: Expressions.IF          => compileIf(ctx, ifExpr)
     case ref: Expressions.REF            => compileRef(ctx, ref)
     case m: Expressions.MATCH            => compileMatch(ctx, m)
+    case Expressions.TYPELIST(start, end, tl)  => EitherT.pure(TYPELIST(tl.map(CONST_STRING)))
     case Expressions.BINARY_OP(start, end, a, op, b) =>
       op match {
         case AND_OP => compileIf(ctx, Expressions.IF(start, end, a, b, Expressions.FALSE(start, end)))
@@ -204,28 +207,20 @@ object CompilerV1 {
         s"Matching not exhaustive: possibleTypes are ${possibleExpressionTypes.l}, while matched are $matchingTypes"
       )
       refTmp = Expressions.REF(1, 1, PART.VALID(1, 1, rootMatchTmpArg))
-      ifBasedCases: Expressions.EXPR = cases.foldRight(Expressions.REF(1, 1, PART.VALID(1, 1, PureContext.errRef)): Expressions.EXPR) {
+      ifBasedCases: Expressions.EXPR =
+       cases.foldRight(Expressions.REF(1, 1, PART.VALID(1, 1, PureContext.errRef)): Expressions.EXPR) {
         case (mc, further) =>
-          val typeSwarma = mc.types.foldLeft(Expressions.FALSE(1, 1): Expressions.EXPR) {
-            case (other, matchType) =>
-              BINARY_OP(
-                1,
-                1,
-                Expressions.FUNCTION_CALL(1,
-                                          1,
-                                          PART.VALID(1, 1, PureContext._isInstanceOf.name),
-                                          List(refTmp, Expressions.CONST_STRING(1, 1, matchType))),
-                BinaryOperation.OR_OP,
-                other
-              )
-          }
           val blockWithNewVar = mc.newVarName match {
             case Some(newVal) => Expressions.BLOCK(1, 1, Expressions.LET(1, 1, newVal, refTmp, mc.types), mc.expr)
             case None         => mc.expr
           }
-          if (typeSwarma.isInstanceOf[Expressions.FALSE])
-            blockWithNewVar
-          else Expressions.IF(1, 1, typeSwarma, blockWithNewVar, further)
+           mc.types.toList match {
+             case List() => blockWithNewVar
+             case types =>
+                val cond =
+                 Expressions.FUNCTION_CALL(1, 1, PART.VALID(1, 1, PureContext._isInstanceOf.name), List(refTmp, Expressions.TYPELIST(1, 1, types.map(_.asInstanceOf[PART.VALID[String]].v))))
+                Expressions.IF(1, 1, cond, blockWithNewVar, further) 
+           }
       }
       compiled <- compileBlock(updatedCtx,
                                Expressions.BLOCK(1, 1, Expressions.LET(1, 1, PART.VALID(1, 1, rootMatchTmpArg), expr, Seq.empty), ifBasedCases))

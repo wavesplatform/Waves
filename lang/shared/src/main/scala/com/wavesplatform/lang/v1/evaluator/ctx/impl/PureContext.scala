@@ -30,8 +30,8 @@ object PureContext {
     case _        => ???
   }
 
-  val _isInstanceOf: PredefFunction = PredefFunction("_isInstanceOf", 1, BOOLEAN, List(("obj", TYPEPARAM('T')), ("of", STRING))) {
-    case (p: CaseObj) :: (s: String) :: Nil => Right(p.caseType.name == s)
+  val _isInstanceOf: PredefFunction = PredefFunction("_isInstanceOf", 1, BOOLEAN, List(("obj", TYPEPARAM('T')), ("of", LIST(STRING)))) {
+    case (p: CaseObj) :: (s: List[String]) :: Nil => Right(s.contains(p.caseType.name))
     case _                                  => ???
   }
 

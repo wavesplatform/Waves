@@ -35,6 +35,8 @@ object Expressions {
   case class MATCH_CASE(start: Int, end: Int, newVarName: Option[PART[String]], types: Seq[PART[String]], expr: EXPR)
   case class MATCH(start: Int, end: Int, expr: EXPR, cases: Seq[MATCH_CASE]) extends EXPR
 
+  case class TYPELIST(start: Int, end: Int, types: List[String]) extends EXPR
+
   case class INVALID(start: Int, end: Int, message: String, next: Option[EXPR] = None) extends EXPR
   implicit class PartOps[T](val self: PART[T]) extends AnyVal {
     def toEither: Either[String, T] = self match {

@@ -100,6 +100,7 @@ object EvaluatorV1 extends ExprEvaluator {
       case IF(cond, t1, t2, tpe)          => evalIF(cond, t1, t2, tpe)
       case GETTER(expr, field, _)         => evalGetter(expr, field)
       case FUNCTION_CALL(header, args, _) => evalFunctionCall(header, args)
+      case TYPELIST(types)                => liftValue(types.map(_.s))
     }).flatMap(v => {
       val ti = typeInfo[T]
       if (t.tpe.typeInfo <:< ti) liftValue(v.asInstanceOf[T])

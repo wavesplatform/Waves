@@ -60,5 +60,6 @@ object Terms {
   case object TRUE                                                                             extends EXPR(BOOLEAN)
   case object FALSE                                                                            extends EXPR(BOOLEAN)
   case class FUNCTION_CALL(function: FunctionHeader, args: List[EXPR], override val tpe: TYPE) extends EXPR(tpe)
+  case class TYPELIST(types: List[CONST_STRING])                                               extends EXPR(LIST(STRING))
 
 }
