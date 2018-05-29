@@ -87,11 +87,11 @@ object CompilerV1 {
               val x1 = union.l
                 .map(k => ctx.predefTypes(k.name))
                 .map(predefType => predefType.fields.find(_._1 == field))
-              if (x1.contains(None)) Left(s"Undefined field $field on $union")
+              if (x1.contains(None)) Left(s"Undefined field `$field` on $union")
               else
                 TypeInferrer.findCommonType(x1.map(_.get._2)) match {
                   case Some(cT) => Right(GETTER(expr = subExpr, field = field, tpe = cT))
-                  case None     => Left(s"Undefined common type for field $field on $union")
+                  case None     => Left(s"Undefined common type for field `$field` on $union")
                 }
 
             case x => Left(s"Can't access to '$field' of a primitive type $x")

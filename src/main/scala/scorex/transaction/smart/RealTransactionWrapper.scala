@@ -84,7 +84,7 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
 
   override def timestamp: Long = tx.timestamp
 
-  override def aliasText: Either[String, String] = tx match {
+  override def alias: Either[String, String] = tx match {
     case g: CreateAliasTransaction => Right(g.alias.name)
     case _                         => Left("Transaction doesn't contain alias text")
   }
@@ -137,5 +137,10 @@ case class RealTransactionWrapper(tx: Transaction) extends com.wavesplatform.lan
   override def minSponsoredAssetFee: Either[String, Option[Long]] = tx match {
     case g: SponsorFeeTransaction => Right(g.minSponsoredAssetFee)
     case _                        => Left("Transaction doesn't contain minSponsoredAssetFee")
+  }
+
+  override def leaseId: Either[String, ByteVector] = tx match {
+    case g: LeaseCancelTransaction => Right(ByteVector(g.leaseId.arr))
+    case _                         => Left("Transaction doesn't contain leaseId")
   }
 }

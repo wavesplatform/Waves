@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 import cats.data.EitherT
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.traits.{DataType, Environment, Transaction}
+import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient, Transaction}
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 
@@ -44,15 +44,6 @@ object WavesContext {
     ) ++ common ++ proven
   )
 
-  private val leaseTransactionType = PredefCaseType(
-    "LeaseTransaction",
-    List(
-      "amount"    -> LONG,
-      "recipient" -> addressOrAliasType,
-//      "assetId"   -> BYTEVECTOR,
-    ) ++ common ++ proven
-  )
-
   private val issueTransactionType = PredefCaseType(
     "IssueTransaction",
     List(
@@ -71,6 +62,35 @@ object WavesContext {
     ) ++ common ++ proven
   )
 
+  private val burnTransactionType = PredefCaseType(
+    "BurnTransaction",
+    List(
+      "amount" -> LONG,
+    ) ++ common ++ proven
+  )
+  private val leaseTransactionType = PredefCaseType(
+    "LeaseTransaction",
+    List(
+      "amount"    -> LONG,
+      "recipient" -> addressOrAliasType,
+      "assetId"   -> BYTEVECTOR,
+    ) ++ common ++ proven
+  )
+
+  private val leaseCancelTransactionType = PredefCaseType(
+    "LeaseCancelTransaction",
+    List(
+      "leaseId" -> BYTEVECTOR,
+    ) ++ common ++ proven
+  )
+
+  private val createAliasTransactionType = PredefCaseType(
+    "CreateAliasTransaction",
+    List(
+      "alias" -> STRING,
+    ) ++ common ++ proven
+  )
+
   private val massTransferTransactionType = PredefCaseType(
     "MassTransferTransaction",
     List(
@@ -82,7 +102,15 @@ object WavesContext {
   )
 
   private val transactionTypes =
-    List(transferTransactionType, leaseTransactionType, issueTransactionType, reissueTransactionType, massTransferTransactionType)
+    List(
+      transferTransactionType,
+      issueTransactionType,
+      reissueTransactionType,
+      burnTransactionType,
+      leaseTransactionType,
+      leaseCancelTransactionType,
+      massTransferTransactionType
+    )
 
   private val transactionType = UNION(transactionTypes.map(_.typeRef))
 
@@ -104,21 +132,17 @@ object WavesContext {
     }
   )
 
+  def mapRecipient(r: Recipient) =
+    "recipient" -> Val(addressOrAliasType)(r match {
+      case Recipient.Alias(name)    => CaseObj(aliasType.typeRef, Map("name"    -> Val(STRING)(name)))
+      case Recipient.Address(bytes) => CaseObj(addressType.typeRef, Map("bytes" -> Val(BYTEVECTOR)(bytes)))
+    })
+
   private def transactionObject(tx: Transaction): CaseObj =
     tx.transactionType match {
-      case 4 =>
-        CaseObj(
-          transferTransactionType.typeRef,
-          Map(
-            "amount"     -> Val(LONG)(tx.amount.right.get),
-            "feeAssetId" -> Val(optionByteVector)(tx.feeAssetId.asInstanceOf[optionByteVector.Underlying]),
-//            "recipient" -> Val(addressOrAliasType)(EitherT.fromEither(tx.recipient.map(bv => Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(bv))))))),
-            "transferAssetId" -> Val(optionByteVector)(tx.transferAssetId.right.get.asInstanceOf[optionByteVector.Underlying]),
-            "attachment"      -> Val(BYTEVECTOR)(tx.attachment.right.get)
-          ) ++ commonTxPart(tx) ++ provenTxPart(tx)
-        )
-
-      case 5 =>
+      case 1 => ???
+      case 2 => ???
+      case 3 =>
         CaseObj(
           issueTransactionType.typeRef,
           Map(
@@ -128,7 +152,20 @@ object WavesContext {
             "reissuable"       -> Val(BOOLEAN)(tx.reissuable.right.get),
           ) ++ commonTxPart(tx) ++ provenTxPart(tx)
         )
-      case 6 =>
+
+      case 4 =>
+        CaseObj(
+          transferTransactionType.typeRef,
+          Map(
+            "amount"     -> Val(LONG)(tx.amount.right.get),
+            "feeAssetId" -> Val(optionByteVector)(tx.feeAssetId.asInstanceOf[optionByteVector.Underlying]),
+            mapRecipient(tx.recipient.right.get),
+            "transferAssetId" -> Val(optionByteVector)(tx.transferAssetId.right.get.asInstanceOf[optionByteVector.Underlying]),
+            "attachment"      -> Val(BYTEVECTOR)(tx.attachment.right.get)
+          ) ++ commonTxPart(tx) ++ provenTxPart(tx)
+        )
+
+      case 5 =>
         CaseObj(
           reissueTransactionType.typeRef,
           Map(
@@ -136,14 +173,36 @@ object WavesContext {
             "reissuable" -> Val(BOOLEAN)(tx.reissuable.right.get),
           ) ++ commonTxPart(tx) ++ provenTxPart(tx)
         )
-
+      case 6 =>
+        CaseObj(
+          burnTransactionType.typeRef,
+          Map(
+            "amount" -> Val(LONG)(tx.amount.right.get),
+          ) ++ commonTxPart(tx) ++ provenTxPart(tx)
+        )
+      case 7 => ??? // exchange
       case 8 =>
         CaseObj(
           leaseTransactionType.typeRef,
           Map(
-            //            "recipient" -> Val(addressOrAliasType)(EitherT.fromEither(tx.recipient.map(bv => Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(bv))))))),
+            mapRecipient(tx.recipient.right.get),
             "amount" -> Val(LONG)(tx.amount.right.get),
-//            "assetId" -> Val(BYTEVECTOR)(tx.assetId.right.get),
+          ) ++ commonTxPart(tx) ++ provenTxPart(tx)
+        )
+
+      case 9 =>
+        CaseObj(
+          leaseCancelTransactionType.typeRef,
+          Map(
+            "leaseId" -> Val(BYTEVECTOR)(tx.leaseId.right.get),
+          ) ++ commonTxPart(tx) ++ provenTxPart(tx)
+        )
+
+      case 10 =>
+        CaseObj(
+          createAliasTransactionType.typeRef,
+          Map(
+            "alias" -> Val(STRING)(tx.alias.right.get),
           ) ++ commonTxPart(tx) ++ provenTxPart(tx)
         )
 
@@ -151,13 +210,17 @@ object WavesContext {
         CaseObj(
           massTransferTransactionType.typeRef,
           Map(
-//            "transfers" -> Val(listTransfers)(tx.transfers.right.get.map(bv => Obj(Map("bytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(bv))))))),
-            "amount"          -> Val(LONG)(tx.amount.right.get),
-            "assetId"         -> Val(BYTEVECTOR)(tx.assetId.right.get),
+            "transfers" -> Val(listTransfers)(
+              tx.transfers.right.get
+                .map(bv => CaseObj(transfer.typeRef, Map(mapRecipient(bv.recipient), "amount" -> Val(LONG)(bv.amount))))
+                .asInstanceOf[listTransfers.Underlying]),
             "transferAssetId" -> Val(optionByteVector)(tx.transferAssetId.right.get.asInstanceOf[optionByteVector.Underlying]),
             "attachment"      -> Val(BYTEVECTOR)(tx.attachment.right.get)
           ) ++ commonTxPart(tx) ++ provenTxPart(tx)
         )
+      case 12 => ??? // data
+      case 13 => ??? // setscript
+      case 14 => ??? // sponsorship
     }
 
   def build(env: Environment): EvaluationContext = {
@@ -234,7 +297,7 @@ object WavesContext {
       }
 
     EvaluationContext.build(
-      caseTypes = Seq(addressType, aliasType) ++ transactionTypes,
+      caseTypes = Seq(addressType, aliasType, transfer) ++ transactionTypes,
       letDefs = Map(("height", LazyVal(LONG)(EitherT(heightCoeval))), ("tx", LazyVal(transactionType)(EitherT(txCoeval)))),
       functions = Seq(
         txByIdF,

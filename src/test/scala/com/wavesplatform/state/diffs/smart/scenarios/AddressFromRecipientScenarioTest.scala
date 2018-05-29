@@ -41,11 +41,12 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
 
     val Parsed.Success(expr, _) = Parser("""
         | match tx {
-        |  case t : TransferTransaction =>  addressFromRecipient(tx.recipient)
+        |  case t : TransferTransaction =>  addressFromRecipient(t.recipient)
         |  case other => throw
         |  }
         |  """.stripMargin)
     assert(expr.size == 1)
+
     val Right(typedExpr) = CompilerV1(CompilerContext.fromEvaluationContext(context), expr.head)
     EvaluatorV1[CaseObj](context, typedExpr).left.map(_._2)
   }
@@ -55,13 +56,9 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
       case (gen, aliasTx, transferViaAddress, transferViaAlias) =>
         assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(aliasTx))) {
           case (_, state) =>
-            val Right(addressBytes: ByteVector) =
-              evalScript(transferViaAddress, state).explicitGet().fields("bytes").value
-
+            val addressBytes: ByteVector = evalScript(transferViaAddress, state).explicitGet().fields("bytes").value
             addressBytes.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
-
-            val Right(resolvedAddressBytes: ByteVector) =
-              evalScript(transferViaAlias, state).explicitGet().fields("bytes").value
+            val resolvedAddressBytes: ByteVector = evalScript(transferViaAlias, state).explicitGet().fields("bytes").value
 
             resolvedAddressBytes.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
         }
