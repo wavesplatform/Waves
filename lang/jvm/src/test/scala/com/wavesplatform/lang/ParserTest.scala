@@ -830,4 +830,10 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       )
     )
   }
+
+  property("rational number") {
+    parseOne("2/3") shouldBe CONST_RAT(0, 3, 2, 3)
+    parseOne("4/6") shouldBe CONST_RAT(0, 3, 2, 3)
+    parseOne("2.5") shouldBe CONST_RAT(0, 3, 5, 2)
+  }
 }
