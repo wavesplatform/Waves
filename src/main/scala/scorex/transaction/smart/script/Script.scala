@@ -5,7 +5,7 @@ import com.wavesplatform.lang.Versioned
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.utils.Base64
 import scorex.transaction.ValidationError.ScriptParseError
 
 trait Script extends Versioned {
@@ -25,9 +25,9 @@ object Script {
 
   val checksumLength = 4
 
-  def fromBase58String(str: String): Either[ScriptParseError, Script] =
+  def fromBase64String(str: String): Either[ScriptParseError, Script] =
     for {
-      bytes  <- Base58.decode(str).toEither.left.map(ex => ScriptParseError(s"Unable to decode base58: ${ex.getMessage}"))
+      bytes  <- Base64.decode(str).toEither.left.map(ex => ScriptParseError(s"Unable to decode base64: ${ex.getMessage}"))
       script <- ScriptReader.fromBytes(bytes)
     } yield script
 

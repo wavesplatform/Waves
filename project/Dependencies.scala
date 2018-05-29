@@ -5,20 +5,20 @@ object Dependencies {
 
   def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.4.19"
 
-  def swaggerModule(module: String) = "io.swagger" % s"swagger-$module" % "1.5.16"
+  def swaggerModule(module: String) = ("io.swagger" % s"swagger-$module" % "1.5.16").exclude("com.google.guava", "guava")
 
   def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.0.9"
 
-  def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.22.Final"
+  def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.24.Final"
 
   def kamonModule(v: String)(module: String) = "io.kamon" %% s"kamon-$module" % v
 
-  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "2.1.0-alpha22"
+  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "2.4.7"
 
   lazy val network = Seq("handler", "buffer", "codec").map(nettyModule) ++ Seq(
     "org.bitlet" % "weupnp" % "0.1.4",
     // Solves an issue with kamon-influxdb
-    asyncHttpClient
+    asyncHttpClient.exclude("io.netty", "netty-handler")
   )
 
   lazy val testKit = scalatest ++ Seq(
@@ -26,20 +26,20 @@ object Dependencies {
     "org.scalacheck"   %% "scalacheck"                  % "1.13.5",
     "org.mockito"      % "mockito-all"                  % "1.10.19",
     "org.scalamock"    %% "scalamock-scalatest-support" % "3.6.0",
-    "org.iq80.leveldb" % "leveldb"                      % "0.9",
+    ("org.iq80.leveldb" % "leveldb" % "0.9").exclude("com.google.guava", "guava"),
     akkaHttpModule("akka-http-testkit")
   )
 
   lazy val itKit = scalatest ++ Seq(
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
-    "com.spotify"                      % "docker-client"                 % "8.9.0" classifier "shaded",
-    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.8.9",
-    asyncHttpClient
+    ("com.spotify" % "docker-client" % "8.11.3").classifier("shaded").exclude("com.google.guava", "guava"),
+    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.9.5",
+    asyncHttpClient.exclude("io.netty", "netty-handler")
   )
 
   lazy val serialization = Seq(
     "com.google.guava"  % "guava"      % "21.0",
-    "com.typesafe.play" %% "play-json" % "2.6.2"
+    "com.typesafe.play" %% "play-json" % "2.6.9"
   )
   lazy val akka = Seq("actor", "slf4j").map(akkaModule)
 
@@ -81,11 +81,18 @@ object Dependencies {
     "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
   )
   lazy val meta        = Seq("com.chuusai" %% "shapeless" % "2.3.3")
-  lazy val monix       = Def.setting(Seq("io.monix" %%% "monix" % "3.0.0-RC1"))
+  lazy val monix       = Def.setting(Seq(
+    // exclusion and explicit dependency can likely be removed when monix 3 is released
+    ("io.monix" %%% "monix" % "3.0.0-RC1").exclude("org.typelevel", "cats-effect_2.12"),
+    "org.typelevel" %%% "cats-effect"  % "0.10.1"
+  ))
   lazy val scodec      = Def.setting(Seq("org.scodec" %%% "scodec-core" % "1.10.3"))
   lazy val fastparse   = Def.setting(Seq("com.lihaoyi" %%% "fastparse" % "1.0.0", "org.bykn" %%% "fastparse-cats-core" % "0.1.0"))
   lazy val ficus       = Seq("com.iheart" %% "ficus" % "1.4.2")
-  lazy val scorex      = Seq(("org.scorexfoundation" %% "scrypto" % "2.0.4").exclude("org.slf4j", "slf4j-api"))
+  lazy val scorex      = Seq("org.scorexfoundation" %% "scrypto" % "2.0.4" excludeAll(
+    ExclusionRule("org.slf4j", "slf4j-api"),
+    ExclusionRule("com.google.guava", "guava")
+  ))
   lazy val commons_net = Seq("commons-net" % "commons-net" % "3.+")
   lazy val scalatest   = Seq("org.scalatest" %% "scalatest" % "3.0.3")
   lazy val scalactic   = Seq("org.scalactic" %% "scalactic" % "3.0.3")
@@ -94,4 +101,5 @@ object Dependencies {
     "org.scalacheck"      %% "scalacheck"      % "1.13.5",
     "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
   )
+  lazy val kindProjector = "org.spire-math" %% "kind-projector" % "0.9.6"
 }

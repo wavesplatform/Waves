@@ -4,8 +4,8 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, EvaluationContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
@@ -18,13 +18,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("patternMatching") {
     val sampleScript =
-      """|
-         |match p {
-         |  case pa: PointA => 0
-         |  case pb: PointB => 1
-         |}
-         |
-      """.stripMargin
+      """match p {
+        |  case pa: PointA => 0
+        |  case pb: PointB => 1
+        |}""".stripMargin
     eval[Long](sampleScript, withUnion(pointAInstance)) shouldBe Right(0)
     eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
   }
@@ -57,7 +54,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   private def eval[T: TypeInfo](code: String, ctx: EvaluationContext = PureContext.instance) = {
     val untyped = Parser(code).get.value
-    val typed   = CompilerV1(CompilerContext.fromEvaluationContext(ctx), untyped)
+    require(untyped.size == 1)
+    val typed = CompilerV1(CompilerContext.fromEvaluationContext(ctx), untyped.head)
     typed.flatMap(EvaluatorV1[T](ctx, _))
   }
 
@@ -81,8 +79,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("equals some lang structure") {
-    eval[Boolean]("let x = (-7763390488025868909>-1171895536391400041) let v = false (v&&true)") shouldBe Right(false)
-    eval[Boolean]("let mshUmcl = (if(true) then true else true) true || mshUmcl") shouldBe Right(true)
+    eval[Boolean]("let x = (-7763390488025868909>-1171895536391400041); let v = false; (v&&true)") shouldBe Right(false)
+    eval[Boolean]("let mshUmcl = (if(true) then true else true); true || mshUmcl") shouldBe Right(true)
     eval[Long]("""if(((1+-1)==-1)) then 1 else (1+1)""") shouldBe Right(2)
     eval[Boolean]("""((((if(true) then 1 else 1)==2)||((if(true)
                     |then true else true)&&(true||true)))||(if(((1>1)||(-1>=-1)))
@@ -90,21 +88,25 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("equals works on elements from Gens") {
-    List(CONST_LONGgen.map(_._1), SUMgen(50).map(_._1), INTGen(50).map(_._1)).foreach(gen =>
+    List(CONST_LONGgen, SUMgen(50), INTGen(50)).foreach(gen =>
       forAll(for {
-        expr <- gen
-        str  <- toString(expr)
-      } yield str) {
-        case str =>
-          eval[Boolean](s"$str == 0 || true") shouldBe Right(true)
+        (expr, res) <- gen
+        str         <- toString(expr)
+      } yield (str, res)) {
+        case (str, res) =>
+          withClue(str) {
+            eval[Long](str) shouldBe Right(res)
+          }
     })
 
     forAll(for {
-      (expr, _) <- BOOLgen(50)
-      str       <- toString(expr)
-    } yield str) {
-      case str =>
-        eval[Boolean](s"$str || true") shouldBe Right(true)
+      (expr, res) <- BOOLgen(50)
+      str         <- toString(expr)
+    } yield (str, res)) {
+      case (str, res) =>
+        withClue(str) {
+          eval[Boolean](str) shouldBe Right(res)
+        }
     }
   }
 

@@ -2,10 +2,18 @@ package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats._
 import com.wavesplatform.lang.v1.FunctionHeader
+import shapeless.{Lens, lens}
 
 case class EvaluationContext(caseTypeDefs: Map[String, PredefCaseType], letDefs: Map[String, LazyVal], functions: Map[FunctionHeader, PredefFunction])
 
 object EvaluationContext {
+
+  object Lenses {
+    val types: Lens[EvaluationContext, Map[String, PredefCaseType]]         = lens[EvaluationContext] >> 'caseTypeDefs
+    val lets: Lens[EvaluationContext, Map[String, LazyVal]]                 = lens[EvaluationContext] >> 'letDefs
+    val funcs: Lens[EvaluationContext, Map[FunctionHeader, PredefFunction]] = lens[EvaluationContext] >> 'functions
+  }
+
   val empty = EvaluationContext(Map.empty, Map.empty, Map.empty)
 
   implicit val monoid: Monoid[EvaluationContext] = new Monoid[EvaluationContext] {

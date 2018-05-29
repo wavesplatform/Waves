@@ -2,11 +2,11 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.lang.TypeInfo
+import com.wavesplatform.lang.{Global, TypeInfo}
 import com.wavesplatform.lang.TypeInfo._
-import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
@@ -15,6 +15,7 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import scodec.bits.ByteVector
 import scorex.account.AddressScheme
 import scorex.transaction.assets.IssueTransactionV2
 import scorex.transaction.smart.script.v1.ScriptV1
@@ -56,8 +57,13 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
                     | }
         """.stripMargin
 
-      untypedScript = Parser(assetScript).get.value
-      typedScript   = ScriptV1(CompilerV1(dummyTypeCheckerContext, untypedScript).explicitGet()).explicitGet()
+      untypedScript = {
+        val r = Parser(assetScript).get.value
+        assert(r.size == 1)
+        r.head
+      }
+
+      typedScript = ScriptV1(CompilerV1(dummyTypeCheckerContext, untypedScript).explicitGet()).explicitGet()
 
       issueTransaction = IssueTransactionV2
         .selfSigned(
@@ -107,12 +113,21 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
 
   private def eval[T: TypeInfo](code: String) = {
     val untyped = Parser(code).get.value
-    val typed   = CompilerV1(dummyTypeCheckerContext, untyped)
+    assert(untyped.size == 1)
+    val typed = CompilerV1(dummyTypeCheckerContext, untyped.head)
     typed.flatMap(EvaluatorV1[T](dummyContext, _))
   }
 
   property("Script toBase58String") {
     eval[Boolean]("toBase58String(base58'AXiXp5CmwVaq4Tp6h6') == \"AXiXp5CmwVaq4Tp6h6\"").explicitGet() shouldBe true
+  }
+
+  property("addressFromString() fails when address is too long") {
+    import Global.MaxBase58Chars
+    val longAddress = "A" * (MaxBase58Chars + 1)
+    val r           = eval[ByteVector](s"""addressFromString("$longAddress")""")
+    r.isLeft shouldBe true
+    r.left.get.toString.contains(s"base58Decode input exceeds $MaxBase58Chars") shouldBe true
   }
 
   property("Scenario") {

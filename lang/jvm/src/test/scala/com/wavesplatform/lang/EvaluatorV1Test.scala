@@ -7,6 +7,7 @@ import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
@@ -20,15 +21,18 @@ import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
+  private def ev[T: TypeInfo](context: EvaluationContext = PureContext.instance, expr: EXPR): Either[(EvaluationContext, ExecutionError), T] =
+    EvaluatorV1[T](context, expr)
   private def simpleDeclarationAndUsage(i: Int) = BLOCK(LET("x", CONST_LONG(i)), REF("x", LONG), LONG)
 
   property("successful on very deep expressions (stack overflow check)") {
     val term = (1 to 100000).foldLeft[EXPR](CONST_LONG(0))((acc, _) => FUNCTION_CALL(sumLong.header, List(acc, CONST_LONG(1)), LONG))
+
     ev[Long](expr = term) shouldBe Right(100000)
   }
 
-  property("return log and context of failed evaluation") {
-    val Left((ctx, log, err)) = ev[Long](
+  property("return error and context of failed evaluation") {
+    val Left((ctx, err)) = ev[Long](
       expr = BLOCK(
         LET("x", CONST_LONG(3)),
         BLOCK(
@@ -40,16 +44,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
     )
 
-    val expectedLog =
-      "Evaluating BLOCK\n" ++
-        "LET: LET(x,CONST_LONG(3)); TYPE: LONG\n" ++
-        "Evaluating BLOCK\n" ++
-        "LET: LET(x,FUNCTION_CALL(FunctionHeader(+,List(LONG, LONG)),List(CONST_LONG(3), CONST_LONG(0)),LONG)); TYPE: LONG"
-
     val expectedError =
       "Value 'x' already defined in the scope"
 
-    log shouldBe expectedLog
     err shouldBe expectedError
     ctx.letDefs.contains("x") shouldBe true
   }
@@ -296,7 +293,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   private def sigVerifyTest(bodyBytes: Array[Byte],
                             publicKey: PublicKey,
-                            signature: Signature): Either[(EvaluationContext, ExecutionLog, ExecutionError), Boolean] = {
+                            signature: Signature): Either[(EvaluationContext, ExecutionError), Boolean] = {
     val txType = PredefCaseType(
       "Transaction",
       List(
@@ -348,7 +345,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     for ((funcName, funcClass) <- hashFunctions) hashFuncTest(bodyBytes, funcName) shouldBe Right(ByteVector(funcClass.hash(bodyText)))
   }
 
-  private def hashFuncTest(bodyBytes: Array[Byte], funcName: String): Either[(EvaluationContext, ExecutionLog, ExecutionError), ByteVector] = {
+  private def hashFuncTest(bodyBytes: Array[Byte], funcName: String): Either[(EvaluationContext, ExecutionError), ByteVector] = {
     val context = Monoid.combineAll(
       Seq(
         PureContext.instance,

@@ -67,6 +67,20 @@ object PureContext {
     case _ => ???
   }
 
+  val uMinus = PredefFunction("-", 1, LONG, List("n" -> LONG)) {
+    case (n: Long) :: Nil => {
+      Right(Math.negateExact(n))
+    }
+    case _ => ???
+  }
+
+  val uNot = PredefFunction("!", 1, BOOLEAN, List("p" -> BOOLEAN)) {
+    case (p: Boolean) :: Nil => {
+      Right(!p)
+    }
+    case _ => ???
+  }
+
   private def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
     PredefFunction(opsToFunctions(op), 1, r, List("a" -> t, "b" -> t)) {
       case a :: b :: Nil =>
@@ -80,16 +94,28 @@ object PureContext {
   }
 
   val sumLong       = createTryOp(SUM_OP, LONG, LONG)(Math.addExact)
+  val subLong       = createTryOp(SUB_OP, LONG, LONG)(Math.subtractExact)
   val sumString     = createOp(SUM_OP, STRING, STRING)(_ + _)
   val sumByteVector = createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR)((a, b) => ByteVector(a.toArray ++ b.toArray))
   val eqLong        = createOp(EQ_OP, LONG, BOOLEAN)(_ == _)
   val eqByteVector  = createOp(EQ_OP, BYTEVECTOR, BOOLEAN)(_ == _)
   val eqBool        = createOp(EQ_OP, BOOLEAN, BOOLEAN)(_ == _)
   val eqString      = createOp(EQ_OP, STRING, BOOLEAN)(_ == _)
+  val neLong        = createOp(NE_OP, LONG, BOOLEAN)(_ != _)
+  val neByteVector  = createOp(NE_OP, BYTEVECTOR, BOOLEAN)(_ != _)
+  val neBool        = createOp(NE_OP, BOOLEAN, BOOLEAN)(_ != _)
+  val neString      = createOp(NE_OP, STRING, BOOLEAN)(_ != _)
   val ge            = createOp(GE_OP, LONG, BOOLEAN)(_ >= _)
   val gt            = createOp(GT_OP, LONG, BOOLEAN)(_ > _)
+  val sge            = createOp(GE_OP, STRING, BOOLEAN)(_ >= _)
+  val sgt            = createOp(GT_OP, STRING, BOOLEAN)(_ > _)
 
-  val operators: Seq[PredefFunction] = Seq(sumLong, sumString, sumByteVector, eqLong, eqByteVector, eqBool, eqString, ge, gt, getElement, getListSize)
+  val operators: Seq[PredefFunction] = Seq(sumLong, subLong, sumString, sumByteVector,
+                                           eqLong, eqByteVector, eqBool, eqString,
+                                           neLong, neByteVector, neBool, neString,
+                                           ge, gt, sge, sgt,
+                                           getElement, getListSize,
+                                           uMinus, uNot)
 
   lazy val instance =
     EvaluationContext.build(caseTypes = Seq.empty,

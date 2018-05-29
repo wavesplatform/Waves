@@ -39,7 +39,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       ("issue", issueGen.retryUntil(_.version == 1), identity),
       ("reissue", reissueGen.retryUntil(_.version == 1), identity),
       ("burn", burnGen.retryUntil(_.version == 1), {
-        case o: JsObject => o ++ Json.obj("quantity" -> o.value("amount"))
+        case o: JsObject => o ++ Json.obj("quantity" -> o.value("quantity"))
         case other       => other
       }),
       ("transfer", transferV1Gen, {

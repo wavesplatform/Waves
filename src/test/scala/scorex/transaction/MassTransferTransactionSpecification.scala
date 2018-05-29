@@ -1,11 +1,15 @@
 package scorex.transaction
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.state.ByteStr
 import org.scalacheck.Arbitrary
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
+import play.api.libs.json.Json
+import scorex.account.PublicKeyAccount
+import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
+import scorex.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer, Transfer}
 import scorex.transaction.transfer._
 
 class MassTransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -73,5 +77,56 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
         val negativeFeeEi = create(version, assetId, sender, feeOverflow, timestamp, -100, attachment, proofs)
         negativeFeeEi shouldBe Left(ValidationError.InsufficientFee())
     }
+  }
+
+  property(testName = "JSON format validation") {
+    val js = Json.parse("""{
+                       "type": 11,
+                       "id": "H36CTJc7ztGRZPCrvpNYeagCN1HV1gXqUthsXKdBT3UD",
+                       "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+                       "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+                       "fee": 200000,
+                       "timestamp": 1518091313964,
+                       "proofs": [
+                       "FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ"],
+                       "version": 1,
+                       "assetId": null,
+                       "attachment": "59QuUcqP6p",
+                       "transferCount": 2,
+                       "totalAmount": 300000000,
+                       "transfers": [
+                       {
+                       "recipient": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+                       "amount": 100000000
+                       },
+                       {
+                       "recipient": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+                       "amount": 200000000
+                       }
+                       ]
+                       }
+  """)
+
+    val transfers = MassTransferTransaction
+      .parseTransfersList(
+        List(Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 100000000L), Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 200000000L)))
+      .right
+      .get
+
+    val tx = MassTransferTransaction
+      .create(
+        1,
+        None,
+        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        transfers,
+        1518091313964L,
+        200000,
+        Base58.decode("59QuUcqP6p").get,
+        Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
+      )
+      .right
+      .get
+
+    js shouldEqual tx.json()
   }
 }

@@ -1,4 +1,4 @@
-# Waves [![Build Status](https://travis-ci.org/wavesplatform/Waves.svg?branch=master)](https://travis-ci.org/wavesplatform/Waves) [![](https://images.microbadger.com/badges/version/wavesplatform/waves-testnet.svg)](http://microbadger.com/images/wavesplatform/waves-testnet "Testnet Node Docker image")
+# Waves [![Build Status](https://travis-ci.org/wavesplatform/Waves.svg?branch=master)](https://travis-ci.org/wavesplatform/Waves) [![](https://images.microbadger.com/badges/version/wavesplatform/waves-testnet.svg)]
 
 In the master branch there is a code with functions that is under development. The latest release for each network can be found in the [Releases section](https://github.com/wavesplatform/Waves/releases), you can switch to the corresponding tag and build the application.
 
@@ -97,7 +97,7 @@ variable before starting a container.
 
 You can run integration test suites from your preferred IDE. The only requirement is to have Docker image pre-built and
 have `docker.imageId` system property defined for the run configuration. The easiest way to build an image is to issue
-`sbt docker` command. You'll find the image ID in the SBT output:
+`sbt it/docker` command. You'll find the image ID in the SBT output:
 
 ```
 ...

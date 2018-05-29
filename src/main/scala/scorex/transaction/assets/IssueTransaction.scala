@@ -29,6 +29,7 @@ trait IssueTransaction extends ProvenTransaction {
   override val json = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
       "version"     -> version,
+      "assetId"     -> assetId().base58,
       "name"        -> new String(name, StandardCharsets.UTF_8),
       "quantity"    -> quantity,
       "reissuable"  -> reissuable,

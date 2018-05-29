@@ -42,9 +42,9 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
             totalPortfolioDiff.balance shouldBe 0
             totalPortfolioDiff.effectiveBalance shouldBe 0
-            totalPortfolioDiff.assets shouldBe Map(reissue.assetId -> (reissue.quantity - burn.amount))
+            totalPortfolioDiff.assets shouldBe Map(reissue.assetId -> (reissue.quantity - burn.quantity))
 
-            val totalAssetVolume = issue.quantity + reissue.quantity - burn.amount
+            val totalAssetVolume = issue.quantity + reissue.quantity - burn.quantity
             newState.portfolio(issue.sender).assets shouldBe Map(reissue.assetId -> totalAssetVolume)
         }
     }
@@ -218,7 +218,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
   private def createScript(code: String) = {
     val Parsed.Success(expr, _) = Parser(code).get
-    ScriptV1(CompilerV1(dummyTypeCheckerContext, expr).explicitGet()).explicitGet()
+    assert(expr.size == 1)
+    ScriptV1(CompilerV1(dummyTypeCheckerContext, expr.head).explicitGet()).explicitGet()
   }
 
   def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransactionV2, TransferTransactionV1, ReissueTransactionV1)] =
