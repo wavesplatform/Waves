@@ -197,7 +197,7 @@ object Parser {
           val innerStart = start + 8
           val innerEnd   = end - 1
           decoded match {
-            case Left(_)  => CONST_BYTEVECTOR(start, end, PART.INVALID(innerStart, innerEnd, "can't parse Base58 string"))
+            case Left(err) => CONST_BYTEVECTOR(start, end, PART.INVALID(innerStart, innerEnd, err))
             case Right(r) => CONST_BYTEVECTOR(start, end, PART.VALID(innerStart, innerEnd, ByteVector(r)))
           }
       }

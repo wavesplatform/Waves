@@ -161,6 +161,14 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parseOne("base58' bQbp'") shouldBe CONST_BYTEVECTOR(0, 13, PART.INVALID(8, 12, "can't parse Base58 string"))
   }
 
+  property("long base58 definition") {
+    import Global.MaxBase58Chars
+    val longBase58 = "A" * (MaxBase58Chars + 1)
+    val to         = 8 + MaxBase58Chars
+    parseOne(s"base58'$longBase58'") shouldBe
+      CONST_BYTEVECTOR(0, to + 1, PART.INVALID(8, to, s"base58Decode input exceeds $MaxBase58Chars"))
+  }
+
   property("string is consumed fully") {
     parseOne(""" "   fooo    bar" """) shouldBe CONST_STRING(1, 17, PART.VALID(2, 16, "   fooo    bar"))
   }

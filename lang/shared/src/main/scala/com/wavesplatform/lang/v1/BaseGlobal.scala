@@ -5,7 +5,7 @@ package com.wavesplatform.lang.v1
   * And IDEA can't find the Global class in the "shared" module, but it must!
   */
 trait BaseGlobal {
-  def base58Encode(input: Array[Byte]): String
+  def base58Encode(input: Array[Byte]): Either[String, String]
   def base58Decode(input: String): Either[String, Array[Byte]]
 
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean

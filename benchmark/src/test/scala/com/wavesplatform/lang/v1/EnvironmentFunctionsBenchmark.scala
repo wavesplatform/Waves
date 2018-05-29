@@ -22,13 +22,14 @@ class EnvironmentFunctionsBenchmark {
   def random_bytes_500_test(): Array[Byte] = randomBytes(DataBytesLength)
 
   @Benchmark
-  def base58_decode_full_test(): Either[String, Array[Byte]] = Global.base58Decode(Global.base58Encode(randomBytes(DataBytesLength)))
+  def base58_decode_full_test(): Either[String, Array[Byte]] =
+    Global.base58Decode(Global.base58Encode(randomBytes(Base58BytesLength)).right.get)
 
   @Benchmark
-  def base58_encode_test(): String = hashTest(Global.base58Encode)
+  def base58_encode_test(): String = hashTest(Base58BytesLength, Global.base58Encode(_).right.get)
 
   @Benchmark
-  def base58_26_encode_test(): String = hashTest(26, Global.base58Encode) // for addressFromString_full_test
+  def base58_26_encode_test(): String = hashTest(26, Global.base58Encode(_).right.get) // for addressFromString_full_test
 
   @Benchmark
   def sha256_test(): Array[Byte] = hashTest(Global.sha256)
@@ -64,13 +65,14 @@ class EnvironmentFunctionsBenchmark {
 
   @Benchmark
   def addressFromString_full_test(): Either[String, Option[ByteVector]] =
-    environmentFunctions.addressFromString(Global.base58Encode(randomAddress.toArray))
+    environmentFunctions.addressFromString(Global.base58Encode(randomAddress.toArray).right.get)
 
 }
 
 object EnvironmentFunctionsBenchmark {
 
   val NetworkByte: Byte = 'P'
+  val Base58BytesLength = Global.MaxBase58Bytes
   val DataBytesLength   = 512
   val SeedBytesLength   = 128
 
