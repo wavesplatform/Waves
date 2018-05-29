@@ -147,10 +147,9 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
   private def hasInHistory[A](db: ReadOnlyDB, addressId: BigInt, key: BigInt => Key[Seq[Int]], v: (Int, BigInt) => Key[A]) =
     db.get(key(addressId))
       .headOption
-      .map { lastChange =>
+      .exists { lastChange =>
         db.has(v(lastChange, addressId))
       }
-      .getOrElse(false)
 
   private def loadLposPortfolio(db: ReadOnlyDB, addressId: BigInt) = Portfolio(
     loadFromHistory(db, addressId, Keys.wavesBalanceHistory, Keys.wavesBalance).getOrElse(0L),
