@@ -161,7 +161,11 @@ object CompilerV1 {
           for {
             exprTpe  <- compile(ctx, EitherT.pure(let.value))
             letTypes <- EitherT.fromEither[Coeval](let.types.map(_.toEither).toList.sequence[CompilationResult, String])
-            _        <- EitherT.cond[Coeval](letTypes.forall(ctx.predefTypes.contains), (), s"Value '$letName' declared as non-existing type")
+            _ <- EitherT.cond[Coeval](
+              letTypes.forall(ctx.predefTypes.contains),
+              (),
+              s"Value '$letName' declared as non-existing type $letTypes, while all possible types are ${ctx.predefTypes}"
+            )
             desiredUnion = if (let.types.isEmpty) exprTpe.tpe else UNION(letTypes.map(CASETYPEREF))
             updatedCtx   = ctx.copy(varDefs = ctx.varDefs + (letName -> desiredUnion))
             inExpr <- compile(updatedCtx, EitherT.pure(block.body))

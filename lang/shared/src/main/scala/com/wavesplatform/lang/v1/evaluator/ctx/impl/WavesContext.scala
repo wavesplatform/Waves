@@ -72,7 +72,7 @@ object WavesContext {
   )
 
   private val massTransferTransactionType = PredefCaseType(
-    "TransferTransaction",
+    "MassTransferTransaction",
     List(
       "feeAssetId"      -> optionByteVector,
       "transferAssetId" -> optionByteVector,
@@ -81,14 +81,10 @@ object WavesContext {
     ) ++ common ++ proven
   )
 
-  private val transactionType =
-    UNION(
-      transferTransactionType.typeRef,
-      leaseTransactionType.typeRef,
-      issueTransactionType.typeRef,
-      reissueTransactionType.typeRef,
-      massTransferTransactionType.typeRef
-    )
+  private val transactionTypes =
+    List(transferTransactionType, leaseTransactionType, issueTransactionType, reissueTransactionType, massTransferTransactionType)
+
+  private val transactionType = UNION(transactionTypes.map(_.typeRef))
 
   private def commonTxPart(tx: Transaction): Map[String, Val] = Map(
     "id"        -> Val(BYTEVECTOR)(tx.id),
@@ -238,7 +234,7 @@ object WavesContext {
       }
 
     EvaluationContext.build(
-      caseTypes = Seq(addressType, aliasType, transferTransactionType, issueTransactionType, reissueTransactionType, leaseTransactionType),
+      caseTypes = Seq(addressType, aliasType) ++ transactionTypes,
       letDefs = Map(("height", LazyVal(LONG)(EitherT(heightCoeval))), ("tx", LazyVal(transactionType)(EitherT(txCoeval)))),
       functions = Seq(
         txByIdF,

@@ -20,7 +20,7 @@ class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matche
          |
          | match tx {
          |  case ttx: TransferTransaction | MassTransferTransaction =>
-         |     sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)
+         |     sigVerify(ttx.bodyBytes,ttx.proofs[0],ttx.senderPk)
          |  case other =>
          |     false
          | }
