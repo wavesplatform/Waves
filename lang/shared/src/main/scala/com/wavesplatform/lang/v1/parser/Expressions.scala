@@ -24,6 +24,7 @@ object Expressions {
   case class CONST_STRING(start: Int, end: Int, value: PART[String])                  extends EXPR
   case class BINARY_OP(start: Int, end: Int, a: EXPR, kind: BinaryOperation, b: EXPR) extends EXPR
   case class BLOCK(start: Int, end: Int, let: LET, body: EXPR)                        extends EXPR
+  case class TBLOCK(start: Int, end: Int, typeName: PART[String], union: TYPELIST, body: EXPR) extends EXPR
   case class IF(start: Int, end: Int, cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)        extends EXPR
   case class REF(start: Int, end: Int, key: PART[String])                             extends EXPR
 

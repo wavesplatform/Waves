@@ -48,7 +48,7 @@ object CompilerV1 {
 
   type ResolvedArgsResult = EitherT[Coeval, String, List[EXPR]]
 
-  private def compile(ctx: CompilerContext, t: SetTypeResult[Expressions.EXPR]): SetTypeResult[EXPR] = t.flatMap {
+  private def compile(ctx: CompilerContext, expr: Expressions.EXPR): SetTypeResult[EXPR] = expr match {
     case x: Expressions.CONST_LONG       => EitherT.pure(CONST_LONG(x.value))
     case x: Expressions.CONST_BYTEVECTOR => handlePart(x.value)(CONST_BYTEVECTOR)
     case x: Expressions.CONST_STRING     => handlePart(x.value)(CONST_STRING)
@@ -57,6 +57,7 @@ object CompilerV1 {
     case getter: Expressions.GETTER      => compileGetter(ctx, getter)
     case fc: Expressions.FUNCTION_CALL   => compileFunctionCall(ctx, fc)
     case block: Expressions.BLOCK        => compileBlock(ctx, block)
+    case Expressions.TBLOCK(_, _, typeName, typeDef, body) => compile(ctx, body)
     case ifExpr: Expressions.IF          => compileIf(ctx, ifExpr)
     case ref: Expressions.REF            => compileRef(ctx, ref)
     case m: Expressions.MATCH            => compileMatch(ctx, m)
@@ -73,7 +74,7 @@ object CompilerV1 {
   private def compileGetter(ctx: CompilerContext, getter: Expressions.GETTER): SetTypeResult[EXPR] =
     for {
       field <- EitherT.fromEither[Coeval](getter.field.toEither)
-      r <- compile(ctx, EitherT.pure(getter.ref))
+      r <- compile(ctx, getter.ref)
         .subflatMap { subExpr =>
           def getField(name: String): Either[String, GETTER] = {
             val refTpe = ctx.predefTypes.get(name).map(Right(_)).getOrElse(Left(s"Undefined type: $name"))
@@ -104,7 +105,7 @@ object CompilerV1 {
     } yield r
 
   private def compileIf(ctx: CompilerContext, ifExpr: Expressions.IF): SetTypeResult[EXPR] =
-    (compile(ctx, EitherT.pure(ifExpr.cond)), compile(ctx, EitherT.pure(ifExpr.ifTrue)), compile(ctx, EitherT.pure(ifExpr.ifFalse))).tupled
+    (compile(ctx, ifExpr.cond), compile(ctx, ifExpr.ifTrue), compile(ctx, ifExpr.ifFalse)).tupled
       .subflatMap[String, EXPR] {
         case (resolvedCond: EXPR, resolvedIfTrue, resolvedIfFalse) =>
           if (resolvedCond.tpe != BOOLEAN)
@@ -163,12 +164,12 @@ object CompilerV1 {
         case (None, None) =>
           import block.let
           for {
-            exprTpe  <- compile(ctx, EitherT.pure(let.value))
+            exprTpe  <- compile(ctx, let.value)
             letTypes <- EitherT.fromEither[Coeval](let.types.map(_.toEither).toList.sequence[CompilationResult, String])
             _        <- EitherT.cond[Coeval](letTypes.forall(ctx.predefTypes.contains), (), s"Value '$letName' declared as non-existing type")
             desiredUnion = if (let.types.isEmpty) exprTpe.tpe else UNION(letTypes.map(CASETYPEREF))
             updatedCtx   = ctx.copy(varDefs = ctx.varDefs + (letName -> desiredUnion))
-            inExpr <- compile(updatedCtx, EitherT.pure(block.body))
+            inExpr <- compile(updatedCtx, block.body)
           } yield
             BLOCK(
               let = LET(letName, exprTpe),
@@ -193,7 +194,7 @@ object CompilerV1 {
     val updatedCtx                           = ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1)
 
     for {
-      typedExpr <- compile(ctx, EitherT.pure(expr))
+      typedExpr <- compile(ctx, expr)
       possibleExpressionTypes <- EitherT.fromEither[Coeval](typedExpr.tpe match {
         case u: UNION => Right(u)
         case _        => Left("Only union type can be matched")
@@ -229,7 +230,7 @@ object CompilerV1 {
 
   private def resolvedFuncArguments(ctx: CompilerContext, args: List[Expressions.EXPR]): ResolvedArgsResult = {
     import cats.instances.list._
-    val r: List[SetTypeResult[EXPR]] = args.map(arg => compile(ctx, EitherT.pure(arg)))(collection.breakOut)
+    val r: List[SetTypeResult[EXPR]] = args.map(arg => compile(ctx, arg))(collection.breakOut)
     r.sequence[SetTypeResult, EXPR]
   }
 
@@ -263,7 +264,7 @@ object CompilerV1 {
   }
 
   def apply(c: CompilerContext, expr: Expressions.EXPR): CompilationResult[EXPR] = {
-    def result = compile(c, EitherT.pure(expr)).value().left.map { e =>
+    def result = compile(c, expr).value().left.map { e =>
       s"Typecheck failed: $e"
     }
     Try(result) match {
