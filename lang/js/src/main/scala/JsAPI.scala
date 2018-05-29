@@ -1,8 +1,8 @@
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.Serde
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext, WavesContext}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment, Transaction}
@@ -11,9 +11,9 @@ import scodec.Attempt
 import scodec.Attempt.Successful
 
 import scala.scalajs.js
+import scala.scalajs.js.Dynamic.{literal => jObj}
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.annotation.JSExportTopLevel
-import scala.scalajs.js.Dynamic.{literal => jObj}
 
 object JsAPI {
 
