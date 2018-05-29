@@ -60,15 +60,14 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
     runScript[Long](s"size(base58'${ByteStr(arr).base58}')".stripMargin) shouldBe Right(3L)
   }
 
-  property("getTransfer should MassTransfer transfers extract") {
+  property("getTransfer should extract MassTransfer transfers") {
     import scodec.bits.ByteVector
-    //import com.wavesplatform.lang.v1.ctx.Obj
     forAll(massTransferGen.filter(_.transfers.size > 0)) {
       case (massTransfer) =>
         val resultAmount = runScript[Long](
           """
             |match tx {
-            | case mttx : MassTransferTransaction  =>  size(mttx.transfers[0])
+            | case mttx : MassTransferTransaction  =>  mttx.transfers[0].amount
             | case other => throw
             | }
             |""".stripMargin,

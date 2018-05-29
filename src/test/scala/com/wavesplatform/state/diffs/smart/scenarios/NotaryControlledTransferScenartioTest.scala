@@ -22,7 +22,7 @@ import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.transfer._
 import scorex.transaction.{DataTransaction, GenesisTransaction}
 
-class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions: Gen[
     (Seq[GenesisTransaction], IssueTransactionV2, DataTransaction, TransferTransactionV1, DataTransaction, DataTransaction, TransferTransactionV1)] =
     for {

@@ -39,7 +39,12 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
     val context =
       BlockchainContext.build(AddressScheme.current.chainId, Coeval.evalOnce(tx), Coeval.evalOnce(blockchain.height), blockchain)
 
-    val Parsed.Success(expr, _) = Parser("addressFromRecipient(tx.recipient)")
+    val Parsed.Success(expr, _) = Parser("""
+        | match tx {
+        |  case t : TransferTransaction =>  addressFromRecipient(tx.recipient)
+        |  case other => throw
+        |  }
+        |  """.stripMargin)
     assert(expr.size == 1)
     val Right(typedExpr) = CompilerV1(CompilerContext.fromEvaluationContext(context), expr.head)
     EvaluatorV1[CaseObj](context, typedExpr).left.map(_._2)
