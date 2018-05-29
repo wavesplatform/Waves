@@ -14,8 +14,6 @@ concurrentRestrictions in Global := {
 }
 enablePlugins(sbtdocker.DockerPlugin)
 
-val aspectjRedistDir = Def.setting(baseDirectory.value / ".." / "third-party" / "aspectj")
-
 inTask(docker)(
   Seq(
     dockerfile := {
@@ -24,24 +22,17 @@ inTask(docker)(
 
       val withAspectJ     = Option(System.getenv("WITH_ASPECTJ")).fold(false)(_.toBoolean)
       val aspectjAgentUrl = "http://search.maven.org/remotecontent?filepath=org/aspectj/aspectjweaver/1.8.13/aspectjweaver-1.8.13.jar"
-      val yourKitArchive  = "YourKit-JavaProfiler-2017.02-b75.zip"
-
-      def extractYourKitFileCmd(name: String): String =
-        s"""FILE=$$(unzip -l /tmp/$yourKitArchive | grep "$name" | rev | cut -f 1 -d' ' | rev) && \\
-           |unzip -o /tmp/$yourKitArchive -d /tmp/ $$FILE && \\
-           |mv /tmp/$$FILE /opt/waves/${name.split("/").last}""".stripMargin
+      val yourKitArchive  = "YourKit-JavaProfiler-2018.04-docker.zip"
 
       new Dockerfile {
         from("anapsix/alpine-java:8_server-jre")
+        runRaw("mkdir -p /opt/waves")
 
-        // Install yourkit
-        runRaw(s"""mkdir -p /opt/waves/ && \\
-                  |apk update && \\
-                  |apk add --no-cache ca-certificates openssl && \\
-                  |update-ca-certificates && \\
-                  |wget https://www.yourkit.com/download/$yourKitArchive -P /tmp/ && \\
-                  |${extractYourKitFileCmd("linux-x86-64/libyjpagent.so")} && \\
-                  |${extractYourKitFileCmd("yjp-controller-api-redist.jar")} && \\
+        // Install YourKit
+        runRaw(s"""apk update && \\
+                  |apk add --no-cache openssl ca-certificates && \\
+                  |wget https://www.yourkit.com/download/docker/$yourKitArchive -P /tmp/ && \\
+                  |unzip /tmp/$yourKitArchive -d /usr/local && \\
                   |rm /tmp/$yourKitArchive""".stripMargin)
 
         if (withAspectJ) run("wget", "--quiet", aspectjAgentUrl, "-O", "/opt/waves/aspectjweaver.jar")
