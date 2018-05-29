@@ -191,35 +191,38 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   }
 
   private def signTransaction(signerAddress: String, jsv: JsObject): ToResponseMarshallable = {
-    val typeId  = (jsv \ "type").as[Byte]
-    val version = (jsv \ "version").asOpt[Byte].getOrElse(1.toByte)
-    val r = TransactionParsers.by(typeId, version) match {
-      case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
-      case Some(x) =>
-        x match {
-          case IssueTransactionV1       => TransactionFactory.issueAssetV1(jsv.as[IssueV1Request], wallet, signerAddress, time)
-          case IssueTransactionV2       => TransactionFactory.issueAssetV2(jsv.as[IssueV2Request], wallet, signerAddress, time)
-          case TransferTransactionV1    => TransactionFactory.transferAssetV1(jsv.as[TransferV1Request], wallet, signerAddress, time)
-          case TransferTransactionV2    => TransactionFactory.transferAssetV2(jsv.as[TransferV2Request], wallet, signerAddress, time)
-          case ReissueTransactionV1     => TransactionFactory.reissueAssetV1(jsv.as[ReissueV1Request], wallet, signerAddress, time)
-          case ReissueTransactionV2     => TransactionFactory.reissueAssetV2(jsv.as[ReissueV2Request], wallet, signerAddress, time)
-          case BurnTransactionV1        => TransactionFactory.burnAssetV1(jsv.as[BurnV1Request], wallet, signerAddress, time)
-          case BurnTransactionV2        => TransactionFactory.burnAssetV2(jsv.as[BurnV2Request], wallet, signerAddress, time)
-          case MassTransferTransaction  => TransactionFactory.massTransferAsset(jsv.as[MassTransferRequest], wallet, signerAddress, time)
-          case LeaseTransactionV1       => TransactionFactory.leaseV1(jsv.as[LeaseV1Request], wallet, signerAddress, time)
-          case LeaseTransactionV2       => TransactionFactory.leaseV2(jsv.as[LeaseV2Request], wallet, signerAddress, time)
-          case LeaseCancelTransactionV1 => TransactionFactory.leaseCancelV1(jsv.as[LeaseCancelV1Request], wallet, signerAddress, time)
-          case LeaseCancelTransactionV2 => TransactionFactory.leaseCancelV2(jsv.as[LeaseCancelV2Request], wallet, signerAddress, time)
-          case CreateAliasTransactionV1 => TransactionFactory.aliasV1(jsv.as[CreateAliasV1Request], wallet, signerAddress, time)
-          case CreateAliasTransactionV2 => TransactionFactory.aliasV2(jsv.as[CreateAliasV2Request], wallet, signerAddress, time)
-          case DataTransaction          => TransactionFactory.data(jsv.as[DataRequest], wallet, signerAddress, time)
-          case SetScriptTransaction     => TransactionFactory.setScript(jsv.as[SetScriptRequest], wallet, signerAddress, time)
-          case SponsorFeeTransaction    => TransactionFactory.sponsor(jsv.as[SponsorFeeRequest], wallet, signerAddress, time)
-        }
-    }
-    r match {
-      case Right(tx) => tx.json()
-      case Left(err) => ApiError.fromValidationError(err)
+    val typeId = (jsv \ "type").as[Byte]
+
+    (jsv \ "version").validateOpt[Byte](versionReads) match {
+      case JsError(errors) => WrongJson(None, errors)
+      case JsSuccess(value, _) =>
+        val version = value getOrElse (1: Byte)
+        val txJson  = jsv ++ Json.obj("version" -> version)
+
+        (TransactionParsers.by(typeId, version) match {
+          case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
+          case Some(x) =>
+            x match {
+              case IssueTransactionV1       => TransactionFactory.issueAssetV1(txJson.as[IssueV1Request], wallet, signerAddress, time)
+              case IssueTransactionV2       => TransactionFactory.issueAssetV2(txJson.as[IssueV2Request], wallet, signerAddress, time)
+              case TransferTransactionV1    => TransactionFactory.transferAssetV1(txJson.as[TransferV1Request], wallet, signerAddress, time)
+              case TransferTransactionV2    => TransactionFactory.transferAssetV2(txJson.as[TransferV2Request], wallet, signerAddress, time)
+              case ReissueTransactionV1     => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], wallet, signerAddress, time)
+              case ReissueTransactionV2     => TransactionFactory.reissueAssetV2(txJson.as[ReissueV2Request], wallet, signerAddress, time)
+              case BurnTransactionV1        => TransactionFactory.burnAssetV1(txJson.as[BurnV1Request], wallet, signerAddress, time)
+              case BurnTransactionV2        => TransactionFactory.burnAssetV2(txJson.as[BurnV2Request], wallet, signerAddress, time)
+              case MassTransferTransaction  => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], wallet, signerAddress, time)
+              case LeaseTransactionV1       => TransactionFactory.leaseV1(txJson.as[LeaseV1Request], wallet, signerAddress, time)
+              case LeaseTransactionV2       => TransactionFactory.leaseV2(txJson.as[LeaseV2Request], wallet, signerAddress, time)
+              case LeaseCancelTransactionV1 => TransactionFactory.leaseCancelV1(txJson.as[LeaseCancelV1Request], wallet, signerAddress, time)
+              case LeaseCancelTransactionV2 => TransactionFactory.leaseCancelV2(txJson.as[LeaseCancelV2Request], wallet, signerAddress, time)
+              case CreateAliasTransactionV1 => TransactionFactory.aliasV1(txJson.as[CreateAliasV1Request], wallet, signerAddress, time)
+              case CreateAliasTransactionV2 => TransactionFactory.aliasV2(txJson.as[CreateAliasV2Request], wallet, signerAddress, time)
+              case DataTransaction          => TransactionFactory.data(txJson.as[DataRequest], wallet, signerAddress, time)
+              case SetScriptTransaction     => TransactionFactory.setScript(txJson.as[SetScriptRequest], wallet, signerAddress, time)
+              case SponsorFeeTransaction    => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)
+            }
+        }).fold(ApiError.fromValidationError, _.json())
     }
   }
 
@@ -237,7 +240,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     handleExceptions(jsonExceptionHandler) {
       json[JsObject] { jsv =>
         val typeId  = (jsv \ "type").as[Byte]
-        val version = (jsv \ "version").asOpt[Byte].getOrElse(1.toByte)
+        val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
 
         val r = TransactionParsers.by(typeId, version) match {
           case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
