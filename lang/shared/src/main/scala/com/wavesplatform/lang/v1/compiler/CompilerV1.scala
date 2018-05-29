@@ -76,7 +76,7 @@ object CompilerV1 {
             val refTpe = ctx.predefTypes.get(name).map(Right(_)).getOrElse(Left(s"Undefined type: $name"))
             val fieldTpe = refTpe.flatMap { ct =>
               val fieldTpe = ct.fields.collectFirst { case (fieldName, tpe) if fieldName == field => tpe }
-              fieldTpe.map(Right(_)).getOrElse(Left(s"Undefined field $name.${getter.field}"))
+              fieldTpe.map(Right(_)).getOrElse(Left(s"Undefined field `$field` of variable `$name`"))
             }
             fieldTpe.right.map(tpe => GETTER(expr = subExpr, field = field, tpe = tpe))
           }

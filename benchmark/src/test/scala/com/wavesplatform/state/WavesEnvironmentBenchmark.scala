@@ -39,7 +39,7 @@ class WavesEnvironmentBenchmark {
 
   @Benchmark
   def resolveAddress_test(st: ResolveAddressSt, bh: Blackhole): Unit = {
-    bh.consume(st.environment.resolveAddress(st.aliases.random))
+    bh.consume(st.environment.resolveAlias(st.aliases.random))
   }
 
   @Benchmark

@@ -56,9 +56,9 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
       case (gen, aliasTx, transferViaAddress, transferViaAlias) =>
         assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(aliasTx))) {
           case (_, state) =>
-            val addressBytes: ByteVector = evalScript(transferViaAddress, state).explicitGet().fields("bytes").value
+            val addressBytes = evalScript(transferViaAddress, state).explicitGet().fields("bytes").value.asInstanceOf[ByteVector]
             addressBytes.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
-            val resolvedAddressBytes: ByteVector = evalScript(transferViaAlias, state).explicitGet().fields("bytes").value
+            val resolvedAddressBytes = evalScript(transferViaAlias, state).explicitGet().fields("bytes").value.asInstanceOf[ByteVector]
 
             resolvedAddressBytes.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
         }

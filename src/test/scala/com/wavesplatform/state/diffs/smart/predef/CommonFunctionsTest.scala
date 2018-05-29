@@ -77,7 +77,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
         val resultAddress = runScript[ByteVector](
           """
                                                       |match tx {
-                                                      | case mttx : MassTransferTransaction  =>  mttx.transfers[0].bytes
+                                                      | case mttx : MassTransferTransaction  =>  mttx.transfers[0].address.bytes
                                                       | case other => throw
                                                       | }
                                                       |""".stripMargin,

@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, Val}
-import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient}
 import scodec.bits.ByteVector
 
 import scala.util.Try
@@ -44,10 +44,8 @@ class EnvironmentFunctions(environment: Environment) {
       addressBytes <- Try(rawAddressBytes.asInstanceOf[ByteVector].toArray).toEither.left.map(_.getMessage)
     } yield environment.data(addressBytes, key, dataType)
 
-  def addressFromRecipient(fields: Map[String, Val]): Either[ExecutionError, Array[Byte]] = {
-    val bytes = fields("bytes").value.asInstanceOf[ByteVector]
-    environment.resolveAddress(bytes.toArray)
-  }
+  def addressFromAlias(name: String): Either[ExecutionError, Recipient.Address] = environment.resolveAlias(name)
+
 }
 
 object EnvironmentFunctions {

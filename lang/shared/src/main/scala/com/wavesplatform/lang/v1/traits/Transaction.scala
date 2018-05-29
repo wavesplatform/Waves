@@ -2,35 +2,34 @@ package com.wavesplatform.lang.v1.traits
 
 import scodec.bits.ByteVector
 
-trait Transaction {
-  def transactionType: Int
-  def id: ByteVector
-  def fee: Long
-  def amount: Either[String, Long]
-  def feeAssetId: Option[ByteVector]
-  def timestamp: Long
-  def bodyBytes: Either[String, ByteVector]
-  def senderPk: Either[String, ByteVector]
-  def transferAssetId: Either[String, Option[ByteVector]]
-  def assetId: Either[String, ByteVector]
-  def proofs: Either[String, IndexedSeq[ByteVector]]
-  def recipient: Either[String, Recipient]
-  def alias: Either[String, String]
-  def reissuable: Either[String, Boolean]
-  def leaseId: Either[String, ByteVector]
-  def decimals: Either[String, Byte]
-  def assetDescription: Either[String, ByteVector]
-  def assetName: Either[String, ByteVector]
-  def attachment: Either[String, ByteVector]
-  def chainId: Either[String, Byte]
-  def version: Either[String, Byte]
-  def minSponsoredAssetFee: Either[String, Option[Long]]
-  def transfers: Either[String, IndexedSeq[Transfer]]
-}
+case class Header(id: ByteVector, fee: Long, timestamp: Long, version: Long)
+
+case class Proven(h: Header, bodyBytes: ByteVector, senderPk: ByteVector, proofs: IndexedSeq[ByteVector])
 
 trait Recipient
 object Recipient {
   case class Address(bytes: ByteVector) extends Recipient
   case class Alias(name: String)        extends Recipient
 }
-case class Transfer(recipient: Recipient, amount: Long)
+case class TransferItem(recipient: Recipient, amount: Long)
+
+trait Tx
+
+object Tx {
+
+  case class Genesis(header: Header, amount: Long, recipient: Recipient) extends Tx
+  case class Transfer(p: Proven,
+                      feeAssetId: Option[ByteVector],
+                      transferAssetId: Option[ByteVector],
+                      amount: Long,
+                      recipient: Recipient,
+                      attachment: ByteVector)
+      extends Tx
+  case class Issue(p: Proven, amount: Long, assetName: ByteVector, assetDescription: ByteVector, reissuable: Boolean)                  extends Tx
+  case class ReIssue(p: Proven, amount: Long, reissuable: Boolean)                                                                     extends Tx
+  case class Burn(p: Proven, amount: Long)                                                                                             extends Tx
+  case class Lease(p: Proven, amount: Long, recipient: Recipient)                                                                      extends Tx
+  case class LeaseCancel(p: Proven, leaseId: ByteVector)                                                                               extends Tx
+  case class CreateAlias(p: Proven, alias: String)                                                                                     extends Tx
+  case class MassTransfer(p: Proven, transferAssetId: Option[ByteVector], transfers: IndexedSeq[TransferItem], attachment: ByteVector) extends Tx
+}
