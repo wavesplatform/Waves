@@ -108,7 +108,7 @@ object EvaluatorV1 extends ExprEvaluator {
 
   }
 
-  def apply[A: TypeInfo](c: EvaluationContext, expr: EXPR): Either[(EvaluationContext, ExecutionError), A] = {
+  def apply[A: TypeInfo](c: EvaluationContext, expr: EXPR): (EvaluationContext, Either[ExecutionError, A]) = {
     evalExpr[A](expr).run(c)
   }
 }

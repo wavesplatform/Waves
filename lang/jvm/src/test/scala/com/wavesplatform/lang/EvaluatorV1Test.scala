@@ -7,6 +7,7 @@ import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext._
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -21,18 +22,18 @@ import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def ev[T: TypeInfo](context: EvaluationContext = PureContext.instance, expr: EXPR): Either[(EvaluationContext, ExecutionError), T] =
+  private def ev[T: TypeInfo](context: EvaluationContext = PureContext.instance, expr: EXPR): (EvaluationContext, Either[ExecutionError, T]) =
     EvaluatorV1[T](context, expr)
   private def simpleDeclarationAndUsage(i: Int) = BLOCK(LET("x", CONST_LONG(i)), REF("x", LONG), LONG)
 
   property("successful on very deep expressions (stack overflow check)") {
     val term = (1 to 100000).foldLeft[EXPR](CONST_LONG(0))((acc, _) => FUNCTION_CALL(sumLong.header, List(acc, CONST_LONG(1)), LONG))
 
-    ev[Long](expr = term) shouldBe Right(100000)
+    ev[Long](expr = term)._2 shouldBe Right(100000)
   }
 
   property("return error and context of failed evaluation") {
-    val Left((ctx, err)) = ev[Long](
+    val (ctx, Left(err)) = ev[Long](
       expr = BLOCK(
         LET("x", CONST_LONG(3)),
         BLOCK(
@@ -57,7 +58,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         LET("x", CONST_LONG(3)),
         CONST_LONG(3),
         LONG
-      )) shouldBe Right(3)
+      ))._2 shouldBe Right(3)
   }
 
   property("successful on x = y") {
@@ -68,11 +69,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
                      FUNCTION_CALL(sumLong.header, List(REF("x", LONG), REF("y", LONG)), LONG),
                      LONG
                    ),
-                   LONG)) shouldBe Right(6)
+                   LONG))._2 shouldBe Right(6)
   }
 
   property("successful on simple get") {
-    ev[Long](expr = simpleDeclarationAndUsage(3)) shouldBe Right(3)
+    ev[Long](expr = simpleDeclarationAndUsage(3))._2 shouldBe Right(3)
   }
 
   property("successful on get used further in expr") {
@@ -81,7 +82,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         LET("x", CONST_LONG(3)),
         FUNCTION_CALL(eqLong.header, List(REF("x", LONG), CONST_LONG(2)), BOOLEAN),
         BOOLEAN
-      )) shouldBe Right(false)
+      ))._2 shouldBe Right(false)
   }
 
   property("successful on multiple lets") {
@@ -90,7 +91,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         LET("x", CONST_LONG(3)),
         BLOCK(LET("y", CONST_LONG(3)), FUNCTION_CALL(eqLong.header, List(REF("x", LONG), REF("y", LONG)), BOOLEAN), BOOLEAN),
         BOOLEAN
-      )) shouldBe Right(true)
+      ))._2 shouldBe Right(true)
   }
 
   property("successful on multiple lets with expression") {
@@ -103,18 +104,18 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
           BOOLEAN
         ),
         BOOLEAN
-      )) shouldBe Right(true)
+      ))._2 shouldBe Right(true)
   }
 
   property("successful on deep type resolution") {
-    ev[Long](expr = IF(FUNCTION_CALL(eqLong.header, List(CONST_LONG(1), CONST_LONG(2)), BOOLEAN), simpleDeclarationAndUsage(3), CONST_LONG(4), LONG)) shouldBe Right(
+    ev[Long](expr = IF(FUNCTION_CALL(eqLong.header, List(CONST_LONG(1), CONST_LONG(2)), BOOLEAN), simpleDeclarationAndUsage(3), CONST_LONG(4), LONG))._2 shouldBe Right(
       4)
   }
 
   property("successful on same value names in different branches") {
     val expr =
       IF(FUNCTION_CALL(eqLong.header, List(CONST_LONG(1), CONST_LONG(2)), BOOLEAN), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4), LONG)
-    ev[Long](expr = expr) shouldBe Right(4)
+    ev[Long](expr = expr)._2 shouldBe Right(4)
   }
 
   property("fails if override") {
@@ -127,11 +128,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
           LONG
         ),
         LONG
-      )) should produce("already defined")
+      ))._2 should produce("already defined")
   }
 
   property("fails if definition not found") {
-    ev[Long](expr = FUNCTION_CALL(sumLong.header, List(REF("x", LONG), CONST_LONG(2)), LONG)) should produce("A definition of 'x' is not found")
+    ev[Long](expr = FUNCTION_CALL(sumLong.header, List(REF("x", LONG), CONST_LONG(2)), LONG))._2 should produce("A definition of 'x' is not found")
   }
 
   property("custom type field access") {
@@ -145,7 +146,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         functions = Map.empty
       ),
       expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", TYPEREF("Point")), "X", LONG), CONST_LONG(2)), LONG)
-    ) shouldBe Right(5)
+    )._2 shouldBe Right(5)
   }
 
   property("lazy let evaluation doesn't throw if not used") {
@@ -162,7 +163,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       expr = BLOCK(LET("Z", REF("badVal", LONG)),
                    FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", TYPEREF("Point")), "X", LONG), CONST_LONG(2)), LONG),
                    LONG)
-    ) shouldBe Right(5)
+    )._2 shouldBe Right(5)
   }
 
   property("field and value are evaluated maximum once") {
@@ -186,12 +187,12 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[Long](
       context = context,
       expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", TYPEREF("Point")), "X", LONG), GETTER(REF("p", TYPEREF("Point")), "X", LONG)), LONG)
-    ) shouldBe Right(6)
+    )._2 shouldBe Right(6)
 
     ev[Long](
       context = context,
       expr = FUNCTION_CALL(sumLong.header, List(REF("h", LONG), REF("h", LONG)), LONG)
-    ) shouldBe Right(8)
+    )._2 shouldBe Right(8)
 
     fieldCalculated shouldBe 1
     valueCalculated shouldBe 1
@@ -216,7 +217,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       expr = BLOCK(LET("X", FUNCTION_CALL(f.header, List(CONST_LONG(1000)), LONG)),
                    FUNCTION_CALL(sumLong.header, List(REF("X", LONG), REF("X", LONG)), LONG),
                    LONG)
-    ) shouldBe Right(2L)
+    )._2 shouldBe Right(2L)
 
     functionEvaluated shouldBe 1
 
@@ -237,7 +238,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val expr = GETTER(REF("fooInstance", fooType.typeRef), "bar", STRING)
 
-    ev[String](context, expr) shouldBe Right("bAr")
+    ev[String](context, expr)._2 shouldBe Right("bAr")
   }
 
   property("successful on function call getter evaluation") {
@@ -262,7 +263,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val expr = GETTER(FUNCTION_CALL(fooCtor.header, List.empty, fooType.typeRef), "bar", STRING)
 
-    ev[String](context, expr) shouldBe Right("bAr")
+    ev[String](context, expr)._2 shouldBe Right("bAr")
   }
 
   property("successful on block getter evaluation") {
@@ -302,7 +303,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       STRING
     )
 
-    ev[String](context, expr) shouldBe Right("TRANSFORMED_BAR")
+    ev[String](context, expr)._2 shouldBe Right("TRANSFORMED_BAR")
   }
 
   property("successful on simple function evaluation") {
@@ -314,7 +315,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         functions = Map(multiplierFunction.header -> multiplierFunction)
       ),
       expr = FUNCTION_CALL(multiplierFunction.header, List(CONST_LONG(3), CONST_LONG(4)), LONG)
-    ) shouldBe Right(12)
+    )._2 shouldBe Right(12)
   }
 
   property("returns an success if sigVerify return a success") {
@@ -324,8 +325,30 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val bodyBytes = "message".getBytes()
     val signature = Curve25519.sign(privateKey, bodyBytes)
 
-    val r = sigVerifyTest(bodyBytes, publicKey, signature)
+    val r = sigVerifyTest(bodyBytes, publicKey, signature)._2
     r.isRight shouldBe true
+  }
+
+  property("returns correct context") {
+    val (alicePrivateKey, _) = Curve25519.createKeyPair("seed0".getBytes())
+    val (bobPrivateKey, bobPublicKey)     = Curve25519.createKeyPair("seed1".getBytes())
+    val (_, senderPublicKey)              = Curve25519.createKeyPair("seed2".getBytes())
+
+    val bodyBytes = "message".getBytes()
+
+    val (ctx, result) = multiSig(
+      bodyBytes,
+      senderPublicKey,
+      bobPublicKey,
+      bobPublicKey,
+      Curve25519.sign(alicePrivateKey, bodyBytes),
+      Curve25519.sign(bobPrivateKey, bodyBytes)
+    )
+
+    result shouldBe Right(false)
+
+    ctx.letDefs("bobSigned").value.value() shouldBe Right(true)
+    ctx.letDefs("aliceSigned").value.value() shouldBe Right(false)
   }
 
   property("returns an error if sigVerify return an error") {
@@ -333,13 +356,13 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val (_, publicKey) = Curve25519.createKeyPair(seed)
     val bodyBytes      = "message".getBytes()
 
-    val r = sigVerifyTest(bodyBytes, publicKey, Signature("signature".getBytes()))
+    val r = sigVerifyTest(bodyBytes, publicKey, Signature("signature".getBytes()))._2
     r.isLeft shouldBe false
   }
 
   private def sigVerifyTest(bodyBytes: Array[Byte],
                             publicKey: PublicKey,
-                            signature: Signature): Either[(EvaluationContext, ExecutionError), Boolean] = {
+                            signature: Signature): (EvaluationContext, Either[ExecutionError, Boolean]) = {
     val txType = PredefType(
       "Transaction",
       List(
@@ -382,15 +405,71 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     )
   }
 
+  private def multiSig(bodyBytes: Array[Byte],
+                       senderPK: PublicKey,
+                       alicePK: PublicKey,
+                       bobPK: PublicKey,
+                       aliceProof: Signature,
+                       bobProof: Signature): (EvaluationContext, Either[ExecutionError, Boolean]) = {
+    val txType = PredefType(
+      "Transaction",
+      List(
+        "bodyBytes" -> BYTEVECTOR,
+        "senderPk"  -> BYTEVECTOR,
+        "proof0"    -> BYTEVECTOR,
+        "proof1"    -> BYTEVECTOR
+      )
+    )
+
+    val txObj = Obj(
+      Map(
+        "bodyBytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(bodyBytes))),
+        "senderPk"  -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(senderPK))),
+        "proof0"    -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(aliceProof))),
+        "proof1"    -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(bobProof)))
+      ))
+
+    val context = Monoid.combineAll(
+      Seq(
+        PureContext.instance,
+        CryptoContext.build(Global),
+        EvaluationContext.build(
+          types = Seq(txType),
+          caseTypes = Seq.empty,
+          letDefs = Map(
+            "tx"          -> LazyVal(TYPEREF(txType.name))(EitherT.pure(txObj)),
+            "alicePubKey" -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(alicePK))),
+            "bobPubKey"   -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(bobPK)))
+          ),
+          functions = Seq.empty
+        )
+      ))
+
+    val compilerContext = CompilerContext.fromEvaluationContext(context)
+
+    val script =
+      s"""
+         |let aliceSigned  = sigVerify(tx.bodyBytes, tx.proof0, alicePubKey)
+         |let bobSigned    = sigVerify(tx.bodyBytes, tx.proof1, bobPubKey  )
+         |
+         |aliceSigned && bobSigned
+   """.stripMargin
+
+    ev[Boolean](
+      context = context,
+      expr = new CompilerV1(compilerContext).compile(script, List.empty).right.get
+    )
+  }
+
   property("checking a hash of some message by crypto function invoking") {
     val bodyText      = "some text for test"
     val bodyBytes     = bodyText.getBytes()
     val hashFunctions = Map("sha256" -> Sha256, "blake2b256" -> Blake2b256, "keccak256" -> Keccak256)
 
-    for ((funcName, funcClass) <- hashFunctions) hashFuncTest(bodyBytes, funcName) shouldBe Right(ByteVector(funcClass.hash(bodyText)))
+    for ((funcName, funcClass) <- hashFunctions) hashFuncTest(bodyBytes, funcName)._2 shouldBe Right(ByteVector(funcClass.hash(bodyText)))
   }
 
-  private def hashFuncTest(bodyBytes: Array[Byte], funcName: String): Either[(EvaluationContext, ExecutionError), ByteVector] = {
+  private def hashFuncTest(bodyBytes: Array[Byte], funcName: String): (EvaluationContext, Either[ExecutionError, ByteVector]) = {
     val context = Monoid.combineAll(
       Seq(
         PureContext.instance,

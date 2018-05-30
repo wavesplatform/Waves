@@ -2,6 +2,7 @@ package scorex.transaction.smart.script
 
 import cats.implicits._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.{ExecutionError, TypeInfo}
 import com.wavesplatform.state._
 import monix.eval.Coeval
@@ -11,7 +12,10 @@ import scorex.transaction.smart.BlockchainContext
 
 object ScriptRunner {
 
-  def apply[A: TypeInfo, T <: Transaction](height: Int, tx: T, blockchain: Blockchain, script: Script): Either[ExecutionError, A] =
+  def apply[A: TypeInfo, T <: Transaction](height: Int,
+                                           tx: T,
+                                           blockchain: Blockchain,
+                                           script: Script): (EvaluationContext, Either[ExecutionError, A]) =
     script match {
       case Script.Expr(expr) =>
         val ctx = BlockchainContext.build(
@@ -20,9 +24,9 @@ object ScriptRunner {
           Coeval.evalOnce(height),
           blockchain
         )
-        EvaluatorV1[A](ctx, expr).left.map(_._2)
+        EvaluatorV1[A](ctx, expr)
 
-      case _ => "Unsupported script version".asLeft[A]
+      case _ => (EvaluationContext.empty, "Unsupported script version".asLeft[A])
     }
 
 }

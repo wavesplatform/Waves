@@ -15,6 +15,7 @@ import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
 import scorex.transaction.transfer._
+
 import scala.concurrent.duration._
 
 /*
@@ -104,7 +105,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
     val signedToGovFail     = unsignedToGov.copy(proofs = Proofs(Seq(accountSigToGovFail)))
 
     assertBadRequestAndResponse(sender.signedBroadcast(signedToGovFail.json() + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt))),
-                                "Reason: TransactionNotAllowedByScript")
+                                "TransactionNotAllowedByScript")
 
     //make correct transfer to government after some time
     sender.waitForHeight(heightBefore + 10, 2.minutes)

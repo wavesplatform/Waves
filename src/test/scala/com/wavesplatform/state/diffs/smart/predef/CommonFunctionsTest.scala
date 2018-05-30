@@ -46,7 +46,6 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
 
   property("getTransfer should MassTransfer transfers extract") {
     import scodec.bits.ByteVector
-    //import com.wavesplatform.lang.v1.ctx.Obj
     forAll(massTransferGen.filter(_.transfers.size > 0)) {
       case (massTransfer) =>
         val resultAmount = runScript[Long]("tx.transfers[0].amount", massTransfer)

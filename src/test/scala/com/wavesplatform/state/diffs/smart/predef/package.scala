@@ -17,6 +17,6 @@ package object predef {
     val Success(expr, _) = Parser(script)
     assert(expr.size == 1)
     val Right(typedExpr) = CompilerV1(dummyTypeCheckerContext, expr.head)
-    EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr).left.map(_._2)
+    EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr)._2
   }
 }

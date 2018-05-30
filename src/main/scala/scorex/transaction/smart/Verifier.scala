@@ -3,7 +3,7 @@ package scorex.transaction.smart
 import cats.syntax.all._
 import com.wavesplatform.crypto
 import com.wavesplatform.state._
-import scorex.transaction.ValidationError.{GenericError, TransactionNotAllowedByScript}
+import scorex.transaction.ValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.smart.script.{Script, ScriptRunner}
@@ -36,9 +36,9 @@ object Verifier {
 
   def verify[T <: Transaction](blockchain: Blockchain, script: Script, height: Int, transaction: T): Either[ValidationError, T] = {
     ScriptRunner[Boolean, T](height, transaction, blockchain, script) match {
-      case Left(execError) => Left(GenericError(s"Script execution error: $execError"))
-      case Right(false)    => Left(TransactionNotAllowedByScript(transaction))
-      case Right(true)     => Right(transaction)
+      case (ctx, Left(execError)) => Left(ScriptExecutionError(transaction, execError, ctx.letDefs))
+      case (ctx, Right(false))    => Left(TransactionNotAllowedByScript(transaction, ctx.letDefs))
+      case (_, Right(true))       => Right(transaction)
     }
   }
 

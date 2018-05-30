@@ -14,7 +14,7 @@ final case class EvalM[A](inner: Kleisli[Coeval, CoevalRef[EvaluationContext], E
     EitherT(inner.run(atom))
   }
 
-  def run(ctx: EvaluationContext): Either[(EvaluationContext, ExecutionError), A] = {
+  def run(ctx: EvaluationContext): (EvaluationContext, Either[ExecutionError, A]) = {
     val atom = CoevalRef.of(ctx)
 
     val action = inner
@@ -23,11 +23,13 @@ final case class EvalM[A](inner: Kleisli[Coeval, CoevalRef[EvaluationContext], E
     (for {
       result  <- action
       lastCtx <- atom.read
-    } yield result.left.map(err => (lastCtx, err))).value
+    } yield (lastCtx, result)).value
   }
 }
 
 object EvalM {
+
+  type EvaluationResult[A] = Either[ExecutionError, A]
 
   private type MM[A] = Kleisli[Coeval, CoevalRef[EvaluationContext], A]
   private val M: Monad[MM] = implicitly
