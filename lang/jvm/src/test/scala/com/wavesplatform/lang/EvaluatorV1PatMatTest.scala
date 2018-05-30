@@ -20,14 +20,15 @@ class EvaluattorV1CaseObjField extends PropSpec with PropertyChecks with Matcher
     ev[Long](
       context = context(pointAInstance),
       expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", TYPEREF("PointA")), "X", LONG), CONST_LONG(2)), LONG)
-    ) shouldBe Right(5)
+    )._2 shouldBe Right(5)
   }
 
   property("case custom type field access over union") {
-    def testAccess(instance: CaseObj, field: String) = ev[Long](
-      context = context(instance),
-      expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", AorB), field, LONG), CONST_LONG(2)), LONG)
-    )
+    def testAccess(instance: CaseObj, field: String) =
+      ev[Long](
+        context = context(instance),
+        expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", AorB), field, LONG), CONST_LONG(2)), LONG)
+      )._2
 
     testAccess(pointAInstance, "X") shouldBe Right(5)
     testAccess(pointBInstance, "X") shouldBe Right(5)
