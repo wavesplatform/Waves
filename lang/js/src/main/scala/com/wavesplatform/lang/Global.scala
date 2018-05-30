@@ -25,7 +25,7 @@ object Global extends BaseGlobal {
 
   private def toBuffer(xs: Array[Byte]): ArrayBuffer = {
     val r = new Int8Array(xs.length)
-    r.set(r.toJSArray)
+    r.set(xs.toJSArray)
     r.buffer
   }
 
