@@ -18,6 +18,7 @@ trait Tx
 object Tx {
 
   case class Genesis(header: Header, amount: Long, recipient: Recipient) extends Tx
+  case class Payment(p: Proven, amount: Long, recipient: Recipient)      extends Tx
   case class Transfer(p: Proven,
                       feeAssetId: Option[ByteVector],
                       transferAssetId: Option[ByteVector],
@@ -33,4 +34,7 @@ object Tx {
   case class CreateAlias(p: Proven, alias: String)                                                                                     extends Tx
   case class SetScript(p: Proven, scipt: Option[ByteVector])                                                                           extends Tx
   case class MassTransfer(p: Proven, transferAssetId: Option[ByteVector], transfers: IndexedSeq[TransferItem], attachment: ByteVector) extends Tx
+  case class Sponsorship(p: Proven, minFee: Option[Long])                                                                              extends Tx
+  case class Exchange(p: Proven)                                                                                                       extends Tx
+  case class Data(p: Proven)                                                                                                           extends Tx
 }

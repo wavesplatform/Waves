@@ -6,6 +6,7 @@ import scodec.bits.ByteVector
 import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.transaction._
 import scorex.transaction.assets._
+import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.transfer._
 
@@ -48,11 +49,9 @@ object RealTransactionWrapper {
           attachment = ByteVector(ms.attachment)
         )
       case ss: SetScriptTransaction => Tx.SetScript(proven(ss), ss.script.map(_.bytes().arr).map(ByteVector(_)))
-      //      case 2 => ??? // payment
-      //      case 7 => ??? // exchange
-      //      case 12 => ??? // data
-      //      case 14 => ??? // sponsorship
-      case _ => ???
+      case p: PaymentTransaction    => Tx.Payment(proven(p), p.amount, p.recipient)
+      case e: ExchangeTransaction   => Tx.Exchange(proven(e))
+      case s: SponsorFeeTransaction => Tx.Sponsorship(proven(s), s.minSponsoredAssetFee)
     }
   }
 }

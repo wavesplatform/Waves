@@ -18,11 +18,11 @@ object WavesContext {
 
   private val optionByteVector: OPTION = OPTION(BYTEVECTOR)
   private val optionAddress            = OPTION(addressType.typeRef)
-//  private val optionLong: OPTION       = OPTION(LONG)
-  private val listByteVector: LIST = LIST(BYTEVECTOR)
-  private val listTransfers        = LIST(transfer.typeRef)
+  private val optionLong: OPTION       = OPTION(LONG)
+  private val listByteVector: LIST     = LIST(BYTEVECTOR)
+  private val listTransfers            = LIST(transfer.typeRef)
 
-  private val common = List(
+  private val header = List(
     "id"        -> BYTEVECTOR,
     "fee"       -> LONG,
     "timestamp" -> LONG,
@@ -34,6 +34,11 @@ object WavesContext {
     "proofs"    -> listByteVector
   )
 
+  private val genesisTransactionType = PredefCaseType(
+    "GenesisTransaction",
+    List("amount" -> LONG, "recipient" -> addressOrAliasType) ++ header
+  )
+
   private val transferTransactionType = PredefCaseType(
     "TransferTransaction",
     List(
@@ -42,7 +47,7 @@ object WavesContext {
       "transferAssetId" -> optionByteVector,
       "recipient"       -> addressOrAliasType,
       "attachment"      -> BYTEVECTOR
-    ) ++ common ++ proven
+    ) ++ header ++ proven
   )
 
   private val issueTransactionType = PredefCaseType(
@@ -52,7 +57,7 @@ object WavesContext {
       "assetName"        -> BYTEVECTOR,
       "assetDescription" -> BYTEVECTOR,
       "reissuable"       -> BOOLEAN,
-    ) ++ common ++ proven
+    ) ++ header ++ proven
   )
 
   private val reissueTransactionType = PredefCaseType(
@@ -60,35 +65,60 @@ object WavesContext {
     List(
       "amount"     -> LONG,
       "reissuable" -> BOOLEAN,
-    ) ++ common ++ proven
+    ) ++ header ++ proven
   )
 
   private val burnTransactionType = PredefCaseType(
     "BurnTransaction",
     List(
       "amount" -> LONG,
-    ) ++ common ++ proven
+    ) ++ header ++ proven
   )
   private val leaseTransactionType = PredefCaseType(
     "LeaseTransaction",
     List(
       "amount"    -> LONG,
       "recipient" -> addressOrAliasType,
-    ) ++ common ++ proven
+    ) ++ header ++ proven
   )
 
   private val leaseCancelTransactionType = PredefCaseType(
     "LeaseCancelTransaction",
     List(
       "leaseId" -> BYTEVECTOR,
-    ) ++ common ++ proven
+    ) ++ header ++ proven
   )
 
   private val createAliasTransactionType = PredefCaseType(
     "CreateAliasTransaction",
     List(
       "alias" -> STRING,
-    ) ++ common ++ proven
+    ) ++ header ++ proven
+  )
+
+  private val paymentTransactionType = PredefCaseType(
+    "PaymentTransaction",
+    List(
+      "amount"    -> LONG,
+      "recipient" -> addressOrAliasType,
+    ) ++ header ++ proven
+  )
+
+  private val sponsorFeeTransactionType = PredefCaseType(
+    "SponsorFeeTransaction",
+    List(
+      "minFee" -> optionLong
+    ) ++ header ++ proven
+  )
+
+  private val exchangeTransactionType = PredefCaseType(
+    "ExchangeTransaction",
+    header ++ proven
+  )
+
+  private val dataTransactionType = PredefCaseType(
+    "DataTransaction",
+    header ++ proven
   )
 
   private val massTransferTransactionType = PredefCaseType(
@@ -98,28 +128,33 @@ object WavesContext {
       "transferAssetId" -> optionByteVector,
       "transfers"       -> listTransfers,
       "attachment"      -> BYTEVECTOR
-    ) ++ common ++ proven
+    ) ++ header ++ proven
   )
 
   private val setScriptTransactionType = PredefCaseType(
     "SetScriptTransaction",
     List(
       "script" -> optionByteVector
-    ) ++ common ++ proven
+    ) ++ header ++ proven
   )
 
-  private val transactionTypes =
-    List(
-      transferTransactionType,
-      issueTransactionType,
-      reissueTransactionType,
-      burnTransactionType,
-      leaseTransactionType,
-      leaseCancelTransactionType,
-      massTransferTransactionType,
-      createAliasTransactionType,
-      setScriptTransactionType
-    )
+  private val obsoleteTransactionTypes = List(genesisTransactionType, paymentTransactionType)
+  private val activeTransactionTypes = List(
+    transferTransactionType,
+    issueTransactionType,
+    reissueTransactionType,
+    burnTransactionType,
+    leaseTransactionType,
+    leaseCancelTransactionType,
+    massTransferTransactionType,
+    createAliasTransactionType,
+    setScriptTransactionType,
+    sponsorFeeTransactionType,
+    exchangeTransactionType,
+    dataTransactionType
+  )
+
+  private val transactionTypes = /* obsoleteTransactionTypes ++ */ activeTransactionTypes
 
   private val transactionType = UNION(transactionTypes.map(_.typeRef))
 
@@ -149,6 +184,10 @@ object WavesContext {
 
   private def transactionObject(tx: Tx): CaseObj =
     tx match {
+      case Tx.Genesis(h, amount, recipient) =>
+        CaseObj(genesisTransactionType.typeRef, Map("amount" -> Val(LONG)(amount)) ++ headerPart(h) + mapRecipient(recipient))
+      case Tx.Payment(p, amount, recipient) =>
+        CaseObj(genesisTransactionType.typeRef, Map("amount" -> Val(LONG)(amount)) ++ provenTxPart(p) + mapRecipient(recipient))
       case Tx.Transfer(p, feeAssetId, transferAssetId, amount, recipient, attachment) =>
         CaseObj(
           transferTransactionType.typeRef,
@@ -214,15 +253,22 @@ object WavesContext {
           ) ++ provenTxPart(p)
         )
 
-      case SetScript(p, scriptOpt) =>
+      case Lease(p, amount, recipient) =>
         CaseObj(
-          setScriptTransactionType.typeRef,
-          Map("script" -> Val(optionByteVector)(scriptOpt.asInstanceOf[optionByteVector.Underlying])) ++ provenTxPart(p)
+          leaseTransactionType.typeRef,
+          Map(
+            "amount" -> Val(LONG)(amount),
+          ) ++ provenTxPart(p) + mapRecipient(recipient)
         )
-      //      case 2 => ??? // payment
-      //      case 7 => ??? // exchange
-      //      case 12 => ??? // data
-      //      case 14 => ??? // sponsorship
+      case SetScript(p, scriptOpt) =>
+        CaseObj(setScriptTransactionType.typeRef,
+                Map("script" -> Val(optionByteVector)(scriptOpt.asInstanceOf[optionByteVector.Underlying])) ++ provenTxPart(p))
+      case Sponsorship(p, minFee) =>
+        CaseObj(sponsorFeeTransactionType.typeRef, Map("minFee" -> Val(optionLong)(minFee.asInstanceOf[optionLong.Underlying])) ++ provenTxPart(p))
+      case Data(p) =>
+        CaseObj(dataTransactionType.typeRef, provenTxPart(p))
+      case Exchange(p) =>
+        CaseObj(exchangeTransactionType.typeRef, provenTxPart(p))
     }
 
   def build(env: Environment): EvaluationContext = {
