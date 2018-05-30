@@ -31,5 +31,6 @@ object Tx {
   case class Lease(p: Proven, amount: Long, recipient: Recipient)                                                                      extends Tx
   case class LeaseCancel(p: Proven, leaseId: ByteVector)                                                                               extends Tx
   case class CreateAlias(p: Proven, alias: String)                                                                                     extends Tx
+  case class SetScript(p: Proven, scipt: Option[ByteVector])                                                                           extends Tx
   case class MassTransfer(p: Proven, transferAssetId: Option[ByteVector], transfers: IndexedSeq[TransferItem], attachment: ByteVector) extends Tx
 }

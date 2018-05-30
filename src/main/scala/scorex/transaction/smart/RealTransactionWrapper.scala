@@ -47,10 +47,10 @@ object RealTransactionWrapper {
           transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.TransferItem(r.address, r.amount)).toIndexedSeq,
           attachment = ByteVector(ms.attachment)
         )
+      case ss: SetScriptTransaction => Tx.SetScript(proven(ss), ss.script.map(_.bytes().arr).map(ByteVector(_)))
       //      case 2 => ??? // payment
       //      case 7 => ??? // exchange
       //      case 12 => ??? // data
-      //      case 13 => ??? // setscript
       //      case 14 => ??? // sponsorship
       case _ => ???
     }

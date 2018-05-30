@@ -101,6 +101,13 @@ object WavesContext {
     ) ++ common ++ proven
   )
 
+  private val setScriptTransactionType = PredefCaseType(
+    "SetScriptTransaction",
+    List(
+      "script" -> optionByteVector
+    ) ++ common ++ proven
+  )
+
   private val transactionTypes =
     List(
       transferTransactionType,
@@ -110,7 +117,8 @@ object WavesContext {
       leaseTransactionType,
       leaseCancelTransactionType,
       massTransferTransactionType,
-      createAliasTransactionType
+      createAliasTransactionType,
+      setScriptTransactionType
     )
 
   private val transactionType = UNION(transactionTypes.map(_.typeRef))
@@ -205,11 +213,16 @@ object WavesContext {
             "attachment"      -> Val(BYTEVECTOR)(attachment)
           ) ++ provenTxPart(p)
         )
+
+      case SetScript(p, scriptOpt) =>
+        CaseObj(
+          setScriptTransactionType.typeRef,
+          Map("script" -> Val(optionByteVector)(scriptOpt.asInstanceOf[optionByteVector.Underlying])) ++ provenTxPart(p)
+        )
       //      case 2 => ??? // payment
       //      case 7 => ??? // exchange
       //      case 12 => ??? // data
-      //      case 13 => ??? // setscript
-      //      case 14 => ??? // sponsorship]
+      //      case 14 => ??? // sponsorship
     }
 
   def build(env: Environment): EvaluationContext = {
