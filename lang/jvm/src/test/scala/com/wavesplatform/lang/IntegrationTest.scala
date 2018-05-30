@@ -63,6 +63,15 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long]("10 + 2") shouldBe Right(12)
   }
 
+  property("multiply and devide") {
+    eval[Long]("10 * 2") shouldBe Right(20)
+    eval[Long]("5 + 10 * 2") shouldBe Right(25)
+    eval[Long]("10 * 2 + 5") shouldBe Right(25)
+    eval[Long]("10 * 2 - 5") shouldBe Right(15)
+    eval[Long]("2 * 2 / 3") shouldBe Right(1)
+    eval[Long]("2.5 * 2") shouldBe Right(5)
+  }
+
   property("equals works on primitive types") {
     eval[Boolean]("base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8' == base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8'") shouldBe Right(true)
     eval[Boolean]("1 == 2") shouldBe Right(false)

@@ -81,6 +81,14 @@ object PureContext {
     case _ => ???
   }
 
+  val muldiv = PredefFunction("muldiv", 4, LONG, List("a" -> LONG, "b" -> LONG, "d" -> LONG)) {
+    case (a: Long)  :: (b: Long) :: (d: Long) :: Nil => {
+      val r = (BigInt(a) * BigInt(b)) / d
+      Either.cond(r.isValidLong, r.toLong, s"$a*$b/$d is too big.")
+    }
+    case _ => ???
+  }
+
   private def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
     PredefFunction(opsToFunctions(op), 1, r, List("a" -> t, "b" -> t)) {
       case a :: b :: Nil =>
@@ -115,7 +123,8 @@ object PureContext {
                                            neLong, neByteVector, neBool, neString,
                                            ge, gt, sge, sgt,
                                            getElement, getListSize,
-                                           uMinus, uNot)
+                                           uMinus, uNot,
+                                           muldiv)
 
   lazy val instance =
     EvaluationContext.build(types = Seq.empty,

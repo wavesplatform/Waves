@@ -58,12 +58,25 @@ object CompilerV1 {
     case ifExpr: Expressions.IF          => compileIf(ctx, ifExpr)
     case ref: Expressions.REF            => compileRef(ctx, ref)
     case m: Expressions.MATCH            => compileMatch(ctx, m)
+
+    case Expressions.BINARY_OP(start, end, Expressions.CONST_RAT(cstart, cend, nom, denom), MUL_OP, b) =>
+        compileFunctionCall(ctx, Expressions.FUNCTION_CALL(start, end, PART.VALID(start, end, "muldiv"), List(Expressions.CONST_LONG(cstart, cend, nom), b, Expressions.CONST_LONG(cstart, cend, denom))))
+    case Expressions.BINARY_OP(start, end, a, MUL_OP, Expressions.CONST_RAT(cstart, cend, nom, denom)) =>
+        compileFunctionCall(ctx, Expressions.FUNCTION_CALL(start, end, PART.VALID(start, end, "muldiv"), List(a, Expressions.CONST_LONG(cstart, cend, nom), Expressions.CONST_LONG(cstart, cend, denom))))
+    case Expressions.BINARY_OP(start, end, a, MUL_OP, b) =>
+        compileFunctionCall(ctx, Expressions.FUNCTION_CALL(start, end, PART.VALID(start, end, "muldiv"), List(a, b, Expressions.CONST_LONG(start, end, 1L))))
+    case Expressions.BINARY_OP(start, end, Expressions.BINARY_OP(_, _, a, MUL_OP, b), DIV_OP, d) =>
+        compileFunctionCall(ctx, Expressions.FUNCTION_CALL(start, end, PART.VALID(start, end, "muldiv"), List(a, b, d)))
+    case Expressions.BINARY_OP(start, end, a, DIV_OP, b) =>
+        compileFunctionCall(ctx, Expressions.FUNCTION_CALL(start, end, PART.VALID(start, end, "muldiv"), List(a, Expressions.CONST_LONG(start, end, 1L), b)))
+
     case Expressions.BINARY_OP(start, end, a, op, b) =>
       op match {
         case AND_OP => compileIf(ctx, Expressions.IF(start, end, a, b, Expressions.FALSE(start, end)))
         case OR_OP  => compileIf(ctx, Expressions.IF(start, end, a, Expressions.TRUE(start, end), b))
         case _      => compileFunctionCall(ctx, Expressions.FUNCTION_CALL(start, end, PART.VALID(start, end, opsToFunctions(op)), List(a, b)))
       }
+    case Expressions.CONST_RAT(_, _, _, _) => EitherT.leftT[Coeval, EXPR]("Only multiplication allowed for rational constants")
     case Expressions.INVALID(_, _, message, _) => EitherT.leftT[Coeval, EXPR](message)
   }
 

@@ -101,6 +101,52 @@ object Parser {
   private val numberP: P[CONST_LONG] = P(Index ~~ (CharIn("+-").? ~~ digit.repX(min = 1)).! ~~ Index).map {
     case (start, x, end) => CONST_LONG(start, end, x.toLong)
   }
+
+  sealed abstract class RAT_REPR
+  case class DEC(indeger: CONST_LONG, fric: String) extends RAT_REPR
+  case class DIV(nom: CONST_LONG, denom: String) extends RAT_REPR
+  case class NAT(v: CONST_LONG) extends RAT_REPR
+
+  private def gcd(a: Long, b: Long, g: Long = 1): Long = {
+    if(a == 0) {
+       b*g
+    } else {
+      (a & 1, b & 1) match {
+        case (0,0) => gcd(a >> 1, b >> 1, g << 1)
+        case (1,0) => gcd(a, b >> 1, g)
+        case (0,1) => gcd(a >> 1, b, g)
+        case (1,1) if (a>=b) => gcd((a - b) >> 1, b, g)
+        case (1,1) => gcd((b - a) >> 1, a, g)
+      }
+   }
+  }
+  private def norm(nom: Long, denom: Long): (Long, Long) = {
+    val g = gcd(nom, denom)
+    (nom/g, denom/g)
+  }
+
+  private val radix = BigInt(10)
+  private val ratP: P[EXPR] = P(Index ~~
+              (numberP.flatMap { n =>
+                 P("." ~~ digit.rep(min = 1).!).map(DEC(n,_)) |
+                 P("/" ~~ (CharIn('1' to '9') ~ digit.rep(min = 0)).!).map(DIV(n,_)) |
+                 P("").map(_ => NAT(n))
+              }) ~~ Index).map {
+    case (_, NAT(n), _) => n
+    case (start, DIV(CONST_LONG(_,_,nom),denom), end) =>
+      val (nn,nd) = norm(nom, denom.toLong)
+      CONST_RAT(start, end, nn, nd)
+    case (start, DEC(CONST_LONG(_,_,n),f), end) =>
+      val denom = radix pow f.filter(_.isDigit).length
+      val nom = n*denom + f.toLong
+      if(nom.isValidLong) {
+        val (nn,nd) = norm(nom.toLong, denom.toLong)
+        CONST_RAT(start, end, nn, nd)
+      } else {
+        INVALID(start, end, s"$nom is too big.")
+      }
+  }
+
   private val trueP: P[TRUE]        = P(Index ~~ "true".! ~~ Index).map { case (start, _, end) => TRUE(start, end) }
   private val falseP: P[FALSE]      = P(Index ~~ "false".! ~~ Index).map { case (start, _, end) => FALSE(start, end) }
   private val bracesP: P[EXPR]      = P("(" ~ fallBackExpr ~ ")")
@@ -228,7 +274,7 @@ object Parser {
       }
   }
 
-  private val baseAtom      = P(ifP | NoCut(matchP) | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP)
+  private val baseAtom      = P(ifP | NoCut(matchP) | byteVectorP | stringP | ratP | trueP | falseP | block | maybeAccessP)
   private lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority) | baseAtom)
 
   private lazy val fallBackExpr = {
