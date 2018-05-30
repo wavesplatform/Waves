@@ -13,11 +13,11 @@ class IssueTransactionV1Suite extends BaseTransactionSuite with TableDrivenPrope
     val assetDescription = "my asset description"
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
 
-    val issuedAssetId = sender.issue(firstAddress, assetName, assetDescription, transferAmount, 2, reissuable = true, issueFee).id
+    val issuedAssetId = sender.issue(firstAddress, assetName, assetDescription, someAssetAmount, 2, reissuable = true, issueFee).id
     nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
 
     notMiner.assertBalances(firstAddress, balance1 - issueFee, eff1 - issueFee)
-    notMiner.assertAssetBalance(firstAddress, issuedAssetId, transferAmount)
+    notMiner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
   }
 
   test("Able to create asset with the same name") {
@@ -25,13 +25,13 @@ class IssueTransactionV1Suite extends BaseTransactionSuite with TableDrivenPrope
     val assetDescription = "my asset description 1"
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
 
-    val issuedAssetId = sender.issue(firstAddress, assetName, assetDescription, transferAmount, 2, reissuable = false, issueFee).id
+    val issuedAssetId = sender.issue(firstAddress, assetName, assetDescription, someAssetAmount, 2, reissuable = false, issueFee).id
     nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
 
-    val issuedAssetIdSameAsset = sender.issue(firstAddress, assetName, assetDescription, transferAmount, 2, reissuable = true, issueFee).id
+    val issuedAssetIdSameAsset = sender.issue(firstAddress, assetName, assetDescription, someAssetAmount, 2, reissuable = true, issueFee).id
     nodes.waitForHeightAriseAndTxPresent(issuedAssetIdSameAsset)
 
-    notMiner.assertAssetBalance(firstAddress, issuedAssetId, transferAmount)
+    notMiner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
     notMiner.assertBalances(firstAddress, balance1 - 2 * issueFee, eff1 - 2 * issueFee)
   }
 
@@ -41,7 +41,7 @@ class IssueTransactionV1Suite extends BaseTransactionSuite with TableDrivenPrope
     val eff1             = notMiner.accountBalances(firstAddress)._2
     val bigAssetFee      = eff1 + 1.waves
 
-    assertBadRequestAndMessage(sender.issue(firstAddress, assetName, assetDescription, transferAmount, 2, reissuable = false, bigAssetFee),
+    assertBadRequestAndMessage(sender.issue(firstAddress, assetName, assetDescription, someAssetAmount, 2, reissuable = false, bigAssetFee),
                                "negative waves balance")
   }
 
