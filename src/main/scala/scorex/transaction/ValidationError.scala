@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.google.common.base.Throwables
-import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
+import com.wavesplatform.lang.v1.evaluator.ctx.LazyVal
 import com.wavesplatform.state.ByteStr
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, MicroBlock}
@@ -46,26 +46,20 @@ object ValidationError {
     override def toString: String = s"InvalidSignature(${s.toString + " reason: " + details})"
   }
 
-  case class ScriptExecutionError(t: Transaction, error: String, evaluationContext: EvaluationContext) extends ValidationError {
+  case class ScriptExecutionError(t: Transaction, error: String, letDefs: Map[String, LazyVal]) extends ValidationError {
     override def toString: String =
       s"""
          |Script execution error: $error
          |Transaction: $t
-         |Context:
-         |  Types: ${evaluationContext.typeDefs.mkString("[\n\t\t", "\n\t\t", "\n\t]")}
-         |  Functions: ${evaluationContext.functions.keys.mkString("[\n\t\t", "\n\t\t", "\n\t]")}
-         |  Variables: ${evaluationContext.letDefs.mkString("[\n\t\t", "\n\t\t", "\n\t]")}
+         |Variables: ${letDefs.mkString("[\n\t\t", "\n\t\t", "\n\t]")}
        """.stripMargin
   }
 
-  case class TransactionNotAllowedByScript(t: Transaction, evaluationContext: EvaluationContext) extends ValidationError {
+  case class TransactionNotAllowedByScript(t: Transaction, letDefs: Map[String, LazyVal]) extends ValidationError {
     override def toString: String =
       s"""
          |TransactionNotAllowedByScript($t)
-         |Context:
-         |  Types: ${evaluationContext.typeDefs.mkString("[\n\t\t", "\n\t\t", "\n\t]")}
-         |  Functions: ${evaluationContext.functions.keys.mkString("[\n\t\t", "\n\t\t", "\n\t]")}
-         |  Variables: ${evaluationContext.letDefs.mkString("[\n\t\t", "\n\t\t", "\n\t]")}
+         |Variables: ${letDefs.mkString("[\n\t\t", "\n\t\t", "\n\t]")}
        """.stripMargin
   }
 
