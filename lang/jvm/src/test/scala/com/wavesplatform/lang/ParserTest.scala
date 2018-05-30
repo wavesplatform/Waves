@@ -543,7 +543,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     )
   }
 
-  property("crypto functions: sha256") {
+  ignore("crypto functions: sha256") {
     val text        = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD=test message"
     val encodedText = ScorexBase58.encode(text.getBytes)
 
@@ -551,7 +551,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       FUNCTION_CALL(0, 54, PART.VALID(0, 6, "sha256"), List(CONST_BYTEVECTOR(7, 53, PART.VALID(15, 52, ByteVector(text.getBytes)))))
   }
 
-  property("crypto functions: blake2b256") {
+  ignore("crypto functions: blake2b256") {
     val text        = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD=test message"
     val encodedText = ScorexBase58.encode(text.getBytes)
 
@@ -559,7 +559,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       FUNCTION_CALL(0, 58, PART.VALID(0, 10, "blake2b256"), List(CONST_BYTEVECTOR(11, 57, PART.VALID(19, 56, ByteVector(text.getBytes)))))
   }
 
-  property("crypto functions: keccak256") {
+  ignore("crypto functions: keccak256") {
     val text        = "❤✓☀★☂♞☯☭☢€☎∞❄♫\u20BD=test message"
     val encodedText = ScorexBase58.encode(text.getBytes)
 
