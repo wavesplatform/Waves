@@ -138,6 +138,8 @@ object WavesContext {
     ) ++ header ++ proven
   )
 
+  val obsoleteTransactionTypes = List(genesisTransactionType, paymentTransactionType)
+
   private val activeTransactionTypes = List(
     transferTransactionType,
     issueTransactionType,
@@ -153,7 +155,7 @@ object WavesContext {
     dataTransactionType
   )
 
-  private val transactionTypes = /* List(genesisTransactionType, paymentTransactionType) ++ */ activeTransactionTypes
+  private val transactionTypes = obsoleteTransactionTypes ++ activeTransactionTypes
 
   private val transactionType = UNION(transactionTypes.map(_.typeRef))
 
