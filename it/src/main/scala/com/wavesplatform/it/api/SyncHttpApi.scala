@@ -86,6 +86,9 @@ object SyncHttpApi extends Assertions {
     def assetsBalance(address: String): FullAssetsInfo =
       Await.result(async(n).assetsBalance(address), RequestAwaitTime)
 
+    def assetsDetails(assetId: String): AssetInfo =
+      Await.result(async(n).assetsDetails(assetId), RequestAwaitTime)
+
     def issue(sourceAddress: String, name: String, description: String, quantity: Long, decimals: Byte, reissuable: Boolean, fee: Long): Transaction =
       Await.result(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee), RequestAwaitTime)
 
