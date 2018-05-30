@@ -4,9 +4,10 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
+import com.wavesplatform.lang.v1.compiler.Terms.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, EvaluationContext}
+import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
@@ -21,9 +22,24 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """match p {
         |  case pa: PointA => 0
         |  case pb: PointB => 1
+        |  case pc: PointC => 2
         |}""".stripMargin
     eval[Long](sampleScript, withUnion(pointAInstance)) shouldBe Right(0)
     eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
+  }
+
+  property("patternMatching with named union types") {
+    val sampleScript =
+      """match p {
+        |  case pa: PointA => 0
+        |  case pb: PointBC => 1
+        |}""".stripMargin
+    eval[Long](sampleScript, withUnion(pointAInstance), { c =>
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(t => CASETYPEREF(t.name)), c))
+    }) shouldBe Right(0)
+    eval[Long](sampleScript, withUnion(pointBInstance), { c =>
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(t => CASETYPEREF(t.name)), c))
+    }) shouldBe Right(1)
   }
 
   property("patternMatching _") {
@@ -32,6 +48,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |match p {
          |  case _: PointA => 0
          |  case _: PointB  => 1
+         |  case _: PointC => 2
          |}
          |
       """.stripMargin
@@ -52,10 +69,15 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
   }
 
-  private def eval[T: TypeInfo](code: String, ctx: EvaluationContext = PureContext.instance) = {
+  private def eval[T: TypeInfo](code: String, ctx: EvaluationContext = PureContext.instance, genTypes: CompilerContext => Map[String, PredefBase] = {
+    _ =>
+      Map.empty
+  }) = {
     val untyped = Parser(code).get.value
     require(untyped.size == 1)
-    val typed = CompilerV1(CompilerContext.fromEvaluationContext(ctx), untyped.head)
+    val cctx  = CompilerContext.fromEvaluationContext(ctx, Map.empty)
+    val types = genTypes(cctx)
+    val typed = CompilerV1(cctx.copy(predefTypes = types ++ cctx.predefTypes), untyped.head)
     typed.flatMap(EvaluatorV1[T](ctx, _))
   }
 

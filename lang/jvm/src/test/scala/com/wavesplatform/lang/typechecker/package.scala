@@ -33,5 +33,5 @@ package object typechecker {
     )
   )
 
-  val typeCheckerContext = CompilerContext.fromEvaluationContext(ctx)
+  val typeCheckerContext = CompilerContext.fromEvaluationContext(ctx, Map.empty)
 }

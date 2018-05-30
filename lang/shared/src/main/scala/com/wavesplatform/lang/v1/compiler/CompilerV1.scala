@@ -10,6 +10,7 @@ import com.wavesplatform.lang.directives.Directive
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
@@ -57,7 +58,17 @@ object CompilerV1 {
     case getter: Expressions.GETTER      => compileGetter(ctx, getter)
     case fc: Expressions.FUNCTION_CALL   => compileFunctionCall(ctx, fc)
     case block: Expressions.BLOCK        => compileBlock(ctx, block)
-    case Expressions.TBLOCK(_, _, typeName, typeDef, body) => compile(ctx, body)
+    case Expressions.TBLOCK(_, _, PART.INVALID(start,end,message), _, _) =>  EitherT.leftT[Coeval, EXPR](s"$message in $start-$end")
+    case Expressions.TBLOCK(_, _, PART.VALID(_,_,typeName), typeDef, body) =>
+         val types = ctx.predefTypes
+         val union = typeDef.types.flatMap({
+            t => types.get(t).fold(List(CASETYPEREF(t))) {
+              case UnionType(_, tl, _) => tl
+              case t: CASETYPEREF => List(t)
+              case _ => ???
+            }
+         }).toSet.toList
+         compile(ctx.copy(predefTypes = types + (typeName -> UnionType(typeName, union, ctx))), body)
     case ifExpr: Expressions.IF          => compileIf(ctx, ifExpr)
     case ref: Expressions.REF            => compileRef(ctx, ref)
     case m: Expressions.MATCH            => compileMatch(ctx, m)
@@ -68,7 +79,7 @@ object CompilerV1 {
         case OR_OP  => compileIf(ctx, Expressions.IF(start, end, a, Expressions.TRUE(start, end), b))
         case _      => compileFunctionCall(ctx, Expressions.FUNCTION_CALL(start, end, PART.VALID(start, end, opsToFunctions(op)), List(a, b)))
       }
-    case Expressions.INVALID(_, _, message, _) => EitherT.leftT[Coeval, EXPR](message)
+    case Expressions.INVALID(start, end, message, _) =>  EitherT.leftT[Coeval, EXPR](s"$message in $start-$end")
   }
 
   private def compileGetter(ctx: CompilerContext, getter: Expressions.GETTER): SetTypeResult[EXPR] =
@@ -192,6 +203,15 @@ object CompilerV1 {
     val Expressions.MATCH(_, _, expr, cases) = m
     val rootMatchTmpArg                      = "$match" + ctx.tmpArgsIdx
     val updatedCtx                           = ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1)
+    val typeDefs = ctx.predefTypes
+    def flat(tl: List[String]): List[String] = {
+      tl.flatMap {
+        t => typeDefs.get(t).fold(List(t)) {
+          case UnionType(_, tl, _) => tl.map(_.name)
+          case t => List(t.name)
+        }
+      }
+    }
 
     for {
       typedExpr <- compile(ctx, expr)
@@ -200,7 +220,7 @@ object CompilerV1 {
         case _        => Left("Only union type can be matched")
       })
       matchingTypes <- EitherT.fromEither[Coeval](cases.flatMap(_.types).map(_.toEither).toList.sequence[CompilationResult, String])
-      matchedTypes = UNION(matchingTypes.map(CASETYPEREF))
+      matchedTypes = UNION(flat(matchingTypes).map(CASETYPEREF))
       lastEmpty    = cases.last.types.isEmpty
       _ <- EitherT.cond[Coeval](
         lastEmpty && (possibleExpressionTypes >= matchedTypes) || (possibleExpressionTypes equivalent matchedTypes),
@@ -219,7 +239,7 @@ object CompilerV1 {
              case List() => blockWithNewVar
              case types =>
                 val cond =
-                 Expressions.FUNCTION_CALL(1, 1, PART.VALID(1, 1, PureContext._isInstanceOf.name), List(refTmp, Expressions.TYPELIST(1, 1, types.map(_.asInstanceOf[PART.VALID[String]].v))))
+                 Expressions.FUNCTION_CALL(1, 1, PART.VALID(1, 1, PureContext._isInstanceOf.name), List(refTmp, Expressions.TYPELIST(1, 1, flat(types.map(_.asInstanceOf[PART.VALID[String]].v)))))
                 Expressions.IF(1, 1, cond, blockWithNewVar, further) 
            }
       }

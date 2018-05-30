@@ -115,7 +115,8 @@ trait TransactionGenBase extends ScriptGen {
 
   val scriptGen = BOOLgen(100).map {
     case (expr, _) =>
-      val typed = CompilerV1(CompilerContext.fromEvaluationContext(PureContext.instance |+| CryptoContext.build(Global)), expr).explicitGet()
+      val typed =
+        CompilerV1(CompilerContext.fromEvaluationContext(PureContext.instance |+| CryptoContext.build(Global), Map.empty), expr).explicitGet()
       ScriptV1(typed).explicitGet()
   }
 

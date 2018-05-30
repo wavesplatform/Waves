@@ -40,7 +40,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
 
     val Parsed.Success(expr, _) = Parser("addressFromRecipient(tx.recipient)")
     assert(expr.size == 1)
-    val Right(typedExpr) = CompilerV1(CompilerContext.fromEvaluationContext(context), expr.head)
+    val Right(typedExpr) = CompilerV1(CompilerContext.fromEvaluationContext(context, Map.empty), expr.head)
     EvaluatorV1[Obj](context, typedExpr).left.map(_._2)
   }
 
