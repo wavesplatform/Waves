@@ -2,7 +2,6 @@ package com.wavesplatform.state
 
 import play.api.libs.json._
 import com.wavesplatform.utils.{Base58, Base64}
-import scodec.bits.ByteVector
 
 import scala.util.Try
 

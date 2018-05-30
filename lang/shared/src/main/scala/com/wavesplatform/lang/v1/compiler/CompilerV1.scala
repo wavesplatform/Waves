@@ -72,11 +72,11 @@ object CompilerV1 {
       field <- EitherT.fromEither[Coeval](getter.field.toEither)
       r <- compile(ctx, EitherT.pure(getter.ref))
         .subflatMap { subExpr =>
-          def getField(name: String): Either[String, GETTER] = {
-            val refTpe = ctx.predefTypes.get(name).map(Right(_)).getOrElse(Left(s"Undefined type: $name"))
+          def getField(typeName: String): Either[String, GETTER] = {
+            val refTpe = ctx.predefTypes.get(typeName).map(Right(_)).getOrElse(Left(s"Undefined type: $typeName"))
             val fieldTpe = refTpe.flatMap { ct =>
               val fieldTpe = ct.fields.collectFirst { case (fieldName, tpe) if fieldName == field => tpe }
-              fieldTpe.map(Right(_)).getOrElse(Left(s"Undefined field `$field` of variable `$name`"))
+              fieldTpe.map(Right(_)).getOrElse(Left(s"Undefined field `$field` of variable of type `$typeName`"))
             }
             fieldTpe.right.map(tpe => GETTER(expr = subExpr, field = field, tpe = tpe))
           }

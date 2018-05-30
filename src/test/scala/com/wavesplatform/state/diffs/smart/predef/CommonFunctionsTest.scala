@@ -7,6 +7,7 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
+import scorex.account.Address
 
 class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -62,7 +63,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
 
   property("getTransfer should extract MassTransfer transfers") {
     import scodec.bits.ByteVector
-    forAll(massTransferGen.filter(_.transfers.size > 0)) {
+    forAll(massTransferGen.retryUntil(tg => tg.transfers.size > 0 && tg.transfers.map(_.address).forall(_.isInstanceOf[Address]))) {
       case (massTransfer) =>
         val resultAmount = runScript[Long](
           """
@@ -77,7 +78,11 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
         val resultAddress = runScript[ByteVector](
           """
                                                       |match tx {
-                                                      | case mttx : MassTransferTransaction  =>  mttx.transfers[0].address.bytes
+                                                      | case mttx : MassTransferTransaction  =>
+                                                      |       match mttx.transfers[0].recipient {
+                                                      |           case address : Address => address.bytes
+                                                      |           case other => throw
+                                                      |       }
                                                       | case other => throw
                                                       | }
                                                       |""".stripMargin,
