@@ -155,9 +155,9 @@ object WavesContext {
     dataTransactionType
   )
 
-  private val transactionTypes = obsoleteTransactionTypes ++ activeTransactionTypes
+  val transactionTypes = obsoleteTransactionTypes ++ activeTransactionTypes
 
-  private val transactionType = UNION(transactionTypes.map(_.typeRef))
+  private val transactionType = UNION(activeTransactionTypes.map(_.typeRef))
 
   private def headerPart(tx: Header): Map[String, Val] = Map(
     "id"        -> Val(BYTEVECTOR)(tx.id),
@@ -253,14 +253,6 @@ object WavesContext {
             "attachment"      -> Val(BYTEVECTOR)(attachment)
           ) ++ provenTxPart(p)
         )
-
-      case Lease(p, amount, recipient) =>
-        CaseObj(
-          leaseTransactionType.typeRef,
-          Map(
-            "amount" -> Val(LONG)(amount),
-          ) ++ provenTxPart(p) + mapRecipient(recipient)
-        )
       case SetScript(p, scriptOpt) =>
         CaseObj(setScriptTransactionType.typeRef,
                 Map("script" -> Val(optionByteVector)(scriptOpt.asInstanceOf[optionByteVector.Underlying])) ++ provenTxPart(p))
@@ -348,7 +340,7 @@ object WavesContext {
       }
 
     EvaluationContext.build(
-      caseTypes = Seq(addressType, aliasType, transfer) ++ transactionTypes,
+      caseTypes = Seq(addressType, aliasType, transfer) ++ activeTransactionTypes,
       letDefs = Map(("height", LazyVal(LONG)(EitherT(heightCoeval))), ("tx", LazyVal(transactionType)(EitherT(txCoeval)))),
       functions = Seq(
         txByIdF,

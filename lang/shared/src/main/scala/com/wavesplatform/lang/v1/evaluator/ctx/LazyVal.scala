@@ -1,13 +1,28 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.compiler.Terms.TYPE
 import com.wavesplatform.lang.TrampolinedExecResult
+import com.wavesplatform.lang.v1.compiler.Terms.TYPE
 import monix.eval.Coeval
 
 sealed trait LazyVal {
   val tpe: TYPE
   val value: TrampolinedExecResult[tpe.Underlying]
+
+  override def toString: String = {
+    val valueStringRepr: String =
+      value.value
+        .attempt()
+        .fold(
+          err => s"Error evaluating value: $err",
+          _.fold(
+            err => s"Error evaluating value: $err",
+            v => v.toString
+          )
+        )
+
+    s"Type: ${tpe.typeInfo}, Value: $valueStringRepr"
+  }
 }
 
 object LazyVal {

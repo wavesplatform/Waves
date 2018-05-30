@@ -47,7 +47,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
     assert(expr.size == 1)
 
     val Right(typedExpr) = CompilerV1(CompilerContext.fromEvaluationContext(context), expr.head)
-    EvaluatorV1[CaseObj](context, typedExpr).left.map(_._2)
+    EvaluatorV1[CaseObj](context, typedExpr)._2
   }
 
   property("Script can resolve AddressOrAlias") {

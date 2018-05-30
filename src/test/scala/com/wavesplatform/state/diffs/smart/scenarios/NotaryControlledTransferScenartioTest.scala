@@ -115,7 +115,7 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
     val untyped = Parser(code).get.value
     assert(untyped.size == 1)
     val typed = CompilerV1(dummyTypeCheckerContext, untyped.head)
-    typed.flatMap(EvaluatorV1[T](dummyContext, _))
+    typed.flatMap(EvaluatorV1[T](dummyContext, _)._2)
   }
 
   property("Script toBase58String") {

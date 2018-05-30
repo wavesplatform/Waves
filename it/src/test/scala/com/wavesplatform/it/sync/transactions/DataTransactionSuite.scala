@@ -1,14 +1,15 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.UnexpectedStatusCodeException
+import com.wavesplatform.it.sync.{calcDataFee, fee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, LongDataEntry, StringDataEntry}
+import com.wavesplatform.utils.Base58
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
 import scorex.api.http.SignedDataRequest
-import com.wavesplatform.utils.Base58
 import scorex.transaction.DataTransaction
 
 import scala.concurrent.duration._

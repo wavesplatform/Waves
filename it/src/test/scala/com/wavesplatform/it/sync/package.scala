@@ -11,6 +11,7 @@ package object sync {
   val leasingAmount              = transferAmount
   val issueAmount                = transferAmount
   val massTransferFeePerTransfer = 0.0005.waves
+  val someAssetAmount            = 100000
 
   def calcDataFee(data: List[DataEntry[_]]): Long = {
     val dataSize = data.map(_.toBytes.length).sum + 128

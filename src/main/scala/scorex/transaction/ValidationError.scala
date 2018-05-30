@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.google.common.base.Throwables
+import com.wavesplatform.lang.v1.evaluator.ctx.LazyVal
 import com.wavesplatform.state.ByteStr
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, MicroBlock}
@@ -45,8 +46,21 @@ object ValidationError {
     override def toString: String = s"InvalidSignature(${s.toString + " reason: " + details})"
   }
 
-  case class TransactionNotAllowedByScript(t: Transaction) extends ValidationError {
-    override def toString: String = s"TransactionNotAllowedByScript($t)"
+  case class ScriptExecutionError(t: Transaction, error: String, letDefs: Map[String, LazyVal]) extends ValidationError {
+    override def toString: String =
+      s"""
+         |Script execution error: $error
+         |Transaction: $t
+         |Variables: ${letDefs.mkString("[\n\t\t", "\n\t\t", "\n\t]")}
+       """.stripMargin
+  }
+
+  case class TransactionNotAllowedByScript(t: Transaction, letDefs: Map[String, LazyVal]) extends ValidationError {
+    override def toString: String =
+      s"""
+         |TransactionNotAllowedByScript($t)
+         |Variables: ${letDefs.mkString("[\n\t\t", "\n\t\t", "\n\t]")}
+       """.stripMargin
   }
 
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {

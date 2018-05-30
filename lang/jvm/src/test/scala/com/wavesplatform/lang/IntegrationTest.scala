@@ -56,7 +56,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val untyped = Parser(code).get.value
     require(untyped.size == 1)
     val typed = CompilerV1(CompilerContext.fromEvaluationContext(ctx), untyped.head)
-    typed.flatMap(EvaluatorV1[T](ctx, _))
+    typed.flatMap(EvaluatorV1[T](ctx, _)._2)
   }
 
   property("function call") {
