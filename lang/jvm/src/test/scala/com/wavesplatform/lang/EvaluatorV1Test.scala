@@ -7,6 +7,7 @@ import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext._
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -328,6 +329,28 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     r.isRight shouldBe true
   }
 
+  property("returns correct context") {
+    val (alicePrivateKey, _) = Curve25519.createKeyPair("seed0".getBytes())
+    val (bobPrivateKey, bobPublicKey)     = Curve25519.createKeyPair("seed1".getBytes())
+    val (_, senderPublicKey)              = Curve25519.createKeyPair("seed2".getBytes())
+
+    val bodyBytes = "message".getBytes()
+
+    val (ctx, result) = multiSig(
+      bodyBytes,
+      senderPublicKey,
+      bobPublicKey,
+      bobPublicKey,
+      Curve25519.sign(alicePrivateKey, bodyBytes),
+      Curve25519.sign(bobPrivateKey, bodyBytes)
+    )
+
+    result shouldBe Right(false)
+
+    ctx.letDefs("bobSigned").value.value() shouldBe Right(true)
+    ctx.letDefs("aliceSigned").value.value() shouldBe Right(false)
+  }
+
   property("returns an error if sigVerify return an error") {
     val seed           = "seed".getBytes()
     val (_, publicKey) = Curve25519.createKeyPair(seed)
@@ -379,6 +402,62 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         ),
         BOOLEAN
       )
+    )
+  }
+
+  private def multiSig(bodyBytes: Array[Byte],
+                       senderPK: PublicKey,
+                       alicePK: PublicKey,
+                       bobPK: PublicKey,
+                       aliceProof: Signature,
+                       bobProof: Signature): (EvaluationContext, Either[ExecutionError, Boolean]) = {
+    val txType = PredefType(
+      "Transaction",
+      List(
+        "bodyBytes" -> BYTEVECTOR,
+        "senderPk"  -> BYTEVECTOR,
+        "proof0"    -> BYTEVECTOR,
+        "proof1"    -> BYTEVECTOR
+      )
+    )
+
+    val txObj = Obj(
+      Map(
+        "bodyBytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(bodyBytes))),
+        "senderPk"  -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(senderPK))),
+        "proof0"    -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(aliceProof))),
+        "proof1"    -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(bobProof)))
+      ))
+
+    val context = Monoid.combineAll(
+      Seq(
+        PureContext.instance,
+        CryptoContext.build(Global),
+        EvaluationContext.build(
+          types = Seq(txType),
+          caseTypes = Seq.empty,
+          letDefs = Map(
+            "tx"          -> LazyVal(TYPEREF(txType.name))(EitherT.pure(txObj)),
+            "alicePubKey" -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(alicePK))),
+            "bobPubKey"   -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(bobPK)))
+          ),
+          functions = Seq.empty
+        )
+      ))
+
+    val compilerContext = CompilerContext.fromEvaluationContext(context)
+
+    val script =
+      s"""
+         |let aliceSigned  = sigVerify(tx.bodyBytes, tx.proof0, alicePubKey)
+         |let bobSigned    = sigVerify(tx.bodyBytes, tx.proof1, bobPubKey  )
+         |
+         |aliceSigned && bobSigned
+   """.stripMargin
+
+    ev[Boolean](
+      context = context,
+      expr = new CompilerV1(compilerContext).compile(script, List.empty).right.get
     )
   }
 

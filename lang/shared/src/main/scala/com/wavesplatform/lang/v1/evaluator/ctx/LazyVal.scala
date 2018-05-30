@@ -10,15 +10,18 @@ sealed trait LazyVal {
   val value: TrampolinedExecResult[tpe.Underlying]
 
   override def toString: String = {
-    s"Type: ${tpe.typeInfo}, Value: ${value.value
-      .attempt()
-      .fold(
-        err => s"Failure($err)",
-        _.fold(
-          err => s"Failure($err)",
-          v => s"Success($v)"
+    val valueStringRepr: String =
+      value.value
+        .attempt()
+        .fold(
+          err => s"Error evaluating value: $err",
+          _.fold(
+            err => s"Error evaluating value: $err",
+            v => v.toString
+          )
         )
-      )}"
+
+    s"Type: ${tpe.typeInfo}, Value: $valueStringRepr"
   }
 }
 

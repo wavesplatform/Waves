@@ -61,7 +61,7 @@ object ValidationError {
   case class TransactionNotAllowedByScript(t: Transaction, evaluationContext: EvaluationContext) extends ValidationError {
     override def toString: String =
       s"""
-         |TransactionNotAllowedByScript($t)"
+         |TransactionNotAllowedByScript($t)
          |Context:
          |  Types: ${evaluationContext.typeDefs.mkString("[\n\t\t", "\n\t\t", "\n\t]")}
          |  Functions: ${evaluationContext.functions.keys.mkString("[\n\t\t", "\n\t\t", "\n\t]")}
