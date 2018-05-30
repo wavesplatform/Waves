@@ -548,7 +548,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     val encodedText = ScorexBase58.encode(text.getBytes)
 
     parseOne(s"sha256(base58'$encodedText')".stripMargin) shouldBe
-      FUNCTION_CALL(0, 96, PART.VALID(0, 6, "sha256"), List(CONST_BYTEVECTOR(7, 95, PART.VALID(15, 94, ByteVector(text.getBytes)))))
+      FUNCTION_CALL(0, 54, PART.VALID(0, 6, "sha256"), List(CONST_BYTEVECTOR(7, 53, PART.VALID(15, 52, ByteVector(text.getBytes)))))
   }
 
   property("crypto functions: blake2b256") {
@@ -556,7 +556,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     val encodedText = ScorexBase58.encode(text.getBytes)
 
     parseOne(s"blake2b256(base58'$encodedText')".stripMargin) shouldBe
-      FUNCTION_CALL(0, 100, PART.VALID(0, 10, "blake2b256"), List(CONST_BYTEVECTOR(11, 99, PART.VALID(19, 98, ByteVector(text.getBytes)))))
+      FUNCTION_CALL(0, 58, PART.VALID(0, 10, "blake2b256"), List(CONST_BYTEVECTOR(11, 57, PART.VALID(19, 56, ByteVector(text.getBytes)))))
   }
 
   property("crypto functions: keccak256") {
@@ -564,7 +564,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     val encodedText = ScorexBase58.encode(text.getBytes)
 
     parseOne(s"keccak256(base58'$encodedText')".stripMargin) shouldBe
-      FUNCTION_CALL(0, 99, PART.VALID(0, 9, "keccak256"), List(CONST_BYTEVECTOR(10, 98, PART.VALID(18, 97, ByteVector(text.getBytes)))))
+      FUNCTION_CALL(0, 57, PART.VALID(0, 9, "keccak256"), List(CONST_BYTEVECTOR(10, 56, PART.VALID(18, 55, ByteVector(text.getBytes)))))
   }
 
   property("show parse all input including INVALID") {
