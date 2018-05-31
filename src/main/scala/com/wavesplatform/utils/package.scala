@@ -77,5 +77,5 @@ package object utils extends ScorexLogging {
 
   lazy val dummyNetworkByte: Byte                   = AddressScheme.current.chainId
   lazy val dummyContext: EvaluationContext          = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), null)
-  lazy val dummyTypeCheckerContext: CompilerContext = CompilerContext.fromEvaluationContext(dummyContext)
+  lazy val dummyTypeCheckerContext: CompilerContext = CompilerContext.fromEvaluationContext(dummyContext, Map.empty)
 }

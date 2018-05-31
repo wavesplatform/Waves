@@ -20,53 +20,33 @@ object EvaluatorV1 extends ExprEvaluator {
     import let.{name, value}
     for {
       ctx <- getContext
-      result <- {
-        if (lets.get(ctx).get(name).isDefined)
-          liftError(s"Value '$name' already defined in the scope")
-        else if (funcs.get(ctx).keys.exists(_.name == name))
-          liftError(s"Value '$name' can't be defined because function with such name is predefined")
-        else {
-          val blockEvaluation = evalExpr(value)(value.tpe.typeInfo)
-          val lazyBlock       = LazyVal(value.tpe)(blockEvaluation.ter(ctx))
-          updateContext(lets.modify(_)(_.updated(name, lazyBlock))) *> evalExpr(inner)(tpe.typeInfo)
-        }
-      }
+      blockEvaluation = evalExpr(value)(value.tpe.typeInfo)
+      lazyBlock       = LazyVal(value.tpe)(blockEvaluation.ter(ctx))
+      result <- updateContext(lets.modify(_)(_.updated(name, lazyBlock))) *> evalExpr(inner)(tpe.typeInfo)
     } yield result
   }
 
-  private def evalRef(key: String) = {
-    for {
-      ctx <- getContext
-      result <- lets.get(ctx).get(key) match {
+  private def evalRef(key: String) =
+    getContext flatMap { ctx =>
+      lets.get(ctx).get(key) match {
         case Some(lzy) => liftTER[Any](lzy.value.value)
-        case None      => liftError[Any](s"A definition of '$key' is not found")
+        case None      => liftError[Any](s"A definition of '$key' not found")
       }
-    } yield result
-  }
+    }
 
-  private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, tpe: TYPE) = {
-    for {
-      ifc <- evalExpr[Boolean](cond)
-      result <- ifc match {
-        case true  => evalExpr(ifTrue)(tpe.typeInfo)
-        case false => evalExpr(ifFalse)(tpe.typeInfo)
+  private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, tpe: TYPE) =
+    evalExpr[Boolean](cond) flatMap {
+      case true  => evalExpr(ifTrue)(tpe.typeInfo)
+      case false => evalExpr(ifFalse)(tpe.typeInfo)
+    }
+
+  private def evalGetter(expr: EXPR, field: String) =
+    evalExpr[CaseObj](expr) flatMap {
+      _.fields.get(field) match {
+        case Some(eager) => liftValue[Any](eager.value)
+        case None        => liftError[Any](s"field '$field' not found")
       }
-    } yield result
-  }
-
-  private def evalGetter(expr: EXPR, field: String) = {
-    for {
-      obj <- evalExpr[CaseObj](expr)
-      result <- obj match {
-        case CaseObj(_, fields) =>
-          fields.get(field) match {
-            case Some(eager) => liftValue[Any](eager.value)
-            case None        => liftError[Any](s"field '$field' not found")
-          }
-      }
-
-    } yield result
-  }
+    }
 
   private def evalFunctionCall(header: FunctionHeader, args: List[EXPR]): EvalM[Any] = {
     for {
@@ -100,10 +80,8 @@ object EvaluatorV1 extends ExprEvaluator {
       if (t.tpe.typeInfo <:< ti) liftValue(v.asInstanceOf[T])
       else liftError(s"Bad type: expected: $ti actual: ${t.tpe.typeInfo}")
     })
-
   }
 
-  def apply[A: TypeInfo](c: EvaluationContext, expr: EXPR): (EvaluationContext, Either[ExecutionError, A]) = {
-    evalExpr[A](expr).run(c)
-  }
+  def apply[A: TypeInfo](c: EvaluationContext, expr: EXPR): (EvaluationContext, Either[ExecutionError, A]) = evalExpr[A](expr).run(c)
+
 }

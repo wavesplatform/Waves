@@ -38,15 +38,14 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         LET("x", CONST_LONG(3)),
         BLOCK(
           LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)), LONG)),
-          FUNCTION_CALL(eqLong.header, List(REF("x", LONG), CONST_LONG(1)), LONG),
+          FUNCTION_CALL(eqLong.header, List(REF("z", LONG), CONST_LONG(1)), LONG),
           LONG
         ),
         LONG
       )
     )
 
-    val expectedError =
-      "Value 'x' already defined in the scope"
+    val expectedError = "A definition of 'z' not found"
 
     err shouldBe expectedError
     ctx.letDefs.contains("x") shouldBe true
@@ -118,21 +117,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[Long](expr = expr)._2 shouldBe Right(4)
   }
 
-  property("fails if override") {
-    ev[Long](
-      expr = BLOCK(
-        LET("x", CONST_LONG(3)),
-        BLOCK(
-          LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)), LONG)),
-          FUNCTION_CALL(eqLong.header, List(REF("x", LONG), CONST_LONG(1)), LONG),
-          LONG
-        ),
-        LONG
-      ))._2 should produce("already defined")
-  }
-
   property("fails if definition not found") {
-    ev[Long](expr = FUNCTION_CALL(sumLong.header, List(REF("x", LONG), CONST_LONG(2)), LONG))._2 should produce("A definition of 'x' is not found")
+    ev[Long](expr = FUNCTION_CALL(sumLong.header, List(REF("x", LONG), CONST_LONG(2)), LONG))._2 should produce("A definition of 'x' not found")
   }
 
   property("custom type field access") {
@@ -404,7 +390,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         )
       ))
 
-    val compilerContext = CompilerContext.fromEvaluationContext(context)
+    val compilerContext = CompilerContext.fromEvaluationContext(context, Map.empty)
 
     val script =
       s"""
