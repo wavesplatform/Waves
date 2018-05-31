@@ -301,7 +301,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     result shouldBe Right(false)
 
-    ctx.letDefs("bobSigned").value.value() shouldBe Right(true)
+    //it false, because script fails on Alice's signature check, and bobSigned is not evaluated
+    ctx.letDefs("bobSigned").evaluated.read() shouldBe false
+
+    ctx.letDefs("aliceSigned").evaluated.read() shouldBe true
     ctx.letDefs("aliceSigned").value.value() shouldBe Right(false)
   }
 
