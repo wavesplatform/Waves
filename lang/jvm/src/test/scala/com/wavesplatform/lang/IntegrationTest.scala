@@ -4,10 +4,9 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
-import com.wavesplatform.lang.v1.compiler.Terms.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
@@ -35,10 +34,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |  case pb: PointBC => 1
         |}""".stripMargin
     eval[Long](sampleScript, withUnion(pointAInstance), { c =>
-      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(t => CASETYPEREF(t.name)), c))
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
     }) shouldBe Right(0)
     eval[Long](sampleScript, withUnion(pointBInstance), { c =>
-      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(t => CASETYPEREF(t.name)), c))
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
     }) shouldBe Right(1)
   }
 
@@ -49,13 +48,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |  case pb: PointBC => pb.YB
         |}""".stripMargin
     eval[Long](sampleScript, withUnion(pointAInstance), { c =>
-      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(t => CASETYPEREF(t.name)), c))
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
     }) shouldBe Right(3)
     eval[Long](sampleScript, withUnion(pointBInstance), { c =>
-      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(t => CASETYPEREF(t.name)), c))
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
     }) shouldBe Right(41)
     eval[Long](sampleScript, withUnion(pointCInstance), { c =>
-      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(t => CASETYPEREF(t.name)), c))
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
     }) shouldBe Right(42)
   }
 
@@ -66,7 +65,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |  case pb: PointBC => pb.X
         |}""".stripMargin
     eval[Long](sampleScript, withUnion(pointCInstance), { c =>
-      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(t => CASETYPEREF(t.name)), c))
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
     }) should produce("Typecheck failed: Undefined field `X`")
   }
 

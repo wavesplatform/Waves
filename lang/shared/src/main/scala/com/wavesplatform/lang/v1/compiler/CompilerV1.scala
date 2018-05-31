@@ -75,10 +75,15 @@ object CompilerV1 {
       field <- EitherT.fromEither[Coeval](getter.field.toEither)
       r <- compile(ctx, getter.ref)
         .subflatMap { subExpr =>
+          def resolveFields(tpe: PredefBase): List[(String, TYPE)] = tpe match {
+            case PredefCaseType(_, fields) => fields
+            case UnionType(_, types)       => types.map(n => resolveFields(ctx.predefTypes(n.name)).toSet).reduce(_ intersect _).toList
+          }
+
           def getField(typeName: String): Either[String, GETTER] = {
             val refTpe = ctx.predefTypes.get(typeName).map(Right(_)).getOrElse(Left(s"Undefined type: $typeName"))
             val fieldTpe = refTpe.flatMap { ct =>
-              val fieldTpe = ct.fields.collectFirst { case (fieldName, tpe) if fieldName == field => tpe }
+              val fieldTpe = resolveFields(ct).collectFirst { case (fieldName, tpe) if fieldName == field => tpe }
               fieldTpe.map(Right(_)).getOrElse(Left(s"Undefined field `$field` of variable of type `$typeName`"))
             }
             fieldTpe.right.map(tpe => GETTER(expr = subExpr, field = field, tpe = tpe))
@@ -89,7 +94,7 @@ object CompilerV1 {
             case union: UNION =>
               val x1 = union.l
                 .map(k => ctx.predefTypes(k.name))
-                .map(predefType => predefType.fields.find(_._1 == field))
+                .map(predefType => resolveFields(predefType).find(_._1 == field))
               if (x1.contains(None)) Left(s"Undefined field `$field` on $union")
               else
                 TypeInferrer.findCommonType(x1.map(_.get._2)) match {
@@ -198,8 +203,8 @@ object CompilerV1 {
     def flat(tl: List[String]): List[String] = {
       tl.flatMap { t =>
         typeDefs.get(t).fold(List(t)) {
-          case UnionType(_, tl, _) => tl.map(_.name)
-          case t                   => List(t.name)
+          case UnionType(_, tl) => tl.map(_.name)
+          case t                => List(t.name)
         }
       }
     }
