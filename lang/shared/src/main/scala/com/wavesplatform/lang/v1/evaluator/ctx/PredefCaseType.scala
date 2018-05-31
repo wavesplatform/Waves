@@ -15,5 +15,5 @@ case class PredefCaseType(name: String, fields: List[(String, TYPE)]) extends Pr
 
 case class UnionType(name: String, types: List[CASETYPEREF], ctx: CompilerContext) extends PredefBase {
   lazy val typeRef = UNION(types)
-  lazy val fields = types.flatMap(n => ctx.predefTypes(n.name).fields).toSet.toList
+  lazy val fields = types.map(n => ctx.predefTypes(n.name).fields.toSet).reduce(_ intersect _).toList
 }
