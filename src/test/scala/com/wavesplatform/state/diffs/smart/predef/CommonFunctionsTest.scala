@@ -7,13 +7,22 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
+import scorex.account.Address
 
 class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   property("extract should transaction transfer assetId if exists") {
     forAll(transferV1Gen) {
       case (transfer) =>
-        val result = runScript[ByteVector]("extract(tx.transferAssetId)", transfer)
+        val result = runScript[ByteVector](
+          """
+            |match tx {
+            | case ttx : TransferTransaction  =>  extract(ttx.transferAssetId)
+            | case other => throw
+            | }
+            |""".stripMargin,
+          transfer
+        )
         transfer.assetId match {
           case Some(v) => result.explicitGet().toArray sameElements v.arr
           case None    => result should produce("from empty option")
@@ -24,7 +33,15 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
   property("isDefined should return true if transfer assetId exists") {
     forAll(transferV1Gen) {
       case (transfer) =>
-        val result = runScript[Boolean]("isDefined(tx.transferAssetId)", transfer)
+        val result = runScript[Boolean](
+          """
+                                          |match tx {
+                                          | case ttx : TransferTransaction  =>  isDefined(ttx.transferAssetId)
+                                          | case other => throw
+                                          | }
+                                          |""".stripMargin,
+          transfer
+        )
         transfer.assetId.isDefined shouldEqual result.right.get
     }
   }
@@ -44,15 +61,43 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
     runScript[Long](s"size(base58'${ByteStr(arr).base58}')".stripMargin) shouldBe Right(3L)
   }
 
-  property("getTransfer should MassTransfer transfers extract") {
+  property("getTransfer should extract MassTransfer transfers") {
     import scodec.bits.ByteVector
-    forAll(massTransferGen.filter(_.transfers.size > 0)) {
+    forAll(massTransferGen.retryUntil(tg => tg.transfers.size > 0 && tg.transfers.map(_.address).forall(_.isInstanceOf[Address]))) {
       case (massTransfer) =>
-        val resultAmount = runScript[Long]("tx.transfers[0].amount", massTransfer)
+        val resultAmount = runScript[Long](
+          """
+            |match tx {
+            | case mttx : MassTransferTransaction  =>  mttx.transfers[0].amount
+            | case other => throw
+            | }
+            |""".stripMargin,
+          massTransfer
+        )
         resultAmount shouldBe Right(massTransfer.transfers(0).amount)
-        val resultAddress = runScript[ByteVector]("tx.transfers[0].address.bytes", massTransfer)
+        val resultAddress = runScript[ByteVector](
+          """
+                                                      |match tx {
+                                                      | case mttx : MassTransferTransaction  =>
+                                                      |       match mttx.transfers[0].recipient {
+                                                      |           case address : Address => address.bytes
+                                                      |           case other => throw
+                                                      |       }
+                                                      | case other => throw
+                                                      | }
+                                                      |""".stripMargin,
+          massTransfer
+        )
         resultAddress shouldBe Right(ByteVector(massTransfer.transfers(0).address.bytes.arr))
-        val resultLen = runScript[Long]("size(tx.transfers)", massTransfer)
+        val resultLen = runScript[Long](
+          """
+                                           |match tx {
+                                           | case mttx : MassTransferTransaction  =>  size(mttx.transfers)
+                                           | case other => throw
+                                           | }
+                                           |""".stripMargin,
+          massTransfer
+        )
         resultLen shouldBe Right(massTransfer.transfers.size.toLong)
     }
   }

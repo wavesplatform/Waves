@@ -136,66 +136,32 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("custom type field access") {
-    val pointType     = PredefType("Point", List("X" -> LONG, "Y"                           -> LONG))
-    val pointInstance = Obj(Map("X"                  -> LazyVal(LONG)(EitherT.pure(3)), "Y" -> LazyVal(LONG)(EitherT.pure(4))))
+    val pointType     = PredefCaseType("Point", List("X"   -> LONG, "Y"         -> LONG))
+    val pointInstance = CaseObj(pointType.typeRef, Map("X" -> Val(LONG)(3), "Y" -> Val(LONG)(4)))
     ev[Long](
       context = PureContext.instance |+| EvaluationContext(
-        typeDefs = Map(pointType.name -> pointType),
-        caseTypeDefs = Map.empty,
-        letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance)))),
+        caseTypeDefs = Map(pointType.name -> pointType),
+        letDefs = Map(("p", LazyVal(pointType.typeRef)(EitherT.pure(pointInstance)))),
         functions = Map.empty
       ),
-      expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", TYPEREF("Point")), "X", LONG), CONST_LONG(2)), LONG)
+      expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", pointType.typeRef), "X", LONG), CONST_LONG(2)), LONG)
     )._2 shouldBe Right(5)
   }
 
   property("lazy let evaluation doesn't throw if not used") {
-    val pointType     = PredefType("Point", List(("X", LONG), ("Y", LONG)))
-    val pointInstance = Obj(Map(("X", LazyVal(LONG)(EitherT.pure(3))), ("Y", LazyVal(LONG)(EitherT.pure(4)))))
+    val pointType     = PredefCaseType("Point", List(("X", LONG), ("Y", LONG)))
+    val pointInstance = CaseObj(pointType.typeRef, Map("X" -> Val(LONG)(3), "Y" -> Val(LONG)(4)))
     val context = PureContext.instance |+| EvaluationContext(
-      typeDefs = Map((pointType.name, pointType)),
-      caseTypeDefs = Map.empty,
-      letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance))), ("badVal", LazyVal(LONG)(EitherT.leftT("Error")))),
+      caseTypeDefs = Map(pointType.name -> pointType),
+      letDefs = Map(("p", LazyVal(pointType.typeRef)(EitherT.pure(pointInstance))), ("badVal", LazyVal(LONG)(EitherT.leftT("Error")))),
       functions = Map.empty
     )
     ev[Long](
       context = context,
       expr = BLOCK(LET("Z", REF("badVal", LONG)),
-                   FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", TYPEREF("Point")), "X", LONG), CONST_LONG(2)), LONG),
+                   FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", pointType.typeRef), "X", LONG), CONST_LONG(2)), LONG),
                    LONG)
     )._2 shouldBe Right(5)
-  }
-
-  property("field and value are evaluated maximum once") {
-    var fieldCalculated = 0
-    var valueCalculated = 0
-
-    val pointType = PredefType("Point", List(("X", LONG), ("Y", LONG)))
-    val pointInstance = Obj(Map(("X", LazyVal(LONG)(EitherT.pure {
-      fieldCalculated = fieldCalculated + 1
-      3
-    })), ("Y", LazyVal(LONG)(EitherT.pure(4)))))
-    val context = PureContext.instance |+| EvaluationContext(
-      typeDefs = Map((pointType.name, pointType)),
-      caseTypeDefs = Map.empty,
-      letDefs = Map(("p", LazyVal(TYPEREF(pointType.name))(EitherT.pure(pointInstance))), ("h", LazyVal(LONG)(EitherT.pure {
-        valueCalculated = valueCalculated + 1
-        4
-      }))),
-      functions = Map.empty
-    )
-    ev[Long](
-      context = context,
-      expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", TYPEREF("Point")), "X", LONG), GETTER(REF("p", TYPEREF("Point")), "X", LONG)), LONG)
-    )._2 shouldBe Right(6)
-
-    ev[Long](
-      context = context,
-      expr = FUNCTION_CALL(sumLong.header, List(REF("h", LONG), REF("h", LONG)), LONG)
-    )._2 shouldBe Right(8)
-
-    fieldCalculated shouldBe 1
-    valueCalculated shouldBe 1
   }
 
   property("let is evaluated maximum once") {
@@ -207,7 +173,6 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
 
     val context = PureContext.instance |+| EvaluationContext(
-      typeDefs = Map.empty,
       caseTypeDefs = Map.empty,
       letDefs = Map.empty,
       functions = Map(f.header -> f)
@@ -224,15 +189,13 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("successful on ref getter evaluation") {
-    val fooType = PredefType("Foo", List(("bar", STRING), ("buz", LONG)))
+    val fooType = PredefCaseType("Foo", List(("bar", STRING), ("buz", LONG)))
 
-    val fooInstance =
-      Obj(Map("bar" -> LazyVal(STRING)(EitherT.pure("bAr")), "buz" -> LazyVal(LONG)(EitherT.pure(1L))))
+    val fooInstance = CaseObj(fooType.typeRef, Map("bar" -> Val(STRING)("bAr"), "buz" -> Val(LONG)(1L)))
 
     val context = EvaluationContext(
-      typeDefs = Map(fooType.name -> fooType),
-      caseTypeDefs = Map.empty,
-      letDefs = Map("fooInstance" -> LazyVal(fooType.typeRef)(EitherT.pure(fooInstance))),
+      caseTypeDefs = Map(fooType.name -> fooType),
+      letDefs = Map("fooInstance"     -> LazyVal(fooType.typeRef)(EitherT.pure(fooInstance))),
       functions = Map.empty
     )
 
@@ -242,21 +205,16 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("successful on function call getter evaluation") {
-    val fooType = PredefType("Foo", List(("bar", STRING), ("buz", LONG)))
+    val fooType = PredefCaseType("Foo", List(("bar", STRING), ("buz", LONG)))
     val fooCtor = PredefFunction("createFoo", 1, fooType.typeRef, List.empty) { _ =>
       Right(
-        Obj(
-          Map(
-            "bar" -> LazyVal(STRING)(EitherT.pure("bAr")),
-            "buz" -> LazyVal(LONG)(EitherT.pure(1L))
-          )
-        )
+        CaseObj(fooType.typeRef, Map("bar" -> Val(STRING)("bAr"), "buz" -> Val(LONG)(1L)))
       )
+
     }
 
     val context = EvaluationContext(
-      typeDefs = Map(fooType.name -> fooType),
-      caseTypeDefs = Map.empty,
+      caseTypeDefs = Map(fooType.name -> fooType),
       letDefs = Map.empty,
       functions = Map(fooCtor.header -> fooCtor)
     )
@@ -267,25 +225,22 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("successful on block getter evaluation") {
-    val fooType = PredefType("Foo", List(("bar", STRING), ("buz", LONG)))
+    val fooType = PredefCaseType("Foo", List(("bar", STRING), ("buz", LONG)))
     val fooCtor = PredefFunction("createFoo", 1, fooType.typeRef, List.empty) { _ =>
       Right(
-        Obj(
-          Map(
-            "bar" -> LazyVal(STRING)(EitherT.pure("bAr")),
-            "buz" -> LazyVal(LONG)(EitherT.pure(1L))
-          )
-        )
-      )
+        CaseObj(fooType.typeRef,
+                Map(
+                  "bar" -> Val(STRING)("bAr"),
+                  "buz" -> Val(LONG)(1L)
+                )))
     }
     val fooTransform = PredefFunction("transformFoo", 1, fooType.typeRef, List(("foo", fooType.typeRef))) {
-      case (fooObj: Obj) :: Nil => Right(fooObj.copy(fooObj.fields.updated("bar", LazyVal(STRING)(EitherT.pure("TRANSFORMED_BAR")))))
-      case _                    => ???
+      case (fooObj: CaseObj) :: Nil => Right(fooObj.copy(fields = fooObj.fields.updated("bar", Val(STRING)("TRANSFORMED_BAR"))))
+      case _                        => ???
     }
 
     val context = EvaluationContext(
-      typeDefs = Map(fooType.name -> fooType),
-      caseTypeDefs = Map.empty,
+      caseTypeDefs = Map(fooType.name -> fooType),
       letDefs = Map.empty,
       functions = Map(
         fooCtor.header      -> fooCtor,
@@ -309,7 +264,6 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("successful on simple function evaluation") {
     ev[Long](
       context = EvaluationContext(
-        typeDefs = Map.empty,
         caseTypeDefs = Map.empty,
         letDefs = Map.empty,
         functions = Map(multiplierFunction.header -> multiplierFunction)
@@ -330,9 +284,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("returns correct context") {
-    val (alicePrivateKey, _) = Curve25519.createKeyPair("seed0".getBytes())
-    val (bobPrivateKey, bobPublicKey)     = Curve25519.createKeyPair("seed1".getBytes())
-    val (_, senderPublicKey)              = Curve25519.createKeyPair("seed2".getBytes())
+    val (alicePrivateKey, _)          = Curve25519.createKeyPair("seed0".getBytes())
+    val (bobPrivateKey, bobPublicKey) = Curve25519.createKeyPair("seed1".getBytes())
+    val (_, senderPublicKey)          = Curve25519.createKeyPair("seed2".getBytes())
 
     val bodyBytes = "message".getBytes()
 
@@ -363,7 +317,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   private def sigVerifyTest(bodyBytes: Array[Byte],
                             publicKey: PublicKey,
                             signature: Signature): (EvaluationContext, Either[ExecutionError, Boolean]) = {
-    val txType = PredefType(
+    val txType = PredefCaseType(
       "Transaction",
       List(
         "bodyBytes" -> BYTEVECTOR,
@@ -372,21 +326,22 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
     )
 
-    val txObj = Obj(
+    val txObj = CaseObj(
+      txType.typeRef,
       Map(
-        "bodyBytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(bodyBytes))),
-        "senderPk"  -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(publicKey))),
-        "proof0"    -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(signature)))
-      ))
+        "bodyBytes" -> Val(BYTEVECTOR)(ByteVector(bodyBytes)),
+        "senderPk"  -> Val(BYTEVECTOR)(ByteVector(publicKey)),
+        "proof0"    -> Val(BYTEVECTOR)(ByteVector(signature))
+      )
+    )
 
     val context = Monoid.combineAll(
       Seq(
         PureContext.instance,
         CryptoContext.build(Global),
         EvaluationContext.build(
-          types = Seq(txType),
-          caseTypes = Seq.empty,
-          letDefs = Map("tx" -> LazyVal(TYPEREF(txType.name))(EitherT.pure(txObj))),
+          caseTypes = Seq(txType),
+          letDefs = Map("tx" -> LazyVal(txType.typeRef)(EitherT.pure(txObj))),
           functions = Seq.empty
         )
       ))
@@ -396,9 +351,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       expr = FUNCTION_CALL(
         function = FunctionHeader("sigVerify", List(FunctionHeaderType.BYTEVECTOR, FunctionHeaderType.BYTEVECTOR, FunctionHeaderType.BYTEVECTOR)),
         args = List(
-          GETTER(REF("tx", TYPEREF(txType.name)), "bodyBytes", BYTEVECTOR),
-          GETTER(REF("tx", TYPEREF(txType.name)), "proof0", BYTEVECTOR),
-          GETTER(REF("tx", TYPEREF(txType.name)), "senderPk", BYTEVECTOR)
+          GETTER(REF("tx", txType.typeRef), "bodyBytes", BYTEVECTOR),
+          GETTER(REF("tx", txType.typeRef), "proof0", BYTEVECTOR),
+          GETTER(REF("tx", txType.typeRef), "senderPk", BYTEVECTOR)
         ),
         BOOLEAN
       )
@@ -411,7 +366,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
                        bobPK: PublicKey,
                        aliceProof: Signature,
                        bobProof: Signature): (EvaluationContext, Either[ExecutionError, Boolean]) = {
-    val txType = PredefType(
+    val txType = PredefCaseType(
       "Transaction",
       List(
         "bodyBytes" -> BYTEVECTOR,
@@ -421,23 +376,24 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
     )
 
-    val txObj = Obj(
+    val txObj = CaseObj(
+      txType.typeRef,
       Map(
-        "bodyBytes" -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(bodyBytes))),
-        "senderPk"  -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(senderPK))),
-        "proof0"    -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(aliceProof))),
-        "proof1"    -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(bobProof)))
-      ))
+        "bodyBytes" -> Val(BYTEVECTOR)(ByteVector(bodyBytes)),
+        "senderPk"  -> Val(BYTEVECTOR)(ByteVector(senderPK)),
+        "proof0"    -> Val(BYTEVECTOR)(ByteVector(aliceProof)),
+        "proof1"    -> Val(BYTEVECTOR)(ByteVector(bobProof))
+      )
+    )
 
     val context = Monoid.combineAll(
       Seq(
         PureContext.instance,
         CryptoContext.build(Global),
         EvaluationContext.build(
-          types = Seq(txType),
-          caseTypes = Seq.empty,
+          caseTypes = Seq(txType),
           letDefs = Map(
-            "tx"          -> LazyVal(TYPEREF(txType.name))(EitherT.pure(txObj)),
+            "tx"          -> LazyVal(txType.typeRef)(EitherT.pure(txObj)),
             "alicePubKey" -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(alicePK))),
             "bobPubKey"   -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(bobPK)))
           ),

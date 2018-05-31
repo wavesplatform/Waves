@@ -33,4 +33,5 @@ object ByteStr {
       case _           => JsError("Expected JsString")
     }
   }
+
 }

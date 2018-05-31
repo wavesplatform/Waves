@@ -34,14 +34,15 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
 
     val scriptText = {
       val sc = Parser(s"""
-        let sigA = base58'${ByteStr(acc0.publicKey)}'
-        let sigB = base58'${ByteStr(acc1.publicKey)}'
-        let sigC = base58'${ByteStr(acc2.publicKey)}'
+        let pkA = base58'${ByteStr(acc0.publicKey)}'
+        let pkB = base58'${ByteStr(acc1.publicKey)}'
+        let pkC = base58'${ByteStr(acc2.publicKey)}'
 
-        let leaseTx =  ((tx.type == 8) && sigVerify(tx.bodyBytes,tx.proofs[0],sigA) && sigVerify(tx.bodyBytes,tx.proofs[2],sigC))
-        let leaseCancelTx = ((tx.type == 9) && sigVerify(tx.bodyBytes,tx.proofs[1],sigA) && sigVerify(tx.bodyBytes,tx.proofs[2],sigB))
-
-        leaseTx || leaseCancelTx
+        match tx {
+          case ltx: LeaseTransaction => sigVerify(ltx.bodyBytes,ltx.proofs[0],pkA) && sigVerify(ltx.bodyBytes,ltx.proofs[2],pkC)
+          case lctx : LeaseCancelTransaction => sigVerify(lctx.bodyBytes,lctx.proofs[1],pkA) && sigVerify(lctx.bodyBytes,lctx.proofs[2],pkB)
+          case other => false
+        }
         """.stripMargin).get.value
       assert(sc.size == 1)
       CompilerV1(dummyTypeCheckerContext, sc.head).explicitGet()

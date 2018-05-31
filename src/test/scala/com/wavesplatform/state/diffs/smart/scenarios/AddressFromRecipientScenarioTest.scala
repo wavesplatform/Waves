@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
-import com.wavesplatform.lang.v1.evaluator.ctx.Obj
+import com.wavesplatform.lang.v1.evaluator.ctx.CaseObj
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState, produce}
@@ -34,14 +34,20 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
     transferViaAlias   <- transferGeneratorP(master, AddressOrAlias.fromBytes(alias.bytes.arr, 0).right.get._1, None, None)
   } yield (Seq(genesis1, genesis2), aliasTx, transferViaAddress, transferViaAlias)
 
-  def evalScript(tx: Transaction, blockchain: Blockchain): Either[com.wavesplatform.lang.ExecutionError, Obj] = {
+  def evalScript(tx: Transaction, blockchain: Blockchain): Either[com.wavesplatform.lang.ExecutionError, CaseObj] = {
     val context =
       BlockchainContext.build(AddressScheme.current.chainId, Coeval.evalOnce(tx), Coeval.evalOnce(blockchain.height), blockchain)
 
-    val Parsed.Success(expr, _) = Parser("addressFromRecipient(tx.recipient)")
+    val Parsed.Success(expr, _) = Parser("""
+        | match tx {
+        |  case t : TransferTransaction =>  addressFromRecipient(t.recipient)
+        |  case other => throw
+        |  }
+        |  """.stripMargin)
     assert(expr.size == 1)
+
     val Right(typedExpr) = CompilerV1(CompilerContext.fromEvaluationContext(context), expr.head)
-    EvaluatorV1[Obj](context, typedExpr)._2
+    EvaluatorV1[CaseObj](context, typedExpr)._2
   }
 
   property("Script can resolve AddressOrAlias") {
@@ -49,13 +55,9 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
       case (gen, aliasTx, transferViaAddress, transferViaAlias) =>
         assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(aliasTx))) {
           case (_, state) =>
-            val Right(addressBytes: ByteVector) =
-              evalScript(transferViaAddress, state).explicitGet().fields("bytes").value.value()
-
+            val addressBytes = evalScript(transferViaAddress, state).explicitGet().fields("bytes").value.asInstanceOf[ByteVector]
             addressBytes.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
-
-            val Right(resolvedAddressBytes: ByteVector) =
-              evalScript(transferViaAlias, state).explicitGet().fields("bytes").value.value()
+            val resolvedAddressBytes = evalScript(transferViaAlias, state).explicitGet().fields("bytes").value.asInstanceOf[ByteVector]
 
             resolvedAddressBytes.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
         }

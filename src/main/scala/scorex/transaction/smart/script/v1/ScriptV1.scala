@@ -15,7 +15,7 @@ object ScriptV1 {
 
   private val checksumLength = 4
   private val maxComplexity  = 20 * functionCosts(FunctionHeader("sigVerify", List(BYTEVECTOR, BYTEVECTOR, BYTEVECTOR)))
-  private val maxSizeInBytes = 2 * 1024
+  private val maxSizeInBytes = 8 * 1024
 
   def validateBytes(bs: Array[Byte]): Either[String, Unit] =
     Either.cond(bs.length <= maxSizeInBytes, (), s"Script is too large: ${bs.length} bytes > $maxSizeInBytes bytes")

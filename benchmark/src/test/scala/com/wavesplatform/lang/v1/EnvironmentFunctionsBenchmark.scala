@@ -5,7 +5,7 @@ import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
-import com.wavesplatform.lang.v1.traits.{DataType, Environment, Transaction}
+import com.wavesplatform.lang.v1.traits._
 import org.openjdk.jmh.annotations._
 import scodec.bits.ByteVector
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey, Signature}
@@ -79,10 +79,10 @@ object EnvironmentFunctionsBenchmark {
   private val defaultEnvironment: Environment = new Environment {
     override def height: Int                                                                                       = 1
     override def networkByte: Byte                                                                                 = NetworkByte
-    override def transaction: Transaction                                                                          = ???
-    override def transactionById(id: Array[Byte]): Option[Transaction]                                             = ???
+    override def transaction: Tx                                                                                   = ???
+    override def transactionById(id: Array[Byte]): Option[Tx]                                                      = ???
     override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any]                     = ???
-    override def resolveAddress(addressOrAlias: Array[Byte]): Either[String, Array[Byte]]                          = ???
+    override def resolveAlias(alias: String): Either[String, Recipient.Address]                                    = ???
     override def transactionHeightById(id: Array[Byte]): Option[Int]                                               = ???
     override def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = ???
   }

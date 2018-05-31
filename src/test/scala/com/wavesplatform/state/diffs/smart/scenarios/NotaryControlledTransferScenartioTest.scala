@@ -22,7 +22,7 @@ import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.transfer._
 import scorex.transaction.{DataTransaction, GenesisTransaction}
 
-class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions: Gen[
     (Seq[GenesisTransaction], IssueTransactionV2, DataTransaction, TransferTransactionV1, DataTransaction, DataTransaction, TransferTransactionV1)] =
     for {
@@ -38,22 +38,23 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
       genesis4 = GenesisTransaction.create(accountA, ENOUGH_AMT, ts).explicitGet()
       genesis5 = GenesisTransaction.create(accountB, ENOUGH_AMT, ts).explicitGet()
 
-      // senderAddress.bytes == company.bytes || (isNotary1Agreed && isRecipientAgreed)
       assetScript = s"""
                     |
-                    | let king = extract(addressFromString("${king.address}"))
-                    | let company = extract(addressFromString("${company.address}"))
-                    | let notary1 = addressFromPublicKey(extract(getByteArray(king,"notary1PK")))
-                    | let txIdBase58String = toBase58String(tx.id)
-                    | let notary1Agreement = getBoolean(notary1,txIdBase58String)
-                    | let isNotary1Agreed = if(isDefined(notary1Agreement)) then extract(notary1Agreement) else false
-                    | let recipientAddress = addressFromRecipient(tx.recipient)
-                    | let recipientAgreement = getBoolean(recipientAddress,txIdBase58String)
-                    | let isRecipientAgreed = if(isDefined(recipientAgreement)) then extract(recipientAgreement) else false
-                    | let senderAddress = addressFromPublicKey(tx.senderPk)
-                    | senderAddress.bytes == company.bytes || (isNotary1Agreed && isRecipientAgreed)
-                    |
-                    |
+                    | match tx {
+                    |   case ttx: TransferTransaction =>
+                    |      let king = extract(addressFromString("${king.address}"))
+                    |      let company = extract(addressFromString("${company.address}"))
+                    |      let notary1 = addressFromPublicKey(extract(getByteArray(king,"notary1PK")))
+                    |      let txIdBase58String = toBase58String(ttx.id)
+                    |      let notary1Agreement = getBoolean(notary1,txIdBase58String)
+                    |      let isNotary1Agreed = if(isDefined(notary1Agreement)) then extract(notary1Agreement) else false
+                    |      let recipientAddress = addressFromRecipient(ttx.recipient)
+                    |      let recipientAgreement = getBoolean(recipientAddress,txIdBase58String)
+                    |      let isRecipientAgreed = if(isDefined(recipientAgreement)) then extract(recipientAgreement) else false
+                    |      let senderAddress = addressFromPublicKey(ttx.senderPk)
+                    |      senderAddress.bytes == company.bytes || (isNotary1Agreed && isRecipientAgreed)
+                    |   case other => throw
+                    | }
         """.stripMargin
 
       untypedScript = {

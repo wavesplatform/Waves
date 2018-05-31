@@ -25,7 +25,7 @@ every month a foundation makes payments from two MassTransactions(type == 11):
 2) 10% as tax and 10% to bank go after 30sec of payment from step 1)
 
 TODO: AFTER NODE-745 fix change to:
-let txToGovComplete = isDefined(mTx) && ((tx.timestamp > (extract(mTx).timestamp) + 30000)) && sigVerify(extract(mTx).bodyBytes,extract(mTx).proofs[0],accountPK)
+let txToGovComplete = isDefined(mTx) && ((ttx.timestamp > (extract(mTx).timestamp) + 30000)) && sigVerify(extract(mTx).bodyBytes,extract(mTx).proofs[0],accountPK)
  */
 
 class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -34,23 +34,27 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
   test("airdrop emulation via MassTransfer") {
     val scriptText = {
       val untyped = Parser(s"""
-        let commonAmount = (tx.transfers[0].amount + tx.transfers[1].amount)
-        let totalAmountToUsers = commonAmount == 8000000000
-        let totalAmountToGov = commonAmount == 2000000000
-        let massTransferType = ((tx.type == 11) && (size(tx.transfers) == 2))
+        match tx {
+          case ttx: MassTransferTransaction =>
+              let commonAmount = (ttx.transfers[0].amount + ttx.transfers[1].amount)
+              let totalAmountToUsers = commonAmount == 8000000000
+              let totalAmountToGov = commonAmount == 2000000000
+              let massTransferType = size(ttx.transfers) == 2
 
-        let accountPK = base58'${ByteStr(sender.publicKey.publicKey)}'
-        let accSig = sigVerify(tx.bodyBytes,tx.proofs[0],accountPK)
+              let accountPK = base58'${ByteStr(sender.publicKey.publicKey)}'
+              let accSig = sigVerify(ttx.bodyBytes,ttx.proofs[0],accountPK)
 
-        let txToUsers = (massTransferType && totalAmountToUsers)
+              let txToUsers = (massTransferType && totalAmountToUsers)
 
-        let mTx = getTransactionById(tx.proofs[1])
+              let mTx = getTransactionById(ttx.proofs[1])
 
-        let txToGov = (massTransferType && totalAmountToGov)
+              let txToGov = (massTransferType && totalAmountToGov)
 
-        let txToGovComplete = if(isDefined(mTx)) then (((tx.timestamp > (extract(mTx).timestamp) + 30000)) && sigVerify(extract(mTx).bodyBytes,extract(mTx).proofs[0],accountPK)) else false
+              let txToGovComplete = if(isDefined(mTx)) then (((ttx.timestamp > (extract(mTx).timestamp) + 30000)) && sigVerify(extract(mTx).bodyBytes,extract(mTx).proofs[0],accountPK)) else false
 
-        (txToGovComplete && accSig && txToGov)  || (txToUsers && accSig)
+              (txToGovComplete && accSig && txToGov)  || (txToUsers && accSig)
+          case other => false
+        }
         """.stripMargin).get.value
       assert(untyped.size == 1)
       CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()

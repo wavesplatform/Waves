@@ -18,10 +18,12 @@ class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matche
     val scriptText =
       s"""
          |
-         | if (tx.type == 4 || tx.type == 11)
-         |  then sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)
-         |  else false
-         |
+         | match tx {
+         |  case ttx: TransferTransaction | MassTransferTransaction =>
+         |     sigVerify(ttx.bodyBytes,ttx.proofs[0],ttx.senderPk)
+         |  case other =>
+         |     false
+         | }
       """.stripMargin
     val untyped = Parser(scriptText).get.value
     assert(untyped.size == 1)

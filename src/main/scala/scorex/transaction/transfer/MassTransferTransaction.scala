@@ -4,17 +4,17 @@ import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.crypto
 import com.wavesplatform.state._
+import com.wavesplatform.utils.Base58
 import monix.eval.Coeval
 import play.api.libs.json.{Format, JsObject, JsValue, Json}
 import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.utils.Base58
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
 import scorex.transaction.ValidationError.Validation
 import scorex.transaction._
-import MassTransferTransaction.{ParsedTransfer, toJson}
+import scorex.transaction.transfer.MassTransferTransaction.{ParsedTransfer, toJson}
+
 import scala.util.{Either, Failure, Success, Try}
-import com.wavesplatform.lang.v1.traits.{Transfer => TransferRepr}
 
 case class MassTransferTransaction private (version: Byte,
                                             assetId: Option[AssetId],
@@ -75,7 +75,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
 
   case class Transfer(recipient: String, amount: Long)
 
-  case class ParsedTransfer(address: AddressOrAlias, amount: Long) extends TransferRepr
+  case class ParsedTransfer(address: AddressOrAlias, amount: Long)
 
   implicit val transferFormat: Format[Transfer] = Json.format
 
