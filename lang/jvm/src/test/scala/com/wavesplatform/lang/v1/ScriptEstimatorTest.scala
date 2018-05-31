@@ -18,4 +18,22 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
     ScriptEstimator(Map(sumHeader -> 1L), expr) shouldBe 'right
   }
 
+  property("handles let expression correctly") {
+    val Plus = FunctionHeader("+", List(FunctionHeaderType.LONG, FunctionHeaderType.LONG)) ///refac?
+    val expr =
+      BLOCK(
+        LET("a", CONST_LONG(1)),
+        BLOCK(LET("b", CONST_LONG(2)), BLOCK(LET("c", FUNCTION_CALL(Plus, List(REF("a", LONG), REF("b", LONG)), LONG)), REF("c", LONG), LONG), LONG),
+        LONG
+      )
+    val estimate = ScriptEstimator(Map(Plus -> 3L), expr)
+    estimate shouldBe 'right
+    estimate.right.get shouldBe 26
+  }
+
+  property("handles const expression correctly") {
+    val estimate = ScriptEstimator(Map.empty, FALSE)
+    estimate shouldBe 'right
+    estimate.right.get shouldBe 1
+  }
 }
