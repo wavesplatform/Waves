@@ -203,7 +203,7 @@ package object database {
 
   def writeSponsorship(ai: SponsorshipValue): Array[Byte] = {
     val ndo = newDataOutput()
-    ndo.writeBigInt(ai.minFee)
+    ndo.writeLong(ai.minFee)
     ndo.toByteArray
   }
 

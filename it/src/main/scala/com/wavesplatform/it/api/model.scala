@@ -51,6 +51,41 @@ case class FullAssetsInfo(address: String, balances: List[FullAssetInfo])
 object FullAssetsInfo {
   implicit val fullAssetsInfoFormat: Format[FullAssetsInfo] = Json.format
 }
+/*
+{
+  "assetId": "EzYjunzh9VVK2JQgM8raxwB8CfghRLpC1fj6Zr7UPdCP",
+  "issueHeight": 372498,
+  "issueTimestamp": 1527681593533,
+  "issuer": "3N2QoZagZibWDnnARKMtdCRUCVpji6tMCA4",
+  "name": "Gigacoin",
+  "description": "Gigacoin",
+  "decimals": 8,
+  "reissuable": true,
+  "quantity": 10000000000,
+  "script": null,
+  "scriptText": null,
+  "complexity": 0,
+  "extraFee": 0,
+  "minSponsoredAssetFee": null
+}
+ */
+case class AssetInfo(assetId: String,
+                     issueHeight: Int,
+                     issueTimestamp: Long,
+                     issuer: String,
+                     name: String,
+                     description: String,
+                     decimals: Int,
+                     reissuable: Boolean,
+                     quantity: Long,
+                     script: Option[String],
+                     scriptText: Option[String],
+                     complexity: Int,
+                     extraFee: Long,
+                     minSponsoredAssetFee: Option[Long])
+object AssetInfo {
+  implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
+}
 
 case class Transaction(`type`: Int, id: String, fee: Long, timestamp: Long, sender: Option[String])
 object Transaction {
