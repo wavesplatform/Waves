@@ -137,9 +137,19 @@ object Types {
       ++ header ++ proven
   )
 
+  def buildDataEntryType(name: String, tpe: TYPE) = PredefCaseType(name + "DataEntry", List("key" -> STRING, "value" -> tpe))
+
+  val strDataEntryType  = buildDataEntryType("Str", STRING)
+  val boolDataEntryType = buildDataEntryType("Bool", BOOLEAN)
+  val bvDataEntryType   = buildDataEntryType("ByteVector", BYTEVECTOR)
+  val longDataEntryType = buildDataEntryType("Long", LONG)
+  val dataEntryTypes    = List(strDataEntryType, boolDataEntryType, bvDataEntryType, longDataEntryType)
+
+  val listOfDataEntriesType = LIST(UNION(dataEntryTypes.map(_.typeRef)))
+
   val dataTransactionType = PredefCaseType(
     "DataTransaction",
-    header ++ proven
+    List("dataEntries" -> listOfDataEntriesType) ++ header ++ proven
   )
 
   val massTransferTransactionType = PredefCaseType(

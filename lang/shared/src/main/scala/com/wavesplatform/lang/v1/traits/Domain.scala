@@ -21,6 +21,14 @@ object OrdType {
 
 case class APair(amountAsset: Option[ByteVector], priceAsset: Option[ByteVector])
 
+trait DataItem
+object DataItem {
+  case class Lng(k: String, v: Long)       extends DataItem
+  case class Bool(k: String, v: Boolean)   extends DataItem
+  case class Bin(k: String, v: ByteVector) extends DataItem
+  case class Str(k: String, v: String)     extends DataItem
+}
+
 case class Ord(senderPublicKey: ByteVector,
                matcherPublicKey: ByteVector,
                assetPair: APair,
@@ -53,5 +61,5 @@ object Tx {
   case class MassTransfer(p: Proven, transferAssetId: Option[ByteVector], transfers: IndexedSeq[TransferItem], attachment: ByteVector) extends Tx
   case class Sponsorship(p: Proven, minFee: Option[Long])                                                                              extends Tx
   case class Exchange(p: Proven, price: Long, amount: Long, buyMatcherFee: Long, sellMatcherFee: Long, buyOrder: Ord, sellOrder: Ord)  extends Tx
-  case class Data(p: Proven)                                                                                                           extends Tx
+  case class Data(p: Proven, items: IndexedSeq[DataItem])                                                                              extends Tx
 }

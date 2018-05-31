@@ -2,8 +2,9 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.lang.v1.compiler.Terms.{BOOLEAN, BYTEVECTOR, LONG, STRING}
 import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, Val}
-import com.wavesplatform.lang.v1.traits._
+import com.wavesplatform.lang.v1.traits.DataItem.{Bin, Bool, Lng, Str}
 import com.wavesplatform.lang.v1.traits.Tx._
+import com.wavesplatform.lang.v1.traits._
 import scodec.bits.ByteVector
 
 object Bindings {
@@ -42,7 +43,11 @@ object Bindings {
       )
     )
 
-  def ordType(o: OrdType): CaseObj = CaseObj((if (o == OrdType.Buy) buyType else sellType).typeRef, Map.empty)
+  def ordType(o: OrdType): CaseObj =
+    CaseObj((o match {
+      case OrdType.Buy  => buyType
+      case OrdType.Sell => sellType
+    }).typeRef, Map.empty)
 
   def orderObject(ord: Ord): CaseObj =
     CaseObj(
@@ -136,8 +141,20 @@ object Bindings {
                 Map("script" -> Val(optionByteVector)(scriptOpt.asInstanceOf[optionByteVector.Underlying])) ++ provenTxPart(p))
       case Sponsorship(p, minFee) =>
         CaseObj(sponsorFeeTransactionType.typeRef, Map("minFee" -> Val(optionLong)(minFee.asInstanceOf[optionLong.Underlying])) ++ provenTxPart(p))
-      case Data(p) =>
-        CaseObj(dataTransactionType.typeRef, provenTxPart(p))
+      case Data(p, dataItems) =>
+        CaseObj(
+          dataTransactionType.typeRef,
+          Map(
+            "dataEntries" -> Val(listOfDataEntriesType)(dataItems
+              .map {
+                case Lng(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> Val(STRING)(k), "value" -> Val(LONG)(v)))
+                case Str(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> Val(STRING)(k), "value" -> Val(STRING)(v)))
+                case Bool(k, v) => CaseObj(longDataEntryType.typeRef, Map("key" -> Val(STRING)(k), "value" -> Val(BOOLEAN)(v)))
+                case Bin(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> Val(STRING)(k), "value" -> Val(BYTEVECTOR)(v)))
+              }
+              .asInstanceOf[listOfDataEntriesType.Underlying])) ++
+            provenTxPart(p)
+        )
       case Exchange(p, price, amount, buyMatcherFee, sellMatcherFee, buyOrder, sellOrder) =>
         CaseObj(
           exchangeTransactionType.typeRef,
