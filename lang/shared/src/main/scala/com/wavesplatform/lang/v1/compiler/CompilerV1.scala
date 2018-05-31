@@ -87,30 +87,29 @@ object CompilerV1 {
       field <- EitherT.fromEither[Coeval](getter.field.toEither)
       r <- compile(ctx, getter.ref)
         .subflatMap { subExpr =>
-          def getField(name: String): Either[String, GETTER] = {
-            val refTpe = ctx.predefTypes.get(name).map(Right(_)).getOrElse(Left(s"Undefined type: $name"))
+          def getField(typeName: String): Either[String, GETTER] = {
+            val refTpe = ctx.predefTypes.get(typeName).map(Right(_)).getOrElse(Left(s"Undefined type: $typeName"))
             val fieldTpe = refTpe.flatMap { ct =>
               val fieldTpe = ct.fields.collectFirst { case (fieldName, tpe) if fieldName == field => tpe }
-              fieldTpe.map(Right(_)).getOrElse(Left(s"Undefined field $name.${getter.field}"))
+              fieldTpe.map(Right(_)).getOrElse(Left(s"Undefined field `$field` of variable of type `$typeName`"))
             }
             fieldTpe.right.map(tpe => GETTER(expr = subExpr, field = field, tpe = tpe))
           }
 
           subExpr.tpe match {
-            case typeRef: TYPEREF     => getField(typeRef.name)
             case typeRef: CASETYPEREF => getField(typeRef.name)
             case union: UNION =>
               val x1 = union.l
                 .map(k => ctx.predefTypes(k.name))
-                .map(predefType => predefType.fields.find(_._1 == getter.field))
-              if (x1.contains(None)) Left(s"Undefined field ${getter.field} on $union")
+                .map(predefType => predefType.fields.find(_._1 == field))
+              if (x1.contains(None)) Left(s"Undefined field `$field` on $union")
               else
                 TypeInferrer.findCommonType(x1.map(_.get._2)) match {
                   case Some(cT) => Right(GETTER(expr = subExpr, field = field, tpe = cT))
-                  case None     => Left(s"Undefined common type for field ${getter.field} on $union")
+                  case None     => Left(s"Undefined common type for field `$field` on $union")
                 }
 
-            case x => Left(s"Can't access to '${getter.field}' of a primitive type $x")
+            case x => Left(s"Can't access to '$field' of a primitive type $x")
           }
         }
     } yield r
@@ -177,7 +176,11 @@ object CompilerV1 {
           for {
             exprTpe  <- compile(ctx, let.value)
             letTypes <- EitherT.fromEither[Coeval](let.types.map(_.toEither).toList.sequence[CompilationResult, String])
-            _        <- EitherT.cond[Coeval](letTypes.forall(ctx.predefTypes.contains), (), s"Value '$letName' declared as non-existing type")
+            _ <- EitherT.cond[Coeval](
+              letTypes.forall(ctx.predefTypes.contains),
+              (),
+              s"Value '$letName' declared as non-existing type $letTypes, while all possible types are ${ctx.predefTypes}"
+            )
             desiredUnion = if (let.types.isEmpty) exprTpe.tpe else UNION(letTypes.map(CASETYPEREF))
             updatedCtx   = ctx.copy(varDefs = ctx.varDefs + (letName -> desiredUnion))
             inExpr <- compile(updatedCtx, block.body)

@@ -39,7 +39,7 @@ class WavesEnvironmentBenchmark {
 
   @Benchmark
   def resolveAddress_test(st: ResolveAddressSt, bh: Blackhole): Unit = {
-    bh.consume(st.environment.resolveAddress(st.aliases.random))
+    bh.consume(st.environment.resolveAlias(st.aliases.random))
   }
 
   @Benchmark
@@ -74,7 +74,7 @@ object WavesEnvironmentBenchmark {
 
   @State(Scope.Benchmark)
   class ResolveAddressSt extends BaseSt {
-    val aliases: Vector[Array[Byte]] = load("resolveAddress", benchSettings.aliasesFile)(x => Alias.fromString(x).explicitGet().bytes.arr)
+    val aliases: Vector[String] = load("resolveAddress", benchSettings.aliasesFile)(x => Alias.buildWithCurrentNetworkByte(x).explicitGet().name)
   }
 
   @State(Scope.Benchmark)

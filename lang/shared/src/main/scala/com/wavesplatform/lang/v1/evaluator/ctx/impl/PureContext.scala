@@ -13,11 +13,11 @@ import scala.util.Try
 object PureContext {
   private val optionT                                             = OPTIONTYPEPARAM(TYPEPARAM('T'))
   private val noneCoeval: Coeval[Either[String, Option[Nothing]]] = Coeval.evalOnce(Right(None))
-  private val nothingCoeval: Coeval[Either[String, Nothing]]      = Coeval.defer(Coeval(Right(???)))
+  private val nothingCoeval: Coeval[Either[String, Nothing]]      = Coeval.defer(Coeval(Right(throw new Exception("explicit contract termination"))))
 
   val none: LazyVal = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval).subflatMap(Right(_: Option[Nothing]))) // IDEA HACK
   val err           = LazyVal(NOTHING)(EitherT(nothingCoeval))
-  val errRef        = "???"
+  val errRef        = "throw"
 
   val extract: PredefFunction = PredefFunction("extract", 1, TYPEPARAM('T'), List(("opt", optionT))) {
     case Some(v) :: Nil => Right(v)
@@ -107,19 +107,34 @@ object PureContext {
   val neString      = createOp(NE_OP, STRING, BOOLEAN)(_ != _)
   val ge            = createOp(GE_OP, LONG, BOOLEAN)(_ >= _)
   val gt            = createOp(GT_OP, LONG, BOOLEAN)(_ > _)
-  val sge            = createOp(GE_OP, STRING, BOOLEAN)(_ >= _)
-  val sgt            = createOp(GT_OP, STRING, BOOLEAN)(_ > _)
+  val sge           = createOp(GE_OP, STRING, BOOLEAN)(_ >= _)
+  val sgt           = createOp(GT_OP, STRING, BOOLEAN)(_ > _)
 
-  val operators: Seq[PredefFunction] = Seq(sumLong, subLong, sumString, sumByteVector,
-                                           eqLong, eqByteVector, eqBool, eqString,
-                                           neLong, neByteVector, neBool, neString,
-                                           ge, gt, sge, sgt,
-                                           getElement, getListSize,
-                                           uMinus, uNot)
+  val operators: Seq[PredefFunction] = Seq(
+    sumLong,
+    subLong,
+    sumString,
+    sumByteVector,
+    eqLong,
+    eqByteVector,
+    eqBool,
+    eqString,
+    neLong,
+    neByteVector,
+    neBool,
+    neString,
+    ge,
+    gt,
+    sge,
+    sgt,
+    getElement,
+    getListSize,
+    uMinus,
+    uNot
+  )
 
   lazy val instance =
-    EvaluationContext.build(types = Seq.empty,
-                            caseTypes = Seq.empty,
+    EvaluationContext.build(caseTypes = Seq.empty,
                             letDefs = Map(("None", none), (errRef, err)),
                             functions = Seq(extract, isDefined, some, size, _isInstanceOf) ++ operators)
 

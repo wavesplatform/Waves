@@ -13,7 +13,7 @@ import scala.util.{Left, Right, Try}
 
 object Common {
 
-  def ev[T: TypeInfo](context: EvaluationContext = PureContext.instance, expr: EXPR): Either[(EvaluationContext, ExecutionError), T] =
+  def ev[T: TypeInfo](context: EvaluationContext = PureContext.instance, expr: EXPR): (EvaluationContext, Either[ExecutionError, T]) =
     EvaluatorV1[T](context, expr)
 
   trait NoShrink {
@@ -52,5 +52,5 @@ object Common {
   val pointCInstance = CaseObj(pointTypeC.typeRef, Map("YB" -> Val(LONG)(41)))
 
   def sampleUnionContext(instance: CaseObj) =
-    EvaluationContext.build(Seq.empty, Seq(pointTypeA, pointTypeB, pointTypeC), Map("p" -> LazyVal(AorBorC)(EitherT.pure(instance))), Seq.empty)
+    EvaluationContext.build(Seq(pointTypeA, pointTypeB, pointTypeC), Map("p" -> LazyVal(AorBorC)(EitherT.pure(instance))), Seq.empty)
 }

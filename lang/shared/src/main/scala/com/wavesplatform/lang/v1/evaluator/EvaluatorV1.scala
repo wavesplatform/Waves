@@ -6,7 +6,7 @@ import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, LET, _}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext.Lenses._
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal, Obj, _}
+import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.{ExecutionError, ExprEvaluator, TypeInfo}
 
 object EvaluatorV1 extends ExprEvaluator {
@@ -56,13 +56,8 @@ object EvaluatorV1 extends ExprEvaluator {
 
   private def evalGetter(expr: EXPR, field: String) = {
     for {
-      obj <- evalExpr[AnyObj](expr)
+      obj <- evalExpr[CaseObj](expr)
       result <- obj match {
-        case Obj(fields) =>
-          fields.get(field) match {
-            case Some(lzy) => liftTER[Any](lzy.value.value)
-            case None      => liftError[Any](s"field '$field' not found")
-          }
         case CaseObj(_, fields) =>
           fields.get(field) match {
             case Some(eager) => liftValue[Any](eager.value)
@@ -109,7 +104,7 @@ object EvaluatorV1 extends ExprEvaluator {
 
   }
 
-  def apply[A: TypeInfo](c: EvaluationContext, expr: EXPR): Either[(EvaluationContext, ExecutionError), A] = {
+  def apply[A: TypeInfo](c: EvaluationContext, expr: EXPR): (EvaluationContext, Either[ExecutionError, A]) = {
     evalExpr[A](expr).run(c)
   }
 }

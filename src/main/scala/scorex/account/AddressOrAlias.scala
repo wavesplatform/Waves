@@ -4,15 +4,10 @@ import com.wavesplatform.state.ByteStr
 import scorex.serialization.Deser
 import scorex.transaction.ValidationError
 
-import scodec.bits.ByteVector
-import com.wavesplatform.lang.v1.traits.{AddressOrAlias => LangAddressOrAlias}
-
-trait AddressOrAlias extends LangAddressOrAlias {
+trait AddressOrAlias {
   def stringRepr: String
 
   def bytes: ByteStr
-
-  override def byteVector: ByteVector = ByteVector(bytes.arr)
 
   override def toString: String = stringRepr
 
