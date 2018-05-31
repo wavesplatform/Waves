@@ -42,6 +42,34 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }) shouldBe Right(1)
   }
 
+  property("union types have filds") {
+    val sampleScript =
+      """match p {
+        |  case pa: PointA => pa.X
+        |  case pb: PointBC => pb.YB
+        |}""".stripMargin
+    eval[Long](sampleScript, withUnion(pointAInstance), { c =>
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(t => CASETYPEREF(t.name)), c))
+    }) shouldBe Right(3)
+    eval[Long](sampleScript, withUnion(pointBInstance), { c =>
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(t => CASETYPEREF(t.name)), c))
+    }) shouldBe Right(41)
+    eval[Long](sampleScript, withUnion(pointCInstance), { c =>
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(t => CASETYPEREF(t.name)), c))
+    }) shouldBe Right(42)
+  }
+
+  property("union types have  only common filds") {
+    val sampleScript =
+      """match p {
+        |  case pa: PointA => pa.X
+        |  case pb: PointBC => pb.X
+        |}""".stripMargin
+    eval[Long](sampleScript, withUnion(pointCInstance), { c =>
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(t => CASETYPEREF(t.name)), c))
+    }) should produce("Typecheck failed: Undefined field `X`")
+  }
+
   property("patternMatching _") {
     val sampleScript =
       """|
