@@ -188,5 +188,6 @@ object Types {
 
   val transactionTypes = obsoleteTransactionTypes ++ activeTransactionTypes
 
-  val transactionType = UNION(activeTransactionTypes.map(_.typeRef))
+  val outgoingTransactionType = UNION(activeTransactionTypes.map(_.typeRef))
+  val anyTransactionType      = UNION(transactionTypes.map(_.typeRef))
 }
