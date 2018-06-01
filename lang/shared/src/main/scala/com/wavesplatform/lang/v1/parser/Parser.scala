@@ -85,7 +85,7 @@ object Parser {
 
   private val varName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index).map {
     case (start, x, end) =>
-      if (keywords.contains(x)) PART.INVALID(start, end, "keywords are restricted")
+      if (keywords.contains(x)) PART.INVALID(start, end, s"keywords are restricted: $x")
       else PART.VALID(start, end, x)
   }
 
@@ -198,7 +198,7 @@ object Parser {
           val innerEnd   = end - 1
           decoded match {
             case Left(err) => CONST_BYTEVECTOR(start, end, PART.INVALID(innerStart, innerEnd, err))
-            case Right(r) => CONST_BYTEVECTOR(start, end, PART.VALID(innerStart, innerEnd, ByteVector(r)))
+            case Right(r)  => CONST_BYTEVECTOR(start, end, PART.VALID(innerStart, innerEnd, ByteVector(r)))
           }
       }
 

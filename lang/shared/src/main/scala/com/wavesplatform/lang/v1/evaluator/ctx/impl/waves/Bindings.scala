@@ -30,7 +30,7 @@ object Bindings {
 
   private def mapRecipient(r: Recipient) =
     "recipient" -> Val(addressOrAliasType)(r match {
-      case Recipient.Alias(name)    => CaseObj(aliasType.typeRef, Map("name"    -> Val(STRING)(name)))
+      case Recipient.Alias(name)    => CaseObj(aliasType.typeRef, Map("alias"   -> Val(STRING)(name)))
       case Recipient.Address(bytes) => CaseObj(addressType.typeRef, Map("bytes" -> Val(BYTEVECTOR)(bytes)))
     })
 
