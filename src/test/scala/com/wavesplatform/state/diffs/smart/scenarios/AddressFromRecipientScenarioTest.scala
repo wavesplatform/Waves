@@ -47,7 +47,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
         |  }
         |  """.stripMargin)
     assert(expr.size == 1)
-    val Right(typedExpr) = CompilerV1(CompilerContext.fromEvaluationContext(context, caseTypes, predefVars), expr.head)
+    val Right(typedExpr) = CompilerV1(CompilerContext.fromEvaluationContext(context, caseTypes.map(v => v.name -> v).toMap, predefVars), expr.head)
     EvaluatorV1[CaseObj](context, typedExpr)._2
   }
 
