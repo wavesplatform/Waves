@@ -26,7 +26,7 @@ class SerdeTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
       case (expr, _) =>
         val typed = CompilerV1(CompilerContext.fromEvaluationContext(PureContext.instance, Map.empty, Map.empty), expr)
         typed shouldBe 'right
-        roundtrip(Serde.codec, typed.right.get)
+        roundtrip(Serde.codec, typed.explicitGet())
     }
   }
 }

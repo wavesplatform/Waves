@@ -104,9 +104,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     require(untyped.size == 1)
     val cctx = CompilerContext.fromEvaluationContext(
       ctx,
-      sampleTypes,
+      sampleTypes.map(v => v.name -> v).toMap,
       Map(PureContext.errRef -> PureContext.predefVars(PureContext.errRef), // need for match fails handling
-          "p"                -> AorBorC))
+          "p"                -> AorBorC)
+    )
     val types = genTypes(cctx)
     val typed = CompilerV1(cctx.copy(predefTypes = types ++ cctx.predefTypes), untyped.head)
     typed.flatMap(EvaluatorV1[T](ctx, _)._2)

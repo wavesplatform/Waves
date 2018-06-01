@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.transferTransactionType
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang._
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
@@ -38,7 +39,7 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
   private def compile(code: String): EXPR = {
     val untyped = Parser(code).get.value
     require(untyped.size == 1)
-    CompilerV1(ctx, untyped.head).right.get
+    CompilerV1(ctx, untyped.head).explicitGet()
   }
 
   property("successful on very deep expressions(stack overflow check)") {
@@ -49,27 +50,27 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
   }
 
   property("handles const expression correctly") {
-    ScriptEstimator(Map.empty, compile("false")).right.get shouldBe 1
+    ScriptEstimator(Map.empty, compile("false")).explicitGet() shouldBe 1
   }
 
   property("handles getter expression correctly") {
-    ScriptEstimator(Map.empty, compile("tx.amount")).right.get shouldBe 2 + 2
+    ScriptEstimator(Map.empty, compile("tx.amount")).explicitGet() shouldBe 2 + 2
   }
 
   property("evaluates let statement lazily") {
     val eager = "let t = 1+1; t"
-    ScriptEstimator(FunctionCosts, compile(eager)).right.get shouldBe 5 + 102 + 2
+    ScriptEstimator(FunctionCosts, compile(eager)).explicitGet() shouldBe 5 + 102 + 2
 
     val lzy = "let t = 1+1; 2" // `t` is unused
-    ScriptEstimator(FunctionCosts, compile(lzy)).right.get shouldBe 5 + 1
+    ScriptEstimator(FunctionCosts, compile(lzy)).explicitGet() shouldBe 5 + 1
 
     val onceOnly = "let x = 2+2; let y = x-x; x-y" // evaluated once only
-    ScriptEstimator(FunctionCosts, compile(onceOnly)).right.get shouldBe (5 + 102) + (5 + 14) + 14
+    ScriptEstimator(FunctionCosts, compile(onceOnly)).explicitGet() shouldBe (5 + 102) + (5 + 14) + 14
   }
 
   property("ignores unused let statements") {
     val script = "let a = 1+2; let b = 2; let c = a+b; b" // `a` and `c` are unused
-    ScriptEstimator(FunctionCosts, compile(script)).right.get shouldBe 5 + (5 + 1) + 5 + 2
+    ScriptEstimator(FunctionCosts, compile(script)).explicitGet() shouldBe 5 + (5 + 1) + 5 + 2
   }
 
   property("recursive let statement") {
@@ -80,6 +81,6 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
 
   property("evaluates if statement lazily") {
     val script = "let a = 1+2; let b = 3+4; let c = if (tx.amount > 5) then a else b; c"
-    ScriptEstimator(FunctionCosts, compile(script)).right.get shouldBe (5 + 102) + 5 + (5 + 16 + 2) + 2
+    ScriptEstimator(FunctionCosts, compile(script)).explicitGet() shouldBe (5 + 102) + 5 + (5 + 16 + 2) + 2
   }
 }

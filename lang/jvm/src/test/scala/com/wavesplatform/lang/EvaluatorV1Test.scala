@@ -381,9 +381,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         )
       ))
 
-    val compilerContext = CompilerContext.fromEvaluationContext(context,
-                                                                Map("Transaction" -> txType),
-                                                                Map("tx"          -> txType.typeRef, "alicePubKey" -> BYTEVECTOR, "bobPubKey" -> BYTEVECTOR))
+    val compilerContext =
+      CompilerContext.fromEvaluationContext(context,
+                                            Map(txType.name -> txType),
+                                            Map("tx"        -> txType.typeRef, "alicePubKey" -> BYTEVECTOR, "bobPubKey" -> BYTEVECTOR))
 
     val script =
       s"""
@@ -395,7 +396,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     ev[Boolean](
       context = context,
-      expr = new CompilerV1(compilerContext).compile(script, List.empty).right.get
+      expr = new CompilerV1(compilerContext).compile(script, List.empty).explicitGet()
     )
   }
 
