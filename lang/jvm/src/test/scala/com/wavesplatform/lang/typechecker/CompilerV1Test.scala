@@ -188,7 +188,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   treeTypeTest("INVALID")(
     ctx = typeCheckerContext,
     expr = Expressions.INVALID(0, 0, "###", None),
-    expectedResult = Left("Typecheck failed: ###")
+    expectedResult = Left("Typecheck failed: ### in 0-0")
   )
 
   private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: CompilationResult[EXPR], ctx: CompilerContext): Unit =

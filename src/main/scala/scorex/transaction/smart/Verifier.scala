@@ -37,7 +37,7 @@ object Verifier {
   def verify[T <: Transaction](blockchain: Blockchain, script: Script, height: Int, transaction: T): Either[ValidationError, T] = {
     ScriptRunner[Boolean, T](height, transaction, blockchain, script) match {
       case (ctx, Left(execError)) => Left(ScriptExecutionError(transaction, execError, ctx.letDefs))
-      case (ctx, Right(false))    => Left(TransactionNotAllowedByScript(transaction, ctx.letDefs))
+      case (ctx, Right(false))    => Left(TransactionNotAllowedByScript(transaction, ctx.letDefs.filter({ case (_, lv) => lv.evaluated.read() })))
       case (_, Right(true))       => Right(transaction)
     }
   }
