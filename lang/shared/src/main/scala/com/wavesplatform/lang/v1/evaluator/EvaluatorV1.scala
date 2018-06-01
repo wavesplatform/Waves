@@ -76,7 +76,7 @@ object EvaluatorV1 extends ExprEvaluator {
       case GETTER(expr, field, _)         => evalGetter(expr, field)
       case FUNCTION_CALL(header, args, _) => evalFunctionCall(header, args)
     }).flatMap(v => {
-      val ti = typeInfo[T]
+//      val ti = typeInfo[T]
 //      if (t.tpe.typeInfo <:< ti)
          liftValue(v.asInstanceOf[T])
 //      else
