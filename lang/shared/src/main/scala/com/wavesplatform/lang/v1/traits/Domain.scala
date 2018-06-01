@@ -51,7 +51,7 @@ object Tx {
                       recipient: Recipient,
                       attachment: ByteVector)
       extends Tx
-  case class Issue(p: Proven, amount: Long, assetName: ByteVector, assetDescription: ByteVector, reissuable: Boolean)                  extends Tx
+  case class Issue(p: Proven, quantity: Long, name: ByteVector, description: ByteVector, reissuable: Boolean, decimals: Long)          extends Tx
   case class ReIssue(p: Proven, amount: Long, reissuable: Boolean)                                                                     extends Tx
   case class Burn(p: Proven, amount: Long)                                                                                             extends Tx
   case class Lease(p: Proven, amount: Long, recipient: Recipient)                                                                      extends Tx

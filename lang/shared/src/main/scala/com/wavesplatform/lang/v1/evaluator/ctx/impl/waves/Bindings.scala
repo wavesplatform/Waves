@@ -82,14 +82,15 @@ object Bindings {
             "attachment"      -> Val(BYTEVECTOR)(attachment)
           ) ++ provenTxPart(p) + mapRecipient(recipient)
         )
-      case Issue(p, amount, assetName, assetDescription, reissuable) =>
+      case Issue(p, quantity, name, description, reissuable, decimals) =>
         CaseObj(
           issueTransactionType.typeRef,
           Map(
-            "amount"           -> Val(LONG)(amount),
-            "assetName"        -> Val(BYTEVECTOR)(assetName),
-            "assetDescription" -> Val(BYTEVECTOR)(assetDescription),
-            "reissuable"       -> Val(BOOLEAN)(reissuable)
+            "quantity"    -> Val(LONG)(quantity),
+            "name"        -> Val(BYTEVECTOR)(name),
+            "description" -> Val(BYTEVECTOR)(description),
+            "reissuable"  -> Val(BOOLEAN)(reissuable),
+            "decimals"    -> Val(LONG)(decimals)
           ) ++ provenTxPart(p)
         )
       case ReIssue(p, amount, reissuable) =>

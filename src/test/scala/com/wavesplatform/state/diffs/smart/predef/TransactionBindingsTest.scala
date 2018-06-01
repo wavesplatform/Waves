@@ -55,5 +55,29 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       result shouldBe Right(true)
     }
   }
+  /*
+     let description = t.description == base58'${ByteStr(t.description).base58}'
+   */
+
+  property("IssueTransaction binding") {
+    forAll(issueGen) { t =>
+      val result = runScript[Boolean](
+        s"""
+          |match tx {
+          | case t : IssueTransaction =>
+          |   ${provenPart(t)}
+          |   let name = t.name == base58'${ByteStr(t.name).base58}'
+          |   let quantity = t.quantity == ${t.quantity}
+          |   let decimals = t.decimals == ${t.decimals}
+          |   let reissuable = t.reissuable == ${t.reissuable}
+          |   $assertProvenPart && quantity && decimals && reissuable && name
+          | case other => throw
+          | }
+          |""".stripMargin,
+        t
+      )
+      result shouldBe Right(true)
+    }
+  }
 
 }

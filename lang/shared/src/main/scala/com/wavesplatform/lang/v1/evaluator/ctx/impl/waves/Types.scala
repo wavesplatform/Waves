@@ -48,10 +48,11 @@ object Types {
   val issueTransactionType = PredefCaseType(
     "IssueTransaction",
     List(
-      "amount"           -> LONG,
-      "assetName"        -> BYTEVECTOR,
-      "assetDescription" -> BYTEVECTOR,
-      "reissuable"       -> BOOLEAN,
+      "quantity"    -> LONG,
+      "name"        -> BYTEVECTOR,
+      "description" -> BYTEVECTOR,
+      "reissuable"  -> BOOLEAN,
+      "decimals"    -> LONG
     ) ++ header ++ proven
   )
 

@@ -54,7 +54,7 @@ object RealTransactionWrapper {
           recipient = t.recipient,
           attachment = ByteVector(t.attachment)
         )
-      case i: IssueTransaction       => Tx.Issue(proven(i), i.quantity, i.assetId(), ByteVector(i.description), i.reissuable)
+      case i: IssueTransaction       => Tx.Issue(proven(i), i.quantity, i.assetId(), ByteVector(i.description), i.reissuable, i.decimals)
       case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.reissuable)
       case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity)
       case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount, b.recipient)
