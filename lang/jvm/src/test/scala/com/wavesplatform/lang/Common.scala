@@ -54,5 +54,5 @@ object Common {
   val sampleTypes = Map("PointA" -> pointTypeA, "PointB" -> pointTypeB, "PointC" -> pointTypeC)
 
   def sampleUnionContext(instance: CaseObj) =
-    EvaluationContext.build(Map("p" -> LazyVal(AorBorC)(EitherT.pure(instance))), Seq.empty)
+    EvaluationContext.build(Map("p" -> LazyVal(EitherT.pure(instance))), Seq.empty)
 }

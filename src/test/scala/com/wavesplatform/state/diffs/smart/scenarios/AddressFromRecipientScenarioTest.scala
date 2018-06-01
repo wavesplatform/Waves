@@ -5,6 +5,7 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.CaseObj
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.caseTypes
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext.predefVars
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState, produce}
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -46,7 +47,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
         |  }
         |  """.stripMargin)
     assert(expr.size == 1)
-    val Right(typedExpr) = CompilerV1(CompilerContext.fromEvaluationContext(context, caseTypes), expr.head)
+    val Right(typedExpr) = CompilerV1(CompilerContext.fromEvaluationContext(context, caseTypes, predefVars), expr.head)
     EvaluatorV1[CaseObj](context, typedExpr)._2
   }
 

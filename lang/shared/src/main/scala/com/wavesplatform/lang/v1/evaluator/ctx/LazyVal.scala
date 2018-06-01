@@ -8,10 +8,9 @@ import monix.eval.Coeval
 import cats.implicits._
 
 sealed trait LazyVal {
-  val tpe: TYPE
   val evaluated: CoevalRef[Boolean] = CoevalRef.of(false)
 
-  val value: TrampolinedExecResult[tpe.Underlying]
+  val value: TrampolinedExecResult[Any]
 
   override def toString: String = {
     val valueStringRepr: String = evaluated.read
@@ -29,21 +28,22 @@ sealed trait LazyVal {
         } else "Not evaluated"
       }).value
 
-    s"Type: ${tpe.typeInfo}, Value: $valueStringRepr"
+    //s"Type: ${tpe.typeInfo}, Value: $valueStringRepr"
+    s"Value: $valueStringRepr"
   }
 }
 
 object LazyVal {
-  private case class LazyValImpl(tpe: TYPE, v: TrampolinedExecResult[Any]) extends LazyVal {
-    override val value: TrampolinedExecResult[tpe.Underlying] = EitherT(
+  private case class LazyValImpl(v: TrampolinedExecResult[Any]) extends LazyVal {
+    override val value: TrampolinedExecResult[Any] = EitherT(
       Coeval.evalOnce(
         evaluated.write(true).apply()
       ) *>
         Coeval.evalOnce(
-          v.map(_.asInstanceOf[tpe.Underlying]).value.apply()
+          v.value.apply()
         )
     )
   }
 
-  def apply(t: TYPE)(v: TrampolinedExecResult[t.Underlying]): LazyVal = LazyValImpl(t, v.map(_.asInstanceOf[Any]))
+  def apply(v: TrampolinedExecResult[Any]): LazyVal = LazyValImpl(v)
 }

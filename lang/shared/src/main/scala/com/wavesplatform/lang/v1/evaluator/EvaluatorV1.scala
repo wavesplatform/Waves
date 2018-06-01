@@ -16,13 +16,13 @@ object EvaluatorV1 extends ExprEvaluator {
   override type V = V1.type
   override val version: V = V1
 
-  private def evalBlock(let: LET, inner: EXPR, tpe: TYPE): EvalM[Any] = {
+  private def evalBlock(let: LET, inner: EXPR): EvalM[Any] = {
     import let.{name, value}
     for {
       ctx <- getContext
-      blockEvaluation = evalExpr(value)(value.tpe.typeInfo)
-      lazyBlock       = LazyVal(value.tpe)(blockEvaluation.ter(ctx))
-      result <- updateContext(lets.modify(_)(_.updated(name, lazyBlock))) *> evalExpr(inner)(tpe.typeInfo)
+      blockEvaluation = evalExpr[Any](value)
+      lazyBlock       = LazyVal(blockEvaluation.ter(ctx))
+      result <- updateContext(lets.modify(_)(_.updated(name, lazyBlock))) *> evalExpr[Any](inner)
     } yield result
   }
 
@@ -34,10 +34,10 @@ object EvaluatorV1 extends ExprEvaluator {
       }
     }
 
-  private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, tpe: TYPE) =
+  private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR) =
     evalExpr[Boolean](cond) flatMap {
-      case true  => evalExpr(ifTrue)(tpe.typeInfo)
-      case false => evalExpr(ifFalse)(tpe.typeInfo)
+      case true  => evalExpr[Any](ifTrue)
+      case false => evalExpr[Any](ifFalse)
     }
 
   private def evalGetter(expr: EXPR, field: String) =
@@ -56,7 +56,7 @@ object EvaluatorV1 extends ExprEvaluator {
         .get(header)
         .fold(liftError[Any](s"function '$header' not found")) { func =>
           args
-            .traverse[EvalM, Any](a => evalExpr(a)(a.tpe.typeInfo).map(_.asInstanceOf[Any]))
+            .traverse[EvalM, Any](a => evalExpr[Any](a))
             .map(func.eval)
             .flatMap(r => liftTER[Any](r.value))
         }
@@ -65,20 +65,22 @@ object EvaluatorV1 extends ExprEvaluator {
 
   private def evalExpr[T: TypeInfo](t: EXPR): EvalM[T] = {
     (t match {
-      case BLOCK(let, inner, blockTpe)    => evalBlock(let, inner, blockTpe)
+      case BLOCK(let, inner, blockTpe)    => evalBlock(let, inner)
       case REF(str, _)                    => evalRef(str)
       case CONST_LONG(v)                  => liftValue(v)
       case CONST_BYTEVECTOR(v)            => liftValue(v)
       case CONST_STRING(v)                => liftValue(v)
       case TRUE                           => liftValue(true)
       case FALSE                          => liftValue(false)
-      case IF(cond, t1, t2, tpe)          => evalIF(cond, t1, t2, tpe)
+      case IF(cond, t1, t2, tpe)          => evalIF(cond, t1, t2)
       case GETTER(expr, field, _)         => evalGetter(expr, field)
       case FUNCTION_CALL(header, args, _) => evalFunctionCall(header, args)
     }).flatMap(v => {
       val ti = typeInfo[T]
-      if (t.tpe.typeInfo <:< ti) liftValue(v.asInstanceOf[T])
-      else liftError(s"Bad type: expected: $ti actual: ${t.tpe.typeInfo}")
+//      if (t.tpe.typeInfo <:< ti)
+         liftValue(v.asInstanceOf[T])
+//      else
+//         liftError(s"Bad type: expected: $ti actual: ${t.tpe.typeInfo}")
     })
   }
 

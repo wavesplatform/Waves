@@ -25,11 +25,14 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
     // make up a `tx` object
     val tx = CaseObj(transferTransactionType.typeRef, Map("amount" -> Val(LONG)(100000000)))
     val txCtx = EvaluationContext(
-      caseTypeDefs = Map(transferTransactionType.name -> transferTransactionType),
-      letDefs = Map("tx"                              -> LazyVal(transferTransactionType.typeRef)(EitherT.pure(tx))),
+      letDefs = Map("tx" -> LazyVal(EitherT.pure(tx))),
       functions = Map.empty
     )
-    CompilerContext.fromEvaluationContext(PureContext.instance |+| txCtx, Map.empty)
+    CompilerContext.fromEvaluationContext(
+      PureContext.instance |+| txCtx,
+      Map(transferTransactionType.name -> transferTransactionType),
+      Map("tx"                         -> transferTransactionType.typeRef)
+    )
   }
 
   private def compile(code: String): EXPR = {
