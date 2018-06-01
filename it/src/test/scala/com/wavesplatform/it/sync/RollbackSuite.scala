@@ -11,7 +11,14 @@ import scala.concurrent.duration._
 import scala.concurrent.Await
 
 class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSending with NodesFromDocker with Matchers {
-  override protected val nodeConfigs: Seq[Config] = Seq(NodeConfigs.randomMiner, NodeConfigs.NotMiner)
+  override def nodeConfigs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(0))
+      .overrideBase(_.raw("waves.blockchain.custom.functionality.blocks-for-feature-activation=1"))
+      .overrideBase(_.raw("waves.blockchain.custom.functionality.feature-check-blocks-period=1"))
+      .withDefault(1)
+      .withSpecial(1, _.nonMiner)
+      .buildNonConflicting()
 
   private val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet
   private def sender        = nodes.last
@@ -110,6 +117,34 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
 
     val data0 = node.getData(firstAddress)
     assert(data0 == List.empty)
+  }
 
+  test("Sponsorship transaction rollback") {
+    val sponsorAssetTotal = 100 * 100L
+
+    val sponsorAssetId =
+      sender
+        .issue(sender.address, "SponsoredAsset", "For test usage", sponsorAssetTotal, decimals = 2, reissuable = false, fee = issueFee)
+        .id
+    nodes.waitForHeightAriseAndTxPresent(sponsorAssetId)
+
+    val sponsorId = sender.sponsorAsset(sender.address, sponsorAssetId, baseFee = 100L, fee = issueFee).id
+    nodes.waitForHeightAriseAndTxPresent(sponsorId)
+
+    val height = sender.waitForTransaction(sponsorId).height
+
+    val assetDetailsBefore = sender.assetsDetails(sponsorAssetId)
+
+    nodes.waitForHeightArise()
+    val sponsorSecondId = sender.sponsorAsset(sender.address, sponsorAssetId, baseFee = 2 * 100L, fee = issueFee).id
+    nodes.waitForHeightAriseAndTxPresent(sponsorSecondId)
+
+    for (n <- nodes) n.rollback(height, false)
+
+    nodes.waitForHeightArise()
+
+    val assetDetailsAfter = sender.assetsDetails(sponsorAssetId)
+
+    assert(assetDetailsAfter.minSponsoredAssetFee == assetDetailsBefore.minSponsoredAssetFee)
   }
 }
