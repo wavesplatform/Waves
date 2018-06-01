@@ -78,6 +78,7 @@ object Dependencies {
 
   lazy val fp = Seq(
     "org.typelevel"       %% "cats-core"       % "1.1.0",
+    "org.typelevel"       %% "cats-mtl-core"       % "0.2.1",
     "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
   )
   lazy val meta        = Seq("com.chuusai" %% "shapeless" % "2.3.3")
