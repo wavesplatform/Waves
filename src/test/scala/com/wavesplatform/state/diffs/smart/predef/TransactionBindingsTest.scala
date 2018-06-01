@@ -2,14 +2,29 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.state._
 import com.wavesplatform.{NoShrink, TransactionGen}
+import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{Address, Alias}
+import scorex.transaction.ProvenTransaction
 
 class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
+  def provenPart(t: ProvenTransaction): String = {
+    def pg(i: Int) = s"let proof$i = t.proofs[$i] == base58'${t.proofs.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).base58}'"
+    s"""
+       |   let id = t.id == base58'${t.id().base58}'
+       |   let fee = t.fee == ${t.assetFee._2}
+       |   let timestamp = t.timestamp == ${t.timestamp}
+       |   let senderPk = t.senderPk == base58'${ByteStr(t.sender.publicKey).base58}'
+       |   ${Range(0, 8).map(pg).mkString("\n")}
+     """.stripMargin
+  }
+
+  val assertProvenPart = "id && fee && timestamp && senderPk && proof0 && proof1 && proof2 && proof3 && proof4 && proof5 && proof6 && proof7"
+
   property("TransferTransaction binding") {
-    forAll(transferV1Gen) { t =>
+    forAll(Gen.oneOf(transferV1Gen, transferV2Gen)) { t =>
       // `version`  is not properly bound yet
       // `proofs`   can be up to 8, gens generate only 1
       // attachment is too big to be encoded in base58
@@ -19,12 +34,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         s"""
           |match tx {
           | case t : TransferTransaction  => 
-          |   let id = t.id == base58'${t.id().base58}'
-          |   let fee = t.fee == ${t.fee}
-          |   let timestamp = t.timestamp == ${t.timestamp}
-          |   let senderPk = t.senderPk == base58'${ByteStr(t.sender.publicKey).base58}'
-          |   let proof0 = t.proofs[0] == base58'${t.signature.base58}'
-          |   let proof1 = t.proofs[1] == base58''
+          |   ${provenPart(t)}
           |   let amount = t.amount == ${t.amount}
           |   let feeAssetId = if (${t.feeAssetId.isDefined})
           |      then extract(t.feeAssetId) == base58'${t.feeAssetId.getOrElse(ByteStr.empty).base58}'
@@ -36,7 +46,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           |       case a: Address => a.bytes == base58'${t.recipient.cast[Address].map(_.bytes.base58).getOrElse("")}'
           |       case a: Alias => a.alias == "${t.recipient.cast[Alias].map(_.name).getOrElse("")}"
           |      }
-          |   id && fee && timestamp && senderPk && proof0 && proof1 && amount && feeAssetId && transferAssetId && recipient
+          |   $assertProvenPart && amount && feeAssetId && transferAssetId && recipient
           | case other => throw
           | }
           |""".stripMargin,
