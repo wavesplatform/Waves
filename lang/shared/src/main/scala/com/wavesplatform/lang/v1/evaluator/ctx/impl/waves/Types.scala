@@ -189,4 +189,6 @@ object Types {
   val transactionTypes = obsoleteTransactionTypes ++ activeTransactionTypes
 
   val transactionType = UNION(activeTransactionTypes.map(_.typeRef))
+
+  val caseTypes = (Seq(addressType, aliasType, transfer) ++ activeTransactionTypes).map(t => t.name -> t).toMap
 }
