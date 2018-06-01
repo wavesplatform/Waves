@@ -2,7 +2,6 @@ package com.wavesplatform.lang.v1.task
 
 import cats.data.Kleisli
 import cats.implicits._
-import com.wavesplatform.lang.v1.evaluator.CoevalRef
 import monix.eval.Coeval
 import monix.execution.atomic.{Atomic, AtomicBuilder}
 
@@ -24,6 +23,12 @@ trait TaskM[S, E, R] {
       finalState <- stateRef.read
     } yield (finalState, result)
   }
+
+  def map[B](f: R => B): TaskM[S, E, B] =
+    TaskM.fromKleisli(inner.map({
+      case Right(v)  => Right(f(v))
+      case Left(err) => Left(err)
+    }))
 
   def flatMap[B](f: R => TaskM[S, E, B]): TaskM[S, E, B] = {
     TaskM.fromKleisli(inner.flatMap({
@@ -49,15 +54,4 @@ object TaskM {
   def apply[S, E, R](f: S => Coeval[Either[E, R]]): TaskM[S, E, R] = new TaskM[S, E, R] {
     override protected[task] val inner: Kleisli[Coeval, CoevalRef[S], Either[E, R]] = Kleisli(_.read >>= f)
   }
-
-  def pure[S, E, R](x: R): TaskM[S, E, R] = TaskM(_ => Coeval.pure(x.asRight))
-
-  def raiseError[S, E, R](e: E): TaskM[S, E, R] = TaskM(_ => Coeval.pure(e.asLeft))
-
-  def get[S, E]: TaskM[S, E, S] = TaskM(s => Coeval.pure(s.asRight))
-
-  def set[S, E](s: S): TaskM[S, E, Unit] =
-    TaskM.fromKleisli(Kleisli(ref => {
-      ref.write(s).map(_.asRight)
-    }))
 }
