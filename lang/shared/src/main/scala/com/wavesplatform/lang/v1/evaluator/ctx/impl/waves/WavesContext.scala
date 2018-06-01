@@ -55,7 +55,7 @@ object WavesContext {
     val heightCoeval: Coeval[Either[String, Long]] = Coeval.evalOnce(Right(env.height))
 
     val txByIdF = {
-      val returnType = OPTION(transactionType)
+      val returnType = OPTION(anyTransactionType)
       PredefFunction("getTransactionById", 100, returnType, List(("id", BYTEVECTOR))) {
         case (id: ByteVector) :: Nil =>
           val maybeDomainTx = env.transactionById(id.toArray).map(transactionObject)
@@ -89,7 +89,7 @@ object WavesContext {
       }
 
     EvaluationContext.build(
-      letDefs = Map(("height", LazyVal(LONG)(EitherT(heightCoeval))), ("tx", LazyVal(transactionType)(EitherT(txCoeval)))),
+      letDefs = Map(("height", LazyVal(LONG)(EitherT(heightCoeval))), ("tx", LazyVal(outgoingTransactionType)(EitherT(txCoeval)))),
       functions = Seq(
         txByIdF,
         txHeightByIdF,
