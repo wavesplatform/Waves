@@ -8,80 +8,103 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
 class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+  val Plus  = FunctionHeader("+", List(FunctionHeaderType.LONG, FunctionHeaderType.LONG))
+  val Minus = FunctionHeader("-", List(FunctionHeaderType.LONG, FunctionHeaderType.LONG))
+  val Gt    = FunctionHeader(">", List(FunctionHeaderType.LONG, FunctionHeaderType.LONG))
+
+  val FunctionCosts: Map[FunctionHeader, Long] = Map(Plus -> 100, Minus -> 10, Gt -> 10)
 
   property("successful on very deep expressions(stack overflow check)") {
-    val sumHeader = FunctionHeader("+", List(FunctionHeaderType.LONG, FunctionHeaderType.LONG))
     val expr = (1 to 100000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
-      FUNCTION_CALL(sumHeader, List(CONST_LONG(1), acc), LONG)
+      FUNCTION_CALL(Plus, List(CONST_LONG(1), acc), LONG)
     }
 
-    ScriptEstimator(Map(sumHeader -> 1L), expr) shouldBe 'right
+    ScriptEstimator(FunctionCosts, expr) shouldBe 'right
   }
 
   property("handles const expression correctly") {
-    val estimate = ScriptEstimator(Map.empty, FALSE)
-    estimate.right.get shouldBe 1
+    ScriptEstimator(Map.empty, FALSE).right.get shouldBe 1
   }
 
-  property("handles let expression correctly") {
-    val Plus     = FunctionHeader("+", List(FunctionHeaderType.LONG, FunctionHeaderType.LONG)) ///refac?
-    val expr     = BLOCK(LET("t", TRUE), REF("t", BOOLEAN), BOOLEAN)
-    val estimate = ScriptEstimator(Map(Plus -> 3L), expr)
-    estimate.right.get shouldBe 8
+  property("handles getter expression correctly") {
+    // tx.type
+    val expr = GETTER(REF("tx", CASETYPEREF("Transaction")), "type", LONG)
+    ScriptEstimator(Map.empty, expr).right.get shouldBe 2 + 2
   }
 
   property("evaluates let statement lazily") {
-    val eager = BLOCK(LET("txtype", GETTER(REF("tx", CASETYPEREF("Transaction")), "type", LONG)), REF("txtype", LONG), BOOLEAN)
-    ScriptEstimator(Map.empty, eager).right.get shouldBe 11
+    // let t = 1 + 1
+    // t
+    val eager = BLOCK(LET("x", FUNCTION_CALL(Plus, List(CONST_LONG(1), CONST_LONG(1)), LONG)), REF("x", LONG), LONG)
+    ScriptEstimator(FunctionCosts, eager).right.get shouldBe 109
 
-    val lzy = BLOCK(LET("txtype", GETTER(REF("tx", CASETYPEREF("Transaction")), "type", LONG)), TRUE, BOOLEAN) // does not reference `txtype`
-    ScriptEstimator(Map.empty, lzy).right.get shouldBe 6
+    // let t = 1 + 1  // unused
+    // 2
+    val lzy = BLOCK(LET("x", FUNCTION_CALL(Plus, List(CONST_LONG(1), CONST_LONG(1)), LONG)), CONST_LONG(2), LONG)
+    ScriptEstimator(FunctionCosts, lzy).right.get shouldBe 6
+
+    // let x = 2 + 2  // evaluated once only
+    // let y = x - x
+    // x - y
+    val onceOnly = BLOCK(
+      LET("x", FUNCTION_CALL(Plus, List(CONST_LONG(2), CONST_LONG(2)), LONG)),
+      BLOCK(LET("y", FUNCTION_CALL(Minus, List(REF("x", LONG), REF("x", LONG)), LONG)),
+            FUNCTION_CALL(Minus, List(REF("x", LONG), REF("y", LONG)), LONG),
+            LONG),
+      LONG
+    )
+    ScriptEstimator(FunctionCosts, onceOnly).right.get shouldBe 140
+  }
+
+  property("ignores unused let statements") {
+    // let a = 1 + 2  // unused
+    // let b = 2
+    // let c = a + b  // unused
+    // b
+    val script = BLOCK(
+      LET("a", FUNCTION_CALL(Plus, List(CONST_LONG(1), CONST_LONG(2)), LONG)),
+      BLOCK(
+        LET("b", CONST_LONG(2)),
+        BLOCK(
+          LET("c", FUNCTION_CALL(Plus, List(REF("a", LONG), REF("b", LONG)), LONG)),
+          REF("b", LONG),
+          LONG
+        ),
+        LONG
+      ),
+      LONG
+    )
+    ScriptEstimator(FunctionCosts, script).right.get shouldBe 18
+  }
+
+  property("recursive let statement") {
+    // let v = v; v
+    val expr = BLOCK(LET("v", REF("v", LONG)), REF("v", LONG), LONG)
+    ScriptEstimator(Map.empty, expr) shouldBe 'right
   }
 
   property("evaluates if statement lazily") {
-    val GetElement = FunctionHeader("GetElement", List(FunctionHeaderType.LIST(FunctionHeaderType.BYTEVECTOR), FunctionHeaderType.LONG))
-    val Gt         = FunctionHeader(">", List(FunctionHeaderType.LONG, FunctionHeaderType.LONG))
-    val Size       = FunctionHeader("size", List(FunctionHeaderType.BYTEVECTOR))
-    val txRef      = REF("tx", CASETYPEREF("Transaction"))
-
+    // let a = 1 + 2
+    // let b = 3 + 4
+    // let c = if tx.type > 5 then a else b
+    // c
     val script = BLOCK(
-      LET("a", FUNCTION_CALL(GetElement, List(GETTER(txRef, "proofs", LIST(BYTEVECTOR)), CONST_LONG(0)), BYTEVECTOR)),
+      LET("a", FUNCTION_CALL(Plus, List(CONST_LONG(1), CONST_LONG(2)), LONG)),
       BLOCK(
-        LET("b", FUNCTION_CALL(GetElement, List(GETTER(txRef, "proofs", LIST(BYTEVECTOR)), CONST_LONG(1)), BYTEVECTOR)),
+        LET("b", FUNCTION_CALL(Plus, List(CONST_LONG(3), CONST_LONG(4)), LONG)),
         BLOCK(
           LET("c",
-              IF(FUNCTION_CALL(Gt, List(GETTER(txRef, "type", LONG), CONST_LONG(5)), BOOLEAN),
-                 REF("a", BYTEVECTOR),
-                 REF("b", BYTEVECTOR),
-                 BYTEVECTOR)),
-          FUNCTION_CALL(Gt, List(FUNCTION_CALL(Size, List(REF("c", BYTEVECTOR)), LONG), CONST_LONG(0)), BOOLEAN),
-          BOOLEAN
+              IF(FUNCTION_CALL(Gt, List(GETTER(REF("tx", CASETYPEREF("Transaction")), "type", LONG), CONST_LONG(5)), BOOLEAN),
+                 REF("a", LONG),
+                 REF("b", LONG),
+                 LONG)),
+          REF("c", LONG),
+          LONG
         ),
-        BOOLEAN
+        LONG
       ),
-      BOOLEAN
+      LONG
     )
-    val estimate = ScriptEstimator(Map(GetElement -> 10L, Gt -> 10L, Size -> 10L), script)
-    estimate.right.get shouldBe 71
-  }
-
-  property("///") {
-    val Plus  = FunctionHeader("+", List(FunctionHeaderType.LONG, FunctionHeaderType.LONG))
-    val Gt    = FunctionHeader(">", List(FunctionHeaderType.LONG, FunctionHeaderType.LONG))
-    val txRef = REF("tx", CASETYPEREF("Transaction"))
-
-    val script = BLOCK(
-      LET("a", GETTER(txRef, "type", LONG)),
-      BLOCK(
-        LET("b", GETTER(txRef, "amount", LONG)),
-        BLOCK(LET("c", FUNCTION_CALL(Plus, List(REF("a", LONG), REF("b", LONG)), LONG)),
-              FUNCTION_CALL(Gt, List(REF("b", LONG), CONST_LONG(0)), BOOLEAN),
-              BOOLEAN),
-        BOOLEAN
-      ),
-      BOOLEAN
-    )
-    val estimate = ScriptEstimator(Map(Plus -> 10L, Gt -> 10L), script)
-    estimate.right.get shouldBe 32
+    ScriptEstimator(FunctionCosts, script).right.get shouldBe 137
   }
 }
