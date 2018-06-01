@@ -5,7 +5,7 @@ import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext.predefVars
+//import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext.predefVars
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
