@@ -134,8 +134,7 @@ object PureContext {
   )
 
   lazy val instance =
-    EvaluationContext.build(caseTypes = Seq.empty,
-                            letDefs = Map(("None", none), (errRef, err)),
+    EvaluationContext.build(letDefs = Map(("None", none), (errRef, err)),
                             functions = Seq(extract, isDefined, some, size, _isInstanceOf) ++ operators)
 
 }
