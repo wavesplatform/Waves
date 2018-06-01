@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.v1.evaluator
+package com.wavesplatform.lang.v1
 
 import cats.data.EitherT
 import com.wavesplatform.lang.{ExecutionError, TrampolinedExecResult}
@@ -6,7 +6,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.task.TaskM
 import monix.eval.Coeval
 
-object EvalM {
+package object evaluator {
   type EvalM[A] = TaskM[EvaluationContext, ExecutionError, A]
 
   implicit class EvalMOps[A](ev: EvalM[A]) {

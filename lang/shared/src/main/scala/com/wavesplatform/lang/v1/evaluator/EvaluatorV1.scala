@@ -13,8 +13,6 @@ import com.wavesplatform.lang.{ExecutionError, ExprEvaluator, TypeInfo}
 
 object EvaluatorV1 extends ExprEvaluator {
 
-  import EvalM._
-
   override type V = V1.type
   override val version: V = V1
 
