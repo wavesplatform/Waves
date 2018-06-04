@@ -57,7 +57,7 @@ object Address extends ScorexLogging {
     for {
       _ <- Either.cond(base58String.length <= AddressStringLength,
                        (),
-                       InvalidAddress(s"Wrong address string length: max=$AddressStringLength, actual: address.length"))
+                       InvalidAddress(s"Wrong address string length: max=$AddressStringLength, actual: ${base58String.length}"))
       byteArray <- Base58.decode(base58String).toEither.left.map(ex => InvalidAddress(s"Unable to decode base58: ${ex.getMessage}"))
       address   <- fromBytes(byteArray)
     } yield address

@@ -100,9 +100,7 @@ class MinerImpl(allChannels: ChannelGroup,
       ))
 
   private def checkScript(account: PrivateKeyAccount): Either[String, Unit] = {
-    Either.cond(blockchainUpdater.accountScript(account).isEmpty,
-                (),
-                s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
+    Either.cond(!blockchainUpdater.hasScript(account), (), s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
   }
 
   private def ngEnabled: Boolean = blockchainUpdater.featureActivationHeight(BlockchainFeatures.NG.id).exists(blockchainUpdater.height > _ + 1)
@@ -336,7 +334,7 @@ class MinerImpl(allChannels: ChannelGroup,
 
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()
-    val nonScriptedAccounts = wallet.privateKeyAccounts.filter(acc => blockchainUpdater.accountScript(acc).isEmpty)
+    val nonScriptedAccounts = wallet.privateKeyAccounts.filterNot(blockchainUpdater.hasScript(_))
     scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map(generateBlockTask).map(_.runAsyncLogErr).toSet)
     microBlockAttempt := SerialCancelable()
     debugState = MinerDebugInfo.MiningBlocks
