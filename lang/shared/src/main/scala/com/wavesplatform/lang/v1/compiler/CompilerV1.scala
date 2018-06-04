@@ -146,7 +146,7 @@ object CompilerV1 {
               }
 
             matchedSignatures match {
-              case Nil                       => Left(s"Can't find a function '$name'(${resolvedArgs.map(_.tpe.typeInfo).mkString(", ")})")
+              case Nil                       => Left(s"Can't find a function '$name'(${resolvedArgs.map(_.tpe.getClass.getSimpleName).mkString(", ")})")
               case (_, oneFuncResult) :: Nil => oneFuncResult
               case manyPairs =>
                 val candidates = manyPairs.map { case (sig, _) => s"'$name'(${sig.args.mkString(", ")})" }

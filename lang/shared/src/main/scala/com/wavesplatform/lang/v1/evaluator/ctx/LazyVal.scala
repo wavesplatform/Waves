@@ -25,9 +25,9 @@ sealed trait LazyVal {
               )
             )
         } else "Not evaluated"
-      }).value
+      })
+      .value
 
-    //s"Type: ${tpe.typeInfo}, Value: $valueStringRepr"
     s"Value: $valueStringRepr"
   }
 }
