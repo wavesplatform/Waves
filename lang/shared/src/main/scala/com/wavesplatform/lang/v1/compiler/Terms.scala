@@ -1,6 +1,5 @@
 package com.wavesplatform.lang.v1.compiler
 
-import com.wavesplatform.lang.TypeInfo
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.evaluator.ctx.CaseObj
 import scodec.bits.ByteVector
@@ -14,9 +13,8 @@ object Terms {
 
   sealed trait TYPE extends TYPEPLACEHOLDER {
     type Underlying
-    def typeInfo: TypeInfo[Underlying]
   }
-  sealed abstract class AUTO_TAGGED_TYPE[T](implicit override val typeInfo: TypeInfo[T]) extends TYPE {
+  sealed abstract class AUTO_TAGGED_TYPE[T] extends TYPE {
     override type Underlying = T
   }
 
@@ -28,11 +26,9 @@ object Terms {
   case object STRING     extends AUTO_TAGGED_TYPE[String]
   case class OPTION(innerType: TYPE) extends TYPE {
     type Underlying = Option[innerType.Underlying]
-    override def typeInfo: TypeInfo[Option[innerType.Underlying]] = TypeInfo.optionTypeInfo(innerType.typeInfo)
   }
   case class LIST(innerType: TYPE) extends TYPE {
     type Underlying = IndexedSeq[innerType.Underlying]
-    override def typeInfo: TypeInfo[IndexedSeq[innerType.Underlying]] = TypeInfo.listTypeInfo(innerType.typeInfo)
   }
   case class CASETYPEREF(name: String)   extends AUTO_TAGGED_TYPE[CaseObj]
   case class UNION(l: List[CASETYPEREF]) extends AUTO_TAGGED_TYPE[CaseObj]

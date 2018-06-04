@@ -2,7 +2,6 @@ package com.wavesplatform.lang
 
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -96,13 +95,17 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
   }
 
-  private def eval[T: TypeInfo](code: String, ctx: EvaluationContext = PureContext.instance, genTypes: CompilerContext => Map[String, PredefBase] = {
-    _ =>
-      Map.empty
+  private def eval[T](code: String, ctx: EvaluationContext = PureContext.instance, genTypes: CompilerContext => Map[String, PredefBase] = { _ =>
+    Map.empty
   }) = {
     val untyped = Parser(code).get.value
     require(untyped.size == 1)
-    val cctx  = CompilerContext.fromEvaluationContext(ctx, sampleTypes)
+    val cctx = CompilerContext.fromEvaluationContext(
+      ctx,
+      sampleTypes.map(v => v.name -> v).toMap,
+      Map(PureContext.errRef -> PureContext.predefVars(PureContext.errRef), // need for match fails handling
+          "p"                -> AorBorC)
+    )
     val types = genTypes(cctx)
     val typed = CompilerV1(cctx.copy(predefTypes = types ++ cctx.predefTypes), untyped.head)
     typed.flatMap(EvaluatorV1[T](ctx, _)._2)
