@@ -5,6 +5,7 @@ import com.wavesplatform.it.util._
 
 package object sync {
   val fee                        = 0.001.waves
+  val leasingFee                 = 0.002.waves
   val smartFee                   = 0.004.waves
   val issueFee                   = 1.waves
   val transferAmount             = 10.waves
