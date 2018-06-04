@@ -107,6 +107,14 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
     }
   }
 
+  override def hasScript(address: Address): Boolean = readOnly { db =>
+    addressIdCache.get(address).fold[Boolean](false) { addressId =>
+      Option(scriptCache.asMap().get(address))
+        .map(_.isDefined)
+        .getOrElse(hasInHistory(db, addressId, Keys.addressScriptHistory, Keys.addressScript))
+    }
+  }
+
   override def accountData(address: Address): AccountDataInfo = readOnly { db =>
     val data = for {
       addressId <- addressIdCache.get(address).toSeq
@@ -137,6 +145,13 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
     for {
       lastChange <- db.get(key(addressId)).headOption
     } yield db.get(v(lastChange, addressId))
+
+  private def hasInHistory[A](db: ReadOnlyDB, addressId: BigInt, key: BigInt => Key[Seq[Int]], v: (Int, BigInt) => Key[A]) =
+    db.get(key(addressId))
+      .headOption
+      .exists { lastChange =>
+        db.has(v(lastChange, addressId))
+      }
 
   private def loadLposPortfolio(db: ReadOnlyDB, addressId: BigInt) = Portfolio(
     loadFromHistory(db, addressId, Keys.wavesBalanceHistory, Keys.wavesBalance).getOrElse(0L),

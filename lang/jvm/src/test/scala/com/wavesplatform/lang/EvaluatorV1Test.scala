@@ -3,7 +3,6 @@ import cats.data.EitherT
 import cats.kernel.Monoid
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -22,7 +21,7 @@ import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def ev[T: TypeInfo](context: EvaluationContext = PureContext.instance, expr: EXPR): (EvaluationContext, Either[ExecutionError, T]) =
+  private def ev[T](context: EvaluationContext = PureContext.instance, expr: EXPR): (EvaluationContext, Either[ExecutionError, T]) =
     EvaluatorV1[T](context, expr)
   private def simpleDeclarationAndUsage(i: Int) = BLOCK(LET("x", CONST_LONG(i)), REF("x", LONG), LONG)
 
@@ -126,7 +125,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val pointInstance = CaseObj(pointType.typeRef, Map("X" -> Val(LONG)(3), "Y" -> Val(LONG)(4)))
     ev[Long](
       context = PureContext.instance |+| EvaluationContext(
-        letDefs = Map(("p", LazyVal(pointType.typeRef)(EitherT.pure(pointInstance)))),
+        letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance)))),
         functions = Map.empty
       ),
       expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", pointType.typeRef), "X", LONG), CONST_LONG(2)), LONG)
@@ -137,7 +136,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val pointType     = PredefCaseType("Point", List(("X", LONG), ("Y", LONG)))
     val pointInstance = CaseObj(pointType.typeRef, Map("X" -> Val(LONG)(3), "Y" -> Val(LONG)(4)))
     val context = PureContext.instance |+| EvaluationContext(
-      letDefs = Map(("p", LazyVal(pointType.typeRef)(EitherT.pure(pointInstance))), ("badVal", LazyVal(LONG)(EitherT.leftT("Error")))),
+      letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance))), ("badVal", LazyVal(EitherT.leftT("Error")))),
       functions = Map.empty
     )
     ev[Long](
@@ -177,7 +176,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val fooInstance = CaseObj(fooType.typeRef, Map("bar" -> Val(STRING)("bAr"), "buz" -> Val(LONG)(1L)))
 
     val context = EvaluationContext(
-      letDefs = Map("fooInstance" -> LazyVal(fooType.typeRef)(EitherT.pure(fooInstance))),
+      letDefs = Map("fooInstance" -> LazyVal(EitherT.pure(fooInstance))),
       functions = Map.empty
     )
 
@@ -322,7 +321,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         PureContext.instance,
         CryptoContext.build(Global),
         EvaluationContext.build(
-          letDefs = Map("tx" -> LazyVal(txType.typeRef)(EitherT.pure(txObj))),
+          letDefs = Map("tx" -> LazyVal(EitherT.pure(txObj))),
           functions = Seq.empty
         )
       ))
@@ -373,15 +372,18 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         CryptoContext.build(Global),
         EvaluationContext.build(
           letDefs = Map(
-            "tx"          -> LazyVal(txType.typeRef)(EitherT.pure(txObj)),
-            "alicePubKey" -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(alicePK))),
-            "bobPubKey"   -> LazyVal(BYTEVECTOR)(EitherT.pure(ByteVector(bobPK)))
+            "tx"          -> LazyVal(EitherT.pure(txObj)),
+            "alicePubKey" -> LazyVal(EitherT.pure(ByteVector(alicePK))),
+            "bobPubKey"   -> LazyVal(EitherT.pure(ByteVector(bobPK)))
           ),
           functions = Seq.empty
         )
       ))
 
-    val compilerContext = CompilerContext.fromEvaluationContext(context, Seq(txType))
+    val compilerContext =
+      CompilerContext.fromEvaluationContext(context,
+                                            Map(txType.name -> txType),
+                                            Map("tx"        -> txType.typeRef, "alicePubKey" -> BYTEVECTOR, "bobPubKey" -> BYTEVECTOR))
 
     val script =
       s"""

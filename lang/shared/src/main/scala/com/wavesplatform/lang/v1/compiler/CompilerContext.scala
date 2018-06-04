@@ -17,9 +17,9 @@ object CompilerContext {
 
   val empty = CompilerContext(Map.empty, Map.empty, Map.empty, 0)
 
-  def fromEvaluationContext(ctx: EvaluationContext, types: Seq[PredefBase]): CompilerContext = {
+  def fromEvaluationContext(ctx: EvaluationContext, types: Map[String, PredefBase], varDefs: TypeDefs): CompilerContext = {
     val map = ctx.functions.values.groupBy(_.name).mapValues(_.map(_.signature).toSeq)
-    CompilerContext(predefTypes = types.map(t => t.name -> t).toMap, varDefs = ctx.letDefs.mapValues(_.tpe), functionDefs = map)
+    CompilerContext(predefTypes = types, varDefs = varDefs, functionDefs = map)
   }
 
   val types: Lens[CompilerContext, Map[String, PredefBase]]                     = lens[CompilerContext] >> 'predefTypes
