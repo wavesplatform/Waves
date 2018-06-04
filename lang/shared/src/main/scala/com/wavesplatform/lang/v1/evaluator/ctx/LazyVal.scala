@@ -1,10 +1,10 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats.data.EitherT
-import com.wavesplatform.lang.TrampolinedExecResult
-import com.wavesplatform.lang.v1.evaluator.CoevalRef
-import monix.eval.Coeval
 import cats.implicits._
+import com.wavesplatform.lang.TrampolinedExecResult
+import com.wavesplatform.lang.v1.task.CoevalRef
+import monix.eval.Coeval
 
 sealed trait LazyVal {
   val evaluated: CoevalRef[Boolean] = CoevalRef.of(false)
