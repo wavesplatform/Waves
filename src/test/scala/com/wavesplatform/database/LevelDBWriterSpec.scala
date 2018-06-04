@@ -15,7 +15,7 @@ import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.utils.TimeImpl
+import scorex.utils.{Time, TimeImpl}
 
 class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestGen {
   "Slice" - {
@@ -41,6 +41,11 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
       writer.hasScript(accountGen.sample.get.toAddress) shouldBe false
     }
 
+    "returns false if a script was set and then unset" in resetTest { (_, account) =>
+      val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub)
+      writer.hasScript(account) shouldBe false
+    }
+
     "returns true" - {
       "if there is a script in db" in test { (_, account) =>
         val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub)
@@ -52,23 +57,43 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
       }
     }
 
-    def gen(ts: Long): Gen[(PrivateKeyAccount, Seq[Block])] = accountGen.map { master =>
-      val genesisTx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      val setScriptTx = SetScriptTransaction
-        .selfSigned(1, master, Some(ScriptV1(Terms.TRUE).explicitGet()), ENOUGH_AMT, ts)
-        .explicitGet()
-
-      val block1 = TestBlock.create(ts, Seq(genesisTx, setScriptTx))
-      val block2 = TestBlock.create(ts + 1, block1.uniqueId, Seq())
-      (master, Seq(block1, block2))
+    def gen(ts: Long): Gen[(PrivateKeyAccount, Seq[Block])] = baseGen(ts).map {
+      case (master, blocks) =>
+        val nextBlock = TestBlock.create(ts + 1, blocks.last.uniqueId, Seq())
+        (master, blocks :+ nextBlock)
     }
 
-    def test(f: (LevelDBWriter, PrivateKeyAccount) => Unit): Unit = {
+    def resetGen(ts: Long): Gen[(PrivateKeyAccount, Seq[Block])] = baseGen(ts).map {
+      case (master, blocks) =>
+        val unsetScriptTx = SetScriptTransaction
+          .selfSigned(1, master, None, 5000000, ts + 1)
+          .explicitGet()
+
+        val block1 = TestBlock.create(ts + 1, blocks.last.uniqueId, Seq(unsetScriptTx))
+        val block2 = TestBlock.create(ts + 2, block1.uniqueId, Seq())
+        (master, blocks ++ List(block1, block2))
+    }
+
+    def baseGen(ts: Long): Gen[(PrivateKeyAccount, Seq[Block])] = accountGen.map { master =>
+      val genesisTx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      val setScriptTx = SetScriptTransaction
+        .selfSigned(1, master, Some(ScriptV1(Terms.TRUE).explicitGet()), 5000000, ts)
+        .explicitGet()
+
+      val block = TestBlock.create(ts, Seq(genesisTx, setScriptTx))
+      (master, Seq(block))
+    }
+
+    def test(f: (LevelDBWriter, PrivateKeyAccount) => Unit): Unit = baseTest(t => gen(t.correctedTime()))(f)
+
+    def resetTest(f: (LevelDBWriter, PrivateKeyAccount) => Unit): Unit = baseTest(t => resetGen(t.correctedTime()))(f)
+
+    def baseTest(gen: Time => Gen[(PrivateKeyAccount, Seq[Block])])(f: (LevelDBWriter, PrivateKeyAccount) => Unit): Unit = {
       val time          = new TimeImpl
       val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub)
       val bcu           = new BlockchainUpdaterImpl(defaultWriter, WavesSettings.fromConfig(loadConfig(ConfigFactory.load())), time)
       try {
-        val (account, blocks) = gen(time.correctedTime()).sample.get
+        val (account, blocks) = gen(time).sample.get
         blocks.foreach { block =>
           bcu.processBlock(block).explicitGet()
         }
