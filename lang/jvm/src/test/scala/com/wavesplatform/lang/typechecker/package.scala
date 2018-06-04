@@ -26,11 +26,10 @@ package object typechecker {
   val ctx = Monoid.combine(
     PureContext.instance,
     EvaluationContext.build(
-      caseTypes = Seq(pointType),
       letDefs = Map(("None", none)),
       functions = Seq(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, unitOnNone, undefinedOptionLong, idOptionLong)
     )
   )
 
-  val typeCheckerContext = CompilerContext.fromEvaluationContext(ctx, Map.empty)
+  val typeCheckerContext = CompilerContext.fromEvaluationContext(ctx, Seq(pointType))
 }

@@ -15,7 +15,12 @@ object RealTransactionWrapper {
 
   private def header(tx: Transaction): Header = Header(ByteVector(tx.id().arr), tx.assetFee._2, tx.timestamp, 0)
   private def proven(tx: ProvenTransaction): Proven =
-    Proven(header(tx), ByteVector(tx.bodyBytes()), ByteVector(tx.sender.publicKey), tx.proofs.proofs.map(_.arr).map(ByteVector(_)).toIndexedSeq)
+    Proven(
+      header(tx),
+      ByteVector(tx.bodyBytes()),
+      ByteVector(tx.sender.publicKey),
+      tx.proofs.proofs.map(_.arr).map(ByteVector(_)).toIndexedSeq
+    )
 
   implicit def toByteVector(s: ByteStr): ByteVector = ByteVector(s.arr)
 
@@ -55,22 +60,24 @@ object RealTransactionWrapper {
           attachment = ByteVector(t.attachment)
         )
       case i: IssueTransaction       => Tx.Issue(proven(i), i.quantity, i.assetId(), ByteVector(i.description), i.reissuable, i.decimals)
-      case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.reissuable)
-      case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity)
+      case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.assetId, r.reissuable)
+      case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity, b.assetId)
       case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount, b.recipient)
       case b: LeaseCancelTransaction => Tx.LeaseCancel(proven(b), b.leaseId)
       case b: CreateAliasTransaction => Tx.CreateAlias(proven(b), b.alias.name)
       case ms: MassTransferTransaction =>
         Tx.MassTransfer(
           proven(ms),
-          transferAssetId = ms.assetId.map(a => ByteVector(a.arr)),
+          assetId = ms.assetId.map(a => ByteVector(a.arr)),
+          transferCount = ms.transfers.length,
+          totalAmount = ms.transfers.map(_.amount).sum,
           transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.TransferItem(r.address, r.amount)).toIndexedSeq,
           attachment = ByteVector(ms.attachment)
         )
       case ss: SetScriptTransaction => Tx.SetScript(proven(ss), ss.script.map(_.bytes()).map(toByteVector))
       case p: PaymentTransaction    => Tx.Payment(proven(p), p.amount, p.recipient)
       case e: ExchangeTransaction   => Tx.Exchange(proven(e), e.price, e.amount, e.buyMatcherFee, e.sellMatcherFee, e.buyOrder, e.sellOrder)
-      case s: SponsorFeeTransaction => Tx.Sponsorship(proven(s), s.minSponsoredAssetFee)
+      case s: SponsorFeeTransaction => Tx.Sponsorship(proven(s), s.assetId, s.minSponsoredAssetFee)
       case d: DataTransaction =>
         Tx.Data(
           proven(d),

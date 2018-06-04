@@ -8,29 +8,40 @@ object ScriptEstimator {
   def apply(functionCosts: Map[FunctionHeader, Long], t: EXPR): Either[String, Long] = {
     type Result[T] = EitherT[Coeval, String, T]
 
-    def aux(t: Result[EXPR]): Result[Long] = t.flatMap {
-      case _: CONST_LONG | _: CONST_BYTEVECTOR | _: CONST_STRING | TRUE | FALSE => EitherT.pure(1)
+    def aux(t: Result[EXPR], syms: Map[String, EXPR]): Result[(Long, Map[String, EXPR])] = t.flatMap {
+      case _: CONST_LONG | _: CONST_BYTEVECTOR | _: CONST_STRING | TRUE | FALSE => EitherT.pure((1, syms))
+      case t: GETTER => aux(EitherT.pure(t.expr), syms).map { case (comp, out) => (comp + 2, out) }
 
-      case t: GETTER => aux(EitherT.pure(t.expr)).map(_ + 2)
-      case t: BLOCK  => aux(EitherT.pure(t.body)).map(_ + 5)
-      case t: IF =>
-        for {
-          cond  <- aux(EitherT.pure(t.cond))
-          right <- aux(EitherT.pure(t.ifTrue))
-          left  <- aux(EitherT.pure(t.ifFalse))
-        } yield 1 + cond + math.max(right, left)
-      case _: REF => EitherT.pure(2)
-      case t: FUNCTION_CALL =>
-        import cats.instances.list._
-        import cats.syntax.traverse._
+      case t: BLOCK => aux(EitherT.pure(t.body), syms + (t.let.name -> t.let.value))
+        .map { case (comp, out) => (comp + 5, out) }
 
-        val callCost = functionCosts.get(t.function).fold[Either[String, Long]](Left(s"Unknown function ${t.function}"))(Right(_))
-        for {
-          callCost <- EitherT.fromEither[Coeval](callCost)
-          args     <- t.args.map(x => aux(EitherT.pure[Coeval, String](x))).sequence[Result, Long]
-        } yield callCost + args.sum
+      case t: REF => syms.get(t.key)
+        .map(expr => aux(EitherT.pure(expr), syms - t.key))
+        .getOrElse(EitherT.pure[Coeval, String]((0L, syms)))
+        .map { case (comp, out) => (comp + 2, out) }
+
+      case t: IF => for {
+        cond <- aux(EitherT.pure(t.cond), syms)
+        (condComp, condSyms) = cond
+        right <- aux(EitherT.pure(t.ifTrue), condSyms)
+        left <- aux(EitherT.pure(t.ifFalse), condSyms)
+        (bodyComp, bodySyms) = if (right._1 > left._1) right else left
+      } yield (condComp + bodyComp + 1, bodySyms)
+
+      case t: FUNCTION_CALL => for {
+        callCost <- EitherT.fromOption[Coeval](functionCosts.get(t.function), s"Unknown function ${t.function}")
+        args <- t.args.foldLeft(EitherT.pure[Coeval, String]((0L, syms))) { case (accEi, arg) =>
+          for {
+            acc <- accEi
+            (accComp, accSyms) = acc
+            v <- aux(EitherT.pure[Coeval, String](arg), accSyms)
+            (comp, out) = v
+          } yield (accComp + comp, out)
+        }
+        (argsComp, argsSyms) = args
+      } yield (callCost + argsComp, argsSyms)
     }
 
-    aux(EitherT.pure(t)).value()
+    aux(EitherT.pure(t), Map.empty).value().map(_._1)
   }
 }

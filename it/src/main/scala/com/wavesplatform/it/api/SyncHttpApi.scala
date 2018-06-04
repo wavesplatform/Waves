@@ -80,6 +80,9 @@ object SyncHttpApi extends Assertions {
     def assetBalance(address: String, asset: String): AssetBalance =
       Await.result(async(n).assetBalance(address, asset), RequestAwaitTime)
 
+    def assetsDetails(assetId: String): AssetInfo =
+      Await.result(async(n).assetsDetails(assetId), RequestAwaitTime)
+
     def addressScriptInfo(address: String): AddressApiRoute.AddressScriptInfo =
       Await.result(async(n).scriptInfo(address), RequestAwaitTime)
 
