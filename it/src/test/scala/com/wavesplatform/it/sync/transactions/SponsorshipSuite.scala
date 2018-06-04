@@ -120,15 +120,6 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       miner.assertBalances(miner.address, minerWavesBalanceAfterFirstXferTest)
     }
 
-    "assets balance should contain sponsor fee info and sponsor balance" in {
-      val sponsorLeaseSomeWaves = sponsor.lease(sponsor.address, bob.address, leasingAmount, leasingFee).id
-      nodes.waitForHeightAriseAndTxPresent(sponsorLeaseSomeWaves)
-      val (sponsorBalance, sponsorEffectiveBalance) = sponsor.accountBalances(sponsor.address)
-      val assetsBalance                             = alice.assetsBalance(alice.address).balances.filter(_.assetId == sponsorAssetId).head
-      assetsBalance.minSponsoredAssetFee shouldBe Some(minSponsorFee)
-      assetsBalance.sponsorBalance shouldBe Some(sponsorEffectiveBalance)
-    }
-
     "waves fee depends on sponsor fee and total sponsor tokens" in {
       val transferTxCustomFeeAlice = alice.transfer(alice.address, bob.address, 1.waves, LargeFee, None, Some(sponsorAssetId)).id
       nodes.waitForHeightAriseAndTxPresent(transferTxCustomFeeAlice)
@@ -139,6 +130,15 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       miner.assertAssetBalance(bob.address, sponsorAssetId, 10 * Token)
       miner.assertBalances(sponsor.address, sponsorWavesBalanceAfterFirstXferTest - Sponsorship.FeeUnit * LargeFee / Token)
       miner.assertBalances(miner.address, minerWavesBalanceAfterFirstXferTest + Sponsorship.FeeUnit * LargeFee / Token)
+    }
+
+    "assets balance should contain sponsor fee info and sponsor balance" in {
+      val sponsorLeaseSomeWaves = sponsor.lease(sponsor.address, bob.address, leasingAmount, leasingFee).id
+      nodes.waitForHeightAriseAndTxPresent(sponsorLeaseSomeWaves)
+      val (sponsorBalance, sponsorEffectiveBalance) = sponsor.accountBalances(sponsor.address)
+      val assetsBalance                             = alice.assetsBalance(alice.address).balances.filter(_.assetId == sponsorAssetId).head
+      assetsBalance.minSponsoredAssetFee shouldBe Some(minSponsorFee)
+      assetsBalance.sponsorBalance shouldBe Some(sponsorEffectiveBalance)
     }
 
     "cancel sponsorship, cannot pay fees in non sponsored assets " in {
