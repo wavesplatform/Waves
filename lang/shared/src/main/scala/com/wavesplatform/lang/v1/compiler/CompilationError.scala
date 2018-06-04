@@ -14,10 +14,7 @@ sealed trait CompilationError {
 object CompilationError {
 
   implicit val show: Show[CompilationError] = (ce: CompilationError) => {
-    s"""
-       |Compilation error at ${ce.start} - ${ce.end}
-       |${ce.message}
-     """.stripMargin
+    s"${ce.message} in ${ce.start}-${ce.end}"
   }
 
   final case object TooManyExpressions extends CompilationError {

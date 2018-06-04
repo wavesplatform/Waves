@@ -20,8 +20,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val sampleScript =
       """match p {
         |  case pa: PointA => 0
-        |  case pb: PointB => 1
-        |  case pc: PointC => 2
+        |  case pa: PointB => 1
+        |  case pa: PointC => 2
         |}""".stripMargin
     eval[Long](sampleScript, withUnion(pointAInstance)) shouldBe Right(0)
     eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
@@ -31,7 +31,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val sampleScript =
       """match p {
         |  case pa: PointA => 0
-        |  case pb: PointBC => 1
+        |  case pa: PointBC => 1
         |}""".stripMargin
     eval[Long](sampleScript, withUnion(pointAInstance), { c =>
       Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
