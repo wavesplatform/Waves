@@ -14,14 +14,14 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with
     "smart account" - {
       "should not count transactions going from a regular account" in {
         val blockchain = stub[Blockchain]
-        (blockchain.accountScript _).when(*).onCall((_: Address) => None).anyNumberOfTimes()
+        (blockchain.hasScript _).when(*).onCall((_: Address) => false).anyNumberOfTimes()
 
         TxEstimators.scriptRunNumber(blockchain, transferWavesTx) shouldBe 0
       }
 
       "should count transactions going from a smart account" in {
         val blockchain = stub[Blockchain]
-        (blockchain.accountScript _).when(*).onCall((_: Address) => Some(script)).anyNumberOfTimes()
+        (blockchain.hasScript _).when(*).onCall((_: Address) => true).anyNumberOfTimes()
 
         TxEstimators.scriptRunNumber(blockchain, transferWavesTx) shouldBe 1
       }
@@ -30,7 +30,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with
     "smart tokens" - {
       "should not count transactions working with a regular tokens" in {
         val blockchain = stub[Blockchain]
-        (blockchain.accountScript _).when(*).onCall((_: Address) => None).anyNumberOfTimes()
+        (blockchain.hasScript _).when(*).onCall((_: Address) => false).anyNumberOfTimes()
         (blockchain.assetDescription _).when(*).onCall((_: ByteStr) => None).anyNumberOfTimes()
 
         TxEstimators.scriptRunNumber(blockchain, transferAssetsTx) shouldBe 0
@@ -38,11 +38,19 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with
 
       "should count transactions working with smart tokens" in {
         val blockchain = stub[Blockchain]
-        (blockchain.accountScript _).when(*).onCall((_: Address) => None).anyNumberOfTimes()
+        (blockchain.hasScript _).when(*).onCall((_: Address) => false).anyNumberOfTimes()
         (blockchain.assetDescription _).when(*).onCall((_: ByteStr) => Some(assetDescription)).anyNumberOfTimes()
 
         TxEstimators.scriptRunNumber(blockchain, transferAssetsTx) shouldBe 1
       }
+    }
+
+    "both - should double count transactions working with smart tokens from samrt account" in {
+      val blockchain = stub[Blockchain]
+      (blockchain.hasScript _).when(*).onCall((_: Address) => true).anyNumberOfTimes()
+      (blockchain.assetDescription _).when(*).onCall((_: ByteStr) => Some(assetDescription)).anyNumberOfTimes()
+
+      TxEstimators.scriptRunNumber(blockchain, transferAssetsTx) shouldBe 2
     }
   }
 
