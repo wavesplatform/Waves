@@ -151,43 +151,43 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
       Expressions.LET(0, 0, Expressions.PART.INVALID(0, 1, "can't parse"), Expressions.TRUE(0, 0), Seq.empty),
       Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "x"))
     ),
-    expectedResult = Left("Typecheck failed: can't parse in 0-1")
+    expectedResult = Left("Compilation failed: can't parse in 0-1")
   )
 
   treeTypeTest("Invalid GETTER")(
     ctx = typeCheckerContext,
     expr = Expressions.GETTER(0, 0, Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "x")), Expressions.PART.INVALID(2, 3, "can't parse")),
-    expectedResult = Left("Typecheck failed: can't parse in 2-3")
+    expectedResult = Left("Compilation failed: can't parse in 2-3")
   )
 
   treeTypeTest("Invalid BYTEVECTOR")(
     ctx = typeCheckerContext,
     expr = Expressions.CONST_BYTEVECTOR(0, 0, Expressions.PART.INVALID(0, 0, "can't parse")),
-    expectedResult = Left("Typecheck failed: can't parse in 0-0")
+    expectedResult = Left("Compilation failed: can't parse in 0-0")
   )
 
   treeTypeTest("Invalid STRING")(
     ctx = typeCheckerContext,
     expr = Expressions.CONST_STRING(0, 0, Expressions.PART.INVALID(0, 0, "can't parse")),
-    expectedResult = Left("Typecheck failed: can't parse in 0-0")
+    expectedResult = Left("Compilation failed: can't parse in 0-0")
   )
 
   treeTypeTest("Invalid REF")(
     ctx = typeCheckerContext,
     expr = Expressions.REF(0, 0, Expressions.PART.INVALID(0, 0, "can't parse")),
-    expectedResult = Left("Typecheck failed: can't parse in 0-0")
+    expectedResult = Left("Compilation failed: can't parse in 0-0")
   )
 
   treeTypeTest("Invalid FUNCTION_CALL")(
     ctx = typeCheckerContext,
     expr = Expressions.FUNCTION_CALL(0, 0, Expressions.PART.INVALID(0, 0, "can't parse"), List.empty),
-    expectedResult = Left("Typecheck failed: can't parse in 0-0")
+    expectedResult = Left("Compilation failed: can't parse in 0-0")
   )
 
   treeTypeTest("INVALID")(
     ctx = typeCheckerContext,
     expr = Expressions.INVALID(0, 0, "###", None),
-    expectedResult = Left("Typecheck failed: ### in 0-0")
+    expectedResult = Left("Compilation failed: ### in 0-0")
   )
 
   private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: Either[String, EXPR], ctx: CompilerContext): Unit =

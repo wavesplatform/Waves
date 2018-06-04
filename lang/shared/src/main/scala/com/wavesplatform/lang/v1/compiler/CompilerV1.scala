@@ -273,7 +273,7 @@ object CompilerV1 {
   def apply(c: CompilerContext, expr: Expressions.EXPR): Either[String, EXPR] = {
     compileExpr(expr)
       .run(c)
-      .map(_._2.leftMap(e => s"Typecheck failed: ${Show[CompilationError].show(e)}"))
+      .map(_._2.leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}"))
       .value
   }
 }

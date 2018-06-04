@@ -65,7 +65,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |}""".stripMargin
     eval[Long](sampleScript, withUnion(pointCInstance), { c =>
       Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
-    }) should produce("Typecheck failed: Undefined field `X`")
+    }) should produce("Compilation failed: Undefined field `X`")
   }
 
   property("patternMatching _") {
