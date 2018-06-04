@@ -96,8 +96,18 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       assertBadRequestAndResponse(bob.transfer(bob.address, alice.address, 1.waves, SmallFee, None, Some(sponsorAssetId)), "unavailable funds")
     }
 
-    val minerWavesBalanceAfterFirstXferTest   = minerWavesBalance + 2.waves + minWavesFee + Sponsorship.FeeUnit * SmallFee / Token
-    val sponsorWavesBalanceAfterFirstXferTest = sponsorWavesBalance - 2.waves - minWavesFee - Sponsorship.FeeUnit * SmallFee / Token
+    "tx is declined if sponsor has not enough effective balance to pay fee" in {
+      val (sponsorBalance, sponsorEffectiveBalance) = sponsor.accountBalances(sponsor.address)
+      val sponsorLeaseAllAvaliableWaves             = sponsor.lease(sponsor.address, bob.address, sponsorEffectiveBalance - leasingFee, leasingFee).id
+      nodes.waitForHeightAriseAndTxPresent(sponsorLeaseAllAvaliableWaves)
+      assertBadRequest(alice.transfer(alice.address, bob.address, 10 * Token, LargeFee, Some(sponsorAssetId), Some(sponsorAssetId)),
+                       "unavailable funds")
+      val cancelLeasingTx = sponsor.cancelLease(sponsor.address, sponsorLeaseAllAvaliableWaves, leasingFee).id
+      nodes.waitForHeightAriseAndTxPresent(cancelLeasingTx)
+    }
+
+    val minerWavesBalanceAfterFirstXferTest   = minerWavesBalance + 2.waves + minWavesFee + 2 * leasingFee + Sponsorship.FeeUnit * SmallFee / Token
+    val sponsorWavesBalanceAfterFirstXferTest = sponsorWavesBalance - 2.waves - minWavesFee - 2 * leasingFee - Sponsorship.FeeUnit * SmallFee / Token
 
     "fee should be written off in issued asset" in {
       val transferTxCustomFeeAlice = alice.transfer(alice.address, bob.address, 10 * Token, SmallFee, Some(sponsorAssetId), Some(sponsorAssetId)).id
