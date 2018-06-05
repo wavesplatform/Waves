@@ -19,6 +19,17 @@ object PureContext {
   val err           = LazyVal(EitherT(nothingCoeval))
   val errRef        = "throw"
 
+  val fraction: PredefFunction = PredefFunction("fraction", 1, LONG, List(("value", LONG), ("numerator", LONG), ("denominator", LONG))) {
+    case (v: Long) :: (n: Long) :: (d: Long) :: Nil => {
+      val result = BigInt(v) * n / d
+      for {
+        _ <- Either.cond(result < Long.MaxValue, (), s"Long overflow: value `$result` greater than 2^63-1")
+        _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^63-1")
+      } yield result.toLong
+    }
+    case _ => ???
+  }
+
   val extract: PredefFunction = PredefFunction("extract", 1, TYPEPARAM('T'), List(("opt", optionT))) {
     case Some(v) :: Nil => Right(v)
     case None :: Nil    => Left("Extract from empty option")
@@ -94,6 +105,8 @@ object PureContext {
   }
 
   val mulLong       = createTryOp(MUL_OP, LONG, LONG)(Math.multiplyExact)
+  val divLong       = createTryOp(DIV_OP, LONG, LONG)(Math.floorDiv)
+  val modLong       = createTryOp(MOD_OP, LONG, LONG)(Math.floorMod)
   val sumLong       = createTryOp(SUM_OP, LONG, LONG)(Math.addExact)
   val subLong       = createTryOp(SUB_OP, LONG, LONG)(Math.subtractExact)
   val sumString     = createOp(SUM_OP, STRING, STRING)(_ + _)
@@ -113,6 +126,8 @@ object PureContext {
 
   val operators: Seq[PredefFunction] = Seq(
     mulLong,
+    divLong,
+    modLong,
     sumLong,
     subLong,
     sumString,
@@ -138,6 +153,17 @@ object PureContext {
   val predefVars = Map(("None", OPTION(NOTHING)), (errRef, NOTHING))
 
   lazy val instance =
-    EvaluationContext.build(letDefs = Map(("None", none), (errRef, err)), functions = Seq(extract, isDefined, some, size, _isInstanceOf) ++ operators)
+    EvaluationContext
+      .build(
+        letDefs = Map(("None", none), (errRef, err)),
+        functions = Seq(
+          fraction,
+          extract,
+          isDefined,
+          some,
+          size,
+          _isInstanceOf
+        ) ++ operators
+      )
 
 }
