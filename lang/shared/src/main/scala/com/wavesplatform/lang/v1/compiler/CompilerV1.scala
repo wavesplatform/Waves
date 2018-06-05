@@ -118,7 +118,7 @@ object CompilerV1 {
     for {
       ctx <- get[CompilerContext, CompilationError]
       letName <- handlePart(let.name)
-        .ensureOr(n => AlreadyDefined(start, end, n, false))(n => !ctx.varDefs.contains(n))
+        .ensureOr(n => AlreadyDefined(start, end, n, false))(n => !ctx.varDefs.contains(n) || let.allowOverride)
         .ensureOr(n => AlreadyDefined(start, end, n, true))(n => !ctx.functionDefs.contains(n))
       compiledLet <- compileExpr(let.value)
       letTypes <- let.types.toList
@@ -213,7 +213,9 @@ object CompilerV1 {
 
   def mkIfCases(ctx: CompilerContext, cases: List[MATCH_CASE], refTmp: Expressions.REF): Expressions.EXPR = {
     cases.foldRight(Expressions.REF(1, 1, PART.VALID(1, 1, PureContext.errRef)): Expressions.EXPR)((mc, further) => {
-      val blockWithNewVar = mc.newVarName.fold(mc.expr)(nv => Expressions.BLOCK(1, 1, Expressions.LET(1, 1, nv, refTmp, mc.types), mc.expr))
+      val blockWithNewVar = mc.newVarName.fold(mc.expr) { nv =>
+        Expressions.BLOCK(1, 1, Expressions.LET(1, 1, nv, refTmp, mc.types, allowOverride = true), mc.expr)
+      }
       mc.types.toList match {
         case Nil => blockWithNewVar
         case types =>
