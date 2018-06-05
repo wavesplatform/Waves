@@ -18,13 +18,6 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
     }
   }
 
-  property("ScriptV1.apply should deny non-BOOLEAN scripts") {
-    def invalidGen(gas: Int) = Gen.oneOf(LONGgen(gas), STRINGgen, BYTESTRgen)
-    forAll(invalidGen(10)) { expr =>
-      ScriptV1(expr) shouldBe Left("Script should return BOOLEAN")
-    }
-  }
-
   property("ScriptV1.apply should deny too complex scripts") {
     val byteVector = CONST_BYTEVECTOR(ByteVector(1))
     val expr = (1 to 21)
