@@ -6,7 +6,6 @@ import com.wavesplatform.lang.ExprCompiler
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.directives.Directive
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.v1.compiler.CompilationError._
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -106,9 +105,13 @@ object CompilerV1 {
             .toCompileM
         })
       refTmpKey = "$match" + ctx.tmpArgsIdx
-      _ <- modify[CompilerContext, CompilationError](c => c.copy(tmpArgsIdx = c.tmpArgsIdx + 1))
+      _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1))
+      allowShadowVarName = typedExpr match {
+        case REF(k, _) => Some(k)
+        case _         => None
+      }
       ifCases <- inspect[CompilerContext, CompilationError, Expressions.EXPR](updatedCtx => {
-        mkIfCases(updatedCtx, cases, Expressions.REF(1, 1, PART.VALID(1, 1, refTmpKey)))
+        mkIfCases(updatedCtx, cases, Expressions.REF(1, 1, PART.VALID(1, 1, refTmpKey)), allowShadowVarName)
       })
       compiledMatch <- compileBlock(start, end, Expressions.LET(1, 1, PART.VALID(1, 1, refTmpKey), expr, Seq.empty), ifCases)
     } yield compiledMatch
@@ -118,7 +121,7 @@ object CompilerV1 {
     for {
       ctx <- get[CompilerContext, CompilationError]
       letName <- handlePart(let.name)
-        .ensureOr(n => AlreadyDefined(start, end, n, false))(n => !ctx.varDefs.contains(n))
+        .ensureOr(n => AlreadyDefined(start, end, n, false))(n => !ctx.varDefs.contains(n) || let.allowShadowing)
         .ensureOr(n => AlreadyDefined(start, end, n, true))(n => !ctx.functionDefs.contains(n))
       compiledLet <- compileExpr(let.value)
       letTypes <- let.types.toList
@@ -192,7 +195,7 @@ object CompilerV1 {
       for {
         resolvedTypeParams <- TypeInferrer(typePairs).leftMap(Generic(start, end, _))
         resolvedResultType <- TypeInferrer.inferResultType(f.result, resolvedTypeParams).leftMap(Generic(start, end, _))
-        header = FunctionHeader(funcName, f.args.map(FunctionHeaderType.fromTypePlaceholder))
+        header = FunctionHeader(f.internalName)
         args   = typedExpressionArgumentsAndTypedPlaceholders.map(_._1)
       } yield FUNCTION_CALL(header, args, resolvedResultType): EXPR
     }
@@ -211,9 +214,15 @@ object CompilerV1 {
         .fold(UnexpectedType(start, end, ifTrue.tpe.toString, ifFalse.tpe.toString).asLeft[IF])(IF(cond, ifTrue, ifFalse, _).asRight)
   }
 
-  def mkIfCases(ctx: CompilerContext, cases: List[MATCH_CASE], refTmp: Expressions.REF): Expressions.EXPR = {
+  def mkIfCases(ctx: CompilerContext, cases: List[MATCH_CASE], refTmp: Expressions.REF, allowShadowVarName: Option[String]): Expressions.EXPR = {
     cases.foldRight(Expressions.REF(1, 1, PART.VALID(1, 1, PureContext.errRef)): Expressions.EXPR)((mc, further) => {
-      val blockWithNewVar = mc.newVarName.fold(mc.expr)(nv => Expressions.BLOCK(1, 1, Expressions.LET(1, 1, nv, refTmp, mc.types), mc.expr))
+      val blockWithNewVar = mc.newVarName.fold(mc.expr) { nv =>
+        val allowShadowing = nv match {
+          case PART.VALID(_, _, x) => allowShadowVarName.contains(x)
+          case _                   => false
+        }
+        Expressions.BLOCK(1, 1, Expressions.LET(1, 1, nv, refTmp, mc.types, allowShadowing), mc.expr)
+      }
       mc.types.toList match {
         case Nil => blockWithNewVar
         case types =>

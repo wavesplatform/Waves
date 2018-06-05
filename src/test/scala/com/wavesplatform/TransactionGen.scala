@@ -320,7 +320,7 @@ trait TransactionGenBase extends ScriptGen {
     for {
       version                                                      <- Gen.oneOf(MassTransferTransaction.supportedVersions.toSeq)
       (assetId, sender, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
-      transferCount                                                <- Gen.choose(0, MaxTransferCount)
+      transferCount                                                <- Gen.choose(1, 10) //MaxTransferCount)
       transferGen = for {
         recipient <- accountOrAliasGen
         amount    <- Gen.choose(1L, Long.MaxValue / MaxTransferCount)
@@ -648,6 +648,10 @@ trait TransactionGenBase extends ScriptGen {
       transfer  <- transferGeneratorP(master, recipient.toAddress, None, None)
       lease     <- leaseAndCancelGeneratorP(master, recipient.toAddress, master)
     } yield (genesis, setScript, lease._1, transfer)
+
+  val setSimpleScriptTransactionGen = for {
+    (_, tx, _, _) <- preconditionsTransferAndLease(TRUE)
+  } yield tx
 
   def smartIssueTransactionGen(senderGen: Gen[PrivateKeyAccount] = accountGen,
                                sGen: Gen[Option[Script]] = Gen.option(scriptGen)): Gen[IssueTransactionV2] =

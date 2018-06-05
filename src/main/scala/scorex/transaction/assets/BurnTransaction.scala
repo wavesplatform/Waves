@@ -25,11 +25,11 @@ trait BurnTransaction extends ProvenTransaction {
 
   override val json: Coeval[JsObject] = Coeval.evalOnce {
     jsonBase() ++ Json.obj(
-      "chainId"  -> chainByte,
-      "version"  -> version,
-      "assetId"  -> assetId.base58,
-      "quantity" -> quantity,
-      "fee"      -> fee
+      "chainId" -> chainByte,
+      "version" -> version,
+      "assetId" -> assetId.base58,
+      "amount"  -> quantity,
+      "fee"     -> fee
     )
   }
 
