@@ -15,8 +15,8 @@ object PureContext {
   private val noneCoeval: Coeval[Either[String, Option[Nothing]]] = Coeval.evalOnce(Right(None))
   private val nothingCoeval: Coeval[Either[String, Nothing]]      = Coeval.defer(Coeval(Right(throw new Exception("explicit contract termination"))))
 
-  val none: LazyVal = LazyVal(OPTION(NOTHING))(EitherT(noneCoeval).subflatMap(Right(_: Option[Nothing]))) // IDEA HACK
-  val err           = LazyVal(NOTHING)(EitherT(nothingCoeval))
+  val none: LazyVal = LazyVal(EitherT(noneCoeval).subflatMap(Right(_: Option[Nothing]))) // IDEA HACK
+  val err           = LazyVal(EitherT(nothingCoeval))
   val errRef        = "throw"
 
   val extract: PredefFunction = PredefFunction("extract", 1, TYPEPARAM('T'), List(("opt", optionT))) {
@@ -132,6 +132,8 @@ object PureContext {
     uMinus,
     uNot
   )
+
+  val predefVars = Map(("None", OPTION(NOTHING)), (errRef, NOTHING))
 
   lazy val instance =
     EvaluationContext.build(letDefs = Map(("None", none), (errRef, err)),

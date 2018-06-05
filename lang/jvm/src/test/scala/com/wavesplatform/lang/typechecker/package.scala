@@ -31,5 +31,5 @@ package object typechecker {
     )
   )
 
-  val typeCheckerContext = CompilerContext.fromEvaluationContext(ctx, Seq(pointType))
+  val typeCheckerContext = CompilerContext.fromEvaluationContext(ctx, Map("Point" -> pointType), Map("None" -> OPTION(NOTHING)))
 }
