@@ -85,7 +85,7 @@ object Parser {
 
   private val varName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index).map {
     case (start, x, end) =>
-      if (keywords.contains(x)) PART.INVALID(start, end, "keywords are restricted")
+      if (keywords.contains(x)) PART.INVALID(start, end, s"keywords are restricted: $x")
       else PART.VALID(start, end, x)
   }
 

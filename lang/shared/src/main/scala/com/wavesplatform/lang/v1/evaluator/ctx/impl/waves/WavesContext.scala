@@ -47,7 +47,7 @@ object WavesContext {
         case (c @ CaseObj(addressType.typeRef, _)) :: Nil => Right(c)
         case c @ CaseObj(aliasType.typeRef, fields) :: Nil =>
           environmentFunctions
-            .addressFromAlias(fields("name").value.asInstanceOf[String])
+            .addressFromAlias(fields("alias").value.asInstanceOf[String])
             .map(resolved => CaseObj(addressType.typeRef, Map("bytes" -> Val(BYTEVECTOR)(resolved.bytes))))
         case _ => ???
       }
