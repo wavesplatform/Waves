@@ -15,7 +15,7 @@ object Expressions {
     case class INVALID(start: Int, end: Int, message: String) extends PART[Nothing]
   }
 
-  case class LET(start: Int, end: Int, name: PART[String], value: EXPR, types: Seq[PART[String]], allowOverride: Boolean = false) extends Positioned
+  case class LET(start: Int, end: Int, name: PART[String], value: EXPR, types: Seq[PART[String]], allowShadowing: Boolean = false) extends Positioned
 
   sealed trait EXPR                                                                    extends Positioned
   case class CONST_LONG(start: Int, end: Int, value: Long)                             extends EXPR
