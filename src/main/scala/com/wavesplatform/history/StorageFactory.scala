@@ -9,7 +9,7 @@ import scorex.utils.Time
 
 object StorageFactory {
   def apply(settings: WavesSettings, db: DB, time: Time): BlockchainUpdater with NG = {
-    val levelDBWriter = new LevelDBWriter(db, settings.blockchainSettings.functionalitySettings)
+    val levelDBWriter = new LevelDBWriter(db, settings.blockchainSettings.functionalitySettings, settings.maxCacheSize)
     new BlockchainUpdaterImpl(levelDBWriter, settings, time)
   }
 }

@@ -9,14 +9,13 @@ import com.wavesplatform.database.{Keys, LevelDBWriter}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.utils.Base58
 import org.slf4j.bridge.SLF4JBridgeHandler
 import scorex.account.{Address, AddressScheme}
-import com.wavesplatform.utils.Base58
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 import scala.util.Try
-import scala.collection.JavaConverters._
 
 object Explorer extends ScorexLogging {
   case class Stats(entryCount: Long, totalKeySize: Long, totalValueSize: Long)
@@ -78,7 +77,7 @@ object Explorer extends ScorexLogging {
 
     log.info(s"Data directory: ${settings.dataDirectory}")
 
-    val db     = openDB(settings.dataDirectory, settings.levelDbCacheSize)
+    val db     = openDB(settings.dataDirectory)
     val reader = new LevelDBWriter(db, settings.blockchainSettings.functionalitySettings)
 
     val blockchainHeight = reader.height
@@ -91,7 +90,7 @@ object Explorer extends ScorexLogging {
         case "O" =>
           val orderId = Base58.decode(args(2)).toOption.map(ByteStr.apply)
           if (orderId.isDefined) {
-            val kVolumeAndFee = Keys.filledVolumeAndFee(blockchainHeight, orderId.get)
+            val kVolumeAndFee = Keys.filledVolumeAndFee(orderId.get)(blockchainHeight)
             val bytes1        = db.get(kVolumeAndFee.keyBytes)
             val v             = kVolumeAndFee.parse(bytes1)
             log.info(s"OrderId = ${Base58.encode(orderId.get.arr)}: Volume = ${v.volume}, Fee = ${v.fee}")
@@ -102,7 +101,7 @@ object Explorer extends ScorexLogging {
             val value2Str            = value2.mkString("[", ", ", "]")
             log.info(s"OrderId = ${Base58.encode(orderId.get.arr)}: History = $value2Str")
             value2.foreach { h =>
-              val k = Keys.filledVolumeAndFee(h, orderId.get)
+              val k = Keys.filledVolumeAndFee(orderId.get)(h)
               val v = k.parse(db.get(k.keyBytes))
               log.info(s"\t h = $h: Volume = ${v.volume}, Fee = ${v.fee}")
             }
@@ -118,7 +117,7 @@ object Explorer extends ScorexLogging {
           val wbh  = kwbh.parse(db.get(kwbh.keyBytes))
 
           val balances = wbh.map { h =>
-            val k = Keys.wavesBalance(h, addressId)
+            val k = Keys.wavesBalance(addressId)(h)
             h -> k.parse(db.get(k.keyBytes))
           }
           balances.foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
@@ -169,7 +168,7 @@ object Explorer extends ScorexLogging {
           val abh  = kabh.parse(db.get(kabh.keyBytes))
 
           val balances = abh.map { h =>
-            val k = Keys.assetBalance(h, addressId, asset)
+            val k = Keys.assetBalance(addressId, asset)(h)
             h -> k.parse(db.get(k.keyBytes))
           }
           balances.foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))

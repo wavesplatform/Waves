@@ -49,26 +49,26 @@ object Keys {
   def heightOf(blockId: ByteStr): Key[Option[Int]] = Key.opt[Int](hash(4, blockId), Ints.fromByteArray, Ints.toByteArray)
 
   def wavesBalanceHistory(addressId: BigInt): Key[Seq[Int]] = historyKey(5, addressId.toByteArray)
-  def wavesBalance(height: Int, addressId: BigInt): Key[Long] =
+  def wavesBalance(addressId: BigInt)(height: Int): Key[Long] =
     Key(hAddr(6, height, addressId), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
   def assetList(addressId: BigInt): Key[Set[ByteStr]]                         = Key(addr(7, addressId), readTxIds(_).toSet, assets => writeTxIds(assets.toSeq))
   def assetBalanceHistory(addressId: BigInt, assetId: ByteStr): Key[Seq[Int]] = historyKey(8, addressId.toByteArray ++ assetId.arr)
-  def assetBalance(height: Int, addressId: BigInt, assetId: ByteStr): Key[Long] =
+  def assetBalance(addressId: BigInt, assetId: ByteStr)(height: Int): Key[Long] =
     Key(hBytes(9, height, addressId.toByteArray ++ assetId.arr), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
   def assetInfoHistory(assetId: ByteStr): Key[Seq[Int]]        = historyKey(10, assetId.arr)
-  def assetInfo(height: Int, assetId: ByteStr): Key[AssetInfo] = Key(hBytes(11, height, assetId.arr), readAssetInfo, writeAssetInfo)
+  def assetInfo(assetId: ByteStr)(height: Int): Key[AssetInfo] = Key(hBytes(11, height, assetId.arr), readAssetInfo, writeAssetInfo)
 
   def leaseBalanceHistory(addressId: BigInt): Key[Seq[Int]] = historyKey(12, addressId.toByteArray)
-  def leaseBalance(height: Int, addressId: BigInt): Key[LeaseBalance] =
+  def leaseBalance(addressId: BigInt)(height: Int): Key[LeaseBalance] =
     Key(hAddr(13, height, addressId), readLeaseBalance, writeLeaseBalance)
   def leaseStatusHistory(leaseId: ByteStr): Key[Seq[Int]] = historyKey(14, leaseId.arr)
-  def leaseStatus(height: Int, leaseId: ByteStr): Key[Boolean] =
+  def leaseStatus(leaseId: ByteStr)(height: Int): Key[Boolean] =
     Key(hBytes(15, height, leaseId.arr), _(0) == 1, active => Array[Byte](if (active) 1 else 0))
 
   def filledVolumeAndFeeHistory(orderId: ByteStr): Key[Seq[Int]]           = historyKey(16, orderId.arr)
-  def filledVolumeAndFee(height: Int, orderId: ByteStr): Key[VolumeAndFee] = Key(hBytes(17, height, orderId.arr), readVolumeAndFee, writeVolumeAndFee)
+  def filledVolumeAndFee(orderId: ByteStr)(height: Int): Key[VolumeAndFee] = Key(hBytes(17, height, orderId.arr), readVolumeAndFee, writeVolumeAndFee)
 
   def transactionInfo(txId: ByteStr): Key[Option[(Int, Transaction)]] = Key.opt(hash(18, txId), readTransactionInfo, writeTransactionInfo)
   def transactionHeight(txId: ByteStr): Key[Option[Int]] =
@@ -90,7 +90,7 @@ object Keys {
   def idToAddress(id: BigInt): Key[Address]            = Key(bytes(26, id.toByteArray), Address.fromBytes(_).explicitGet(), _.bytes.arr)
 
   def addressScriptHistory(addressId: BigInt): Key[Seq[Int]] = historyKey(27, addressId.toByteArray)
-  def addressScript(height: Int, addressId: BigInt): Key[Option[Script]] =
+  def addressScript(addressId: BigInt)(height: Int): Key[Option[Script]] =
     Key.opt(hAddr(28, height, addressId), ScriptReader.fromBytes(_).explicitGet(), _.bytes().arr)
 
   def approvedFeatures: Key[Map[Short, Int]]  = Key(Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
@@ -101,11 +101,11 @@ object Keys {
     Key(addr(32, addressId) ++ Ints.toByteArray(chunkNo), readStrings, writeStrings)
 
   def dataHistory(addressId: BigInt, key: String): Key[Seq[Int]] = historyKey(33, addressId.toByteArray ++ key.getBytes(UTF_8))
-  def data(height: Int, addressId: BigInt, key: String): Key[Option[DataEntry[_]]] =
+  def data(addressId: BigInt, key: String)(height: Int): Key[Option[DataEntry[_]]] =
     Key.opt(hBytes(34, height, addressId.toByteArray ++ key.getBytes(UTF_8)), DataEntry.parseValue(key, _, 0)._1, _.valueBytes)
 
   def sponsorshipHistory(assetId: ByteStr): Key[Seq[Int]]               = historyKey(35, assetId.arr)
-  def sponsorship(height: Int, assetId: ByteStr): Key[SponsorshipValue] = Key(hBytes(36, height, assetId.arr), readSponsorship, writeSponsorship)
+  def sponsorship(assetId: ByteStr)(height: Int): Key[SponsorshipValue] = Key(hBytes(36, height, assetId.arr), readSponsorship, writeSponsorship)
 
   val addressesForWavesSeqNr: Key[Int]                = intKey(37)
   def addressesForWaves(seqNr: Int): Key[Seq[BigInt]] = Key(h(38, seqNr), readBigIntSeq, writeBigIntSeq)

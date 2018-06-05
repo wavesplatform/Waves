@@ -2,12 +2,12 @@ package com.wavesplatform
 
 import java.nio.ByteBuffer
 
+import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.state._
 import scorex.transaction.smart.script.{Script, ScriptReader}
-import com.google.common.base.Charsets.UTF_8
 import scorex.transaction.{Transaction, TransactionParsers}
 
 package object database {
