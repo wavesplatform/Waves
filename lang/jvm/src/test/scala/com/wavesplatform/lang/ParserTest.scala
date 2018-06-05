@@ -838,4 +838,8 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       )
     )
   }
+
+  property("underscore in numbers") {
+    parseOne("100_000_000") shouldBe CONST_LONG(0, 11, 100000000)
+  }
 }
