@@ -93,6 +93,7 @@ object PureContext {
     }
   }
 
+  val mulLong       = createTryOp(MUL_OP, LONG, LONG)(Math.multiplyExact)
   val sumLong       = createTryOp(SUM_OP, LONG, LONG)(Math.addExact)
   val subLong       = createTryOp(SUB_OP, LONG, LONG)(Math.subtractExact)
   val sumString     = createOp(SUM_OP, STRING, STRING)(_ + _)
@@ -111,6 +112,7 @@ object PureContext {
   val sgt           = createOp(GT_OP, STRING, BOOLEAN)(_ > _)
 
   val operators: Seq[PredefFunction] = Seq(
+    mulLong,
     sumLong,
     subLong,
     sumString,
@@ -136,7 +138,6 @@ object PureContext {
   val predefVars = Map(("None", OPTION(NOTHING)), (errRef, NOTHING))
 
   lazy val instance =
-    EvaluationContext.build(letDefs = Map(("None", none), (errRef, err)),
-                            functions = Seq(extract, isDefined, some, size, _isInstanceOf) ++ operators)
+    EvaluationContext.build(letDefs = Map(("None", none), (errRef, err)), functions = Seq(extract, isDefined, some, size, _isInstanceOf) ++ operators)
 
 }
