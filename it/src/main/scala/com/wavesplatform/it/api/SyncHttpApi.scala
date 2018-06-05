@@ -182,7 +182,7 @@ object SyncHttpApi extends Assertions {
 
     import com.wavesplatform.it.api.AsyncHttpApi.{NodesAsyncHttpApi => async}
 
-    private val TxInBlockchainAwaitTime = 6 * nodes.head.blockDelay
+    private val TxInBlockchainAwaitTime = 8 * nodes.head.blockDelay
     private val ConditionAwaitTime      = 5.minutes
 
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
