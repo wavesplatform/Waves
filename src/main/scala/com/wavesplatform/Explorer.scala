@@ -88,6 +88,19 @@ object Explorer extends ScorexLogging {
       val flag = args(1).toUpperCase
 
       flag match {
+        case "B" =>
+          val maybeBlockId = Base58.decode(args(2)).toOption.map(ByteStr.apply)
+          if (maybeBlockId.isDefined) {
+            val kBlockHeight     = Keys.heightOf(maybeBlockId.get)
+            val blockHeightBytes = db.get(kBlockHeight.keyBytes)
+            val maybeBlockHeight = kBlockHeight.parse(blockHeightBytes)
+            maybeBlockHeight.foreach { h =>
+              val kBlock     = Keys.blockBytes(h)
+              val blockBytes = db.get(kBlock.keyBytes)
+              log.info(s"BlockId=${maybeBlockId.get} at h=$h: ${Base58.encode(blockBytes)}")
+            }
+          } else log.error("No block ID was provided")
+
         case "O" =>
           val orderId = Base58.decode(args(2)).toOption.map(ByteStr.apply)
           if (orderId.isDefined) {
