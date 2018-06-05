@@ -19,7 +19,7 @@ trait PredefFunction {
 
 object PredefFunction {
 
-  case class FunctionTypeSignature(args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER, name: String)
+  case class FunctionTypeSignature(args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER, internalName: String)
 
   case class PredefFunctionImpl(name: String,
                                 cost: Long,
@@ -34,15 +34,6 @@ object PredefFunction {
     override val signature              = FunctionTypeSignature(args.map(_._2), resultType, internalName)
     override val header: FunctionHeader = FunctionHeader(internalName)
   }
-
-//  abstract class PredefFunctionImplT(val name: String,
-//                                 val cost: Long,
-//                                 val resultType: TYPEPLACEHOLDER,
-//                                 val args: List[(String, TYPEPLACEHOLDER)])
-//      extends PredefFunction {
-//    override val signature              = FunctionTypeSignature(args.map(_._2), resultType)
-//    override val header: FunctionHeader = FunctionHeader(name)
-//  }
 
   def apply(name: String, cost: Long, resultType: TYPEPLACEHOLDER, args: List[(String, TYPEPLACEHOLDER)], internalName: String)(
       ev: List[Any] => Either[String, Any]): PredefFunction =

@@ -191,7 +191,7 @@ object CompilerV1 {
       for {
         resolvedTypeParams <- TypeInferrer(typePairs).leftMap(Generic(start, end, _))
         resolvedResultType <- TypeInferrer.inferResultType(f.result, resolvedTypeParams).leftMap(Generic(start, end, _))
-        header = FunctionHeader(f.name)
+        header = FunctionHeader(f.internalName)
         args   = typedExpressionArgumentsAndTypedPlaceholders.map(_._1)
       } yield FUNCTION_CALL(header, args, resolvedResultType): EXPR
     }

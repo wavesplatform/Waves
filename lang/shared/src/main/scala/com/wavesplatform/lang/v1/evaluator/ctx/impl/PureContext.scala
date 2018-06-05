@@ -41,7 +41,7 @@ object PureContext {
     case _              => ???
   }
 
-  val size: PredefFunction = PredefFunction("size", 1, LONG, List(("byteVector", BYTEVECTOR)), "_vs") {
+  val size: PredefFunction = PredefFunction("size", 1, LONG, List(("byteVector", BYTEVECTOR)), "sizebytevector") {
     case (bv: ByteVector) :: Nil => Right(bv.size)
     case _                       => ???
   }
@@ -59,7 +59,7 @@ object PureContext {
     case _                                          => ???
   }
 
-  val getListSize = PredefFunction("size", 2, LONG, List("arr" -> LISTTYPEPARAM(TYPEPARAM('T'))), "_ls") {
+  val getListSize = PredefFunction("size", 2, LONG, List("arr" -> LISTTYPEPARAM(TYPEPARAM('T'))), "sizeList") {
     case (arr: IndexedSeq[_]) :: Nil => {
 
       Right(arr.size.toLong)
@@ -136,7 +136,6 @@ object PureContext {
   val predefVars = Map(("None", OPTION(NOTHING)), (errRef, NOTHING))
 
   lazy val instance =
-    EvaluationContext.build(letDefs = Map(("None", none), (errRef, err)),
-                            functions = Seq(extract, isDefined, some, size, _isInstanceOf) ++ operators)
+    EvaluationContext.build(letDefs = Map(("None", none), (errRef, err)), functions = Seq(extract, isDefined, some, size, _isInstanceOf) ++ operators)
 
 }
