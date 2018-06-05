@@ -178,14 +178,20 @@ trait Caches extends Blockchain {
           assetDescriptionCache.put(
             id,
             Some(
-              AssetDescription(it.sender,
-                               it.name,
-                               it.description,
-                               it.decimals,
-                               ai.isReissuable,
-                               ai.volume,
-                               it.script,
-                               sponsorshipCache.get(id).fold(0L)(_.minFee)))
+              AssetDescription(
+                it.sender,
+                it.name,
+                it.description,
+                it.decimals,
+                ai.isReissuable,
+                ai.volume,
+                it.script,
+                diff.sponsorship.filter(_._1 == id).headOption match {
+                  case Some((_, SponsorshipValue(v))) => v
+                  case _                              => 0L
+                }
+              )
+            )
           )
         case _ =>
       }
