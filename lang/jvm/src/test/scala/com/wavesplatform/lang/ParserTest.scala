@@ -838,4 +838,41 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       )
     )
   }
+
+  property("if expressions") {
+    parseOne("if (10 < 15) then true else false") shouldBe IF(
+      0,
+      33,
+      BINARY_OP(4, 11, CONST_LONG(9, 11, 15), LT_OP, CONST_LONG(4, 6, 10)),
+      TRUE(18, 22),
+      FALSE(28, 33)
+    )
+    parseOne("if 10 < 15 then true else false") shouldBe IF(
+      0,
+      31,
+      BINARY_OP(3, 10, CONST_LONG(8, 10, 15), LT_OP, CONST_LONG(3, 5, 10)),
+      TRUE(16, 20),
+      FALSE(26, 31)
+    )
+    parseOne(s"""if (10 < 15)
+                |then true
+                |else false""".stripMargin) shouldBe IF(
+      0,
+      33,
+      BINARY_OP(4, 11, CONST_LONG(9, 11, 15), LT_OP, CONST_LONG(4, 6, 10)),
+      TRUE(18, 22),
+      FALSE(28, 33)
+    )
+
+    parseOne(s"""if 10 < 15
+                |then true
+                |else false""".stripMargin) shouldBe IF(
+      0,
+      31,
+      BINARY_OP(3, 10, CONST_LONG(8, 10, 15), LT_OP, CONST_LONG(3, 5, 10)),
+      TRUE(16, 20),
+      FALSE(26, 31)
+    )
+  }
+
 }
