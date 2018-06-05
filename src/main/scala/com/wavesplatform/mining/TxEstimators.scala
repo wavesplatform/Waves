@@ -24,8 +24,8 @@ object TxEstimators {
   object scriptRunNumber extends Fn {
     override def apply(blockchain: Blockchain, x: Transaction): Long = {
       val smartAccountRun = x match {
-        case x: Transaction with Authorized if blockchain.accountScript(x.sender).isDefined => 1
-        case _                                                                              => 0
+        case x: Transaction with Authorized if blockchain.hasScript(x.sender) => 1
+        case _                                                                => 0
       }
 
       val assetIds = x match {

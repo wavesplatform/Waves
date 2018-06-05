@@ -56,7 +56,7 @@ object Importer extends ScorexLogging {
 
         createInputStream(filename) match {
           case Success(inputStream) =>
-            val db                = openDB(settings.dataDirectory, settings.levelDbCacheSize)
+            val db                = openDB(settings.dataDirectory)
             val blockchainUpdater = StorageFactory(settings, db, NTP)
             val pos               = new PoSSelector(blockchainUpdater, settings.blockchainSettings)
             val checkpoint        = new CheckpointServiceImpl(db, settings.checkpointsSettings)

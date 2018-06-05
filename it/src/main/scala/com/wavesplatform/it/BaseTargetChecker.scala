@@ -23,7 +23,7 @@ object BaseTargetChecker {
       .resolve()
     val settings     = WavesSettings.fromConfig(sharedConfig)
     val genesisBlock = Block.genesis(settings.blockchainSettings.genesisSettings).explicitGet()
-    val db           = openDB("/tmp/tmp-db", 1024)
+    val db           = openDB("/tmp/tmp-db")
     val bu           = StorageFactory(settings, db, NTP)
     val pos          = new PoSSelector(bu, settings.blockchainSettings)
     bu.processBlock(genesisBlock)

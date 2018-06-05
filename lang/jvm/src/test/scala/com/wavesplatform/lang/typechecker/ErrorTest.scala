@@ -32,9 +32,9 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
       LET(0, 0, PART.VALID(0, 0, "Some"), CONST_LONG(0, 0, 2), Seq.empty),
       TRUE(0, 0)
     ),
-    "BINARY_OP with wrong types"                   -> "Typecheck failed: Can't find a function '+'" -> BINARY_OP(0, 0, TRUE(0, 0), SUM_OP, CONST_LONG(0, 0, 1)),
-    "IF can't find common"                         -> "Can't find common type" -> IF(0, 0, TRUE(0, 0), TRUE(0, 0), CONST_LONG(0, 0, 0)),
-    "IF clause must be boolean"                    -> "IF clause is expected to be BOOLEAN" -> IF(0, 0, CONST_LONG(0, 0, 0), TRUE(0, 0), FALSE(0, 0)),
+    "BINARY_OP with wrong types"                   -> "Compilation failed: Can't find a function '+'" -> BINARY_OP(0, 0, TRUE(0, 0), SUM_OP, CONST_LONG(0, 0, 1)),
+    "IF can't find common"                         -> "Unexpected type, required: BOOLEAN" -> IF(0, 0, TRUE(0, 0), TRUE(0, 0), CONST_LONG(0, 0, 0)),
+    "IF clause must be boolean"                    -> "Unexpected type, required: BOOLEAN" -> IF(0, 0, CONST_LONG(0, 0, 0), TRUE(0, 0), FALSE(0, 0)),
     "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(
       0,
       0,
@@ -47,7 +47,7 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
       PART.VALID(0, 0, unitOnNone.name),
       List(FUNCTION_CALL(0, 0, PART.VALID(0, 0, "Some"), List(CONST_LONG(0, 0, 3))))
     ),
-    "FUNCTION_CALL with wrong type of argument" -> "Typecheck failed: Non-matching types: expected: LONG, actual: BOOLEAN" -> FUNCTION_CALL(
+    "FUNCTION_CALL with wrong type of argument" -> "Compilation failed: Non-matching types: expected: LONG, actual: BOOLEAN" -> FUNCTION_CALL(
       0,
       0,
       PART.VALID(0, 0, multiplierFunction.name),

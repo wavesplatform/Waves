@@ -13,7 +13,7 @@ import scorex.utils.{ScorexLogging, TimeImpl}
 trait WithState extends ScorexLogging {
   private def withState[A](fs: FunctionalitySettings)(f: Blockchain => A): A = {
     val path = Files.createTempDirectory("leveldb-test")
-    val db   = openDB(path.toAbsolutePath.toString, 2048000)
+    val db   = openDB(path.toAbsolutePath.toString)
     try f(new LevelDBWriter(db, fs))
     finally {
       db.close()

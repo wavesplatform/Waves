@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.{NoShrink, TransactionGen}

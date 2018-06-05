@@ -4,22 +4,9 @@ import java.util
 
 import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
-import com.wavesplatform.state.{
-  AccountDataInfo,
-  AssetDescription,
-  AssetInfo,
-  Blockchain,
-  ByteStr,
-  Diff,
-  LeaseBalance,
-  Portfolio,
-  Sponsorship,
-  SponsorshipValue,
-  VolumeAndFee
-}
+import com.wavesplatform.state._
 import scorex.account.{Address, Alias}
 import scorex.block.Block
-import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.smart.script.Script
 import scorex.transaction.{AssetId, Transaction}
 
@@ -28,7 +15,7 @@ import scala.collection.JavaConverters._
 trait Caches extends Blockchain {
   import Caches._
 
-  private val MaxSize = 100000
+  protected def maxCacheSize: Int
 
   @volatile
   private var heightCache = loadHeight()
@@ -49,35 +36,36 @@ trait Caches extends Blockchain {
   protected def forgetTransaction(id: ByteStr): Unit     = transactionIds.remove(id)
   override def containsTransaction(id: ByteStr): Boolean = transactionIds.containsKey(id)
 
-  protected val portfolioCache: LoadingCache[Address, Portfolio] = cache(MaxSize, loadPortfolio)
+  private val portfolioCache: LoadingCache[Address, Portfolio] = cache(maxCacheSize, loadPortfolio)
   protected def loadPortfolio(address: Address): Portfolio
-  override def portfolio(a: Address): Portfolio = portfolioCache.get(a)
+  protected def discardPortfolio(address: Address): Unit = portfolioCache.invalidate(address)
+  override def portfolio(a: Address): Portfolio          = portfolioCache.get(a)
 
-  protected val assetInfoCache: LoadingCache[AssetId, Option[AssetInfo]] = cache(MaxSize, loadAssetInfo)
-  protected def loadAssetInfo(assetId: AssetId): Option[AssetInfo]
-
-  protected val assetDescriptionCache: LoadingCache[AssetId, Option[AssetDescription]] = cache(MaxSize, loadAssetDescription)
+  private val assetDescriptionCache: LoadingCache[AssetId, Option[AssetDescription]] = cache(maxCacheSize, loadAssetDescription)
   protected def loadAssetDescription(assetId: AssetId): Option[AssetDescription]
-  override def assetDescription(assetId: AssetId): Option[AssetDescription] = assetDescriptionCache.get(assetId) map { descr =>
-    sponsorshipCache.get(assetId).fold(descr) {
-      case SponsorshipValue(minFee) =>
-        descr.copy(sponsorship = minFee)
-    }
-  }
+  protected def discardAssetDescription(assetId: AssetId): Unit             = assetDescriptionCache.invalidate(assetId)
+  override def assetDescription(assetId: AssetId): Option[AssetDescription] = assetDescriptionCache.get(assetId)
 
-  protected val volumeAndFeeCache: LoadingCache[ByteStr, VolumeAndFee] = cache(MaxSize, loadVolumeAndFee)
+  private val volumeAndFeeCache: LoadingCache[ByteStr, VolumeAndFee] = cache(maxCacheSize, loadVolumeAndFee)
   protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee
+  protected def discardVolumeAndFee(orderId: ByteStr): Unit       = volumeAndFeeCache.invalidate(orderId)
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = volumeAndFeeCache.get(orderId)
 
-  protected val scriptCache: LoadingCache[Address, Option[Script]] = cache(MaxSize, loadScript)
+  private val scriptCache: LoadingCache[Address, Option[Script]] = cache(maxCacheSize, loadScript)
   protected def loadScript(address: Address): Option[Script]
+  protected def hasScriptBytes(address: Address): Boolean
+  protected def discardScript(address: Address): Unit = scriptCache.invalidate(address)
+
   override def accountScript(address: Address): Option[Script] = scriptCache.get(address)
+  override def hasScript(address: Address): Boolean =
+    Option(scriptCache.getIfPresent(address)).flatten.isDefined || hasScriptBytes(address)
 
   private var lastAddressId = loadMaxAddressId()
   protected def loadMaxAddressId(): BigInt
 
-  protected val addressIdCache: LoadingCache[Address, Option[BigInt]] = cache(MaxSize, loadAddressId)
+  private val addressIdCache: LoadingCache[Address, Option[BigInt]] = cache(maxCacheSize, loadAddressId)
   protected def loadAddressId(address: Address): Option[BigInt]
+  protected def addressId(address: Address): Option[BigInt] = addressIdCache.get(address)
 
   @volatile
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
@@ -88,9 +76,6 @@ trait Caches extends Blockchain {
   protected var activatedFeaturesCache: Map[Short, Int] = loadActivatedFeatures()
   protected def loadActivatedFeatures(): Map[Short, Int]
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
-
-  protected val sponsorshipCache: LoadingCache[ByteStr, Option[SponsorshipValue]] = cache(MaxSize, loadSponsorship)
-  protected def loadSponsorship(assetId: ByteStr): Option[SponsorshipValue]
 
   protected def doAppend(block: Block,
                          addresses: Map[Address, BigInt],
@@ -118,12 +103,10 @@ trait Caches extends Blockchain {
     }
 
     val newAddressIds = (for {
-      (address, offset) <- newAddresses.result().toSeq.zipWithIndex
-    } yield {
-      val nextAddressId = lastAddressId + offset + 1
-      addressIdCache.put(address, Some(nextAddressId))
-      address -> nextAddressId
-    }).toMap
+      (address, offset) <- newAddresses.result().zipWithIndex
+    } yield address -> (lastAddressId + offset + 1)).toMap
+
+    def addressId(address: Address): BigInt = (newAddressIds.get(address) orElse addressIdCache.get(address)).get
 
     lastAddressId += newAddressIds.size
 
@@ -132,56 +115,37 @@ trait Caches extends Blockchain {
     val wavesBalances = Map.newBuilder[BigInt, Long]
     val assetBalances = Map.newBuilder[BigInt, Map[ByteStr, Long]]
     val leaseBalances = Map.newBuilder[BigInt, LeaseBalance]
+    val newPortfolios = Map.newBuilder[Address, Portfolio]
 
     for ((address, portfolioDiff) <- diff.portfolios) {
       val newPortfolio = portfolioCache.get(address).combine(portfolioDiff)
       if (portfolioDiff.balance != 0) {
-        wavesBalances += addressIdCache.get(address).get -> newPortfolio.balance
+        wavesBalances += addressId(address) -> newPortfolio.balance
       }
 
       if (portfolioDiff.lease != LeaseBalance.empty) {
-        leaseBalances += addressIdCache.get(address).get -> newPortfolio.lease
+        leaseBalances += addressId(address) -> newPortfolio.lease
       }
 
       if (portfolioDiff.assets.nonEmpty) {
         val newAssetBalances = for { (k, v) <- portfolioDiff.assets if v != 0 } yield k -> newPortfolio.assets(k)
         if (newAssetBalances.nonEmpty) {
-          assetBalances += addressIdCache.get(address).get -> newAssetBalances
+          assetBalances += addressId(address) -> newAssetBalances
         }
       }
 
-      portfolioCache.put(address, newPortfolio)
+      newPortfolios += address -> newPortfolio
     }
 
-    val newFills = Map.newBuilder[ByteStr, VolumeAndFee]
-
-    for ((orderId, fillInfo) <- diff.orderFills) {
-      val newVolumeAndFee = volumeAndFeeCache.get(orderId).combine(fillInfo)
-      volumeAndFeeCache.put(orderId, newVolumeAndFee)
-      newFills += orderId -> newVolumeAndFee
-    }
+    val newFills = for {
+      (orderId, fillInfo) <- diff.orderFills
+    } yield orderId -> volumeAndFeeCache.get(orderId).combine(fillInfo)
 
     val newTransactions = Map.newBuilder[ByteStr, (Transaction, Set[BigInt])]
     for ((id, (_, tx, addresses)) <- diff.transactions) {
       transactionIds.put(id, tx.timestamp)
-      newTransactions += id -> ((tx, addresses.map(a => addressIdCache.get(a).get)))
+      newTransactions += id -> ((tx, addresses.map(addressId)))
     }
-
-    for ((id, sp: SponsorshipValue) <- diff.sponsorship) {
-      sponsorshipCache.put(id, Some(sp))
-    }
-
-    for ((id, ai) <- diff.issuedAssets) {
-      assetInfoCache.put(id, Some(ai))
-      diff.transactions.get(id) match {
-        case Some((_, it: IssueTransaction, _)) =>
-          assetDescriptionCache.put(id,
-                                    Some(AssetDescription(it.sender, it.name, it.description, it.decimals, ai.isReissuable, ai.volume, it.script, 0)))
-        case _ =>
-      }
-    }
-
-    scriptCache.putAll(diff.scripts.asJava)
 
     doAppend(
       block,
@@ -192,12 +156,18 @@ trait Caches extends Blockchain {
       diff.leaseState,
       newTransactions.result(),
       diff.issuedAssets,
-      newFills.result(),
-      diff.scripts.map { case (address, s)        => addressIdCache.get(address).get -> s },
-      diff.accountData.map { case (address, data) => addressIdCache.get(address).get -> data },
-      diff.aliases.map { case (a, address)        => a                               -> addressIdCache.get(address).get },
+      newFills,
+      diff.scripts.map { case (address, s)        => addressId(address) -> s },
+      diff.accountData.map { case (address, data) => addressId(address) -> data },
+      diff.aliases.map { case (a, address)        => a                  -> addressId(address) },
       diff.sponsorship
     )
+
+    for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
+    for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
+    for ((address, portfolio)    <- newPortfolios.result()) portfolioCache.put(address, portfolio)
+    for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
+    scriptCache.putAll(diff.scripts.asJava)
   }
 
   protected def doRollback(targetBlockId: ByteStr): Seq[Block]
@@ -221,7 +191,6 @@ object Caches {
     CacheBuilder
       .newBuilder()
       .maximumSize(maximumSize)
-      .recordStats()
       .build(new CacheLoader[K, V] {
         override def load(key: K) = loader(key)
       })

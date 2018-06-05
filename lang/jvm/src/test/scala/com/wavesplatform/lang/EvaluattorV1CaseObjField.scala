@@ -2,7 +2,6 @@ package com.wavesplatform.lang
 
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext._
 import com.wavesplatform.lang.v1.evaluator.ctx._

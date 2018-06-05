@@ -2,8 +2,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.lang.{Global, TypeInfo}
-import com.wavesplatform.lang.TypeInfo._
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.parser.Parser
@@ -111,7 +110,7 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
        accountBDataTransaction,
        transferFromAToB)
 
-  private def eval[T: TypeInfo](code: String) = {
+  private def eval[T](code: String) = {
     val untyped = Parser(code).get.value
     assert(untyped.size == 1)
     val typed = CompilerV1(dummyTypeCheckerContext, untyped.head)

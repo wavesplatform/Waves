@@ -27,7 +27,7 @@ object LangSerdeBenchmark {
 
   @State(Scope.Benchmark)
   class St extends BigSum {
-    val serilizedExpr: BitVector = Serde.codec.encode(expr).require
+    val serilizedExpr: BitVector = Serde.codec.encode(expr).require.compact
   }
 
 }

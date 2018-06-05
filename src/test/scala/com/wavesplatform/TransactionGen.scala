@@ -5,6 +5,7 @@ import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+//import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext.predefVars
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
@@ -116,7 +117,8 @@ trait TransactionGenBase extends ScriptGen {
   val scriptGen = BOOLgen(100).map {
     case (expr, _) =>
       val typed =
-        CompilerV1(CompilerContext.fromEvaluationContext(PureContext.instance |+| CryptoContext.build(Global), Seq.empty), expr).explicitGet()
+        CompilerV1(CompilerContext.fromEvaluationContext(PureContext.instance |+| CryptoContext.build(Global), Map.empty, PureContext.predefVars),
+                   expr).explicitGet()
       ScriptV1(typed).explicitGet()
   }
 
@@ -318,7 +320,7 @@ trait TransactionGenBase extends ScriptGen {
     for {
       version                                                      <- Gen.oneOf(MassTransferTransaction.supportedVersions.toSeq)
       (assetId, sender, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
-      transferCount                                                <- Gen.choose(0, MaxTransferCount)
+      transferCount                                                <- Gen.choose(1, 10) //MaxTransferCount)
       transferGen = for {
         recipient <- accountOrAliasGen
         amount    <- Gen.choose(1L, Long.MaxValue / MaxTransferCount)
@@ -646,6 +648,10 @@ trait TransactionGenBase extends ScriptGen {
       transfer  <- transferGeneratorP(master, recipient.toAddress, None, None)
       lease     <- leaseAndCancelGeneratorP(master, recipient.toAddress, master)
     } yield (genesis, setScript, lease._1, transfer)
+
+  val setSimpleScriptTransactionGen = for {
+    (_, tx, _, _) <- preconditionsTransferAndLease(TRUE)
+  } yield tx
 
   def smartIssueTransactionGen(senderGen: Gen[PrivateKeyAccount] = accountGen,
                                sGen: Gen[Option[Script]] = Gen.option(scriptGen)): Gen[IssueTransactionV2] =

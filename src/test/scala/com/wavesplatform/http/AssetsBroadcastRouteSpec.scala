@@ -30,7 +30,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
   (utx.putIfNew _).when(*).onCall((t: Transaction) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
 
-  "returns StateCheckFiled" - {
+  "returns StateCheckFailed" - {
 
     val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
 
@@ -39,7 +39,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       ("issue", issueGen.retryUntil(_.version == 1), identity),
       ("reissue", reissueGen.retryUntil(_.version == 1), identity),
       ("burn", burnGen.retryUntil(_.version == 1), {
-        case o: JsObject => o ++ Json.obj("quantity" -> o.value("quantity"))
+        case o: JsObject => o ++ Json.obj("quantity" -> o.value("amount"))
         case other       => other
       }),
       ("transfer", transferV1Gen, {

@@ -1,10 +1,11 @@
 package com.wavesplatform.lang.typechecker
 
+import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.compiler
-import com.wavesplatform.lang.v1.compiler.CompilerV1.CompilationResult
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions
@@ -144,6 +145,117 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
     )
   )
 
+  treeTypeTest("pattern matching - allow shadowing of ref with the same name")(
+    ctx = typeCheckerContext,
+    expr = Expressions.MATCH(
+      0,
+      0,
+      Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "p")),
+      List(
+        Expressions.MATCH_CASE(
+          0,
+          0,
+          Some(Expressions.PART.VALID(0, 0, "p")),
+          List(Expressions.PART.VALID(0, 0, "PointA"), Expressions.PART.VALID(0, 0, "PointB")),
+          Expressions.TRUE(0, 0)
+        ),
+        Expressions.MATCH_CASE(
+          0,
+          0,
+          None,
+          List.empty,
+          Expressions.FALSE(0, 0)
+        )
+      )
+    ),
+    expectedResult = Right(
+      BLOCK(
+        LET("$match0", REF("p", Common.AorB)),
+        IF(
+          IF(
+            FUNCTION_CALL(
+              PureContext._isInstanceOf.header,
+              List(REF("$match0", Common.AorB), CONST_STRING("PointB")),
+              BOOLEAN
+            ),
+            TRUE,
+            FUNCTION_CALL(
+              PureContext._isInstanceOf.header,
+              List(REF("$match0", Common.AorB), CONST_STRING("PointA")),
+              BOOLEAN
+            ),
+            BOOLEAN
+          ),
+          BLOCK(LET("p", REF("$match0", Common.AorB)), TRUE, BOOLEAN),
+          FALSE,
+          BOOLEAN
+        ),
+        BOOLEAN
+      ))
+  )
+
+  treeTypeTest("pattern matching - deny shadowing of other variable")(
+    ctx = typeCheckerContext,
+    expr = Expressions.BLOCK(
+      0,
+      0,
+      Expressions.LET(0, 0, Expressions.PART.VALID(0, 0, "foo"), Expressions.TRUE(0, 0), Seq.empty),
+      Expressions.MATCH(
+        0,
+        0,
+        Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "p")),
+        List(
+          Expressions.MATCH_CASE(
+            0,
+            0,
+            Some(Expressions.PART.VALID(0, 0, "foo")),
+            List(Expressions.PART.VALID(0, 0, "PointA"), Expressions.PART.VALID(0, 0, "PointB")),
+            Expressions.TRUE(0, 0)
+          ),
+          Expressions.MATCH_CASE(
+            0,
+            0,
+            None,
+            List.empty,
+            Expressions.FALSE(0, 0)
+          )
+        )
+      )
+    ),
+    expectedResult = Left("Compilation failed: Value 'foo' already defined in the scope in 1-1")
+  )
+
+  treeTypeTest("pattern matching - deny shadowing in non-ref")(
+    ctx = typeCheckerContext,
+    expr = Expressions.MATCH(
+      0,
+      0,
+      Expressions.FUNCTION_CALL(
+        0,
+        0,
+        Expressions.PART.VALID(0, 0, "idT"),
+        List(Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "p")))
+      ),
+      List(
+        Expressions.MATCH_CASE(
+          0,
+          0,
+          Some(Expressions.PART.VALID(0, 0, "p")),
+          List(Expressions.PART.VALID(0, 0, "PointA"), Expressions.PART.VALID(0, 0, "PointB")),
+          Expressions.TRUE(0, 0)
+        ),
+        Expressions.MATCH_CASE(
+          0,
+          0,
+          None,
+          List.empty,
+          Expressions.FALSE(0, 0)
+        )
+      )
+    ),
+    expectedResult = Left("Compilation failed: Value 'p' already defined in the scope in 1-1")
+  )
+
   treeTypeTest("Invalid LET")(
     ctx = typeCheckerContext,
     expr = Expressions.BLOCK(
@@ -152,46 +264,46 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
       Expressions.LET(0, 0, Expressions.PART.INVALID(0, 1, "can't parse"), Expressions.TRUE(0, 0), Seq.empty),
       Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "x"))
     ),
-    expectedResult = Left("Typecheck failed: Can't compile an invalid instruction: can't parse in 0-1")
+    expectedResult = Left("Compilation failed: can't parse in 0-1")
   )
 
   treeTypeTest("Invalid GETTER")(
     ctx = typeCheckerContext,
     expr = Expressions.GETTER(0, 0, Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "x")), Expressions.PART.INVALID(2, 3, "can't parse")),
-    expectedResult = Left("Typecheck failed: Can't compile an invalid instruction: can't parse in 2-3")
+    expectedResult = Left("Compilation failed: can't parse in 2-3")
   )
 
   treeTypeTest("Invalid BYTEVECTOR")(
     ctx = typeCheckerContext,
     expr = Expressions.CONST_BYTEVECTOR(0, 0, Expressions.PART.INVALID(0, 0, "can't parse")),
-    expectedResult = Left("Typecheck failed: can't parse in 0-0")
+    expectedResult = Left("Compilation failed: can't parse in 0-0")
   )
 
   treeTypeTest("Invalid STRING")(
     ctx = typeCheckerContext,
     expr = Expressions.CONST_STRING(0, 0, Expressions.PART.INVALID(0, 0, "can't parse")),
-    expectedResult = Left("Typecheck failed: can't parse in 0-0")
+    expectedResult = Left("Compilation failed: can't parse in 0-0")
   )
 
   treeTypeTest("Invalid REF")(
     ctx = typeCheckerContext,
     expr = Expressions.REF(0, 0, Expressions.PART.INVALID(0, 0, "can't parse")),
-    expectedResult = Left("Typecheck failed: Can't compile an invalid instruction: can't parse in 0-0")
+    expectedResult = Left("Compilation failed: can't parse in 0-0")
   )
 
   treeTypeTest("Invalid FUNCTION_CALL")(
     ctx = typeCheckerContext,
     expr = Expressions.FUNCTION_CALL(0, 0, Expressions.PART.INVALID(0, 0, "can't parse"), List.empty),
-    expectedResult = Left("Typecheck failed: Can't compile an invalid instruction: can't parse in 0-0")
+    expectedResult = Left("Compilation failed: can't parse in 0-0")
   )
 
   treeTypeTest("INVALID")(
     ctx = typeCheckerContext,
     expr = Expressions.INVALID(0, 0, "###", None),
-    expectedResult = Left("Typecheck failed: ### in 0-0")
+    expectedResult = Left("Compilation failed: ### in 0-0")
   )
 
-  private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: CompilationResult[EXPR], ctx: CompilerContext): Unit =
+  private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: Either[String, EXPR], ctx: CompilerContext): Unit =
     property(propertyName) {
       compiler.CompilerV1(ctx, expr) shouldBe expectedResult
     }

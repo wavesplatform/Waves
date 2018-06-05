@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1.testing
 
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import org.scalacheck._
@@ -55,7 +54,7 @@ trait TypedScriptGen {
   def FUNCTION_CALLgen(resultType: TYPE): Gen[EXPR] =
     Gen.const(
       FUNCTION_CALL(
-        function = FunctionHeader("+", List(FunctionHeaderType.LONG, FunctionHeaderType.LONG)),
+        function = FunctionHeader("l+l"),
         args = List(CONST_LONG(1), CONST_LONG(1)),
         resultType
       )

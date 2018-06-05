@@ -7,6 +7,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.generator.cli.ScoptImplicits
 import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.network.client.NetworkSender
+import com.wavesplatform.settings.inetSocketAddressReader
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
