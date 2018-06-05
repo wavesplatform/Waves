@@ -12,7 +12,7 @@ import org.openjdk.jmh.infra.Blackhole
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(4)
 @Fork(1)
-@Warmup(iterations = 10)
+@Warmup(iterations = 20)
 @Measurement(iterations = 10)
 class ScriptEvaluatorBenchmark {
   @Benchmark
