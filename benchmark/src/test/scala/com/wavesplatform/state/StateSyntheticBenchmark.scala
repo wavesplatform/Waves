@@ -75,7 +75,7 @@ object StateSyntheticBenchmark {
       val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)"
       val untypedScript = Parser(textScript).get.value
       assert(untypedScript.size == 1)
-      val typedScript = CompilerV1(dummyTypeCheckerContext, untypedScript.head).explicitGet()
+      val typedScript = CompilerV1(dummyTypeCheckerContext, untypedScript.head).explicitGet()._1
 
       val setScriptBlock = nextBlock(
         Seq(
