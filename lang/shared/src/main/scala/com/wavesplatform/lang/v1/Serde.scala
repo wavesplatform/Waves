@@ -1,6 +1,5 @@
 package com.wavesplatform.lang.v1
 
-import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.v1.compiler.Terms._
 import scodec._
 import scodec.codecs._
@@ -8,21 +7,6 @@ import scodec.codecs._
 object Serde {
 
   import codecs.implicits._
-
-  implicit def d0             = Discriminated[FunctionHeaderType, Int](uint8)
-  implicit def dTypeParam     = d0.bind[FunctionHeaderType.TYPEPARAM](0)
-  implicit def dOptTypeParam  = d0.bind[FunctionHeaderType.OPTIONTYPEPARAM](1)
-  implicit def d0Nothing      = d0.bind[FunctionHeaderType.NOTHING.type](2)
-  implicit def d0Unit         = d0.bind[FunctionHeaderType.UNIT.type](3)
-  implicit def d0Long         = d0.bind[FunctionHeaderType.LONG.type](4)
-  implicit def d0ByteVector   = d0.bind[FunctionHeaderType.BYTEVECTOR.type](5)
-  implicit def d0Boolean      = d0.bind[FunctionHeaderType.BOOLEAN.type](6)
-  implicit def d0Option       = d0.bind[FunctionHeaderType.OPTION](7)
-  implicit def d0String       = d0.bind[FunctionHeaderType.STRING.type](8)
-  implicit def d0List         = d0.bind[FunctionHeaderType.LIST](9)
-  implicit def dListTypeParam = d0.bind[FunctionHeaderType.LISTTYPEPARAM](10)
-  implicit def d0CaseTypeRef  = d0.bind[FunctionHeaderType.CASETYPEREF](11)
-  implicit def d0Union        = d0.bind[FunctionHeaderType.UNION](12)
 
   implicit def d                = Discriminated[EXPR, Int](uint8)
   implicit def dConstInt        = d.bind[CONST_LONG](0)

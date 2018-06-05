@@ -6,7 +6,6 @@ import com.wavesplatform.lang.ExprCompiler
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.directives.Directive
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.v1.compiler.CompilationError._
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -192,7 +191,7 @@ object CompilerV1 {
       for {
         resolvedTypeParams <- TypeInferrer(typePairs).leftMap(Generic(start, end, _))
         resolvedResultType <- TypeInferrer.inferResultType(f.result, resolvedTypeParams).leftMap(Generic(start, end, _))
-        header = FunctionHeader(funcName, f.args.map(FunctionHeaderType.fromTypePlaceholder))
+        header = FunctionHeader(f.internalName)
         args   = typedExpressionArgumentsAndTypedPlaceholders.map(_._1)
       } yield FUNCTION_CALL(header, args, resolvedResultType): EXPR
     }
