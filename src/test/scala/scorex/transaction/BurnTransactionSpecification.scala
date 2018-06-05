@@ -36,7 +36,7 @@ class BurnTransactionSpecification extends PropSpec with PropertyChecks with Mat
                        "chainId": null,
                        "version": 1,
                        "assetId": "9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz",
-                       "quantity": 10000000000
+                       "amount": 10000000000
                     }
     """)
 
@@ -68,7 +68,7 @@ class BurnTransactionSpecification extends PropSpec with PropertyChecks with Mat
                        "chainId": 84,
                        "version": 2,
                        "assetId": "9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz",
-                       "quantity": 10000000000
+                       "amount": 10000000000
                     }
     """)
 
