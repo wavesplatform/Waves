@@ -19,6 +19,6 @@ object JsAPI {
         else None
       })
       .flatMap(CompilerV1(CompilerContext.empty, _).toOption)
-      .flatMap(Serde.codec.encode(_._1).toOption)
+      .flatMap(p => Serde.codec.encode(p._1).toOption)
   }
 }
