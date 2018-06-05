@@ -688,6 +688,35 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     )
   }
 
+  property("pattern matching - allow shadowing") {
+    val code =
+      """match p { 
+        |  case p: PointA | PointB => true
+        |  case _ => false
+        |}""".stripMargin
+    parseOne(code) shouldBe MATCH(
+      0,
+      64,
+      REF(6, 7, PART.VALID(6, 7, "p")),
+      List(
+        MATCH_CASE(
+          13,
+          44,
+          Some(PART.VALID(18, 19, "p")),
+          List(PART.VALID(21, 27, "PointA"), PART.VALID(30, 36, "PointB")),
+          TRUE(40, 44)
+        ),
+        MATCH_CASE(
+          47,
+          62,
+          None,
+          List.empty,
+          FALSE(57, 62)
+        )
+      )
+    )
+  }
+
   property("pattern matching with valid case, but no type is defined") {
     parseOne("match tx { case x => 1 } ") shouldBe MATCH(
       0,

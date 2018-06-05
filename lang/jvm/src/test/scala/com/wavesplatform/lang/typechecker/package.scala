@@ -1,6 +1,7 @@
 package com.wavesplatform.lang
 
 import cats.kernel.Monoid
+import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common.multiplierFunction
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -35,5 +36,16 @@ package object typechecker {
     )
   )
 
-  val typeCheckerContext = CompilerContext.fromEvaluationContext(ctx, Map("Point" -> pointType), Map("None" -> OPTION(NOTHING)))
+  val typeCheckerContext = CompilerContext.fromEvaluationContext(
+    ctx |+| Common.sampleUnionContext(Common.pointAInstance),
+    Map(
+      pointType.name         -> pointType,
+      Common.pointTypeA.name -> Common.pointTypeA,
+      Common.pointTypeB.name -> Common.pointTypeB
+    ),
+    Map(
+      "None" -> OPTION(NOTHING),
+      "p"    -> Common.AorB
+    )
+  )
 }
