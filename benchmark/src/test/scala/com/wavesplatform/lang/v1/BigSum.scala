@@ -15,7 +15,6 @@ class BigSum {
 
   val expr: EXPR = FUNCTION_CALL(
     function = FunctionHeader(name = "l=l"),
-    args = List(CONST_LONG(1), bigSum),
-    BOOLEAN
+    args = List(CONST_LONG(1), bigSum)
   )
 }
