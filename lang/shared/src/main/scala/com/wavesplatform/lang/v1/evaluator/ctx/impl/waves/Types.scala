@@ -153,7 +153,7 @@ object Types {
 
   val dataTransactionType = PredefCaseType(
     "DataTransaction",
-    List("dataEntries" -> listOfDataEntriesType) ++ header ++ proven
+    List("data" -> listOfDataEntriesType) ++ header ++ proven
   )
 
   val massTransferTransactionType = PredefCaseType(

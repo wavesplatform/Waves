@@ -223,20 +223,30 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   }
   /*
   TODO After support of base64 decoding to add
-     let key, value and type
+     let value
    */
 
   property("DataTransaction binding") {
-    forAll(dataTransactionGen) { t =>
-      val result = runScript[Boolean](
+    forAll(dataTransactionGen(10)) { t =>
+      def pg(i: Int) =
+        s"""let key$i = t.data[$i].key == "${t.data(i).key}"
+         """.stripMargin
+
+      val script =
         s"""
-           |match tx {
-           | case t : DataTransaction =>
-           |   ${provenPart(t)}
-           |   $assertProvenPart
-           | case other => throw
-           | }
-           |""".stripMargin,
+                       |match tx {
+                       | case t : DataTransaction =>
+                       |   ${provenPart(t)}
+                       |   ${Range(0, t.data.length).map(pg).mkString("\n")}
+                       |   $assertProvenPart && ${Range(0, t.data.length).map(i => s"key$i").mkString(" && ")}
+                       | case other => throw
+                       | }
+                       |""".stripMargin
+
+      println(script)
+
+      val result = runScript[Boolean](
+        script,
         t
       )
       result shouldBe Right(true)
@@ -249,7 +259,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   Occurred when passed generated values (
    */
   property("MassTransferTransaction binding") {
-    forAll(massTransferGen) { t =>
+    forAll(massTransferGen(10)) { t =>
       def pg(i: Int) =
         s"""let recipient$i = match (t.transfers[$i].recipient) {
            |case a: Address => a.bytes == base58'${t.transfers(i).address.cast[Address].map(_.bytes.base58).getOrElse("")}'

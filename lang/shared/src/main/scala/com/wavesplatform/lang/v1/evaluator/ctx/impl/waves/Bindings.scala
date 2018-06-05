@@ -152,11 +152,11 @@ object Bindings {
           Map("assetId"              -> Val(BYTEVECTOR)(assetId),
               "minSponsoredAssetFee" -> Val(optionLong)(minSponsoredAssetFee.asInstanceOf[optionLong.Underlying])) ++ provenTxPart(p)
         )
-      case Data(p, dataItems) =>
+      case Data(p, data) =>
         CaseObj(
           dataTransactionType.typeRef,
           Map(
-            "dataEntries" -> Val(listOfDataEntriesType)(dataItems
+            "data" -> Val(listOfDataEntriesType)(data
               .map {
                 case Lng(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> Val(STRING)(k), "value" -> Val(LONG)(v)))
                 case Str(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> Val(STRING)(k), "value" -> Val(STRING)(v)))
