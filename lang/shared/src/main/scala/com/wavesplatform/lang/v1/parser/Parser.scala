@@ -112,7 +112,7 @@ object Parser {
   private val refP: P[REF] = P(varName).map { x =>
     REF(x.start, x.end, x)
   }
-  private val ifP: P[IF] = P(Index ~~ "if" ~ bracesP ~ "then" ~ fallBackExpr ~ "else" ~ fallBackExpr ~~ Index).map {
+  private val ifP: P[IF] = P(Index ~~ "if" ~ fallBackExpr ~ "then" ~ fallBackExpr ~ "else" ~ fallBackExpr ~~ Index).map {
     case (start, x, y, z, end) => IF(start, end, x, y, z)
   }
 
