@@ -63,7 +63,7 @@ object StateSyntheticBenchmark {
             amount,
             ts,
             None,
-            300000,
+            1000000,
             Array.emptyByteArray
           )
           .explicitGet()
@@ -72,7 +72,7 @@ object StateSyntheticBenchmark {
     override def init(): Unit = {
       super.init()
 
-      val textScript    = "sigVerify(tx.bodyBytes,tx.proof0,tx.senderPk)"
+      val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)"
       val untypedScript = Parser(textScript).get.value
       assert(untypedScript.size == 1)
       val typedScript = CompilerV1(dummyTypeCheckerContext, untypedScript.head).explicitGet()
@@ -84,7 +84,7 @@ object StateSyntheticBenchmark {
               SetScriptTransaction.supportedVersions.head,
               richAccount,
               Some(ScriptV1(typedScript).explicitGet()),
-              100000,
+              1000000,
               System.currentTimeMillis()
             )
             .explicitGet()

@@ -2,7 +2,6 @@ package com.wavesplatform.lang
 
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -20,8 +19,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val sampleScript =
       """match p {
         |  case pa: PointA => 0
-        |  case pb: PointB => 1
-        |  case pc: PointC => 2
+        |  case pa: PointB => 1
+        |  case pa: PointC => 2
         |}""".stripMargin
     eval[Long](sampleScript, withUnion(pointAInstance)) shouldBe Right(0)
     eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
@@ -31,7 +30,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val sampleScript =
       """match p {
         |  case pa: PointA => 0
-        |  case pb: PointBC => 1
+        |  case pa: PointBC => 1
         |}""".stripMargin
     eval[Long](sampleScript, withUnion(pointAInstance), { c =>
       Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
@@ -66,7 +65,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |}""".stripMargin
     eval[Long](sampleScript, withUnion(pointCInstance), { c =>
       Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
-    }) should produce("Typecheck failed: Undefined field `X`")
+    }) should produce("Compilation failed: Undefined field `X`")
   }
 
   property("patternMatching _") {
@@ -96,13 +95,17 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
   }
 
-  private def eval[T: TypeInfo](code: String, ctx: EvaluationContext = PureContext.instance, genTypes: CompilerContext => Map[String, PredefBase] = {
-    _ =>
-      Map.empty
+  private def eval[T](code: String, ctx: EvaluationContext = PureContext.instance, genTypes: CompilerContext => Map[String, PredefBase] = { _ =>
+    Map.empty
   }) = {
     val untyped = Parser(code).get.value
     require(untyped.size == 1)
-    val cctx  = CompilerContext.fromEvaluationContext(ctx, sampleTypes)
+    val cctx = CompilerContext.fromEvaluationContext(
+      ctx,
+      sampleTypes.map(v => v.name -> v).toMap,
+      Map(PureContext.errRef -> PureContext.predefVars(PureContext.errRef), // need for match fails handling
+          "p"                -> AorBorC)
+    )
     val types = genTypes(cctx)
     val typed = CompilerV1(cctx.copy(predefTypes = types ++ cctx.predefTypes), untyped.head)
     typed.flatMap(EvaluatorV1[T](ctx, _)._2)

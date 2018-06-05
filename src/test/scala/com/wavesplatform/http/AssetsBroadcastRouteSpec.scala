@@ -30,7 +30,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
   (utx.putIfNew _).when(*).onCall((t: Transaction) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
 
-  "returns StateCheckFiled" - {
+  "returns StateCheckFailed" - {
 
     val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
 

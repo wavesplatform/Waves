@@ -2,7 +2,6 @@ package com.wavesplatform.lang.v1
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.ScriptEvaluatorBenchmark.St
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext

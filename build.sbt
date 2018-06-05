@@ -201,6 +201,7 @@ lazy val lang =
       addCompilerPlugin(Dependencies.kindProjector),
       libraryDependencies ++=
         Dependencies.cats ++
+          Dependencies.fp ++
           Dependencies.scalacheck ++
           Dependencies.scorex ++
           Dependencies.scalatest ++

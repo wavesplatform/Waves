@@ -4,6 +4,7 @@ import cats.data.EitherT
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.traits._
 import monix.eval.Coeval
 import scodec.bits.ByteVector
@@ -46,7 +47,7 @@ object WavesContext {
         case (c @ CaseObj(addressType.typeRef, _)) :: Nil => Right(c)
         case c @ CaseObj(aliasType.typeRef, fields) :: Nil =>
           environmentFunctions
-            .addressFromAlias(fields("name").value.asInstanceOf[String])
+            .addressFromAlias(fields("alias").value.asInstanceOf[String])
             .map(resolved => CaseObj(addressType.typeRef, Map("bytes" -> Val(BYTEVECTOR)(resolved.bytes))))
         case _ => ???
       }
@@ -89,7 +90,7 @@ object WavesContext {
       }
 
     EvaluationContext.build(
-      letDefs = Map(("height", LazyVal(LONG)(EitherT(heightCoeval))), ("tx", LazyVal(outgoingTransactionType)(EitherT(txCoeval)))),
+      letDefs = Map(("height", LazyVal(EitherT(heightCoeval))), ("tx", LazyVal(EitherT(txCoeval)))),
       functions = Seq(
         txByIdF,
         txHeightByIdF,
@@ -105,4 +106,5 @@ object WavesContext {
       )
     )
   }
+  var predefVars = PureContext.predefVars ++ Map(("height", LONG), ("tx", outgoingTransactionType))
 }

@@ -124,7 +124,7 @@ object Bindings {
         )
       case CreateAlias(p, alias) =>
         CaseObj(
-          leaseCancelTransactionType.typeRef,
+          createAliasTransactionType.typeRef,
           Map(
             "alias" -> Val(STRING)(alias),
           ) ++ provenTxPart(p)
