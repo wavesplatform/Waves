@@ -9,8 +9,7 @@ class BigSum {
   private val bigSum = (1 to 100).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
     FUNCTION_CALL(
       function = FunctionHeader(name = "l+l"),
-      args = List(r, CONST_LONG(i)),
-      LONG
+      args = List(r, CONST_LONG(i))
     )
   }
 
