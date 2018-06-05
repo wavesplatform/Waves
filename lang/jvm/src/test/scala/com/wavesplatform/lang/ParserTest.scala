@@ -585,12 +585,12 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     val script =
       """let C = 1
         |foo
-        |#@2
+        |@~2
         |true""".stripMargin
 
     parseAll(script) shouldBe Seq(
       BLOCK(0, 13, LET(0, 9, PART.VALID(4, 5, "C"), CONST_LONG(8, 9, 1), Seq.empty), REF(10, 13, PART.VALID(10, 13, "foo"))),
-      INVALID(14, 16, "#@", Some(CONST_LONG(16, 17, 2))),
+      INVALID(14, 16, "@~", Some(CONST_LONG(16, 17, 2))),
       TRUE(18, 22)
     )
   }
@@ -598,25 +598,25 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   property("should parse INVALID expressions in the middle") {
     val script =
       """let C = 1
-        |# /
+        |@ /
         |true""".stripMargin
     parseOne(script) shouldBe BLOCK(
       0,
       18,
       LET(0, 9, PART.VALID(4, 5, "C"), CONST_LONG(8, 9, 1), Seq.empty),
-      INVALID(10, 14, "# /\n", Some(TRUE(14, 18)))
+      INVALID(10, 13, "@ /", Some(TRUE(14, 18)))
     )
   }
 
   property("should parse INVALID expressions at start") {
     val script =
-      """# /
+      """@ /
         |let C = 1
         |true""".stripMargin
     parseOne(script) shouldBe INVALID(
       0,
-      4,
-      "# /\n",
+      3,
+      "@ /",
       Some(
         BLOCK(
           4,
@@ -632,10 +632,10 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     val script =
       """let C = 1
         |true
-        |# /""".stripMargin
+        |~ /""".stripMargin
     parseAll(script) shouldBe Seq(
       BLOCK(0, 14, LET(0, 9, PART.VALID(4, 5, "C"), CONST_LONG(8, 9, 1), Seq.empty), TRUE(10, 14)),
-      INVALID(15, 18, "# /")
+      INVALID(15, 18, "~ /")
     )
   }
 
@@ -936,5 +936,32 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         |# foo""".stripMargin
 
     parseOne(code) shouldBe TRUE(0, 4)
+  }
+
+  property("comments - block - between LET and BODY (full line)") {
+    val code =
+      """let x = true
+        |# foo
+        |x""".stripMargin
+
+    parseOne(code) shouldBe BLOCK(
+      0,
+      20,
+      LET(0, 18, PART.VALID(4, 5, "x"), TRUE(8, 12), List.empty),
+      REF(19, 20, PART.VALID(19, 20, "x"))
+    )
+  }
+
+  property("comments - block - between LET and BODY (at end of a line)") {
+    val code =
+      """let x = true # foo
+        |x""".stripMargin
+
+    parseOne(code) shouldBe BLOCK(
+      0,
+      20,
+      LET(0, 18, PART.VALID(4, 5, "x"), TRUE(8, 12), List.empty),
+      REF(19, 20, PART.VALID(19, 20, "x"))
+    )
   }
 }
