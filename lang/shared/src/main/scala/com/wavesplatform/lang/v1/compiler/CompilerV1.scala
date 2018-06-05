@@ -105,7 +105,7 @@ object CompilerV1 {
             .toCompileM
         })
       refTmpKey = "$match" + ctx.tmpArgsIdx
-      _ <- modify[CompilerContext, CompilationError](c => c.copy(tmpArgsIdx = c.tmpArgsIdx + 1))
+      _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1))
       allowShadowVarName = typedExpr match {
         case REF(k, _) => Some(k)
         case _         => None

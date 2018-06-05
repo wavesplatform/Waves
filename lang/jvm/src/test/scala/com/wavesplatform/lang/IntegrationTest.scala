@@ -95,6 +95,17 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
   }
 
+  property("patternMatching block") {
+    val sampleScript =
+      """|
+         |match (let x = 1; p) {
+         |  case _  => 1
+         |}
+         |
+      """.stripMargin
+    eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
+  }
+
   private def eval[T](code: String, ctx: EvaluationContext = PureContext.instance, genTypes: CompilerContext => Map[String, PredefBase] = { _ =>
     Map.empty
   }) = {
