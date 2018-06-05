@@ -60,7 +60,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
         }
         """.stripMargin).get.value
       assert(untyped.size == 1)
-      CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()
+      CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()._1
     }
 
     // set script
