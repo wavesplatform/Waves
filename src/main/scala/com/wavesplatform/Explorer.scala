@@ -11,7 +11,7 @@ import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.ByteStr
 import org.slf4j.bridge.SLF4JBridgeHandler
 import scorex.account.{Address, AddressScheme}
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.utils.{Base58, Base64}
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
@@ -97,7 +97,7 @@ object Explorer extends ScorexLogging {
             maybeBlockHeight.foreach { h =>
               val kBlock     = Keys.blockBytes(h)
               val blockBytes = db.get(kBlock.keyBytes)
-              log.info(s"BlockId=${maybeBlockId.get} at h=$h: ${Base58.encode(blockBytes)}")
+              log.info(s"BlockId=${maybeBlockId.get} at h=$h: ${Base64.encode(blockBytes)}")
             }
           } else log.error("No block ID was provided")
 
