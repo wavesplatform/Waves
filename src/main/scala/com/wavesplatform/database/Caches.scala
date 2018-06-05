@@ -186,9 +186,9 @@ trait Caches extends Blockchain {
                 ai.isReissuable,
                 ai.volume,
                 it.script,
-                diff.sponsorship.filter(_._1 == id).headOption match {
-                  case Some((_, SponsorshipValue(v))) => v
-                  case _                              => 0L
+                diff.sponsorship.get(id) match {
+                  case Some(SponsorshipValue(v)) => v
+                  case _                         => 0L
                 }
               )
             )
