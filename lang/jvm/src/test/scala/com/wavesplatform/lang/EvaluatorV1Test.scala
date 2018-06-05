@@ -423,4 +423,22 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
     )
   }
+
+  property("math functions") {
+    val sum   = FUNCTION_CALL(sumLong.header, List(CONST_LONG(5), CONST_LONG(5)), LONG)
+    val mul   = FUNCTION_CALL(mulLong.header, List(CONST_LONG(5), CONST_LONG(5)), LONG)
+    val div   = FUNCTION_CALL(divLong.header, List(CONST_LONG(10), CONST_LONG(3)), LONG)
+    val mod   = FUNCTION_CALL(modLong.header, List(CONST_LONG(10), CONST_LONG(3)), LONG)
+    val frac  = FUNCTION_CALL(fraction.header, List(CONST_LONG(Long.MaxValue), CONST_LONG(2), CONST_LONG(4)), LONG)
+    val frac2 = FUNCTION_CALL(fraction.header, List(CONST_LONG(Long.MaxValue), CONST_LONG(3), CONST_LONG(2)), LONG)
+    val frac3 = FUNCTION_CALL(fraction.header, List(CONST_LONG(-Long.MaxValue), CONST_LONG(3), CONST_LONG(2)), LONG)
+
+    ev[Long](expr = sum)._2 shouldBe Right(10)
+    ev[Long](expr = mul)._2 shouldBe Right(25)
+    ev[Long](expr = div)._2 shouldBe Right(3)
+    ev[Long](expr = mod)._2 shouldBe Right(1)
+    ev[Long](expr = frac)._2 shouldBe Right(Long.MaxValue / 2)
+    ev[Long](expr = frac2)._2 shouldBe Left(s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1")
+    ev[Long](expr = frac3)._2 shouldBe Left(s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1")
+  }
 }

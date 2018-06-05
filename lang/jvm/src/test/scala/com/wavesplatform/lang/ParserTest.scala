@@ -277,7 +277,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parseOne(script) shouldBe BLOCK(
       0,
       15,
-      LET(0, 10, PART.INVALID(4, 6, "keywords are restricted"), CONST_LONG(9, 10, 1), Seq.empty),
+      LET(0, 10, PART.INVALID(4, 6, "keywords are restricted: if"), CONST_LONG(9, 10, 1), Seq.empty),
       TRUE(11, 15)
     )
   }
@@ -289,7 +289,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parseOne(script) shouldBe BLOCK(
       0,
       16,
-      LET(0, 11, PART.INVALID(4, 7, "keywords are restricted"), CONST_LONG(10, 11, 1), Seq.empty),
+      LET(0, 11, PART.INVALID(4, 7, "keywords are restricted: let"), CONST_LONG(10, 11, 1), Seq.empty),
       TRUE(12, 16)
     )
   }
@@ -302,7 +302,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       parseOne(script) shouldBe BLOCK(
         0,
         17,
-        LET(0, 12, PART.INVALID(4, 8, "keywords are restricted"), CONST_LONG(11, 12, 1), Seq.empty),
+        LET(0, 12, PART.INVALID(4, 8, s"keywords are restricted: $keyword"), CONST_LONG(11, 12, 1), Seq.empty),
         TRUE(13, 17)
       )
     }
@@ -315,7 +315,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parseOne(script) shouldBe BLOCK(
       0,
       18,
-      LET(0, 13, PART.INVALID(4, 9, "keywords are restricted"), CONST_LONG(12, 13, 1), Seq.empty),
+      LET(0, 13, PART.INVALID(4, 9, "keywords are restricted: false"), CONST_LONG(12, 13, 1), Seq.empty),
       TRUE(14, 18)
     )
   }
@@ -325,7 +325,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parseOne(script) shouldBe BINARY_OP(
       0,
       6,
-      REF(0, 2, PART.INVALID(0, 2, "keywords are restricted")),
+      REF(0, 2, PART.INVALID(0, 2, "keywords are restricted: if")),
       BinaryOperation.SUM_OP,
       CONST_LONG(5, 6, 1)
     )
@@ -336,7 +336,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parseOne(script) shouldBe BINARY_OP(
       0,
       7,
-      REF(0, 3, PART.INVALID(0, 3, "keywords are restricted")),
+      REF(0, 3, PART.INVALID(0, 3, "keywords are restricted: let")),
       BinaryOperation.SUM_OP,
       CONST_LONG(6, 7, 1)
     )
@@ -348,7 +348,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       parseOne(script) shouldBe BINARY_OP(
         0,
         8,
-        REF(0, 4, PART.INVALID(0, 4, "keywords are restricted")),
+        REF(0, 4, PART.INVALID(0, 4, s"keywords are restricted: $keyword")),
         BinaryOperation.SUM_OP,
         CONST_LONG(7, 8, 1)
       )
@@ -838,4 +838,45 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       )
     )
   }
+
+  property("if expressions") {
+    parseOne("if (10 < 15) then true else false") shouldBe IF(
+      0,
+      33,
+      BINARY_OP(4, 11, CONST_LONG(9, 11, 15), LT_OP, CONST_LONG(4, 6, 10)),
+      TRUE(18, 22),
+      FALSE(28, 33)
+    )
+    parseOne("if 10 < 15 then true else false") shouldBe IF(
+      0,
+      31,
+      BINARY_OP(3, 10, CONST_LONG(8, 10, 15), LT_OP, CONST_LONG(3, 5, 10)),
+      TRUE(16, 20),
+      FALSE(26, 31)
+    )
+    parseOne(s"""if (10 < 15)
+                |then true
+                |else false""".stripMargin) shouldBe IF(
+      0,
+      33,
+      BINARY_OP(4, 11, CONST_LONG(9, 11, 15), LT_OP, CONST_LONG(4, 6, 10)),
+      TRUE(18, 22),
+      FALSE(28, 33)
+    )
+
+    parseOne(s"""if 10 < 15
+                |then true
+                |else false""".stripMargin) shouldBe IF(
+      0,
+      31,
+      BINARY_OP(3, 10, CONST_LONG(8, 10, 15), LT_OP, CONST_LONG(3, 5, 10)),
+      TRUE(16, 20),
+      FALSE(26, 31)
+    )
+  }
+
+  property("underscore in numbers") {
+    parseOne("100_000_000") shouldBe CONST_LONG(0, 11, 100000000)
+  }
+
 }

@@ -71,7 +71,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
                   }
               }
 
-              val initalHeight = blockchainUpdater.height
+              val initialHeight = blockchainUpdater.height
 
               val droppedBlocksEi = for {
                 commonBlockHeight <- blockchainUpdater.heightOf(lastCommonBlockId).toRight(GenericError("Fork contains no common parent"))
@@ -90,12 +90,12 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
                       Left(e)
 
                     case Right(_) =>
-                      val depth = initalHeight - commonBlockHeight
+                      val depth = initialHeight - commonBlockHeight
                       if (depth > 0) {
                         Metrics.write(
                           Point
                             .measurement("rollback")
-                            .addField("depth", initalHeight - commonBlockHeight)
+                            .addField("depth", initialHeight - commonBlockHeight)
                             .addField("txs", droppedBlocks.size)
                         )
                       }

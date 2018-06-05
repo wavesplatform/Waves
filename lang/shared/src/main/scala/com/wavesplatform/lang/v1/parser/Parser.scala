@@ -85,7 +85,7 @@ object Parser {
 
   private val varName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index).map {
     case (start, x, end) =>
-      if (keywords.contains(x)) PART.INVALID(start, end, "keywords are restricted")
+      if (keywords.contains(x)) PART.INVALID(start, end, s"keywords are restricted: $x")
       else PART.VALID(start, end, x)
   }
 
@@ -98,9 +98,10 @@ object Parser {
     case x                                              => INVALID(start, end, xs, x)
   }
 
-  private val numberP: P[CONST_LONG] = P(Index ~~ (CharIn("+-").? ~~ digit.repX(min = 1)).! ~~ Index).map {
-    case (start, x, end) => CONST_LONG(start, end, x.toLong)
-  }
+  private val numberP: P[CONST_LONG] =
+    P(Index ~~ (CharIn("+-").? ~~ digit.repX(min = 1)).! ~~ ("_" ~~ digit.repX(min = 1).!).repX(min = 0) ~~ Index)
+      .map({ case (start, x1, x2, end) => CONST_LONG(start, end, x2.foldLeft(x1)(_ ++ _).toLong) })
+
   private val trueP: P[TRUE]        = P(Index ~~ "true".! ~~ Index).map { case (start, _, end) => TRUE(start, end) }
   private val falseP: P[FALSE]      = P(Index ~~ "false".! ~~ Index).map { case (start, _, end) => FALSE(start, end) }
   private val bracesP: P[EXPR]      = P("(" ~ fallBackExpr ~ ")")
@@ -111,7 +112,7 @@ object Parser {
   private val refP: P[REF] = P(varName).map { x =>
     REF(x.start, x.end, x)
   }
-  private val ifP: P[IF] = P(Index ~~ "if" ~ bracesP ~ "then" ~ fallBackExpr ~ "else" ~ fallBackExpr ~~ Index).map {
+  private val ifP: P[IF] = P(Index ~~ "if" ~ fallBackExpr ~ "then" ~ fallBackExpr ~ "else" ~ fallBackExpr ~~ Index).map {
     case (start, x, y, z, end) => IF(start, end, x, y, z)
   }
 
@@ -198,7 +199,7 @@ object Parser {
           val innerEnd   = end - 1
           decoded match {
             case Left(err) => CONST_BYTEVECTOR(start, end, PART.INVALID(innerStart, innerEnd, err))
-            case Right(r) => CONST_BYTEVECTOR(start, end, PART.VALID(innerStart, innerEnd, ByteVector(r)))
+            case Right(r)  => CONST_BYTEVECTOR(start, end, PART.VALID(innerStart, innerEnd, ByteVector(r)))
           }
       }
 
