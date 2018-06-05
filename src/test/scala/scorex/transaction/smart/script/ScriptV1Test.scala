@@ -1,7 +1,6 @@
 package scorex.transaction.smart.script
 
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.FunctionHeader.{FunctionHeaderType => FHT}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Terms.{BOOLEAN, LONG}
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
@@ -32,7 +31,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
     val expr = (1 to 21)
       .map { _ =>
         FUNCTION_CALL(
-          function = FunctionHeader(name = "sigVerify", List(FHT.BYTEVECTOR, FHT.BYTEVECTOR, FHT.BYTEVECTOR)),
+          function = FunctionHeader(name = "sigVerify"),
           args = List(byteVector, byteVector, byteVector),
           BOOLEAN
         )
@@ -45,14 +44,14 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
   property("ScriptV1.apply should deny too big scripts") {
     val bigSum = (1 to 100).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
       FUNCTION_CALL(
-        function = FunctionHeader(name = "==", List(FHT.LONG, FHT.LONG)),
+        function = FunctionHeader(name = "l=l"),
         args = List(r, CONST_LONG(i)),
         LONG
       )
     }
     val expr = (1 to 9).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
       FUNCTION_CALL(
-        function = FunctionHeader(name = "==", List(FHT.LONG, FHT.LONG)),
+        function = FunctionHeader(name = "l=l"),
         args = List(r, bigSum),
         BOOLEAN
       )
@@ -66,7 +65,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
     val expr = (1 to 19)
       .map { _ =>
         FUNCTION_CALL(
-          function = FunctionHeader(name = "sigVerify", List(FHT.BYTEVECTOR, FHT.BYTEVECTOR, FHT.BYTEVECTOR)),
+          function = FunctionHeader(name = "sigVerify"),
           args = List(byteVector, byteVector, byteVector),
           BOOLEAN
         )

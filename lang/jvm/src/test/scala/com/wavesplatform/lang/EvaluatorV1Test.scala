@@ -4,7 +4,6 @@ import cats.kernel.Monoid
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.FunctionHeader.FunctionHeaderType
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
@@ -329,7 +328,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[Boolean](
       context = context,
       expr = FUNCTION_CALL(
-        function = FunctionHeader("sigVerify", List(FunctionHeaderType.BYTEVECTOR, FunctionHeaderType.BYTEVECTOR, FunctionHeaderType.BYTEVECTOR)),
+        function = FunctionHeader("sigVerify"),
         args = List(
           GETTER(REF("tx", txType.typeRef), "bodyBytes", BYTEVECTOR),
           GETTER(REF("tx", txType.typeRef), "proof0", BYTEVECTOR),
@@ -418,7 +417,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[ByteVector](
       context = context,
       expr = FUNCTION_CALL(
-        function = FunctionHeader(funcName, List(FunctionHeaderType.BYTEVECTOR)),
+        function = FunctionHeader(funcName),
         args = List(CONST_BYTEVECTOR(ByteVector(bodyBytes))),
         BYTEVECTOR
       )

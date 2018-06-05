@@ -106,7 +106,7 @@ object PureContext {
   val neBool        = createOp(NE_OP, BOOLEAN, BOOLEAN, "b!=b")(_ != _)
   val neString      = createOp(NE_OP, STRING, BOOLEAN, "s!=s")(_ != _)
   val ge            = createOp(GE_OP, LONG, BOOLEAN, "b>=b")(_ >= _)
-  val gt            = createOp(GT_OP, LONG, BOOLEAN, "b>b")(_ > _)
+  val gt            = createOp(GT_OP, LONG, BOOLEAN, "l>l")(_ > _)
   val sge           = createOp(GE_OP, STRING, BOOLEAN, "s>=s")(_ >= _)
   val sgt           = createOp(GT_OP, STRING, BOOLEAN, "s>s")(_ > _)
 

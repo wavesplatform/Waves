@@ -32,7 +32,7 @@ object PredefFunction {
       EitherT.fromEither[Coeval](ev(args))
     }
     override val signature              = FunctionTypeSignature(args.map(_._2), resultType, internalName)
-    override val header: FunctionHeader = FunctionHeader(internalName, args.map(_._2).map(FunctionHeader.FunctionHeaderType.fromTypePlaceholder))
+    override val header: FunctionHeader = FunctionHeader(internalName)
   }
 
 //  abstract class PredefFunctionImplT(val name: String,
@@ -41,7 +41,7 @@ object PredefFunction {
 //                                 val args: List[(String, TYPEPLACEHOLDER)])
 //      extends PredefFunction {
 //    override val signature              = FunctionTypeSignature(args.map(_._2), resultType)
-//    override val header: FunctionHeader = FunctionHeader(name, args.map(_._2).map(FunctionHeader.FunctionHeaderType.fromTypePlaceholder))
+//    override val header: FunctionHeader = FunctionHeader(name)
 //  }
 
   def apply(name: String, cost: Long, resultType: TYPEPLACEHOLDER, args: List[(String, TYPEPLACEHOLDER)], internalName: String)(
