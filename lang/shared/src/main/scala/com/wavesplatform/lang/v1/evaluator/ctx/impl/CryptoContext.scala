@@ -29,6 +29,11 @@ object CryptoContext {
       case (bytes: ByteVector) :: Nil => global.base58Encode(bytes.toArray)
       case _ => ???
     }
-    EvaluationContext.build(Map.empty, Seq(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF))
+
+    def toBase64StringF: PredefFunction = PredefFunction("toBase64String", 10, STRING, List(("bytes", BYTEVECTOR))) {
+      case (bytes: ByteVector) :: Nil => global.base64Encode(bytes.toArray)
+      case _ => ???
+    }
+    EvaluationContext.build(Map.empty, Seq(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF, toBase64StringF))
   }
 }

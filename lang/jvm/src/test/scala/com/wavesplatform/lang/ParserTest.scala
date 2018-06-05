@@ -161,12 +161,26 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parseOne("base58' bQbp'") shouldBe CONST_BYTEVECTOR(0, 13, PART.INVALID(8, 12, "can't parse Base58 string"))
   }
 
-  property("long base58 definition") {
-    import Global.MaxBase58Chars
-    val longBase58 = "A" * (MaxBase58Chars + 1)
-    val to         = 8 + MaxBase58Chars
-    parseOne(s"base58'$longBase58'") shouldBe
-      CONST_BYTEVECTOR(0, to + 1, PART.INVALID(8, to, s"base58Decode input exceeds $MaxBase58Chars"))
+  property("valid non-empty base64 definition") {
+    parseOne("base64'TElLRQ=='") shouldBe CONST_BYTEVECTOR(0, 16, PART.VALID(8, 15, ByteVector("LIKE".getBytes)))
+  }
+
+  property("valid empty base64 definition") {
+    parseOne("base64''") shouldBe CONST_BYTEVECTOR(0, 8, PART.VALID(8, 7, ByteVector.empty))
+  }
+
+  property("invalid base64 definition") {
+    parseOne("base64'mid-size'") shouldBe CONST_BYTEVECTOR(0, 16, PART.INVALID(8, 15, "can't parse Base64 string"))
+  }
+
+  property("literal too long") {
+    import Global.MaxLiteralLength
+    val longLiteral = "A" * (MaxLiteralLength + 1)
+    val to          = 8 + MaxLiteralLength
+    parseOne(s"base58'$longLiteral'") shouldBe
+      CONST_BYTEVECTOR(0, to + 1, PART.INVALID(8, to, s"base58Decode input exceeds $MaxLiteralLength"))
+    parseOne(s"base64'base64:$longLiteral'") shouldBe
+      CONST_BYTEVECTOR(0, to + 8, PART.INVALID(8, to + 7, s"base58Decode input exceeds $MaxLiteralLength"))
   }
 
   property("string is consumed fully") {

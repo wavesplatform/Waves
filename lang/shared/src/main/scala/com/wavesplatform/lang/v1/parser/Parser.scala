@@ -19,7 +19,7 @@ object Parser {
   import White._
   import fastparse.noApi._
 
-  val keywords               = Set("let", "base58", "true", "false", "if", "then", "else", "match", "case")
+  val keywords               = Set("let", "base58", "base64", "true", "false", "if", "then", "else", "match", "case")
   private val lowerChar      = CharIn('a' to 'z')
   private val upperChar      = CharIn('A' to 'Z')
   private val char           = lowerChar | upperChar
@@ -190,12 +190,15 @@ object Parser {
       }
 
   private val byteVectorP: P[EXPR] =
-    P(Index ~~ "base58'" ~/ Pass ~~ CharPred(_ != '\'').repX.! ~~ "'" ~~ Index)
+    P(Index ~~ "base" ~~ ("58" | "64").! ~~ "'" ~/ Pass ~~ CharPred(_ != '\'').repX.! ~~ "'" ~~ Index)
       .map {
-        case (start, xs, end) =>
-          val decoded    = if (xs.isEmpty) Right(Array.emptyByteArray) else Global.base58Decode(xs)
+        case (start, base, xs, end) =>
           val innerStart = start + 8
           val innerEnd   = end - 1
+          val decoded = base match {
+            case "58" => Global.base58Decode(xs)
+            case "64" => Global.base64Decode(xs)
+          }
           decoded match {
             case Left(err) => CONST_BYTEVECTOR(start, end, PART.INVALID(innerStart, innerEnd, err))
             case Right(r) => CONST_BYTEVECTOR(start, end, PART.VALID(innerStart, innerEnd, ByteVector(r)))
