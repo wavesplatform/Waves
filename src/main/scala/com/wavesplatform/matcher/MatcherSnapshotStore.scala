@@ -27,7 +27,7 @@ class MatcherSnapshotStore(config: Config) extends SnapshotStore {
 
   private val serializationExtension = SerializationExtension(context.system)
 
-  private val writableDB = openDB(config.getString("leveldb-dir"), 100)
+  private val writableDB = openDB(config.getString("leveldb-dir"))
 
   private def readOnly[A](f: ReadOnlyDB => A): A = {
     val s = writableDB.getSnapshot
