@@ -240,7 +240,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
             assetInfo                                 <- blockchain.assetDescription(assetId)
             (_, (issueTransaction: IssueTransaction)) <- blockchain.transactionInfo(assetId)
             sponsorBalance = if (assetInfo.sponsorship != 0) {
-              Some(blockchain.portfolio(issueTransaction.sender).balance)
+              Some(blockchain.portfolio(issueTransaction.sender).effectiveBalance)
             } else {
               None
             }
