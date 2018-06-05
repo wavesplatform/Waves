@@ -922,4 +922,19 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parseOne("100_000_000") shouldBe CONST_LONG(0, 11, 100000000)
   }
 
+  property("comments - the whole line at start") {
+    val code =
+      """# foo
+        |true""".stripMargin
+
+    parseOne(code) shouldBe TRUE(6, 10)
+  }
+
+  property("comments - the whole line at end") {
+    val code =
+      """true
+        |# foo""".stripMargin
+
+    parseOne(code) shouldBe TRUE(0, 4)
+  }
 }
