@@ -150,7 +150,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("let is evaluated maximum once") {
     var functionEvaluated = 0
 
-    val f = PredefFunction("F", 1, LONG, List(("_", LONG))) { _ =>
+    val f = PredefFunction("F", 1, LONG, List(("_", LONG)), "F") { _ =>
       functionEvaluated = functionEvaluated + 1
       Right(1L)
     }
@@ -187,7 +187,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on function call getter evaluation") {
     val fooType = PredefCaseType("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = PredefFunction("createFoo", 1, fooType.typeRef, List.empty) { _ =>
+    val fooCtor = PredefFunction("createFoo", 1, fooType.typeRef, List.empty, "createFoo") { _ =>
       Right(
         CaseObj(fooType.typeRef, Map("bar" -> Val(STRING)("bAr"), "buz" -> Val(LONG)(1L)))
       )
@@ -206,7 +206,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on block getter evaluation") {
     val fooType = PredefCaseType("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = PredefFunction("createFoo", 1, fooType.typeRef, List.empty) { _ =>
+    val fooCtor = PredefFunction("createFoo", 1, fooType.typeRef, List.empty, "createFoo") { _ =>
       Right(
         CaseObj(fooType.typeRef,
                 Map(
@@ -214,7 +214,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
                   "buz" -> Val(LONG)(1L)
                 )))
     }
-    val fooTransform = PredefFunction("transformFoo", 1, fooType.typeRef, List(("foo", fooType.typeRef))) {
+    val fooTransform = PredefFunction("transformFoo", 1, fooType.typeRef, List(("foo", fooType.typeRef)), "transformFoo") {
       case (fooObj: CaseObj) :: Nil => Right(fooObj.copy(fields = fooObj.fields.updated("bar", Val(STRING)("TRANSFORMED_BAR"))))
       case _                        => ???
     }
