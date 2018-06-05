@@ -3,7 +3,6 @@ package scorex.transaction.smart.script
 import cats.implicits._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Terms.{BOOLEAN, LONG}
 import com.wavesplatform.state.EitherExt2
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -39,13 +38,10 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
         CONST_LONG(20),
         FUNCTION_CALL(
           FunctionHeader("l+l"),
-          List(REF("x", LONG), REF("x", LONG)),
-          LONG
+          List(REF("x"), REF("x"))
         )
-      ),
-      BOOLEAN
-    ),
-    BOOLEAN
+      )
+    )
   )
 
   private val expectedScript = ScriptV1(expectedExpr).explicitGet()

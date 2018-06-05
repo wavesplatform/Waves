@@ -62,16 +62,16 @@ object EvaluatorV1 extends ExprEvaluator {
   private def pureAny[A](v: A): EvalM[Any] = v.pure[EvalM].map(_.asInstanceOf[Any])
 
   private def evalExpr(t: EXPR): EvalM[Any] = t match {
-    case BLOCK(let, inner, _)           => evalBlock(let, inner)
-    case REF(str, _)                    => evalRef(str)
+    case BLOCK(let, inner)           => evalBlock(let, inner)
+    case REF(str)                    => evalRef(str)
     case CONST_LONG(v)                  => pureAny(v)
     case CONST_BYTEVECTOR(v)            => pureAny(v)
     case CONST_STRING(v)                => pureAny(v)
     case TRUE                           => pureAny(true)
     case FALSE                          => pureAny(false)
-    case IF(cond, t1, t2, _)            => evalIF(cond, t1, t2)
-    case GETTER(expr, field, _)         => evalGetter(expr, field)
-    case FUNCTION_CALL(header, args, _) => evalFunctionCall(header, args)
+    case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
+    case GETTER(expr, field)         => evalGetter(expr, field)
+    case FUNCTION_CALL(header, args) => evalFunctionCall(header, args)
   }
 
   def apply[A](c: EvaluationContext, expr: EXPR): (EvaluationContext, Either[ExecutionError, A]) = {

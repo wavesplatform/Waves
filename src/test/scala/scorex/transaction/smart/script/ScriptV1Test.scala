@@ -2,7 +2,6 @@ package scorex.transaction.smart.script
 
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Terms.{BOOLEAN, LONG}
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.state.diffs.produce
 import org.scalacheck.Gen
@@ -32,11 +31,10 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
       .map { _ =>
         FUNCTION_CALL(
           function = FunctionHeader(name = "sigVerify"),
-          args = List(byteVector, byteVector, byteVector),
-          BOOLEAN
+          args = List(byteVector, byteVector, byteVector)
         )
       }
-      .reduceLeft[EXPR](IF(_, _, FALSE, BOOLEAN))
+      .reduceLeft[EXPR](IF(_, _, FALSE))
 
     ScriptV1(expr) should produce("Script is too complex")
   }
@@ -45,15 +43,13 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
     val bigSum = (1 to 100).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
       FUNCTION_CALL(
         function = FunctionHeader(name = "l=l"),
-        args = List(r, CONST_LONG(i)),
-        LONG
+        args = List(r, CONST_LONG(i))
       )
     }
     val expr = (1 to 9).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
       FUNCTION_CALL(
         function = FunctionHeader(name = "l=l"),
-        args = List(r, bigSum),
-        BOOLEAN
+        args = List(r, bigSum)
       )
     }
 
@@ -66,11 +62,10 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
       .map { _ =>
         FUNCTION_CALL(
           function = FunctionHeader(name = "sigVerify"),
-          args = List(byteVector, byteVector, byteVector),
-          BOOLEAN
+          args = List(byteVector, byteVector, byteVector)
         )
       }
-      .reduceLeft[EXPR](IF(_, _, FALSE, BOOLEAN))
+      .reduceLeft[EXPR](IF(_, _, FALSE))
 
     ScriptV1(expr) shouldBe 'right
   }

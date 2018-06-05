@@ -21,7 +21,7 @@ object ScriptV1 {
 
   def apply(x: EXPR, checkSize: Boolean = true): Either[String, Script] =
     for {
-      _                <- Either.cond(x.tpe == BOOLEAN, (), "Script should return BOOLEAN")
+      //_                <- Either.cond(x.tpe == BOOLEAN, (), "Script should return BOOLEAN")
       scriptComplexity <- ScriptEstimator(functionCosts, x)
       _                <- Either.cond(scriptComplexity <= maxComplexity, (), s"Script is too complex: $scriptComplexity > $maxComplexity")
       s = new ScriptV1(x)
