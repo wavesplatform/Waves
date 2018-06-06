@@ -1219,4 +1219,38 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       PART.VALID(9, 10, "y")
     )
   }
+
+  property("comments - function call") {
+    val code =
+      """f(
+        | # foo
+        | 1 # bar
+        | # baz
+        | , 2
+        | # quux
+        |)""".stripMargin
+
+    parseOne(code) shouldBe FUNCTION_CALL(
+      0,
+      40,
+      PART.VALID(0, 1, "f"),
+      List(CONST_LONG(11, 12, 1), CONST_LONG(29, 30, 2))
+    )
+  }
+
+  property("comments - array") {
+    val code =
+      """xs[
+        | # foo
+        | 1
+        | # bar
+        |]""".stripMargin
+
+    parseOne(code) shouldBe FUNCTION_CALL(
+      0,
+      22,
+      PART.VALID(2, 22, "getElement"),
+      List(REF(0, 2, PART.VALID(0, 2, "xs")), CONST_LONG(12, 13, 1))
+    )
+  }
 }
