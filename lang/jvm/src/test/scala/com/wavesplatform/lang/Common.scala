@@ -47,9 +47,9 @@ object Common {
   val AorB    = UNION(List(CASETYPEREF(pointTypeA.typeRef.name), CASETYPEREF(pointTypeB.typeRef.name)))
   val AorBorC = UNION(List(CASETYPEREF(pointTypeA.typeRef.name), CASETYPEREF(pointTypeB.typeRef.name), CASETYPEREF(pointTypeC.typeRef.name)))
 
-  val pointAInstance = CaseObj(pointTypeA.typeRef, Map("X"  -> Val(LONG)(3), "YA" -> Val(LONG)(40)))
-  val pointBInstance = CaseObj(pointTypeB.typeRef, Map("X"  -> Val(LONG)(3), "YB" -> Val(LONG)(41)))
-  val pointCInstance = CaseObj(pointTypeC.typeRef, Map("YB" -> Val(LONG)(42)))
+  val pointAInstance = CaseObj(pointTypeA.typeRef, Map("X"  -> 3L, "YA" -> 40L))
+  val pointBInstance = CaseObj(pointTypeB.typeRef, Map("X"  -> 3L, "YB" -> 41L))
+  val pointCInstance = CaseObj(pointTypeC.typeRef, Map("YB" -> 42L))
 
   val sampleTypes = Seq(pointTypeA, pointTypeB, pointTypeC)
 
