@@ -20,7 +20,7 @@ class EnvironmentFunctions(environment: Environment) {
 
   def addressFromString(str: String): Either[String, Option[ByteVector]] = {
     val base58String = if (str.startsWith(Prefix)) str.drop(Prefix.length) else str
-    Global.base58Decode(base58String) match {
+    Global.base58Decode(base58String, Global.MaxAddressLength) match {
       case Left(e) => Left(e)
       case Right(addressBytes) =>
         val version = addressBytes.head
