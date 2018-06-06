@@ -129,25 +129,25 @@ object Parser {
   private val matchCaseP: P[MATCH_CASE] = {
     val restMatchCaseInvalidP: P[String] = P((!"=>" ~~ AnyChars(1).!).repX.map(_.mkString))
     val varDefP: P[Option[PART[String]]] = varName.map(Some(_)) | "_".!.map(_ => None)
-    val typesP: P[Seq[PART[String]]]     = varName.rep(min = 1, sep = "|")
+    val typesP: P[Seq[PART[String]]]     = varName.rep(min = 1, sep = comment.rep ~ "|" ~ comment.rep)
     val typesDefP = (
-      ":" ~
+      ":" ~ comment.rep ~
         (typesP | (Index ~~ restMatchCaseInvalidP ~~ Index).map {
-          case (start, x, end) => Seq(PART.INVALID(start, end, "the type for variable should be specified: `case varName: Type => expr`"))
+          case (start, _, end) => Seq(PART.INVALID(start, end, "the type for variable should be specified: `case varName: Type => expr`"))
         })
     ).?.map(_.getOrElse(List.empty))
 
     P(
-      Index ~~ "case" ~/ (
-        (varDefP ~ typesDefP) |
+      Index ~~ "case" ~ comment.rep ~/ (
+        (varDefP ~ comment.rep ~ typesDefP) |
           (Index ~~ restMatchCaseInvalidP ~~ Index).map {
-            case (start, x, end) =>
+            case (start, _, end) =>
               (
                 Some(PART.INVALID(start, end, "invalid syntax, should be: `case varName: Type => expr` or `case _ => expr`")),
                 Seq.empty[PART[String]]
               )
           }
-      ) ~ "=>" ~/ baseExpr.? ~~ Index
+      ) ~ comment.rep ~ "=>" ~/ baseExpr.? ~~ Index
     ).map {
       case (start, (v, types), e, end) =>
         val exprStart = types.lastOption.orElse(v).fold(start)(_.end)
@@ -161,11 +161,12 @@ object Parser {
     }
   }
 
-  private lazy val matchP: P[EXPR] = P(Index ~~ "match" ~/ fallBackExpr ~ "{" ~ NoCut(matchCaseP).rep ~ "}" ~~ Index)
-    .map {
-      case (start, _, Nil, end)   => INVALID(start, end, "pattern matching requires case branches")
-      case (start, e, cases, end) => MATCH(start, end, e, cases.toList)
-    }
+  private lazy val matchP: P[EXPR] =
+    P(Index ~~ "match" ~/ fallBackExpr ~ "{" ~ comment.rep ~ NoCut(matchCaseP).rep(sep = comment.rep) ~ comment.rep ~ "}" ~~ Index)
+      .map {
+        case (start, _, Nil, end)   => INVALID(start, end, "pattern matching requires case branches")
+        case (start, e, cases, end) => MATCH(start, end, e, cases.toList)
+      }
 
   private val accessP: P[(Int, Accessor, Int)] = P(
     ("" ~ Index ~ "." ~/ varName.map(Getter) ~~ Index) |
@@ -233,9 +234,9 @@ object Parser {
       }
   }
 
-  private val baseAtom = comment.rep() ~
+  private val baseAtom = comment.rep ~
     P(ifP | NoCut(matchP) | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP) ~
-    comment.rep()
+    comment.rep
 
   private lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority) | baseAtom)
 

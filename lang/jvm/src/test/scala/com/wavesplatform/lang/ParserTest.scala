@@ -964,4 +964,233 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       REF(19, 20, PART.VALID(19, 20, "x"))
     )
   }
+
+  property("comments - if - after condition") {
+    val code =
+      """if 10 < 15 # test
+        |then true else false""".stripMargin
+
+    parseOne(code) shouldBe IF(
+      0,
+      38,
+      BINARY_OP(3, 17, CONST_LONG(8, 10, 15), LT_OP, CONST_LONG(3, 5, 10)),
+      TRUE(23, 27),
+      FALSE(33, 38)
+    )
+  }
+
+  property("comments - pattern matching - after case") {
+    val code =
+      """match p {
+        |  case # test
+        |       p: PointA | PointB => true
+        |  case _ => false
+        |}""".stripMargin
+    parseOne(code) shouldBe MATCH(
+      0,
+      77,
+      REF(6, 7, PART.VALID(6, 7, "p")),
+      List(
+        MATCH_CASE(
+          12,
+          57,
+          Some(PART.VALID(31, 32, "p")),
+          List(PART.VALID(34, 40, "PointA"), PART.VALID(43, 49, "PointB")),
+          TRUE(53, 57)
+        ),
+        MATCH_CASE(
+          60,
+          75,
+          None,
+          List.empty,
+          FALSE(70, 75)
+        )
+      )
+    )
+  }
+
+  property("comments - pattern matching - after variable") {
+    val code =
+      """match p {
+        |  case p # test
+        |       : PointA
+        |       | PointB => true
+        |  case _ => false
+        |}""".stripMargin
+    parseOne(code) shouldBe MATCH(
+      0,
+      85,
+      REF(6, 7, PART.VALID(6, 7, "p")),
+      List(
+        MATCH_CASE(
+          12,
+          65,
+          Some(PART.VALID(17, 18, "p")),
+          List(PART.VALID(35, 41, "PointA"), PART.VALID(51, 57, "PointB")),
+          TRUE(61, 65)
+        ),
+        MATCH_CASE(
+          68,
+          83,
+          None,
+          List.empty,
+          FALSE(78, 83)
+        )
+      )
+    )
+  }
+
+  property("comments - pattern matching - before types") {
+    val code =
+      """match p {
+        |  case p: # test
+        |         PointA | PointB => true
+        |  case _ => false
+        |}""".stripMargin
+    parseOne(code) shouldBe MATCH(
+      0,
+      79,
+      REF(6, 7, PART.VALID(6, 7, "p")),
+      List(
+        MATCH_CASE(
+          12,
+          59,
+          Some(PART.VALID(17, 18, "p")),
+          List(PART.VALID(36, 42, "PointA"), PART.VALID(45, 51, "PointB")),
+          TRUE(55, 59)
+        ),
+        MATCH_CASE(
+          62,
+          77,
+          None,
+          List.empty,
+          FALSE(72, 77)
+        )
+      )
+    )
+  }
+
+  property("comments - pattern matching - before a value's block") {
+    val code =
+      """match p {
+        |  case p: PointA | PointB # test
+        |         => true
+        |  case _ => false
+        |}""".stripMargin
+    parseOne(code) shouldBe MATCH(
+      0,
+      79,
+      REF(6, 7, PART.VALID(6, 7, "p")),
+      List(
+        MATCH_CASE(
+          12,
+          59,
+          Some(PART.VALID(17, 18, "p")),
+          List(PART.VALID(20, 26, "PointA"), PART.VALID(29, 35, "PointB")),
+          TRUE(55, 59)
+        ),
+        MATCH_CASE(
+          62,
+          77,
+          None,
+          List.empty,
+          FALSE(72, 77)
+        )
+      )
+    )
+  }
+
+  property("comments - pattern matching - in a type definition - 1") {
+    val code =
+      """match p {
+        |  case p : PointA # foo
+        |         | PointB # bar
+        |         => true
+        |  case _ => false
+        |}""".stripMargin
+    parseOne(code) shouldBe MATCH(
+      0,
+      94,
+      REF(6, 7, PART.VALID(6, 7, "p")),
+      List(
+        MATCH_CASE(
+          12,
+          74,
+          Some(PART.VALID(17, 18, "p")),
+          List(PART.VALID(21, 27, "PointA"), PART.VALID(45, 51, "PointB")),
+          TRUE(70, 74)
+        ),
+        MATCH_CASE(
+          77,
+          92,
+          None,
+          List.empty,
+          FALSE(87, 92)
+        )
+      )
+    )
+  }
+
+  property("comments - pattern matching - in a type definition - 2") {
+    val code =
+      """match p {
+        |  case p: PointA | # foo
+        |          PointB   # bar
+        |         => true
+        |  case _ => false
+        |}""".stripMargin
+    parseOne(code) shouldBe MATCH(
+      0,
+      96,
+      REF(6, 7, PART.VALID(6, 7, "p")),
+      List(
+        MATCH_CASE(
+          12,
+          76,
+          Some(PART.VALID(17, 18, "p")),
+          List(PART.VALID(20, 26, "PointA"), PART.VALID(45, 51, "PointB")),
+          TRUE(72, 76)
+        ),
+        MATCH_CASE(
+          79,
+          94,
+          None,
+          List.empty,
+          FALSE(89, 94)
+        )
+      )
+    )
+  }
+
+  property("comments - pattern matching - between cases") {
+    val code =
+      """match p {
+        |  # foo
+        |  case p: PointA | PointB => true
+        |  # bar
+        |  case _ => false
+        |  # baz
+        |}""".stripMargin
+    parseOne(code) shouldBe MATCH(
+      0,
+      87,
+      REF(6, 7, PART.VALID(6, 7, "p")),
+      List(
+        MATCH_CASE(
+          20,
+          59,
+          Some(PART.VALID(25, 26, "p")),
+          List(PART.VALID(28, 34, "PointA"), PART.VALID(37, 43, "PointB")),
+          TRUE(47, 51)
+        ),
+        MATCH_CASE(
+          62,
+          85,
+          None,
+          List.empty,
+          FALSE(72, 77)
+        )
+      )
+    )
+  }
 }
