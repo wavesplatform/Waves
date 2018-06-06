@@ -27,6 +27,7 @@ object Parser {
   private val unicodeSymbolP = P("\\u" ~/ Pass ~~ (char | digit).repX(min = 0, max = 4))
   private val notEndOfString = CharPred(_ != '\"')
   private val specialSymbols = P("\\" ~~ notEndOfString.?)
+  private val comment        = P("#" ~~ CharPred(_ != '\n').repX).rep
 
   private val escapedUnicodeSymbolP: P[(Int, String, Int)] = P(Index ~~ (NoCut(unicodeSymbolP) | specialSymbols).! ~~ Index)
   private val stringP: P[EXPR] = P(Index ~~ "\"" ~/ Pass ~~ (escapedUnicodeSymbolP | notEndOfString).!.repX ~~ "\"" ~~ Index)
@@ -106,7 +107,7 @@ object Parser {
   private val falseP: P[FALSE]      = P(Index ~~ "false".! ~~ Index).map { case (start, _, end) => FALSE(start, end) }
   private val bracesP: P[EXPR]      = P("(" ~ fallBackExpr ~ ")")
   private val curlyBracesP: P[EXPR] = P("{" ~ fallBackExpr ~ "}")
-  private val letP: P[LET] = P(Index ~~ "let" ~ varName ~ "=" ~/ fallBackExpr ~~ Index).map {
+  private val letP: P[LET] = P(Index ~~ "let" ~ comment ~ varName ~ comment ~ "=" ~/ fallBackExpr ~~ Index).map {
     case (start, v, e, end) => LET(start, end, v, e, Seq.empty)
   }
   private val refP: P[REF] = P(varName).map { x =>
@@ -128,25 +129,25 @@ object Parser {
   private val matchCaseP: P[MATCH_CASE] = {
     val restMatchCaseInvalidP: P[String] = P((!"=>" ~~ AnyChars(1).!).repX.map(_.mkString))
     val varDefP: P[Option[PART[String]]] = varName.map(Some(_)) | "_".!.map(_ => None)
-    val typesP: P[Seq[PART[String]]]     = varName.rep(min = 1, sep = "|")
+    val typesP: P[Seq[PART[String]]]     = varName.rep(min = 1, sep = comment ~ "|" ~ comment)
     val typesDefP = (
-      ":" ~
+      ":" ~ comment ~
         (typesP | (Index ~~ restMatchCaseInvalidP ~~ Index).map {
-          case (start, x, end) => Seq(PART.INVALID(start, end, "the type for variable should be specified: `case varName: Type => expr`"))
+          case (start, _, end) => Seq(PART.INVALID(start, end, "the type for variable should be specified: `case varName: Type => expr`"))
         })
     ).?.map(_.getOrElse(List.empty))
 
     P(
-      Index ~~ "case" ~/ (
-        (varDefP ~ typesDefP) |
+      Index ~~ "case" ~ comment ~/ (
+        (varDefP ~ comment ~ typesDefP) |
           (Index ~~ restMatchCaseInvalidP ~~ Index).map {
-            case (start, x, end) =>
+            case (start, _, end) =>
               (
                 Some(PART.INVALID(start, end, "invalid syntax, should be: `case varName: Type => expr` or `case _ => expr`")),
                 Seq.empty[PART[String]]
               )
           }
-      ) ~ "=>" ~/ baseExpr.? ~~ Index
+      ) ~ comment ~ "=>" ~/ baseExpr.? ~~ Index
     ).map {
       case (start, (v, types), e, end) =>
         val exprStart = types.lastOption.orElse(v).fold(start)(_.end)
@@ -160,14 +161,15 @@ object Parser {
     }
   }
 
-  private lazy val matchP: P[EXPR] = P(Index ~~ "match" ~/ fallBackExpr ~ "{" ~ NoCut(matchCaseP).rep ~ "}" ~~ Index)
-    .map {
-      case (start, _, Nil, end)   => INVALID(start, end, "pattern matching requires case branches")
-      case (start, e, cases, end) => MATCH(start, end, e, cases.toList)
-    }
+  private lazy val matchP: P[EXPR] =
+    P(Index ~~ "match" ~/ fallBackExpr ~ "{" ~ comment ~ NoCut(matchCaseP).rep(sep = comment) ~ comment ~ "}" ~~ Index)
+      .map {
+        case (start, _, Nil, end)   => INVALID(start, end, "pattern matching requires case branches")
+        case (start, e, cases, end) => MATCH(start, end, e, cases.toList)
+      }
 
   private val accessP: P[(Int, Accessor, Int)] = P(
-    ("" ~ Index ~ "." ~/ varName.map(Getter) ~~ Index) |
+    ("" ~ comment ~ Index ~ "." ~/ comment ~ varName.map(Getter) ~~ Index) |
       (Index ~~ "(" ~/ functionCallArgs.map(Args) ~ ")" ~~ Index) |
       (Index ~~ "[" ~/ fallBackExpr.map(ListIndex) ~ "]" ~~ Index)
   )
@@ -232,7 +234,10 @@ object Parser {
       }
   }
 
-  private val baseAtom      = P(ifP | NoCut(matchP) | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP)
+  private val baseAtom = comment ~
+    P(ifP | NoCut(matchP) | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP) ~
+    comment
+
   private lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority) | baseAtom)
 
   private lazy val fallBackExpr = {
