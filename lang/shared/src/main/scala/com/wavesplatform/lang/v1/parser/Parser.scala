@@ -169,7 +169,7 @@ object Parser {
       }
 
   private val accessP: P[(Int, Accessor, Int)] = P(
-    ("" ~ Index ~ "." ~/ varName.map(Getter) ~~ Index) |
+    ("" ~ comment.rep ~ Index ~ "." ~/ comment.rep ~ varName.map(Getter) ~~ Index) |
       (Index ~~ "(" ~/ functionCallArgs.map(Args) ~ ")" ~~ Index) |
       (Index ~~ "[" ~/ fallBackExpr.map(ListIndex) ~ "]" ~~ Index)
   )

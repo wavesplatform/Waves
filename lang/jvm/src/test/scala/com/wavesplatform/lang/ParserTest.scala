@@ -1193,4 +1193,30 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       )
     )
   }
+
+  property("comments - getter - before dot") {
+    val code =
+      """x # foo
+        |.y""".stripMargin
+
+    parseOne(code) shouldBe GETTER(
+      0,
+      10,
+      REF(0, 1, PART.VALID(0, 1, "x")),
+      PART.VALID(9, 10, "y")
+    )
+  }
+
+  property("comments - getter - after dot") {
+    val code =
+      """x. # foo
+        |y""".stripMargin
+
+    parseOne(code) shouldBe GETTER(
+      0,
+      10,
+      REF(0, 1, PART.VALID(0, 1, "x")),
+      PART.VALID(9, 10, "y")
+    )
+  }
 }
