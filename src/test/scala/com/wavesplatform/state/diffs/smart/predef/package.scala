@@ -15,8 +15,8 @@ package object predef {
   def runScript[T](script: String, tx: Transaction = null): Either[String, T] = {
     val Success(expr, _) = Parser(script)
     if (expr.size == 1) {
-      val Right(typedExpr) = CompilerV1(dummyTypeCheckerContext, expr.head)
-      val r                = EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr)
+      val Right((typedExpr, tpe)) = CompilerV1(dummyTypeCheckerContext, expr.head)
+      val r                       = EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr)
       r._2
     } else {
       Left(expr.mkString("\n"))

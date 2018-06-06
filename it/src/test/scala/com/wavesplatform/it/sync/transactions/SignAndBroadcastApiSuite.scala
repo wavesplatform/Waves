@@ -113,6 +113,10 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
         version = v
       )
 
+      signAndBroadcast(Json.obj("type" -> 6, "quantity" -> 0, "assetId" -> issueId, "sender" -> firstAddress, "fee" -> 1.waves),
+                       usesProofs = isProof,
+                       version = v)
+
       signAndBroadcast(Json.obj("type" -> 6, "quantity" -> 100.waves, "assetId" -> issueId, "sender" -> firstAddress, "fee" -> 1.waves),
                        usesProofs = isProof,
                        version = v)

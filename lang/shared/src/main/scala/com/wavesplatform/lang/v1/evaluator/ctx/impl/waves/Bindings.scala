@@ -82,7 +82,7 @@ object Bindings {
             "attachment"      -> Val(BYTEVECTOR)(attachment)
           ) ++ provenTxPart(p) + mapRecipient(recipient)
         )
-      case Issue(p, quantity, name, description, reissuable, decimals) =>
+      case Issue(p, quantity, name, description, reissuable, decimals, scriptOpt) =>
         CaseObj(
           issueTransactionType.typeRef,
           Map(
@@ -90,7 +90,8 @@ object Bindings {
             "name"        -> Val(BYTEVECTOR)(name),
             "description" -> Val(BYTEVECTOR)(description),
             "reissuable"  -> Val(BOOLEAN)(reissuable),
-            "decimals"    -> Val(LONG)(decimals)
+            "decimals"    -> Val(LONG)(decimals),
+            "script"      -> Val(optionByteVector)(scriptOpt.asInstanceOf[optionByteVector.Underlying])
           ) ++ provenTxPart(p)
         )
       case ReIssue(p, quantity, assetId, reissuable) =>

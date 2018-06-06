@@ -52,7 +52,8 @@ object Types {
       "name"        -> BYTEVECTOR,
       "description" -> BYTEVECTOR,
       "reissuable"  -> BOOLEAN,
-      "decimals"    -> LONG
+      "decimals"    -> LONG,
+      "script"      -> optionByteVector
     ) ++ header ++ proven
   )
 
@@ -197,5 +198,5 @@ object Types {
   val outgoingTransactionType = UNION(activeTransactionTypes.map(_.typeRef))
   val anyTransactionType      = UNION(transactionTypes.map(_.typeRef))
 
-  val caseTypes = (Seq(addressType, aliasType, transfer) ++ transactionTypes)
+  val caseTypes = (Seq(addressType, aliasType, transfer) ++ dataEntryTypes ++ transactionTypes)
 }

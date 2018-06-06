@@ -119,7 +119,7 @@ trait TransactionGenBase extends ScriptGen {
       val typed =
         CompilerV1(CompilerContext.fromEvaluationContext(PureContext.instance |+| CryptoContext.build(Global), Map.empty, PureContext.predefVars),
                    expr).explicitGet()
-      ScriptV1(typed).explicitGet()
+      ScriptV1(typed._1).explicitGet()
   }
 
   val setScriptTransactionGen: Gen[SetScriptTransaction] = for {

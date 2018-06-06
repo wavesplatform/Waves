@@ -161,12 +161,26 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parseOne("base58' bQbp'") shouldBe CONST_BYTEVECTOR(0, 13, PART.INVALID(8, 12, "can't parse Base58 string"))
   }
 
-  property("long base58 definition") {
-    import Global.MaxBase58Chars
-    val longBase58 = "A" * (MaxBase58Chars + 1)
-    val to         = 8 + MaxBase58Chars
-    parseOne(s"base58'$longBase58'") shouldBe
-      CONST_BYTEVECTOR(0, to + 1, PART.INVALID(8, to, s"base58Decode input exceeds $MaxBase58Chars"))
+  property("valid non-empty base64 definition") {
+    parseOne("base64'TElLRQ=='") shouldBe CONST_BYTEVECTOR(0, 16, PART.VALID(8, 15, ByteVector("LIKE".getBytes)))
+  }
+
+  property("valid empty base64 definition") {
+    parseOne("base64''") shouldBe CONST_BYTEVECTOR(0, 8, PART.VALID(8, 7, ByteVector.empty))
+  }
+
+  property("invalid base64 definition") {
+    parseOne("base64'mid-size'") shouldBe CONST_BYTEVECTOR(0, 16, PART.INVALID(8, 15, "can't parse Base64 string"))
+  }
+
+  property("literal too long") {
+    import Global.MaxLiteralLength
+    val longLiteral = "A" * (MaxLiteralLength + 1)
+    val to          = 8 + MaxLiteralLength
+    parseOne(s"base58'$longLiteral'") shouldBe
+      CONST_BYTEVECTOR(0, to + 1, PART.INVALID(8, to, s"base58Decode input exceeds $MaxLiteralLength"))
+    parseOne(s"base64'base64:$longLiteral'") shouldBe
+      CONST_BYTEVECTOR(0, to + 8, PART.INVALID(8, to + 7, s"base58Decode input exceeds $MaxLiteralLength"))
   }
 
   property("string is consumed fully") {
@@ -688,6 +702,35 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     )
   }
 
+  property("pattern matching - allow shadowing") {
+    val code =
+      """match p { 
+        |  case p: PointA | PointB => true
+        |  case _ => false
+        |}""".stripMargin
+    parseOne(code) shouldBe MATCH(
+      0,
+      64,
+      REF(6, 7, PART.VALID(6, 7, "p")),
+      List(
+        MATCH_CASE(
+          13,
+          44,
+          Some(PART.VALID(18, 19, "p")),
+          List(PART.VALID(21, 27, "PointA"), PART.VALID(30, 36, "PointB")),
+          TRUE(40, 44)
+        ),
+        MATCH_CASE(
+          47,
+          62,
+          None,
+          List.empty,
+          FALSE(57, 62)
+        )
+      )
+    )
+  }
+
   property("pattern matching with valid case, but no type is defined") {
     parseOne("match tx { case x => 1 } ") shouldBe MATCH(
       0,
@@ -839,7 +882,44 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     )
   }
 
+  property("if expressions") {
+    parseOne("if (10 < 15) then true else false") shouldBe IF(
+      0,
+      33,
+      BINARY_OP(4, 11, CONST_LONG(9, 11, 15), LT_OP, CONST_LONG(4, 6, 10)),
+      TRUE(18, 22),
+      FALSE(28, 33)
+    )
+    parseOne("if 10 < 15 then true else false") shouldBe IF(
+      0,
+      31,
+      BINARY_OP(3, 10, CONST_LONG(8, 10, 15), LT_OP, CONST_LONG(3, 5, 10)),
+      TRUE(16, 20),
+      FALSE(26, 31)
+    )
+    parseOne(s"""if (10 < 15)
+                |then true
+                |else false""".stripMargin) shouldBe IF(
+      0,
+      33,
+      BINARY_OP(4, 11, CONST_LONG(9, 11, 15), LT_OP, CONST_LONG(4, 6, 10)),
+      TRUE(18, 22),
+      FALSE(28, 33)
+    )
+
+    parseOne(s"""if 10 < 15
+                |then true
+                |else false""".stripMargin) shouldBe IF(
+      0,
+      31,
+      BINARY_OP(3, 10, CONST_LONG(8, 10, 15), LT_OP, CONST_LONG(3, 5, 10)),
+      TRUE(16, 20),
+      FALSE(26, 31)
+    )
+  }
+
   property("underscore in numbers") {
     parseOne("100_000_000") shouldBe CONST_LONG(0, 11, 100000000)
   }
+
 }

@@ -54,7 +54,7 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
     val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)"
     val untypedScript = Parser(textScript).get.value
     assert(untypedScript.size == 1)
-    val typedScript = CompilerV1(dummyTypeCheckerContext, untypedScript.head).explicitGet()
+    val typedScript = CompilerV1(dummyTypeCheckerContext, untypedScript.head).explicitGet()._1
 
     forAll(differentTransfers(typedScript)) {
       case (gen, setScript, transfers, scriptTransfers) =>

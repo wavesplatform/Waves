@@ -43,7 +43,7 @@ class Matcher(actorSystem: ActorSystem,
     MatcherActor.name
   )
 
-  lazy val db = openDB(matcherSettings.dataDir, matcherSettings.levelDbCacheSize)
+  lazy val db = openDB(matcherSettings.dataDir)
 
   lazy val orderHistory: ActorRef = actorSystem.actorOf(OrderHistoryActor.props(db, matcherSettings, utx, wallet), OrderHistoryActor.name)
 

@@ -4,6 +4,7 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions
@@ -16,7 +17,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   property("should infer generic function return type") {
     import com.wavesplatform.lang.v1.parser.Expressions._
     val Right(v) = CompilerV1(typeCheckerContext, FUNCTION_CALL(0, 0, PART.VALID(0, 0, idT.name), List(CONST_LONG(0, 0, 1))))
-    v.tpe shouldBe LONG
+    v._2 shouldBe LONG
   }
 
   property("should infer inner types") {
@@ -26,7 +27,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
         typeCheckerContext,
         FUNCTION_CALL(0, 0, PART.VALID(0, 0, extract.name), List(FUNCTION_CALL(0, 0, PART.VALID(0, 0, undefinedOptionLong.name), List.empty)))
       )
-    v.tpe shouldBe LONG
+    v._2 shouldBe LONG
   }
 
   treeTypeTest("unitOnNone(NONE)")(
@@ -35,7 +36,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
                                      0,
                                      Expressions.PART.VALID(0, 0, unitOnNone.name),
                                      List(Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "None")))),
-    expectedResult = Right(FUNCTION_CALL(unitOnNone.header, List(REF("None", OPTION(NOTHING))), UNIT))
+    expectedResult = Right((FUNCTION_CALL(unitOnNone.header, List(REF("None"))), UNIT))
   )
 
   property("successful on very deep expressions(stack overflow check)") {
@@ -44,7 +45,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
     }
 
     val expectedResult = Right(LONG)
-    CompilerV1(typeCheckerContext, expr).map(_.tpe) match {
+    CompilerV1(typeCheckerContext, expr).map(_._2) match {
       case Right(x)    => Right(x) shouldBe expectedResult
       case e @ Left(_) => e shouldBe expectedResult
     }
@@ -58,24 +59,19 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
       ref = Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "p")),
       field = Expressions.PART.VALID(0, 0, "x")
     ),
-    expectedResult = Right(
-      GETTER(
-        expr = REF("p", CASETYPEREF("Point")),
-        field = "x",
-        tpe = LONG
-      ))
+    expectedResult = Right((GETTER(expr = REF("p"), field = "x"), LONG))
   )
 
   treeTypeTest("REF(OBJECT)")(
     ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> CASETYPEREF("Point")), functionDefs = Map.empty),
     expr = Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "p")),
-    expectedResult = Right(REF("p", CASETYPEREF("Point")))
+    expectedResult = Right((REF("p"), CASETYPEREF("Point")))
   )
 
   treeTypeTest("REF x = y")(
     ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> CASETYPEREF("Point")), functionDefs = Map.empty),
     expr = Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "p")),
-    expectedResult = Right(REF("p", CASETYPEREF("Point")))
+    expectedResult = Right((REF("p"), CASETYPEREF("Point")))
   )
 
   treeTypeTest("MULTIPLY(1,2)")(
@@ -86,7 +82,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
       Expressions.PART.VALID(0, 0, multiplierFunction.name),
       List(Expressions.CONST_LONG(0, 0, 1), Expressions.CONST_LONG(0, 0, 2))
     ),
-    expectedResult = Right(FUNCTION_CALL(multiplierFunction.header, List(CONST_LONG(1), CONST_LONG(2)), LONG))
+    expectedResult = Right((FUNCTION_CALL(multiplierFunction.header, List(CONST_LONG(1), CONST_LONG(2))), LONG))
   )
 
   treeTypeTest("idOptionLong(NONE)")(
@@ -97,7 +93,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
       Expressions.PART.VALID(0, 0, idOptionLong.name),
       List(Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "None")))
     ),
-    expectedResult = Right(FUNCTION_CALL(idOptionLong.header, List(REF("None", OPTION(NOTHING))), UNIT))
+    expectedResult = Right((FUNCTION_CALL(idOptionLong.header, List(REF("None"))), UNIT))
   )
 
   treeTypeTest("idOptionLong(SOME(NONE))")(
@@ -115,8 +111,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
         )
       )
     ),
-    expectedResult =
-      Right(FUNCTION_CALL(idOptionLong.header, List(FUNCTION_CALL(some.header, List(REF("None", OPTION(NOTHING))), OPTION(OPTION(NOTHING)))), UNIT))
+    expectedResult = Right((FUNCTION_CALL(idOptionLong.header, List((FUNCTION_CALL(some.header, List(REF("None")))))), UNIT))
   )
 
   treeTypeTest("idOptionLong(SOME(CONST_LONG(3)))")(
@@ -135,12 +130,115 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
       )
     ),
     expectedResult = Right(
-      FUNCTION_CALL(
-        idOptionLong.header,
-        List(FUNCTION_CALL(some.header, List(FUNCTION_CALL(some.header, List(CONST_LONG(3)), OPTION(LONG))), OPTION(OPTION(LONG)))),
-        UNIT
-      )
+      (FUNCTION_CALL(idOptionLong.header, List(FUNCTION_CALL(some.header, List(FUNCTION_CALL(some.header, List(CONST_LONG(3))))))), UNIT)
     )
+  )
+
+  treeTypeTest("pattern matching - allow shadowing of ref with the same name")(
+    ctx = typeCheckerContext,
+    expr = Expressions.MATCH(
+      0,
+      0,
+      Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "p")),
+      List(
+        Expressions.MATCH_CASE(
+          0,
+          0,
+          Some(Expressions.PART.VALID(0, 0, "p")),
+          List(Expressions.PART.VALID(0, 0, "PointA"), Expressions.PART.VALID(0, 0, "PointB")),
+          Expressions.TRUE(0, 0)
+        ),
+        Expressions.MATCH_CASE(
+          0,
+          0,
+          None,
+          List.empty,
+          Expressions.FALSE(0, 0)
+        )
+      )
+    ),
+    expectedResult = Right(
+      (BLOCK(
+         LET("$match0", REF("p")),
+         IF(
+           IF(
+             FUNCTION_CALL(
+               PureContext._isInstanceOf.header,
+               List(REF("$match0"), CONST_STRING("PointB"))
+             ),
+             TRUE,
+             FUNCTION_CALL(
+               PureContext._isInstanceOf.header,
+               List(REF("$match0"), CONST_STRING("PointA"))
+             )
+           ),
+           BLOCK(LET("p", REF("$match0")), TRUE),
+           FALSE
+         )
+       ),
+       BOOLEAN))
+  )
+
+  treeTypeTest("pattern matching - deny shadowing of other variable")(
+    ctx = typeCheckerContext,
+    expr = Expressions.BLOCK(
+      0,
+      0,
+      Expressions.LET(0, 0, Expressions.PART.VALID(0, 0, "foo"), Expressions.TRUE(0, 0), Seq.empty),
+      Expressions.MATCH(
+        0,
+        0,
+        Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "p")),
+        List(
+          Expressions.MATCH_CASE(
+            0,
+            0,
+            Some(Expressions.PART.VALID(0, 0, "foo")),
+            List(Expressions.PART.VALID(0, 0, "PointA"), Expressions.PART.VALID(0, 0, "PointB")),
+            Expressions.TRUE(0, 0)
+          ),
+          Expressions.MATCH_CASE(
+            0,
+            0,
+            None,
+            List.empty,
+            Expressions.FALSE(0, 0)
+          )
+        )
+      )
+    ),
+    expectedResult = Left("Compilation failed: Value 'foo' already defined in the scope in 1-1")
+  )
+
+  treeTypeTest("pattern matching - deny shadowing in non-ref")(
+    ctx = typeCheckerContext,
+    expr = Expressions.MATCH(
+      0,
+      0,
+      Expressions.FUNCTION_CALL(
+        0,
+        0,
+        Expressions.PART.VALID(0, 0, "idT"),
+        List(Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "p")))
+      ),
+      List(
+        Expressions.MATCH_CASE(
+          0,
+          0,
+          Some(Expressions.PART.VALID(0, 0, "p")),
+          List(Expressions.PART.VALID(0, 0, "PointA"), Expressions.PART.VALID(0, 0, "PointB")),
+          Expressions.TRUE(0, 0)
+        ),
+        Expressions.MATCH_CASE(
+          0,
+          0,
+          None,
+          List.empty,
+          Expressions.FALSE(0, 0)
+        )
+      )
+    ),
+    expectedResult = Left("Compilation failed: Value 'p' already defined in the scope in 1-1")
   )
 
   treeTypeTest("Invalid LET")(
@@ -190,7 +288,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
     expectedResult = Left("Compilation failed: ### in 0-0")
   )
 
-  private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: Either[String, EXPR], ctx: CompilerContext): Unit =
+  private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: Either[String, (EXPR, TYPE)], ctx: CompilerContext): Unit =
     property(propertyName) {
       compiler.CompilerV1(ctx, expr) shouldBe expectedResult
     }

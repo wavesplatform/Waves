@@ -64,7 +64,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
       case other => false
     }""".stripMargin).get.value
       assert(untyped.size == 1)
-      CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()
+      CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()._1
     }
 
     val pkSwapBC1 = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).right.get

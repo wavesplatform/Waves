@@ -1,6 +1,7 @@
 package com.wavesplatform
 
 import java.io.File
+import java.net.{InetSocketAddress, URI}
 
 import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigValueType}
 import com.wavesplatform.state.ByteStr
@@ -30,6 +31,11 @@ package object settings {
           throw new ConfigException.WrongType(config.getValue(path).origin(), path, ConfigValueType.OBJECT.name(), other.name())
       }
 
+  }
+
+  implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = { (config: Config, path: String) =>
+    val uri = new URI(s"my://${config.getString(path)}")
+    new InetSocketAddress(uri.getHost, uri.getPort)
   }
 
   def loadConfig(userConfig: Config): Config = {

@@ -56,7 +56,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   import monix.execution.Scheduler.Implicits.{global => scheduler}
 
-  private val db = openDB(settings.dataDirectory, settings.levelDbCacheSize)
+  private val db = openDB(settings.dataDirectory)
 
   private val LocalScoreBroadcastDebounce = 1.second
 
@@ -203,14 +203,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       syncWithChannelClosed,
       extensionLoaderScheduler,
       timeoutSubject
-    ) { case ((c, b)) => processFork(c, b.blocks) }
+    ) { case (c, b) => processFork(c, b.blocks) }
 
     rxExtensionLoaderShutdown = Some(sh)
 
     UtxPoolSynchronizer.start(utxStorage, settings.synchronizationSettings.utxSynchronizerSettings, allChannels, transactions)
     val microBlockSink = microblockDatas.mapTask(scala.Function.tupled(processMicroBlock))
     val blockSink      = newBlocks.mapTask(scala.Function.tupled(processBlock))
-    val checkpointSink = checkpoints.mapTask { case ((s, c)) => processCheckpoint(Some(s), c) }
+    val checkpointSink = checkpoints.mapTask { case (s, c) => processCheckpoint(Some(s), c) }
 
     Observable.merge(microBlockSink, blockSink, checkpointSink).subscribe()
     miner.scheduleMining()
