@@ -23,7 +23,7 @@ object Global extends BaseGlobal {
 
   private def hash(message: Array[Byte])(f: ArrayBuffer => ArrayBuffer): Array[Byte] = toArray(f(toBuffer(message)))
 
-  private def toBuffer(xs: Array[Byte]): ArrayBuffer = {
+  def toBuffer(xs: Array[Byte]): ArrayBuffer = {
     val r = new Int8Array(xs.length)
     r.set(xs.toJSArray)
     r.buffer

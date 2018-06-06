@@ -71,14 +71,14 @@ object JsAPI {
       case Success(value, _)    => Right[String, Expressions.EXPR](value.head)
       case Failure(_, _, extra) => Left[String, Expressions.EXPR](extra.traced.trace)
     }).flatMap(CompilerV1(CompilerContext.fromEvaluationContext(d), _))
-      .flatMap(ast => serialize(ast).map(x => (Global.base58Encode(x), ast)))
+      .flatMap(ast => serialize(ast).map(x => (x, ast)))
       .fold(
         err => {
           js.Dynamic.literal("error" -> err)
         }, {
           case (result, ast) =>
             // js.Dynamic.literal("result" -> result)
-            js.Dynamic.literal("result" -> result, "ast" -> toJs(ast))
+            js.Dynamic.literal("result" -> Global.toBuffer(result), "ast" -> toJs(ast))
         }
       )
   }
