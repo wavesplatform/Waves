@@ -107,7 +107,7 @@ object Parser {
   private val falseP: P[FALSE]      = P(Index ~~ "false".! ~~ Index).map { case (start, _, end) => FALSE(start, end) }
   private val bracesP: P[EXPR]      = P("(" ~ fallBackExpr ~ ")")
   private val curlyBracesP: P[EXPR] = P("{" ~ fallBackExpr ~ "}")
-  private val letP: P[LET] = P(Index ~~ "let" ~ varName ~ "=" ~/ fallBackExpr ~~ Index).map {
+  private val letP: P[LET] = P(Index ~~ "let" ~ comment.rep ~ varName ~ comment.rep ~ "=" ~/ fallBackExpr ~~ Index).map {
     case (start, v, e, end) => LET(start, end, v, e, Seq.empty)
   }
   private val refP: P[REF] = P(varName).map { x =>

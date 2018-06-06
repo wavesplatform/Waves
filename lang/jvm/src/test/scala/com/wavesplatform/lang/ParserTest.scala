@@ -938,6 +938,32 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parseOne(code) shouldBe TRUE(0, 4)
   }
 
+  property("comments - block - after let") {
+    val s =
+      """let # foo
+        |  x = true
+        |x""".stripMargin
+    parseOne(s) shouldBe BLOCK(
+      0,
+      22,
+      LET(0, 20, PART.VALID(12, 13, "x"), TRUE(16, 20), List.empty),
+      REF(21, 22, PART.VALID(21, 22, "x"))
+    )
+  }
+
+  property("comments - block - before assignment") {
+    val s =
+      """let x # foo
+        |  = true
+        |x""".stripMargin
+    parseOne(s) shouldBe BLOCK(
+      0,
+      22,
+      LET(0, 20, PART.VALID(4, 5, "x"), TRUE(16, 20), List.empty),
+      REF(21, 22, PART.VALID(21, 22, "x"))
+    )
+  }
+
   property("comments - block - between LET and BODY (full line)") {
     val code =
       """let x = true
