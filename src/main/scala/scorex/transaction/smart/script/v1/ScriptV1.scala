@@ -8,12 +8,13 @@ import com.wavesplatform.lang.v1.{FunctionHeader, ScriptEstimator, Serde}
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import scorex.transaction.smart.script.Script
+import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 
 object ScriptV1 {
   private val functionCosts: Map[FunctionHeader, Long] = EvaluationContext.functionCosts(com.wavesplatform.utils.dummyContext.functions.values)
 
   private val checksumLength = 4
-  private val maxComplexity  = 20 * functionCosts(FunctionHeader("sigVerify"))
+  private val maxComplexity  = 20 * functionCosts(FunctionHeader(SIGVERIFY))
   private val maxSizeInBytes = 8 * 1024
 
   def validateBytes(bs: Array[Byte]): Either[String, Unit] =

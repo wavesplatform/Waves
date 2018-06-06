@@ -13,11 +13,12 @@ import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang._
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 
 class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
-  val Plus  = FunctionHeader("l+l")
-  val Minus = FunctionHeader("l-l")
-  val Gt    = FunctionHeader("l>l")
+  val Plus  = FunctionHeader(SUM_LONG)
+  val Minus = FunctionHeader(SUB_LONG)
+  val Gt    = FunctionHeader(GT_LONG)
 
   val FunctionCosts: Map[FunctionHeader, Long] = Map(Plus -> 100, Minus -> 10, Gt -> 10)
 

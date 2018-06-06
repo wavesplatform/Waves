@@ -8,6 +8,7 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 import scorex.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 
 class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
 
@@ -22,7 +23,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
     val expr = (1 to 21)
       .map { _ =>
         FUNCTION_CALL(
-          function = FunctionHeader(name = "sigVerify"),
+          function = FunctionHeader(name = SIGVERIFY),
           args = List(byteVector, byteVector, byteVector)
         )
       }
@@ -34,13 +35,13 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
   property("ScriptV1.apply should deny too big scripts") {
     val bigSum = (1 to 100).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
       FUNCTION_CALL(
-        function = FunctionHeader(name = "l=l"),
+        function = FunctionHeader(name = SUM_LONG),
         args = List(r, CONST_LONG(i))
       )
     }
     val expr = (1 to 9).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
       FUNCTION_CALL(
-        function = FunctionHeader(name = "l=l"),
+        function = FunctionHeader(name = EQ_LONG),
         args = List(r, bigSum)
       )
     }
@@ -53,7 +54,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
     val expr = (1 to 19)
       .map { _ =>
         FUNCTION_CALL(
-          function = FunctionHeader(name = "sigVerify"),
+          function = FunctionHeader(name = SIGVERIFY),
           args = List(byteVector, byteVector, byteVector)
         )
       }
