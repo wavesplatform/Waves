@@ -16,46 +16,33 @@ import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
 
-class LazyFieldAccessTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class TransactionFieldAccessTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   private def preconditionsTransferAndLease(
       code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransactionV1)] = {
     val untyped = Parser(code).get.value
     assert(untyped.size == 1)
-    val typed = CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()
+    val typed = CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()._1
     preconditionsTransferAndLease(typed)
   }
 
-  private val goodScript =
+  private val script =
     """
       |
-      | if (tx.type == 4)
-      |   then isDefined(tx.transferAssetId)==false
-      |   else false
-      |
-      """.stripMargin
-
-  private val badScript =
-    """
-      |
-      | isDefined(tx.transferAssetId) == false
-      |
+      | match tx {
+      | case ttx: TransferTransaction =>
+      |       isDefined(ttx.transferAssetId)==false
+      |   case other =>
+      |       false
+      | }
       """.stripMargin
 
   property("accessing field of transaction without checking its type first results on exception") {
-    forAll(preconditionsTransferAndLease(goodScript)) {
+    forAll(preconditionsTransferAndLease(script)) {
       case ((genesis, script, lease, transfer)) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(totalDiffEi =>
           totalDiffEi should produce("TransactionNotAllowedByScript"))
-    }
-  }
-  property("accessing field of transaction with check") {
-    forAll(preconditionsTransferAndLease(badScript)) {
-      case ((genesis, script, lease, transfer)) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), smartEnabledFS)(totalDiffEi =>
-          totalDiffEi should produce("doesn't transfer any asset"))
     }
   }
 }

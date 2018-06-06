@@ -22,18 +22,10 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.{immutable, mutable}
 
 object LevelDBWriter {
-  private def loadSponsorship(db: ReadOnlyDB, assetId: ByteStr) = {
-    db.get(Keys.sponsorshipHistory(assetId)).headOption.map(h => db.get(Keys.sponsorship(h, assetId)))
-  }
+  private def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr): Boolean =
+    db.get(Keys.leaseStatusHistory(leaseId)).headOption.fold(false)(h => db.get(Keys.leaseStatus(leaseId)(h)))
 
-  private def loadAssetInfo(db: ReadOnlyDB, assetId: ByteStr) = {
-    db.get(Keys.assetInfoHistory(assetId)).headOption.map(h => db.get(Keys.assetInfo(h, assetId)))
-  }
-
-  private def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr) =
-    db.get(Keys.leaseStatusHistory(leaseId)).headOption.fold(false)(h => db.get(Keys.leaseStatus(h, leaseId)))
-
-  private def resolveAlias(db: ReadOnlyDB, alias: Alias) = {
+  private def resolveAlias(db: ReadOnlyDB, alias: Alias): Option[Address] = {
     db.get(Keys.addressIdOfAlias(alias)).map(addressId => db.get(Keys.idToAddress(addressId)))
   }
 
@@ -73,9 +65,21 @@ object LevelDBWriter {
 
     recMerge(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
+
+  implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {
+    def fromHistory[A](historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
+      for {
+        lastChange <- db.get(historyKey).headOption
+      } yield db.get(valueKey(lastChange))
+
+    def hasInHistory(historyKey: Key[Seq[Int]], v: Int => Key[_]): Boolean =
+      db.get(historyKey)
+        .headOption
+        .exists(h => db.has(v(h)))
+  }
 }
 
-class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches with ScorexLogging {
+class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize: Int = 100000) extends Caches with ScorexLogging {
 
   import LevelDBWriter._
 
@@ -102,77 +106,70 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
   override protected def loadLastBlock(): Option[Block] = readOnly(db => db.get(Keys.blockAt(db.get(Keys.height))))
 
   override protected def loadScript(address: Address): Option[Script] = readOnly { db =>
-    addressIdCache.get(address).fold[Option[Script]](None) { addressId =>
-      loadFromHistory[Option[Script]](db, addressId, Keys.addressScriptHistory, Keys.addressScript).flatten
+    addressId(address).fold(Option.empty[Script]) { addressId =>
+      db.fromHistory(Keys.addressScriptHistory(addressId), Keys.addressScript(addressId)).flatten
+    }
+  }
+
+  override protected def hasScriptBytes(address: Address): Boolean = readOnly { db =>
+    addressId(address).fold(false) { addressId =>
+      db.hasInHistory(Keys.addressScriptHistory(addressId), Keys.addressScript(addressId))
     }
   }
 
   override def accountData(address: Address): AccountDataInfo = readOnly { db =>
-    val data = for {
-      addressId <- addressIdCache.get(address).toSeq
+    AccountDataInfo((for {
+      addressId <- addressId(address).toSeq
       keyChunkCount = db.get(Keys.dataKeyChunkCount(addressId))
       chunkNo <- Range(0, keyChunkCount)
       key     <- db.get(Keys.dataKeyChunk(addressId, chunkNo))
       value   <- accountData(address, key)
-    } yield key -> value
-    AccountDataInfo(data.toMap)
+    } yield key -> value).toMap)
   }
 
   override def accountData(address: Address, key: String): Option[DataEntry[_]] = readOnly { db =>
-    addressIdCache.get(address).fold[Option[DataEntry[_]]](None) { addressId =>
-      loadFromHistory[Option[DataEntry[_]]](db, addressId, Keys.dataHistory(_, key), Keys.data(_, _, key)).flatten
+    addressId(address).fold(Option.empty[DataEntry[_]]) { addressId =>
+      db.fromHistory(Keys.dataHistory(addressId, key), Keys.data(addressId, key)).flatten
     }
   }
 
   override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = readOnly { db =>
-    addressIdCache.get(address).fold(0L) { addressId =>
+    addressId(address).fold(0L) { addressId =>
       mayBeAssetId match {
-        case Some(assetId) => loadFromHistory(db, addressId, Keys.assetBalanceHistory(_, assetId), Keys.assetBalance(_, _, assetId)).getOrElse(0L)
-        case None          => loadFromHistory(db, addressId, Keys.wavesBalanceHistory, Keys.wavesBalance).getOrElse(0L)
+        case Some(assetId) => db.fromHistory(Keys.assetBalanceHistory(addressId, assetId), Keys.assetBalance(addressId, assetId)).getOrElse(0L)
+        case None          => db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L)
       }
     }
   }
 
-  private def loadFromHistory[A](db: ReadOnlyDB, addressId: BigInt, key: BigInt => Key[Seq[Int]], v: (Int, BigInt) => Key[A]) =
-    for {
-      lastChange <- db.get(key(addressId)).headOption
-    } yield db.get(v(lastChange, addressId))
-
   private def loadLposPortfolio(db: ReadOnlyDB, addressId: BigInt) = Portfolio(
-    loadFromHistory(db, addressId, Keys.wavesBalanceHistory, Keys.wavesBalance).getOrElse(0L),
-    loadFromHistory(db, addressId, Keys.leaseBalanceHistory, Keys.leaseBalance).getOrElse(LeaseBalance.empty),
+    db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L),
+    db.fromHistory(Keys.leaseBalanceHistory(addressId), Keys.leaseBalance(addressId)).getOrElse(LeaseBalance.empty),
     Map.empty
   )
 
   private def loadPortfolio(db: ReadOnlyDB, addressId: BigInt) = loadLposPortfolio(db, addressId).copy(
     assets = (for {
       assetId <- db.get(Keys.assetList(addressId))
-      h       <- db.get(Keys.assetBalanceHistory(addressId, assetId)).headOption
-    } yield assetId -> db.get(Keys.assetBalance(h, addressId, assetId))).toMap
+    } yield assetId -> db.fromHistory(Keys.assetBalanceHistory(addressId, assetId), Keys.assetBalance(addressId, assetId)).getOrElse(0L)).toMap
   )
 
   override protected def loadPortfolio(address: Address): Portfolio = readOnly { db =>
-    addressIdCache.get(address).fold(Portfolio.empty)(loadPortfolio(db, _))
+    addressId(address).fold(Portfolio.empty)(loadPortfolio(db, _))
   }
-
-  override protected def loadAssetInfo(assetId: ByteStr): Option[AssetInfo] =
-    readOnly(LevelDBWriter.loadAssetInfo(_, assetId))
-
-  override protected def loadSponsorship(assetId: ByteStr): Option[SponsorshipValue] =
-    readOnly(LevelDBWriter.loadSponsorship(_, assetId))
 
   override protected def loadAssetDescription(assetId: ByteStr): Option[AssetDescription] = readOnly { db =>
     db.get(Keys.transactionInfo(assetId)) match {
       case Some((_, i: IssueTransaction)) =>
-        val ai          = LevelDBWriter.loadAssetInfo(db, assetId).getOrElse(AssetInfo(isReissuable = false, 0, None))
-        val sponsorship = LevelDBWriter.loadSponsorship(db, assetId).fold(0L)(_.minFee)
+        val ai          = db.fromHistory(Keys.assetInfoHistory(assetId), Keys.assetInfo(assetId)).getOrElse(AssetInfo(i.reissuable, i.quantity, i.script))
+        val sponsorship = db.fromHistory(Keys.sponsorshipHistory(assetId), Keys.sponsorship(assetId)).fold(0L)(_.minFee)
         Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, ai.script, sponsorship))
       case _ => None
     }
   }
 
   override protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee = readOnly { db =>
-    db.get(Keys.filledVolumeAndFeeHistory(orderId)).headOption.fold(VolumeAndFee.empty)(h => db.get(Keys.filledVolumeAndFee(h, orderId)))
+    db.fromHistory(Keys.filledVolumeAndFeeHistory(orderId), Keys.filledVolumeAndFee(orderId)).getOrElse(VolumeAndFee.empty)
   }
 
   override protected def loadApprovedFeatures(): Map[Short, Int] = readOnly(_.get(Keys.approvedFeatures))
@@ -224,9 +221,9 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
       if (wbh.isEmpty) {
         newAddressesForWaves += addressId
       }
-      rw.put(Keys.wavesBalance(height, addressId), balance)
+      rw.put(Keys.wavesBalance(addressId)(height), balance)
       changedAddresses += addressId
-      expiredKeys ++= updateHistory(rw, wbh, kwbh, threshold, h => Keys.wavesBalance(h, addressId))
+      expiredKeys ++= updateHistory(rw, wbh, kwbh, threshold, Keys.wavesBalance(addressId))
     }
 
     if (newAddressesForWaves.nonEmpty) {
@@ -236,9 +233,9 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
     }
 
     for ((addressId, leaseBalance) <- leaseBalances) {
-      rw.put(Keys.leaseBalance(height, addressId), leaseBalance)
+      rw.put(Keys.leaseBalance(addressId)(height), leaseBalance)
       changedAddresses += addressId
-      expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), threshold, Keys.leaseBalance(_, addressId))
+      expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), threshold, Keys.leaseBalance(addressId))
     }
 
     val newAddressesForAsset = mutable.AnyRefMap.empty[ByteStr, Set[BigInt]]
@@ -251,8 +248,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
       rw.put(Keys.assetList(addressId), prevAssets ++ assets.keySet)
       changedAddresses += addressId
       for ((assetId, balance) <- assets) {
-        rw.put(Keys.assetBalance(height, addressId, assetId), balance)
-        expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, assetId), threshold, Keys.assetBalance(_, addressId, assetId))
+        rw.put(Keys.assetBalance(addressId, assetId)(height), balance)
+        expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, assetId), threshold, Keys.assetBalance(addressId, assetId))
       }
     }
 
@@ -268,24 +265,23 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
     rw.put(Keys.changedAddresses(height), changedAddresses.result().toSeq)
 
     for ((orderId, volumeAndFee) <- filledQuantity) {
-      val kk = Keys.filledVolumeAndFee(height, orderId)
-      rw.put(kk, volumeAndFee)
-      expiredKeys ++= updateHistory(rw, Keys.filledVolumeAndFeeHistory(orderId), threshold, Keys.filledVolumeAndFee(_, orderId))
+      rw.put(Keys.filledVolumeAndFee(orderId)(height), volumeAndFee)
+      expiredKeys ++= updateHistory(rw, Keys.filledVolumeAndFeeHistory(orderId), threshold, Keys.filledVolumeAndFee(orderId))
     }
 
     for ((assetId, assetInfo) <- reissuedAssets) {
-      rw.put(Keys.assetInfo(height, assetId), assetInfo)
-      expiredKeys ++= updateHistory(rw, Keys.assetInfoHistory(assetId), threshold, Keys.assetInfo(_, assetId))
+      rw.put(Keys.assetInfo(assetId)(height), assetInfo)
+      expiredKeys ++= updateHistory(rw, Keys.assetInfoHistory(assetId), threshold, Keys.assetInfo(assetId))
     }
 
     for ((leaseId, state) <- leaseStates) {
-      rw.put(Keys.leaseStatus(height, leaseId), state)
-      expiredKeys ++= updateHistory(rw, Keys.leaseStatusHistory(leaseId), threshold, Keys.leaseStatus(_, leaseId))
+      rw.put(Keys.leaseStatus(leaseId)(height), state)
+      expiredKeys ++= updateHistory(rw, Keys.leaseStatusHistory(leaseId), threshold, Keys.leaseStatus(leaseId))
     }
 
     for ((addressId, script) <- scripts) {
-      expiredKeys ++= updateHistory(rw, Keys.addressScriptHistory(addressId), threshold, Keys.addressScript(_, addressId))
-      script.foreach(s => rw.put(Keys.addressScript(height, addressId), Some(s)))
+      expiredKeys ++= updateHistory(rw, Keys.addressScriptHistory(addressId), threshold, Keys.addressScript(addressId))
+      script.foreach(s => rw.put(Keys.addressScript(addressId)(height), Some(s)))
     }
 
     for ((addressId, addressData) <- data) {
@@ -294,8 +290,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
           (key, value) <- addressData.data
           kdh   = Keys.dataHistory(addressId, key)
           isNew = rw.get(kdh).isEmpty
-          _     = rw.put(Keys.data(height, addressId, key), Some(value))
-          _     = expiredKeys ++= updateHistory(rw, kdh, threshold, Keys.data(_, addressId, key))
+          _     = rw.put(Keys.data(addressId, key)(height), Some(value))
+          _     = expiredKeys ++= updateHistory(rw, kdh, threshold, Keys.data(addressId, key))
           if isNew
         } yield key
       ).toSeq
@@ -343,8 +339,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
     }
 
     for ((assetId, sp: SponsorshipValue) <- sponsorship) {
-      rw.put(Keys.sponsorship(height, assetId), sp)
-      expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(assetId), threshold, Keys.sponsorship(_, assetId))
+      rw.put(Keys.sponsorship(assetId)(height), sp)
+      expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(assetId), threshold, Keys.sponsorship(assetId))
     }
 
     rw.put(Keys.transactionIdsAtHeight(height), transactions.keys.toSeq)
@@ -359,25 +355,26 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
       val discardedBlocks = Seq.newBuilder[Block]
 
       for (currentHeight <- height until targetHeight by -1) readWrite { rw =>
+        log.trace(s"Rolling back to ${currentHeight - 1}")
         rw.put(Keys.height, currentHeight - 1)
 
         for (addressId <- rw.get(Keys.changedAddresses(currentHeight))) {
           val address = rw.get(Keys.idToAddress(addressId))
 
           for (assetId <- rw.get(Keys.assetList(addressId))) {
-            rw.delete(Keys.assetBalance(currentHeight, addressId, assetId))
+            rw.delete(Keys.assetBalance(addressId, assetId)(currentHeight))
             rw.filterHistory(Keys.assetBalanceHistory(addressId, assetId), currentHeight)
           }
 
-          rw.delete(Keys.wavesBalance(currentHeight, addressId))
+          rw.delete(Keys.wavesBalance(addressId)(currentHeight))
           rw.filterHistory(Keys.wavesBalanceHistory(addressId), currentHeight)
 
-          rw.delete(Keys.leaseBalance(currentHeight, addressId))
+          rw.delete(Keys.leaseBalance(addressId)(currentHeight))
           rw.filterHistory(Keys.leaseBalanceHistory(addressId), currentHeight)
 
           log.trace(s"Discarding portfolio for $address")
 
-          portfolioCache.invalidate(address)
+          discardPortfolio(address)
           balanceAtHeightCache.invalidate((currentHeight, addressId))
           leaseBalanceAtHeightCache.invalidate((currentHeight, addressId))
         }
@@ -402,18 +399,18 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
 
             case tx: SetScriptTransaction =>
               val address = tx.sender.toAddress
-              scriptCache.invalidate(address)
-              addressIdCache.get(address).foreach { addressId =>
-                rw.delete(Keys.addressScript(currentHeight, addressId))
+              discardScript(address)
+              addressId(address).foreach { addressId =>
+                rw.delete(Keys.addressScript(addressId)(currentHeight))
                 rw.filterHistory(Keys.addressScriptHistory(addressId), currentHeight)
               }
 
             case tx: DataTransaction =>
               val address = tx.sender.toAddress
-              addressIdCache.get(address).foreach { addressId =>
+              addressId(address).foreach { addressId =>
                 tx.data.foreach { e =>
                   log.trace(s"Discarding ${e.key} for $address at $currentHeight")
-                  rw.delete(Keys.data(currentHeight, addressId, e.key))
+                  rw.delete(Keys.data(addressId, e.key)(currentHeight))
                   rw.filterHistory(Keys.dataHistory(addressId, e.key), currentHeight)
                 }
               }
@@ -444,28 +441,26 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
   }
 
   private def rollbackAssetInfo(rw: RW, assetId: ByteStr, currentHeight: Int): Unit = {
-    rw.delete(Keys.assetInfo(currentHeight, assetId))
+    rw.delete(Keys.assetInfo(assetId)(currentHeight))
     rw.filterHistory(Keys.assetInfoHistory(assetId), currentHeight)
-    assetInfoCache.invalidate(assetId)
-    assetDescriptionCache.invalidate(assetId)
+    discardAssetDescription(assetId)
   }
 
   private def rollbackOrderFill(rw: RW, orderId: ByteStr, currentHeight: Int): Unit = {
-    rw.delete(Keys.filledVolumeAndFee(currentHeight, orderId))
+    rw.delete(Keys.filledVolumeAndFee(orderId)(currentHeight))
     rw.filterHistory(Keys.filledVolumeAndFeeHistory(orderId), currentHeight)
-    volumeAndFeeCache.invalidate(orderId)
+    discardVolumeAndFee(orderId)
   }
 
   private def rollbackLeaseStatus(rw: RW, leaseId: ByteStr, currentHeight: Int): Unit = {
-    rw.delete(Keys.leaseStatus(currentHeight, leaseId))
+    rw.delete(Keys.leaseStatus(leaseId)(currentHeight))
     rw.filterHistory(Keys.leaseStatusHistory(leaseId), currentHeight)
   }
 
   private def rollbackSponsorship(rw: RW, assetId: ByteStr, currentHeight: Int): Unit = {
-    rw.delete(Keys.sponsorship(currentHeight, assetId))
+    rw.delete(Keys.sponsorship(assetId)(currentHeight))
     rw.filterHistory(Keys.sponsorshipHistory(assetId), currentHeight)
-    assetDescriptionCache.invalidate(assetId)
-    sponsorshipCache.invalidate(assetId)
+    discardAssetDescription(assetId)
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(db => db.get(Keys.transactionInfo(id)))
@@ -516,8 +511,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
       val lbh = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, to)
       for {
         (wh, lh) <- merge(wbh, lbh)
-        wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalance(wh, addressId)))
-        lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalance(lh, addressId)))
+        wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalance(addressId)(wh)))
+        lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalance(addressId)(lh)))
       } yield BalanceSnapshot(wh.max(lh), wb, lb.in, lb.out)
     }
   }
@@ -590,7 +585,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
     (for {
       seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
       addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
-      balance   <- loadFromHistory(db, addressId, Keys.assetBalanceHistory(_, assetId), Keys.assetBalance(_, _, assetId))
+      balance   <- db.fromHistory(Keys.assetBalanceHistory(addressId, assetId), Keys.assetBalance(addressId, assetId))
       if balance > 0
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
   }
@@ -601,7 +596,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings) extends Caches wi
       addressId <- db.get(Keys.addressesForWaves(seqNr)).par
       history = db.get(Keys.wavesBalanceHistory(addressId))
       actualHeight <- history.partition(_ > height)._2.headOption
-      balance = db.get(Keys.wavesBalance(actualHeight, addressId))
+      balance = db.get(Keys.wavesBalance(addressId)(actualHeight))
       if balance > 0
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
   }

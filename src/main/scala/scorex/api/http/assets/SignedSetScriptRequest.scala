@@ -18,7 +18,7 @@ case class SignedSetScriptRequest(@ApiModelProperty(required = true)
                                   version: Byte,
                                   @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                                   senderPublicKey: String,
-                                  @ApiModelProperty(value = "Base58 encoded script(including version and checksum)", required = true)
+                                  @ApiModelProperty(value = "Base64 encoded script(including version and checksum)", required = true)
                                   script: Option[String],
                                   @ApiModelProperty(required = true)
                                   fee: Long,

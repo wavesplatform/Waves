@@ -15,7 +15,7 @@ case class ByteStr(arr: Array[Byte]) {
 
   lazy val base58: String = Base58.encode(arr)
 
-  lazy val base64: String = Base64.encode(arr)
+  lazy val base64: String = "base64:" + Base64.encode(arr)
 
   lazy val trim: String = base58.toString.take(7) + "..."
 
@@ -24,6 +24,7 @@ case class ByteStr(arr: Array[Byte]) {
 
 object ByteStr {
   def decodeBase58(s: String): Try[ByteStr] = Base58.decode(s).map(ByteStr(_))
+  def decodeBase64(s: String): Try[ByteStr] = Base64.decode(s).map(ByteStr(_))
   val empty: ByteStr                        = ByteStr(Array.emptyByteArray)
 
   implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
@@ -33,4 +34,5 @@ object ByteStr {
       case _           => JsError("Expected JsString")
     }
   }
+
 }

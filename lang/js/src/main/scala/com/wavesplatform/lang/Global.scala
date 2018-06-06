@@ -6,13 +6,27 @@ import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.typedarray.{ArrayBuffer, Int8Array}
 
 object Global extends BaseGlobal {
-  def base58Encode(input: Array[Byte]): String = impl.Global.base58Encode(toBuffer(input))
-  def base58Decode(input: String): Either[String, Array[Byte]] =
-    impl.Global
-      .base58Decode(input)
-      .toOption
-      .map(toArray)
-      .fold[Either[String, Array[Byte]]](Left("Cannot decode"))(Right(_))
+  def base58Encode(input: Array[Byte]): Either[String, String] = Right(impl.Global.base58Encode(toBuffer(input)))
+  override def base58Decode(input: String, limit: Int): Either[String, Array[Byte]] =
+    for {
+      _ <- Either.cond(input.length <= limit, {}, s"Input is too long (${input.length}), limit is $limit")
+      x <- impl.Global
+        .base58Decode(input)
+        .toOption
+        .map(toArray)
+        .toRight("Cannot decode")
+    } yield x
+
+  override def base64Encode(input: Array[Byte]): Either[String, String] = Right(impl.Global.base64Encode(toBuffer(input)))
+  override def base64Decode(input: String, limit: Int): Either[String, Array[Byte]] =
+    for {
+      _ <- Either.cond(input.length <= limit, {}, s"Input is too long (${input.length}), limit is $limit")
+      x <- impl.Global
+        .base64Decode(input)
+        .toOption
+        .map(toArray)
+        .toRight("Cannot decode")
+    } yield x
 
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean =
     impl.Global.curve25519verify(toBuffer(message), toBuffer(sig), toBuffer(pub))

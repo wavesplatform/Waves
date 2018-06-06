@@ -22,6 +22,9 @@ object BinaryOperation {
     GE_OP,
     LT_OP,
     LE_OP,
+    MUL_OP,
+    DIV_OP,
+    MOD_OP,
     SUM_OP,
     SUB_OP
   )
@@ -51,6 +54,15 @@ object BinaryOperation {
   }
   case object SUB_OP extends BinaryOperation {
     val func = "-"
+  }
+  case object MUL_OP extends BinaryOperation {
+    override val func: String = "*"
+  }
+  case object DIV_OP extends BinaryOperation {
+    override val func: String = "/"
+  }
+  case object MOD_OP extends BinaryOperation {
+    override val func: String = "%"
   }
   case object LE_OP extends BinaryOperation {
     val func            = ">="

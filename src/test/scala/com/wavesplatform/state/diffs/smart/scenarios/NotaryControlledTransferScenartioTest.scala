@@ -2,8 +2,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.lang.TypeInfo
-import com.wavesplatform.lang.TypeInfo._
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.parser.Parser
@@ -15,13 +14,14 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import scodec.bits.ByteVector
 import scorex.account.AddressScheme
 import scorex.transaction.assets.IssueTransactionV2
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.transfer._
 import scorex.transaction.{DataTransaction, GenesisTransaction}
 
-class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions: Gen[
     (Seq[GenesisTransaction], IssueTransactionV2, DataTransaction, TransferTransactionV1, DataTransaction, DataTransaction, TransferTransactionV1)] =
     for {
@@ -37,22 +37,23 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
       genesis4 = GenesisTransaction.create(accountA, ENOUGH_AMT, ts).explicitGet()
       genesis5 = GenesisTransaction.create(accountB, ENOUGH_AMT, ts).explicitGet()
 
-      // senderAddress.bytes == company.bytes || (isNotary1Agreed && isRecipientAgreed)
       assetScript = s"""
                     |
-                    | let king = extract(addressFromString("${king.address}"))
-                    | let company = extract(addressFromString("${company.address}"))
-                    | let notary1 = addressFromPublicKey(extract(getByteArray(king,"notary1PK")))
-                    | let txIdBase58String = toBase58String(tx.id)
-                    | let notary1Agreement = getBoolean(notary1,txIdBase58String)
-                    | let isNotary1Agreed = if(isDefined(notary1Agreement)) then extract(notary1Agreement) else false
-                    | let recipientAddress = addressFromRecipient(tx.recipient)
-                    | let recipientAgreement = getBoolean(recipientAddress,txIdBase58String)
-                    | let isRecipientAgreed = if(isDefined(recipientAgreement)) then extract(recipientAgreement) else false
-                    | let senderAddress = addressFromPublicKey(tx.senderPk)
-                    | senderAddress.bytes == company.bytes || (isNotary1Agreed && isRecipientAgreed)
-                    |
-                    |
+                    | match tx {
+                    |   case ttx: TransferTransaction =>
+                    |      let king = extract(addressFromString("${king.address}"))
+                    |      let company = extract(addressFromString("${company.address}"))
+                    |      let notary1 = addressFromPublicKey(extract(getByteArray(king,"notary1PK")))
+                    |      let txIdBase58String = toBase58String(ttx.id)
+                    |      let notary1Agreement = getBoolean(notary1,txIdBase58String)
+                    |      let isNotary1Agreed = if(isDefined(notary1Agreement)) then extract(notary1Agreement) else false
+                    |      let recipientAddress = addressFromRecipient(ttx.recipient)
+                    |      let recipientAgreement = getBoolean(recipientAddress,txIdBase58String)
+                    |      let isRecipientAgreed = if(isDefined(recipientAgreement)) then extract(recipientAgreement) else false
+                    |      let senderAddress = addressFromPublicKey(ttx.senderPk)
+                    |      senderAddress.bytes == company.bytes || (isNotary1Agreed && isRecipientAgreed)
+                    |   case other => throw
+                    | }
         """.stripMargin
 
       untypedScript = {
@@ -61,7 +62,7 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
         r.head
       }
 
-      typedScript = ScriptV1(CompilerV1(dummyTypeCheckerContext, untypedScript).explicitGet()).explicitGet()
+      typedScript = ScriptV1(CompilerV1(dummyTypeCheckerContext, untypedScript).explicitGet()._1).explicitGet()
 
       issueTransaction = IssueTransactionV2
         .selfSigned(
@@ -109,15 +110,29 @@ class HackatonScenartioTest extends PropSpec with PropertyChecks with Matchers w
        accountBDataTransaction,
        transferFromAToB)
 
-  private def eval[T: TypeInfo](code: String) = {
+  private def eval[T](code: String) = {
     val untyped = Parser(code).get.value
     assert(untyped.size == 1)
-    val typed = CompilerV1(dummyTypeCheckerContext, untyped.head)
-    typed.flatMap(EvaluatorV1[T](dummyContext, _))
+    val typed = CompilerV1(dummyTypeCheckerContext, untyped.head).map(_._1)
+    typed.flatMap(EvaluatorV1[T](dummyContext, _)._2)
   }
 
   property("Script toBase58String") {
-    eval[Boolean]("toBase58String(base58'AXiXp5CmwVaq4Tp6h6') == \"AXiXp5CmwVaq4Tp6h6\"").explicitGet() shouldBe true
+    val s = "AXiXp5CmwVaq4Tp6h6"
+    eval[Boolean](s"""toBase58String(base58'$s') == \"$s\"""").explicitGet() shouldBe true
+  }
+
+  property("Script toBase64String") {
+    val s = "Kl0pIkOM3tRikA=="
+    eval[Boolean](s"""toBase64String(base64'$s') == \"$s\"""").explicitGet() shouldBe true
+  }
+
+  property("addressFromString() fails when address is too long") {
+    import Global.MaxAddressLength
+    val longAddress = "A" * (MaxAddressLength + 1)
+    val r           = eval[ByteVector](s"""addressFromString("$longAddress")""")
+    r.isLeft shouldBe true
+    r.left.get shouldBe s"base58Decode input exceeds $MaxAddressLength"
   }
 
   property("Scenario") {

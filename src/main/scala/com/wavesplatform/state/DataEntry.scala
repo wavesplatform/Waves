@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets.UTF_8
 
 import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.state.DataEntry._
-import com.wavesplatform.utils.Base64
 import play.api.libs.json._
 import scorex.serialization.Deser
 
@@ -70,7 +69,7 @@ object DataEntry {
             case JsDefined(JsString("binary")) =>
               jsv \ "value" match {
                 case JsDefined(JsString(enc)) =>
-                  Base64.decode(enc).fold(ex => JsError(ex.getMessage), arr => JsSuccess(BinaryDataEntry(key, ByteStr(arr))))
+                  ByteStr.decodeBase64(enc).fold(ex => JsError(ex.getMessage), bstr => JsSuccess(BinaryDataEntry(key, bstr)))
                 case _ => JsError("value is missing or not a string")
               }
             case JsDefined(JsString("string")) =>

@@ -15,6 +15,7 @@ import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
 import scorex.transaction.transfer._
+
 import scala.concurrent.duration._
 
 /*
@@ -22,9 +23,6 @@ Scenario:
 every month a foundation makes payments from two MassTransactions(type == 11):
 1) 80% to users
 2) 10% as tax and 10% to bank go after 30sec of payment from step 1)
-
-TODO: AFTER NODE-745 fix change to:
-let txToGovComplete = isDefined(mTx) && ((tx.timestamp > (extract(mTx).timestamp) + 30000)) && sigVerify(extract(mTx).bodyBytes,extract(mTx).proofs[0],accountPK)
  */
 
 class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -33,26 +31,36 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
   test("airdrop emulation via MassTransfer") {
     val scriptText = {
       val untyped = Parser(s"""
-        let commonAmount = (tx.transfers[0].amount + tx.transfers[1].amount)
-        let totalAmountToUsers = commonAmount == 8000000000
-        let totalAmountToGov = commonAmount == 2000000000
-        let massTransferType = ((tx.type == 11) && (size(tx.transfers) == 2))
+        match tx {
+          case ttx: MassTransferTransaction =>
+            let commonAmount = (ttx.transfers[0].amount + ttx.transfers[1].amount)
+            let totalAmountToUsers = commonAmount == 8000000000
+            let totalAmountToGov = commonAmount == 2000000000
+            let massTxSize = size(ttx.transfers) == 2
 
-        let accountPK = base58'${ByteStr(sender.publicKey.publicKey)}'
-        let accSig = sigVerify(tx.bodyBytes,tx.proofs[0],accountPK)
+            let accountPK = base58'${ByteStr(sender.publicKey.publicKey)}'
+            let accSig = sigVerify(ttx.bodyBytes,ttx.proofs[0],accountPK)
 
-        let txToUsers = (massTransferType && totalAmountToUsers)
+            let txToUsers = (massTxSize && totalAmountToUsers)
 
-        let mTx = getTransactionById(tx.proofs[1])
+            let mTx = getTransactionById(ttx.proofs[1])
 
-        let txToGov = (massTransferType && totalAmountToGov)
-
-        let txToGovComplete = if(isDefined(mTx)) then (((tx.timestamp > (extract(mTx).timestamp) + 30000)) && sigVerify(extract(mTx).bodyBytes,extract(mTx).proofs[0],accountPK)) else false
-
-        (txToGovComplete && accSig && txToGov)  || (txToUsers && accSig)
+            if (txToUsers && accSig) then true
+            else
+            if(isDefined(mTx)) then
+                match extract(mTx) {
+                  case mt2: MassTransferTransaction =>
+                    let txToGov = (massTxSize && totalAmountToGov)
+                    let txToGovComplete = (ttx.timestamp > mt2.timestamp + 30000) && sigVerify(mt2.bodyBytes,mt2.proofs[0], accountPK)
+                    txToGovComplete && accSig && txToGov
+                  case other => false
+                }
+            else false
+        case other => false
+        }
         """.stripMargin).get.value
       assert(untyped.size == 1)
-      CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()
+      CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()._1
     }
 
     // set script
@@ -104,7 +112,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
     val signedToGovFail     = unsignedToGov.copy(proofs = Proofs(Seq(accountSigToGovFail)))
 
     assertBadRequestAndResponse(sender.signedBroadcast(signedToGovFail.json() + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt))),
-                                "Reason: TransactionNotAllowedByScript")
+                                "TransactionNotAllowedByScript")
 
     //make correct transfer to government after some time
     sender.waitForHeight(heightBefore + 10, 2.minutes)

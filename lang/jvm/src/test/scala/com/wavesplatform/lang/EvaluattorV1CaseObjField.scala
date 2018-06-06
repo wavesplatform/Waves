@@ -2,7 +2,6 @@ package com.wavesplatform.lang
 
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext._
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -19,15 +18,16 @@ class EvaluattorV1CaseObjField extends PropSpec with PropertyChecks with Matcher
   property("case custom type field access") {
     ev[Long](
       context = context(pointAInstance),
-      expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", TYPEREF("PointA")), "X", LONG), CONST_LONG(2)), LONG)
-    ) shouldBe Right(5)
+      expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p"), "X"), CONST_LONG(2)))
+    )._2 shouldBe Right(5)
   }
 
   property("case custom type field access over union") {
-    def testAccess(instance: CaseObj, field: String) = ev[Long](
-      context = context(instance),
-      expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p", AorB), field, LONG), CONST_LONG(2)), LONG)
-    )
+    def testAccess(instance: CaseObj, field: String) =
+      ev[Long](
+        context = context(instance),
+        expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p"), field), CONST_LONG(2)))
+      )._2
 
     testAccess(pointAInstance, "X") shouldBe Right(5)
     testAccess(pointBInstance, "X") shouldBe Right(5)

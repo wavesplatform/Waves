@@ -3,9 +3,10 @@ import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext, WavesContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
-import com.wavesplatform.lang.v1.traits.{DataType, Environment, Transaction}
+import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient, Tx}
 import fastparse.core.Parsed.{Failure, Success}
 import scodec.Attempt
 import scodec.Attempt.Successful
@@ -20,16 +21,16 @@ object JsAPI {
   private def toJs(ast: EXPR): js.Object = {
     def r(expr: EXPR): js.Object = {
       expr match {
-        case CONST_LONG(t)                      => jObj("type" -> "LONG", "value"       -> t)
-        case GETTER(ref, field, tpe)            => jObj("type" -> "GETTER", "ref"       -> r(ref), "field" -> field)
-        case CONST_BYTEVECTOR(bs)               => jObj("type" -> "BYTEVECTOR", "value" -> bs.toArray.toJSArray)
-        case CONST_STRING(s)                    => jObj("type" -> "STRING", "value"     -> s)
-        case BLOCK(let, body, tpe)              => jObj("type" -> "BLOCK", "let"        -> jObj("name" -> let.name, "value" -> r(let.value)), "body" -> r(body))
-        case IF(cond, ifTrue, ifFalse, tpe)     => jObj("type" -> "IF", "condition"     -> r(cond), "true" -> r(ifTrue), "false" -> r(ifFalse))
-        case REF(key, tpe)                      => jObj("type" -> "REF", "key"          -> key)
-        case TRUE                               => jObj("type" -> "BOOL", "value"       -> true)
-        case FALSE                              => jObj("type" -> "BOOL", "value"       -> false)
-        case FUNCTION_CALL(function, args, tpe) => jObj("type" -> "CALL", "name"        -> function.name, "args" -> args.map(r).toJSArray)
+        case CONST_LONG(t)                 => jObj("type" -> "LONG", "value"       -> t)
+        case GETTER(ref, field)            => jObj("type" -> "GETTER", "ref"       -> r(ref), "field" -> field)
+        case CONST_BYTEVECTOR(bs)          => jObj("type" -> "BYTEVECTOR", "value" -> bs.toArray.toJSArray)
+        case CONST_STRING(s)               => jObj("type" -> "STRING", "value"     -> s)
+        case BLOCK(let, body)              => jObj("type" -> "BLOCK", "let"        -> jObj("name" -> let.name, "value" -> r(let.value)), "body" -> r(body))
+        case IF(cond, ifTrue, ifFalse)     => jObj("type" -> "IF", "condition"     -> r(cond), "true" -> r(ifTrue), "false" -> r(ifFalse))
+        case REF(key)                      => jObj("type" -> "REF", "key"          -> key)
+        case TRUE                          => jObj("type" -> "BOOL", "value"       -> true)
+        case FALSE                         => jObj("type" -> "BOOL", "value"       -> false)
+        case FUNCTION_CALL(function, args) => jObj("type" -> "CALL", "name"        -> function.name, "args" -> args.map(r).toJSArray)
       }
     }
 
@@ -42,12 +43,12 @@ object JsAPI {
     val c = WavesContext.build(new Environment {
       override def height: Int                                                                                       = ???
       override def networkByte: Byte                                                                                 = ???
-      override def transaction: Transaction                                                                          = ???
-      override def transactionById(id: Array[Byte]): Option[Transaction]                                             = ???
+      override def transaction: Tx                                                                                   = ???
+      override def transactionById(id: Array[Byte]): Option[Tx]                                                      = ???
       override def transactionHeightById(id: Array[Byte]): Option[Int]                                               = ???
       override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any]                     = ???
-      override def resolveAddress(addressOrAlias: Array[Byte]): Either[String, Array[Byte]]                          = ???
       override def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = ???
+      override def resolveAlias(name: String): Either[String, Recipient.Address]                                     = ???
     })
 
     val b = Monoid.combine(c, CryptoContext.build(Global))
@@ -70,15 +71,15 @@ object JsAPI {
     (Parser(input) match {
       case Success(value, _)    => Right[String, Expressions.EXPR](value.head)
       case Failure(_, _, extra) => Left[String, Expressions.EXPR](extra.traced.trace)
-    }).flatMap(CompilerV1(CompilerContext.fromEvaluationContext(d), _))
-      .flatMap(ast => serialize(ast).map(x => (x, ast)))
+    }).flatMap(CompilerV1(CompilerContext.fromEvaluationContext(d, Map.empty, Map.empty), _))
+      .flatMap(ast => serialize(ast._1).map(x => (x, ast)))
       .fold(
         err => {
           js.Dynamic.literal("error" -> err)
         }, {
           case (result, ast) =>
             // js.Dynamic.literal("result" -> result)
-            js.Dynamic.literal("result" -> Global.toBuffer(result), "ast" -> toJs(ast))
+            js.Dynamic.literal("result" -> Global.toBuffer(result), "ast" -> toJs(ast._1))
         }
       )
   }

@@ -137,6 +137,14 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
     }
   }
 
+  override def hasScript(address: Address): Boolean = {
+    diff.scripts.get(address) match {
+      case None          => inner.hasScript(address)
+      case Some(None)    => false
+      case Some(Some(_)) => true
+    }
+  }
+
   override def accountData(acc: Address): AccountDataInfo = {
     val fromInner = inner.accountData(acc)
     val fromDiff  = diff.accountData.get(acc).orEmpty

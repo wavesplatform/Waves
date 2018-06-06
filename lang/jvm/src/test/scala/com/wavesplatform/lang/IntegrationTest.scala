@@ -2,11 +2,10 @@ package com.wavesplatform.lang
 
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.TypeInfo._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, EvaluationContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
@@ -20,10 +19,53 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val sampleScript =
       """match p {
         |  case pa: PointA => 0
-        |  case pb: PointB => 1
+        |  case pa: PointB => 1
+        |  case pa: PointC => 2
         |}""".stripMargin
     eval[Long](sampleScript, withUnion(pointAInstance)) shouldBe Right(0)
     eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
+  }
+
+  property("patternMatching with named union types") {
+    val sampleScript =
+      """match p {
+        |  case pa: PointA => 0
+        |  case pa: PointBC => 1
+        |}""".stripMargin
+    eval[Long](sampleScript, withUnion(pointAInstance), { c =>
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
+    }) shouldBe Right(0)
+    eval[Long](sampleScript, withUnion(pointBInstance), { c =>
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
+    }) shouldBe Right(1)
+  }
+
+  property("union types have filds") {
+    val sampleScript =
+      """match p {
+        |  case pa: PointA => pa.X
+        |  case pb: PointBC => pb.YB
+        |}""".stripMargin
+    eval[Long](sampleScript, withUnion(pointAInstance), { c =>
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
+    }) shouldBe Right(3)
+    eval[Long](sampleScript, withUnion(pointBInstance), { c =>
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
+    }) shouldBe Right(41)
+    eval[Long](sampleScript, withUnion(pointCInstance), { c =>
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
+    }) shouldBe Right(42)
+  }
+
+  property("union types have  only common filds") {
+    val sampleScript =
+      """match p {
+        |  case pa: PointA => pa.X
+        |  case pb: PointBC => pb.X
+        |}""".stripMargin
+    eval[Long](sampleScript, withUnion(pointCInstance), { c =>
+      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
+    }) should produce("Compilation failed: Undefined field `X`")
   }
 
   property("patternMatching _") {
@@ -32,6 +74,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |match p {
          |  case _: PointA => 0
          |  case _: PointB  => 1
+         |  case _: PointC => 2
          |}
          |
       """.stripMargin
@@ -52,11 +95,31 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
   }
 
-  private def eval[T: TypeInfo](code: String, ctx: EvaluationContext = PureContext.instance) = {
+  property("patternMatching block") {
+    val sampleScript =
+      """|
+         |match (let x = 1; p) {
+         |  case _  => 1
+         |}
+         |
+      """.stripMargin
+    eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
+  }
+
+  private def eval[T](code: String, ctx: EvaluationContext = PureContext.instance, genTypes: CompilerContext => Map[String, PredefBase] = { _ =>
+    Map.empty
+  }) = {
     val untyped = Parser(code).get.value
     require(untyped.size == 1)
-    val typed = CompilerV1(CompilerContext.fromEvaluationContext(ctx), untyped.head)
-    typed.flatMap(EvaluatorV1[T](ctx, _))
+    val cctx = CompilerContext.fromEvaluationContext(
+      ctx,
+      sampleTypes.map(v => v.name -> v).toMap,
+      Map(PureContext.errRef -> PureContext.predefVars(PureContext.errRef), // need for match fails handling
+          "p"                -> AorBorC)
+    )
+    val types = genTypes(cctx)
+    val typed = CompilerV1(cctx.copy(predefTypes = types ++ cctx.predefTypes), untyped.head)
+    typed.flatMap(v => EvaluatorV1[T](ctx, v._1)._2)
   }
 
   property("function call") {
@@ -85,6 +148,16 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Boolean]("""((((if(true) then 1 else 1)==2)||((if(true)
                     |then true else true)&&(true||true)))||(if(((1>1)||(-1>=-1)))
                     |then (-1>=1) else false))""".stripMargin) shouldBe Right(true)
+  }
+
+  property("sum/mul/div/mod/fraction functions") {
+    eval[Long]("(10 + 10)") shouldBe Right(20)
+    eval[Long]("(10 * 10)") shouldBe Right(100)
+    eval[Long]("(10 / 3)") shouldBe Right(3)
+    eval[Long]("(10 % 3)") shouldBe Right(1)
+    eval[Long]("fraction(9223372036854775807, 2, 4)") shouldBe Right(Long.MaxValue / 2)
+    eval[Long]("fraction(9223372036854775807, 3, 2)") shouldBe Left(s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1")
+    eval[Long]("fraction(-9223372036854775807, 3, 2)") shouldBe Left(s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1")
   }
 
   property("equals works on elements from Gens") {

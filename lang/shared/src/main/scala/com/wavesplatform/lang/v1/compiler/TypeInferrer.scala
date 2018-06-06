@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.compiler
 
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang._
 
 object TypeInferrer {
 
@@ -14,7 +15,7 @@ object TypeInferrer {
         import cats.instances.option._
         import cats.instances.vector._
         import cats.syntax.all._
-        val matchResults = matching.flatMap(_.right.get).groupBy(_.name)
+        val matchResults = matching.flatMap(_.explicitGet()).groupBy(_.name)
 
         // a function like Option[T], T => Option[Option[T]]
         // can lead to different interpretations of `T`.
@@ -32,7 +33,7 @@ object TypeInferrer {
 
         resolved.find(_._2.isLeft) match {
           case Some((_, left)) => left.asInstanceOf[Left[String, Nothing]]
-          case None            => Right(resolved.mapValues(_.right.get))
+          case None            => Right(resolved.mapValues(_.explicitGet()))
         }
     }
   }

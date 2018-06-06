@@ -8,7 +8,7 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 case class WavesSettings(directory: String,
                          dataDirectory: String,
-                         levelDbCacheSize: Long,
+                         maxCacheSize: Int,
                          networkSettings: NetworkSettings,
                          walletSettings: WalletSettings,
                          blockchainSettings: BlockchainSettings,
@@ -31,7 +31,7 @@ object WavesSettings {
   def fromConfig(config: Config): WavesSettings = {
     val directory               = config.as[String](s"$configPath.directory")
     val dataDirectory           = config.as[String](s"$configPath.data-directory")
-    val levelDbCacheSize        = config.getBytes(s"$configPath.leveldb-cache-size")
+    val maxCacheSize            = config.as[Int](s"$configPath.max-cache-size")
     val networkSettings         = config.as[NetworkSettings]("waves.network")
     val walletSettings          = config.as[WalletSettings]("waves.wallet")
     val blockchainSettings      = BlockchainSettings.fromConfig(config)
@@ -48,7 +48,7 @@ object WavesSettings {
     WavesSettings(
       directory,
       dataDirectory,
-      levelDbCacheSize,
+      maxCacheSize,
       networkSettings,
       walletSettings,
       blockchainSettings,

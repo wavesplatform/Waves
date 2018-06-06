@@ -1,14 +1,15 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.UnexpectedStatusCodeException
+import com.wavesplatform.it.sync.{calcDataFee, fee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, LongDataEntry, StringDataEntry}
+import com.wavesplatform.utils.Base58
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
 import scorex.api.http.SignedDataRequest
-import com.wavesplatform.utils.Base58
 import scorex.transaction.DataTransaction
 
 import scala.concurrent.duration._
@@ -137,9 +138,9 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     sender.getData(secondAddress, "int") shouldBe intEntry2
     sender.getData(secondAddress, "bool") shouldBe boolEntry2
-    sender.getData(secondAddress, "blob").equals(blobEntry2)
-    sender.getData(secondAddress, "str").equals(stringEntry2)
-    sender.getData(secondAddress).equals(dataAllTypes)
+    sender.getData(secondAddress, "blob") shouldBe blobEntry2
+    sender.getData(secondAddress, "str") shouldBe stringEntry2
+    sender.getData(secondAddress) shouldBe dataAllTypes.sortBy(_.key)
 
     notMiner.assertBalances(secondAddress, balance2 - fee, eff2 - fee)
 
@@ -217,9 +218,6 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("base64:not a base64")))),
                                 "Illegal base64 character")
-
-    assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("yomp")))),
-                                "base64:chars expected")
   }
 
   test("transaction requires a valid proof") {

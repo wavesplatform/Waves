@@ -52,6 +52,10 @@ object SyncHttpApi extends Assertions {
     def get(path: String): Response =
       Await.result(async(n).get(path), RequestAwaitTime)
 
+    def utx = Await.result(async(n).utx, RequestAwaitTime)
+
+    def utxSize = Await.result(async(n).utxSize, RequestAwaitTime)
+
     def seed(address: String): String =
       Await.result(async(n).seed(address), RequestAwaitTime)
 
@@ -75,6 +79,9 @@ object SyncHttpApi extends Assertions {
 
     def assetBalance(address: String, asset: String): AssetBalance =
       Await.result(async(n).assetBalance(address, asset), RequestAwaitTime)
+
+    def assetsDetails(assetId: String): AssetInfo =
+      Await.result(async(n).assetsDetails(assetId), RequestAwaitTime)
 
     def addressScriptInfo(address: String): AddressApiRoute.AddressScriptInfo =
       Await.result(async(n).scriptInfo(address), RequestAwaitTime)
@@ -162,15 +169,20 @@ object SyncHttpApi extends Assertions {
     def debugMinerInfo(): Seq[State] =
       Await.result(async(n).debugMinerInfo(), RequestAwaitTime)
 
+    def debugStateAt(height: Long): Map[String, Long] = Await.result(async(n).debugStateAt(height), RequestAwaitTime)
+
     def height: Int =
       Await.result(async(n).height, RequestAwaitTime)
+
+    def rollback(to: Int, returnToUTX: Boolean = true): Unit =
+      Await.result(async(n).rollback(to, returnToUTX), RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
 
     import com.wavesplatform.it.api.AsyncHttpApi.{NodesAsyncHttpApi => async}
 
-    private val TxInBlockchainAwaitTime = 6 * nodes.head.blockDelay
+    private val TxInBlockchainAwaitTime = 8 * nodes.head.blockDelay
     private val ConditionAwaitTime      = 5.minutes
 
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
