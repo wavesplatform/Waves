@@ -119,7 +119,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     )
     val types = genTypes(cctx)
     val typed = CompilerV1(cctx.copy(predefTypes = types ++ cctx.predefTypes), untyped.head)
-    typed.flatMap(EvaluatorV1[T](ctx, _)._2)
+    typed.flatMap(v => EvaluatorV1[T](ctx, v._1)._2)
   }
 
   property("function call") {

@@ -38,12 +38,12 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
   private def compile(code: String): EXPR = {
     val untyped = Parser(code).get.value
     require(untyped.size == 1)
-    CompilerV1(ctx, untyped.head).explicitGet()
+    CompilerV1(ctx, untyped.head).map(_._1).explicitGet()
   }
 
   property("successful on very deep expressions(stack overflow check)") {
     val expr = (1 to 100000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
-      FUNCTION_CALL(Plus, List(CONST_LONG(1), acc), LONG)
+      FUNCTION_CALL(Plus, List(CONST_LONG(1), acc))
     }
     ScriptEstimator(FunctionCosts, expr) shouldBe 'right
   }
@@ -74,7 +74,7 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
 
   property("recursive let statement") {
     // let v = v; v
-    val expr = BLOCK(LET("v", REF("v", LONG)), REF("v", LONG), LONG)
+    val expr = BLOCK(LET("v", REF("v")), REF("v"))
     ScriptEstimator(Map.empty, expr) shouldBe 'right
   }
 
