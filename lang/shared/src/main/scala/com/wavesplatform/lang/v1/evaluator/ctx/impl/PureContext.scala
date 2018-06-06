@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.data.EitherT
+import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, EvaluationContext, LazyVal, PredefFunction}
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
@@ -150,10 +151,10 @@ object PureContext {
     uNot
   )
 
-  val predefVars = Map(("None", OPTION(NOTHING)), (errRef, NOTHING))
+  private val vars      = Map(("None", OPTION(NOTHING)), (errRef, NOTHING))
+  private val functions = Seq(fraction, extract, isDefined, some, size, _isInstanceOf) ++ operators
 
-  lazy val instance =
-    EvaluationContext.build(letDefs = Map(("None", none), (errRef, err)),
-                            functions = Seq(fraction, extract, isDefined, some, size, _isInstanceOf) ++ operators)
+  lazy val evalContext     = EvaluationContext.build(letDefs = Map(("None", none), (errRef, err)), functions = functions)
+  lazy val compilerContext = CompilerContext.build(Seq.empty, vars, functions)
 
 }

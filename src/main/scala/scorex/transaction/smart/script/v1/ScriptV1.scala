@@ -10,7 +10,8 @@ import monix.eval.Coeval
 import scorex.transaction.smart.script.Script
 
 object ScriptV1 {
-  private val functionCosts: Map[FunctionHeader, Long] = EvaluationContext.functionCosts(com.wavesplatform.utils.dummyContext.functions.values)
+  private val functionCosts: Map[FunctionHeader, Long] =
+    EvaluationContext.functionCosts(com.wavesplatform.utils.dummyEvaluationContext.functions.values)
 
   private val checksumLength = 4
   private val maxComplexity  = 20 * functionCosts(FunctionHeader("sigVerify"))

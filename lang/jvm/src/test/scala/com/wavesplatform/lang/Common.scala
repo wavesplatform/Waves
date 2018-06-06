@@ -13,7 +13,7 @@ import scala.util.{Left, Right, Try}
 
 object Common {
 
-  def ev[T](context: EvaluationContext = PureContext.instance, expr: EXPR): (EvaluationContext, Either[ExecutionError, T]) =
+  def ev[T](context: EvaluationContext = PureContext.evalContext, expr: EXPR): (EvaluationContext, Either[ExecutionError, T]) =
     EvaluatorV1[T](context, expr)
 
   trait NoShrink {
@@ -40,9 +40,9 @@ object Common {
     case _                               => ??? // suppress pattern match warning
   }
 
-  val pointTypeA = PredefCaseType("PointA", List("X"  -> LONG, "YA" -> LONG))
-  val pointTypeB = PredefCaseType("PointB", List("X"  -> LONG, "YB" -> LONG))
-  val pointTypeC = PredefCaseType("PointC", List("YB" -> LONG))
+  val pointTypeA = CaseType("PointA", List("X"  -> LONG, "YA" -> LONG))
+  val pointTypeB = CaseType("PointB", List("X"  -> LONG, "YB" -> LONG))
+  val pointTypeC = CaseType("PointC", List("YB" -> LONG))
 
   val AorB    = UNION(List(CASETYPEREF(pointTypeA.typeRef.name), CASETYPEREF(pointTypeB.typeRef.name)))
   val AorBorC = UNION(List(CASETYPEREF(pointTypeA.typeRef.name), CASETYPEREF(pointTypeB.typeRef.name), CASETYPEREF(pointTypeC.typeRef.name)))

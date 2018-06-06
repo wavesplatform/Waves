@@ -13,7 +13,7 @@ import org.scalatest.{Matchers, PropSpec}
 
 class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
 
-  def withUnion(p: CaseObj): EvaluationContext = Monoid.combine(PureContext.instance, sampleUnionContext(p))
+  def withUnion(p: CaseObj): EvaluationContext = Monoid.combine(PureContext.evalContext, sampleUnionContext(p))
 
   property("patternMatching") {
     val sampleScript =
@@ -106,20 +106,21 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
   }
 
-  private def eval[T](code: String, ctx: EvaluationContext = PureContext.instance, genTypes: CompilerContext => Map[String, PredefBase] = { _ =>
+  private def eval[T](code: String, ctx: EvaluationContext = PureContext.evalContext, genTypes: CompilerContext => Map[String, DefinedType] = { _ =>
     Map.empty
-  }) = {
+  }): Either[String, T] = {
     val untyped = Parser(code).get.value
     require(untyped.size == 1)
-    val cctx = CompilerContext.fromEvaluationContext(
-      ctx,
-      sampleTypes.map(v => v.name -> v).toMap,
-      Map(PureContext.errRef -> PureContext.predefVars(PureContext.errRef), // need for match fails handling
-          "p"                -> AorBorC)
-    )
-    val types = genTypes(cctx)
-    val typed = CompilerV1(cctx.copy(predefTypes = types ++ cctx.predefTypes), untyped.head)
-    typed.flatMap(v => EvaluatorV1[T](ctx, v._1)._2)
+//    val cctx = CompilerContext.fromEvaluationContext(
+//      ctx,
+//      sampleTypes.map(v => v.name -> v).toMap,
+//      Map(PureContext.errRef -> PureContext.predefVars(PureContext.errRef), // need for match fails handling
+//          "p"                -> AorBorC)
+//    )
+//    val types = genTypes(cctx)
+//    val typed = CompilerV1(cctx.copy(predefTypes = types ++ cctx.predefTypes), untyped.head)
+//    typed.flatMap(v => EvaluatorV1[T](ctx, v._1)._2)
+    ???
   }
 
   property("function call") {

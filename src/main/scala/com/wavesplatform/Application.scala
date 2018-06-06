@@ -390,7 +390,6 @@ object Application extends ScorexLogging {
 
   def main(args: Array[String]): Unit = {
 
-
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
     // http://stackoverflow.com/a/17219327
     System.setProperty("sun.net.inetaddr.ttl", "0")

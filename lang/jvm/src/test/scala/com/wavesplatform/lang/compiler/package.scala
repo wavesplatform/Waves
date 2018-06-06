@@ -6,12 +6,12 @@ import com.wavesplatform.lang.Common.multiplierFunction
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, PredefCaseType, PredefFunction}
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, CaseType, PredefFunction}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.none
 
-package object typechecker {
+package object compiler {
 
-  val pointType = PredefCaseType("Point", List("x" -> LONG, "y" -> LONG))
+  val pointType = CaseType("Point", List("x" -> LONG, "y" -> LONG))
 
   val idT = PredefFunction("idT", 1, TYPEPARAM('T'), List("p1" -> TYPEPARAM('T')), "idT")(Right(_))
   val extract = PredefFunction("extract", 1, TYPEPARAM('T'), List("p1" -> OPTIONTYPEPARAM(TYPEPARAM('T'))), "extract") {
@@ -28,24 +28,13 @@ package object typechecker {
                    List("p1" -> TYPEPARAM('T'), "p2" -> TYPEPARAM('T')),
                    "functionWithTwoPrarmsOfTheSameType")(Right(_))
 
-  val ctx = Monoid.combine(
-    PureContext.instance,
-    EvaluationContext.build(
-      letDefs = Map(("None", none)),
+  val typeCheckerContext = Monoid.combine(
+    PureContext.compilerContext,
+    CompilerContext.build(
+      predefTypes = Seq(pointType, Common.pointTypeA, Common.pointTypeB),
+      varDefs = Map("None" -> OPTION(NOTHING), "p" -> Common.AorB),
       functions = Seq(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, unitOnNone, undefinedOptionLong, idOptionLong)
     )
   )
 
-  val typeCheckerContext = CompilerContext.fromEvaluationContext(
-    ctx |+| Common.sampleUnionContext(Common.pointAInstance),
-    Map(
-      pointType.name         -> pointType,
-      Common.pointTypeA.name -> Common.pointTypeA,
-      Common.pointTypeB.name -> Common.pointTypeB
-    ),
-    Map(
-      "None" -> OPTION(NOTHING),
-      "p"    -> Common.AorB
-    )
-  )
 }

@@ -11,8 +11,8 @@ import scorex.transaction._
 
 object BlockchainContext {
 
-  private val baseContext = Monoid.combine(PureContext.instance, CryptoContext.build(Global))
+  private val baseContext = Monoid.combine(PureContext.evalContext, CryptoContext.evalContext(Global))
 
   def build(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], blockchain: Blockchain): EvaluationContext =
-    Monoid.combine(baseContext, WavesContext.build(new WavesEnvironment(nByte, tx, h, blockchain)))
+    Monoid.combine(baseContext, WavesContext.evalContext(new WavesEnvironment(nByte, tx, h, blockchain)))
 }

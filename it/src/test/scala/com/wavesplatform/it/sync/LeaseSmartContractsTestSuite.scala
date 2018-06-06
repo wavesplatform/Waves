@@ -7,7 +7,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
-import com.wavesplatform.utils.dummyTypeCheckerContext
+import com.wavesplatform.utils.dummyCompilerContext
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.JsNumber
 import scorex.account.{AddressScheme, PrivateKeyAccount}
@@ -45,7 +45,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
         }
         """.stripMargin).get.value
       assert(sc.size == 1)
-      CompilerV1(dummyTypeCheckerContext, sc.head).explicitGet()._1
+      CompilerV1(dummyCompilerContext, sc.head).explicitGet()._1
     }
 
     val script = ScriptV1(scriptText).explicitGet()

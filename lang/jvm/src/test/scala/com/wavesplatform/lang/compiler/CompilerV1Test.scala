@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.typechecker
+package com.wavesplatform.lang.compiler
 
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.compiler

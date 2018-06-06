@@ -14,8 +14,8 @@ import scala.util.{Failure, Success, Try}
 
 object ScriptCompiler {
 
-  private val v1Compiler    = new CompilerV1(utils.dummyTypeCheckerContext)
-  private val functionCosts = EvaluationContext.functionCosts(utils.dummyContext.functions.values)
+  private val v1Compiler    = new CompilerV1(utils.dummyCompilerContext)
+  private val functionCosts = EvaluationContext.functionCosts(utils.dummyEvaluationContext.functions.values)
 
   def apply(scriptText: String): Either[String, (Script, Long)] = {
     val directives = DirectiveParser(scriptText)

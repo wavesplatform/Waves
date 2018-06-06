@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.typechecker
+package com.wavesplatform.lang.compiler
 
 import com.wavesplatform.lang.Common.{NoShrink, multiplierFunction, produce}
 import com.wavesplatform.lang.v1.compiler.CompilerV1

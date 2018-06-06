@@ -38,7 +38,7 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
       """.stripMargin
     val untyped = Parser(script).get.value
     assert(untyped.size == 1)
-    CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()._1
+    CompilerV1(dummyCompilerContext, untyped.head).explicitGet()._1
   }
 
   val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, TransferTransactionV2, Seq[ByteStr])] = for {

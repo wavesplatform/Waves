@@ -20,7 +20,7 @@ import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def ev[T](context: EvaluationContext = PureContext.instance, expr: EXPR): (EvaluationContext, Either[ExecutionError, T]) =
+  private def ev[T](context: EvaluationContext = PureContext.evalContext, expr: EXPR): (EvaluationContext, Either[ExecutionError, T]) =
     EvaluatorV1[T](context, expr)
   private def simpleDeclarationAndUsage(i: Int) = BLOCK(LET("x", CONST_LONG(i)), REF("x"))
 
@@ -111,10 +111,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("custom type field access") {
-    val pointType     = PredefCaseType("Point", List("X"   -> LONG, "Y"         -> LONG))
+    val pointType     = CaseType("Point", List("X"         -> LONG, "Y"         -> LONG))
     val pointInstance = CaseObj(pointType.typeRef, Map("X" -> Val(LONG)(3), "Y" -> Val(LONG)(4)))
     ev[Long](
-      context = PureContext.instance |+| EvaluationContext(
+      context = PureContext.evalContext |+| EvaluationContext(
         letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance)))),
         functions = Map.empty
       ),
@@ -123,9 +123,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("lazy let evaluation doesn't throw if not used") {
-    val pointType     = PredefCaseType("Point", List(("X", LONG), ("Y", LONG)))
+    val pointType     = CaseType("Point", List(("X", LONG), ("Y", LONG)))
     val pointInstance = CaseObj(pointType.typeRef, Map("X" -> Val(LONG)(3), "Y" -> Val(LONG)(4)))
-    val context = PureContext.instance |+| EvaluationContext(
+    val context = PureContext.evalContext |+| EvaluationContext(
       letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance))), ("badVal", LazyVal(EitherT.leftT("Error")))),
       functions = Map.empty
     )
@@ -143,7 +143,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       Right(1L)
     }
 
-    val context = PureContext.instance |+| EvaluationContext(
+    val context = PureContext.evalContext |+| EvaluationContext(
       letDefs = Map.empty,
       functions = Map(f.header -> f)
     )
@@ -157,7 +157,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("successful on ref getter evaluation") {
-    val fooType = PredefCaseType("Foo", List(("bar", STRING), ("buz", LONG)))
+    val fooType = CaseType("Foo", List(("bar", STRING), ("buz", LONG)))
 
     val fooInstance = CaseObj(fooType.typeRef, Map("bar" -> Val(STRING)("bAr"), "buz" -> Val(LONG)(1L)))
 
@@ -172,7 +172,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("successful on function call getter evaluation") {
-    val fooType = PredefCaseType("Foo", List(("bar", STRING), ("buz", LONG)))
+    val fooType = CaseType("Foo", List(("bar", STRING), ("buz", LONG)))
     val fooCtor = PredefFunction("createFoo", 1, fooType.typeRef, List.empty, "createFoo") { _ =>
       Right(
         CaseObj(fooType.typeRef, Map("bar" -> Val(STRING)("bAr"), "buz" -> Val(LONG)(1L)))
@@ -191,7 +191,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("successful on block getter evaluation") {
-    val fooType = PredefCaseType("Foo", List(("bar", STRING), ("buz", LONG)))
+    val fooType = CaseType("Foo", List(("bar", STRING), ("buz", LONG)))
     val fooCtor = PredefFunction("createFoo", 1, fooType.typeRef, List.empty, "createFoo") { _ =>
       Right(
         CaseObj(fooType.typeRef,
@@ -282,7 +282,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   private def sigVerifyTest(bodyBytes: Array[Byte],
                             publicKey: PublicKey,
                             signature: Signature): (EvaluationContext, Either[ExecutionError, Boolean]) = {
-    val txType = PredefCaseType(
+    val txType = CaseType(
       "Transaction",
       List(
         "bodyBytes" -> BYTEVECTOR,
@@ -302,8 +302,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val context = Monoid.combineAll(
       Seq(
-        PureContext.instance,
-        CryptoContext.build(Global),
+        PureContext.evalContext,
+        CryptoContext.evalContext(Global),
         EvaluationContext.build(
           letDefs = Map("tx" -> LazyVal(EitherT.pure(txObj))),
           functions = Seq.empty
@@ -329,7 +329,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
                        bobPK: PublicKey,
                        aliceProof: Signature,
                        bobProof: Signature): (EvaluationContext, Either[ExecutionError, Boolean]) = {
-    val txType = PredefCaseType(
+    val txType = CaseType(
       "Transaction",
       List(
         "bodyBytes" -> BYTEVECTOR,
@@ -349,25 +349,32 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
     )
 
+    val vars: Map[String, (TYPE, LazyVal)] = Map(
+      "tx"          -> (txType.typeRef, LazyVal(EitherT.pure(txObj))),
+      "alicePubKey" -> (BYTEVECTOR, LazyVal(EitherT.pure(ByteVector(alicePK)))),
+      "bobPubKey"   -> (BYTEVECTOR, LazyVal(EitherT.pure(ByteVector(bobPK))))
+    )
+
     val context = Monoid.combineAll(
       Seq(
-        PureContext.instance,
-        CryptoContext.build(Global),
+        PureContext.evalContext,
+        CryptoContext.evalContext(Global),
         EvaluationContext.build(
-          letDefs = Map(
-            "tx"          -> LazyVal(EitherT.pure(txObj)),
-            "alicePubKey" -> LazyVal(EitherT.pure(ByteVector(alicePK))),
-            "bobPubKey"   -> LazyVal(EitherT.pure(ByteVector(bobPK)))
-          ),
+          letDefs = vars.mapValues(_._2),
           functions = Seq.empty
         )
       ))
 
-    val compilerContext =
-      CompilerContext.fromEvaluationContext(context,
-                                            Map(txType.name -> txType),
-                                            Map("tx"        -> txType.typeRef, "alicePubKey" -> BYTEVECTOR, "bobPubKey" -> BYTEVECTOR))
-
+    val compilerContext = Monoid.combineAll(
+      Seq(
+        PureContext.compilerContext,
+        CryptoContext.compilerContext(Global),
+        CompilerContext.build(
+          predefTypes = Seq.empty,
+          varDefs = vars.mapValues(_._1),
+          functions = Seq.empty
+        )
+      ))
     val script =
       s"""
          |let aliceSigned  = sigVerify(tx.bodyBytes, tx.proof0, alicePubKey)
@@ -393,8 +400,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   private def hashFuncTest(bodyBytes: Array[Byte], funcName: String): (EvaluationContext, Either[ExecutionError, ByteVector]) = {
     val context = Monoid.combineAll(
       Seq(
-        PureContext.instance,
-        CryptoContext.build(Global)
+        PureContext.evalContext,
+        CryptoContext.evalContext(Global)
       )
     )
 

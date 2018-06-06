@@ -1,10 +1,10 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import cats.data.EitherT
+import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.traits._
 import monix.eval.Coeval
 import scodec.bits.ByteVector
@@ -14,7 +14,7 @@ object WavesContext {
   import Bindings._
   import Types._
 
-  def build(env: Environment): EvaluationContext = {
+  private def build(env: Environment): (Map[String, (TYPE, LazyVal)], Seq[PredefFunction]) = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getdataF(name: String, dataType: DataType) =
@@ -28,12 +28,13 @@ object WavesContext {
     val getByteArrayF: PredefFunction = getdataF("getByteArray", DataType.ByteArray)
     val getStringF: PredefFunction    = getdataF("getString", DataType.String)
 
-    val addressFromPublicKeyF: PredefFunction = PredefFunction("addressFromPublicKey", 100, addressType.typeRef, List(("publicKey", BYTEVECTOR)), "addressFromPublicKey") {
-      case (pk: ByteVector) :: Nil =>
-        val r = environmentFunctions.addressFromPublicKey(pk)
-        Right(CaseObj(addressType.typeRef, Map("bytes" -> Val(BYTEVECTOR)(r))))
-      case _ => ???
-    }
+    val addressFromPublicKeyF: PredefFunction =
+      PredefFunction("addressFromPublicKey", 100, addressType.typeRef, List(("publicKey", BYTEVECTOR)), "addressFromPublicKey") {
+        case (pk: ByteVector) :: Nil =>
+          val r = environmentFunctions.addressFromPublicKey(pk)
+          Right(CaseObj(addressType.typeRef, Map("bytes" -> Val(BYTEVECTOR)(r))))
+        case _ => ???
+      }
 
     val addressFromStringF: PredefFunction = PredefFunction("addressFromString", 100, optionAddress, List(("string", STRING)), "addressFromString") {
       case (addressString: String) :: Nil =>
@@ -89,22 +90,30 @@ object WavesContext {
         case _                       => ???
       }
 
-    EvaluationContext.build(
-      letDefs = Map(("height", LazyVal(EitherT(heightCoeval))), ("tx", LazyVal(EitherT(txCoeval)))),
-      functions = Seq(
-        txByIdF,
-        txHeightByIdF,
-        getLongF,
-        getBooleanF,
-        getByteArrayF,
-        getStringF,
-        addressFromPublicKeyF,
-        addressFromStringF,
-        addressFromRecipientF,
-        accountBalanceF,
-        accountAssetBalanceF
-      )
+    val vars = Map(("height", (LONG, LazyVal(EitherT(heightCoeval)))), ("tx", (outgoingTransactionType, LazyVal(EitherT(txCoeval)))))
+    val functions = Seq(
+      txByIdF,
+      txHeightByIdF,
+      getLongF,
+      getBooleanF,
+      getByteArrayF,
+      getStringF,
+      addressFromPublicKeyF,
+      addressFromStringF,
+      addressFromRecipientF,
+      accountBalanceF,
+      accountAssetBalanceF
     )
+    (vars, functions)
   }
-  var predefVars = PureContext.predefVars ++ Map(("height", LONG), ("tx", outgoingTransactionType))
+
+  def evalContext(env: Environment): EvaluationContext = {
+    val (vars, funcs) = build(env)
+    EvaluationContext.build(vars.mapValues(_._2), funcs)
+  }
+  def compilerContext(env: Environment): CompilerContext = {
+    val (vars, funcs) = build(env)
+    CompilerContext.build(Types.wavesTypes, vars.mapValues(_._1), funcs)
+  }
+
 }
