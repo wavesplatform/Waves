@@ -49,7 +49,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure 
   "and sync again" in Await.result(
     for {
       baseHeight <- traverse(nodes)(_.height).map(_.max)
-      _          <- nodes.waitForSameBlocksAt(baseHeight + 5)
+      _          <- nodes.waitForSameBlockHeadesAt(baseHeight + 5)
     } yield (),
     5.minutes
   )

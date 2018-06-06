@@ -105,13 +105,13 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     assert(data2 == List(entry3, entry2))
 
     for (n <- nodes) n.rollback(tx1height, returnToUTX = false)
-    nodes.waitForSameBlocksAt(tx1height)
+    nodes.waitForSameBlockHeadesAt(tx1height)
 
     val data1 = node.getData(firstAddress)
     assert(data1 == List(entry1))
 
     for (n <- nodes) n.rollback(tx1height - 1, returnToUTX = false)
-    nodes.waitForSameBlocksAt(tx1height - 1)
+    nodes.waitForSameBlockHeadesAt(tx1height - 1)
 
     val data0 = node.getData(firstAddress)
     assert(data0 == List.empty)
