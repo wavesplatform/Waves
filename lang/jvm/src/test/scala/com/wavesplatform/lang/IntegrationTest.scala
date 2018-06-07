@@ -126,6 +126,20 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long]("10 + 2") shouldBe Right(12)
   }
 
+  property("max values") {
+    val longMax = Long.MaxValue
+    val longMin = Long.MinValue
+//    eval(s"$longMax + 1 - 1") shouldBe Left("long overflow")
+//    eval(s"$longMin - 1 + 1") shouldBe Left("long overflow")
+//    eval(s"$longMax - 1 + 1") shouldBe Right(longMax)
+//    eval(s"$longMin + 1 - 1") shouldBe Right(longMin)
+    eval(s"$longMax * 2") shouldBe Left("long overflow")
+    //  eval(s"$longMax * 1.1") shouldBe Right(longMax)
+    //eval(s"$longMax / $longMin + 1") shouldBe Right(0)
+    eval(s"($longMax / 2) * 2") shouldBe Right(longMax - 1)
+
+  }
+
   property("equals works on primitive types") {
     eval[Boolean]("base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8' == base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8'") shouldBe Right(true)
     eval[Boolean]("1 == 2") shouldBe Right(false)
@@ -146,8 +160,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Boolean]("let mshUmcl = (if(true) then true else true); true || mshUmcl") shouldBe Right(true)
     eval[Long]("""if(((1+-1)==-1)) then 1 else (1+1)""") shouldBe Right(2)
     eval[Boolean]("""((((if(true) then 1 else 1)==2)||((if(true)
-                    |then true else true)&&(true||true)))||(if(((1>1)||(-1>=-1)))
-                    |then (-1>=1) else false))""".stripMargin) shouldBe Right(true)
+        |then true else true)&&(true||true)))||(if(((1>1)||(-1>=-1)))
+        |then (-1>=1) else false))""".stripMargin) shouldBe Right(true)
   }
 
   property("sum/mul/div/mod/fraction functions") {
