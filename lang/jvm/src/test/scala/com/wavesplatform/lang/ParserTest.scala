@@ -333,6 +333,16 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       LET(0, 11, PART.INVALID(4, 7, "keywords are restricted: let"), CONST_LONG(10, 11, 1), Seq.empty),
       TRUE(12, 16)
     )
+
+    import com.wavesplatform.helpers._
+    import com.wavesplatform.helpers.ExprMatcher._
+    import com.wavesplatform.helpers.PositionMatcher._
+
+    parseOne(script) shouldBe Block(
+      StartEndMatch(0, 16),
+      Let(StartEndMatch(0, 11), PartInvalid(StartEndMatch(4, 7), "keywords are restricted: let"), ConstLong(StartEndMatch(10, 11), 1)),
+      True(StartEndMatch(12, 16))
+    )
   }
 
   List("then", "else", "true").foreach { keyword =>
