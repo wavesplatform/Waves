@@ -258,19 +258,14 @@ object Parser {
     P(binaryOp(fallBackAtom, opsByPriority) | fallBackAtom)
   }
 
-  private def binaryOp(atom: P[EXPR], rest: List[BinaryOperation]): P[EXPR] = rest match {
+  private def binaryOp(atom: P[EXPR], rest: List[List[BinaryOperation]]): P[EXPR] = rest match {
     case Nil => unaryOp(atom, unaryOps)
-    case kind :: restOps =>
+    case kinds :: restOps =>
       val operand = binaryOp(atom, restOps)
-      P(
-        Index ~~
-          operand ~
-          (kind.parser.!.map(_ => kind) ~
-            (NoCut(operand) | Index.map(i => INVALID(i, i, "expected a second operator", None)))).rep() ~~
-          Index
-      ).map {
+      val kind = kinds.map(_.parser).reduce((pl,pr) => P(pl | pr))
+      P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(i, i, "expected a second operator", None)))).rep() ~~ Index).map {
         case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)], end) =>
-          r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, end, acc, currOperand) }
+          r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.end, acc, currOperand) }
       }
   }
 
