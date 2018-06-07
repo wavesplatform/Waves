@@ -1,10 +1,10 @@
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient, Tx}
 import fastparse.core.Parsed.{Failure, Success}
@@ -39,49 +39,50 @@ object JsAPI {
 
   @JSExportTopLevel("compile")
   def compile(input: String): js.Dynamic = {
-//
-//    val c = WavesContext.build(new Environment {
-//      override def height: Int                                                                                       = ???
-//      override def networkByte: Byte                                                                                 = ???
-//      override def transaction: Tx                                                                                   = ???
-//      override def transactionById(id: Array[Byte]): Option[Tx]                                                      = ???
-//      override def transactionHeightById(id: Array[Byte]): Option[Int]                                               = ???
-//      override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any]                     = ???
-//      override def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = ???
-//      override def resolveAlias(name: String): Either[String, Recipient.Address]                                     = ???
-//    })
-//
-//    val b = Monoid.combine(c, CryptoContext.build(Global))
-//    val d = Monoid.combine(b, PureContext.evalContext)
-//
-//    def serialize(expr: EXPR): Either[String, Array[Byte]] = {
-//      Serde.codec
-//        .encode(expr)
-//        .map(x => {
-//          val s = Array(1.toByte) ++ x.toByteArray
-//          s ++ hash(s).take(4)
-//        }) match {
-//        case Successful(value)      => Right[String, Array[Byte]](value)
-//        case Attempt.Failure(cause) => Left[String, Array[Byte]](cause.message)
-//      }
-//    }
-//
-//    def hash(m: Array[Byte]) = Global.keccak256(Global.blake2b256(m))
-//
-//    (Parser(input) match {
-//      case Success(value, _)    => Right[String, Expressions.EXPR](value.head)
-//      case Failure(_, _, extra) => Left[String, Expressions.EXPR](extra.traced.trace)
-//    }).flatMap(CompilerV1(CompilerContext.fromEvaluationContext(d, Map.empty, Map.empty), _))
-//      .flatMap(ast => serialize(ast._1).map(x => (x, ast)))
-//      .fold(
-//        err => {
-//          js.Dynamic.literal("error" -> err)
-//        }, {
-//          case (result, ast) =>
-//            // js.Dynamic.literal("result" -> result)
-//            js.Dynamic.literal("result" -> Global.toBuffer(result), "ast" -> toJs(ast._1))
-//        }
-//      )
+
+    val wavesContext = WavesContext.build(new Environment {
+      override def height: Int                                                                                       = ???
+      override def networkByte: Byte                                                                                 = ???
+      override def transaction: Tx                                                                                   = ???
+      override def transactionById(id: Array[Byte]): Option[Tx]                                                      = ???
+      override def transactionHeightById(id: Array[Byte]): Option[Int]                                               = ???
+      override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any]                     = ???
+      override def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = ???
+      override def resolveAlias(name: String): Either[String, Recipient.Address]                                     = ???
+    })
+
+    val cryptoContext = CryptoContext.build(Global)
+
+    val compilerContext = Monoid.combineAll(Seq(PureContext.ctx, cryptoContext, wavesContext)).compilerContext
+
+    def hash(m: Array[Byte]) = Global.keccak256(Global.blake2b256(m))
+
+    def serialize(expr: EXPR): Either[String, Array[Byte]] = {
+      Serde.codec
+        .encode(expr)
+        .map(x => {
+          val s = Array(1.toByte) ++ x.toByteArray
+          s ++ hash(s).take(4)
+        }) match {
+        case Successful(value)      => Right[String, Array[Byte]](value)
+        case Attempt.Failure(cause) => Left[String, Array[Byte]](cause.message)
+      }
+    }
+
+    (Parser(input) match {
+      case Success(value, _)    => Right[String, Expressions.EXPR](value.head)
+      case Failure(_, _, extra) => Left[String, Expressions.EXPR](extra.traced.trace)
+    }).flatMap(CompilerV1(compilerContext, _))
+      .flatMap(ast => serialize(ast._1).map(x => (x, ast)))
+      .fold(
+        err => {
+          js.Dynamic.literal("error" -> err)
+        }, {
+          case (result, ast) =>
+            // js.Dynamic.literal("result" -> result)
+            js.Dynamic.literal("result" -> Global.toBuffer(result), "ast" -> toJs(ast._1))
+        }
+      )
     ???
   }
 }
