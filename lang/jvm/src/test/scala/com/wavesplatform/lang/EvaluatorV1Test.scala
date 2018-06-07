@@ -1,17 +1,17 @@
 package com.wavesplatform.lang
+
 import cats.data.EitherT
 import cats.kernel.Monoid
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
-import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
@@ -22,6 +22,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   private def ev[T](context: EvaluationContext = PureContext.evalContext, expr: EXPR): (EvaluationContext, Either[ExecutionError, T]) =
     EvaluatorV1[T](context, expr)
+
   private def simpleDeclarationAndUsage(i: Int) = BLOCK(LET("x", CONST_LONG(i)), REF("x"))
 
   property("successful on very deep expressions (stack overflow check)") {
@@ -357,24 +358,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val context = Monoid.combineAll(
       Seq(
-        PureContext.evalContext,
-        CryptoContext.evalContext(Global),
-        EvaluationContext.build(
-          letDefs = vars.mapValues(_._2),
-          functions = Seq.empty
-        )
+        PureContext.ctx,
+        CryptoContext.build(Global),
+        CTX(Seq(txType), vars, Seq.empty)
       ))
 
-    val compilerContext = Monoid.combineAll(
-      Seq(
-        PureContext.compilerContext,
-        CryptoContext.compilerContext(Global),
-        CompilerContext.build(
-          predefTypes = Seq.empty,
-          varDefs = vars.mapValues(_._1),
-          functions = Seq.empty
-        )
-      ))
     val script =
       s"""
          |let aliceSigned  = sigVerify(tx.bodyBytes, tx.proof0, alicePubKey)
@@ -383,10 +371,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
          |aliceSigned && bobSigned
    """.stripMargin
 
-    ev[Boolean](
-      context = context,
-      expr = new CompilerV1(compilerContext).compile(script, List.empty).explicitGet()
-    )
+    ev[Boolean](context.evaluationContext, new CompilerV1(context.compilerContext).compile(script, List.empty).explicitGet())
   }
 
   property("checking a hash of some message by crypto function invoking") {

@@ -1,13 +1,11 @@
 package com.wavesplatform.lang
 
 import cats.kernel.Monoid
-import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common.multiplierFunction
-import com.wavesplatform.lang.v1.compiler.CompilerContext
+import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, CaseType, PredefFunction}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.none
+import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, PredefFunction}
 
 package object compiler {
 
@@ -28,13 +26,15 @@ package object compiler {
                    List("p1" -> TYPEPARAM('T'), "p2" -> TYPEPARAM('T')),
                    "functionWithTwoPrarmsOfTheSameType")(Right(_))
 
-  val typeCheckerContext = Monoid.combine(
-    PureContext.compilerContext,
-    CompilerContext.build(
-      predefTypes = Seq(pointType, Common.pointTypeA, Common.pointTypeB),
-      varDefs = Map("None" -> OPTION(NOTHING), "p" -> Common.AorB),
-      functions = Seq(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, unitOnNone, undefinedOptionLong, idOptionLong)
+  val compilerContext = Monoid
+    .combine(
+      PureContext.ctx,
+      CTX(
+        Seq(pointType, Common.pointTypeA, Common.pointTypeB),
+        Map("p" -> (Common.AorB, null)),
+        Seq(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, unitOnNone, undefinedOptionLong, idOptionLong)
+      )
     )
-  )
+    .compilerContext
 
 }

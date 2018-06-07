@@ -1,14 +1,14 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import com.wavesplatform.lang.v1.compiler.Terms.{BOOLEAN, BYTEVECTOR, STRING}
-import com.wavesplatform.lang.v1.BaseGlobal
+import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, PredefFunction}
 import scodec.bits.ByteVector
 
 object CryptoContext {
 
-  private def cryptoFunctions(global: BaseGlobal) = {
+  def build(global: BaseGlobal) = {
 
     def hashFunction(name: String, cost: Long)(h: Array[Byte] => Array[Byte]) =
       PredefFunction(name, cost, BYTEVECTOR, List(("bytes", BYTEVECTOR)), name) {
@@ -36,9 +36,9 @@ object CryptoContext {
       case (bytes: ByteVector) :: Nil => global.base64Encode(bytes.toArray)
       case _                          => ???
     }
-    Seq(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF, toBase64StringF)
+    CTX(Seq.empty, Map.empty, Seq(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF, toBase64StringF))
   }
 
-  def evalContext(global: BaseGlobal): EvaluationContext   = EvaluationContext.build(Map.empty, cryptoFunctions(global))
-  def compilerContext(global: BaseGlobal): CompilerContext = CompilerContext.build(Seq.empty, Map.empty, cryptoFunctions(global))
+  def evalContext(global: BaseGlobal): EvaluationContext   = build(global).evaluationContext
+  def compilerContext(global: BaseGlobal): CompilerContext = build(global).compilerContext
 }

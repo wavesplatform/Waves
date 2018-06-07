@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.compiler.CompilerContext
+import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
@@ -14,7 +14,7 @@ object WavesContext {
   import Bindings._
   import Types._
 
-  private def build(env: Environment): (Map[String, (TYPE, LazyVal)], Seq[PredefFunction]) = {
+  def build(env: Environment): CTX = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getdataF(name: String, dataType: DataType) =
@@ -90,7 +90,8 @@ object WavesContext {
         case _                       => ???
       }
 
-    val vars = Map(("height", (LONG, LazyVal(EitherT(heightCoeval)))), ("tx", (outgoingTransactionType, LazyVal(EitherT(txCoeval)))))
+    val vars: Map[String, (TYPE, LazyVal)] =
+      Map(("height", (LONG, LazyVal(EitherT(heightCoeval)))), ("tx", (outgoingTransactionType, LazyVal(EitherT(txCoeval)))))
     val functions = Seq(
       txByIdF,
       txHeightByIdF,
@@ -104,16 +105,6 @@ object WavesContext {
       accountBalanceF,
       accountAssetBalanceF
     )
-    (vars, functions)
+    CTX(Types.wavesTypes, vars, functions)
   }
-
-  def evalContext(env: Environment): EvaluationContext = {
-    val (vars, funcs) = build(env)
-    EvaluationContext.build(vars.mapValues(_._2), funcs)
-  }
-  def compilerContext(env: Environment): CompilerContext = {
-    val (vars, funcs) = build(env)
-    CompilerContext.build(Types.wavesTypes, vars.mapValues(_._1), funcs)
-  }
-
 }

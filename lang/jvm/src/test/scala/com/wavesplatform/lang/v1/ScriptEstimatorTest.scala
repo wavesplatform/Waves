@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1
 
 import cats.data.EitherT
+import cats.kernel.Monoid
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -22,18 +23,15 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
   val FunctionCosts: Map[FunctionHeader, Long] = Map(Plus -> 100, Minus -> 10, Gt -> 10)
 
   private val ctx: CompilerContext = {
-    // make up a `tx` object
-//    val tx = CaseObj(transferTransactionType.typeRef, Map("amount" -> Val(LONG)(100000000)))
-//    val txCtx = EvaluationContext(
-//      letDefs = Map("tx" -> LazyVal(EitherT.pure(tx))),
-//      functions = Map.empty
-//    )
-//    CompilerContext.fromEvaluationContext(
-//      PureContext.evalContext |+| txCtx,
-//      Map(transferTransactionType.name -> transferTransactionType),
-//      Map("tx"                         -> transferTransactionType.typeRef)
-//    )
-    ???
+    val tx = CaseObj(transferTransactionType.typeRef, Map("amount" -> Val(LONG)(100000000)))
+    Monoid
+      .combine(PureContext.ctx,
+               CTX(
+                 Seq(transferTransactionType),
+                 Map("tx" -> (transferTransactionType.typeRef, LazyVal(EitherT.pure(tx)))),
+                 Seq.empty
+               ))
+      .compilerContext
   }
 
   private def compile(code: String): EXPR = {

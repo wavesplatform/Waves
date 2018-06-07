@@ -86,7 +86,7 @@ package object utils extends ScorexLogging {
     Monoid.combineAll(
       Seq(
         CryptoContext.compilerContext(Global),
-        WavesContext.compilerContext(new WavesEnvironment(dummyNetworkByte, Coeval(???), Coeval(???), null)),
+        WavesContext.build(new WavesEnvironment(dummyNetworkByte, Coeval(???), Coeval(???), null)).compilerContext,
         PureContext.compilerContext
       ))
 

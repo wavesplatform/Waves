@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.compiler
 
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.evaluator.ctx.CaseObj
+import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, CaseType}
 import scodec.bits.ByteVector
 
 object Terms {
@@ -33,6 +33,9 @@ object Terms {
   case class CASETYPEREF(name: String)   extends AUTO_TAGGED_TYPE[CaseObj]
   case class UNION(l: List[CASETYPEREF]) extends AUTO_TAGGED_TYPE[CaseObj]
   object UNION {
+
+    def of(l: CaseType*): UNION = UNION(l.map(_.typeRef).toList)
+
     def apply(l: CASETYPEREF*): UNION = new UNION(l.toList)
 
     implicit class UnionExt(l1: UNION) {
@@ -47,15 +50,15 @@ object Terms {
 
   sealed abstract class EXPR
   case class LET(name: String, value: EXPR)
-  case class CONST_LONG(t: Long)                                                               extends EXPR
+  case class CONST_LONG(t: Long)                                       extends EXPR
   case class GETTER(expr: EXPR, field: String)                         extends EXPR
-  case class CONST_BYTEVECTOR(bs: ByteVector)                                                  extends EXPR
-  case class CONST_STRING(s: String)                                                           extends EXPR
+  case class CONST_BYTEVECTOR(bs: ByteVector)                          extends EXPR
+  case class CONST_STRING(s: String)                                   extends EXPR
   case class BLOCK(let: LET, body: EXPR)                               extends EXPR
   case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)               extends EXPR
   case class REF(key: String)                                          extends EXPR
-  case object TRUE                                                                             extends EXPR
-  case object FALSE                                                                            extends EXPR
+  case object TRUE                                                     extends EXPR
+  case object FALSE                                                    extends EXPR
   case class FUNCTION_CALL(function: FunctionHeader, args: List[EXPR]) extends EXPR
 
 }

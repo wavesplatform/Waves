@@ -1,11 +1,11 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.compiler.CompilerContext
-import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, EvaluationContext, LazyVal, PredefFunction}
-import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.BinaryOperation
+import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, LazyVal, PredefFunction}
+import com.wavesplatform.lang.v1.parser.BinaryOperation
+import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 
@@ -151,10 +151,11 @@ object PureContext {
     uNot
   )
 
-  private val vars      = Map(("None", OPTION(NOTHING)), (errRef, NOTHING))
+  private val vars      = Map(("None", (OPTION(NOTHING), none)), (errRef, (NOTHING, err)))
   private val functions = Seq(fraction, extract, isDefined, some, size, _isInstanceOf) ++ operators
 
-  lazy val evalContext     = EvaluationContext.build(letDefs = Map(("None", none), (errRef, err)), functions = functions)
-  lazy val compilerContext = CompilerContext.build(Seq.empty, vars, functions)
+  lazy val ctx             = CTX(Seq.empty, vars, functions)
+  lazy val evalContext     = ctx.evaluationContext
+  lazy val compilerContext = ctx.compilerContext
 
 }

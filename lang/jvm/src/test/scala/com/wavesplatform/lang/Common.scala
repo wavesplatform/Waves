@@ -2,10 +2,10 @@ package com.wavesplatform.lang
 
 import cats.data.EitherT
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.{CASETYPEREF, EXPR, LONG, UNION}
+import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, LONG, UNION}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import org.scalacheck.Shrink
 import org.scalatest.matchers.{MatchResult, Matcher}
 
@@ -44,14 +44,15 @@ object Common {
   val pointTypeB = CaseType("PointB", List("X"  -> LONG, "YB" -> LONG))
   val pointTypeC = CaseType("PointC", List("YB" -> LONG))
 
-  val AorB    = UNION(List(CASETYPEREF(pointTypeA.typeRef.name), CASETYPEREF(pointTypeB.typeRef.name)))
-  val AorBorC = UNION(List(CASETYPEREF(pointTypeA.typeRef.name), CASETYPEREF(pointTypeB.typeRef.name), CASETYPEREF(pointTypeC.typeRef.name)))
+  val AorB    = UNION.of(pointTypeA, pointTypeB)
+  val AorBorC = UNION.of(pointTypeA, pointTypeB, pointTypeC)
+  val BorC    = UNION.of(pointTypeB, pointTypeC)
 
   val pointAInstance = CaseObj(pointTypeA.typeRef, Map("X"  -> Val(LONG)(3), "YA" -> Val(LONG)(40)))
   val pointBInstance = CaseObj(pointTypeB.typeRef, Map("X"  -> Val(LONG)(3), "YB" -> Val(LONG)(41)))
   val pointCInstance = CaseObj(pointTypeC.typeRef, Map("YB" -> Val(LONG)(42)))
 
-  val sampleTypes = Seq(pointTypeA, pointTypeB, pointTypeC)
+  val sampleTypes: Seq[DefinedType] = Seq(pointTypeA, pointTypeB, pointTypeC) ++ Seq(UnionType("PointAB", AorB.l), UnionType("PointBC", BorC.l))
 
   def sampleUnionContext(instance: CaseObj) =
     EvaluationContext.build(Map("p" -> LazyVal(EitherT.pure(instance))), Seq.empty)

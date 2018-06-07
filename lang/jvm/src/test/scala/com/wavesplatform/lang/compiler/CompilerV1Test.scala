@@ -16,7 +16,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
 
   property("should infer generic function return type") {
     import com.wavesplatform.lang.v1.parser.Expressions._
-    val Right(v) = CompilerV1(typeCheckerContext, FUNCTION_CALL(0, 0, PART.VALID(0, 0, idT.name), List(CONST_LONG(0, 0, 1))))
+    val Right(v) = CompilerV1(compilerContext, FUNCTION_CALL(0, 0, PART.VALID(0, 0, idT.name), List(CONST_LONG(0, 0, 1))))
     v._2 shouldBe LONG
   }
 
@@ -24,14 +24,14 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
     import com.wavesplatform.lang.v1.parser.Expressions._
     val Right(v) =
       CompilerV1(
-        typeCheckerContext,
+        compilerContext,
         FUNCTION_CALL(0, 0, PART.VALID(0, 0, extract.name), List(FUNCTION_CALL(0, 0, PART.VALID(0, 0, undefinedOptionLong.name), List.empty)))
       )
     v._2 shouldBe LONG
   }
 
   treeTypeTest("unitOnNone(NONE)")(
-    ctx = typeCheckerContext,
+    ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(0,
                                      0,
                                      Expressions.PART.VALID(0, 0, unitOnNone.name),
@@ -45,7 +45,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
     }
 
     val expectedResult = Right(LONG)
-    CompilerV1(typeCheckerContext, expr).map(_._2) match {
+    CompilerV1(compilerContext, expr).map(_._2) match {
       case Right(x)    => Right(x) shouldBe expectedResult
       case e @ Left(_) => e shouldBe expectedResult
     }
@@ -75,7 +75,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   )
 
   treeTypeTest("MULTIPLY(1,2)")(
-    ctx = typeCheckerContext,
+    ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(
       0,
       0,
@@ -86,7 +86,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   )
 
   treeTypeTest("idOptionLong(NONE)")(
-    ctx = typeCheckerContext,
+    ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(
       0,
       0,
@@ -97,7 +97,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   )
 
   treeTypeTest("idOptionLong(SOME(NONE))")(
-    ctx = typeCheckerContext,
+    ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(
       0,
       0,
@@ -115,7 +115,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   )
 
   treeTypeTest("idOptionLong(SOME(CONST_LONG(3)))")(
-    ctx = typeCheckerContext,
+    ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(
       0,
       0,
@@ -135,7 +135,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   )
 
   treeTypeTest("pattern matching - allow shadowing of ref with the same name")(
-    ctx = typeCheckerContext,
+    ctx = compilerContext,
     expr = Expressions.MATCH(
       0,
       0,
@@ -180,7 +180,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   )
 
   treeTypeTest("pattern matching - deny shadowing of other variable")(
-    ctx = typeCheckerContext,
+    ctx = compilerContext,
     expr = Expressions.BLOCK(
       0,
       0,
@@ -211,7 +211,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   )
 
   treeTypeTest("pattern matching - deny shadowing in non-ref")(
-    ctx = typeCheckerContext,
+    ctx = compilerContext,
     expr = Expressions.MATCH(
       0,
       0,
@@ -242,7 +242,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   )
 
   treeTypeTest("Invalid LET")(
-    ctx = typeCheckerContext,
+    ctx = compilerContext,
     expr = Expressions.BLOCK(
       0,
       0,
@@ -253,37 +253,37 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   )
 
   treeTypeTest("Invalid GETTER")(
-    ctx = typeCheckerContext,
+    ctx = compilerContext,
     expr = Expressions.GETTER(0, 0, Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "x")), Expressions.PART.INVALID(2, 3, "can't parse")),
     expectedResult = Left("Compilation failed: can't parse in 2-3")
   )
 
   treeTypeTest("Invalid BYTEVECTOR")(
-    ctx = typeCheckerContext,
+    ctx = compilerContext,
     expr = Expressions.CONST_BYTEVECTOR(0, 0, Expressions.PART.INVALID(0, 0, "can't parse")),
     expectedResult = Left("Compilation failed: can't parse in 0-0")
   )
 
   treeTypeTest("Invalid STRING")(
-    ctx = typeCheckerContext,
+    ctx = compilerContext,
     expr = Expressions.CONST_STRING(0, 0, Expressions.PART.INVALID(0, 0, "can't parse")),
     expectedResult = Left("Compilation failed: can't parse in 0-0")
   )
 
   treeTypeTest("Invalid REF")(
-    ctx = typeCheckerContext,
+    ctx = compilerContext,
     expr = Expressions.REF(0, 0, Expressions.PART.INVALID(0, 0, "can't parse")),
     expectedResult = Left("Compilation failed: can't parse in 0-0")
   )
 
   treeTypeTest("Invalid FUNCTION_CALL")(
-    ctx = typeCheckerContext,
+    ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(0, 0, Expressions.PART.INVALID(0, 0, "can't parse"), List.empty),
     expectedResult = Left("Compilation failed: can't parse in 0-0")
   )
 
   treeTypeTest("INVALID")(
-    ctx = typeCheckerContext,
+    ctx = compilerContext,
     expr = Expressions.INVALID(0, 0, "###", None),
     expectedResult = Left("Compilation failed: ### in 0-0")
   )
