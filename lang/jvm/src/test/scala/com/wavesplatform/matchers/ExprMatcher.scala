@@ -1,4 +1,4 @@
-package com.wavesplatform.helpers
+package com.wavesplatform.matchers
 
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions}
@@ -10,7 +10,17 @@ import scala.reflect.runtime.universe._
 sealed trait ExprMatcher extends Matcher[Expressions.EXPR]
 
 object ExprMatcher {
+
+  case object AnyExpr extends ExprMatcher {
+    override def apply(left: EXPR): MatchResult = MatchResult(
+      true,
+      "",
+      ""
+    )
+  }
+
   sealed trait PartMatcher[T] extends Matcher[PART[T]]
+
   case class AnyPart[T](positionMatcher: PositionMatcher) extends PartMatcher[T] {
     override def apply(left: PART[T]): MatchResult = left match {
       case PART.VALID(s, e, _)   => positionMatcher((s, e))

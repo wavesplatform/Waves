@@ -1,4 +1,4 @@
-package com.wavesplatform.helpers
+package com.wavesplatform.matchers
 
 import org.scalatest.matchers.{MatchResult, Matcher}
 
