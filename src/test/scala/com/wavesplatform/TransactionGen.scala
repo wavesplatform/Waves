@@ -317,14 +317,14 @@ trait TransactionGenBase extends ScriptGen {
 
   val massTransferGen: Gen[MassTransferTransaction] = massTransferGen(MaxTransferCount)
 
-  def massTransferGen(maxCount: Int) =
+  def massTransferGen(maxTransfersCount: Int) =
     for {
       version                                                      <- Gen.oneOf(MassTransferTransaction.supportedVersions.toSeq)
       (assetId, sender, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
-      transferCount                                                <- Gen.choose(1, maxCount)
+      transferCount                                                <- Gen.choose(0, maxTransfersCount)
       transferGen = for {
         recipient <- accountOrAliasGen
-        amount    <- Gen.choose(1L, Long.MaxValue / maxCount)
+        amount    <- Gen.choose(1L, Long.MaxValue / maxTransfersCount)
       } yield ParsedTransfer(recipient, amount)
       recipients <- Gen.listOfN(transferCount, transferGen)
     } yield MassTransferTransaction.selfSigned(version, assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
@@ -588,6 +588,10 @@ trait TransactionGenBase extends ScriptGen {
     size <- Gen.choose[Byte](0, MaxKeySize)
   } yield Random.nextString(size)
 
+  val dataScriptsKeyGen = for {
+    size <- Gen.choose[Byte](0, 10)
+  } yield Random.nextString(size)
+
   val dataAsciiKeyGen = for {
     size <- Gen.choose[Byte](0, MaxKeySize)
   } yield Random.alphanumeric.take(size).mkString
@@ -618,17 +622,18 @@ trait TransactionGenBase extends ScriptGen {
       value <- Gen.listOfN(size, aliasAlphabetGen)
     } yield StringDataEntry(key, value.mkString)
 
-  def dataEntryGen(maxSize: Int) = Gen.oneOf(longEntryGen(), booleanEntryGen(), binaryEntryGen(maxSize), stringEntryGen(maxSize))
+  def dataEntryGen(maxSize: Int, keyGen: Gen[String] = dataKeyGen) =
+    Gen.oneOf(longEntryGen(keyGen), booleanEntryGen(keyGen), binaryEntryGen(maxSize, keyGen), stringEntryGen(maxSize, keyGen))
 
   val dataTransactionGen: Gen[DataTransaction] = dataTransactionGen(DataTransaction.MaxEntryCount)
 
-  def dataTransactionGen(maxEntryCount: Int) =
+  def dataTransactionGen(maxEntryCount: Int, useForScript: Boolean = false) =
     (for {
       sender    <- accountGen
       timestamp <- timestampGen
       size      <- Gen.choose(0, maxEntryCount)
-      maxEntrySize = (DataTransaction.MaxBytes - 122) / (size max 1) min DataEntry.MaxValueSize
-      data    <- Gen.listOfN(size, dataEntryGen(maxEntrySize))
+      maxEntrySize = if (useForScript) 200 else (DataTransaction.MaxBytes - 122) / (size max 1) min DataEntry.MaxValueSize
+      data    <- if (useForScript) Gen.listOfN(size, dataEntryGen(maxEntrySize, dataScriptsKeyGen)) else Gen.listOfN(size, dataEntryGen(maxEntrySize))
       version <- Gen.oneOf(DataTransaction.supportedVersions.toSeq)
     } yield DataTransaction.selfSigned(version, sender, data, 15000000, timestamp).right.get)
       .label("DataTransaction")
