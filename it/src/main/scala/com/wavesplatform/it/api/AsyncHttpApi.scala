@@ -431,16 +431,16 @@ object AsyncHttpApi extends Assertions {
         blocks
           .find(cond)
           .fold[Future[BlockHeaders]] {
-          val maybeLastBlock = blocks.lastOption
-          if (maybeLastBlock.exists(_.height >= to)) {
-            Future.failed(new NoSuchElementException)
-          } else {
-            val newFrom = maybeLastBlock.fold(_from)(b => (b.height + 19).min(to))
-            val newTo   = newFrom + 19
-            n.log.debug(s"Loaded ${blocks.length} blocks, no match found. Next range: [$newFrom, ${newFrom + 19}]")
-            timer.schedule(load(newFrom, newTo), n.settings.blockchainSettings.genesisSettings.averageBlockDelay)
-          }
-        }(Future.successful)
+            val maybeLastBlock = blocks.lastOption
+            if (maybeLastBlock.exists(_.height >= to)) {
+              Future.failed(new NoSuchElementException)
+            } else {
+              val newFrom = maybeLastBlock.fold(_from)(b => (b.height + 19).min(to))
+              val newTo   = newFrom + 19
+              n.log.debug(s"Loaded ${blocks.length} blocks, no match found. Next range: [$newFrom, ${newFrom + 19}]")
+              timer.schedule(load(newFrom, newTo), n.settings.blockchainSettings.genesisSettings.averageBlockDelay)
+            }
+          }(Future.successful)
       }
 
       load(from, (from + 19).min(to))

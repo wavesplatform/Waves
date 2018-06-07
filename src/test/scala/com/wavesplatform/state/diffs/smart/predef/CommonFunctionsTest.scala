@@ -41,7 +41,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
                                           |""".stripMargin,
           transfer
         )
-        transfer.assetId.isDefined shouldEqual result.right.get
+        transfer.assetId.isDefined shouldEqual result.explicitGet()
     }
   }
 

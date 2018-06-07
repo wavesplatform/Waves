@@ -50,7 +50,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
       ts     <- positiveIntGen
       fee    <- smallFeeGen
       amt    <- smallFeeGen
-      genesis: GenesisTransaction    = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+      genesis: GenesisTransaction    = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       payment: TransferTransactionV1 = createWavesTransfer(master, master, amt, fee, ts).explicitGet()
     } yield (miner, genesis, payment, ts)
     scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {

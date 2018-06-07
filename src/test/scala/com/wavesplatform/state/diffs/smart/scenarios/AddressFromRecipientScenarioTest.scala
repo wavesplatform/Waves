@@ -27,13 +27,13 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
     master                   <- accountGen
     ts                       <- timestampGen
     other: PrivateKeyAccount <- accountGen
-    genesis1: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    genesis2: GenesisTransaction = GenesisTransaction.create(other, ENOUGH_AMT, ts).right.get
+    genesis1: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+    genesis2: GenesisTransaction = GenesisTransaction.create(other, ENOUGH_AMT, ts).explicitGet()
     alias              <- aliasGen
     fee                <- smallFeeGen
     aliasTx            <- createAliasGen(other, alias, fee, ts)
     transferViaAddress <- transferGeneratorP(master, other, None, None)
-    transferViaAlias   <- transferGeneratorP(master, AddressOrAlias.fromBytes(alias.bytes.arr, 0).right.get._1, None, None)
+    transferViaAlias   <- transferGeneratorP(master, AddressOrAlias.fromBytes(alias.bytes.arr, 0).explicitGet()._1, None, None)
   } yield (Seq(genesis1, genesis2), aliasTx, transferViaAddress, transferViaAlias)
 
   def evalScript(tx: Transaction, blockchain: Blockchain): Either[com.wavesplatform.lang.ExecutionError, CaseObj] = {

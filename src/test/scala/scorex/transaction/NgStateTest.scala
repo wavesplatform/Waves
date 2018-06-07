@@ -2,7 +2,7 @@ package scorex.transaction
 
 import com.wavesplatform.history._
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.state.{Diff, NgState}
+import com.wavesplatform.state.{Diff, EitherExt2, NgState}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -16,7 +16,7 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
       master    <- accountGen
       recipient <- accountGen
       ts        <- positiveIntGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       payments: Seq[TransferTransactionV1] <- Gen.listOfN(amt, wavesTransferGeneratorP(master, recipient))
     } yield (genesis, payments)
 
