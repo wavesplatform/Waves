@@ -80,11 +80,12 @@ object JsAPI {
       .flatMap(ast => serialize(ast._1).map(x => (x, ast)))
       .fold(
         err => {
-          js.Dynamic.literal("error" -> err)
+          ???
+//          js.Dynamic.literal("error" -> err)
         }, {
-          case (result, ast) =>
-            // js.Dynamic.literal("result" -> result)
-            js.Dynamic.literal("result" -> Global.toBuffer(result), "ast" -> toJs(ast._1))
+          case (result, ast) => ???
+          // js.Dynamic.literal("result" -> result)
+//            js.Dynamic.literal("result" -> Global.toBuffer(result), "ast" -> toJs(ast._1))
         }
       )
   }
