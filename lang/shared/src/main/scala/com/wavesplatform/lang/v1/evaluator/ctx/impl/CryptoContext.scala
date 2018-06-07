@@ -12,7 +12,7 @@ object CryptoContext {
   def build(global: BaseGlobal) = {
 
     def hashFunction(name: String, internalName: Short, cost: Long)(h: Array[Byte] => Array[Byte]) =
-      PredefFunction(name, cost, BYTEVECTOR, List(("bytes", BYTEVECTOR)), internalName) {
+      PredefFunction(name, cost, internalName, List(("bytes", BYTEVECTOR)), BYTEVECTOR) {
         case (m: ByteVector) :: Nil => Right(ByteVector(h(m.toArray)))
         case _                      => ???
       }
@@ -22,21 +22,23 @@ object CryptoContext {
     val sha256F: PredefFunction     = hashFunction("sha256", SHA256, 10)(global.sha256)
 
     val sigVerifyF: PredefFunction =
-      PredefFunction("sigVerify", 100, BOOLEAN, List(("message", BYTEVECTOR), ("sig", BYTEVECTOR), ("pub", BYTEVECTOR)), SIGVERIFY) {
+      PredefFunction("sigVerify", 100, SIGVERIFY, List("message" -> BYTEVECTOR, "sig" -> BYTEVECTOR, "pub" -> BYTEVECTOR), BOOLEAN) {
         case (m: ByteVector) :: (s: ByteVector) :: (p: ByteVector) :: Nil =>
           Right(global.curve25519verify(m.toArray, s.toArray, p.toArray))
         case _ => ???
       }
 
-    def toBase58StringF: PredefFunction = PredefFunction("toBase58String", 10, STRING, List(("bytes", BYTEVECTOR)), TOBASE58) {
-      case (bytes: ByteVector) :: Nil => global.base58Encode(bytes.toArray)
-      case _                          => ???
-    }
+    def toBase58StringF: PredefFunction =
+      PredefFunction("toBase58String", 10, TOBASE58, List(("bytes", BYTEVECTOR)), STRING) {
+        case (bytes: ByteVector) :: Nil => global.base58Encode(bytes.toArray)
+        case _                          => ???
+      }
 
-    def toBase64StringF: PredefFunction = PredefFunction("toBase64String", 10, STRING, List(("bytes", BYTEVECTOR)), TOBASE64) {
-      case (bytes: ByteVector) :: Nil => global.base64Encode(bytes.toArray)
-      case _                          => ???
-    }
+    def toBase64StringF: PredefFunction =
+      PredefFunction("toBase64String", 10, TOBASE64, List(("bytes", BYTEVECTOR)), STRING) {
+        case (bytes: ByteVector) :: Nil => global.base64Encode(bytes.toArray)
+        case _                          => ???
+      }
     CTX(Seq.empty, Map.empty, Seq(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF, toBase64StringF))
   }
 

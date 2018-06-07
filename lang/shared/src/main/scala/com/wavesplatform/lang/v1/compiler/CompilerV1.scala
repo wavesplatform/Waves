@@ -157,7 +157,7 @@ object CompilerV1 {
       result <- (signatures match {
         case Nil           => FunctionNotFound(p.start, p.end, name, compiledArgs.map(_._2.toString)).asLeft[(EXPR, TYPE)]
         case single :: Nil => matchFuncOverload(p, name, args, compiledArgs, single)
-        case many => {
+        case many =>
           val matchedSigs = many
             .map(matchFuncOverload(p, name, args, compiledArgs, _))
             .collect({ case Right(ex) => ex })
@@ -167,7 +167,6 @@ object CompilerV1 {
             case call :: Nil => call.asRight[CompilationError]
             case _           => AmbiguousOverloading(p.start, p.end, name, signatures.toList).asLeft[(EXPR, TYPE)]
           }
-        }
       }).toCompileM
     } yield result
   }

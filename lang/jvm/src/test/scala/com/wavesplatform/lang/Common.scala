@@ -35,7 +35,7 @@ object Common {
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
-  val multiplierFunction: PredefFunction = PredefFunction("MULTIPLY", 1, LONG, List(("x1", LONG), ("x2", LONG)), 512) {
+  val multiplierFunction: PredefFunction = PredefFunction("MULTIPLY", 1, 512, List("x1" -> LONG, "x2" -> LONG), LONG) {
     case (x1: Long) :: (x2: Long) :: Nil => Try(x1 * x2).toEither.left.map(_.toString)
     case _                               => ??? // suppress pattern match warning
   }

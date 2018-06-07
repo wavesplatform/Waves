@@ -19,7 +19,7 @@ object WavesContext {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getdataF(name: String, internalName: Short, dataType: DataType) =
-      PredefFunction(name, 100, OPTION(dataType.innerType), List(("address", addressType.typeRef), ("key", STRING)), internalName) {
+      PredefFunction(name, 100, internalName, List("address" -> addressType.typeRef, "key" -> STRING), OPTION(dataType.innerType)) {
         case (addr: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addr, k, dataType)
         case _                                     => ???
       }
@@ -30,14 +30,14 @@ object WavesContext {
     val getStringF: PredefFunction    = getdataF("getString", DATA_STRING, DataType.String)
 
     val addressFromPublicKeyF: PredefFunction =
-      PredefFunction("addressFromPublicKey", 100, addressType.typeRef, List(("publicKey", BYTEVECTOR)), ADDRESSFROMPUBKEY) {
+      PredefFunction("addressFromPublicKey", 100, ADDRESSFROMPUBKEY, List(("publicKey", BYTEVECTOR)), addressType.typeRef) {
         case (pk: ByteVector) :: Nil =>
           val r = environmentFunctions.addressFromPublicKey(pk)
           Right(CaseObj(addressType.typeRef, Map("bytes" -> r)))
         case _ => ???
       }
 
-    val addressFromStringF: PredefFunction = PredefFunction("addressFromString", 100, optionAddress, List(("string", STRING)), ADDRESSFROMSTRING) {
+    val addressFromStringF: PredefFunction = PredefFunction("addressFromString", 100, ADDRESSFROMSTRING, List("string" -> STRING), optionAddress) {
       case (addressString: String) :: Nil =>
         val r = environmentFunctions.addressFromString(addressString)
         r.map(_.map(x => CaseObj(addressType.typeRef, Map("bytes" -> x))))
@@ -45,7 +45,7 @@ object WavesContext {
     }
 
     val addressFromRecipientF: PredefFunction =
-      PredefFunction("addressFromRecipient", 100, addressType.typeRef, List(("AddressOrAlias", addressOrAliasType)), ADDRESSFROMRECIPIENT) {
+      PredefFunction("addressFromRecipient", 100, ADDRESSFROMRECIPIENT, List("AddressOrAlias" -> addressOrAliasType), addressType.typeRef) {
         case (c @ CaseObj(addressType.typeRef, _)) :: Nil => Right(c)
         case c @ CaseObj(aliasType.typeRef, fields) :: Nil =>
           environmentFunctions
@@ -59,25 +59,24 @@ object WavesContext {
 
     val txByIdF = {
       val returnType = OPTION(anyTransactionType)
-      PredefFunction("getTransactionById", 100, returnType, List(("id", BYTEVECTOR)), GETTRANSACTIONBYID) {
+      PredefFunction("getTransactionById", 100, GETTRANSACTIONBYID, List("id" -> BYTEVECTOR), returnType)({
         case (id: ByteVector) :: Nil =>
           val maybeDomainTx = env.transactionById(id.toArray).map(transactionObject)
           Right(maybeDomainTx).map(_.asInstanceOf[returnType.Underlying])
         case _ => ???
-      }
+      })
     }
 
-    val accountBalanceF: PredefFunction =
-      PredefFunction("accountBalance", 100, LONG, List(("addressOrAlias", addressOrAliasType)), ACCOUNTBALANCE) {
-        case CaseObj(_, fields) :: Nil =>
-          val acc = fields("bytes").asInstanceOf[ByteVector].toArray
-          env.accountBalanceOf(acc, None)
+    val accountBalanceF: PredefFunction = PredefFunction("accountBalance", 100, ACCOUNTBALANCE, List("addressOrAlias" -> addressOrAliasType), LONG)({
+      case CaseObj(_, fields) :: Nil =>
+        val acc = fields("bytes").asInstanceOf[ByteVector].toArray
+        env.accountBalanceOf(acc, None)
 
-        case _ => ???
-      }
+      case _ => ???
+    })
 
     val accountAssetBalanceF: PredefFunction =
-      PredefFunction("accountAssetBalance", 100, LONG, List(("addressOrAlias", addressOrAliasType), ("assetId", BYTEVECTOR)), ACCOUNTASSETBALANCE) {
+      PredefFunction("accountAssetBalance", 100, ACCOUNTASSETBALANCE, List("addressOrAlias" -> addressOrAliasType, "assetId" -> BYTEVECTOR), LONG) {
         case CaseObj(_, fields) :: (assetId: ByteVector) :: Nil =>
           val acc = fields("bytes").asInstanceOf[ByteVector]
           env.accountBalanceOf(acc.toArray, Some(assetId.toArray))
@@ -85,14 +84,13 @@ object WavesContext {
         case _ => ???
       }
 
-    val txHeightByIdF =
-      PredefFunction("transactionHeightById", 100, OPTION(LONG), List(("id", BYTEVECTOR)), TRANSACTIONHEIGHTBYID) {
-        case (id: ByteVector) :: Nil => Right(env.transactionHeightById(id.toArray))
-        case _                       => ???
-      }
+    val txHeightByIdF = PredefFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, List("id" -> BYTEVECTOR), OPTION(LONG))({
+      case (id: ByteVector) :: Nil => Right(env.transactionHeightById(id.toArray))
+      case _                       => ???
+    })
 
     val vars: Map[String, (TYPE, LazyVal)] =
-      Map(("height", (LONG, LazyVal(EitherT(heightCoeval)))), ("tx", (outgoingTransactionType, LazyVal(EitherT(txCoeval)))))
+      Map("height" -> (LONG, LazyVal(EitherT(heightCoeval))), "tx" -> (outgoingTransactionType, LazyVal(EitherT(txCoeval))))
     val functions = Seq(
       txByIdF,
       txHeightByIdF,
