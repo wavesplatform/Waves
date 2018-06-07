@@ -4,7 +4,7 @@ import cats.kernel.Monoid
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common.multiplierFunction
 import com.wavesplatform.lang.v1.compiler.CompilerContext
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, PredefCaseType, PredefFunction}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.none
