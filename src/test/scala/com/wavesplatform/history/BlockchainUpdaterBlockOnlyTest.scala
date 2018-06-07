@@ -1,6 +1,7 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.state.diffs._
 import org.scalacheck.Gen
@@ -21,6 +22,7 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
     } yield (genesis, payments)
 
   property("can apply valid blocks") {
+    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments(1)) {
       case (domain, (genesis, payments)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), Seq(payments.head)))
@@ -29,6 +31,7 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
   }
 
   property("can apply, rollback and reprocess valid blocks") {
+    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments(2)) {
       case (domain, (genesis, payments)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), Seq(payments(0)), Seq(payments(1))))
@@ -44,6 +47,7 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
   }
 
   property("can't apply block with invalid signature") {
+    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments(1)) {
       case (domain, (genesis, payment)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), payment))
@@ -53,6 +57,7 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
   }
 
   property("can't apply block with invalid signature after rollback") {
+    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments(1)) {
       case (domain, (genesis, payment)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), payment))
@@ -64,6 +69,7 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
   }
 
   property("can process 11 blocks and then rollback to genesis") {
+    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments(10)) {
       case (domain, (genesis, payments)) =>
         val blocks = chainBlocks(Seq(genesis) +: payments.map(Seq(_)))

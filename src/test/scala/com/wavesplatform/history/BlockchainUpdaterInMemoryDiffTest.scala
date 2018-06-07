@@ -1,6 +1,7 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import org.scalacheck.Gen
@@ -25,7 +26,7 @@ class BlockchainUpdaterInMemoryDiffTest
   } yield (genesis, payment, payment2)
 
   property("compaction with liquid block doesn't make liquid block affect state once") {
-
+    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments) {
       case (domain, (genesis, payment1, payment2)) =>
         val blocksWithoutCompaction = chainBlocks(
@@ -49,6 +50,7 @@ class BlockchainUpdaterInMemoryDiffTest
     }
   }
   property("compaction without liquid block doesn't make liquid block affect state once") {
+    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments) {
       case (domain, (genesis, payment1, payment2)) =>
         val firstBlocks             = chainBlocks(Seq(Seq(genesis)) ++ Seq.fill(MaxTransactionsPerBlockDiff * 2 - 2)(Seq.empty[Transaction]))
