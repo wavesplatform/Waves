@@ -1,6 +1,7 @@
 package com.wavesplatform.db
 
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
+import com.wavesplatform.state.EitherExt2
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 
@@ -18,7 +19,7 @@ class StorageCodecsSpec extends FreeSpec with Matchers with PropertyChecks {
     val bytes = CheckpointCodec.encode(c1)
     val r     = CheckpointCodec.decode(bytes)
     r.isRight shouldBe true
-    val c2 = r.right.get.value
+    val c2 = r.explicitGet().value
     c2.signature.sameElements(c1.signature) shouldBe true
     c2.items.length shouldBe 0
   }
@@ -29,7 +30,7 @@ class StorageCodecsSpec extends FreeSpec with Matchers with PropertyChecks {
     val bytes = CheckpointCodec.encode(c1)
     val r     = CheckpointCodec.decode(bytes)
     r.isRight shouldBe true
-    val c2 = r.right.get.value
+    val c2 = r.explicitGet().value
     c2.signature.sameElements(c1.signature) shouldBe true
     c2.items.length shouldBe c1.items.length
     c2.items.head.signature.sameElements(c1.items.head.signature) shouldBe true
@@ -53,19 +54,19 @@ class StorageCodecsSpec extends FreeSpec with Matchers with PropertyChecks {
   "TupleCodec" in {
     val codec = Tuple2Codec[String, Short](StringCodec, ShortCodec)
     val x     = ("foo", 10: Short)
-    codec.decode(codec.encode(x)).right.get.value shouldBe x
+    codec.decode(codec.encode(x)).explicitGet().value shouldBe x
   }
 
   "OptionCodec" - {
     val codec = OptionCodec[String](StringCodec)
 
     "None" in {
-      codec.decode(codec.encode(None)).right.get.value shouldBe None
+      codec.decode(codec.encode(None)).explicitGet().value shouldBe None
     }
 
     "Some(x)" in {
       val x = Option("foo")
-      codec.decode(codec.encode(x)).right.get.value shouldBe x
+      codec.decode(codec.encode(x)).explicitGet().value shouldBe x
     }
   }
 

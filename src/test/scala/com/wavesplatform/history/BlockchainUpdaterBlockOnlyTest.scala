@@ -1,6 +1,7 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.state.diffs._
 import org.scalacheck.Gen
 import org.scalatest._
@@ -15,7 +16,7 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
       master    <- accountGen
       recipient <- accountGen
       ts        <- positiveIntGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       payments <- Gen.listOfN(paymentsAmt, wavesTransferGeneratorP(master, recipient))
     } yield (genesis, payments)
 

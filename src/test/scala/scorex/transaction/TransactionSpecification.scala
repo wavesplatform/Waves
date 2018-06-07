@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.state.EitherExt2
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount
@@ -14,7 +15,7 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
         val sender    = PrivateKeyAccount(senderSeed)
         val recipient = PrivateKeyAccount(recipientSeed)
 
-        val tx = createWavesTransfer(sender, recipient, amount, fee, time).right.get
+        val tx = createWavesTransfer(sender, recipient, amount, fee, time).explicitGet()
 
         tx.timestamp shouldEqual time
         tx.amount shouldEqual amount
@@ -29,7 +30,7 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
       (senderSeed: Array[Byte], recipientSeed: Array[Byte], time: Long, amount: Long, fee: Long) =>
         val sender    = PrivateKeyAccount(senderSeed)
         val recipient = PrivateKeyAccount(recipientSeed)
-        val tx        = createWavesTransfer(sender, recipient, amount, fee, time).right.get
+        val tx        = createWavesTransfer(sender, recipient, amount, fee, time).explicitGet()
         val txAfter   = TransferTransactionV1.parseBytes(tx.bytes()).get
 
         txAfter.getClass.shouldBe(tx.getClass)
@@ -48,7 +49,7 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
       (senderSeed: Array[Byte], recipientSeed: Array[Byte], time: Long, amount: Long, fee: Long) =>
         val sender    = PrivateKeyAccount(senderSeed)
         val recipient = PrivateKeyAccount(recipientSeed)
-        val tx        = createWavesTransfer(sender, recipient, amount, fee, time).right.get
+        val tx        = createWavesTransfer(sender, recipient, amount, fee, time).explicitGet()
         val txAfter   = TransactionParsers.parseBytes(tx.bytes()).get.asInstanceOf[TransferTransactionV1]
 
         txAfter.getClass.shouldBe(tx.getClass)

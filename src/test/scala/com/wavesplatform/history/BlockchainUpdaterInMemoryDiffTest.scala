@@ -19,7 +19,7 @@ class BlockchainUpdaterInMemoryDiffTest
     master    <- accountGen
     recipient <- accountGen
     ts        <- positiveIntGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     payment: TransferTransactionV1  <- wavesTransferGeneratorP(master, recipient)
     payment2: TransferTransactionV1 <- wavesTransferGeneratorP(master, recipient)
   } yield (genesis, payment, payment2)

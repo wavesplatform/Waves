@@ -24,7 +24,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
     val setup = for {
       master <- accountGen
       ts     <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
     } yield (genesis, issueTx, sponsorTx, sponsor1Tx, cancelTx)
 
@@ -54,7 +54,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
     val setup = for {
       master <- accountGen
       ts     <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       (_, sponsorTx, _, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
     } yield (genesis, sponsorTx, cancelTx)
 
@@ -75,7 +75,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
     val setup = for {
       master <- accountGen
       ts     <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
     } yield (genesis, issueTx, sponsorTx)
 
@@ -93,7 +93,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
     val setup = for {
       master <- accountGen
       ts     <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, 400000000, ts).right.get
+      genesis: GenesisTransaction = GenesisTransaction.create(master, 400000000, ts).explicitGet()
       (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
       recipient                  <- accountGen
       assetId = issueTx.id()
@@ -136,10 +136,10 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       master    <- accountGen
       recipient <- accountGen
       ts        <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, 300000000, ts).right.get
-      issue                       = IssueTransactionV1.selfSigned(master, Base58.decode("Asset").get, Array.emptyByteArray, 100, 2, false, 100000000, ts + 1).right.get
+      genesis: GenesisTransaction = GenesisTransaction.create(master, 300000000, ts).explicitGet()
+      issue                       = IssueTransactionV1.selfSigned(master, Base58.decode("Asset").get, Array.emptyByteArray, 100, 2, false, 100000000, ts + 1).explicitGet()
       assetId                     = issue.id()
-      sponsor                     = SponsorFeeTransaction.selfSigned(1, master, assetId, Some(100), 100000000, ts + 2).right.get
+      sponsor                     = SponsorFeeTransaction.selfSigned(1, master, assetId, Some(100), 100000000, ts + 2).explicitGet()
       assetTransfer = TransferTransactionV1
         .selfSigned(Some(assetId), master, recipient, issue.quantity, ts + 3, None, 100000, Array.emptyByteArray)
         .right

@@ -5,7 +5,7 @@ import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import com.wavesplatform.it.sync.{calcDataFee, fee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, LongDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, EitherExt2, LongDataEntry, StringDataEntry}
 import com.wavesplatform.utils.Base58
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
@@ -49,7 +49,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
              fee: Long = 100000,
              timestamp: Long = System.currentTimeMillis,
              version: Byte = DataTransaction.supportedVersions.head): DataTransaction =
-      DataTransaction.selfSigned(version, sender.privateKey, entries, fee, timestamp).right.get
+      DataTransaction.selfSigned(version, sender.privateKey, entries, fee, timestamp).explicitGet()
 
     def request(tx: DataTransaction): SignedDataRequest =
       SignedDataRequest(DataTransaction.supportedVersions.head,

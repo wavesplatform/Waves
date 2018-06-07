@@ -69,7 +69,7 @@ class SetScriptTransactionSpecification extends PropSpec with PropertyChecks wit
     val tx = SetScriptTransaction
       .create(
         1,
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         None,
         100000,
         1526983936610L,

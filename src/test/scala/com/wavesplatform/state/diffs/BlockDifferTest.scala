@@ -6,7 +6,7 @@ import com.wavesplatform.BlockGen
 import com.wavesplatform.db.WithState
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.state.{Blockchain, Diff, EitherExt2}
 import org.scalatest.{FreeSpecLike, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
@@ -149,7 +149,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
 
   private def getTwoMinersBlockChain(from: PrivateKeyAccount, to: PrivateKeyAccount, numPayments: Int): Seq[Block] = {
     val ts                   = System.currentTimeMillis() - 100000
-    val genesisTx            = GenesisTransaction.create(from, Long.MaxValue - 1, ts).right.get
+    val genesisTx            = GenesisTransaction.create(from, Long.MaxValue - 1, ts).explicitGet()
     val features: Set[Short] = Set[Short](2)
 
     val paymentTxs = (1 to numPayments).map { i =>
@@ -159,7 +159,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
         amount = 10000,
         TransactionFee,
         timestamp = ts + i * 1000
-      ).right.get
+      ).explicitGet()
     }
 
     (genesisTx +: paymentTxs).zipWithIndex.map {
