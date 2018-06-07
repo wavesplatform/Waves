@@ -112,8 +112,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("custom type field access") {
-    val pointType     = PredefCaseType("Point", List("X"   -> LONG, "Y"         -> LONG))
-    val pointInstance = CaseObj(pointType.typeRef, Map("X" -> Val(LONG)(3), "Y" -> Val(LONG)(4)))
+    val pointType     = PredefCaseType("Point", List("X"   -> LONG, "Y" -> LONG))
+    val pointInstance = CaseObj(pointType.typeRef, Map("X" -> 3L, "Y"   -> 4L))
     ev[Long](
       context = PureContext.instance |+| EvaluationContext(
         letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance)))),
@@ -125,7 +125,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("lazy let evaluation doesn't throw if not used") {
     val pointType     = PredefCaseType("Point", List(("X", LONG), ("Y", LONG)))
-    val pointInstance = CaseObj(pointType.typeRef, Map("X" -> Val(LONG)(3), "Y" -> Val(LONG)(4)))
+    val pointInstance = CaseObj(pointType.typeRef, Map("X" -> 3L, "Y" -> 4L))
     val context = PureContext.instance |+| EvaluationContext(
       letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance))), ("badVal", LazyVal(EitherT.leftT("Error")))),
       functions = Map.empty
@@ -160,7 +160,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("successful on ref getter evaluation") {
     val fooType = PredefCaseType("Foo", List(("bar", STRING), ("buz", LONG)))
 
-    val fooInstance = CaseObj(fooType.typeRef, Map("bar" -> Val(STRING)("bAr"), "buz" -> Val(LONG)(1L)))
+    val fooInstance = CaseObj(fooType.typeRef, Map("bar" -> "bAr", "buz" -> 1L))
 
     val context = EvaluationContext(
       letDefs = Map("fooInstance" -> LazyVal(EitherT.pure(fooInstance))),
@@ -176,7 +176,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val fooType = PredefCaseType("Foo", List(("bar", STRING), ("buz", LONG)))
     val fooCtor = PredefFunction("createFoo", 1, fooType.typeRef, List.empty, 259) { _ =>
       Right(
-        CaseObj(fooType.typeRef, Map("bar" -> Val(STRING)("bAr"), "buz" -> Val(LONG)(1L)))
+        CaseObj(fooType.typeRef, Map("bar" -> "bAr", "buz" -> 1L))
       )
 
     }
@@ -197,12 +197,12 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       Right(
         CaseObj(fooType.typeRef,
                 Map(
-                  "bar" -> Val(STRING)("bAr"),
-                  "buz" -> Val(LONG)(1L)
+                  "bar" -> "bAr",
+                  "buz" -> 1L
                 )))
     }
     val fooTransform = PredefFunction("transformFoo", 1, fooType.typeRef, List(("foo", fooType.typeRef)), 260) {
-      case (fooObj: CaseObj) :: Nil => Right(fooObj.copy(fields = fooObj.fields.updated("bar", Val(STRING)("TRANSFORMED_BAR"))))
+      case (fooObj: CaseObj) :: Nil => Right(fooObj.copy(fields = fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
       case _                        => ???
     }
 
@@ -295,9 +295,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val txObj = CaseObj(
       txType.typeRef,
       Map(
-        "bodyBytes" -> Val(BYTEVECTOR)(ByteVector(bodyBytes)),
-        "senderPk"  -> Val(BYTEVECTOR)(ByteVector(publicKey)),
-        "proof0"    -> Val(BYTEVECTOR)(ByteVector(signature))
+        "bodyBytes" -> ByteVector(bodyBytes),
+        "senderPk"  -> ByteVector(publicKey),
+        "proof0"    -> ByteVector(signature)
       )
     )
 
@@ -343,10 +343,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val txObj = CaseObj(
       txType.typeRef,
       Map(
-        "bodyBytes" -> Val(BYTEVECTOR)(ByteVector(bodyBytes)),
-        "senderPk"  -> Val(BYTEVECTOR)(ByteVector(senderPK)),
-        "proof0"    -> Val(BYTEVECTOR)(ByteVector(aliceProof)),
-        "proof1"    -> Val(BYTEVECTOR)(ByteVector(bobProof))
+        "bodyBytes" -> ByteVector(bodyBytes),
+        "senderPk"  -> ByteVector(senderPK),
+        "proof0"    -> ByteVector(aliceProof),
+        "proof1"    -> ByteVector(bobProof)
       )
     )
 
