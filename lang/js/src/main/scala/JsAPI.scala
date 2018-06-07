@@ -12,32 +12,34 @@ import scodec.Attempt
 import scodec.Attempt.Successful
 
 import scala.scalajs.js
-import scala.scalajs.js.Dynamic.{literal => jObj}
-import scala.scalajs.js.JSConverters._
+//import scala.scalajs.js.Dynamic.{literal => jObj}
+//import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.annotation.JSExportTopLevel
 
 object JsAPI {
 
-  private def toJs(ast: EXPR): js.Object = {
-    def r(expr: EXPR): js.Object = {
-      expr match {
-        case CONST_LONG(t)        => jObj.applyDynamic("apply")("type" -> "LONG", "value"       -> t)
-        case GETTER(ref, field)   => jObj.applyDynamic("apply")("type" -> "GETTER", "ref"       -> r(ref), "field" -> field)
-        case CONST_BYTEVECTOR(bs) => jObj.applyDynamic("apply")("type" -> "BYTEVECTOR", "value" -> bs.toArray.toJSArray)
-        case CONST_STRING(s)      => jObj.applyDynamic("apply")("type" -> "STRING", "value"     -> s)
-        case BLOCK(let, body) =>
-          jObj.applyDynamic("apply")("type" -> "BLOCK", "let" -> jObj("name" -> let.name, "value" -> r(let.value)), "body" -> r(body))
-        case IF(cond, ifTrue, ifFalse) =>
-          jObj.applyDynamic("apply")("type" -> "IF", "condition" -> r(cond), "true" -> r(ifTrue), "false" -> r(ifFalse))
-        case REF(key)                      => jObj.applyDynamic("apply")("type" -> "REF", "key"    -> key)
-        case TRUE                          => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> true)
-        case FALSE                         => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> false)
-        case FUNCTION_CALL(function, args) => jObj.applyDynamic("apply")("type" -> "CALL", "name"  -> function.name, "args" -> args.map(r).toJSArray)
-      }
-    }
-
-    r(ast)
-  }
+  private def toJs(ast: EXPR): js.Object = ???
+//
+//  {
+//    def r(expr: EXPR): js.Object = {
+//      expr match {
+//        case CONST_LONG(t)        => jObj.applyDynamic("apply")("type" -> "LONG", "value"       -> t)
+//        case GETTER(ref, field)   => jObj.applyDynamic("apply")("type" -> "GETTER", "ref"       -> r(ref), "field" -> field)
+//        case CONST_BYTEVECTOR(bs) => jObj.applyDynamic("apply")("type" -> "BYTEVECTOR", "value" -> bs.toArray.toJSArray)
+//        case CONST_STRING(s)      => jObj.applyDynamic("apply")("type" -> "STRING", "value"     -> s)
+//        case BLOCK(let, body) =>
+//          jObj.applyDynamic("apply")("type" -> "BLOCK", "let" -> jObj("name" -> let.name, "value" -> r(let.value)), "body" -> r(body))
+//        case IF(cond, ifTrue, ifFalse) =>
+//          jObj.applyDynamic("apply")("type" -> "IF", "condition" -> r(cond), "true" -> r(ifTrue), "false" -> r(ifFalse))
+//        case REF(key)                      => jObj.applyDynamic("apply")("type" -> "REF", "key"    -> key)
+//        case TRUE                          => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> true)
+//        case FALSE                         => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> false)
+//        case FUNCTION_CALL(function, args) => jObj.applyDynamic("apply")("type" -> "CALL", "name"  -> function.name, "args" -> args.map(r).toJSArray)
+//      }
+//    }
+//
+//    r(ast)
+//  }
 
   @JSExportTopLevel("compile")
   def compile(input: String): js.Dynamic = {
@@ -85,6 +87,5 @@ object JsAPI {
             js.Dynamic.literal("result" -> Global.toBuffer(result), "ast" -> toJs(ast._1))
         }
       )
-    ???
   }
 }
