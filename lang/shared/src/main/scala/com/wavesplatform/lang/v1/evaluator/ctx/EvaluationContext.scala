@@ -23,8 +23,8 @@ object EvaluationContext {
   }
 
   def build(letDefs: Map[String, LazyVal], functions: Seq[PredefFunction]): EvaluationContext = {
-    if (functions.map(_.header.name).distinct.size != functions.size) {
-      val dups = functions.groupBy(_.header.name).filter(_._2.size != 1)
+    if (functions.distinct.size != functions.size) {
+      val dups = functions.groupBy(_.header).filter(_._2.size != 1)
       throw new Exception(s"Duplicate runtime functions names: $dups")
     }
     EvaluationContext(letDefs = letDefs, functions = functions.map(f => f.header -> f).toMap)

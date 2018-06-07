@@ -1,3 +1,7 @@
 package com.wavesplatform.lang.v1
 
-case class FunctionHeader(name: Short)
+sealed trait FunctionHeader
+object FunctionHeader {
+  case class Predef(name: Short) extends FunctionHeader
+  case class User(name: String)  extends FunctionHeader
+}

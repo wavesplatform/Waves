@@ -50,12 +50,12 @@ trait TypedScriptGen {
 
   def BYTESTRgen: Gen[EXPR] = Gen.identifier.map(x => CONST_BYTEVECTOR(ByteVector(x.getBytes)))
 
-  def REFgen(tpe: TYPE): Gen[EXPR] = Gen.identifier.map(REF(_))
+  def REFgen(tpe: TYPE): Gen[EXPR] = Gen.identifier.map(REF)
 
   def FUNCTION_CALLgen(resultType: TYPE): Gen[EXPR] =
     Gen.const(
       FUNCTION_CALL(
-        function = FunctionHeader(SUM_LONG),
+        function = FunctionHeader.Predef(SUM_LONG),
         args = List(CONST_LONG(1), CONST_LONG(1))
       )
     )

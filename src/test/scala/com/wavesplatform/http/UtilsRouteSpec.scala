@@ -26,7 +26,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   ).route
 
   val script = FUNCTION_CALL(
-    function = FunctionHeader(EQ),
+    function = FunctionHeader.Predef(EQ),
     args = List(CONST_LONG(1), CONST_LONG(2))
   )
 

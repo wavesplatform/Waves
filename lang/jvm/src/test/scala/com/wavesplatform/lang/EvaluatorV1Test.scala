@@ -320,7 +320,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[Boolean](
       context = context,
       expr = FUNCTION_CALL(
-        function = FunctionHeader(SIGVERIFY),
+        function = FunctionHeader.Predef(SIGVERIFY),
         args = List(
           GETTER(REF("tx"), "bodyBytes"),
           GETTER(REF("tx"), "proof0"),
@@ -399,7 +399,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[ByteVector](
       context = context,
       expr = FUNCTION_CALL(
-        function = FunctionHeader(funcName),
+        function = FunctionHeader.Predef(funcName),
         args = List(CONST_BYTEVECTOR(ByteVector(bodyBytes)))
       )
     )

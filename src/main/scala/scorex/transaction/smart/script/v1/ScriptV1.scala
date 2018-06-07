@@ -15,7 +15,7 @@ object ScriptV1 {
     EvaluationContext.functionCosts(com.wavesplatform.utils.dummyEvaluationContext.functions.values)
 
   private val checksumLength = 4
-  private val maxComplexity  = 20 * functionCosts(FunctionHeader(SIGVERIFY))
+  private val maxComplexity  = 20 * functionCosts(FunctionHeader.Predef(SIGVERIFY))
   private val maxSizeInBytes = 8 * 1024
 
   def validateBytes(bs: Array[Byte]): Either[String, Unit] =

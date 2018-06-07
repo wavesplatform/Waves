@@ -29,9 +29,9 @@ class CompilerV1(ctx: CompilerContext) extends ExprCompiler {
         else if (xs.isEmpty) Left("No expression")
         else {
           CompilerV1(ctx, xs.head) match {
-            case Left(err)   => Left(err.toString)
+            case Left(err)              => Left(err.toString)
             case Right((expr, BOOLEAN)) => Right(expr)
-            case Right((_, _)) => Left("Script should return boolean")
+            case Right((_, _))          => Left("Script should return boolean")
           }
         }
       case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
@@ -43,11 +43,11 @@ object CompilerV1 {
 
   def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, TYPE)] = {
     expr match {
-      case x: Expressions.CONST_LONG                         => (CONST_LONG(x.value): EXPR, LONG: TYPE).pure[CompileM]
-      case x: Expressions.CONST_BYTEVECTOR                   => handlePart(x.value).map(v => (CONST_BYTEVECTOR(v), BYTEVECTOR: TYPE))
-      case x: Expressions.CONST_STRING                       => handlePart(x.value).map(v => (CONST_STRING(v), STRING: TYPE))
-      case _: Expressions.TRUE                               => (TRUE: EXPR, BOOLEAN: TYPE).pure[CompileM]
-      case _: Expressions.FALSE                              => (FALSE: EXPR, BOOLEAN: TYPE).pure[CompileM]
+      case x: Expressions.CONST_LONG                => (CONST_LONG(x.value): EXPR, LONG: TYPE).pure[CompileM]
+      case x: Expressions.CONST_BYTEVECTOR          => handlePart(x.value).map(v => (CONST_BYTEVECTOR(v), BYTEVECTOR: TYPE))
+      case x: Expressions.CONST_STRING              => handlePart(x.value).map(v => (CONST_STRING(v), STRING: TYPE))
+      case _: Expressions.TRUE                      => (TRUE: EXPR, BOOLEAN: TYPE).pure[CompileM]
+      case _: Expressions.FALSE                     => (FALSE: EXPR, BOOLEAN: TYPE).pure[CompileM]
       case Expressions.GETTER(p, ref, field)        => compileGetter(p, field, ref)
       case Expressions.BLOCK(p, let, body)          => compileBlock(p, let, body)
       case Expressions.IF(p, cond, ifTrue, ifFalse) => compileIf(p, cond, ifTrue, ifFalse)
@@ -197,7 +197,7 @@ object CompilerV1 {
       for {
         resolvedTypeParams <- TypeInferrer(typePairs).leftMap(Generic(p.start, p.end, _))
         resolvedResultType <- TypeInferrer.inferResultType(f.result, resolvedTypeParams).leftMap(Generic(p.start, p.end, _))
-        header = FunctionHeader(f.internalName)
+        header = FunctionHeader.Predef(f.internalName)
         args   = typedExpressionArgumentsAndTypedPlaceholders.map(_._1._1)
       } yield (FUNCTION_CALL(header, args): EXPR, resolvedResultType)
     }
@@ -211,7 +211,8 @@ object CompilerV1 {
   def mkIf(p: Pos, cond: EXPR, ifTrue: (EXPR, TYPE), ifFalse: (EXPR, TYPE)): Either[CompilationError, (EXPR, TYPE)] = {
     TypeInferrer
       .findCommonType(ifTrue._2, ifFalse._2)
-      .fold(UnexpectedType(p.start, p.end, ifTrue._2.toString, ifFalse._2.toString).asLeft[(IF, TYPE)])(t => (IF(cond, ifTrue._1, ifFalse._1), t).asRight)
+      .fold(UnexpectedType(p.start, p.end, ifTrue._2.toString, ifFalse._2.toString).asLeft[(IF, TYPE)])(t =>
+        (IF(cond, ifTrue._1, ifFalse._1), t).asRight)
   }
 
   def mkIfCases(ctx: CompilerContext, cases: List[MATCH_CASE], refTmp: Expressions.REF, allowShadowVarName: Option[String]): Expressions.EXPR = {
@@ -219,7 +220,7 @@ object CompilerV1 {
       val blockWithNewVar = mc.newVarName.fold(mc.expr) { nv =>
         val allowShadowing = nv match {
           case PART.VALID(_, x) => allowShadowVarName.contains(x)
-          case _                   => false
+          case _                => false
         }
         Expressions.BLOCK(Pos(1, 1), Expressions.LET(Pos(1, 1), nv, refTmp, mc.types, allowShadowing), mc.expr)
       }
@@ -238,11 +239,7 @@ object CompilerV1 {
     })
   }
 
-  private def mkGetter(p: Pos,
-                       ctx: CompilerContext,
-                       typeName: String,
-                       fieldName: String,
-                       expr: EXPR): Either[CompilationError, (GETTER, TYPE)] = {
+  private def mkGetter(p: Pos, ctx: CompilerContext, typeName: String, fieldName: String, expr: EXPR): Either[CompilationError, (GETTER, TYPE)] = {
     for {
       refTpe <- ctx.predefTypes
         .get(typeName)
@@ -273,7 +270,7 @@ object CompilerV1 {
   }
 
   private def handlePart[T](part: PART[T]): CompileM[T] = part match {
-    case PART.VALID(_, x)               => x.pure[CompileM]
+    case PART.VALID(_, x)         => x.pure[CompileM]
     case PART.INVALID(p, message) => raiseError(Generic(p.start, p.end, message))
   }
   def apply(c: CompilerContext, expr: Expressions.EXPR): Either[String, (EXPR, TYPE)] = {
