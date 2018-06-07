@@ -35,7 +35,7 @@ object Common {
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
-  val multiplierFunction: PredefFunction = PredefFunction("MULTIPLY", 1, Terms.LONG, List(("x1", Terms.LONG), ("x2", Terms.LONG)), "l*l") {
+  val multiplierFunction: PredefFunction = PredefFunction("MULTIPLY", 1, Terms.LONG, List(("x1", Terms.LONG), ("x2", Terms.LONG)), 512) {
     case (x1: Long) :: (x2: Long) :: Nil => Try(x1 * x2).toEither.left.map(_.toString)
     case _                               => ??? // suppress pattern match warning
   }
@@ -48,9 +48,9 @@ object Common {
   val AorBorC = UNION.of(pointTypeA, pointTypeB, pointTypeC)
   val BorC    = UNION.of(pointTypeB, pointTypeC)
 
-  val pointAInstance = CaseObj(pointTypeA.typeRef, Map("X"  -> Val(LONG)(3), "YA" -> Val(LONG)(40)))
-  val pointBInstance = CaseObj(pointTypeB.typeRef, Map("X"  -> Val(LONG)(3), "YB" -> Val(LONG)(41)))
-  val pointCInstance = CaseObj(pointTypeC.typeRef, Map("YB" -> Val(LONG)(42)))
+  val pointAInstance = CaseObj(pointTypeA.typeRef, Map("X"  -> 3L, "YA" -> 40L))
+  val pointBInstance = CaseObj(pointTypeB.typeRef, Map("X"  -> 3L, "YB" -> 41L))
+  val pointCInstance = CaseObj(pointTypeC.typeRef, Map("YB" -> 42L))
 
   val sampleTypes: Seq[DefinedType] = Seq(pointTypeA, pointTypeB, pointTypeC) ++ Seq(UnionType("PointAB", AorB.l), UnionType("PointBC", BorC.l))
 

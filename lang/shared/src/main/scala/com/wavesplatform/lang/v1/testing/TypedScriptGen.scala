@@ -5,6 +5,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import org.scalacheck._
 import scodec.bits.ByteVector
+import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 
 trait TypedScriptGen {
 
@@ -54,7 +55,7 @@ trait TypedScriptGen {
   def FUNCTION_CALLgen(resultType: TYPE): Gen[EXPR] =
     Gen.const(
       FUNCTION_CALL(
-        function = FunctionHeader("l+l"),
+        function = FunctionHeader(SUM_LONG),
         args = List(CONST_LONG(1), CONST_LONG(1))
       )
     )

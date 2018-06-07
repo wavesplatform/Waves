@@ -24,6 +24,7 @@ import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.transfer._
 import scorex.utils.TimeImpl
+import MassTransferTransaction.MaxTransferCount
 
 import scala.util.Random
 
@@ -313,19 +314,19 @@ trait TransactionGenBase extends ScriptGen {
     (assetId, sender, _, amount, timestamp, feeAssetId, feeAmount, attachment) <- transferParamGen
   } yield TransferTransactionV1.selfSigned(assetId, sender, sender, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
 
-  val massTransferGen = {
-    import MassTransferTransaction.MaxTransferCount
+  val massTransferGen: Gen[MassTransferTransaction] = massTransferGen(MaxTransferCount)
+
+  def massTransferGen(maxCount: Int) =
     for {
       version                                                      <- Gen.oneOf(MassTransferTransaction.supportedVersions.toSeq)
       (assetId, sender, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
-      transferCount                                                <- Gen.choose(1, 10) //MaxTransferCount)
+      transferCount                                                <- Gen.choose(1, maxCount)
       transferGen = for {
         recipient <- accountOrAliasGen
-        amount    <- Gen.choose(1L, Long.MaxValue / MaxTransferCount)
+        amount    <- Gen.choose(1L, Long.MaxValue / maxCount)
       } yield ParsedTransfer(recipient, amount)
       recipients <- Gen.listOfN(transferCount, transferGen)
     } yield MassTransferTransaction.selfSigned(version, assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
-  }.label("massTransferTransaction")
 
   val MinIssueFee = 100000000
 
@@ -618,11 +619,13 @@ trait TransactionGenBase extends ScriptGen {
 
   def dataEntryGen(maxSize: Int) = Gen.oneOf(longEntryGen(), booleanEntryGen(), binaryEntryGen(maxSize), stringEntryGen(maxSize))
 
-  val dataTransactionGen =
+  val dataTransactionGen: Gen[DataTransaction] = dataTransactionGen(DataTransaction.MaxEntryCount)
+
+  def dataTransactionGen(maxEntryCount: Int) =
     (for {
       sender    <- accountGen
       timestamp <- timestampGen
-      size      <- Gen.choose(0, DataTransaction.MaxEntryCount)
+      size      <- Gen.choose(0, maxEntryCount)
       maxEntrySize = (DataTransaction.MaxBytes - 122) / (size max 1) min DataEntry.MaxValueSize
       data    <- Gen.listOfN(size, dataEntryGen(maxEntrySize))
       version <- Gen.oneOf(DataTransaction.supportedVersions.toSeq)

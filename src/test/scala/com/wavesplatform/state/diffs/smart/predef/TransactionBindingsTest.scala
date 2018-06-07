@@ -55,6 +55,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       result shouldBe Right(true)
     }
   }
+
   /*
      TODO: after NODE-792 fix to add:
      let name = t.name == base58'${ByteStr(t.name).base58}'
@@ -71,7 +72,10 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           |   let quantity = t.quantity == ${t.quantity}
           |   let decimals = t.decimals == ${t.decimals}
           |   let reissuable = t.reissuable == ${t.reissuable}
-          |   $assertProvenPart && quantity && decimals && reissuable
+          |   let script = if (${t.script.isDefined}) then extract(t.script) == base64'${t.script
+             .map(_.bytes().base64)
+             .getOrElse("")}' else isDefined(t.script) == false
+          |   $assertProvenPart && quantity && decimals && reissuable && script
           | case other => throw
           | }
           |""".stripMargin,
@@ -198,13 +202,6 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     }
   }
 
-  /*
-  TODO After support of base64 decoding to add
-     let script = if (${t.script.isDefined}) then extract(t.script) == base58'${t.script
-             .map(_.bytes().base58)
-             .getOrElse("")}' else isDefined(t.script) == false
-   */
-
   property("SetScriptTransaction binding") {
     forAll(setScriptTransactionGen) { t =>
       val result = runScript[Boolean](
@@ -212,7 +209,10 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |match tx {
            | case t : SetScriptTransaction =>
            |   ${provenPart(t)}
-           |   $assertProvenPart
+           |   let script = if (${t.script.isDefined}) then extract(t.script) == base64'${t.script
+             .map(_.bytes().base64)
+             .getOrElse("")}' else isDefined(t.script) == false
+           |   $assertProvenPart && script
            | case other => throw
            | }
            |""".stripMargin,
@@ -221,22 +221,40 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       result shouldBe Right(true)
     }
   }
-  /*
-  TODO After support of base64 decoding to add
-     let key, value and type
-   */
 
   property("DataTransaction binding") {
-    forAll(dataTransactionGen) { t =>
+    forAll(dataTransactionGen(1)) { t =>
+      def pg(i: Int) = {
+        val v = t.data(i) match {
+          case x: LongDataEntry    => s"case a: LongDataEntry => a.value == ${x.value}"
+          case x: BooleanDataEntry => s"case a: BoolDataEntry => a.value == ${x.value}"
+          case x: BinaryDataEntry  => s"case a: ByteVectorDataEntry => a.value == base64'${x.value.base64}'"
+          case x: StringDataEntry  => s"""case a: StrDataEntry => a.value == "${x.value}""""
+        }
+
+        s"""let key$i = t.data[$i].key == "${t.data(i).key}"
+           |let value$i = match (t.data[$i]) {
+           | $v
+           | case other => true
+           |}
+         """.stripMargin
+      }
+
+      val resString =
+        if (t.data.isEmpty) assertProvenPart else assertProvenPart + s" && ${Range(0, t.data.length).map(i => s"key$i && value$i").mkString(" && ")}"
+
+      val s = s"""
+                 |match tx {
+                 | case t : DataTransaction =>
+                 |   ${provenPart(t)}
+                 |   ${Range(0, t.data.length).map(pg).mkString("\n")}
+                 |   $resString
+                 | case other => throw
+                 | }
+                 |""".stripMargin
+
       val result = runScript[Boolean](
-        s"""
-           |match tx {
-           | case t : DataTransaction =>
-           |   ${provenPart(t)}
-           |   $assertProvenPart
-           | case other => throw
-           | }
-           |""".stripMargin,
+        s,
         t
       )
       result shouldBe Right(true)
@@ -249,7 +267,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   Occurred when passed generated values (
    */
   property("MassTransferTransaction binding") {
-    forAll(massTransferGen) { t =>
+    forAll(massTransferGen(10)) { t =>
       def pg(i: Int) =
         s"""let recipient$i = match (t.transfers[$i].recipient) {
            |case a: Address => a.bytes == base58'${t.transfers(i).address.cast[Address].map(_.bytes.base58).getOrElse("")}'

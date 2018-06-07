@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import com.wavesplatform.lang.v1.compiler.Terms.{BOOLEAN, BYTEVECTOR, LONG, STRING}
-import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, Val}
+import com.wavesplatform.lang.v1.evaluator.ctx.CaseObj
 import com.wavesplatform.lang.v1.traits.DataItem.{Bin, Bool, Lng, Str}
 import com.wavesplatform.lang.v1.traits.Tx._
 import com.wavesplatform.lang.v1.traits._
@@ -10,18 +9,18 @@ import scodec.bits.ByteVector
 object Bindings {
   import Types._
 
-  private def headerPart(tx: Header): Map[String, Val] = Map(
-    "id"        -> Val(BYTEVECTOR)(tx.id),
-    "fee"       -> Val(LONG)(tx.fee),
-    "timestamp" -> Val(LONG)(tx.timestamp),
-    "version"   -> Val(LONG)(tx.version),
+  private def headerPart(tx: Header): Map[String, Any] = Map(
+    "id"        -> tx.id,
+    "fee"       -> tx.fee,
+    "timestamp" -> tx.timestamp,
+    "version"   -> tx.version,
   )
 
-  private def provenTxPart(tx: Proven): Map[String, Val] =
+  private def provenTxPart(tx: Proven): Map[String, Any] =
     Map(
-      "senderPk"  -> Val(BYTEVECTOR)(tx.senderPk),
-      "bodyBytes" -> Val(BYTEVECTOR)(tx.bodyBytes),
-      "proofs" -> Val(listByteVector) {
+      "senderPk"  -> tx.senderPk,
+      "bodyBytes" -> tx.bodyBytes,
+      "proofs" -> {
         val existingProofs = tx.proofs
         val allProofs      = existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteVector.empty)
         allProofs.toIndexedSeq.asInstanceOf[listByteVector.Underlying]
@@ -29,17 +28,17 @@ object Bindings {
     ) ++ headerPart(tx.h)
 
   private def mapRecipient(r: Recipient) =
-    "recipient" -> Val(addressOrAliasType)(r match {
-      case Recipient.Alias(name)    => CaseObj(aliasType.typeRef, Map("alias"   -> Val(STRING)(name)))
-      case Recipient.Address(bytes) => CaseObj(addressType.typeRef, Map("bytes" -> Val(BYTEVECTOR)(bytes)))
+    "recipient" -> (r match {
+      case Recipient.Alias(name)    => CaseObj(aliasType.typeRef, Map("alias"   -> name))
+      case Recipient.Address(bytes) => CaseObj(addressType.typeRef, Map("bytes" -> bytes))
     })
 
   def assetPair(ap: APair): CaseObj =
     CaseObj(
       assetPairType.typeRef,
       Map(
-        "amountAsset" -> Val(optionByteVector)(ap.amountAsset.asInstanceOf[optionByteVector.Underlying]),
-        "priceAsset"  -> Val(optionByteVector)(ap.priceAsset.asInstanceOf[optionByteVector.Underlying])
+        "amountAsset" -> ap.amountAsset.asInstanceOf[optionByteVector.Underlying],
+        "priceAsset"  -> ap.priceAsset.asInstanceOf[optionByteVector.Underlying]
       )
     )
 
@@ -53,129 +52,130 @@ object Bindings {
     CaseObj(
       orderType.typeRef,
       Map(
-        "senderPublicKey"  -> Val(BYTEVECTOR)(ord.senderPublicKey),
-        "matcherPublicKey" -> Val(BYTEVECTOR)(ord.matcherPublicKey),
-        "assetPair"        -> Val(assetPairType.typeRef)(assetPair(ord.assetPair)),
-        "orderType"        -> Val(ordTypeType)(ordType(ord.orderType)),
-        "price"            -> Val(LONG)(ord.price),
-        "amount"           -> Val(LONG)(ord.amount),
-        "timestamp"        -> Val(LONG)(ord.timestamp),
-        "expiration"       -> Val(LONG)(ord.expiration),
-        "matcherFee"       -> Val(LONG)(ord.matcherFee),
-        "signature"        -> Val(BYTEVECTOR)(ord.signature)
+        "senderPublicKey"  -> ord.senderPublicKey,
+        "matcherPublicKey" -> ord.matcherPublicKey,
+        "assetPair"        -> assetPair(ord.assetPair),
+        "orderType"        -> ordType(ord.orderType),
+        "price"            -> ord.price,
+        "amount"           -> ord.amount,
+        "timestamp"        -> ord.timestamp,
+        "expiration"       -> ord.expiration,
+        "matcherFee"       -> ord.matcherFee,
+        "signature"        -> ord.signature
       )
     )
 
   def transactionObject(tx: Tx): CaseObj =
     tx match {
       case Tx.Genesis(h, amount, recipient) =>
-        CaseObj(genesisTransactionType.typeRef, Map("amount" -> Val(LONG)(amount)) ++ headerPart(h) + mapRecipient(recipient))
+        CaseObj(genesisTransactionType.typeRef, Map("amount" -> amount) ++ headerPart(h) + mapRecipient(recipient))
       case Tx.Payment(p, amount, recipient) =>
-        CaseObj(genesisTransactionType.typeRef, Map("amount" -> Val(LONG)(amount)) ++ provenTxPart(p) + mapRecipient(recipient))
+        CaseObj(genesisTransactionType.typeRef, Map("amount" -> amount) ++ provenTxPart(p) + mapRecipient(recipient))
       case Tx.Transfer(p, feeAssetId, transferAssetId, amount, recipient, attachment) =>
         CaseObj(
           transferTransactionType.typeRef,
           Map(
-            "amount"          -> Val(LONG)(amount),
-            "feeAssetId"      -> Val(optionByteVector)(feeAssetId.asInstanceOf[optionByteVector.Underlying]),
-            "transferAssetId" -> Val(optionByteVector)(transferAssetId.asInstanceOf[optionByteVector.Underlying]),
-            "attachment"      -> Val(BYTEVECTOR)(attachment)
+            "amount"          -> amount,
+            "feeAssetId"      -> feeAssetId.asInstanceOf[optionByteVector.Underlying],
+            "transferAssetId" -> transferAssetId.asInstanceOf[optionByteVector.Underlying],
+            "attachment"      -> attachment
           ) ++ provenTxPart(p) + mapRecipient(recipient)
         )
-      case Issue(p, quantity, name, description, reissuable, decimals) =>
+      case Issue(p, quantity, name, description, reissuable, decimals, scriptOpt) =>
         CaseObj(
           issueTransactionType.typeRef,
           Map(
-            "quantity"    -> Val(LONG)(quantity),
-            "name"        -> Val(BYTEVECTOR)(name),
-            "description" -> Val(BYTEVECTOR)(description),
-            "reissuable"  -> Val(BOOLEAN)(reissuable),
-            "decimals"    -> Val(LONG)(decimals)
+            "quantity"    -> quantity,
+            "name"        -> name,
+            "description" -> description,
+            "reissuable"  -> reissuable,
+            "decimals"    -> decimals,
+            "script"      -> scriptOpt.asInstanceOf[optionByteVector.Underlying]
           ) ++ provenTxPart(p)
         )
       case ReIssue(p, quantity, assetId, reissuable) =>
         CaseObj(
           reissueTransactionType.typeRef,
           Map(
-            "quantity"   -> Val(LONG)(quantity),
-            "assetId"    -> Val(BYTEVECTOR)(assetId),
-            "reissuable" -> Val(BOOLEAN)(reissuable),
+            "quantity"   -> quantity,
+            "assetId"    -> assetId,
+            "reissuable" -> reissuable,
           ) ++ provenTxPart(p)
         )
       case Burn(p, quantity, assetId) =>
         CaseObj(burnTransactionType.typeRef,
                 Map(
-                  "quantity" -> Val(LONG)(quantity),
-                  "assetId"  -> Val(BYTEVECTOR)(assetId)
+                  "quantity" -> quantity,
+                  "assetId"  -> assetId
                 ) ++ provenTxPart(p))
       case Lease(p, amount, recipient) =>
         CaseObj(
           leaseTransactionType.typeRef,
           Map(
-            "amount" -> Val(LONG)(amount),
+            "amount" -> amount,
           ) ++ provenTxPart(p) + mapRecipient(recipient)
         )
       case LeaseCancel(p, leaseId) =>
         CaseObj(
           leaseCancelTransactionType.typeRef,
           Map(
-            "leaseId" -> Val(BYTEVECTOR)(leaseId),
+            "leaseId" -> leaseId,
           ) ++ provenTxPart(p)
         )
       case CreateAlias(p, alias) =>
         CaseObj(
           createAliasTransactionType.typeRef,
           Map(
-            "alias" -> Val(STRING)(alias),
+            "alias" -> alias,
           ) ++ provenTxPart(p)
         )
       case MassTransfer(p, assetId, transferCount, totalAmount, transfers, attachment) =>
         CaseObj(
           massTransferTransactionType.typeRef,
           Map(
-            "transfers" -> Val(listTransfers)(
+            "transfers" -> (
               transfers
-                .map(bv => CaseObj(transfer.typeRef, Map(mapRecipient(bv.recipient), "amount" -> Val(LONG)(bv.amount))))
+                .map(bv => CaseObj(transfer.typeRef, Map(mapRecipient(bv.recipient), "amount" -> bv.amount)))
                 .asInstanceOf[listTransfers.Underlying]),
-            "assetId"       -> Val(optionByteVector)(assetId.asInstanceOf[optionByteVector.Underlying]),
-            "transferCount" -> Val(LONG)(transferCount),
-            "totalAmount"   -> Val(LONG)(totalAmount),
-            "attachment"    -> Val(BYTEVECTOR)(attachment)
+            "assetId"       -> assetId.asInstanceOf[optionByteVector.Underlying],
+            "transferCount" -> transferCount,
+            "totalAmount"   -> totalAmount,
+            "attachment"    -> attachment
           ) ++ provenTxPart(p)
         )
       case SetScript(p, scriptOpt) =>
         CaseObj(setScriptTransactionType.typeRef,
-                Map("script" -> Val(optionByteVector)(scriptOpt.asInstanceOf[optionByteVector.Underlying])) ++ provenTxPart(p))
+                Map("script" -> scriptOpt.asInstanceOf[optionByteVector.Underlying]) ++ provenTxPart(p))
       case Sponsorship(p, assetId, minSponsoredAssetFee) =>
         CaseObj(
           sponsorFeeTransactionType.typeRef,
-          Map("assetId"              -> Val(BYTEVECTOR)(assetId),
-              "minSponsoredAssetFee" -> Val(optionLong)(minSponsoredAssetFee.asInstanceOf[optionLong.Underlying])) ++ provenTxPart(p)
+          Map("assetId"              -> assetId,
+              "minSponsoredAssetFee" -> minSponsoredAssetFee.asInstanceOf[optionLong.Underlying]) ++ provenTxPart(p)
         )
-      case Data(p, dataItems) =>
+      case Data(p, data) =>
         CaseObj(
           dataTransactionType.typeRef,
           Map(
-            "dataEntries" -> Val(listOfDataEntriesType)(dataItems
+            "data" -> data
               .map {
-                case Lng(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> Val(STRING)(k), "value" -> Val(LONG)(v)))
-                case Str(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> Val(STRING)(k), "value" -> Val(STRING)(v)))
-                case Bool(k, v) => CaseObj(longDataEntryType.typeRef, Map("key" -> Val(STRING)(k), "value" -> Val(BOOLEAN)(v)))
-                case Bin(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> Val(STRING)(k), "value" -> Val(BYTEVECTOR)(v)))
+                case Lng(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> k, "value" -> v))
+                case Str(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> k, "value" -> v))
+                case Bool(k, v) => CaseObj(longDataEntryType.typeRef, Map("key" -> k, "value" -> v))
+                case Bin(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> k, "value" -> v))
               }
-              .asInstanceOf[listOfDataEntriesType.Underlying])) ++
+              .asInstanceOf[listOfDataEntriesType.Underlying]) ++
             provenTxPart(p)
         )
       case Exchange(p, price, amount, buyMatcherFee, sellMatcherFee, buyOrder, sellOrder) =>
         CaseObj(
           exchangeTransactionType.typeRef,
           Map(
-            "buyOrder"       -> Val(orderType.typeRef)(orderObject(buyOrder)),
-            "sellOrder"      -> Val(orderType.typeRef)(orderObject(sellOrder)),
-            "price"          -> Val(LONG)(price),
-            "amount"         -> Val(LONG)(amount),
-            "buyMatcherFee"  -> Val(LONG)(buyMatcherFee),
-            "sellMatcherFee" -> Val(LONG)(sellMatcherFee),
+            "buyOrder"       -> orderObject(buyOrder),
+            "sellOrder"      -> orderObject(sellOrder),
+            "price"          -> price,
+            "amount"         -> amount,
+            "buyMatcherFee"  -> buyMatcherFee,
+            "sellMatcherFee" -> sellMatcherFee,
           ) ++ provenTxPart(p)
         )
     }

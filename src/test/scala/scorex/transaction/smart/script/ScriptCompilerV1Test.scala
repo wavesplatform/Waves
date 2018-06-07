@@ -7,6 +7,7 @@ import com.wavesplatform.state.EitherExt2
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 
 class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
 
@@ -33,11 +34,11 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
   private val expectedExpr = BLOCK(
     LET("x", CONST_LONG(10)),
     FUNCTION_CALL(
-      FunctionHeader("l=l"),
+      FunctionHeader(EQ_LONG),
       List(
         CONST_LONG(20),
         FUNCTION_CALL(
-          FunctionHeader("l+l"),
+          FunctionHeader(SUM_LONG),
           List(REF("x"), REF("x"))
         )
       )

@@ -8,6 +8,7 @@ import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import monix.eval.Coeval
 import scodec.bits.ByteVector
+import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 
 import scala.util.Try
 
@@ -20,7 +21,7 @@ object PureContext {
   val err           = LazyVal(EitherT(nothingCoeval))
   val errRef        = "throw"
 
-  val fraction: PredefFunction = PredefFunction("fraction", 1, LONG, List(("value", LONG), ("numerator", LONG), ("denominator", LONG)), "fraction") {
+  val fraction: PredefFunction = PredefFunction("fraction", 1, LONG, List(("value", LONG), ("numerator", LONG), ("denominator", LONG)), FRACTION) {
     case (v: Long) :: (n: Long) :: (d: Long) :: Nil => {
       val result = BigInt(v) * n / d
       for {
@@ -31,34 +32,34 @@ object PureContext {
     case _ => ???
   }
 
-  val extract: PredefFunction = PredefFunction("extract", 1, TYPEPARAM('T'), List(("opt", optionT)), "extract") {
+  val extract: PredefFunction = PredefFunction("extract", 1, TYPEPARAM('T'), List(("opt", optionT)), EXTRACT) {
     case Some(v) :: Nil => Right(v)
     case None :: Nil    => Left("Extract from empty option")
     case _              => ???
   }
 
-  val some: PredefFunction = PredefFunction("Some", 1, optionT, List(("obj", TYPEPARAM('T'))), "Some") {
+  val some: PredefFunction = PredefFunction("Some", 1, optionT, List(("obj", TYPEPARAM('T'))), SOME) {
     case v :: Nil => Right(Some(v))
     case _        => ???
   }
 
-  val _isInstanceOf: PredefFunction = PredefFunction("_isInstanceOf", 1, BOOLEAN, List(("obj", TYPEPARAM('T')), ("of", STRING)), "_iio") {
+  val _isInstanceOf: PredefFunction = PredefFunction("_isInstanceOf", 1, BOOLEAN, List(("obj", TYPEPARAM('T')), ("of", STRING)), ISINSTANCEOF) {
     case (p: CaseObj) :: (s: String) :: Nil => Right(p.caseType.name == s)
     case _                                  => ???
   }
 
-  val isDefined: PredefFunction = PredefFunction("isDefined", 1, BOOLEAN, List(("opt", optionT)), "isDefined") {
+  val isDefined: PredefFunction = PredefFunction("isDefined", 1, BOOLEAN, List(("opt", optionT)), ISDEFINED) {
     case Some(_) :: Nil => Right(true)
     case None :: Nil    => Right(false)
     case _              => ???
   }
 
-  val size: PredefFunction = PredefFunction("size", 1, LONG, List(("byteVector", BYTEVECTOR)), "sizebytevector") {
+  val size: PredefFunction = PredefFunction("size", 1, LONG, List(("byteVector", BYTEVECTOR)), SIZE_BYTES) {
     case (bv: ByteVector) :: Nil => Right(bv.size)
     case _                       => ???
   }
 
-  private def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: String)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
+  private def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
     PredefFunction(opsToFunctions(op), 1, r, List("a" -> t, "b" -> t), func) {
       case a :: b :: Nil =>
         Right(body(a.asInstanceOf[t.Underlying], b.asInstanceOf[t.Underlying]))
@@ -66,12 +67,12 @@ object PureContext {
     }
   }
 
-  val getElement = PredefFunction("getElement", 2, TYPEPARAM('T'), List("arr" -> LISTTYPEPARAM(TYPEPARAM('T')), "pos" -> LONG), "getElement") {
+  val getElement = PredefFunction("getElement", 2, TYPEPARAM('T'), List("arr" -> LISTTYPEPARAM(TYPEPARAM('T')), "pos" -> LONG), GET_LIST) {
     case (arr: IndexedSeq[_]) :: (pos: Long) :: Nil => Try(arr(pos.toInt)).toEither.left.map(_.toString)
     case _                                          => ???
   }
 
-  val getListSize = PredefFunction("size", 2, LONG, List("arr" -> LISTTYPEPARAM(TYPEPARAM('T'))), "sizeList") {
+  val getListSize = PredefFunction("size", 2, LONG, List("arr" -> LISTTYPEPARAM(TYPEPARAM('T'))), SIZE_LIST) {
     case (arr: IndexedSeq[_]) :: Nil => {
 
       Right(arr.size.toLong)
@@ -79,21 +80,21 @@ object PureContext {
     case _ => ???
   }
 
-  val uMinus = PredefFunction("-", 1, LONG, List("n" -> LONG), "-l") {
+  val uMinus = PredefFunction("-", 1, LONG, List("n" -> LONG), MINUS_LONG) {
     case (n: Long) :: Nil => {
       Right(Math.negateExact(n))
     }
     case _ => ???
   }
 
-  val uNot = PredefFunction("!", 1, BOOLEAN, List("p" -> BOOLEAN), "!") {
+  val uNot = PredefFunction("!", 1, BOOLEAN, List("p" -> BOOLEAN), NOT_BOOLEAN) {
     case (p: Boolean) :: Nil => {
       Right(!p)
     }
     case _ => ???
   }
 
-  private def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE, func: String)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
+  private def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
     PredefFunction(opsToFunctions(op), 1, r, List("a" -> t, "b" -> t), func) {
       case a :: b :: Nil =>
         try {
@@ -105,25 +106,25 @@ object PureContext {
     }
   }
 
-  val mulLong       = createTryOp(MUL_OP, LONG, LONG, "l*l")(Math.multiplyExact)
-  val divLong       = createTryOp(DIV_OP, LONG, LONG, "l/l")(Math.floorDiv)
-  val modLong       = createTryOp(MOD_OP, LONG, LONG, "l%l")(Math.floorMod)
-  val sumLong       = createTryOp(SUM_OP, LONG, LONG, "l+l")(Math.addExact)
-  val subLong       = createTryOp(SUB_OP, LONG, LONG, "l-l")(Math.subtractExact)
-  val sumString     = createOp(SUM_OP, STRING, STRING, "s+s")(_ + _)
-  val sumByteVector = createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, "v+v")((a, b) => ByteVector(a.toArray ++ b.toArray))
-  val eqLong        = createOp(EQ_OP, LONG, BOOLEAN, "l=l")(_ == _)
-  val eqByteVector  = createOp(EQ_OP, BYTEVECTOR, BOOLEAN, "v=v")(_ == _)
-  val eqBool        = createOp(EQ_OP, BOOLEAN, BOOLEAN, "b=b")(_ == _)
-  val eqString      = createOp(EQ_OP, STRING, BOOLEAN, "s=s")(_ == _)
-  val neLong        = createOp(NE_OP, LONG, BOOLEAN, "l!=l")(_ != _)
-  val neByteVector  = createOp(NE_OP, BYTEVECTOR, BOOLEAN, "v!=v")(_ != _)
-  val neBool        = createOp(NE_OP, BOOLEAN, BOOLEAN, "b!=b")(_ != _)
-  val neString      = createOp(NE_OP, STRING, BOOLEAN, "s!=s")(_ != _)
-  val ge            = createOp(GE_OP, LONG, BOOLEAN, "b>=b")(_ >= _)
-  val gt            = createOp(GT_OP, LONG, BOOLEAN, "l>l")(_ > _)
-  val sge           = createOp(GE_OP, STRING, BOOLEAN, "s>=s")(_ >= _)
-  val sgt           = createOp(GT_OP, STRING, BOOLEAN, "s>s")(_ > _)
+  val mulLong       = createTryOp(MUL_OP, LONG, LONG, MUL_LONG)(Math.multiplyExact)
+  val divLong       = createTryOp(DIV_OP, LONG, LONG, DIV_LONG)(Math.floorDiv)
+  val modLong       = createTryOp(MOD_OP, LONG, LONG, MOD_LONG)(Math.floorMod)
+  val sumLong       = createTryOp(SUM_OP, LONG, LONG, SUM_LONG)(Math.addExact)
+  val subLong       = createTryOp(SUB_OP, LONG, LONG, SUB_LONG)(Math.subtractExact)
+  val sumString     = createOp(SUM_OP, STRING, STRING, SUM_STRING)(_ + _)
+  val sumByteVector = createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES)((a, b) => ByteVector(a.toArray ++ b.toArray))
+  val eqLong        = createOp(EQ_OP, LONG, BOOLEAN, EQ_LONG)(_ == _)
+  val eqByteVector  = createOp(EQ_OP, BYTEVECTOR, BOOLEAN, EQ_BYTES)(_ == _)
+  val eqBool        = createOp(EQ_OP, BOOLEAN, BOOLEAN, EQ_BOOLEAN)(_ == _)
+  val eqString      = createOp(EQ_OP, STRING, BOOLEAN, EQ_STRING)(_ == _)
+  val neLong        = createOp(NE_OP, LONG, BOOLEAN, NE_LONG)(_ != _)
+  val neByteVector  = createOp(NE_OP, BYTEVECTOR, BOOLEAN, NE_BYTES)(_ != _)
+  val neBool        = createOp(NE_OP, BOOLEAN, BOOLEAN, NE_BOOLEAN)(_ != _)
+  val neString      = createOp(NE_OP, STRING, BOOLEAN, NE_STRING)(_ != _)
+  val ge            = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)(_ >= _)
+  val gt            = createOp(GT_OP, LONG, BOOLEAN, GT_LONG)(_ > _)
+  val sge           = createOp(GE_OP, STRING, BOOLEAN, GE_STRING)(_ >= _)
+  val sgt           = createOp(GT_OP, STRING, BOOLEAN, GT_STRING)(_ > _)
 
   val operators: Seq[PredefFunction] = Seq(
     mulLong,

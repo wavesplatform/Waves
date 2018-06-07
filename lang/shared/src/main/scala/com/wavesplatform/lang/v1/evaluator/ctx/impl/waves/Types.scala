@@ -52,7 +52,8 @@ object Types {
       "name"        -> BYTEVECTOR,
       "description" -> BYTEVECTOR,
       "reissuable"  -> BOOLEAN,
-      "decimals"    -> LONG
+      "decimals"    -> LONG,
+      "script"      -> optionByteVector
     ) ++ header ++ proven
   )
 
@@ -153,7 +154,7 @@ object Types {
 
   val dataTransactionType = CaseType(
     "DataTransaction",
-    List("dataEntries" -> listOfDataEntriesType) ++ header ++ proven
+    List("data" -> listOfDataEntriesType) ++ header ++ proven
   )
 
   val massTransferTransactionType = CaseType(

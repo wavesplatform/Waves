@@ -394,10 +394,10 @@ object AsyncHttpApi extends Assertions {
     def createAddress: Future[String] =
       post(s"${n.nodeApiEndpoint}/addresses").as[JsValue].map(v => (v \ "address").as[String])
 
-    def waitForNextBlock: Future[Block] =
+    def waitForNextBlock: Future[BlockHeaders] =
       for {
-        currentBlock <- lastBlock
-        actualBlock  <- findBlock(_.height > currentBlock.height, currentBlock.height)
+        currentBlock <- lastBlockHeaders
+        actualBlock  <- findBlockHeaders(_.height > currentBlock.height, currentBlock.height)
       } yield actualBlock
 
     def waitForHeightArise: Future[Int] =
@@ -421,6 +421,26 @@ object AsyncHttpApi extends Assertions {
               timer.schedule(load(newFrom, newTo), n.settings.blockchainSettings.genesisSettings.averageBlockDelay)
             }
           }(Future.successful)
+      }
+
+      load(from, (from + 19).min(to))
+    }
+
+    def findBlockHeaders(cond: BlockHeaders => Boolean, from: Int = 1, to: Int = Int.MaxValue): Future[BlockHeaders] = {
+      def load(_from: Int, _to: Int): Future[BlockHeaders] = blockHeadersSeq(_from, _to).flatMap { blocks =>
+        blocks
+          .find(cond)
+          .fold[Future[BlockHeaders]] {
+          val maybeLastBlock = blocks.lastOption
+          if (maybeLastBlock.exists(_.height >= to)) {
+            Future.failed(new NoSuchElementException)
+          } else {
+            val newFrom = maybeLastBlock.fold(_from)(b => (b.height + 19).min(to))
+            val newTo   = newFrom + 19
+            n.log.debug(s"Loaded ${blocks.length} blocks, no match found. Next range: [$newFrom, ${newFrom + 19}]")
+            timer.schedule(load(newFrom, newTo), n.settings.blockchainSettings.genesisSettings.averageBlockDelay)
+          }
+        }(Future.successful)
       }
 
       load(from, (from + 19).min(to))
@@ -558,19 +578,19 @@ object AsyncHttpApi extends Assertions {
         _      <- traverse(nodes)(_.waitForHeight(height + 1))
       } yield ()
 
-    def waitForSameBlocksAt(height: Int, retryInterval: FiniteDuration = 5.seconds): Future[Boolean] = {
+    def waitForSameBlockHeadesAt(height: Int, retryInterval: FiniteDuration = 5.seconds): Future[Boolean] = {
 
       def waitHeight = waitFor[Int](s"all heights >= $height")(retryInterval)(_.height, _.forall(_ >= height))
 
-      def waitSameBlocks =
-        waitFor[Block](s"same blocks at height = $height")(retryInterval)(_.blockAt(height), { blocks =>
+      def waitSameBlockHeaders =
+        waitFor[BlockHeaders](s"same blocks at height = $height")(retryInterval)(_.blockHeadersAt(height), { blocks =>
           val sig = blocks.map(_.signature)
           sig.forall(_ == sig.head)
         })
 
       for {
         _ <- waitHeight
-        r <- waitSameBlocks
+        r <- waitSameBlockHeaders
       } yield r
     }
 

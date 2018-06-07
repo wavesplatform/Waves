@@ -51,13 +51,20 @@ object Tx {
                       recipient: Recipient,
                       attachment: ByteVector)
       extends Tx
-  case class Issue(p: Proven, quantity: Long, name: ByteVector, description: ByteVector, reissuable: Boolean, decimals: Long) extends Tx
-  case class ReIssue(p: Proven, quantity: Long, assetId: ByteVector, reissuable: Boolean)                                     extends Tx
-  case class Burn(p: Proven, quantity: Long, assetId: ByteVector)                                                             extends Tx
-  case class Lease(p: Proven, amount: Long, recipient: Recipient)                                                             extends Tx
-  case class LeaseCancel(p: Proven, leaseId: ByteVector)                                                                      extends Tx
-  case class CreateAlias(p: Proven, alias: String)                                                                            extends Tx
-  case class SetScript(p: Proven, script: Option[ByteVector])                                                                 extends Tx
+  case class Issue(p: Proven,
+                   quantity: Long,
+                   name: ByteVector,
+                   description: ByteVector,
+                   reissuable: Boolean,
+                   decimals: Long,
+                   script: Option[ByteVector])
+      extends Tx
+  case class ReIssue(p: Proven, quantity: Long, assetId: ByteVector, reissuable: Boolean) extends Tx
+  case class Burn(p: Proven, quantity: Long, assetId: ByteVector)                         extends Tx
+  case class Lease(p: Proven, amount: Long, recipient: Recipient)                         extends Tx
+  case class LeaseCancel(p: Proven, leaseId: ByteVector)                                  extends Tx
+  case class CreateAlias(p: Proven, alias: String)                                        extends Tx
+  case class SetScript(p: Proven, script: Option[ByteVector])                             extends Tx
   case class MassTransfer(p: Proven,
                           assetId: Option[ByteVector],
                           transferCount: Long,
@@ -67,5 +74,5 @@ object Tx {
       extends Tx
   case class Sponsorship(p: Proven, assetId: ByteVector, minSponsoredAssetFee: Option[Long])                                          extends Tx
   case class Exchange(p: Proven, price: Long, amount: Long, buyMatcherFee: Long, sellMatcherFee: Long, buyOrder: Ord, sellOrder: Ord) extends Tx
-  case class Data(p: Proven, items: IndexedSeq[DataItem])                                                                             extends Tx
+  case class Data(p: Proven, data: IndexedSeq[DataItem])                                                                              extends Tx
 }
