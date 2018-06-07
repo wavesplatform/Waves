@@ -21,16 +21,18 @@ object JsAPI {
   private def toJs(ast: EXPR): js.Object = {
     def r(expr: EXPR): js.Object = {
       expr match {
-        case CONST_LONG(t)                 => jObj("type" -> "LONG", "value"       -> t)
-        case GETTER(ref, field)            => jObj("type" -> "GETTER", "ref"       -> r(ref), "field" -> field)
-        case CONST_BYTEVECTOR(bs)          => jObj("type" -> "BYTEVECTOR", "value" -> bs.toArray.toJSArray)
-        case CONST_STRING(s)               => jObj("type" -> "STRING", "value"     -> s)
-        case BLOCK(let, body)              => jObj("type" -> "BLOCK", "let"        -> jObj("name" -> let.name, "value" -> r(let.value)), "body" -> r(body))
-        case IF(cond, ifTrue, ifFalse)     => jObj("type" -> "IF", "condition"     -> r(cond), "true" -> r(ifTrue), "false" -> r(ifFalse))
-        case REF(key)                      => jObj("type" -> "REF", "key"          -> key)
-        case TRUE                          => jObj("type" -> "BOOL", "value"       -> true)
-        case FALSE                         => jObj("type" -> "BOOL", "value"       -> false)
-        case FUNCTION_CALL(function, args) => jObj("type" -> "CALL", "name"        -> function.name, "args" -> args.map(r).toJSArray)
+        case CONST_LONG(t)        => jObj.applyDynamic("apply")("type" -> "LONG", "value"       -> t)
+        case GETTER(ref, field)   => jObj.applyDynamic("apply")("type" -> "GETTER", "ref"       -> r(ref), "field" -> field)
+        case CONST_BYTEVECTOR(bs) => jObj.applyDynamic("apply")("type" -> "BYTEVECTOR", "value" -> bs.toArray.toJSArray)
+        case CONST_STRING(s)      => jObj.applyDynamic("apply")("type" -> "STRING", "value"     -> s)
+        case BLOCK(let, body) =>
+          jObj.applyDynamic("apply")("type" -> "BLOCK", "let" -> jObj("name" -> let.name, "value" -> r(let.value)), "body" -> r(body))
+        case IF(cond, ifTrue, ifFalse) =>
+          jObj.applyDynamic("apply")("type" -> "IF", "condition" -> r(cond), "true" -> r(ifTrue), "false" -> r(ifFalse))
+        case REF(key)                      => jObj.applyDynamic("apply")("type" -> "REF", "key"    -> key)
+        case TRUE                          => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> true)
+        case FALSE                         => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> false)
+        case FUNCTION_CALL(function, args) => jObj.applyDynamic("apply")("type" -> "CALL", "name"  -> function.name, "args" -> args.map(r).toJSArray)
       }
     }
 
