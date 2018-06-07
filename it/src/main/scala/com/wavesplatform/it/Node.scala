@@ -5,11 +5,12 @@ import java.net.{InetSocketAddress, URL}
 import com.typesafe.config.Config
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.EitherExt2
+import com.wavesplatform.utils.Base58
 import org.asynchttpclient.Dsl.{config => clientConfig, _}
 import org.asynchttpclient._
 import org.slf4j.LoggerFactory
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.utils.Base58
 import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration.FiniteDuration
@@ -24,8 +25,8 @@ abstract class Node(config: Config) extends AutoCloseable {
       .setKeepAlive(false)
       .setNettyTimer(GlobalTimer.instance))
 
-  val privateKey: PrivateKeyAccount = PrivateKeyAccount.fromSeed(config.getString("account-seed")).right.get
-  val publicKey: PublicKeyAccount   = PublicKeyAccount.fromBase58String(config.getString("public-key")).right.get
+  val privateKey: PrivateKeyAccount = PrivateKeyAccount.fromSeed(config.getString("account-seed")).explicitGet()
+  val publicKey: PublicKeyAccount   = PublicKeyAccount.fromBase58String(config.getString("public-key")).explicitGet()
   val address: String               = config.getString("address")
 
   def nodeApiEndpoint: URL

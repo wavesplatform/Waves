@@ -3,7 +3,7 @@ package scorex.transaction
 import com.google.common.primitives.Shorts
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state.DataEntry._
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, LongDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, EitherExt2, LongDataEntry, StringDataEntry}
 import com.wavesplatform.utils.Base58
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
@@ -175,7 +175,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     val tx = DataTransaction
       .create(
         1,
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         List(entry1, entry2, entry3),
         100000,
         1526911531530L,

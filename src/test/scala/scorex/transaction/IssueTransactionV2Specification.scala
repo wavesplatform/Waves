@@ -1,9 +1,9 @@
 package scorex.transaction
 
+import com.wavesplatform.state.{ByteStr, EitherExt2, HistoryTest}
 import com.wavesplatform.{TransactionGen, WithDB}
-import com.wavesplatform.state.{ByteStr, HistoryTest}
-import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
 import scorex.transaction.assets.IssueTransactionV2
@@ -53,7 +53,7 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
       .create(
         2,
         'T',
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         "Gigacoin".getBytes,
         "Gigacoin".getBytes,
         10000000000L,

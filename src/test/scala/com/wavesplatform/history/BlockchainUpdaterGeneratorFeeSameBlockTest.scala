@@ -24,9 +24,9 @@ class BlockchainUpdaterGeneratorFeeSameBlockTest
     recipient <- accountGen
     fee       <- smallFeeGen
     ts        <- positiveIntGen
-    genesis: GenesisTransaction = GenesisTransaction.create(sender, ENOUGH_AMT, ts).right.get
+    genesis: GenesisTransaction = GenesisTransaction.create(sender, ENOUGH_AMT, ts).explicitGet()
     payment: TransferTransactionV1 <- wavesTransferGeneratorP(sender, recipient)
-    generatorPaymentOnFee: TransferTransactionV1 = createWavesTransfer(defaultSigner, recipient, payment.fee, fee, ts + 1).right.get
+    generatorPaymentOnFee: TransferTransactionV1 = createWavesTransfer(defaultSigner, recipient, payment.fee, fee, ts + 1).explicitGet()
   } yield (genesis, payment, generatorPaymentOnFee)
 
   property("block generator can spend fee after transaction before applyMinerFeeWithTransactionAfter") {

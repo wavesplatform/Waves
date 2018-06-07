@@ -4,7 +4,7 @@ import com.wavesplatform.WithDB
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
 import com.wavesplatform.settings.{Constants, WalletSettings}
-import com.wavesplatform.state.{Blockchain, ByteStr, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{Blockchain, ByteStr, EitherExt2, LeaseBalance, Portfolio}
 import com.wavesplatform.utx.UtxPool
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
@@ -39,7 +39,7 @@ class OrderValidatorSpecification
   val w                              = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
   val acc: Option[PrivateKeyAccount] = w.generateNewAccount()
 
-  val matcherPubKey: PublicKeyAccount = w.findPrivateKey(s.account).right.get
+  val matcherPubKey: PublicKeyAccount = w.findPrivateKey(s.account).explicitGet()
 
   private var ov = new OrderValidator {
     override val orderHistory: OrderHistory = OrderHistoryImpl(db, matcherSettings)

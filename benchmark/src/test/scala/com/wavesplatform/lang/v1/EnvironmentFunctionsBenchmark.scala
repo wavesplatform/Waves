@@ -6,6 +6,7 @@ import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
 import com.wavesplatform.lang.v1.traits._
+import com.wavesplatform.state.EitherExt2
 import org.openjdk.jmh.annotations._
 import scodec.bits.ByteVector
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey, Signature}
@@ -23,13 +24,13 @@ class EnvironmentFunctionsBenchmark {
 
   @Benchmark
   def base58_decode_full_test(): Either[String, Array[Byte]] =
-    Global.base58Decode(Global.base58Encode(randomBytes(Base58BytesLength)).right.get)
+    Global.base58Decode(Global.base58Encode(randomBytes(Base58BytesLength)).explicitGet())
 
   @Benchmark
-  def base58_encode_test(): String = hashTest(Base58BytesLength, Global.base58Encode(_).right.get)
+  def base58_encode_test(): String = hashTest(Base58BytesLength, Global.base58Encode(_).explicitGet())
 
   @Benchmark
-  def base58_26_encode_test(): String = hashTest(26, Global.base58Encode(_).right.get) // for addressFromString_full_test
+  def base58_26_encode_test(): String = hashTest(26, Global.base58Encode(_).explicitGet()) // for addressFromString_full_test
 
   @Benchmark
   def sha256_test(): Array[Byte] = hashTest(Global.sha256)
@@ -65,7 +66,7 @@ class EnvironmentFunctionsBenchmark {
 
   @Benchmark
   def addressFromString_full_test(): Either[String, Option[ByteVector]] =
-    environmentFunctions.addressFromString(Global.base58Encode(randomAddress.toArray).right.get)
+    environmentFunctions.addressFromString(Global.base58Encode(randomAddress.toArray).explicitGet())
 
 }
 

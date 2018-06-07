@@ -46,7 +46,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           |       case a: Address => a.bytes == base58'${t.recipient.cast[Address].map(_.bytes.base58).getOrElse("")}'
           |       case a: Alias => a.alias == "${t.recipient.cast[Alias].map(_.name).getOrElse("")}"
           |      }
-          |   $assertProvenPart && amount && feeAssetId && transferAssetId && recipient
+          |    let attachment = t.attachment == base58'${ByteStr(t.attachment).base58}'
+          |   $assertProvenPart && amount && feeAssetId && transferAssetId && recipient && attachment
           | case other => throw
           | }
           |""".stripMargin,
@@ -66,19 +67,19 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     forAll(issueGen) { t =>
       val result = runScript[Boolean](
         s"""
-          |match tx {
-          | case t : IssueTransaction =>
-          |   ${provenPart(t)}
-          |   let quantity = t.quantity == ${t.quantity}
-          |   let decimals = t.decimals == ${t.decimals}
-          |   let reissuable = t.reissuable == ${t.reissuable}
-          |   let script = if (${t.script.isDefined}) then extract(t.script) == base64'${t.script
+           |match tx {
+           | case t : IssueTransaction =>
+           |   ${provenPart(t)}
+           |   let quantity = t.quantity == ${t.quantity}
+           |   let decimals = t.decimals == ${t.decimals}
+           |   let reissuable = t.reissuable == ${t.reissuable}
+           |   let script = if (${t.script.isDefined}) then extract(t.script) == base64'${t.script
              .map(_.bytes().base64)
              .getOrElse("")}' else isDefined(t.script) == false
-          |   $assertProvenPart && quantity && decimals && reissuable && script
-          | case other => throw
-          | }
-          |""".stripMargin,
+           |   $assertProvenPart && quantity && decimals && reissuable && script
+           | case other => throw
+           | }
+           |""".stripMargin,
         t
       )
       result shouldBe Right(true)
@@ -223,7 +224,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   }
 
   property("DataTransaction binding") {
-    forAll(dataTransactionGen(1)) { t =>
+    forAll(dataTransactionGen(5, true)) { t =>
       def pg(i: Int) = {
         val v = t.data(i) match {
           case x: LongDataEntry    => s"case a: LongDataEntry => a.value == ${x.value}"
@@ -261,11 +262,6 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     }
   }
 
-  /*
-  StackOverflowError was thrown during property evaluation.
-  Message: "None"
-  Occurred when passed generated values (
-   */
   property("MassTransferTransaction binding") {
     forAll(massTransferGen(10)) { t =>
       def pg(i: Int) =
@@ -276,6 +272,15 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |let amount$i = t.transfers[$i].amount == ${t.transfers(i).amount}
          """.stripMargin
 
+      val resString =
+        if (t.transfers.isEmpty) assertProvenPart
+        else
+          assertProvenPart + s" &&" + {
+            Range(0, t.transfers.length)
+              .map(i => s"recipient$i && amount$i")
+              .mkString(" && ")
+          }
+
       val script = s"""
                       |match tx {
                       | case t : MassTransferTransaction =>
@@ -283,11 +288,10 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                       |      else isDefined(t.assetId) == false
                       |     let transferCount = t.transferCount == ${t.transfers.length}
                       |     let totalAmount = t.totalAmount == ${t.transfers.map(_.amount).sum}
+                      |     let attachment = t.attachment == base58'${ByteStr(t.attachment).base58}'
                       |     ${Range(0, t.transfers.length).map(pg).mkString("\n")}
                       |   ${provenPart(t)}
-                      |   $assertProvenPart && assetId && transferCount && totalAmount && ${Range(0, t.transfers.length)
-                        .map(i => s"recipient$i && amount$i")
-                        .mkString(" && ")}
+                      |   $resString && assetId && transferCount && totalAmount && attachment
                       | case other => throw
                       | }
                       |""".stripMargin

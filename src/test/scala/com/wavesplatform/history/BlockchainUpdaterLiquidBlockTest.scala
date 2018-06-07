@@ -27,7 +27,7 @@ class BlockchainUpdaterLiquidBlockTest extends PropSpec with PropertyChecks with
 
     val prevBlock = unsafeBlock(
       reference = randomSig,
-      txs = Seq(GenesisTransaction.create(richAccount, ENOUGH_AMT, 0).right.get),
+      txs = Seq(GenesisTransaction.create(richAccount, ENOUGH_AMT, 0).explicitGet()),
       signer = TestBlock.defaultSigner,
       version = 3,
       timestamp = 0
@@ -79,7 +79,7 @@ class BlockchainUpdaterLiquidBlockTest extends PropSpec with PropertyChecks with
       feeAmount <- smallFeeGen
       timestamp <- timestampGen
       recipient <- accountGen
-    } yield TransferTransactionV1.selfSigned(None, from, recipient, amount, timestamp, None, feeAmount, Array.empty).right.get
+    } yield TransferTransactionV1.selfSigned(None, from, recipient, amount, timestamp, None, feeAmount, Array.empty).explicitGet()
 
   private def unsafeChainBaseAndMicro(totalRefTo: ByteStr,
                                       base: Seq[Transaction],
