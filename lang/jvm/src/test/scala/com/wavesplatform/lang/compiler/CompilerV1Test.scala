@@ -3,6 +3,7 @@ package com.wavesplatform.lang.compiler
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._

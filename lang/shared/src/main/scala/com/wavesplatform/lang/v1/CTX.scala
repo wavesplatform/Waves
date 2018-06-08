@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1
 
 import cats.Monoid
 import com.wavesplatform.lang.v1.compiler.CompilerContext
-import com.wavesplatform.lang.v1.compiler.Terms.TYPE
+import com.wavesplatform.lang.v1.compiler.Types.TYPE
 import com.wavesplatform.lang.v1.evaluator.ctx.{DefinedType, EvaluationContext, LazyVal, PredefFunction}
 
 case class CTX(types: Seq[DefinedType], vars: Map[String, (TYPE, LazyVal)], functions: Seq[PredefFunction]) {

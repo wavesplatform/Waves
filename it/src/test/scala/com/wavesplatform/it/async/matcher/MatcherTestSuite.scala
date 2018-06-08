@@ -8,11 +8,11 @@ import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{Node, ReportingTestName}
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.matcher.market.MatcherActor
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{ByteStr, EitherExt2}
+import com.wavesplatform.utils.Base58
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.api.http.assets.SignedTransferV1Request
 import scorex.api.http.leasing.{SignedLeaseCancelV1Request, SignedLeaseV1Request}
-import com.wavesplatform.utils.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import scorex.transaction.transfer._
@@ -587,7 +587,7 @@ class MatcherTestSuite
       .selfSigned(
         assetId = assetId,
         sender = from.privateKey,
-        recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).right.get,
+        recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).explicitGet(),
         amount = amount,
         timestamp = System.currentTimeMillis(),
         feeAssetId = None,
@@ -604,7 +604,7 @@ class MatcherTestSuite
     val leaseTx = LeaseTransactionV1
       .selfSigned(
         sender = from.privateKey,
-        recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).right.get,
+        recipient = scorex.account.Address.fromBytes(Base58.decode(to.address).get).explicitGet(),
         amount = amount,
         timestamp = System.currentTimeMillis(),
         fee = TransactionFee

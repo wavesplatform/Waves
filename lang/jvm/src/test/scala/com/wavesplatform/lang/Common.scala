@@ -1,8 +1,8 @@
 package com.wavesplatform.lang
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, LONG, UNION}
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -35,7 +35,7 @@ object Common {
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
-  val multiplierFunction: PredefFunction = PredefFunction("MULTIPLY", 1, Terms.LONG, List(("x1", Terms.LONG), ("x2", Terms.LONG)), 512) {
+  val multiplierFunction: PredefFunction = PredefFunction("MULTIPLY", 1, LONG, List(("x1", LONG), ("x2", LONG)), 512) {
     case (x1: Long) :: (x2: Long) :: Nil => Try(x1 * x2).toEither.left.map(_.toString)
     case _                               => ??? // suppress pattern match warning
   }

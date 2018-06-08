@@ -5,7 +5,7 @@ import java.util.concurrent.ThreadLocalRandom
 import cats.Show
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
 import com.wavesplatform.state.DataEntry.{MaxValueSize, Type}
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, LongDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, EitherExt2, LongDataEntry}
 import org.slf4j.LoggerFactory
 import scorex.account.{Alias, PrivateKeyAccount}
 import scorex.transaction._
@@ -154,7 +154,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
           case CreateAliasTransactionV1 =>
             val sender      = randomFrom(accounts).get
             val aliasString = NarrowTransactionGenerator.generateAlias()
-            logOption(CreateAliasTransactionV1.selfSigned(sender, Alias.buildWithCurrentNetworkByte(aliasString).right.get, 100000, ts))
+            logOption(CreateAliasTransactionV1.selfSigned(sender, Alias.buildWithCurrentNetworkByte(aliasString).explicitGet(), 100000, ts))
           case MassTransferTransaction =>
             val transferCount = r.nextInt(MassTransferTransaction.MaxTransferCount)
             val transfers = for (i <- 0 to transferCount) yield {

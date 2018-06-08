@@ -3,7 +3,7 @@ package com.wavesplatform.db
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{ByteStr, EitherExt2}
 import scorex.transaction.AssetId
 
 import scala.collection.generic.CanBuildFrom
@@ -119,14 +119,14 @@ case class ColCodec[Col[BB] <: TraversableOnce[BB], A](valueCodec: Codec[A])(imp
   override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Col[A]]] = {
     val n = Try(Ints.fromByteArray(bytes.take(Ints.BYTES))).toEither.left.map(e => CodecFailure(e.getMessage))
     if (n.isRight) {
-      val expectedLength = n.right.get
+      val expectedLength = n.explicitGet()
       val builder        = cbf()
       var i              = Ints.BYTES
       var error          = false
       while (i < bytes.length && !error) {
         val r = valueCodec.decode(bytes.slice(i, bytes.length))
         if (r.isRight) {
-          val rr = r.right.get
+          val rr = r.explicitGet()
           i = i + rr.length
           builder.+=(rr.value)
         } else {

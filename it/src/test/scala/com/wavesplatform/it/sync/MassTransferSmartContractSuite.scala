@@ -102,7 +102,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
     val heightBefore = sender.height
 
     val transfersToGov =
-      MassTransferTransaction.parseTransfersList(List(Transfer(firstAddress, transferAmount), Transfer(fourthAddress, transferAmount))).right.get
+      MassTransferTransaction.parseTransfersList(List(Transfer(firstAddress, transferAmount), Transfer(fourthAddress, transferAmount))).explicitGet()
 
     val unsignedToGov =
       MassTransferTransaction

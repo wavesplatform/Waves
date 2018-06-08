@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{ByteStr, EitherExt2}
 import org.scalacheck.Arbitrary
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -117,7 +117,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
       .create(
         1,
         None,
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         transfers,
         1518091313964L,
         200000,

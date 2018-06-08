@@ -2,11 +2,12 @@ package com.wavesplatform.lang
 
 import cats.data.EitherT
 import cats.kernel.Monoid
-import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -17,7 +18,6 @@ import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
@@ -116,10 +116,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val pointType     = CaseType("Point", List("X"         -> LONG, "Y" -> LONG))
     val pointInstance = CaseObj(pointType.typeRef, Map("X" -> 3L, "Y"   -> 4L))
     ev[Long](
-      context = PureContext.evalContext |+| EvaluationContext(
-        letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance)))),
-        functions = Map.empty
-      ),
+      context = Monoid.combine(PureContext.evalContext,
+                               EvaluationContext(
+                                 letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance)))),
+                                 functions = Map.empty
+                               )),
       expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p"), "X"), CONST_LONG(2)))
     )._2 shouldBe Right(5)
   }
@@ -127,9 +128,12 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("lazy let evaluation doesn't throw if not used") {
     val pointType     = CaseType("Point", List(("X", LONG), ("Y", LONG)))
     val pointInstance = CaseObj(pointType.typeRef, Map("X" -> 3L, "Y" -> 4L))
-    val context = PureContext.evalContext |+| EvaluationContext(
-      letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance))), ("badVal", LazyVal(EitherT.leftT("Error")))),
-      functions = Map.empty
+    val context = Monoid.combine(
+      PureContext.evalContext,
+      EvaluationContext(
+        letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance))), ("badVal", LazyVal(EitherT.leftT("Error")))),
+        functions = Map.empty
+      )
     )
     ev[Long](
       context = context,
@@ -145,10 +149,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       Right(1L)
     }
 
-    val context = PureContext.evalContext |+| EvaluationContext(
-      letDefs = Map.empty,
-      functions = Map(f.header -> f)
-    )
+    val context = Monoid.combine(PureContext.evalContext,
+                                 EvaluationContext(
+                                   letDefs = Map.empty,
+                                   functions = Map(f.header -> f)
+                                 ))
     ev[Long](
       context = context,
       expr = BLOCK(LET("X", FUNCTION_CALL(f.header, List(CONST_LONG(1000)))), FUNCTION_CALL(sumLong.header, List(REF("X"), REF("X"))))

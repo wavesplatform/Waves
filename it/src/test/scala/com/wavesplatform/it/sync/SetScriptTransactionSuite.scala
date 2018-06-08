@@ -17,7 +17,7 @@ import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.transfer._
 
 class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private def pkFromAddress(address: String) = PrivateKeyAccount.fromSeed(sender.seed(address)).right.get
+  private def pkFromAddress(address: String) = PrivateKeyAccount.fromSeed(sender.seed(address)).explicitGet()
 
   private val fourthAddress: String = sender.createAddress()
 

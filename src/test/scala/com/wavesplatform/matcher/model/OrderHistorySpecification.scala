@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.model
 import com.wavesplatform.WithDB
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{ByteStr, EitherExt2}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
@@ -64,7 +64,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Accepted
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe
-      math.max(ord1.matcherFee - ord1.getReceiveAmount(ord1.price, ord1.amount).right.get, 0L)
+      math.max(ord1.matcherFee - ord1.getReceiveAmount(ord1.price, ord1.amount).explicitGet(), 0L)
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 8L
 
     oh.allOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
@@ -97,9 +97,9 @@ class OrderHistorySpecification
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.Accepted
 
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe
-      math.max(ord1.matcherFee - ord1.getReceiveAmount(ord1.price, ord1.amount).right.get, 0L) + ord2.amount + ord2.matcherFee
+      math.max(ord1.matcherFee - ord1.getReceiveAmount(ord1.price, ord1.amount).explicitGet(), 0L) + ord2.amount + ord2.matcherFee
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe
-      ord1.getSpendAmount(ord1.price, ord1.amount).right.get
+      ord1.getSpendAmount(ord1.price, ord1.amount).explicitGet()
 
     oh.allOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr(), ord2.idStr())
     oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(pair.priceAsset -> ord1.idStr(), pair.amountAsset -> ord2.idStr())

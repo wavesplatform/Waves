@@ -1,10 +1,11 @@
 package scorex.transaction
 
+import com.wavesplatform.state.EitherExt2
+import com.wavesplatform.utils.Base58
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.utils.Base58
 
 class GenesisTransactionSpecification extends PropSpec with PropertyChecks with Matchers {
 
@@ -28,7 +29,7 @@ class GenesisTransactionSpecification extends PropSpec with PropertyChecks with 
 
     val balance             = 12345L
     val timestamp           = 1234567890L
-    val expectedTransaction = GenesisTransaction.create(defaultRecipient, balance, timestamp).right.get
+    val expectedTransaction = GenesisTransaction.create(defaultRecipient, balance, timestamp).explicitGet()
 
     actualTransaction should equal(expectedTransaction)
   }
@@ -37,7 +38,7 @@ class GenesisTransactionSpecification extends PropSpec with PropertyChecks with 
     forAll(Gen.listOfN(32, Arbitrary.arbitrary[Byte]).map(_.toArray), Gen.posNum[Long], Gen.posNum[Long]) {
       (recipientSeed: Array[Byte], time: Long, amount: Long) =>
         val recipient = PrivateKeyAccount(recipientSeed)
-        val source    = GenesisTransaction.create(recipient, amount, time).right.get
+        val source    = GenesisTransaction.create(recipient, amount, time).explicitGet()
         val bytes     = source.bytes()
         val dest      = GenesisTransaction.parseBytes(bytes).get
 

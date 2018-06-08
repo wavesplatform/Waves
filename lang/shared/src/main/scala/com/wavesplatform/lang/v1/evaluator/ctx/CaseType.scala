@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
-import com.wavesplatform.lang.v1.compiler.Terms.{CASETYPEREF, TYPE, UNION}
+import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, TYPE, UNION}
 
 trait DefinedType {
   def name: String

@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.compiler
 
 import cats.Monoid
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
-import com.wavesplatform.lang.v1.compiler.Terms.TYPE
+import com.wavesplatform.lang.v1.compiler.Types.TYPE
 import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx.{DefinedType, PredefFunction}
 import shapeless._

@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{ByteStr, EitherExt2}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
@@ -50,11 +50,11 @@ class LeaseTransactionSpecification extends PropSpec with PropertyChecks with Ma
 
     val tx = LeaseTransactionV1
       .create(
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         10000000,
         1000000,
         1526646300260L,
-        Address.fromString("3NCBMxgdghg4tUhEEffSXy11L6hUi6fcBpd").right.get,
+        Address.fromString("3NCBMxgdghg4tUhEEffSXy11L6hUi6fcBpd").explicitGet(),
         ByteStr.decodeBase58("iy3TmfbFds7pc9cDDqfjEJhfhVyNtm3GcxoVz8L3kJFvgRPUmiqqKLMeJGYyN12AhaQ6HvE7aF1tFgaAoCCgNJJ").get
       )
       .right
@@ -83,11 +83,11 @@ class LeaseTransactionSpecification extends PropSpec with PropertyChecks with Ma
     val tx = LeaseTransactionV2
       .create(
         2,
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         10000000,
         1000000,
         1526646497465L,
-        Address.fromString("3NCBMxgdghg4tUhEEffSXy11L6hUi6fcBpd").right.get,
+        Address.fromString("3NCBMxgdghg4tUhEEffSXy11L6hUi6fcBpd").explicitGet(),
         Proofs(Seq(ByteStr.decodeBase58("5Fr3yLwvfKGDsFLi8A8JbHqToHDojrPbdEGx9mrwbeVWWoiDY5pRqS3rcX1rXC9ud52vuxVdBmGyGk5krcgwFu9q").get))
       )
       .right
