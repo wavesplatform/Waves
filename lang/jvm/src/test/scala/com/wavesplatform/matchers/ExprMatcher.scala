@@ -29,7 +29,7 @@ object ExprMatcher {
   }
   case class PartValid[T: TypeTag](positionMatcher: PositionMatcher, value: T) extends PartMatcher[T] {
     override def apply(left: PART[T]): MatchResult = left match {
-      case PART.VALID(s, e, v: T) =>
+      case PART.VALID(s, e, v) =>
         positionMatcher((s, e)) <|>
           MatchResult(
             v == value,
@@ -152,7 +152,7 @@ object ExprMatcher {
   case class FunctionCall(positionMatcher: PositionMatcher, name: PartMatcher[String], argMatcher: Matcher[List[EXPR]]) extends ExprMatcher {
     override def apply(left: Expressions.EXPR): MatchResult = left match {
       case FUNCTION_CALL(s, e, n, args) => positionMatcher((s, e)) <|> name(n) <|> argMatcher(args)
-      case _                         => wrongTypeMatchResult[left.type, FUNCTION_CALL]
+      case _                            => wrongTypeMatchResult[left.type, FUNCTION_CALL]
     }
   }
 }
