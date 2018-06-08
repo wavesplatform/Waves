@@ -3,23 +3,17 @@ package com.wavesplatform.lang.v1.evaluator
 object FunctionIds {
   val SUM_LONG: Short = 0
   val SUB_LONG: Short = 1
-  val EQ_LONG: Short = 2
-  val NE_LONG: Short = 3
   val GT_LONG: Short = 4
   val GE_LONG: Short = 5
 
   val SUM_STRING: Short = 6
-  val EQ_STRING: Short = 7
-  val NE_STRING: Short = 8
   val GT_STRING: Short = 9
   val GE_STRING: Short = 10
 
   val SUM_BYTES: Short = 11
-  val EQ_BYTES: Short = 12
-  val NE_BYTES: Short = 13
 
-  val EQ_BOOLEAN: Short = 14
-  val NE_BOOLEAN: Short = 15
+  val EQ: Short = 14
+  val NE: Short = 15
 
   val MUL_LONG: Short = 16
   val DIV_LONG: Short = 17
@@ -65,5 +59,4 @@ object FunctionIds {
   val ACCOUNTBALANCE: Short = 136
   val ACCOUNTASSETBALANCE: Short = 137
   val TRANSACTIONHEIGHTBYID: Short = 138
-  
 }

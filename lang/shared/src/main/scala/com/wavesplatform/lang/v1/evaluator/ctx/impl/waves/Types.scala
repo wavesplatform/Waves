@@ -112,7 +112,8 @@ object Types {
   )
 
   val buyType     = CaseType("Buy", List.empty)
-  val sellType    = CaseType("Buy", List.empty)
+  val sellType    = CaseType("Sell", List.empty)
+
   val ordTypeType = UNION(buyType.typeRef, sellType.typeRef)
 
   val assetPairType = CaseType("AssetPair", List("amountAsset" -> optionByteVector, "priceAsset" -> optionByteVector))
