@@ -52,7 +52,7 @@ object CompilerV1 {
       case Expressions.REF(start, end, key)                  => compileRef(start, end, key)
       case Expressions.FUNCTION_CALL(start, end, name, args) => compileFunctionCall(start, end, name, args)
       case Expressions.MATCH(start, end, ex, cases)          => compileMatch(start, end, ex, cases.toList)
-      case Expressions.INVALID(start, end, message, _)       => raiseError(Generic(start, end, message))
+      case Expressions.INVALID(start, end, message)          => raiseError(Generic(start, end, message))
       case Expressions.BINARY_OP(start, end, a, op, b) =>
         op match {
           case AND_OP => compileIf(start, end, a, b, Expressions.FALSE(start, end))

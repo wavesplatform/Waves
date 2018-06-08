@@ -285,7 +285,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
 
   treeTypeTest("INVALID")(
     ctx = compilerContext,
-    expr = Expressions.INVALID(0, 0, "###", None),
+    expr = Expressions.INVALID(0, 0, "###"),
     expectedResult = Left("Compilation failed: ### in 0-0")
   )
 
