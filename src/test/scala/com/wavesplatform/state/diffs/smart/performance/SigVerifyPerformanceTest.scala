@@ -42,7 +42,7 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
       ts        <- positiveIntGen
       amt       <- smallFeeGen
       fee       <- smallFeeGen
-      genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+      genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       setScript <- selfSignedSetScriptTransactionGenP(master, ScriptV1(typed).explicitGet())
       transfer       = simpleSendGen(master, recipient, ts)
       scriptTransfer = scriptedSendGen(master, recipient, ts)

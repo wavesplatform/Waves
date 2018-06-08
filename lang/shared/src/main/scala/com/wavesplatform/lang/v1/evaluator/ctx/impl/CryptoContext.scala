@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import com.wavesplatform.lang.v1.compiler.Terms.{BOOLEAN, BYTEVECTOR, STRING}
+import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTEVECTOR, STRING}
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, PredefFunction}
 import scodec.bits.ByteVector

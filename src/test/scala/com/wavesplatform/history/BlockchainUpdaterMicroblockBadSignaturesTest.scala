@@ -1,6 +1,7 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import org.scalacheck.Gen
@@ -23,12 +24,13 @@ class BlockchainUpdaterMicroblockBadSignaturesTest
     master    <- accountGen
     recipient <- accountGen
     ts        <- positiveIntGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     payment: TransferTransactionV1  <- wavesTransferGeneratorP(master, recipient)
     payment2: TransferTransactionV1 <- wavesTransferGeneratorP(master, recipient)
   } yield (genesis, payment, payment2)
 
   property("bad total resulting block signature") {
+    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments) {
       case (domain, (genesis, payment, payment2)) =>
         val block0                 = buildBlockOfTxs(randomSig, Seq(genesis))
@@ -41,6 +43,7 @@ class BlockchainUpdaterMicroblockBadSignaturesTest
   }
 
   property("bad microBlock signature") {
+    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments) {
       case (domain, (genesis, payment, payment2)) =>
         val block0                 = buildBlockOfTxs(randomSig, Seq(genesis))
@@ -53,6 +56,7 @@ class BlockchainUpdaterMicroblockBadSignaturesTest
   }
 
   property("other sender") {
+    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments) {
       case (domain, (genesis, payment, payment2)) =>
         val otherSigner = PrivateKeyAccount(TestBlock.randomOfLength(KeyLength).arr)

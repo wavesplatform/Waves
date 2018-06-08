@@ -7,7 +7,7 @@ import com.wavesplatform.matcher.market.OrderBookActor.ForceCancelOrder
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ForceCancelOrderFromHistory, GetActiveOrdersByAddress, GetActiveOrdersByAddressResponse}
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.matcher.model.LimitOrder
-import com.wavesplatform.state.{ByteStr, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{ByteStr, EitherExt2, LeaseBalance, Portfolio}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -133,7 +133,7 @@ class BalanceWatcherWorkerActorSpecification
 
   private def noChanges(addr: Address) = BalanceChanged(Map(addr -> BalanceChanged.Changes(Monoid.empty[Portfolio], Set.empty)))
 
-  private def addr(x: String): Address = PrivateKeyAccount.fromSeed(x).right.get.toAddress
+  private def addr(x: String): Address = PrivateKeyAccount.fromSeed(x).explicitGet().toAddress
 
   private def timedWithActors(oneAddressProcessingTimeout: FiniteDuration)(f: TestActors => Unit): Unit = {
     val matcher = TestProbe("matcher")

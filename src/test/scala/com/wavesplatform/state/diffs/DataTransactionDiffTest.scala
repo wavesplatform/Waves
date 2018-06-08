@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, LongDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, EitherExt2, LongDataEntry}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
@@ -18,11 +18,11 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
   val baseSetup: Gen[(GenesisTransaction, PrivateKeyAccount, Long)] = for {
     master <- accountGen
     ts     <- positiveLongGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
   } yield (genesis, master, ts)
 
   def data(version: Byte, sender: PrivateKeyAccount, data: List[DataEntry[_]], fee: Long, timestamp: Long): DataTransaction =
-    DataTransaction.selfSigned(version, sender, data, fee, timestamp).right.get
+    DataTransaction.selfSigned(version, sender, data, fee, timestamp).explicitGet()
 
   property("state invariants hold") {
     val setup = for {

@@ -4,7 +4,7 @@ import cats.data.EitherT
 import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, EvaluationContext, LazyVal, PredefFunction}
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types._
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._

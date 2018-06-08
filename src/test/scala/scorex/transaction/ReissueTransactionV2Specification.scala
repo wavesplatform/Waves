@@ -1,12 +1,12 @@
 package scorex.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{ByteStr, EitherExt2}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
-import scorex.transaction.assets.{ReissueTransactionV2}
+import scorex.transaction.assets.ReissueTransactionV2
 
 class ReissueTransactionV2Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -33,7 +33,7 @@ class ReissueTransactionV2Specification extends PropSpec with PropertyChecks wit
       .create(
         2,
         'T',
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
         100000000L,
         true,

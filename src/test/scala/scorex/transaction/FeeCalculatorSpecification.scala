@@ -80,7 +80,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Match
   property("Transfer transaction with fee in asset") {
     val feeCalculator = new FeeCalculator(mySettings, noScriptBlockchain)
     val sender        = PrivateKeyAccount(Array.emptyByteArray)
-    val recipient     = Address.fromString("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8").right.get
+    val recipient     = Address.fromString("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8").explicitGet()
     val tx1: TransferTransactionV1 = TransferTransactionV1
       .selfSigned(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000, Some(WhitelistedAsset), 12, Array.emptyByteArray)
       .right

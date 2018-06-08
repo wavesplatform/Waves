@@ -1,6 +1,7 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import org.scalacheck.Gen
@@ -25,13 +26,14 @@ class BlockchainUpdaterMicroblockSunnyDayTest
     bob    <- accountGen
     ts     <- positiveIntGen
     fee    <- smallFeeGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     masterToAlice: TransferTransactionV1 <- wavesTransferGeneratorP(master, alice)
-    aliceToBob  = createWavesTransfer(alice, bob, masterToAlice.amount - fee - 1, fee, ts).right.get
-    aliceToBob2 = createWavesTransfer(alice, bob, masterToAlice.amount - fee - 1, fee, ts + 1).right.get
+    aliceToBob  = createWavesTransfer(alice, bob, masterToAlice.amount - fee - 1, fee, ts).explicitGet()
+    aliceToBob2 = createWavesTransfer(alice, bob, masterToAlice.amount - fee - 1, fee, ts + 1).explicitGet()
   } yield (genesis, masterToAlice, aliceToBob, aliceToBob2)
 
   property("all txs in different blocks: B0 <- B1 <- B2 <- B3!") {
+    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments) {
       case (domain, (genesis, masterToAlice, aliceToBob, aliceToBob2)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), Seq(masterToAlice), Seq(aliceToBob), Seq(aliceToBob2)))

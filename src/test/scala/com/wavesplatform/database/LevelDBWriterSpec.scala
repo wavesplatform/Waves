@@ -1,6 +1,7 @@
 package com.wavesplatform.database
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -41,19 +42,28 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
       writer.hasScript(accountGen.sample.get.toAddress) shouldBe false
     }
 
-    "returns false if a script was set and then unset" in resetTest { (_, account) =>
-      val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub)
-      writer.hasScript(account) shouldBe false
+    "returns false if a script was set and then unset" in {
+      assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
+      resetTest { (_, account) =>
+        val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub)
+        writer.hasScript(account) shouldBe false
+      }
     }
 
     "returns true" - {
-      "if there is a script in db" in test { (_, account) =>
-        val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub)
-        writer.hasScript(account) shouldBe true
+      "if there is a script in db" in {
+        assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
+        test { (_, account) =>
+          val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub)
+          writer.hasScript(account) shouldBe true
+        }
       }
 
-      "if there is a script in cache" in test { (defaultWriter, account) =>
-        defaultWriter.hasScript(account) shouldBe true
+      "if there is a script in cache" in {
+        assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
+        test { (defaultWriter, account) =>
+          defaultWriter.hasScript(account) shouldBe true
+        }
       }
     }
 
