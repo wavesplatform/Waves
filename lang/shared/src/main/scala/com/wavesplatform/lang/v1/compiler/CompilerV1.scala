@@ -5,7 +5,6 @@ import cats.implicits._
 import com.wavesplatform.lang.ExprCompiler
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.directives.Directive
-import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.CompilationError._
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -124,8 +123,8 @@ object CompilerV1 {
     for {
       ctx <- get[CompilerContext, CompilationError]
       letName <- handlePart(let.name)
-        .ensureOr(n => AlreadyDefined(p.start, p.end, n, false))(n => !ctx.varDefs.contains(n) || let.allowShadowing)
-        .ensureOr(n => AlreadyDefined(p.start, p.end, n, true))(n => !ctx.functionDefs.contains(n))
+        .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = false))(n => !ctx.varDefs.contains(n) || let.allowShadowing)
+        .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = true))(n => !ctx.functionDefs.contains(n))
       compiledLet <- compileExpr(let.value)
       letTypes <- let.types.toList
         .traverse[CompileM, String](handlePart)
@@ -165,7 +164,7 @@ object CompilerV1 {
           matchedSigs match {
             case Nil         => FunctionNotFound(p.start, p.end, name, compiledArgs.map(_._2.toString)).asLeft[(EXPR, TYPE)]
             case call :: Nil => call.asRight[CompilationError]
-            case _           => AmbiguousOverloading(p.start, p.end, name, signatures.toList).asLeft[(EXPR, TYPE)]
+            case _           => AmbiguousOverloading(p.start, p.end, name, signatures).asLeft[(EXPR, TYPE)]
           }
       }).toCompileM
     } yield result
@@ -195,10 +194,9 @@ object CompilerV1 {
       val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case (typedExpr, tph) => (typedExpr._2, tph) }
       for {
         resolvedTypeParams <- TypeInferrer(typePairs).leftMap(Generic(p.start, p.end, _))
-        resolvedResultType <- TypeInferrer.inferResultType(f.result, resolvedTypeParams).leftMap(Generic(p.start, p.end, _))
-        header = FunctionHeader.Predef(f.internalName)
-        args   = typedExpressionArgumentsAndTypedPlaceholders.map(_._1._1)
-      } yield (FUNCTION_CALL(header, args): EXPR, resolvedResultType)
+        resolvedResultType <- TypeInferrer.inferResultType(f.result, resolvedTypeParams).leftMap(Generic(start, end, _))
+        args = typedExpressionArgumentsAndTypedPlaceholders.map(_._1._1)
+      } yield (FUNCTION_CALL(f.header, args): EXPR, resolvedResultType)
     }
   }
 

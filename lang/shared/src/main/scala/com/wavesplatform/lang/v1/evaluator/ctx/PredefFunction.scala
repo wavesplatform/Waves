@@ -10,17 +10,17 @@ import monix.eval.Coeval
 sealed trait BaseFunction
 
 case class PredefFunction(name: String, cost: Long, signature: FunctionTypeSignature, ev: List[Any] => Either[String, Any]) extends BaseFunction {
-  val header = FunctionHeader.Predef(signature.internalName)
+  def header: FunctionHeader = signature.header
 
   def eval(args: List[Any]): TrampolinedExecResult[Any] = EitherT.fromEither[Coeval](ev(args))
 }
 
 object PredefFunction {
 
-  case class FunctionTypeSignature(internalName: Short, args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER)
+  case class FunctionTypeSignature(header: FunctionHeader, args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER)
 
   def apply(name: String, cost: Long, internalName: Short, args: List[(String, TYPEPLACEHOLDER)], resultType: TYPEPLACEHOLDER)(
       ev: List[Any] => Either[String, Any]) =
-    new PredefFunction(name, cost, FunctionTypeSignature(internalName, args.map(_._2), resultType), ev)
+    new PredefFunction(name, cost, FunctionTypeSignature(FunctionHeader.Predef(internalName), args.map(_._2), resultType), ev)
 
 }

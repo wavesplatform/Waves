@@ -38,7 +38,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         LET("x", CONST_LONG(3)),
         BLOCK(
           LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)))),
-          FUNCTION_CALL(PureContext.eq, header, List(REF("z"), CONST_LONG(1)))
+          FUNCTION_CALL(PureContext.eq.header, List(REF("z"), CONST_LONG(1)))
         )
       )
     )

@@ -10,7 +10,6 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 object CryptoContext {
 
   def build(global: BaseGlobal) = {
-
     def hashFunction(name: String, internalName: Short, cost: Long)(h: Array[Byte] => Array[Byte]) =
       PredefFunction(name, cost, internalName, List(("bytes", BYTEVECTOR)), BYTEVECTOR) {
         case (m: ByteVector) :: Nil => Right(ByteVector(h(m.toArray)))
@@ -28,17 +27,16 @@ object CryptoContext {
         case _ => ???
       }
 
-    def toBase58StringF: PredefFunction =
-      PredefFunction("toBase58String", 10, TOBASE58, List(("bytes", BYTEVECTOR)), STRING) {
-        case (bytes: ByteVector) :: Nil => global.base58Encode(bytes.toArray)
-        case _                          => ???
-      }
+    def toBase58StringF: PredefFunction = PredefFunction("toBase58String", 10, TOBASE58, List(("bytes", BYTEVECTOR)), STRING) {
+      case (bytes: ByteVector) :: Nil => global.base58Encode(bytes.toArray)
+      case _                          => ???
+    }
 
-    def toBase64StringF: PredefFunction =
-      PredefFunction("toBase64String", 10, TOBASE64, List(("bytes", BYTEVECTOR)), STRING) {
-        case (bytes: ByteVector) :: Nil => global.base64Encode(bytes.toArray)
-        case _                          => ???
-      }
+    def toBase64StringF: PredefFunction = PredefFunction("toBase64String", 10, TOBASE64, List(("bytes", BYTEVECTOR)), STRING) {
+      case (bytes: ByteVector) :: Nil => global.base64Encode(bytes.toArray)
+      case _                          => ???
+    }
+
     CTX(Seq.empty, Map.empty, Seq(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF, toBase64StringF))
   }
 

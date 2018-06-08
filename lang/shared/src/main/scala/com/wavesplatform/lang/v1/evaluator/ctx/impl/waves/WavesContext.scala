@@ -59,21 +59,21 @@ object WavesContext {
 
     val txByIdF = {
       val returnType = OPTION(anyTransactionType)
-      PredefFunction("getTransactionById", 100, GETTRANSACTIONBYID, List("id" -> BYTEVECTOR), returnType)({
+      PredefFunction("getTransactionById", 100, GETTRANSACTIONBYID, List("id" -> BYTEVECTOR), returnType) {
         case (id: ByteVector) :: Nil =>
           val maybeDomainTx = env.transactionById(id.toArray).map(transactionObject)
           Right(maybeDomainTx).map(_.asInstanceOf[returnType.Underlying])
         case _ => ???
-      })
+      }
     }
 
-    val accountBalanceF: PredefFunction = PredefFunction("accountBalance", 100, ACCOUNTBALANCE, List("addressOrAlias" -> addressOrAliasType), LONG)({
+    val accountBalanceF: PredefFunction = PredefFunction("accountBalance", 100, ACCOUNTBALANCE, List("addressOrAlias" -> addressOrAliasType), LONG) {
       case CaseObj(_, fields) :: Nil =>
         val acc = fields("bytes").asInstanceOf[ByteVector].toArray
         env.accountBalanceOf(acc, None)
 
       case _ => ???
-    })
+    }
 
     val accountAssetBalanceF: PredefFunction =
       PredefFunction("accountAssetBalance", 100, ACCOUNTASSETBALANCE, List("addressOrAlias" -> addressOrAliasType, "assetId" -> BYTEVECTOR), LONG) {
@@ -84,13 +84,13 @@ object WavesContext {
         case _ => ???
       }
 
-    val txHeightByIdF = PredefFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, List("id" -> BYTEVECTOR), OPTION(LONG))({
+    val txHeightByIdF = PredefFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, List("id" -> BYTEVECTOR), OPTION(LONG)) {
       case (id: ByteVector) :: Nil => Right(env.transactionHeightById(id.toArray))
       case _                       => ???
-    })
+    }
 
     val vars: Map[String, (TYPE, LazyVal)] =
-      Map("height" -> (LONG, LazyVal(EitherT(heightCoeval))), "tx" -> (outgoingTransactionType, LazyVal(EitherT(txCoeval))))
+      Map(("height", (LONG, LazyVal(EitherT(heightCoeval)))), ("tx", (outgoingTransactionType, LazyVal(EitherT(txCoeval)))))
     val functions = Seq(
       txByIdF,
       txHeightByIdF,
