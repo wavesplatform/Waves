@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.compiler
 
-import com.wavesplatform.lang.v1.evaluator.ctx.CaseObj
+import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, CaseType}
 import scodec.bits.ByteVector
 
 object Types {
@@ -32,6 +32,9 @@ object Types {
   case class CASETYPEREF(name: String)   extends AUTO_TAGGED_TYPE[CaseObj]
   case class UNION(l: List[CASETYPEREF]) extends AUTO_TAGGED_TYPE[CaseObj]
   object UNION {
+
+    def of(l: CaseType*): UNION = UNION(l.map(_.typeRef).toList)
+
     def apply(l: CASETYPEREF*): UNION = new UNION(l.toList)
 
     implicit class UnionExt(l1: UNION) {

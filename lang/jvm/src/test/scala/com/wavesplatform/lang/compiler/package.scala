@@ -1,18 +1,16 @@
 package com.wavesplatform.lang
 
 import cats.kernel.Monoid
-import cats.syntax.semigroup._
 import com.wavesplatform.lang.Common.multiplierFunction
-import com.wavesplatform.lang.v1.compiler.CompilerContext
+import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, PredefCaseType, PredefFunction}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.none
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, PredefFunction}
 
-package object typechecker {
+package object compiler {
 
-  val pointType = PredefCaseType("Point", List("x" -> LONG, "y" -> LONG))
+  val pointType = CaseType("Point", List("x" -> LONG, "y" -> LONG))
 
   val idT = PredefFunction("idT", 1, TYPEPARAM('T'), List("p1" -> TYPEPARAM('T')), 256)(Right(_))
   val extract = PredefFunction("extract", 1, TYPEPARAM('T'), List("p1" -> OPTIONTYPEPARAM(TYPEPARAM('T'))), EXTRACT) {
@@ -25,24 +23,15 @@ package object typechecker {
   val functionWithTwoPrarmsOfTheSameType =
     PredefFunction("functionWithTwoPrarmsOfTheSameType", 1, TYPEPARAM('T'), List("p1" -> TYPEPARAM('T'), "p2" -> TYPEPARAM('T')), 260)(Right(_))
 
-  val ctx = Monoid.combine(
-    PureContext.instance,
-    EvaluationContext.build(
-      letDefs = Map(("None", none)),
-      functions = Seq(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, unitOnNone, undefinedOptionLong, idOptionLong)
+  val compilerContext = Monoid
+    .combine(
+      PureContext.ctx,
+      CTX(
+        Seq(pointType, Common.pointTypeA, Common.pointTypeB),
+        Map(("p", (Common.AorB, null))),
+        Seq(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, unitOnNone, undefinedOptionLong, idOptionLong)
+      )
     )
-  )
+    .compilerContext
 
-  val typeCheckerContext = CompilerContext.fromEvaluationContext(
-    ctx |+| Common.sampleUnionContext(Common.pointAInstance),
-    Map(
-      pointType.name         -> pointType,
-      Common.pointTypeA.name -> Common.pointTypeA,
-      Common.pointTypeB.name -> Common.pointTypeB
-    ),
-    Map(
-      "None" -> OPTION(NOTHING),
-      "p"    -> Common.AorB
-    )
-  )
 }

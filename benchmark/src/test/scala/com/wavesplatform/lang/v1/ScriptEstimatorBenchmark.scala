@@ -22,7 +22,7 @@ class ScriptEstimatorBenchmark {
 object ScriptEstimatorBenchmark {
 
   class St extends BigSum {
-    val functionCosts: Map[FunctionHeader, Long] = EvaluationContext.functionCosts(utils.dummyContext.functions.values)
+    val functionCosts: Map[FunctionHeader, Long] = EvaluationContext.functionCosts(utils.dummyEvaluationContext.functions.values)
   }
 
 }

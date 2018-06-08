@@ -2,8 +2,8 @@ package com.wavesplatform
 
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.settings.Constants
@@ -15,13 +15,13 @@ import org.scalatest.{BeforeAndAfterAll, Suite}
 import scorex.account.PublicKeyAccount._
 import scorex.account._
 import scorex.transaction._
-import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
 import scorex.transaction.lease._
+import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.transfer._
 import scorex.utils.TimeImpl
 import MassTransferTransaction.MaxTransferCount
@@ -117,8 +117,7 @@ trait TransactionGenBase extends ScriptGen {
   val scriptGen = BOOLgen(100).map {
     case (expr, _) =>
       val typed =
-        CompilerV1(CompilerContext.fromEvaluationContext(PureContext.instance |+| CryptoContext.build(Global), Map.empty, PureContext.predefVars),
-                   expr).explicitGet()
+        CompilerV1(PureContext.compilerContext |+| CryptoContext.compilerContext(Global), expr).explicitGet()
       ScriptV1(typed._1).explicitGet()
   }
 

@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.typechecker
+package com.wavesplatform.lang.compiler
 
 import com.wavesplatform.lang.Common.{NoShrink, multiplierFunction, produce}
 import com.wavesplatform.lang.v1.compiler.CompilerV1
@@ -64,7 +64,7 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
   private def errorTests(exprs: ((String, String), Expressions.EXPR)*): Unit = exprs.foreach {
     case ((label, error), input) =>
       property(s"Error: $label") {
-        CompilerV1(typeCheckerContext, input) should produce(error)
+        CompilerV1(compilerContext, input) should produce(error)
       }
   }
 
