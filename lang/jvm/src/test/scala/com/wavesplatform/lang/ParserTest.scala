@@ -1380,5 +1380,12 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
                                          BINARY_OP(0, 3, REF(0, 1, PART.VALID(0, 1, "a")), DIV_OP, REF(2, 3, PART.VALID(2, 3, "b"))),
                                          MUL_OP,
                                          REF(4, 5, PART.VALID(4, 5, "c")))
+    parseOne("a<b==c>=d") shouldBe BINARY_OP(
+      0,
+      9,
+      BINARY_OP(0, 3, REF(2, 3, PART.VALID(2, 3, "b")), LT_OP, REF(0, 1, PART.VALID(0, 1, "a"))),
+      EQ_OP,
+      BINARY_OP(5, 9, REF(5, 6, PART.VALID(5, 6, "c")), GE_OP, REF(8, 9, PART.VALID(8, 9, "d")))
+    )
   }
 }

@@ -1,8 +1,11 @@
 package com.wavesplatform.lang
 
+import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
+import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.Types.TYPE
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -13,8 +16,6 @@ import org.scalatest.{Matchers, PropSpec}
 
 class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
 
-  def withUnion(p: CaseObj): EvaluationContext = Monoid.combine(PureContext.instance, sampleUnionContext(p))
-
   property("patternMatching") {
     val sampleScript =
       """match p {
@@ -22,8 +23,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |  case pa: PointB => 1
         |  case pa: PointC => 2
         |}""".stripMargin
-    eval[Long](sampleScript, withUnion(pointAInstance)) shouldBe Right(0)
-    eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
+    eval[Long](sampleScript, Some(pointAInstance)) shouldBe Right(0)
+    eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(1)
   }
 
   property("patternMatching with named union types") {
@@ -32,12 +33,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |  case pa: PointA => 0
         |  case pa: PointBC => 1
         |}""".stripMargin
-    eval[Long](sampleScript, withUnion(pointAInstance), { c =>
-      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
-    }) shouldBe Right(0)
-    eval[Long](sampleScript, withUnion(pointBInstance), { c =>
-      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
-    }) shouldBe Right(1)
+    eval[Long](sampleScript, Some(pointAInstance)) shouldBe Right(0)
+    eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(1)
   }
 
   property("union types have filds") {
@@ -46,15 +43,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |  case pa: PointA => pa.X
         |  case pb: PointBC => pb.YB
         |}""".stripMargin
-    eval[Long](sampleScript, withUnion(pointAInstance), { c =>
-      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
-    }) shouldBe Right(3)
-    eval[Long](sampleScript, withUnion(pointBInstance), { c =>
-      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
-    }) shouldBe Right(41)
-    eval[Long](sampleScript, withUnion(pointCInstance), { c =>
-      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
-    }) shouldBe Right(42)
+    eval[Long](sampleScript, Some(pointAInstance)) shouldBe Right(3)
+    eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(41)
+    eval[Long](sampleScript, Some(pointCInstance)) shouldBe Right(42)
   }
 
   property("union types have  only common filds") {
@@ -63,9 +54,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |  case pa: PointA => pa.X
         |  case pb: PointBC => pb.X
         |}""".stripMargin
-    eval[Long](sampleScript, withUnion(pointCInstance), { c =>
-      Map("PointBC" -> UnionType("PointBC", List(pointTypeB, pointTypeC).map(_.typeRef)))
-    }) should produce("Compilation failed: Undefined field `X`")
+    eval[Long](sampleScript, Some(pointCInstance)) should produce("Compilation failed: Undefined field `X`")
   }
 
   property("patternMatching _") {
@@ -78,8 +67,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |}
          |
       """.stripMargin
-    eval[Long](sampleScript, withUnion(pointAInstance)) shouldBe Right(0)
-    eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
+    eval[Long](sampleScript, Some(pointAInstance)) shouldBe Right(0)
+    eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(1)
   }
 
   property("patternMatching any type") {
@@ -91,8 +80,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |}
          |
       """.stripMargin
-    eval[Long](sampleScript, withUnion(pointAInstance)) shouldBe Right(0)
-    eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
+    eval[Long](sampleScript, Some(pointAInstance)) shouldBe Right(0)
+    eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(1)
   }
 
   property("patternMatching block") {
@@ -103,23 +92,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |}
          |
       """.stripMargin
-    eval[Long](sampleScript, withUnion(pointBInstance)) shouldBe Right(1)
+    eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(1)
   }
 
-  private def eval[T](code: String, ctx: EvaluationContext = PureContext.instance, genTypes: CompilerContext => Map[String, PredefBase] = { _ =>
-    Map.empty
-  }) = {
+  private def eval[T](code: String, pointInstance: Option[CaseObj] = None): Either[String, T] = {
     val untyped = Parser(code).get.value
     require(untyped.size == 1)
-    val cctx = CompilerContext.fromEvaluationContext(
-      ctx,
-      sampleTypes.map(v => v.name -> v).toMap,
-      Map(PureContext.errRef -> PureContext.predefVars(PureContext.errRef), // need for match fails handling
-          "p"                -> AorBorC)
-    )
-    val types = genTypes(cctx)
-    val typed = CompilerV1(cctx.copy(predefTypes = types ++ cctx.predefTypes), untyped.head)
-    typed.flatMap(v => EvaluatorV1[T](ctx, v._1)._2)
+    val lazyVal                                     = LazyVal(EitherT.pure(pointInstance.getOrElse(null)))
+    val stringToTuple: Map[String, (TYPE, LazyVal)] = Map(("p", (AorBorC, lazyVal)))
+    val ctx: CTX =
+      Monoid.combine(PureContext.ctx, CTX(sampleTypes, stringToTuple, Seq.empty))
+    val typed = CompilerV1(ctx.compilerContext, untyped.head)
+    typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1)._2)
   }
 
   property("function call") {

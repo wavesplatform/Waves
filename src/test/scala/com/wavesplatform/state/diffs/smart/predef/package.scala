@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs.smart
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.utils.dummyTypeCheckerContext
+import com.wavesplatform.utils.dummyCompilerContext
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval
 import scorex.transaction.Transaction
@@ -15,7 +15,7 @@ package object predef {
   def runScript[T](script: String, tx: Transaction = null): Either[String, T] = {
     val Success(expr, _) = Parser(script)
     if (expr.size == 1) {
-      val Right((typedExpr, tpe)) = CompilerV1(dummyTypeCheckerContext, expr.head)
+      val Right((typedExpr, tpe)) = CompilerV1(dummyCompilerContext, expr.head)
       val r                       = EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr)
       r._2
     } else {

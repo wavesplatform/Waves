@@ -7,7 +7,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
-import com.wavesplatform.utils.dummyTypeCheckerContext
+import com.wavesplatform.utils.dummyCompilerContext
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.{JsNumber, Json}
 import scorex.account.PrivateKeyAccount
@@ -62,7 +62,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
       """.stripMargin).get.value
       assert(untyped.size == 1)
-      CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()._1
+      CompilerV1(dummyCompilerContext, untyped.head).explicitGet()._1
     }
 
     val script = ScriptV1(scriptText).explicitGet()

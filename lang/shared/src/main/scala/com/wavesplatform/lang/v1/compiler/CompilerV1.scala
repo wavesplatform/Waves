@@ -42,7 +42,7 @@ object CompilerV1 {
   def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, TYPE)] = {
     expr match {
       case x: Expressions.CONST_LONG                         => (CONST_LONG(x.value): EXPR, LONG: TYPE).pure[CompileM]
-      case x: Expressions.CONST_BYTEVECTOR                   => handlePart(x.value).map(v => (CONST_BYTEVECTOR(v), BYTEVECTOR:TYPE))
+      case x: Expressions.CONST_BYTEVECTOR                   => handlePart(x.value).map(v => (CONST_BYTEVECTOR(v), BYTEVECTOR: TYPE))
       case x: Expressions.CONST_STRING                       => handlePart(x.value).map(v => (CONST_STRING(v), STRING: TYPE))
       case _: Expressions.TRUE                               => (TRUE: EXPR, BOOLEAN: TYPE).pure[CompileM]
       case _: Expressions.FALSE                              => (FALSE: EXPR, BOOLEAN: TYPE).pure[CompileM]
@@ -70,7 +70,7 @@ object CompilerV1 {
     get[CompilerContext, CompilationError].flatMap(ctx => {
       (for {
         cond       <- compileExpr(condExpr).run(ctx).map(_._2)()
-        _ <- Either.cond(cond._2 == BOOLEAN, (), UnexpectedType(start, end, "BOOLEAN", cond._2.toString))
+        _          <- Either.cond(cond._2 == BOOLEAN, (), UnexpectedType(start, end, "BOOLEAN", cond._2.toString))
         ifTrue     <- compileExpr(ifTrueExpr).run(ctx).map(_._2)()
         ifFalse    <- compileExpr(ifFalseExpr).run(ctx).map(_._2)()
         compiledIf <- mkIf(start, end, cond._1, ifTrue, ifFalse)
@@ -78,7 +78,7 @@ object CompilerV1 {
     })
   }
 
-  def flat(typeDefs: Map[String, PredefBase], tl: List[String]): List[String] =
+  def flat(typeDefs: Map[String, DefinedType], tl: List[String]): List[String] =
     tl.flatMap(typeName =>
       typeDefs.get(typeName).fold(List(typeName)) {
         case UnionType(_, types) => types.map(_.name)
@@ -110,7 +110,7 @@ object CompilerV1 {
       _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1))
       allowShadowVarName = typedExpr._1 match {
         case REF(k) => Some(k)
-        case _         => None
+        case _      => None
       }
       ifCases <- inspect[CompilerContext, CompilationError, Expressions.EXPR](updatedCtx => {
         mkIfCases(updatedCtx, cases, Expressions.REF(1, 1, PART.VALID(1, 1, refTmpKey)), allowShadowVarName)
@@ -203,15 +203,15 @@ object CompilerV1 {
     }
   }
 
-  def resolveFields(ctx: CompilerContext, tpe: PredefBase): List[(String, TYPE)] = tpe match {
-    case PredefCaseType(_, fields) => fields
-    case UnionType(_, types)       => types.map(n => resolveFields(ctx, ctx.predefTypes(n.name)).toSet).reduce(_ intersect _).toList
+  def resolveFields(ctx: CompilerContext, tpe: DefinedType): List[(String, TYPE)] = tpe match {
+    case CaseType(_, fields) => fields
+    case UnionType(_, types) => types.map(n => resolveFields(ctx, ctx.predefTypes(n.name)).toSet).reduce(_ intersect _).toList
   }
 
   def mkIf(start: Int, end: Int, cond: EXPR, ifTrue: (EXPR, TYPE), ifFalse: (EXPR, TYPE)): Either[CompilationError, (EXPR, TYPE)] = {
-   TypeInferrer
-     .findCommonType(ifTrue._2, ifFalse._2)
-     .fold(UnexpectedType(start, end, ifTrue._2.toString, ifFalse._2.toString).asLeft[(IF, TYPE)])(t => (IF(cond, ifTrue._1, ifFalse._1), t).asRight)
+    TypeInferrer
+      .findCommonType(ifTrue._2, ifFalse._2)
+      .fold(UnexpectedType(start, end, ifTrue._2.toString, ifFalse._2.toString).asLeft[(IF, TYPE)])(t => (IF(cond, ifTrue._1, ifFalse._1), t).asRight)
   }
 
   def mkIfCases(ctx: CompilerContext, cases: List[MATCH_CASE], refTmp: Expressions.REF, allowShadowVarName: Option[String]): Expressions.EXPR = {
@@ -248,7 +248,7 @@ object CompilerV1 {
     for {
       refTpe <- ctx.predefTypes
         .get(typeName)
-        .fold(TypeNotFound(start, end, typeName).asLeft[PredefBase])(_.asRight)
+        .fold(TypeNotFound(start, end, typeName).asLeft[DefinedType])(_.asRight)
       fieldTpe <- resolveFields(ctx, refTpe)
         .collectFirst({ case (field, tpe) if fieldName == field => tpe })
         .fold(FieldNotFound(start, end, fieldName, typeName).asLeft[TYPE])(_.asRight)

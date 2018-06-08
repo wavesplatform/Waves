@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{assertDiffAndState, assertDiffEi, produce}
-import com.wavesplatform.utils.dummyTypeCheckerContext
+import com.wavesplatform.utils.dummyCompilerContext
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -22,7 +22,7 @@ class TransactionFieldAccessTest extends PropSpec with PropertyChecks with Match
       code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransactionV1)] = {
     val untyped = Parser(code).get.value
     assert(untyped.size == 1)
-    val typed = CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()._1
+    val typed = CompilerV1(dummyCompilerContext, untyped.head).explicitGet()._1
     preconditionsTransferAndLease(typed)
   }
 

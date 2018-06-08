@@ -13,7 +13,7 @@ import org.scalatest.{Matchers, PropSpec}
 
 class EvaluattorV1CaseObjField extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  def context(p: CaseObj): EvaluationContext = Monoid.combine(PureContext.instance, sampleUnionContext(p))
+  def context(p: CaseObj): EvaluationContext = Monoid.combine(PureContext.evalContext, sampleUnionContext(p))
 
   property("case custom type field access") {
     ev[Long](

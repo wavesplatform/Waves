@@ -6,7 +6,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
-import com.wavesplatform.utils.dummyTypeCheckerContext
+import com.wavesplatform.utils.dummyCompilerContext
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -40,7 +40,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       setScript <- {
         val untypedAllFieldsRequiredScript = Parser(allFieldsRequiredScript).get.value
         assert(untypedAllFieldsRequiredScript.size == 1)
-        val typedAllFieldsRequiredScript = CompilerV1(dummyTypeCheckerContext, untypedAllFieldsRequiredScript.head).explicitGet()._1
+        val typedAllFieldsRequiredScript = CompilerV1(dummyCompilerContext, untypedAllFieldsRequiredScript.head).explicitGet()._1
         selfSignedSetScriptTransactionGenP(master, ScriptV1(typedAllFieldsRequiredScript).explicitGet())
       }
       transferFromScripted <- versionedTransferGenP(master, alice, Proofs.empty)
