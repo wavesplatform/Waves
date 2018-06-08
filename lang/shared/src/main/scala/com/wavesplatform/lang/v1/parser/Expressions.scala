@@ -1,13 +1,13 @@
 package com.wavesplatform.lang.v1.parser
 
-import com.wavesplatform.lang.v1.parser.Expressions.Pos.FakePos
+import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import scodec.bits.ByteVector
 
 object Expressions {
 
   sealed trait Pos { self =>
     override def equals(obj: scala.Any): Boolean = {
-      obj == FakePos || obj == self
+      obj == AnyPos || obj == self
     }
     def end: Int
     def start: Int
@@ -16,7 +16,7 @@ object Expressions {
   object Pos {
     def apply(start: Int, end: Int): Pos = RealPos(start, end)
     final case class RealPos(start: Int, end: Int) extends Pos
-    private[lang] case object FakePos extends Pos {
+    case object AnyPos extends Pos {
       override def start: Int = -1
       override def end: Int   = -1
     }
@@ -53,7 +53,7 @@ object Expressions {
   implicit class PartOps[T](val self: PART[T]) extends AnyVal {
     def toEither: Either[String, T] = self match {
       case Expressions.PART.VALID(_, x)         => Right(x)
-      case Expressions.PART.INVALID(p, message) => Left(s"Can't compile an invalid instruction: $message in $s-$e")
+      case Expressions.PART.INVALID(p, message) => Left(s"Can't compile an invalid instruction: $message in ${p.start}-${p.end}")
     }
   }
 

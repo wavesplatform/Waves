@@ -78,20 +78,20 @@ object Parser {
         }
 
         val r =
-          if (errors.isEmpty) PART.VALID(start + 1, end - 1, consumedString.toString)
-          else PART.INVALID(start + 1, end - 1, errors.mkString(";"))
-        (start, end, r)
+          if (errors.isEmpty) PART.VALID(Pos(start + 1, end - 1), consumedString.toString)
+          else PART.INVALID(Pos(start + 1, end - 1), errors.mkString(";"))
+        (Pos(start, end), r)
     }
     .map(Function.tupled(CONST_STRING))
 
   private val correctVarName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index)
     .filter { case (_, x, _) => !keywords.contains(x) }
-    .map { case (start, x, end) => PART.VALID(start, end, x) }
+    .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
   private val anyVarName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index).map {
     case (start, x, end) =>
-      if (keywords.contains(x)) PART.INVALID(start, end, s"keywords are restricted: $x")
-      else PART.VALID(start, end, x)
+      if (keywords.contains(x)) PART.INVALID(Pos(start, end), s"keywords are restricted: $x")
+      else PART.VALID(Pos(start, end), x)
   }
 
   private val invalid: P[INVALID] = {
@@ -111,7 +111,7 @@ object Parser {
 
   private val numberP: P[CONST_LONG] =
     P(Index ~~ (CharIn("+-").? ~~ digit.repX(min = 1)).! ~~ ("_" ~~ digit.repX(min = 1).!).repX(min = 0) ~~ Index)
-      .map({ case (start, x1, x2, end) => CONST_LONG(start, end, x2.foldLeft(x1)(_ ++ _).toLong) })
+      .map({ case (start, x1, x2, end) => CONST_LONG(Pos(start, end), x2.foldLeft(x1)(_ ++ _).toLong) })
 
   private val trueP: P[TRUE]        = P(Index ~~ "true".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => TRUE(start, end) }
   private val falseP: P[FALSE]      = P(Index ~~ "false".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => FALSE(start, end) }
@@ -119,7 +119,7 @@ object Parser {
   private val curlyBracesP: P[EXPR] = P("{" ~ baseExpr ~ "}")
 
   private val refP: P[REF] = P(correctVarName).map { x =>
-    REF(x.start, x.end, x)
+    REF(Pos(x.position.start, x.position.end), x)
   }
 
   private val ifP: P[IF] = {
@@ -166,7 +166,7 @@ object Parser {
     val typesDefP = (
       ":" ~ comment ~
         (typesP | (Index ~~ restMatchCaseInvalidP ~~ Index).map {
-          case (start, _, end) => Seq(PART.INVALID(start, end, "the type for variable should be specified: `case varName: Type => expr`"))
+          case (start, _, end) => Seq(PART.INVALID(Pos(start, end), "the type for variable should be specified: `case varName: Type => expr`"))
         })
     ).?.map(_.getOrElse(List.empty))
 
@@ -176,20 +176,19 @@ object Parser {
           (Index ~~ restMatchCaseInvalidP ~~ Index).map {
             case (start, _, end) =>
               (
-                Some(PART.INVALID(start, end, "invalid syntax, should be: `case varName: Type => expr` or `case _ => expr`")),
+                Some(PART.INVALID(Pos(start, end), "invalid syntax, should be: `case varName: Type => expr` or `case _ => expr`")),
                 Seq.empty[PART[String]]
               )
           }
       ) ~ comment ~ "=>" ~/ baseExpr.? ~~ Index
     ).map {
       case (start, (v, types), e, end) =>
-        val exprStart = types.lastOption.orElse(v).fold(start)(_.end)
+        val exprStart = types.lastOption.orElse(v).fold(start)(_.position.end)
         MATCH_CASE(
-          start = start,
-          end = end,
+          Pos(start, end),
           newVarName = v,
           types = types,
-          expr = e.getOrElse(INVALID(exprStart, end, "expected expression"))
+          expr = e.getOrElse(INVALID(Pos(exprStart, end), "expected expression"))
         )
     }
   }
@@ -197,8 +196,8 @@ object Parser {
   private lazy val matchP: P[EXPR] =
     P(Index ~~ "match" ~~ &(border) ~/ baseExpr ~ "{" ~ comment ~ matchCaseP.rep(sep = comment) ~ comment ~ "}" ~~ Index)
       .map {
-        case (start, _, Nil, end)   => INVALID(start, end, "pattern matching requires case branches")
-        case (start, e, cases, end) => MATCH(start, end, e, cases.toList)
+        case (start, _, Nil, end)   => INVALID(Pos(start, end), "pattern matching requires case branches")
+        case (start, e, cases, end) => MATCH(Pos(start, end), e, cases.toList)
       }
 
   private val accessP: P[(Int, Accessor, Int)] = P(
@@ -214,13 +213,13 @@ object Parser {
           accessors.foldLeft(obj) {
             case (e, (accessStart, a, accessEnd)) =>
               a match {
-                case Getter(n) => GETTER(start, accessEnd, e, n)
+                case Getter(n) => GETTER(Pos(start, accessEnd), e, n)
                 case Args(args) =>
                   e match {
-                    case REF(_, _, functionName) => FUNCTION_CALL(start, accessEnd, functionName, args.toList)
-                    case _                       => FUNCTION_CALL(start, accessEnd, PART.INVALID(start, objEnd, s"'$obj' is not a function name"), args.toList)
+                    case REF(_, functionName) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
+                    case _                       => FUNCTION_CALL(Pos(start, accessEnd), PART.INVALID(Pos(start, objEnd), s"'$obj' is not a function name"), args.toList)
                   }
-                case ListIndex(index) => FUNCTION_CALL(start, accessEnd, PART.VALID(accessStart, accessEnd, "getElement"), List(e, index))
+                case ListIndex(index) => FUNCTION_CALL(Pos(start, accessEnd), PART.VALID(Pos(accessStart, accessEnd), "getElement"), List(e, index))
               }
           }
       }
@@ -236,8 +235,8 @@ object Parser {
             case "64" => Global.base64Decode(xs)
           }
           decoded match {
-            case Left(err) => CONST_BYTEVECTOR(start, end, PART.INVALID(innerStart, innerEnd, err))
-            case Right(r)  => CONST_BYTEVECTOR(start, end, PART.VALID(innerStart, innerEnd, ByteVector(r)))
+            case Left(err) => CONST_BYTEVECTOR(Pos(start, end), PART.INVALID(Pos(innerStart, innerEnd), err))
+            case Right(r)  => CONST_BYTEVECTOR(Pos(start, end), PART.VALID(Pos(innerStart, innerEnd), ByteVector(r)))
           }
       }
 
@@ -291,9 +290,9 @@ object Parser {
     case kinds :: restOps =>
       val operand = binaryOp(atom, restOps)
       val kind    = kinds.map(_.parser).reduce((pl, pr) => P(pl | pr))
-      P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(i, i, "expected a second operator")))).rep).map {
+      P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(Pos(i, i), "expected a second operator")))).rep).map {
         case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
-          r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.end, acc, currOperand) }
+          r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.position.end, acc, currOperand) }
       }
   }
 
