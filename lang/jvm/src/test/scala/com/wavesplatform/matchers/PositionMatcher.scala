@@ -5,14 +5,6 @@ import org.scalatest.matchers.{MatchResult, Matcher}
 sealed trait PositionMatcher extends Matcher[(Int, Int)]
 
 object PositionMatcher {
-//
-//  def expectedPosition(pm: PositionMatcher): (Int, Int) = {
-//    case AnyPosition => (-1, -1)
-//    case StartMatch(s) => (s, -1)
-//    case EndMatch(e) => (-1, e)
-//    case StartEndMatch(s, e) => (s, e)
-//  }
-
   case object AnyPosition extends PositionMatcher {
     override def apply(left: (Int, Int)): MatchResult =
       MatchResult(

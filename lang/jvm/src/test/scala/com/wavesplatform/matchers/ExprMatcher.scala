@@ -7,7 +7,7 @@ import scodec.bits.ByteVector
 
 import scala.reflect.runtime.universe._
 
-sealed trait ExprMatcher extends Matcher[Expressions.EXPR]
+sealed trait ExprMatcher extends BeMatcher[Expressions.EXPR]
 
 object ExprMatcher {
 
@@ -19,7 +19,7 @@ object ExprMatcher {
     )
   }
 
-  sealed trait PartMatcher[T] extends Matcher[PART[T]]
+  sealed trait PartMatcher[T] extends BeMatcher[PART[T]]
 
   case class AnyPart[T](positionMatcher: PositionMatcher) extends PartMatcher[T] {
     override def apply(left: PART[T]): MatchResult = left match {
@@ -45,7 +45,7 @@ object ExprMatcher {
       case PART.INVALID(s, e, m) =>
         positionMatcher((s, e)) <|>
           MatchResult(
-            m.matches(s".*$message.*"),
+            m equals message,
             s"$m doesnot match $message",
             s"$m unexpectly match $message"
           )
@@ -99,7 +99,7 @@ object ExprMatcher {
     override def apply(expr: Expressions.EXPR): MatchResult = expr match {
       case BINARY_OP(s, e, a, k, b) =>
         positionMatcher((s, e)) <|>
-//          Matchers.equal(kind)(k) <|>
+          MatchResult(k == kind, s"got $k while expecting $kind", s"got unexpected $kind", IndexedSeq(k, kind)) <|>
           left(a) <|>
           right(b)
       case _ => wrongTypeMatchResult[expr.type, BINARY_OP]
@@ -144,7 +144,7 @@ object ExprMatcher {
     }
   }
   //TODO: add args matchers
-  case class FunctionCall(positionMatcher: PositionMatcher, name: PartMatcher[String]) extends ExprMatcher {
+  case class FunctionCall(positionMatcher: PositionMatcher, name: PartMatcher[String], argMatcher: Matcher[List[EXPR]]) extends ExprMatcher {
     override def apply(left: Expressions.EXPR): MatchResult = left match {
       case FUNCTION_CALL(s, e, n, _) => positionMatcher((s, e)) <|> name(n)
       case _                         => wrongTypeMatchResult[left.type, FUNCTION_CALL]

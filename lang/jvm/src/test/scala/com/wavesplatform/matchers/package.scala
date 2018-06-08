@@ -1,9 +1,8 @@
 package com.wavesplatform
 
-import com.wavesplatform.lang.v1.parser.Expressions.EXPR
 import com.wavesplatform.matchers.ExprMatcher._
 import com.wavesplatform.matchers.PositionMatcher.{AnyPosition, EndMatch, StartEndMatch, StartMatch}
-import org.scalatest.matchers.{MatchResult, Matcher}
+import org.scalatest.matchers.{BeMatcher, MatchResult}
 import scodec.bits.ByteVector
 
 import scala.reflect.runtime.universe._
@@ -23,7 +22,7 @@ package object matchers {
       IndexedSeq("left", "right")
     )
 
-  def positionedMatcher[A](start: Int, end: Int, pos: PositionMatcher, matcher: Matcher[A])(a: A): MatchResult =
+  def positionedMatcher[A](start: Int, end: Int, pos: PositionMatcher, matcher: BeMatcher[A])(a: A): MatchResult =
     pos((start, end)) <|> matcher(a)
 
   val anyExpr: ExprMatcher = AnyExpr
@@ -33,7 +32,7 @@ package object matchers {
     * POSITIONS
     *
     */
-  val **                = AnyPosition
+  val anyPos             = AnyPosition
   def startsFrom(s: Int) = StartMatch(s)
   def endsAt(e: Int)     = EndMatch(e)
 
@@ -42,11 +41,11 @@ package object matchers {
     * PARTS
     *
     */
-  def anyPart[T: TypeTag]                                   = AnyPart[T](**)
+  def anyPart[T: TypeTag] = AnyPart[T](anyPos)
 //  val anyValidPart                                 = ???
   def validPart[T: TypeTag](start: Int, end: Int, value: T) = PartValid(StartEndMatch(start, end), value)
   def validPart[T: TypeTag](pos: PositionMatcher, value: T) = PartValid(pos, value)
-  def validPart[T: TypeTag](value: T)                       = PartValid(**, value)
+  def validPart[T: TypeTag](value: T)                       = PartValid(anyPos, value)
 
 //  val anyInvalidPart                                        = ???
   def invalidPart[T: TypeTag](start: Int, end: Int, message: String) = PartInvalid[T](StartEndMatch(start, end), message)
@@ -58,8 +57,8 @@ package object matchers {
     * BOOLS
     *
     */
-  val `true`  = True(**)
-  val `false` = False(**)
+  val `true`  = True(anyPos)
+  val `false` = False(anyPos)
 
   /***
     *
