@@ -112,7 +112,7 @@ object Types {
   )
 
   val buyType     = PredefCaseType("Buy", List.empty)
-  val sellType    = PredefCaseType("Buy", List.empty)
+  val sellType    = PredefCaseType("Sell", List.empty)
   val ordTypeType = UNION(buyType.typeRef, sellType.typeRef)
 
   val assetPairType = PredefCaseType("AssetPair", List("amountAsset" -> optionByteVector, "priceAsset" -> optionByteVector))

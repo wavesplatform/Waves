@@ -112,18 +112,20 @@ object PureContext {
   val subLong       = createTryOp(SUB_OP, LONG, LONG, SUB_LONG)(Math.subtractExact)
   val sumString     = createOp(SUM_OP, STRING, STRING, SUM_STRING)(_ + _)
   val sumByteVector = createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES)((a, b) => ByteVector(a.toArray ++ b.toArray))
-  val eqLong        = createOp(EQ_OP, LONG, BOOLEAN, EQ_LONG)(_ == _)
-  val eqByteVector  = createOp(EQ_OP, BYTEVECTOR, BOOLEAN, EQ_BYTES)(_ == _)
-  val eqBool        = createOp(EQ_OP, BOOLEAN, BOOLEAN, EQ_BOOLEAN)(_ == _)
-  val eqString      = createOp(EQ_OP, STRING, BOOLEAN, EQ_STRING)(_ == _)
-  val neLong        = createOp(NE_OP, LONG, BOOLEAN, NE_LONG)(_ != _)
-  val neByteVector  = createOp(NE_OP, BYTEVECTOR, BOOLEAN, NE_BYTES)(_ != _)
-  val neBool        = createOp(NE_OP, BOOLEAN, BOOLEAN, NE_BOOLEAN)(_ != _)
-  val neString      = createOp(NE_OP, STRING, BOOLEAN, NE_STRING)(_ != _)
   val ge            = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)(_ >= _)
   val gt            = createOp(GT_OP, LONG, BOOLEAN, GT_LONG)(_ > _)
   val sge           = createOp(GE_OP, STRING, BOOLEAN, GE_STRING)(_ >= _)
   val sgt           = createOp(GT_OP, STRING, BOOLEAN, GT_STRING)(_ > _)
+
+  val eq = PredefFunction(EQ_OP.func, 1, BOOLEAN, List("a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')), EQ) {
+    case a :: b :: Nil => Right(a == b)
+    case _ => ???
+  }
+
+  val ne = PredefFunction(NE_OP.func, 1, BOOLEAN, List("a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')), NE) {
+    case a :: b :: Nil => Right(a != b)
+    case _ => ???
+  }
 
   val operators: Seq[PredefFunction] = Seq(
     mulLong,
@@ -133,14 +135,8 @@ object PureContext {
     subLong,
     sumString,
     sumByteVector,
-    eqLong,
-    eqByteVector,
-    eqBool,
-    eqString,
-    neLong,
-    neByteVector,
-    neBool,
-    neString,
+    eq,
+    ne,
     ge,
     gt,
     sge,
