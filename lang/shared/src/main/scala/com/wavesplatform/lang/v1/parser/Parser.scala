@@ -120,24 +120,25 @@ object Parser {
     REF(x.start, x.end, x)
   }
 
-  private val ifP: P[IF] =
-    P(Index ~~ "if" ~/ Index ~ baseExpr.? ~ Index ~ ("then" ~/ Index ~ baseExpr.?).? ~ Index ~ ("else" ~/ Index ~ baseExpr.?).? ~~ Index).map {
-      case (start, condPos, condRaw, ifTruePos, ifTrueRaw, ifFalsePos, ifFalseRaw, end) =>
+  private val ifP: P[IF] = {
+    def optionalPart(keyword: String, branch: String): P[EXPR] = (Index ~ (keyword ~/ Index ~ baseExpr.?).?).map {
+      case (ifTruePos, ifTrueRaw) =>
+        ifTrueRaw
+          .map { case (pos, expr) => expr.getOrElse(INVALID(pos, pos, s"expected a $branch branch's expression")) }
+          .getOrElse(INVALID(ifTruePos, ifTruePos, s"expected a $branch branch"))
+    }
+
+    val thenPart = optionalPart("then", "true")
+    val elsePart = optionalPart("else", "false")
+
+    P(Index ~~ "if" ~/ Index ~ baseExpr.? ~ thenPart ~ elsePart ~~ Index).map {
+      case (start, condPos, condRaw, ifTrue, ifFalse, end) =>
         val cond = condRaw.getOrElse(INVALID(condPos, condPos, "expected a condition"))
-        val ifTrue = ifTrueRaw
-          .map { case (pos, expr) => expr.getOrElse(INVALID(pos, pos, "expected a true branch's expression")) }
-          .getOrElse(INVALID(ifTruePos, ifTruePos, "expected a true branch"))
-        val ifFalse = ifFalseRaw
-          .map { case (pos, expr) => expr.getOrElse(INVALID(pos, pos, "expected a false branch's expression")) }
-          .getOrElse(INVALID(ifFalsePos, ifFalsePos, "expected a false branch"))
         IF(start, end, cond, ifTrue, ifFalse)
     } |
-      P(Index ~~ "then" ~/ Index ~ baseExpr.? ~ Index ~ ("else" ~/ Index ~ baseExpr.?).? ~~ Index).map {
-        case (start, ifTrueExprPos, ifTrueRaw, ifFalsePos, ifFalseRaw, end) =>
+      P(Index ~~ "then" ~/ Index ~ baseExpr.? ~ elsePart ~~ Index).map {
+        case (start, ifTrueExprPos, ifTrueRaw, ifFalse, end) =>
           val ifTrue = ifTrueRaw.getOrElse(INVALID(ifTrueExprPos, ifTrueExprPos, "expected a true branch's expression"))
-          val ifFalse = ifFalseRaw
-            .map { case (pos, expr) => expr.getOrElse(INVALID(pos, pos, "expected a false branch's expression")) }
-            .getOrElse(INVALID(ifFalsePos, ifFalsePos, "expected a false branch"))
           IF(start, end, INVALID(start, start, "expected a condition"), ifTrue, ifFalse)
       } |
       P(Index ~~ "else" ~/ Index ~ baseExpr.? ~~ Index).map {
@@ -145,6 +146,7 @@ object Parser {
           val ifFalse = ifFalseRaw.getOrElse(INVALID(ifFalseExprPos, ifFalseExprPos, "expected a false branch's expression"))
           IF(start, end, INVALID(start, start, "expected a condition"), INVALID(start, start, "expected a true branch"), ifFalse)
       }
+  }
 
   private val functionCallArgs: P[Seq[EXPR]] = baseExpr.rep(sep = ",")
 
