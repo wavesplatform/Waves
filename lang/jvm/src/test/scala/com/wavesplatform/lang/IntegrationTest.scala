@@ -165,11 +165,11 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("sum/mul/div/mod/fraction functions") {
-    eval[Long]("(10 + 10)") shouldBe Right(20)
+    eval[Long]("(10 + 10)#jhk\n ") shouldBe Right(20)
     eval[Long]("(10 * 10)") shouldBe Right(100)
     eval[Long]("(10 / 3)") shouldBe Right(3)
     eval[Long]("(10 % 3)") shouldBe Right(1)
-    eval[Long]("fraction(9223372036854775807, 2, 4)") shouldBe Right(Long.MaxValue / 2)
+    eval[Long]("fraction(9223372036854775807, -2, -4)") shouldBe Right(Long.MaxValue / 2)
     eval[Long]("fraction(9223372036854775807, 3, 2)") shouldBe Left(s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1")
     eval[Long]("fraction(-9223372036854775807, 3, 2)") shouldBe Left(s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1")
   }
