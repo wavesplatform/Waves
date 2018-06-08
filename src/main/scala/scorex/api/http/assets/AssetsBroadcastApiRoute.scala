@@ -245,7 +245,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
       new ApiResponse(code = 200, message = "Json with signed Sponsor fee transaction"),
       new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])
     ))
-  def sponsor: Route = (path("reissue") & post) {
+  def sponsor: Route = (path("sponsor") & post) {
     import scorex.api.http.assets.SponsorFeeRequest._
     json[SignedSponsorFeeRequest] { sponsorReq =>
       doBroadcast(sponsorReq.toTx)
