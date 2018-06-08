@@ -38,7 +38,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         LET("x", CONST_LONG(3)),
         BLOCK(
           LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)))),
-          FUNCTION_CALL(eqLong.header, List(REF("z"), CONST_LONG(1)))
+          FUNCTION_CALL(PureContext.eq.header, List(REF("z"), CONST_LONG(1)))
         )
       )
     )
@@ -74,7 +74,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[Boolean](
       expr = BLOCK(
         LET("x", CONST_LONG(3)),
-        FUNCTION_CALL(eqLong.header, List(REF("x"), CONST_LONG(2)))
+        FUNCTION_CALL(PureContext.eq.header, List(REF("x"), CONST_LONG(2)))
       ))._2 shouldBe Right(false)
   }
 
@@ -82,7 +82,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[Boolean](
       expr = BLOCK(
         LET("x", CONST_LONG(3)),
-        BLOCK(LET("y", CONST_LONG(3)), FUNCTION_CALL(eqLong.header, List(REF("x"), REF("y"))))
+        BLOCK(LET("y", CONST_LONG(3)), FUNCTION_CALL(PureContext.eq.header, List(REF("x"), REF("y"))))
       ))._2 shouldBe Right(true)
   }
 
@@ -92,19 +92,19 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         LET("x", CONST_LONG(3)),
         BLOCK(
           LET("y", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)))),
-          FUNCTION_CALL(eqLong.header, List(REF("x"), REF("y")))
+          FUNCTION_CALL(PureContext.eq.header, List(REF("x"), REF("y")))
         )
       ))._2 shouldBe Right(true)
   }
 
   property("successful on deep type resolution") {
-    ev[Long](expr = IF(FUNCTION_CALL(eqLong.header, List(CONST_LONG(1), CONST_LONG(2))), simpleDeclarationAndUsage(3), CONST_LONG(4)))._2 shouldBe Right(
+    ev[Long](expr = IF(FUNCTION_CALL(PureContext.eq.header, List(CONST_LONG(1), CONST_LONG(2))), simpleDeclarationAndUsage(3), CONST_LONG(4)))._2 shouldBe Right(
       4)
   }
 
   property("successful on same value names in different branches") {
     val expr =
-      IF(FUNCTION_CALL(eqLong.header, List(CONST_LONG(1), CONST_LONG(2))), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4))
+      IF(FUNCTION_CALL(PureContext.eq.header, List(CONST_LONG(1), CONST_LONG(2))), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4))
     ev[Long](expr = expr)._2 shouldBe Right(4)
   }
 
