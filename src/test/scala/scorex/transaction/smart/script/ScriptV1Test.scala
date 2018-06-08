@@ -41,7 +41,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
     }
     val expr = (1 to 9).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
       FUNCTION_CALL(
-        function = FunctionHeader(name = EQ_LONG),
+        function = FunctionHeader(name = EQ),
         args = List(r, bigSum)
       )
     }
