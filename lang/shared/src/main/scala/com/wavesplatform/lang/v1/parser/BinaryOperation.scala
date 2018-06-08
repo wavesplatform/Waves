@@ -15,7 +15,8 @@ object BinaryOperation {
 
   val opsByPriority: List[List[BinaryOperation]] = List(
     List(OR_OP, AND_OP),
-    List(EQ_OP, NE_OP, GT_OP, GE_OP, LT_OP, LE_OP),
+    List(EQ_OP, NE_OP),
+    List(GT_OP, GE_OP, LT_OP, LE_OP),
     List(SUM_OP, SUB_OP),
     List(MUL_OP, DIV_OP, MOD_OP)
   )
