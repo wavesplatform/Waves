@@ -14,7 +14,7 @@ class BigSum {
   }
 
   val expr: EXPR = FUNCTION_CALL(
-    function = FunctionHeader(name = EQ_LONG),
+    function = FunctionHeader(name = EQ),
     args = List(CONST_LONG(1), bigSum)
   )
 }
