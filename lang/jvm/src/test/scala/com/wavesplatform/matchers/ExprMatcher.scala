@@ -53,7 +53,12 @@ object ExprMatcher {
     }
   }
 
-  case class Let(positionMatcher: PositionMatcher, name: PartMatcher[String], value: ExprMatcher) extends Matcher[LET] {
+  case class AnyLet(positionMatcher: PositionMatcher) extends BeMatcher[LET] {
+    override def apply(left: LET): MatchResult =
+      positionMatcher((left.start, left.end)) <|> any(left)
+  }
+
+  case class Let(positionMatcher: PositionMatcher, name: PartMatcher[String], value: ExprMatcher) extends BeMatcher[LET] {
     override def apply(left: LET): MatchResult = {
       positionMatcher((left.start, left.end)) <|>
         name(left.name) <|>
@@ -105,7 +110,7 @@ object ExprMatcher {
       case _ => wrongTypeMatchResult[expr.type, BINARY_OP]
     }
   }
-  case class Block(positionMatcher: PositionMatcher, let: Matcher[LET], body: ExprMatcher) extends ExprMatcher {
+  case class Block(positionMatcher: PositionMatcher, let: BeMatcher[LET], body: ExprMatcher) extends ExprMatcher {
     override def apply(left: Expressions.EXPR): MatchResult = left match {
       case BLOCK(s, e, l, b) =>
         positionMatcher((s, e)) <|>
@@ -143,10 +148,10 @@ object ExprMatcher {
       case _           => wrongTypeMatchResult[left.type, FALSE]
     }
   }
-  //TODO: add args matchers
+
   case class FunctionCall(positionMatcher: PositionMatcher, name: PartMatcher[String], argMatcher: Matcher[List[EXPR]]) extends ExprMatcher {
     override def apply(left: Expressions.EXPR): MatchResult = left match {
-      case FUNCTION_CALL(s, e, n, _) => positionMatcher((s, e)) <|> name(n)
+      case FUNCTION_CALL(s, e, n, args) => positionMatcher((s, e)) <|> name(n) <|> argMatcher(args)
       case _                         => wrongTypeMatchResult[left.type, FUNCTION_CALL]
     }
   }
