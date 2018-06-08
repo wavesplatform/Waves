@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs
 
+import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -18,16 +19,16 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Matche
       master2   <- accountGen
       recipient <- otherAccountGen(candidate = master)
       ts        <- timestampGen
-      gen1: GenesisTransaction = GenesisTransaction.create(master, Long.MaxValue - 1, ts).right.get
-      gen2: GenesisTransaction = GenesisTransaction.create(master2, Long.MaxValue - 1, ts).right.get
+      gen1: GenesisTransaction = GenesisTransaction.create(master, Long.MaxValue - 1, ts).explicitGet()
+      gen2: GenesisTransaction = GenesisTransaction.create(master2, Long.MaxValue - 1, ts).explicitGet()
       fee    <- smallFeeGen
       amount <- Gen.choose(Long.MaxValue / 2, Long.MaxValue - fee - 1)
-      transfer1 = createWavesTransfer(master, recipient, amount, fee, ts).right.get
-      transfer2 = createWavesTransfer(master2, recipient, amount, fee, ts).right.get
+      transfer1 = createWavesTransfer(master, recipient, amount, fee, ts).explicitGet()
+      transfer2 = createWavesTransfer(master2, recipient, amount, fee, ts).explicitGet()
     } yield (gen1, gen2, transfer1, transfer2)
 
     forAll(preconditionsAndPayment) {
-      case ((gen1, gen2, transfer1, transfer2)) =>
+      case (gen1, gen2, transfer1, transfer2) =>
         assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, transfer1))), TestBlock.create(Seq(transfer2))) { blockDiffEi =>
           blockDiffEi should produce("negative waves balance")
         }
@@ -40,8 +41,8 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Matche
       master2   <- accountGen
       recipient <- accountGen
       ts        <- timestampGen
-      gen1 = GenesisTransaction.create(master1, Long.MaxValue - 1, ts).right.get
-      gen2 = GenesisTransaction.create(master2, Long.MaxValue - 1, ts).right.get
+      gen1 = GenesisTransaction.create(master1, Long.MaxValue - 1, ts).explicitGet()
+      gen2 = GenesisTransaction.create(master2, Long.MaxValue - 1, ts).explicitGet()
       fee  <- smallFeeGen
       amt1 <- Gen.choose(Long.MaxValue / 2 + 1, Long.MaxValue - 1 - fee)
       amt2 <- Gen.choose(Long.MaxValue / 2 + 1, Long.MaxValue - 1 - fee)
@@ -64,12 +65,12 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Matche
     ts     <- positiveIntGen
     amt    <- positiveLongGen
     fee    <- smallFeeGen
-    genesis: GenesisTransaction                   = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    masterTransfersToAlice: TransferTransactionV1 = createWavesTransfer(master, alice, amt, fee, ts).right.get
+    genesis: GenesisTransaction                   = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+    masterTransfersToAlice: TransferTransactionV1 = createWavesTransfer(master, alice, amt, fee, ts).explicitGet()
     (aliceLeasesToBob, _)    <- leaseAndCancelGeneratorP(alice, bob, alice) suchThat (_._1.amount < amt)
     (masterLeasesToAlice, _) <- leaseAndCancelGeneratorP(master, alice, master) suchThat (_._1.amount > aliceLeasesToBob.amount)
     transferAmt              <- Gen.choose(amt - fee - aliceLeasesToBob.amount, amt - fee)
-    aliceTransfersMoreThanOwnsMinusLeaseOut = createWavesTransfer(alice, cooper, transferAmt, fee, ts).right.get
+    aliceTransfersMoreThanOwnsMinusLeaseOut = createWavesTransfer(alice, cooper, transferAmt, fee, ts).explicitGet()
 
   } yield (genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice, aliceTransfersMoreThanOwnsMinusLeaseOut)
 

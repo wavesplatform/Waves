@@ -55,7 +55,7 @@ trait BaseState extends TransactionGenBase {
   private val initGen: Gen[(PrivateKeyAccount, Block)] = for {
     rich <- accountGen
   } yield {
-    val genesisTx = GenesisTransaction.create(rich, waves(100000000L), System.currentTimeMillis() - 10000).right.get
+    val genesisTx = GenesisTransaction.create(rich, waves(100000000L), System.currentTimeMillis() - 10000).explicitGet()
     (rich, TestBlock.create(time = genesisTx.timestamp, Seq(genesisTx)))
   }
 

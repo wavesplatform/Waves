@@ -42,7 +42,7 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
       ts        <- positiveIntGen
       amt       <- smallFeeGen
       fee       <- smallFeeGen
-      genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+      genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       setScript <- selfSignedSetScriptTransactionGenP(master, ScriptV1(typed).explicitGet())
       transfer       = simpleSendGen(master, recipient, ts)
       scriptTransfer = scriptedSendGen(master, recipient, ts)
@@ -54,7 +54,7 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
     val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)"
     val untypedScript = Parser(textScript).get.value
     assert(untypedScript.size == 1)
-    val typedScript = CompilerV1(dummyTypeCheckerContext, untypedScript.head).explicitGet()._1
+    val typedScript = CompilerV1(dummyCompilerContext, untypedScript.head).explicitGet()._1
 
     forAll(differentTransfers(typedScript)) {
       case (gen, setScript, transfers, scriptTransfers) =>

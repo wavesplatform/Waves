@@ -1,24 +1,25 @@
 package scorex.account
 
+import com.wavesplatform.state.EitherExt2
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
 class AccountOrAliasTests extends PropSpec with PropertyChecks with Matchers {
 
   property("Account should get parsed correctly") {
-    AddressOrAlias.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get shouldBe an[Address]
-    AddressOrAlias.fromString("address:3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get shouldBe an[Address]
+    AddressOrAlias.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet() shouldBe an[Address]
+    AddressOrAlias.fromString("address:3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet() shouldBe an[Address]
 
-    Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get shouldBe an[Address]
-    Address.fromString("address:3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get shouldBe an[Address]
+    Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet() shouldBe an[Address]
+    Address.fromString("address:3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet() shouldBe an[Address]
   }
 
   property("Alias should get parsed correctly") {
-    val alias = AddressOrAlias.fromString("alias:T:sasha").right.get.asInstanceOf[Alias]
+    val alias = AddressOrAlias.fromString("alias:T:sasha").explicitGet().asInstanceOf[Alias]
     alias.name shouldBe "sasha"
     alias.networkByte shouldBe 'T'
 
-    val alias2 = Alias.fromString("alias:T:sasha").right.get
+    val alias2 = Alias.fromString("alias:T:sasha").explicitGet()
     alias2.name shouldBe "sasha"
     alias2.networkByte shouldBe 'T'
 

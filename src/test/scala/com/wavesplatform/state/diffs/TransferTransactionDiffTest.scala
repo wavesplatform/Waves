@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.implicits._
-import com.wavesplatform.state.{LeaseBalance, Portfolio}
+import com.wavesplatform.state.{EitherExt2, LeaseBalance, Portfolio}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -19,7 +19,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     master    <- accountGen
     recepient <- otherAccountGen(candidate = master)
     ts        <- positiveIntGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
     issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
     maybeAsset               <- Gen.option(issue1)
@@ -54,7 +54,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       master    <- accountGen
       recepient <- otherAccountGen(master)
       ts        <- positiveIntGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       issue: IssueTransaction      <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
       feeIssue: IssueTransactionV2 <- smartIssueTransactionGen(master, scriptGen.map(_.some))
       transferV1                   <- transferGeneratorP(master, recepient, issue.id().some, feeIssue.id().some)

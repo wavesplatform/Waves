@@ -31,8 +31,8 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
   private def catchParseError(x: String, e: Failure[Char, String]): Nothing = {
     import e.{index => i}
-    println(s"val codeInBytes = new String(Array[Byte](${x.getBytes.mkString(",")}))")
-    println(s"""val codeInStr = "${escapedCode(x)}"""")
+    println(s"val code1 = new String(Array[Byte](${x.getBytes.mkString(",")}))")
+    println(s"""val code2 = "${escapedCode(x)}"""")
     println(s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${e.extra.traced.fullStack
       .mkString("\n")}")
     throw new TestFailedException("Test failed", 0)
@@ -284,6 +284,33 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     )
   }
 
+  property("should parse a binary operation with block operand") {
+    val script =
+      """let x = a &&
+        |let y = 1
+        |true
+        |true""".stripMargin
+
+    parseOne(script) shouldBe BLOCK(
+      0,
+      32,
+      LET(
+        0,
+        27,
+        PART.VALID(4, 5, "x"),
+        BINARY_OP(
+          8,
+          27,
+          REF(8, 9, PART.VALID(8, 9, "a")),
+          AND_OP,
+          BLOCK(13, 27, LET(13, 22, PART.VALID(17, 18, "y"), CONST_LONG(21, 22, 1), List()), TRUE(23, 27))
+        ),
+        List()
+      ),
+      TRUE(28, 32)
+    )
+  }
+
   property("reserved keywords are invalid variable names in block: if") {
     val script =
       s"""let if = 1
@@ -339,7 +366,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parseOne(script) shouldBe BINARY_OP(
       0,
       6,
-      REF(0, 2, PART.INVALID(0, 2, "keywords are restricted: if")),
+      INVALID(0, 2, "if", None),
       BinaryOperation.SUM_OP,
       CONST_LONG(5, 6, 1)
     )
@@ -350,7 +377,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parseOne(script) shouldBe BINARY_OP(
       0,
       7,
-      REF(0, 3, PART.INVALID(0, 3, "keywords are restricted: let")),
+      INVALID(0, 3, "let", None),
       BinaryOperation.SUM_OP,
       CONST_LONG(6, 7, 1)
     )
@@ -362,7 +389,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       parseOne(script) shouldBe BINARY_OP(
         0,
         8,
-        REF(0, 4, PART.INVALID(0, 4, s"keywords are restricted: $keyword")),
+        INVALID(0, keyword.length, keyword, None),
         BinaryOperation.SUM_OP,
         CONST_LONG(7, 8, 1)
       )
@@ -590,7 +617,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
     parseAll(script) shouldBe Seq(
       BLOCK(0, 13, LET(0, 9, PART.VALID(4, 5, "C"), CONST_LONG(8, 9, 1), Seq.empty), REF(10, 13, PART.VALID(10, 13, "foo"))),
-      INVALID(14, 16, "@~", Some(CONST_LONG(16, 17, 2))),
+      INVALID(14, 17, "@~2", None),
       TRUE(18, 22)
     )
   }
@@ -604,7 +631,13 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       0,
       18,
       LET(0, 9, PART.VALID(4, 5, "C"), CONST_LONG(8, 9, 1), Seq.empty),
-      INVALID(10, 13, "@ /", Some(TRUE(14, 18)))
+      BINARY_OP(
+        10,
+        18,
+        INVALID(10, 11, "@", None),
+        DIV_OP,
+        TRUE(14, 18)
+      )
     )
   }
 
@@ -613,17 +646,16 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       """@ /
         |let C = 1
         |true""".stripMargin
-    parseOne(script) shouldBe INVALID(
+    parseOne(script) shouldBe BINARY_OP(
       0,
-      3,
-      "@ /",
-      Some(
-        BLOCK(
-          4,
-          18,
-          LET(4, 13, PART.VALID(8, 9, "C"), CONST_LONG(12, 13, 1), Seq.empty),
-          TRUE(14, 18)
-        )
+      18,
+      INVALID(0, 1, "@", None),
+      DIV_OP,
+      BLOCK(
+        4,
+        18,
+        LET(4, 13, PART.VALID(8, 9, "C"), CONST_LONG(12, 13, 1), List.empty),
+        TRUE(14, 18)
       )
     )
   }
@@ -635,7 +667,24 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         |~ /""".stripMargin
     parseAll(script) shouldBe Seq(
       BLOCK(0, 14, LET(0, 9, PART.VALID(4, 5, "C"), CONST_LONG(8, 9, 1), Seq.empty), TRUE(10, 14)),
-      INVALID(15, 18, "~ /")
+      BINARY_OP(
+        15,
+        18,
+        INVALID(15, 16, "~", None),
+        DIV_OP,
+        INVALID(18, 18, "expected a second operator", None)
+      )
+    )
+  }
+
+  property("should parse a binary operation without a second operand") {
+    val script = "a &&"
+    parseOne(script) shouldBe BINARY_OP(
+      0,
+      4,
+      REF(0, 1, PART.VALID(0, 1, "a")),
+      AND_OP,
+      INVALID(4, 4, "expected a second operator", None)
     )
   }
 
@@ -882,6 +931,31 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     )
   }
 
+  property("pattern matching - incomplete binary operation") {
+    val script =
+      """match tx {
+        |  case a => true &&
+        |  case b => 1
+        |}""".stripMargin
+
+    parseAll(script)(0) shouldBe
+      MATCH(
+        0,
+        46,
+        REF(6, 8, PART.VALID(6, 8, "tx")),
+        List(
+          MATCH_CASE(
+            13,
+            30,
+            Some(PART.VALID(18, 19, "a")),
+            List(),
+            BINARY_OP(23, 33, TRUE(23, 27), AND_OP, INVALID(33, 33, "expected a second operator", None))
+          ),
+          MATCH_CASE(33, 44, Some(PART.VALID(38, 39, "b")), List(), CONST_LONG(43, 44, 1))
+        )
+      )
+  }
+
   property("if expressions") {
     parseOne("if (10 < 15) then true else false") shouldBe IF(
       0,
@@ -999,7 +1073,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parseOne(code) shouldBe IF(
       0,
       38,
-      BINARY_OP(3, 17, CONST_LONG(8, 10, 15), LT_OP, CONST_LONG(3, 5, 10)),
+      BINARY_OP(3, 10, CONST_LONG(8, 10, 15), LT_OP, CONST_LONG(3, 5, 10)),
       TRUE(23, 27),
       FALSE(33, 38)
     )
@@ -1277,6 +1351,41 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       22,
       PART.VALID(2, 22, "getElement"),
       List(REF(0, 2, PART.VALID(0, 2, "xs")), CONST_LONG(12, 13, 1))
+    )
+  }
+
+  property("operations priority") {
+    parseOne("a-b+c") shouldBe BINARY_OP(0,
+                                         5,
+                                         BINARY_OP(0, 3, REF(0, 1, PART.VALID(0, 1, "a")), SUB_OP, REF(2, 3, PART.VALID(2, 3, "b"))),
+                                         SUM_OP,
+                                         REF(4, 5, PART.VALID(4, 5, "c")))
+    parseOne("a+b-c") shouldBe BINARY_OP(0,
+                                         5,
+                                         BINARY_OP(0, 3, REF(0, 1, PART.VALID(0, 1, "a")), SUM_OP, REF(2, 3, PART.VALID(2, 3, "b"))),
+                                         SUB_OP,
+                                         REF(4, 5, PART.VALID(4, 5, "c")))
+    parseOne("a+b*c") shouldBe BINARY_OP(0,
+                                         5,
+                                         REF(0, 1, PART.VALID(0, 1, "a")),
+                                         SUM_OP,
+                                         BINARY_OP(2, 5, REF(2, 3, PART.VALID(2, 3, "b")), MUL_OP, REF(4, 5, PART.VALID(4, 5, "c"))))
+    parseOne("a*b-c") shouldBe BINARY_OP(0,
+                                         5,
+                                         BINARY_OP(0, 3, REF(0, 1, PART.VALID(0, 1, "a")), MUL_OP, REF(2, 3, PART.VALID(2, 3, "b"))),
+                                         SUB_OP,
+                                         REF(4, 5, PART.VALID(4, 5, "c")))
+    parseOne("a/b*c") shouldBe BINARY_OP(0,
+                                         5,
+                                         BINARY_OP(0, 3, REF(0, 1, PART.VALID(0, 1, "a")), DIV_OP, REF(2, 3, PART.VALID(2, 3, "b"))),
+                                         MUL_OP,
+                                         REF(4, 5, PART.VALID(4, 5, "c")))
+    parseOne("a<b==c>=d") shouldBe BINARY_OP(
+      0,
+      9,
+      BINARY_OP(0, 3, REF(2, 3, PART.VALID(2, 3, "b")), LT_OP, REF(0, 1, PART.VALID(0, 1, "a"))),
+      EQ_OP,
+      BINARY_OP(5, 9, REF(5, 6, PART.VALID(5, 6, "c")), GE_OP, REF(8, 9, PART.VALID(8, 9, "d")))
     )
   }
 }

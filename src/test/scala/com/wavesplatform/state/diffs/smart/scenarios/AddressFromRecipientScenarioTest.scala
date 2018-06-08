@@ -1,11 +1,9 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
+import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.CaseObj
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.caseTypes
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext.predefVars
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState, produce}
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -27,13 +25,13 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
     master                   <- accountGen
     ts                       <- timestampGen
     other: PrivateKeyAccount <- accountGen
-    genesis1: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    genesis2: GenesisTransaction = GenesisTransaction.create(other, ENOUGH_AMT, ts).right.get
+    genesis1: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+    genesis2: GenesisTransaction = GenesisTransaction.create(other, ENOUGH_AMT, ts).explicitGet()
     alias              <- aliasGen
     fee                <- smallFeeGen
     aliasTx            <- createAliasGen(other, alias, fee, ts)
     transferViaAddress <- transferGeneratorP(master, other, None, None)
-    transferViaAlias   <- transferGeneratorP(master, AddressOrAlias.fromBytes(alias.bytes.arr, 0).right.get._1, None, None)
+    transferViaAlias   <- transferGeneratorP(master, AddressOrAlias.fromBytes(alias.bytes.arr, 0).explicitGet()._1, None, None)
   } yield (Seq(genesis1, genesis2), aliasTx, transferViaAddress, transferViaAlias)
 
   def evalScript(tx: Transaction, blockchain: Blockchain): Either[com.wavesplatform.lang.ExecutionError, CaseObj] = {
@@ -47,8 +45,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
         |  }
         |  """.stripMargin)
     assert(expr.size == 1)
-    val Right((typedExpr, tpe)) =
-      CompilerV1(CompilerContext.fromEvaluationContext(context, caseTypes.map(v => v.name -> v).toMap, predefVars), expr.head)
+    val Right((typedExpr, _)) = CompilerV1(com.wavesplatform.utils.dummyCompilerContext, expr.head)
     EvaluatorV1[CaseObj](context, typedExpr)._2
   }
 

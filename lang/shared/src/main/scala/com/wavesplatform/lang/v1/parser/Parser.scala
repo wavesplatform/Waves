@@ -84,14 +84,27 @@ object Parser {
     }
     .map(Function.tupled(CONST_STRING))
 
-  private val varName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index).map {
+  private val correctVarName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index)
+    .filter { case (_, x, _) => !keywords.contains(x) }
+    .map { case (start, x, end) => PART.VALID(start, end, x) }
+
+  private val anyVarName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index).map {
     case (start, x, end) =>
       if (keywords.contains(x)) PART.INVALID(start, end, s"keywords are restricted: $x")
       else PART.VALID(start, end, x)
   }
 
-  private val invalid: P[INVALID] = P(Index ~~ AnyChars(1).! ~~ Index ~~ fallBackExpr.?).map {
-    case (start, xs, end, next) => foldInvalid(start, end, xs, next)
+  private val invalid: P[INVALID] = {
+    val White = WhitespaceApi.Wrapper {
+      import fastparse.all._
+      NoTrace("")
+    }
+
+    import White._
+    P(Index ~~ CharPred(x => !Whitespaces.contains(x)).rep(min = 1).! ~~ Index)
+      .map {
+        case (start, xs, end) => foldInvalid(start, end, xs, None)
+      }
   }
 
   private def foldInvalid(start: Int, end: Int, xs: String, next: Option[EXPR]): INVALID = next match {
@@ -107,10 +120,10 @@ object Parser {
   private val falseP: P[FALSE]      = P(Index ~~ "false".! ~~ Index).map { case (start, _, end) => FALSE(start, end) }
   private val bracesP: P[EXPR]      = P("(" ~ fallBackExpr ~ ")")
   private val curlyBracesP: P[EXPR] = P("{" ~ fallBackExpr ~ "}")
-  private val letP: P[LET] = P(Index ~~ "let" ~ comment ~ varName ~ comment ~ "=" ~/ fallBackExpr ~~ Index).map {
+  private val letP: P[LET] = P(Index ~~ "let" ~ comment ~ anyVarName ~ comment ~ "=" ~/ fallBackExpr ~~ Index).map {
     case (start, v, e, end) => LET(start, end, v, e, Seq.empty)
   }
-  private val refP: P[REF] = P(varName).map { x =>
+  private val refP: P[REF] = P(correctVarName).map { x =>
     REF(x.start, x.end, x)
   }
   private val ifP: P[IF] = P(Index ~~ "if" ~ fallBackExpr ~ "then" ~ fallBackExpr ~ "else" ~ fallBackExpr ~~ Index).map {
@@ -128,8 +141,8 @@ object Parser {
 
   private val matchCaseP: P[MATCH_CASE] = {
     val restMatchCaseInvalidP: P[String] = P((!"=>" ~~ AnyChars(1).!).repX.map(_.mkString))
-    val varDefP: P[Option[PART[String]]] = varName.map(Some(_)) | "_".!.map(_ => None)
-    val typesP: P[Seq[PART[String]]]     = varName.rep(min = 1, sep = comment ~ "|" ~ comment)
+    val varDefP: P[Option[PART[String]]] = anyVarName.map(Some(_)) | "_".!.map(_ => None)
+    val typesP: P[Seq[PART[String]]]     = anyVarName.rep(min = 1, sep = comment ~ "|" ~ comment)
     val typesDefP = (
       ":" ~ comment ~
         (typesP | (Index ~~ restMatchCaseInvalidP ~~ Index).map {
@@ -169,7 +182,7 @@ object Parser {
       }
 
   private val accessP: P[(Int, Accessor, Int)] = P(
-    ("" ~ comment ~ Index ~ "." ~/ comment ~ varName.map(Getter) ~~ Index) |
+    ("" ~ comment ~ Index ~ "." ~/ comment ~ anyVarName.map(Getter) ~~ Index) |
       (Index ~~ "(" ~/ functionCallArgs.map(Args) ~ ")" ~~ Index) |
       (Index ~~ "[" ~/ fallBackExpr.map(ListIndex) ~ "]" ~~ Index)
   )
@@ -245,13 +258,14 @@ object Parser {
     P(binaryOp(fallBackAtom, opsByPriority) | fallBackAtom)
   }
 
-  private def binaryOp(atom: P[EXPR], rest: List[BinaryOperation]): P[EXPR] = rest match {
+  private def binaryOp(atom: P[EXPR], rest: List[List[BinaryOperation]]): P[EXPR] = rest match {
     case Nil => unaryOp(atom, unaryOps)
-    case kind :: restOps =>
+    case kinds :: restOps =>
       val operand = binaryOp(atom, restOps)
-      P(Index ~~ operand ~ (kind.parser.!.map(_ => kind) ~ operand).rep() ~~ Index).map {
+      val kind = kinds.map(_.parser).reduce((pl,pr) => P(pl | pr))
+      P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(i, i, "expected a second operator", None)))).rep() ~~ Index).map {
         case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)], end) =>
-          r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, end, acc, currOperand) }
+          r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.end, acc, currOperand) }
       }
   }
 
@@ -262,5 +276,5 @@ object Parser {
       } | acc
   }
 
-  def apply(str: String): core.Parsed[Seq[EXPR], Char, String] = P(Start ~ (!End ~ fallBackExpr).rep(min = 1)).parse(str)
+  def apply(str: String): core.Parsed[Seq[EXPR], Char, String] = P(Start ~ fallBackExpr.rep(min = 1) ~ End).parse(str)
 }

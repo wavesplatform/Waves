@@ -21,7 +21,8 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     blockchainSettings = history.DefaultWavesSettings.blockchainSettings.copy(
       functionalitySettings = history.DefaultWavesSettings.blockchainSettings.functionalitySettings.copy(
         featureCheckBlocksPeriod = ApprovalPeriod,
-        blocksForFeatureActivation = (ApprovalPeriod * 0.9).toInt
+        blocksForFeatureActivation = (ApprovalPeriod * 0.9).toInt,
+        preActivatedFeatures = Map.empty
       )
     ),
     featuresSettings = history.DefaultWavesSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = true)
@@ -30,7 +31,8 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
   private val WavesSettingsWithDoubling = WavesSettings.copy(
     blockchainSettings = WavesSettings.blockchainSettings.copy(
       functionalitySettings = WavesSettings.blockchainSettings.functionalitySettings.copy(
-        doubleFeaturesPeriodsAfterHeight = 300
+        doubleFeaturesPeriodsAfterHeight = 300,
+        preActivatedFeatures = Map.empty
       )
     ))
 

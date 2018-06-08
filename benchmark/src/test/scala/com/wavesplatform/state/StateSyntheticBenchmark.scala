@@ -6,7 +6,7 @@ import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.StateSyntheticBenchmark._
-import com.wavesplatform.utils.dummyTypeCheckerContext
+import com.wavesplatform.utils.dummyCompilerContext
 import org.openjdk.jmh.annotations._
 import org.scalacheck.Gen
 import scorex.account.PrivateKeyAccount
@@ -39,7 +39,7 @@ object StateSyntheticBenchmark {
       for {
         amount    <- Gen.choose(1, waves(1))
         recipient <- accountGen
-      } yield TransferTransactionV1.selfSigned(None, sender, recipient, amount, ts, None, 100000, Array.emptyByteArray).right.get
+      } yield TransferTransactionV1.selfSigned(None, sender, recipient, amount, ts, None, 100000, Array.emptyByteArray).explicitGet()
   }
 
   @State(Scope.Benchmark)
@@ -75,7 +75,7 @@ object StateSyntheticBenchmark {
       val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)"
       val untypedScript = Parser(textScript).get.value
       assert(untypedScript.size == 1)
-      val typedScript = CompilerV1(dummyTypeCheckerContext, untypedScript.head).explicitGet()._1
+      val typedScript = CompilerV1(dummyCompilerContext, untypedScript.head).explicitGet()._1
 
       val setScriptBlock = nextBlock(
         Seq(

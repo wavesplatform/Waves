@@ -6,7 +6,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
-import com.wavesplatform.utils.dummyTypeCheckerContext
+import com.wavesplatform.utils.dummyCompilerContext
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.JsNumber
 import scorex.account.PrivateKeyAccount
@@ -32,7 +32,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
   private val AliceBC1: String = sender.createAddress()
   private val swapBC1: String  = sender.createAddress()
 
-  private val AlicesPK = PrivateKeyAccount.fromSeed(sender.seed(AliceBC1)).right.get
+  private val AlicesPK = PrivateKeyAccount.fromSeed(sender.seed(AliceBC1)).explicitGet()
 
   private val secretText = "some secret message from Alice"
   private val shaSecret  = "BN6RTYGWcwektQfSFzH8raYo9awaLgQ7pLyWLQY4S4F5"
@@ -64,10 +64,10 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
       case other => false
     }""".stripMargin).get.value
       assert(untyped.size == 1)
-      CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()._1
+      CompilerV1(dummyCompilerContext, untyped.head).explicitGet()._1
     }
 
-    val pkSwapBC1 = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).right.get
+    val pkSwapBC1 = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).explicitGet()
     val script    = ScriptV1(sc1).explicitGet()
     val sc1SetTx = SetScriptTransaction
       .selfSigned(version = SetScriptTransaction.supportedVersions.head,
@@ -95,8 +95,8 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         .selfSigned(
           version = 2,
           assetId = None,
-          sender = PrivateKeyAccount.fromSeed(sender.seed(AliceBC1)).right.get,
-          recipient = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).right.get,
+          sender = PrivateKeyAccount.fromSeed(sender.seed(AliceBC1)).explicitGet(),
+          recipient = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).explicitGet(),
           amount = transferAmount + fee + smartFee,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
@@ -117,8 +117,8 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         .selfSigned(
           version = 2,
           assetId = None,
-          sender = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).right.get,
-          recipient = PrivateKeyAccount.fromSeed(sender.seed(AliceBC1)).right.get,
+          sender = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).explicitGet(),
+          recipient = PrivateKeyAccount.fromSeed(sender.seed(AliceBC1)).explicitGet(),
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
@@ -142,8 +142,8 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         .create(
           version = 2,
           assetId = None,
-          sender = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).right.get,
-          recipient = PrivateKeyAccount.fromSeed(sender.seed(BobBC1)).right.get,
+          sender = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).explicitGet(),
+          recipient = PrivateKeyAccount.fromSeed(sender.seed(BobBC1)).explicitGet(),
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
@@ -173,8 +173,8 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
       .selfSigned(
         version = 2,
         assetId = None,
-        sender = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).right.get,
-        recipient = PrivateKeyAccount.fromSeed(sender.seed(AliceBC1)).right.get,
+        sender = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).explicitGet(),
+        recipient = PrivateKeyAccount.fromSeed(sender.seed(AliceBC1)).explicitGet(),
         amount = transferAmount,
         timestamp = System.currentTimeMillis(),
         feeAssetId = None,

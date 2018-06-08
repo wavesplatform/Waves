@@ -1,6 +1,6 @@
 package scorex.consensus.nxt
 
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{ByteStr, EitherExt2}
 import org.scalatest.{Assertions, Matchers, PropSpec}
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.consensus.TransactionsOrdering
@@ -17,7 +17,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           TransferTransactionV1
             .selfSigned(None,
                         PrivateKeyAccount(Array.fill(32)(0)),
-                        Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+                        Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
                         100000,
                         5,
                         None,
@@ -31,7 +31,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransactionV1
         .selfSigned(None,
                     PrivateKeyAccount(Array.fill(32)(0)),
-                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
                     100000,
                     1,
                     None,
@@ -42,7 +42,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransactionV1
         .selfSigned(None,
                     PrivateKeyAccount(Array.fill(32)(0)),
-                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
                     100000,
                     2,
                     None,
@@ -53,7 +53,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransactionV1
         .selfSigned(None,
                     PrivateKeyAccount(Array.fill(32)(0)),
-                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
                     100000,
                     1,
                     None,
@@ -65,7 +65,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
         .selfSigned(
           None,
           PrivateKeyAccount(Array.fill(32)(0)),
-          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           100000,
           2,
           Some(ByteStr.empty),
@@ -78,7 +78,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
         .selfSigned(
           None,
           PrivateKeyAccount(Array.fill(32)(0)),
-          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           100000,
           1,
           Some(ByteStr.empty),
@@ -101,7 +101,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           TransferTransactionV1
             .selfSigned(None,
                         PrivateKeyAccount(Array.fill(32)(0)),
-                        Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+                        Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
                         100000,
                         5,
                         None,
@@ -115,7 +115,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransactionV1
         .selfSigned(None,
                     PrivateKeyAccount(Array.fill(32)(0)),
-                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
                     100000,
                     1,
                     None,
@@ -126,7 +126,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransactionV1
         .selfSigned(None,
                     PrivateKeyAccount(Array.fill(32)(0)),
-                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
                     100000,
                     1,
                     None,
@@ -137,7 +137,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransactionV1
         .selfSigned(None,
                     PrivateKeyAccount(Array.fill(32)(0)),
-                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
                     100000,
                     2,
                     None,
@@ -149,7 +149,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
         .selfSigned(
           None,
           PrivateKeyAccount(Array.fill(32)(0)),
-          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           100000,
           1,
           Some(ByteStr.empty),
@@ -162,7 +162,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
         .selfSigned(
           None,
           PrivateKeyAccount(Array.fill(32)(0)),
-          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           100000,
           2,
           Some(ByteStr.empty),
@@ -183,7 +183,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransactionV1
         .selfSigned(None,
                     PrivateKeyAccount(Array.fill(32)(0)),
-                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
                     100000,
                     124L,
                     None,
@@ -194,7 +194,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransactionV1
         .selfSigned(None,
                     PrivateKeyAccount(Array.fill(32)(0)),
-                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
                     100000,
                     123L,
                     None,
@@ -212,7 +212,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransactionV1
         .selfSigned(None,
                     PrivateKeyAccount(Array.fill(32)(0)),
-                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
                     100000,
                     123L,
                     None,
@@ -223,7 +223,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransactionV1
         .selfSigned(None,
                     PrivateKeyAccount(Array.fill(32)(0)),
-                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+                    Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
                     100000,
                     124L,
                     None,

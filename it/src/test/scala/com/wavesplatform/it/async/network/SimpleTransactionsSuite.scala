@@ -9,6 +9,7 @@ import com.wavesplatform.it.api.AsyncNetworkApi._
 import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.network.{RawBytes, TransactionSpec}
+import com.wavesplatform.state.EitherExt2
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import scorex.account.Address
@@ -33,7 +34,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
 
   test("valid tx send by network to node should be in blockchain") {
     val tx = TransferTransactionV1
-      .selfSigned(None, node.privateKey, Address.fromString(node.address).right.get, 1L, System.currentTimeMillis(), None, 100000L, Array())
+      .selfSigned(None, node.privateKey, Address.fromString(node.address).explicitGet(), 1L, System.currentTimeMillis(), None, 100000L, Array())
       .right
       .get
     val f = for {
@@ -49,7 +50,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
     val tx = TransferTransactionV1
       .selfSigned(None,
                   node.privateKey,
-                  Address.fromString(node.address).right.get,
+                  Address.fromString(node.address).explicitGet(),
                   1L,
                   System.currentTimeMillis() + (1 days).toMillis,
                   None,

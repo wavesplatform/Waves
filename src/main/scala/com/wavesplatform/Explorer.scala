@@ -8,7 +8,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.database.{Keys, LevelDBWriter}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{ByteStr, EitherExt2}
 import com.wavesplatform.utils.{Base58, Base64}
 import org.slf4j.bridge.SLF4JBridgeHandler
 import scorex.account.{Address, AddressScheme}
@@ -121,7 +121,7 @@ object Explorer extends ScorexLogging {
           } else log.error("No order ID was provided")
 
         case "A" =>
-          val address   = Address.fromString(args(2)).right.get
+          val address   = Address.fromString(args(2)).explicitGet()
           val aid       = Keys.addressId(address)
           val addressId = aid.parse(db.get(aid.keyBytes)).get
           log.info(s"Address id = $addressId")
@@ -158,7 +158,7 @@ object Explorer extends ScorexLogging {
           }
 
         case "T" =>
-          val address   = Address.fromString(args(2)).right.get
+          val address   = Address.fromString(args(2)).explicitGet()
           val aid       = Keys.addressId(address)
           val addressId = aid.parse(db.get(aid.keyBytes)).get
           log.info(s"Address id = $addressId")
@@ -171,7 +171,7 @@ object Explorer extends ScorexLogging {
         case "AA" =>
           val secondaryId = args(3)
 
-          val address   = Address.fromString(args(2)).right.get
+          val address   = Address.fromString(args(2)).explicitGet()
           val asset     = ByteStr.decodeBase58(secondaryId).get
           val ai        = Keys.addressId(address)
           val addressId = ai.parse(db.get(ai.keyBytes)).get

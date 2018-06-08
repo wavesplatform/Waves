@@ -8,6 +8,7 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.transfer._
+import com.wavesplatform.features.BlockchainFeatures
 
 class BlockchainUpdaterBadReferencesTest
     extends PropSpec
@@ -20,7 +21,7 @@ class BlockchainUpdaterBadReferencesTest
     master    <- accountGen
     recipient <- accountGen
     ts        <- positiveIntGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     payment: TransferTransactionV1  <- wavesTransferGeneratorP(master, recipient)
     payment2: TransferTransactionV1 <- wavesTransferGeneratorP(master, recipient)
     payment3: TransferTransactionV1 <- wavesTransferGeneratorP(master, recipient)
@@ -118,6 +119,7 @@ class BlockchainUpdaterBadReferencesTest
   }
 
   property("block: incorrect or non-existing block when liquid exists") {
+    assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments) {
       case (domain, (genesis, payment, payment2, payment3)) =>
         val blocks   = chainBlocks(Seq(Seq(genesis), Seq(payment), Seq(payment2)))
