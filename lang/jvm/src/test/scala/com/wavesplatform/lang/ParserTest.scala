@@ -1420,5 +1420,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parseOne("thenx") shouldBe REF(0, 5, PART.VALID(0, 5, "thenx"))
     parseOne("elsex") shouldBe REF(0, 5, PART.VALID(0, 5, "elsex"))
     parseOne("matchx") shouldBe REF(0, 6, PART.VALID(0, 6, "matchx"))
+    parseOne("truex") shouldBe REF(0, 5, PART.VALID(0, 5, "truex"))
+    parseOne("falsex") shouldBe REF(0, 6, PART.VALID(0, 6, "falsex"))
   }
 }
