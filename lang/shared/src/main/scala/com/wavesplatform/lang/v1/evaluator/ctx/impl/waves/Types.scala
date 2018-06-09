@@ -24,6 +24,7 @@ object Types {
     "version"   -> LONG,
   )
   val proven = List(
+    "sender"    -> addressType.typeRef,
     "senderPk"  -> BYTEVECTOR,
     "bodyBytes" -> BYTEVECTOR,
     "proofs"    -> listByteVector
@@ -111,8 +112,8 @@ object Types {
     ) ++ header ++ proven
   )
 
-  val buyType     = CaseType("Buy", List.empty)
-  val sellType    = CaseType("Sell", List.empty)
+  val buyType  = CaseType("Buy", List.empty)
+  val sellType = CaseType("Sell", List.empty)
 
   val ordTypeType = UNION(buyType.typeRef, sellType.typeRef)
 
