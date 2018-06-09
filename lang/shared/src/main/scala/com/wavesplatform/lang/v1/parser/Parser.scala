@@ -107,12 +107,14 @@ object Parser {
       }
   }
 
+  private val border: P[Unit] = CharIn(" \t\n\r({")
+
   private val numberP: P[CONST_LONG] =
     P(Index ~~ (CharIn("+-").? ~~ digit.repX(min = 1)).! ~~ ("_" ~~ digit.repX(min = 1).!).repX(min = 0) ~~ Index)
       .map({ case (start, x1, x2, end) => CONST_LONG(start, end, x2.foldLeft(x1)(_ ++ _).toLong) })
 
-  private val trueP: P[TRUE]        = P(Index ~~ "true".! ~~ Index).map { case (start, _, end) => TRUE(start, end) }
-  private val falseP: P[FALSE]      = P(Index ~~ "false".! ~~ Index).map { case (start, _, end) => FALSE(start, end) }
+  private val trueP: P[TRUE]        = P(Index ~~ "true".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => TRUE(start, end) }
+  private val falseP: P[FALSE]      = P(Index ~~ "false".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => FALSE(start, end) }
   private val bracesP: P[EXPR]      = P("(" ~ baseExpr ~ ")")
   private val curlyBracesP: P[EXPR] = P("{" ~ baseExpr ~ "}")
 
@@ -131,17 +133,17 @@ object Parser {
     val thenPart = optionalPart("then", "true")
     val elsePart = optionalPart("else", "false")
 
-    P(Index ~~ "if" ~/ Index ~ baseExpr.? ~ thenPart ~ elsePart ~~ Index).map {
+    P(Index ~~ "if" ~~ &(border) ~/ Index ~ baseExpr.? ~ thenPart ~ elsePart ~~ Index).map {
       case (start, condPos, condRaw, ifTrue, ifFalse, end) =>
         val cond = condRaw.getOrElse(INVALID(condPos, condPos, "expected a condition"))
         IF(start, end, cond, ifTrue, ifFalse)
     } |
-      P(Index ~~ "then" ~/ Index ~ baseExpr.? ~ elsePart ~~ Index).map {
+      P(Index ~~ "then" ~~ &(border) ~/ Index ~ baseExpr.? ~ elsePart ~~ Index).map {
         case (start, ifTrueExprPos, ifTrueRaw, ifFalse, end) =>
           val ifTrue = ifTrueRaw.getOrElse(INVALID(ifTrueExprPos, ifTrueExprPos, "expected a true branch's expression"))
           IF(start, end, INVALID(start, start, "expected a condition"), ifTrue, ifFalse)
       } |
-      P(Index ~~ "else" ~/ Index ~ baseExpr.? ~~ Index).map {
+      P(Index ~~ "else" ~~ &(border) ~/ Index ~ baseExpr.? ~~ Index).map {
         case (start, ifFalseExprPos, ifFalseRaw, end) =>
           val ifFalse = ifFalseRaw.getOrElse(INVALID(ifFalseExprPos, ifFalseExprPos, "expected a false branch's expression"))
           IF(start, end, INVALID(start, start, "expected a condition"), INVALID(start, start, "expected a true branch"), ifFalse)
@@ -169,7 +171,7 @@ object Parser {
     ).?.map(_.getOrElse(List.empty))
 
     P(
-      Index ~~ "case" ~ comment ~/ (
+      Index ~~ "case" ~~ &(border) ~ comment ~/ (
         (varDefP ~ comment ~ typesDefP) |
           (Index ~~ restMatchCaseInvalidP ~~ Index).map {
             case (start, _, end) =>
@@ -193,7 +195,7 @@ object Parser {
   }
 
   private lazy val matchP: P[EXPR] =
-    P(Index ~~ "match" ~/ baseExpr ~ "{" ~ comment ~ matchCaseP.rep(sep = comment) ~ comment ~ "}" ~~ Index)
+    P(Index ~~ "match" ~~ &(border) ~/ baseExpr ~ "{" ~ comment ~ matchCaseP.rep(sep = comment) ~ comment ~ "}" ~~ Index)
       .map {
         case (start, _, Nil, end)   => INVALID(start, end, "pattern matching requires case branches")
         case (start, e, cases, end) => MATCH(start, end, e, cases.toList)
@@ -240,7 +242,7 @@ object Parser {
       }
 
   private val letP: P[LET] =
-    P(Index ~~ "let" ~/ comment ~ Index ~ anyVarName.? ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
+    P(Index ~~ "let" ~~ &(CharIn(" \t\n\r")) ~/ comment ~ Index ~ anyVarName.? ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
       .map {
         case (start, namePos, nameRaw, valuePos, valueRaw, end) =>
           val name = nameRaw.getOrElse(PART.INVALID(namePos, namePos, "expected a variable's name"))

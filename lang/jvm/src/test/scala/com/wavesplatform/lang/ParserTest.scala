@@ -1414,4 +1414,13 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       BINARY_OP(5, 9, REF(5, 6, PART.VALID(5, 6, "c")), GE_OP, REF(8, 9, PART.VALID(8, 9, "d")))
     )
   }
+
+  property("allow name starts with kerword") {
+    parseOne("ifx") shouldBe REF(0, 3, PART.VALID(0, 3, "ifx"))
+    parseOne("thenx") shouldBe REF(0, 5, PART.VALID(0, 5, "thenx"))
+    parseOne("elsex") shouldBe REF(0, 5, PART.VALID(0, 5, "elsex"))
+    parseOne("matchx") shouldBe REF(0, 6, PART.VALID(0, 6, "matchx"))
+    parseOne("truex") shouldBe REF(0, 5, PART.VALID(0, 5, "truex"))
+    parseOne("falsex") shouldBe REF(0, 6, PART.VALID(0, 6, "falsex"))
+  }
 }
