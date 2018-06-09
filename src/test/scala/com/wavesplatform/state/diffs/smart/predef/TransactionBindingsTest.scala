@@ -16,6 +16,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
        |   let id = t.id == base58'${t.id().base58}'
        |   let fee = t.fee == ${t.assetFee._2}
        |   let timestamp = t.timestamp == ${t.timestamp}
+       |   let sender = t.sender == addressFromPublicKey(base58'${t.sender.bytes.base58}')
        |   let senderPk = t.senderPk == base58'${ByteStr(t.sender.publicKey).base58}'
        |   ${Range(0, 8).map(pg).mkString("\n")}
      """.stripMargin

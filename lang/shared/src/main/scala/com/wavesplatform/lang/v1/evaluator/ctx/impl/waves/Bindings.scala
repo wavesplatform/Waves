@@ -18,6 +18,7 @@ object Bindings {
 
   private def provenTxPart(tx: Proven): Map[String, Any] =
     Map(
+      "sender"    -> tx.sender,
       "senderPk"  -> tx.senderPk,
       "bodyBytes" -> tx.bodyBytes,
       "proofs" -> {
@@ -133,10 +134,9 @@ object Bindings {
         CaseObj(
           massTransferTransactionType.typeRef,
           Map(
-            "transfers" -> (
-              transfers
-                .map(bv => CaseObj(transfer.typeRef, Map(mapRecipient(bv.recipient), "amount" -> bv.amount)))
-                .asInstanceOf[listTransfers.Underlying]),
+            "transfers" -> (transfers
+              .map(bv => CaseObj(transfer.typeRef, Map(mapRecipient(bv.recipient), "amount" -> bv.amount)))
+              .asInstanceOf[listTransfers.Underlying]),
             "assetId"       -> assetId.asInstanceOf[optionByteVector.Underlying],
             "transferCount" -> transferCount,
             "totalAmount"   -> totalAmount,
@@ -144,13 +144,11 @@ object Bindings {
           ) ++ provenTxPart(p)
         )
       case SetScript(p, scriptOpt) =>
-        CaseObj(setScriptTransactionType.typeRef,
-                Map("script" -> scriptOpt.asInstanceOf[optionByteVector.Underlying]) ++ provenTxPart(p))
+        CaseObj(setScriptTransactionType.typeRef, Map("script" -> scriptOpt.asInstanceOf[optionByteVector.Underlying]) ++ provenTxPart(p))
       case Sponsorship(p, assetId, minSponsoredAssetFee) =>
         CaseObj(
           sponsorFeeTransactionType.typeRef,
-          Map("assetId"              -> assetId,
-              "minSponsoredAssetFee" -> minSponsoredAssetFee.asInstanceOf[optionLong.Underlying]) ++ provenTxPart(p)
+          Map("assetId" -> assetId, "minSponsoredAssetFee" -> minSponsoredAssetFee.asInstanceOf[optionLong.Underlying]) ++ provenTxPart(p)
         )
       case Data(p, data) =>
         CaseObj(
