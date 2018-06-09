@@ -1,17 +1,20 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.TrampolinedExecResult
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction.FunctionTypeSignature
 import monix.eval.Coeval
 
-sealed trait BaseFunction
+sealed trait BaseFunction {
+  def signature: FunctionTypeSignature
+  def header: FunctionHeader = signature.header
+  def cost: Long
+  def name: String
+}
 
 case class PredefFunction(name: String, cost: Long, signature: FunctionTypeSignature, ev: List[Any] => Either[String, Any]) extends BaseFunction {
-  def header: FunctionHeader = signature.header
-
   def eval(args: List[Any]): TrampolinedExecResult[Any] = EitherT.fromEither[Coeval](ev(args))
 }
 

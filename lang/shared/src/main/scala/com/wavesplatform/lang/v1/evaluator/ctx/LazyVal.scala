@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats.data.EitherT
 import cats.implicits._
-import com.wavesplatform.lang.TrampolinedExecResult
+import com.wavesplatform.lang.{ExecutionError, TrampolinedExecResult}
 import com.wavesplatform.lang.v1.task.CoevalRef
 import monix.eval.Coeval
 
@@ -45,4 +45,5 @@ object LazyVal {
   }
 
   def apply(v: TrampolinedExecResult[Any]): LazyVal = LazyValImpl(v)
+  def lift(v: Coeval[Either[String, Any]]): LazyVal = apply(EitherT.apply[Coeval, ExecutionError, Any](v))
 }

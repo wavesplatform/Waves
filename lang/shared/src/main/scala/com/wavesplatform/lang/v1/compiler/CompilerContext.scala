@@ -4,7 +4,7 @@ import cats.Monoid
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Types.TYPE
 import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction.FunctionTypeSignature
-import com.wavesplatform.lang.v1.evaluator.ctx.{DefinedType, PredefFunction}
+import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, DefinedType}
 import shapeless._
 
 case class CompilerContext(predefTypes: Map[String, DefinedType], varDefs: VariableTypes, functionDefs: FunctionTypes, tmpArgsIdx: Int = 0) {
@@ -14,7 +14,7 @@ case class CompilerContext(predefTypes: Map[String, DefinedType], varDefs: Varia
 
 object CompilerContext {
 
-  def build(predefTypes: Seq[DefinedType], varDefs: VariableTypes, functions: Seq[PredefFunction]) = new CompilerContext(
+  def build(predefTypes: Seq[DefinedType], varDefs: VariableTypes, functions: Seq[BaseFunction]) = new CompilerContext(
     predefTypes = predefTypes.map(t => t.name -> t).toMap,
     varDefs = varDefs,
     functionDefs = functions.groupBy(_.name).map { case (k, v) => k -> v.map(_.signature).toList }

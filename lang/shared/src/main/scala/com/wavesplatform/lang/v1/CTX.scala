@@ -3,9 +3,9 @@ package com.wavesplatform.lang.v1
 import cats.Monoid
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.Types.TYPE
-import com.wavesplatform.lang.v1.evaluator.ctx.{DefinedType, EvaluationContext, LazyVal, PredefFunction}
+import com.wavesplatform.lang.v1.evaluator.ctx._
 
-case class CTX(types: Seq[DefinedType], vars: Map[String, (TYPE, LazyVal)], functions: Seq[PredefFunction]) {
+case class CTX(types: Seq[DefinedType], vars: Map[String, (TYPE, LazyVal)], functions: Seq[BaseFunction]) {
   lazy val evaluationContext: EvaluationContext = {
     if (functions.map(_.header).distinct.size != functions.size) {
       val dups = functions.groupBy(_.header).filter(_._2.size != 1)
