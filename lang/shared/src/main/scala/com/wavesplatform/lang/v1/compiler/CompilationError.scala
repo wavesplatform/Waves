@@ -2,8 +2,7 @@ package com.wavesplatform.lang.v1.compiler
 
 import cats.Show
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
-import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction.FunctionTypeSignature
-
+import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 
 sealed trait CompilationError {
   def start: Int

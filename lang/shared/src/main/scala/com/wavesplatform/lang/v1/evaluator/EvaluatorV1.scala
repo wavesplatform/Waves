@@ -51,15 +51,13 @@ object EvaluatorV1 extends ExprEvaluator {
       result <- funcs
         .get(ctx)
         .get(header)
-        .fold(raiseError[EvaluationContext, ExecutionError, Any](s"function '$header' not found")) { func =>
-          args
-            .traverse[EvalM, Any](a => evalExpr(a))
-            .map { args =>
-              func match {
-                case func: PredefFunction => func.eval(args)
-              }
-            }
-            .flatMap(r => liftTER[Any](r.value))
+        .fold(raiseError[EvaluationContext, ExecutionError, Any](s"function '$header' not found")) {
+          case func: UserFunction => func.ev(args).liftTo[EvalM].flatMap(evalExpr)
+          case func: PredefFunction =>
+            args
+              .traverse[EvalM, Any](a => evalExpr(a))
+              .map(func.eval)
+              .flatMap(r => liftTER[Any](r.value))
         }
     } yield result
 

@@ -125,6 +125,12 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     )._2 shouldBe Right(5)
   }
 
+  property("user functions are work") {
+    ev[Boolean](
+      expr = FUNCTION_CALL(FunctionHeader.User("!="), List(CONST_LONG(1), CONST_LONG(2)))
+    )._2 shouldBe Right(true)
+  }
+
   property("lazy let evaluation doesn't throw if not used") {
     val pointType     = CaseType("Point", List(("X", LONG), ("Y", LONG)))
     val pointInstance = CaseObj(pointType.typeRef, Map("X" -> 3L, "Y" -> 4L))

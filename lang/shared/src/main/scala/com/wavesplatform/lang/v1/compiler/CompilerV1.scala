@@ -9,7 +9,6 @@ import com.wavesplatform.lang.v1.compiler.CompilationError._
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._

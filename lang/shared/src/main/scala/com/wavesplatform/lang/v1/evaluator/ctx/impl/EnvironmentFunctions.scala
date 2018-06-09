@@ -40,7 +40,7 @@ class EnvironmentFunctions(environment: Environment) {
   def getData(addr: CaseObj, key: String, dataType: DataType): Either[String, Any] =
     for {
       rawAddressBytes <- addr.fields.get("bytes").fold[Either[String, Any]](Left("Can't find 'bytes'"))(Right(_))
-      addressBytes <- Try(rawAddressBytes.asInstanceOf[ByteVector].toArray).toEither.left.map(_.getMessage)
+      addressBytes    <- Try(rawAddressBytes.asInstanceOf[ByteVector].toArray).toEither.left.map(_.getMessage)
     } yield environment.data(addressBytes, key, dataType)
 
   def addressFromAlias(name: String): Either[ExecutionError, Recipient.Address] = environment.resolveAlias(name)

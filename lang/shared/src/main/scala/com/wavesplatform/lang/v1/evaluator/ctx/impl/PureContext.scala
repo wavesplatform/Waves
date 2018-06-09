@@ -1,8 +1,9 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.CompilerContext
+import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -118,8 +119,8 @@ object PureContext {
     case _             => ???
   }
 
-  val ne: BaseFunction = PredefFunction(NE_OP.func, 1, NE, List("a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')), BOOLEAN) {
-    case a :: b :: Nil => Right(a != b)
+  val ne: BaseFunction = UserFunction(NE_OP.func, 1, List("a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')), BOOLEAN) {
+    case a :: b :: Nil => Right(FUNCTION_CALL(FunctionHeader.Predef(NOT_BOOLEAN), List(FUNCTION_CALL(FunctionHeader.Predef(EQ), List(a, b)))))
     case _             => ???
   }
 
