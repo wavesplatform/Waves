@@ -58,29 +58,27 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     }
   }
 
-  /*
-     TODO: after NODE-792 fix to add:
-     let name = t.name == base58'${ByteStr(t.name).base58}'
-     let description = t.description == base58'${ByteStr(t.description).base58}'
-   */
-
   property("IssueTransaction binding") {
     forAll(issueGen) { t =>
+      val s = s"""
+                 |match tx {
+                 | case t : IssueTransaction =>
+                 |   ${provenPart(t)}
+                 |   let quantity = t.quantity == ${t.quantity}
+                 |   let decimals = t.decimals == ${t.decimals}
+                 |   let reissuable = t.reissuable == ${t.reissuable}
+                 |   let name = t.name == base58'${ByteStr(t.name).base58}'
+                 |   let description = t.description == base58'${ByteStr(t.description).base58}'
+                 |   let script = if (${t.script.isDefined}) then extract(t.script) == base64'${t.script
+                   .map(_.bytes().base64)
+                   .getOrElse("")}' else isDefined(t.script) == false
+                 |   $assertProvenPart && quantity && decimals && reissuable && script && name && description
+                 | case other => throw
+                 | }
+                 |""".stripMargin
+
       val result = runScript[Boolean](
-        s"""
-           |match tx {
-           | case t : IssueTransaction =>
-           |   ${provenPart(t)}
-           |   let quantity = t.quantity == ${t.quantity}
-           |   let decimals = t.decimals == ${t.decimals}
-           |   let reissuable = t.reissuable == ${t.reissuable}
-           |   let script = if (${t.script.isDefined}) then extract(t.script) == base64'${t.script
-             .map(_.bytes().base64)
-             .getOrElse("")}' else isDefined(t.script) == false
-           |   $assertProvenPart && quantity && decimals && reissuable && script
-           | case other => throw
-           | }
-           |""".stripMargin,
+        s,
         t
       )
       result shouldBe Right(true)
