@@ -110,7 +110,7 @@ trait TransactionGenBase extends ScriptGen {
   }
 
   val proofsGen: Gen[Proofs] = for {
-    proofsAmount <- Gen.chooseNum(0, 7)
+    proofsAmount <- Gen.choose(1, 8)
     proofs       <- Gen.listOfN(proofsAmount, genBoundedBytes(0, 50))
   } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
 

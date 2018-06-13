@@ -16,42 +16,41 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
        |   let id = t.id == base58'${t.id().base58}'
        |   let fee = t.fee == ${t.assetFee._2}
        |   let timestamp = t.timestamp == ${t.timestamp}
+       |   let bodyBytes = t.bodyBytes == base58'${ByteStr(t.bodyBytes.apply()).base58}'
        |   let sender = t.sender == addressFromPublicKey(base58'${t.sender.bytes.base58}')
        |   let senderPk = t.senderPk == base58'${ByteStr(t.sender.publicKey).base58}'
        |   ${Range(0, 8).map(pg).mkString("\n")}
      """.stripMargin
   }
 
-  val assertProvenPart = "id && fee && timestamp && senderPk && proof0 && proof1 && proof2 && proof3 && proof4 && proof5 && proof6 && proof7"
+  val assertProvenPart =
+    "id && fee && timestamp && senderPk && proof0 && proof1 && proof2 && proof3 && proof4 && proof5 && proof6 && proof7 && bodyBytes"
 
   property("TransferTransaction binding") {
     forAll(Gen.oneOf(transferV1Gen, transferV2Gen)) { t =>
       // `version`  is not properly bound yet
-      // `proofs`   can be up to 8, gens generate only 1
-      // attachment is too big to be encoded in base58
-      // bodyBytes  is too big to be encoded in base58
 
       val result = runScript[Boolean](
         s"""
-          |match tx {
-          | case t : TransferTransaction  => 
-          |   ${provenPart(t)}
-          |   let amount = t.amount == ${t.amount}
-          |   let feeAssetId = if (${t.feeAssetId.isDefined})
-          |      then extract(t.feeAssetId) == base58'${t.feeAssetId.getOrElse(ByteStr.empty).base58}'
-          |      else isDefined(t.feeAssetId) == false
-          |   let transferAssetId = if (${t.assetId.isDefined})
-          |      then extract(t.transferAssetId) == base58'${t.assetId.getOrElse(ByteStr.empty).base58}'
-          |      else isDefined(t.transferAssetId) == false
-          |   let recipient = match (t.recipient) {
-          |       case a: Address => a.bytes == base58'${t.recipient.cast[Address].map(_.bytes.base58).getOrElse("")}'
-          |       case a: Alias => a.alias == "${t.recipient.cast[Alias].map(_.name).getOrElse("")}"
-          |      }
-          |    let attachment = t.attachment == base58'${ByteStr(t.attachment).base58}'
-          |   $assertProvenPart && amount && feeAssetId && transferAssetId && recipient && attachment
-          | case other => throw
-          | }
-          |""".stripMargin,
+           |match tx {
+           | case t : TransferTransaction  =>
+           |   ${provenPart(t)}
+           |   let amount = t.amount == ${t.amount}
+           |   let feeAssetId = if (${t.feeAssetId.isDefined})
+           |      then extract(t.feeAssetId) == base58'${t.feeAssetId.getOrElse(ByteStr.empty).base58}'
+           |      else isDefined(t.feeAssetId) == false
+           |   let transferAssetId = if (${t.assetId.isDefined})
+           |      then extract(t.transferAssetId) == base58'${t.assetId.getOrElse(ByteStr.empty).base58}'
+           |      else isDefined(t.transferAssetId) == false
+           |   let recipient = match (t.recipient) {
+           |       case a: Address => a.bytes == base58'${t.recipient.cast[Address].map(_.bytes.base58).getOrElse("")}'
+           |       case a: Alias => a.alias == "${t.recipient.cast[Alias].map(_.name).getOrElse("")}"
+           |      }
+           |    let attachment = t.attachment == base58'${ByteStr(t.attachment).base58}'
+           |   $assertProvenPart && amount && feeAssetId && transferAssetId && recipient && attachment
+           | case other => throw
+           | }
+           |""".stripMargin,
         t
       )
       result shouldBe Right(true)
