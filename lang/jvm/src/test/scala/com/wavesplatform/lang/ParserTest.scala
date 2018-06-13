@@ -270,7 +270,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parseOne(s) shouldBe BLOCK(
       AnyPos,
       LET(AnyPos, PART.VALID(AnyPos, "q"), CONST_LONG(AnyPos, 1), List.empty),
-      INVALID(AnyPos, "can't find a separator. Did you mean ';' or '\\n' ?", Some(REF(AnyPos, PART.VALID(AnyPos, "c"))))
+      INVALID(AnyPos, "expected ';'")
     )
   }
 
@@ -347,10 +347,9 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   property("reserved keywords are invalid variable names in expr: let") {
     val script = "let + 1"
     parseOne(script) shouldBe BLOCK(
-      0,
-      7,
-      LET(0, 3, PART.INVALID(4, 4, "expected a variable's name"), INVALID(4, 4, "expected a value"), List.empty),
-      INVALID(3, 3, "expected ';'")
+      AnyPos,
+      LET(AnyPos, PART.INVALID(AnyPos, "expected a variable's name"), INVALID(AnyPos, "expected a value"), List.empty),
+      INVALID(AnyPos, "expected ';'")
     )
   }
 
@@ -358,7 +357,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     val script = "if + 1"
     parseOne(script) shouldBe BINARY_OP(
       AnyPos,
-      IF(AnyPos, INVALID(3, 3, "expected a condition"), INVALID(3, 3, "expected a true branch"), INVALID(3, 3, "expected a false branch")),
+      IF(AnyPos, INVALID(AnyPos, "expected a condition"), INVALID(AnyPos, "expected a true branch"), INVALID(AnyPos, "expected a false branch")),
       BinaryOperation.SUM_OP,
       CONST_LONG(AnyPos, 1)
     )
@@ -367,22 +366,26 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   property("reserved keywords are invalid variable names in expr: then") {
     val script = "then + 1"
     parseOne(script) shouldBe BINARY_OP(
-      0,
-      8,
-      IF(0, 4, INVALID(0, 0, "expected a condition"), INVALID(5, 5, "expected a true branch's expression"), INVALID(5, 5, "expected a false branch")),
+      AnyPos,
+      IF(AnyPos,
+         INVALID(AnyPos, "expected a condition"),
+         INVALID(AnyPos, "expected a true branch's expression"),
+         INVALID(AnyPos, "expected a false branch")),
       BinaryOperation.SUM_OP,
-      CONST_LONG(7, 8, 1)
+      CONST_LONG(AnyPos, 1)
     )
   }
 
   property("reserved keywords are invalid variable names in expr: else") {
     val script = "else + 1"
     parseOne(script) shouldBe BINARY_OP(
-      0,
-      8,
-      IF(0, 4, INVALID(0, 0, "expected a condition"), INVALID(0, 0, "expected a true branch"), INVALID(5, 5, "expected a false branch's expression")),
+      AnyPos,
+      IF(AnyPos,
+         INVALID(AnyPos, "expected a condition"),
+         INVALID(AnyPos, "expected a true branch"),
+         INVALID(AnyPos, "expected a false branch's expression")),
       BinaryOperation.SUM_OP,
-      CONST_LONG(7, 8, 1)
+      CONST_LONG(AnyPos, 1)
     )
   }
 
@@ -567,7 +570,9 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     val encodedText = ScorexBase58.encode(text.getBytes)
 
     parseOne(s"sha256(base58'$encodedText')".stripMargin) shouldBe
-      FUNCTION_CALL(0, 96, PART.VALID(0, 6, "sha256"), List(CONST_BYTEVECTOR(7, 95, PART.VALID(15, 94, ByteVector(text.getBytes)))))
+      FUNCTION_CALL(Pos(0, 96),
+                    PART.VALID(Pos(0, 6), "sha256"),
+                    List(CONST_BYTEVECTOR(Pos(7, 95), PART.VALID(Pos(15, 94), ByteVector(text.getBytes)))))
   }
 
   property("crypto functions: blake2b256") {
@@ -575,7 +580,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     val encodedText = ScorexBase58.encode(text.getBytes)
 
     parseOne(s"blake2b256(base58'$encodedText')".stripMargin) shouldBe
-      FUNCTION_CALL(0, 100, PART.VALID(0, 10, "blake2b256"), List(CONST_BYTEVECTOR(11, 99, PART.VALID(19, 98, ByteVector(text.getBytes)))))
+      FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "blake2b256"), List(CONST_BYTEVECTOR(AnyPos, PART.VALID(AnyPos, ByteVector(text.getBytes)))))
   }
 
   property("crypto functions: keccak256") {
@@ -583,7 +588,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     val encodedText = ScorexBase58.encode(text.getBytes)
 
     parseOne(s"keccak256(base58'$encodedText')".stripMargin) shouldBe
-      FUNCTION_CALL(0, 99, PART.VALID(0, 9, "keccak256"), List(CONST_BYTEVECTOR(10, 98, PART.VALID(18, 97, ByteVector(text.getBytes)))))
+      FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "keccak256"), List(CONST_BYTEVECTOR(AnyPos, PART.VALID(AnyPos, ByteVector(text.getBytes)))))
   }
 
   property("show parse all input including INVALID") {
@@ -606,7 +611,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         |let C = 1
         |true""".stripMargin
     parseAll(script) shouldBe Seq(
-      INVALID(0, 3, "can't parse the expression"),
+      INVALID(AnyPos, "can't parse the expression"),
       BLOCK(
         AnyPos,
         LET(AnyPos, PART.VALID(AnyPos, "C"), CONST_LONG(AnyPos, 1), List.empty),
@@ -622,12 +627,11 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         |true""".stripMargin
     parseAll(script) shouldBe Seq(
       BLOCK(
-        0,
-        13,
-        LET(0, 9, PART.VALID(4, 5, "C"), CONST_LONG(8, 9, 1), Seq.empty),
-        INVALID(10, 13, "can't parse the expression")
+        AnyPos,
+        LET(AnyPos, PART.VALID(AnyPos, "C"), CONST_LONG(AnyPos, 1), Seq.empty),
+        INVALID(AnyPos, "can't parse the expression")
       ),
-      TRUE(14, 18)
+      TRUE(AnyPos)
     )
   }
 
@@ -637,8 +641,8 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         |true
         |~ /""".stripMargin
     parseAll(script) shouldBe Seq(
-      BLOCK(0, 14, LET(0, 9, PART.VALID(4, 5, "C"), CONST_LONG(8, 9, 1), Seq.empty), TRUE(10, 14)),
-      INVALID(15, 18, "can't parse the expression")
+      BLOCK(AnyPos, LET(AnyPos, PART.VALID(AnyPos, "C"), CONST_LONG(AnyPos, 1), Seq.empty), TRUE(AnyPos)),
+      INVALID(AnyPos, "can't parse the expression")
     )
   }
 
@@ -903,23 +907,20 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         |}""".stripMargin
 
     parseOne(script) shouldBe MATCH(
-      0,
-      64,
-      REF(6, 8, PART.VALID(6, 8, "tx")),
+      AnyPos,
+      REF(AnyPos, PART.VALID(AnyPos, "tx")),
       List(
         MATCH_CASE(
-          13,
-          48,
-          Some(PART.VALID(18, 19, "a")),
+          AnyPos,
+          Some(PART.VALID(AnyPos, "a")),
           List(),
           BLOCK(
-            27,
-            48,
-            LET(27, 39, PART.VALID(31, 32, "x"), TRUE(35, 39), List.empty),
-            BINARY_OP(44, 51, REF(44, 45, PART.VALID(44, 45, "x")), AND_OP, INVALID(51, 51, "expected a second operator"))
+            AnyPos,
+            LET(AnyPos, PART.VALID(AnyPos, "x"), TRUE(AnyPos), List.empty),
+            BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "x")), AND_OP, INVALID(AnyPos, "expected a second operator"))
           )
         ),
-        MATCH_CASE(51, 62, Some(PART.VALID(56, 57, "b")), List.empty, CONST_LONG(61, 62, 1))
+        MATCH_CASE(AnyPos, Some(PART.VALID(AnyPos, "b")), List.empty, CONST_LONG(AnyPos, 1))
       )
     )
   }
@@ -1310,20 +1311,19 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
                                          MUL_OP,
                                          REF(AnyPos, PART.VALID(AnyPos, "c")))
     parseOne("a<b==c>=d") shouldBe BINARY_OP(
-      0,
-      9,
-      BINARY_OP(0, 3, REF(2, 3, PART.VALID(2, 3, "b")), LT_OP, REF(0, 1, PART.VALID(0, 1, "a"))),
+      AnyPos,
+      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "b")), LT_OP, REF(AnyPos, PART.VALID(AnyPos, "a"))),
       EQ_OP,
-      BINARY_OP(5, 9, REF(5, 6, PART.VALID(5, 6, "c")), GE_OP, REF(8, 9, PART.VALID(8, 9, "d")))
+      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "c")), GE_OP, REF(AnyPos, PART.VALID(AnyPos, "d")))
     )
   }
 
   property("allow name starts with kerword") {
-    parseOne("ifx") shouldBe REF(0, 3, PART.VALID(0, 3, "ifx"))
-    parseOne("thenx") shouldBe REF(0, 5, PART.VALID(0, 5, "thenx"))
-    parseOne("elsex") shouldBe REF(0, 5, PART.VALID(0, 5, "elsex"))
-    parseOne("matchx") shouldBe REF(0, 6, PART.VALID(0, 6, "matchx"))
-    parseOne("truex") shouldBe REF(0, 5, PART.VALID(0, 5, "truex"))
-    parseOne("falsex") shouldBe REF(0, 6, PART.VALID(0, 6, "falsex"))
+    parseOne("ifx") shouldBe REF(AnyPos, PART.VALID(AnyPos, "ifx"))
+    parseOne("thenx") shouldBe REF(AnyPos, PART.VALID(AnyPos, "thenx"))
+    parseOne("elsex") shouldBe REF(AnyPos, PART.VALID(AnyPos, "elsex"))
+    parseOne("matchx") shouldBe REF(AnyPos, PART.VALID(AnyPos, "matchx"))
+    parseOne("truex") shouldBe REF(AnyPos, PART.VALID(AnyPos, "truex"))
+    parseOne("falsex") shouldBe REF(AnyPos, PART.VALID(AnyPos, "falsex"))
   }
 }
