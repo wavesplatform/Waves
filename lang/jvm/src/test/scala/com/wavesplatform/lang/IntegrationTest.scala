@@ -110,18 +110,21 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long]("10 + 2") shouldBe Right(12)
   }
 
-  property("max values") {
+  property("max values and operation order") {
     val longMax = Long.MaxValue
     val longMin = Long.MinValue
-//    eval(s"$longMax + 1 - 1") shouldBe Left("long overflow")
-//    eval(s"$longMin - 1 + 1") shouldBe Left("long overflow")
-//    eval(s"$longMax - 1 + 1") shouldBe Right(longMax)
-//    eval(s"$longMin + 1 - 1") shouldBe Right(longMin)
-    eval(s"$longMax * 2") shouldBe Left("long overflow")
-    //  eval(s"$longMax * 1.1") shouldBe Right(longMax)
-    //eval(s"$longMax / $longMin + 1") shouldBe Right(0)
+    eval(s"$longMax + 1 - 1") shouldBe Left("long overflow")
+    eval(s"$longMin - 1 + 1") shouldBe Left("long overflow")
+    eval(s"$longMax - 1 + 1") shouldBe Right(longMax)
+    eval(s"$longMin + 1 - 1") shouldBe Right(longMin)
+    eval(s"$longMax / $longMin + 1") shouldBe Right(0)
     eval(s"($longMax / 2) * 2") shouldBe Right(longMax - 1)
-
+    eval[Long]("fraction(9223372036854775807, 3, 2)") shouldBe Left(s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1")
+    eval[Long]("fraction(-9223372036854775807, 3, 2)") shouldBe Left(s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1")
+    eval[Long](s"$longMax + fraction(-9223372036854775807, 3, 2)") shouldBe Left(
+      s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1")
+    eval[Long](s"2 + 2 * 2") shouldBe Right(6)
+    eval("2 * 3 == 2 + 4") shouldBe Right(true)
   }
 
   property("equals works on primitive types") {
@@ -155,8 +158,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long]("(10 / 3)") shouldBe Right(3)
     eval[Long]("(10 % 3)") shouldBe Right(1)
     eval[Long]("fraction(9223372036854775807, -2, -4)") shouldBe Right(Long.MaxValue / 2)
-    eval[Long]("fraction(9223372036854775807, 3, 2)") shouldBe Left(s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1")
-    eval[Long]("fraction(-9223372036854775807, 3, 2)") shouldBe Left(s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1")
   }
 
   property("equals works on elements from Gens") {
