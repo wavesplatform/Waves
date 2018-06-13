@@ -4,7 +4,7 @@ import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.CTX
-import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.{CompilerV1, Terms}
 import com.wavesplatform.lang.v1.compiler.Types.TYPE
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -158,6 +158,17 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long]("(10 / 3)") shouldBe Right(3)
     eval[Long]("(10 % 3)") shouldBe Right(1)
     eval[Long]("fraction(9223372036854775807, -2, -4)") shouldBe Right(Long.MaxValue / 2)
+  }
+
+  def compile(script: String): Either[String, Terms.EXPR] = {
+    val compiler = new CompilerV1(CTX.empty.compilerContext)
+    compiler.compile(script, List.empty)
+  }
+
+  property("wrong script return type") {
+    compile("1") should produce("should return boolean")
+    compile(""" "string" """) should produce("should return boolean")
+    compile(""" base58'string' """) should produce("should return boolean")
   }
 
   property("equals works on elements from Gens") {
