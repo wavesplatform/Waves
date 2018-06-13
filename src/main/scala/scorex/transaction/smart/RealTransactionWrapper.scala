@@ -17,6 +17,7 @@ object RealTransactionWrapper {
   private def proven(tx: ProvenTransaction): Proven =
     Proven(
       header(tx),
+      Recipient.Address(ByteVector(tx.sender.bytes.arr)),
       ByteVector(tx.bodyBytes()),
       ByteVector(tx.sender.publicKey),
       tx.proofs.proofs.map(_.arr).map(ByteVector(_)).toIndexedSeq
@@ -60,7 +61,13 @@ object RealTransactionWrapper {
           attachment = ByteVector(t.attachment)
         )
       case i: IssueTransaction =>
-        Tx.Issue(proven(i), i.quantity, i.assetId(), ByteVector(i.description), i.reissuable, i.decimals, i.script.map(_.bytes()).map(toByteVector))
+        Tx.Issue(proven(i),
+                 i.quantity,
+                 ByteVector(i.name),
+                 ByteVector(i.description),
+                 i.reissuable,
+                 i.decimals,
+                 i.script.map(_.bytes()).map(toByteVector))
       case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.assetId, r.reissuable)
       case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity, b.assetId)
       case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount, b.recipient)

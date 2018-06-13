@@ -101,36 +101,56 @@ object Parser {
     }
 
     import White._
-    P(Index ~~ CharPred(x => !Whitespaces.contains(x)).rep(min = 1).! ~~ Index)
+    P(Index ~~ CharPred(_ != '\n').rep(min = 1) ~~ Index)
       .map {
-        case (start, xs, end) => foldInvalid(start, end, xs, None)
+        case (start, end) => INVALID(start, end, "can't parse the expression")
       }
   }
 
-  private def foldInvalid(start: Int, end: Int, xs: String, next: Option[EXPR]): INVALID = next match {
-    case Some(INVALID(_, endInvalid, nextXs, nextNext)) => foldInvalid(start, endInvalid, xs + nextXs, nextNext)
-    case x                                              => INVALID(start, end, xs, x)
-  }
+  private val border: P[Unit] = CharIn(" \t\n\r({")
 
   private val numberP: P[CONST_LONG] =
     P(Index ~~ (CharIn("+-").? ~~ digit.repX(min = 1)).! ~~ ("_" ~~ digit.repX(min = 1).!).repX(min = 0) ~~ Index)
       .map({ case (start, x1, x2, end) => CONST_LONG(start, end, x2.foldLeft(x1)(_ ++ _).toLong) })
 
-  private val trueP: P[TRUE]        = P(Index ~~ "true".! ~~ Index).map { case (start, _, end) => TRUE(start, end) }
-  private val falseP: P[FALSE]      = P(Index ~~ "false".! ~~ Index).map { case (start, _, end) => FALSE(start, end) }
-  private val bracesP: P[EXPR]      = P("(" ~ fallBackExpr ~ ")")
-  private val curlyBracesP: P[EXPR] = P("{" ~ fallBackExpr ~ "}")
-  private val letP: P[LET] = P(Index ~~ "let" ~ comment ~ anyVarName ~ comment ~ "=" ~/ fallBackExpr ~~ Index).map {
-    case (start, v, e, end) => LET(start, end, v, e, Seq.empty)
-  }
+  private val trueP: P[TRUE]        = P(Index ~~ "true".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => TRUE(start, end) }
+  private val falseP: P[FALSE]      = P(Index ~~ "false".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => FALSE(start, end) }
+  private val bracesP: P[EXPR]      = P("(" ~ baseExpr ~ ")")
+  private val curlyBracesP: P[EXPR] = P("{" ~ baseExpr ~ "}")
+
   private val refP: P[REF] = P(correctVarName).map { x =>
     REF(x.start, x.end, x)
   }
-  private val ifP: P[IF] = P(Index ~~ "if" ~ fallBackExpr ~ "then" ~ fallBackExpr ~ "else" ~ fallBackExpr ~~ Index).map {
-    case (start, x, y, z, end) => IF(start, end, x, y, z)
+
+  private val ifP: P[IF] = {
+    def optionalPart(keyword: String, branch: String): P[EXPR] = (Index ~ (keyword ~/ Index ~ baseExpr.?).?).map {
+      case (ifTruePos, ifTrueRaw) =>
+        ifTrueRaw
+          .map { case (pos, expr) => expr.getOrElse(INVALID(pos, pos, s"expected a $branch branch's expression")) }
+          .getOrElse(INVALID(ifTruePos, ifTruePos, s"expected a $branch branch"))
+    }
+
+    val thenPart = optionalPart("then", "true")
+    val elsePart = optionalPart("else", "false")
+
+    P(Index ~~ "if" ~~ &(border) ~/ Index ~ baseExpr.? ~ thenPart ~ elsePart ~~ Index).map {
+      case (start, condPos, condRaw, ifTrue, ifFalse, end) =>
+        val cond = condRaw.getOrElse(INVALID(condPos, condPos, "expected a condition"))
+        IF(start, end, cond, ifTrue, ifFalse)
+    } |
+      P(Index ~~ "then" ~~ &(border) ~/ Index ~ baseExpr.? ~ elsePart ~~ Index).map {
+        case (start, ifTrueExprPos, ifTrueRaw, ifFalse, end) =>
+          val ifTrue = ifTrueRaw.getOrElse(INVALID(ifTrueExprPos, ifTrueExprPos, "expected a true branch's expression"))
+          IF(start, end, INVALID(start, start, "expected a condition"), ifTrue, ifFalse)
+      } |
+      P(Index ~~ "else" ~~ &(border) ~/ Index ~ baseExpr.? ~~ Index).map {
+        case (start, ifFalseExprPos, ifFalseRaw, end) =>
+          val ifFalse = ifFalseRaw.getOrElse(INVALID(ifFalseExprPos, ifFalseExprPos, "expected a false branch's expression"))
+          IF(start, end, INVALID(start, start, "expected a condition"), INVALID(start, start, "expected a true branch"), ifFalse)
+      }
   }
 
-  private val functionCallArgs: P[Seq[EXPR]] = fallBackExpr.rep(sep = ",")
+  private val functionCallArgs: P[Seq[EXPR]] = baseExpr.rep(sep = ",")
 
   private val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | refP)
 
@@ -151,7 +171,7 @@ object Parser {
     ).?.map(_.getOrElse(List.empty))
 
     P(
-      Index ~~ "case" ~ comment ~/ (
+      Index ~~ "case" ~~ &(border) ~ comment ~/ (
         (varDefP ~ comment ~ typesDefP) |
           (Index ~~ restMatchCaseInvalidP ~~ Index).map {
             case (start, _, end) =>
@@ -175,7 +195,7 @@ object Parser {
   }
 
   private lazy val matchP: P[EXPR] =
-    P(Index ~~ "match" ~/ fallBackExpr ~ "{" ~ comment ~ NoCut(matchCaseP).rep(sep = comment) ~ comment ~ "}" ~~ Index)
+    P(Index ~~ "match" ~~ &(border) ~/ baseExpr ~ "{" ~ comment ~ matchCaseP.rep(sep = comment) ~ comment ~ "}" ~~ Index)
       .map {
         case (start, _, Nil, end)   => INVALID(start, end, "pattern matching requires case branches")
         case (start, e, cases, end) => MATCH(start, end, e, cases.toList)
@@ -184,7 +204,7 @@ object Parser {
   private val accessP: P[(Int, Accessor, Int)] = P(
     ("" ~ comment ~ Index ~ "." ~/ comment ~ anyVarName.map(Getter) ~~ Index) |
       (Index ~~ "(" ~/ functionCallArgs.map(Args) ~ ")" ~~ Index) |
-      (Index ~~ "[" ~/ fallBackExpr.map(ListIndex) ~ "]" ~~ Index)
+      (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
   )
 
   private val maybeAccessP: P[EXPR] =
@@ -221,6 +241,17 @@ object Parser {
           }
       }
 
+  private val letP: P[LET] =
+    P(Index ~~ "let" ~~ &(CharIn(" \t\n\r")) ~/ comment ~ Index ~ anyVarName.? ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
+      .map {
+        case (start, namePos, nameRaw, valuePos, valueRaw, end) =>
+          val name = nameRaw.getOrElse(PART.INVALID(namePos, namePos, "expected a variable's name"))
+          val value = valueRaw
+            .map { case (pos, expr) => expr.getOrElse(INVALID(pos, pos, "expected a value's expression")) }
+            .getOrElse(INVALID(valuePos, valuePos, "expected a value"))
+          LET(start, end, name, value, Seq.empty)
+      }
+
   private val block: P[EXPR] = {
     // Hack to force parse of "\n". Otherwise it is treated as a separator
     val newLineSep = {
@@ -236,35 +267,32 @@ object Parser {
 
     P(
       Index ~~
-        letP ~~
-        Index ~~ (("" ~ ";").!.map(_ => true) | newLineSep.!.map(_ => true) | "".!.map(_ => false)) ~~ Index ~
-        fallBackExpr ~~
-        Index)
-      .map {
-        case (start, l, sepStart, sep, sepEnd, e, end) =>
-          if (sep) BLOCK(start, end, l, e)
-          else BLOCK(start, end, l, INVALID(sepStart, sepEnd, "can't find a separator. Did you mean ';' or '\\n' ?", Some(e)))
-      }
+        letP ~/
+        Pass ~~
+        (
+          ("" ~ ";") ~/ (baseExpr | invalid).? |
+            newLineSep ~/ (baseExpr | invalid).? |
+            (Index ~~ CharPred(_ != '\n').repX).map(pos => Some(INVALID(pos, pos, "expected ';'")))
+        ) ~~
+        Index
+    ).map {
+      case (start, l, body, end) => BLOCK(start, end, l, body.getOrElse(INVALID(end, end, "expected a body")))
+    }
   }
 
   private val baseAtom = comment ~
-    P(ifP | NoCut(matchP) | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP) ~
+    P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP) ~
     comment
 
   private lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority) | baseAtom)
-
-  private lazy val fallBackExpr = {
-    val fallBackAtom = P(baseAtom | invalid)
-    P(binaryOp(fallBackAtom, opsByPriority) | fallBackAtom)
-  }
 
   private def binaryOp(atom: P[EXPR], rest: List[List[BinaryOperation]]): P[EXPR] = rest match {
     case Nil => unaryOp(atom, unaryOps)
     case kinds :: restOps =>
       val operand = binaryOp(atom, restOps)
-      val kind = kinds.map(_.parser).reduce((pl,pr) => P(pl | pr))
-      P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(i, i, "expected a second operator", None)))).rep() ~~ Index).map {
-        case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)], end) =>
+      val kind    = kinds.map(_.parser).reduce((pl, pr) => P(pl | pr))
+      P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(i, i, "expected a second operator")))).rep).map {
+        case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
           r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.end, acc, currOperand) }
       }
   }
@@ -276,5 +304,12 @@ object Parser {
       } | acc
   }
 
-  def apply(str: String): core.Parsed[Seq[EXPR], Char, String] = P(Start ~ fallBackExpr.rep(min = 1) ~ End).parse(str)
+  private val statements: P[Seq[EXPR]] = (baseExpr | invalid).rep(min = 1).map { xs =>
+    xs.foldLeft(Vector.empty[EXPR]) {
+      case (init :+ INVALID(start, _, _), INVALID(_, end, _)) => init :+ INVALID(start, end, "can't parse the expression")
+      case (init, x)                                          => init :+ x
+    }
+  }
+
+  def apply(str: String): core.Parsed[Seq[EXPR], Char, String] = P(Start ~ statements ~ End).parse(str)
 }
