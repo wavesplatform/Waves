@@ -1,22 +1,30 @@
 package com.wavesplatform.lang.v1.parser
 
-import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
+import com.wavesplatform.lang.v1.parser.Expressions.Pos.{AnyPos, RealPos}
 import scodec.bits.ByteVector
 
 object Expressions {
 
-  sealed trait Pos { self =>
-    override def equals(obj: scala.Any): Boolean = {
-      obj == AnyPos || obj == self
-    }
+  sealed trait Pos {
     def end: Int
     def start: Int
   }
 
   object Pos {
     def apply(start: Int, end: Int): Pos = RealPos(start, end)
-    final case class RealPos(start: Int, end: Int) extends Pos
+    final case class RealPos(start: Int, end: Int) extends Pos { self =>
+      override def equals(obj: scala.Any): Boolean = obj match {
+        case AnyPos => true
+        case RealPos(s, e) => s == start && e == end
+        case _ => false
+      }
+    }
     case object AnyPos extends Pos {
+      override def equals(obj: scala.Any): Boolean = obj match {
+        case _: Pos => true
+        case _ => false
+      }
+
       override def start: Int = -1
       override def end: Int   = -1
     }
