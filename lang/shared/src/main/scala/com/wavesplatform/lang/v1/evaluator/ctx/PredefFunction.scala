@@ -14,7 +14,7 @@ sealed trait BaseFunction {
   def name: String
 }
 
-case class FunctionTypeSignature(header: FunctionHeader, args: List[TYPEPLACEHOLDER], result: TYPEPLACEHOLDER)
+case class FunctionTypeSignature(result: TYPEPLACEHOLDER, args: Seq[TYPEPLACEHOLDER], header: FunctionHeader)
 
 case class PredefFunction(name: String, cost: Long, signature: FunctionTypeSignature, ev: List[Any] => Either[String, Any]) extends BaseFunction {
   def eval(args: List[Any]): TrampolinedExecResult[Any] = EitherT.fromEither[Coeval](ev(args))
@@ -22,9 +22,9 @@ case class PredefFunction(name: String, cost: Long, signature: FunctionTypeSigna
 
 object PredefFunction {
 
-  def apply(name: String, cost: Long, internalName: Short, args: List[(String, TYPEPLACEHOLDER)], resultType: TYPEPLACEHOLDER)(
+  def apply(name: String, cost: Long, internalName: Short, resultType: TYPEPLACEHOLDER, args: (String, TYPEPLACEHOLDER)*)(
       ev: List[Any] => Either[String, Any]) =
-    new PredefFunction(name, cost, FunctionTypeSignature(FunctionHeader.Predef(internalName), args.map(_._2), resultType), ev)
+    new PredefFunction(name, cost, FunctionTypeSignature(resultType, args.map(_._2), FunctionHeader.Predef(internalName)), ev)
 
 }
 
@@ -32,7 +32,7 @@ case class UserFunction(name: String, cost: Long, signature: FunctionTypeSignatu
 
 object UserFunction {
 
-  def apply(name: String, cost: Long, args: List[(String, TYPEPLACEHOLDER)], resultType: TYPEPLACEHOLDER)(ev: List[EXPR] => Either[String, EXPR]) =
-    new UserFunction(name, cost, FunctionTypeSignature(FunctionHeader.User(name), args.map(_._2), resultType), ev)
+  def apply(name: String, cost: Long, resultType: TYPEPLACEHOLDER, args: (String, TYPEPLACEHOLDER)*)(ev: List[EXPR] => Either[String, EXPR]) =
+    new UserFunction(name, cost, FunctionTypeSignature(resultType, args.map(_._2), FunctionHeader.User(name)), ev)
 
 }

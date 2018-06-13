@@ -23,7 +23,7 @@ object PureContext {
   val err: LazyVal  = LazyVal.lift(nothingCoeval)
   val errRef        = "throw"
 
-  val fraction: BaseFunction = PredefFunction("fraction", 1, FRACTION, List("value" -> LONG, "numerator" -> LONG, "denominator" -> LONG), LONG) {
+  val fraction: BaseFunction = PredefFunction("fraction", 1, FRACTION, LONG, "value" -> LONG, "numerator" -> LONG, "denominator" -> LONG) {
     case (v: Long) :: (n: Long) :: (d: Long) :: Nil =>
       val result = BigInt(v) * n / d
       for {
@@ -33,66 +33,63 @@ object PureContext {
     case _ => ???
   }
 
-  val extract: BaseFunction = PredefFunction("extract", 1, EXTRACT, List("opt" -> optionT), TYPEPARAM('T')) {
+  val extract: BaseFunction = PredefFunction("extract", 1, EXTRACT, TYPEPARAM('T'), "opt" -> optionT) {
     case Some(v) :: Nil => Right(v)
     case None :: Nil    => Left("Extract from empty option")
     case _              => ???
   }
 
-  val some: BaseFunction = PredefFunction("Some", 1, SOME, List("obj" -> TYPEPARAM('T')), optionT) {
+  val some: BaseFunction = PredefFunction("Some", 1, SOME, optionT, "obj" -> TYPEPARAM('T')) {
     case v :: Nil => Right(Some(v))
     case _        => ???
   }
 
-  val _isInstanceOf: BaseFunction = PredefFunction("_isInstanceOf", 1, ISINSTANCEOF, List("obj" -> TYPEPARAM('T'), "of" -> STRING), BOOLEAN) {
+  val _isInstanceOf: BaseFunction = PredefFunction("_isInstanceOf", 1, ISINSTANCEOF, BOOLEAN, "obj" -> TYPEPARAM('T'), "of" -> STRING) {
     case (p: CaseObj) :: (s: String) :: Nil => Right(p.caseType.name == s)
     case _                                  => ???
   }
 
-  val isDefined: BaseFunction = PredefFunction("isDefined", 1, ISDEFINED, List("opt" -> optionT), BOOLEAN) {
+  val isDefined: BaseFunction = PredefFunction("isDefined", 1, ISDEFINED, BOOLEAN, "opt" -> optionT) {
     case Some(_) :: Nil => Right(true)
     case None :: Nil    => Right(false)
     case _              => ???
   }
 
-  val size: BaseFunction = PredefFunction("size", 1, SIZE_BYTES, List("byteVector" -> BYTEVECTOR), LONG) {
+  val size: BaseFunction = PredefFunction("size", 1, SIZE_BYTES, LONG, "byteVector" -> BYTEVECTOR) {
     case (bv: ByteVector) :: Nil => Right(bv.size)
     case _                       => ???
   }
 
   private def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (t.Underlying, t.Underlying) => r.Underlying): BaseFunction =
-    PredefFunction(opsToFunctions(op), 1, func, List("a" -> t, "b" -> t), r) {
+    PredefFunction(opsToFunctions(op), 1, func, r, "a" -> t, "b" -> t) {
       case a :: b :: Nil =>
         Right(body(a.asInstanceOf[t.Underlying], b.asInstanceOf[t.Underlying]))
       case _ => ???
     }
 
   val getElement: BaseFunction =
-    PredefFunction("getElement", 2, GET_LIST, List("arr" -> LISTTYPEPARAM(TYPEPARAM('T')), "pos" -> LONG), TYPEPARAM('T')) {
+    PredefFunction("getElement", 2, GET_LIST, TYPEPARAM('T'), "arr" -> LISTTYPEPARAM(TYPEPARAM('T')), "pos" -> LONG) {
       case (arr: IndexedSeq[_]) :: (pos: Long) :: Nil => Try(arr(pos.toInt)).toEither.left.map(_.toString)
       case _                                          => ???
     }
 
-  val getListSize: BaseFunction = PredefFunction("size", 2, SIZE_LIST, List("arr" -> LISTTYPEPARAM(TYPEPARAM('T'))), LONG) {
-    case (arr: IndexedSeq[_]) :: Nil => {
-
-      Right(arr.size.toLong)
-    }
-    case _ => ???
+  val getListSize: BaseFunction = PredefFunction("size", 2, SIZE_LIST, LONG, "arr" -> LISTTYPEPARAM(TYPEPARAM('T'))) {
+    case (arr: IndexedSeq[_]) :: Nil => Right(arr.size.toLong)
+    case _                           => ???
   }
 
-  val uMinus: BaseFunction = PredefFunction("-", 1, MINUS_LONG, List("n" -> LONG), LONG) {
+  val uMinus: BaseFunction = PredefFunction("-", 1, MINUS_LONG, LONG, "n" -> LONG) {
     case (n: Long) :: Nil => Right(Math.negateExact(n))
     case _                => ???
   }
 
-  val uNot: BaseFunction = PredefFunction("!", 1, NOT_BOOLEAN, List("p" -> BOOLEAN), BOOLEAN) {
+  val uNot: BaseFunction = PredefFunction("!", 1, NOT_BOOLEAN, BOOLEAN, "p" -> BOOLEAN) {
     case (p: Boolean) :: Nil => Right(!p)
     case _                   => ???
   }
 
   private def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (t.Underlying, t.Underlying) => r.Underlying): BaseFunction =
-    PredefFunction(opsToFunctions(op), 1, func, List("a" -> t, "b" -> t), r) {
+    PredefFunction(opsToFunctions(op), 1, func, r, "a" -> t, "b" -> t) {
       case a :: b :: Nil =>
         try {
           Right(body(a.asInstanceOf[t.Underlying], b.asInstanceOf[t.Underlying]))
@@ -114,12 +111,12 @@ object PureContext {
   val sge: BaseFunction           = createOp(GE_OP, STRING, BOOLEAN, GE_STRING)(_ >= _)
   val sgt: BaseFunction           = createOp(GT_OP, STRING, BOOLEAN, GT_STRING)(_ > _)
 
-  val eq: BaseFunction = PredefFunction(EQ_OP.func, 1, EQ, List("a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')), BOOLEAN) {
+  val eq: BaseFunction = PredefFunction(EQ_OP.func, 1, EQ, BOOLEAN, "a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')) {
     case a :: b :: Nil => Right(a == b)
     case _             => ???
   }
 
-  val ne: BaseFunction = UserFunction(NE_OP.func, 1, List("a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')), BOOLEAN) {
+  val ne: BaseFunction = UserFunction(NE_OP.func, 1, BOOLEAN, "a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')) {
     case a :: b :: Nil => Right(FUNCTION_CALL(FunctionHeader.Predef(NOT_BOOLEAN), List(FUNCTION_CALL(FunctionHeader.Predef(EQ), List(a, b)))))
     case _             => ???
   }

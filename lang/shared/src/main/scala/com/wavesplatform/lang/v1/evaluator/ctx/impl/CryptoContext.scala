@@ -11,7 +11,7 @@ object CryptoContext {
 
   def build(global: BaseGlobal): CTX = {
     def hashFunction(name: String, internalName: Short, cost: Long)(h: Array[Byte] => Array[Byte]): BaseFunction =
-      PredefFunction(name, cost, internalName, List(("bytes", BYTEVECTOR)), BYTEVECTOR) {
+      PredefFunction(name, cost, internalName, BYTEVECTOR, "bytes" -> BYTEVECTOR) {
         case (m: ByteVector) :: Nil => Right(ByteVector(h(m.toArray)))
         case _                      => ???
       }
@@ -21,18 +21,18 @@ object CryptoContext {
     val sha256F: BaseFunction     = hashFunction("sha256", SHA256, 10)(global.sha256)
 
     val sigVerifyF: BaseFunction =
-      PredefFunction("sigVerify", 100, SIGVERIFY, List("message" -> BYTEVECTOR, "sig" -> BYTEVECTOR, "pub" -> BYTEVECTOR), BOOLEAN) {
+      PredefFunction("sigVerify", 100, SIGVERIFY, BOOLEAN, "message" -> BYTEVECTOR, "sig" -> BYTEVECTOR, "pub" -> BYTEVECTOR) {
         case (m: ByteVector) :: (s: ByteVector) :: (p: ByteVector) :: Nil =>
           Right(global.curve25519verify(m.toArray, s.toArray, p.toArray))
         case _ => ???
       }
 
-    def toBase58StringF: BaseFunction = PredefFunction("toBase58String", 10, TOBASE58, List(("bytes", BYTEVECTOR)), STRING) {
+    def toBase58StringF: BaseFunction = PredefFunction("toBase58String", 10, TOBASE58, STRING, "bytes" -> BYTEVECTOR) {
       case (bytes: ByteVector) :: Nil => global.base58Encode(bytes.toArray)
       case _                          => ???
     }
 
-    def toBase64StringF: BaseFunction = PredefFunction("toBase64String", 10, TOBASE64, List(("bytes", BYTEVECTOR)), STRING) {
+    def toBase64StringF: BaseFunction = PredefFunction("toBase64String", 10, TOBASE64, STRING, "bytes" -> BYTEVECTOR) {
       case (bytes: ByteVector) :: Nil => global.base64Encode(bytes.toArray)
       case _                          => ???
     }

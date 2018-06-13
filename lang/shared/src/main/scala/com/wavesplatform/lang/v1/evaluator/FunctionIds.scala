@@ -4,11 +4,11 @@ object FunctionIds {
   val SUM_LONG: Short = 0
   val SUB_LONG: Short = 1
   val GT_LONG: Short  = 4
-  val GE_LONG: Short  = 5
+  val GE_LONG: Short  = 5 // ?
 
   val SUM_STRING: Short = 6
   val GT_STRING: Short  = 9
-  val GE_STRING: Short  = 10
+  val GE_STRING: Short  = 10 // ?
 
   val SUM_BYTES: Short = 11
 

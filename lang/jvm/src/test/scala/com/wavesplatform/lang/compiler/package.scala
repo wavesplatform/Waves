@@ -12,16 +12,16 @@ package object compiler {
 
   val pointType = CaseType("Point", List("x" -> LONG, "y" -> LONG))
 
-  val idT = PredefFunction("idT", 1, 256, List("p1" -> TYPEPARAM('T')), TYPEPARAM('T'))(Right(_))
-  val extract = PredefFunction("extract", 1, EXTRACT, List("p1" -> OPTIONTYPEPARAM(TYPEPARAM('T'))), TYPEPARAM('T')) {
+  val idT = PredefFunction("idT", 1, 256, TYPEPARAM('T'), "p1" -> TYPEPARAM('T'))(Right(_))
+  val extract = PredefFunction("extract", 1, EXTRACT, TYPEPARAM('T'), "p1" -> OPTIONTYPEPARAM(TYPEPARAM('T'))) {
     case Some(vl) :: Nil => Right(vl)
     case _               => Left("extracting from empty option")
   }
-  val undefinedOptionLong = PredefFunction("undefinedOptionLong", 1, 257, List.empty, OPTION(LONG))(_ => ???)
-  val idOptionLong        = PredefFunction("idOptionLong", 1, 258, List("opt" -> OPTION(OPTION(LONG))), UNIT)(_ => Right(()))
-  val unitOnNone          = PredefFunction("unitOnNone", 1, 259, List("opt" -> OPTION(NOTHING)), UNIT)(_ => Right(()))
+  val undefinedOptionLong = PredefFunction("undefinedOptionLong", 1, 257, OPTION(LONG), List.empty: _*)(_ => ???)
+  val idOptionLong        = PredefFunction("idOptionLong", 1, 258, UNIT, "opt" -> OPTION(OPTION(LONG)))(_ => Right(()))
+  val unitOnNone          = PredefFunction("unitOnNone", 1, 259, UNIT, "opt" -> OPTION(NOTHING))(_ => Right(()))
   val functionWithTwoPrarmsOfTheSameType =
-    PredefFunction("functionWithTwoPrarmsOfTheSameType", 1, 260, List("p1" -> TYPEPARAM('T'), "p2" -> TYPEPARAM('T')), TYPEPARAM('T'))(Right(_))
+    PredefFunction("functionWithTwoPrarmsOfTheSameType", 1, 260, TYPEPARAM('T'), "p1" -> TYPEPARAM('T'), "p2" -> TYPEPARAM('T'))(Right(_))
 
   val compilerContext = Monoid
     .combine(
