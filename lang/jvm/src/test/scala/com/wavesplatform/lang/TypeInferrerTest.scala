@@ -12,14 +12,14 @@ class TypeInferrerTest extends FreeSpec with Matchers {
 
   "no types to infer" - {
     "all types are correct" in {
-      TypeInferrer(Seq((LONG, LONG), (LONG, LONG), (CASETYPEREF("User"), CASETYPEREF("User")))) shouldBe Right(Map.empty)
+      TypeInferrer(Seq((LONG, LONG), (LONG, LONG), (CASETYPEREF("User", List()), CASETYPEREF("User", List())))) shouldBe Right(Map.empty)
     }
     "fails if no simple common type" in {
       TypeInferrer(Seq((LONG, BYTEVECTOR))) should produce("Non-matching types")
     }
 
     "fails if no obj common type" in {
-      TypeInferrer(Seq((CASETYPEREF("User"), CASETYPEREF("Admin")))) should produce("Non-matching types")
+      TypeInferrer(Seq((CASETYPEREF("User", List()), CASETYPEREF("Admin", List())))) should produce("Non-matching types")
     }
   }
 

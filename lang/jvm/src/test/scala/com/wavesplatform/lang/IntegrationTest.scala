@@ -168,4 +168,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }
   }
 
+  property("Extract from Some") {
+    eval[Long]("extractU(SomeU(1))+1") shouldBe Right(2)
+  }
 }

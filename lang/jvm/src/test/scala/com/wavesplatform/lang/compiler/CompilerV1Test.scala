@@ -53,7 +53,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   }
 
   treeTypeTest("GETTER")(
-    ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> CASETYPEREF("Point")), functionDefs = Map.empty),
+    ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> pointType.typeRef), functionDefs = Map.empty),
     expr = Expressions.GETTER(
       0,
       0,
@@ -64,15 +64,15 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   )
 
   treeTypeTest("REF(OBJECT)")(
-    ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> CASETYPEREF("Point")), functionDefs = Map.empty),
+    ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> pointType.typeRef), functionDefs = Map.empty),
     expr = Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "p")),
-    expectedResult = Right((REF("p"), CASETYPEREF("Point")))
+    expectedResult = Right((REF("p"), pointType.typeRef))
   )
 
   treeTypeTest("REF x = y")(
-    ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> CASETYPEREF("Point")), functionDefs = Map.empty),
+    ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> pointType.typeRef), functionDefs = Map.empty),
     expr = Expressions.REF(0, 0, Expressions.PART.VALID(0, 0, "p")),
-    expectedResult = Right((REF("p"), CASETYPEREF("Point")))
+    expectedResult = Right((REF("p"), pointType.typeRef))
   )
 
   treeTypeTest("MULTIPLY(1,2)")(

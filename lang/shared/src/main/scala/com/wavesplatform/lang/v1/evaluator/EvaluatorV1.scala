@@ -38,11 +38,8 @@ object EvaluatorV1 extends ExprEvaluator {
     }
 
   private def evalGetter(expr: EXPR, field: String) =
-    evalExpr(expr).map(_.asInstanceOf[CaseObj]) flatMap {
-      _.fields.get(field) match {
-        case Some(eager) => eager.pure[EvalM]
-        case None        => raiseError[EvaluationContext, ExecutionError, Any](s"field '$field' not found")
-      }
+    evalExpr(expr).map(_.asInstanceOf[CaseObj]) map {
+      _.fields(field)
     }
 
   private def evalFunctionCall(header: FunctionHeader, args: List[EXPR]): EvalM[Any] =

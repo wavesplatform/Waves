@@ -152,7 +152,7 @@ object Types {
   val longDataEntryType = buildDataEntryType("Long", LONG)
   val dataEntryTypes    = List(strDataEntryType, boolDataEntryType, bvDataEntryType, longDataEntryType)
 
-  val listOfDataEntriesType = LIST(UNION(dataEntryTypes.map(_.typeRef)))
+  val listOfDataEntriesType = LIST(UNION.create(dataEntryTypes.map(_.typeRef)))
 
   val dataTransactionType = CaseType(
     "DataTransaction",
@@ -197,8 +197,8 @@ object Types {
 
   val transactionTypes = /*obsoleteTransactionTypes ++ */ activeTransactionTypes
 
-  val outgoingTransactionType = UNION(activeTransactionTypes.map(_.typeRef))
-  val anyTransactionType      = UNION(transactionTypes.map(_.typeRef))
+  val outgoingTransactionType = UNION.create(activeTransactionTypes.map(_.typeRef))
+  val anyTransactionType      = UNION.create(transactionTypes.map(_.typeRef))
 
   val wavesTypes = Seq(addressType, aliasType, transfer) ++ dataEntryTypes ++ transactionTypes
 }

@@ -43,6 +43,17 @@ object PureContext {
     case _        => ???
   }
 
+  val extractU: PredefFunction = PredefFunction.create("extractU", 1L, fromNonable(TYPEPARAM('T')) _, List(("opt", TYPEPARAM('T'):TYPEPLACEHOLDER)), 1124: Short) {
+    case () :: Nil    => Left("Extract from empty option")
+    case v :: Nil => Right(v)
+    case _              => ???
+  }
+
+  val someU: PredefFunction = PredefFunction.create("SomeU", 1L, asNonable(TYPEPARAM('T')) _, List(("obj", TYPEPARAM('T'):TYPEPLACEHOLDER)), 1125: Short) {
+    case v :: Nil => Right(v)
+    case _        => ???
+  }
+
   val _isInstanceOf: PredefFunction = PredefFunction("_isInstanceOf", 1, BOOLEAN, List(("obj", TYPEPARAM('T')), ("of", STRING)), ISINSTANCEOF) {
     case (p: CaseObj) :: (s: String) :: Nil => Right(p.caseType.name == s)
     case _                                  => ???
@@ -149,7 +160,7 @@ object PureContext {
   )
 
   private val vars      = Map(("None", (OPTION(NOTHING), none)), (errRef, (NOTHING, err)))
-  private val functions = Seq(fraction, extract, isDefined, some, size, _isInstanceOf) ++ operators
+  private val functions = Seq(fraction, extract, isDefined, some, size, _isInstanceOf, extractU, someU) ++ operators
 
   lazy val ctx             = CTX(Seq.empty, vars, functions)
   lazy val evalContext     = ctx.evaluationContext
