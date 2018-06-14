@@ -193,7 +193,7 @@ object CompilerV1 {
       val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case (typedExpr, tph) => (typedExpr._2, tph) }
       for {
         resolvedTypeParams <- TypeInferrer(typePairs).leftMap(Generic(p.start, p.end, _))
-        resolvedResultType <- TypeInferrer.inferResultType(f.result, resolvedTypeParams).leftMap(Generic(start, end, _))
+        resolvedResultType <- TypeInferrer.inferResultType(f.result, resolvedTypeParams).leftMap(Generic(p.start, p.end, _))
         args = typedExpressionArgumentsAndTypedPlaceholders.map(_._1._1)
       } yield (FUNCTION_CALL(f.header, args): EXPR, resolvedResultType)
     }
