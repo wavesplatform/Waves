@@ -1,6 +1,7 @@
 package scorex.api.http
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import com.wavesplatform.lang.v1.evaluator.ctx.LazyVal
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import play.api.libs.json._
 import scorex.account.{Address, AddressOrAlias, Alias}
@@ -40,6 +41,10 @@ object ApiError {
     case ValidationError.OrderValidationError(_, m)      => CustomValidationError(m)
     case ValidationError.UnsupportedTransactionType      => CustomValidationError("UnsupportedTransactionType")
     case ValidationError.Mistiming(err)                  => Mistiming(err)
+    case ValidationError.TransactionNotAllowedByScript(tx, vars, scriptSrc, isTokenScript) =>
+      TransactionNotAllowedByScript(tx, vars, scriptSrc, isTokenScript)
+    case ValidationError.ScriptExecutionError(tx, err, src, vars, isToken) =>
+      ScriptExecutionError(tx, err, src, vars, isToken)
     case TransactionValidationError(error, tx) =>
       error match {
         case ValidationError.Mistiming(errorMessage) => Mistiming(errorMessage)
@@ -220,4 +225,51 @@ case class ScriptCompilerError(errorMessage: String) extends ApiError {
   override val id: Int          = 305
   override val code: StatusCode = StatusCodes.BadRequest
   override val message: String  = errorMessage
+}
+
+case class ScriptExecutionError(tx: Transaction, error: String, scriptSrc: String, vars: Map[String, LazyVal], isTokenScript: Boolean)
+    extends ApiError {
+  override val id: Int          = 306
+  override val code: StatusCode = StatusCodes.BadRequest
+  override val message: String  = s"Error while executing ${if (isTokenScript) "token" else "account"}-script: $error"
+  override lazy val json: JsObject = {
+    val (calculated, notCalculated) = vars.partition(_._2.evaluated.read())
+    Json.obj(
+      "error"       -> id,
+      "message"     -> message,
+      "transaction" -> tx.json(),
+      "script"      -> scriptSrc,
+      "vars" -> Json.obj(
+        "calculated" -> calculated.map({
+          case (k, v) => Json.obj(k -> v.value.toString)
+        }),
+        "notcalculated" -> notCalculated.map({
+          case (k, v) => Json.obj(k -> v.value.toString)
+        })
+      )
+    )
+  }
+}
+
+case class TransactionNotAllowedByScript(tx: Transaction, vars: Map[String, LazyVal], scriptSrc: String, isTokenScript: Boolean) extends ApiError {
+  override val id: Int          = 307
+  override val code: StatusCode = StatusCodes.BadRequest
+  override val message: String  = s"Transaction not allowed by ${if (isTokenScript) "token" else "account"}-script"
+  override lazy val json: JsObject = {
+    val (calculated, notCalculated) = vars.partition(_._2.evaluated.read())
+    Json.obj(
+      "error"       -> id,
+      "message"     -> message,
+      "transaction" -> tx.json(),
+      "script"      -> scriptSrc,
+      "vars" -> Json.obj(
+        "calculated" -> calculated.map({
+          case (k, v) => Json.obj(k -> v.value.toString)
+        }),
+        "notcalculated" -> notCalculated.map({
+          case (k, v) => Json.obj(k -> v.value.toString)
+        })
+      )
+    )
+  }
 }

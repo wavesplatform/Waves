@@ -11,6 +11,7 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import scorex.api.http.ScriptExecutionError
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
@@ -54,7 +55,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
                            TestBlock.create(Seq(transferFromScripted)),
                            smartEnabledFS) { case _ => () }
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, genesis2, setScript))), TestBlock.create(Seq(transferFromScripted)), smartEnabledFS)(
-          totalDiffEi => totalDiffEi should produce("Script execution error"))
+          totalDiffEi => totalDiffEi shouldBe Left(_: ScriptExecutionError))
     }
   }
 }
