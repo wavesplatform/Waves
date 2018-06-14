@@ -130,7 +130,7 @@ object CompilerV1 {
       letTypes <- let.types.toList
         .traverse[CompileM, String](handlePart)
         .ensure(NonExistingType(p.start, p.end, letName, ctx.predefTypes.keys.toList))(_.forall(ctx.predefTypes.contains))
-      typeUnion = if (letTypes.isEmpty) compiledLet._2 else new UNION(letTypes.map(ctx.predefTypes).map(_.typeRef))
+      typeUnion = if (letTypes.isEmpty) compiledLet._2 else UNION.create(letTypes.map(ctx.predefTypes).map(_.typeRef))
       _            <- modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> typeUnion)))
       compiledBody <- compileExpr(body)
     } yield (BLOCK(LET(letName, compiledLet._1), compiledBody._1), compiledBody._2)

@@ -15,17 +15,18 @@ object Types {
     def name: String = ???
     def fields: List[(String, TYPE)] = List()
     def l: List[TYPE] = List(this)
+    override def toString: String = name
   }
   sealed abstract class AUTO_TAGGED_TYPE[T] extends TYPE {
     override type Underlying = T
   }
 
   case object NOTHING    extends AUTO_TAGGED_TYPE[Nothing]
-  case object UNIT       extends AUTO_TAGGED_TYPE[Unit]
-  case object LONG       extends AUTO_TAGGED_TYPE[Long]
-  case object BYTEVECTOR extends AUTO_TAGGED_TYPE[ByteVector]
-  case object BOOLEAN    extends AUTO_TAGGED_TYPE[Boolean]
-  case object STRING     extends AUTO_TAGGED_TYPE[String]
+  case object UNIT       extends AUTO_TAGGED_TYPE[Unit] { override val name = "Unit" }
+  case object LONG       extends AUTO_TAGGED_TYPE[Long] { override val name = "Int" }
+  case object BYTEVECTOR extends AUTO_TAGGED_TYPE[ByteVector]  { override val name = "ByteVector" }
+  case object BOOLEAN    extends AUTO_TAGGED_TYPE[Boolean] { override val name = "Boolean" }
+  case object STRING     extends AUTO_TAGGED_TYPE[String] { override val name = "String" }
   case class OPTION(innerType: TYPE) extends TYPE {
     type Underlying = Option[innerType.Underlying]
   }
@@ -35,6 +36,7 @@ object Types {
   case class CASETYPEREF(override val name: String, override val fields: List[(String, TYPE)])   extends AUTO_TAGGED_TYPE[CaseObj]
   class UNION(override val l: List[TYPE]) extends AUTO_TAGGED_TYPE[CaseObj] {
     override lazy val fields: List[(String, TYPE)] = l.map(_.fields.toSet).reduce(_ intersect _).toList
+    override def toString: String = "UNION("++l.mkString("|")++")"
   }
   object UNION {
     def of(l: CaseType*): TYPE = UNION.create(l.map(_.typeRef).toList)

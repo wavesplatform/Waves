@@ -197,4 +197,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("Extract from Some") {
     eval[Long]("extractU(SomeU(1))+1") shouldBe Right(2)
   }
+
+  property("Match with not case types") {
+    eval[Long]("match SomeU(1) { case x: Int => x \n case y: Unit => 2 }") shouldBe Right(1)
+  }
 }

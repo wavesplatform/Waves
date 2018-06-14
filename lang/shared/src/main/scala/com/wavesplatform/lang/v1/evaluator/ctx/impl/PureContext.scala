@@ -4,7 +4,7 @@ import cats.data.EitherT
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
-import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, LazyVal, PredefFunction}
+import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import monix.eval.Coeval
@@ -55,8 +55,12 @@ object PureContext {
   }
 
   val _isInstanceOf: PredefFunction = PredefFunction("_isInstanceOf", 1, BOOLEAN, List(("obj", TYPEPARAM('T')), ("of", STRING)), ISINSTANCEOF) {
+    case (p: Boolean) :: ("Boolean") :: Nil => Right(true)
+    case (p: String) :: ("String") :: Nil => Right(true)
+    case (p: Long) :: ("Int") :: Nil => Right(true)
+    case (()) :: ("Unit") :: Nil => Right(true)
     case (p: CaseObj) :: (s: String) :: Nil => Right(p.caseType.name == s)
-    case _                                  => ???
+    case _                                  => Right(false)
   }
 
   val isDefined: PredefFunction = PredefFunction("isDefined", 1, BOOLEAN, List(("opt", optionT)), ISDEFINED) {
@@ -162,7 +166,11 @@ object PureContext {
   private val vars      = Map(("None", (OPTION(NOTHING), none)), (errRef, (NOTHING, err)))
   private val functions = Seq(fraction, extract, isDefined, some, size, _isInstanceOf, extractU, someU) ++ operators
 
-  lazy val ctx             = CTX(Seq.empty, vars, functions)
+  lazy val ctx          = CTX(Seq(
+                    new DefinedType { val name = "Unit"; val typeRef: TYPE = UNIT },
+                    new DefinedType { val name = "Int"; val typeRef: TYPE = LONG },
+                    new DefinedType { val name = "String"; val typeRef: TYPE = STRING }
+                  ), vars, functions)
   lazy val evalContext     = ctx.evaluationContext
   lazy val compilerContext = ctx.compilerContext
 
