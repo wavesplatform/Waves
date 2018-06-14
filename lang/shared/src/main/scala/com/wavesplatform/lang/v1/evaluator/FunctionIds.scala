@@ -53,6 +53,7 @@ object FunctionIds {
   val ADDRESSFROMPUBKEY: Short    = 700
   val ADDRESSFROMSTRING: Short    = 701
   val ADDRESSFROMRECIPIENT: Short = 702
+  val ADDRESSFROMBYTES: Short     = 703
 
   val GETTRANSACTIONBYID: Short    = 750
   val ACCOUNTBALANCE: Short        = 751

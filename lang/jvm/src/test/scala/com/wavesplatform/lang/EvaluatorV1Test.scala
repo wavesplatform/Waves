@@ -335,7 +335,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         List(CONST_BYTEVECTOR(ByteVector(pkBytes)))
       )
 
-      ev[ByteVector](ctx.evaluationContext, expr)._2 shouldBe Right(ByteVector(Common.addressFromPublicKey(environment.networkByte, pkBytes)))
+      val actual = ev[CaseObj](ctx.evaluationContext, expr)._2.map(_.fields("bytes"))
+      actual shouldBe Right(ByteVector(Common.addressFromPublicKey(environment.networkByte, pkBytes)))
     }
   }
 

@@ -39,37 +39,47 @@ object WavesContext {
       )
     )
 
-    val addressFromPublicKeyF: BaseFunction = UserFunction("addressFromPublicKey", 100, BYTEVECTOR, "publicKey" -> BYTEVECTOR) {
+    val addressFromBytesF = PredefFunction("addressFromBytes", 1, ADDRESSFROMBYTES, addressType.typeRef, "bytes" -> BYTEVECTOR) {
+      case (bytes: ByteVector) :: Nil => Right(CaseObj(addressType.typeRef, Map("bytes" -> bytes)))
+      case _                          => ???
+    }
+
+    val addressFromPublicKeyF: BaseFunction = UserFunction("addressFromPublicKey", 100, addressType.typeRef, "publicKey" -> BYTEVECTOR) {
       case pk :: Nil =>
         Right(
-          BLOCK(
-            LET(
-              "$afpk_withoutChecksum",
-              FUNCTION_CALL(
-                FunctionHeader.Predef(SUM_BYTES),
-                List(
-                  CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion, env.networkByte)),
-                  // publicKeyHash
+          FUNCTION_CALL(
+            FunctionHeader.Predef(ADDRESSFROMBYTES),
+            List(
+              BLOCK(
+                LET(
+                  "@afpk_withoutChecksum",
                   FUNCTION_CALL(
-                    FunctionHeader.Predef(TAKE_BYTES),
+                    FunctionHeader.Predef(SUM_BYTES),
                     List(
-                      secureHashExpr(pk),
-                      CONST_LONG(EnvironmentFunctions.HashLength)
+                      CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion, env.networkByte)),
+                      // publicKeyHash
+                      FUNCTION_CALL(
+                        FunctionHeader.Predef(TAKE_BYTES),
+                        List(
+                          secureHashExpr(pk),
+                          CONST_LONG(EnvironmentFunctions.HashLength)
+                        )
+                      )
                     )
                   )
-                )
-              )
-            ),
-            // bytes
-            FUNCTION_CALL(
-              FunctionHeader.Predef(SUM_BYTES),
-              List(
-                REF("$afpk_withoutChecksum"),
+                ),
+                // bytes
                 FUNCTION_CALL(
-                  FunctionHeader.Predef(TAKE_BYTES),
+                  FunctionHeader.Predef(SUM_BYTES),
                   List(
-                    secureHashExpr(REF("$afpk_withoutChecksum")),
-                    CONST_LONG(EnvironmentFunctions.ChecksumLength)
+                    REF("@afpk_withoutChecksum"),
+                    FUNCTION_CALL(
+                      FunctionHeader.Predef(TAKE_BYTES),
+                      List(
+                        secureHashExpr(REF("@afpk_withoutChecksum")),
+                        CONST_LONG(EnvironmentFunctions.ChecksumLength)
+                      )
+                    )
                   )
                 )
               )
@@ -143,6 +153,7 @@ object WavesContext {
       getBooleanF,
       getByteArrayF,
       getStringF,
+      addressFromBytesF,
       addressFromPublicKeyF,
       addressFromStringF,
       addressFromRecipientF,
