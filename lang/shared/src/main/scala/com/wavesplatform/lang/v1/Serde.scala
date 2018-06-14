@@ -8,9 +8,9 @@ object Serde {
 
   import codecs.implicits._
 
-  implicit val dFunctionHeader       = Discriminated[FunctionHeader, Boolean](bool)
-  implicit val dFunctionHeaderSystem = dFunctionHeader.bind[FunctionHeader.Predef](false)
-  implicit val dFunctionHeaderUser   = dFunctionHeader.bind[FunctionHeader.User](true)
+  implicit val dFunctionHeader       = Discriminated[FunctionHeader, Int](uint8)
+  implicit val dFunctionHeaderSystem = dFunctionHeader.bind[FunctionHeader.Predef](0)
+  implicit val dFunctionHeaderUser   = dFunctionHeader.bind[FunctionHeader.User](1)
 
   implicit val d                = Discriminated[EXPR, Int](uint8)
   implicit val dConstInt        = d.bind[CONST_LONG](0)

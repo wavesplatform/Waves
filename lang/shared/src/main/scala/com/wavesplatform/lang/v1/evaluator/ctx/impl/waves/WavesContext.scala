@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
+import cats.data.EitherT
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -142,8 +143,8 @@ object WavesContext {
     }
 
     val vars: Map[String, (TYPE, LazyVal)] = Map(
-      ("height", (LONG, LazyVal.lift(heightCoeval))),
-      ("tx", (outgoingTransactionType, LazyVal.lift(txCoeval)))
+      ("height", (LONG, LazyVal(EitherT(heightCoeval)))),
+      ("tx", (outgoingTransactionType, LazyVal(EitherT(txCoeval))))
     )
 
     val functions = Seq(

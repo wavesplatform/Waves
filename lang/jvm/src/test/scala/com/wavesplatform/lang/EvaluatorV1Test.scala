@@ -127,10 +127,14 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     )._2 shouldBe Right(5)
   }
 
-  property("user functions are work") {
+  property("ne works") {
     ev[Boolean](
       expr = FUNCTION_CALL(FunctionHeader.User(PureContext.ne.name), List(CONST_LONG(1), CONST_LONG(2)))
     )._2 shouldBe Right(true)
+
+    ev[Boolean](
+      expr = FUNCTION_CALL(FunctionHeader.User(PureContext.ne.name), List(CONST_LONG(1), CONST_LONG(1)))
+    )._2 shouldBe Right(false)
   }
 
   property("lazy let evaluation doesn't throw if not used") {

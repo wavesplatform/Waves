@@ -20,7 +20,7 @@ object PureContext {
   private val nothingCoeval: Coeval[Either[String, Nothing]]      = Coeval.defer(Coeval(Right(throw new Exception("explicit contract termination"))))
 
   val none: LazyVal = LazyVal(EitherT(noneCoeval).subflatMap(Right(_: Option[Nothing]))) // IDEA HACK
-  val err: LazyVal  = LazyVal.lift(nothingCoeval)
+  val err           = LazyVal(EitherT(nothingCoeval))
   val errRef        = "throw"
 
   val fraction: BaseFunction = PredefFunction("fraction", 1, FRACTION, LONG, "value" -> LONG, "numerator" -> LONG, "denominator" -> LONG) {

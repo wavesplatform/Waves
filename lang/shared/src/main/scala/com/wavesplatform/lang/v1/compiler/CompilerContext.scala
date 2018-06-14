@@ -8,7 +8,6 @@ import shapeless._
 
 case class CompilerContext(predefTypes: Map[String, DefinedType], varDefs: VariableTypes, functionDefs: FunctionTypes, tmpArgsIdx: Int = 0) {
   def functionTypeSignaturesByName(name: String): List[FunctionTypeSignature] = functionDefs.getOrElse(name, List.empty)
-  def hasFunction(name: String): Boolean                                      = functionDefs.contains(name)
 }
 
 object CompilerContext {
