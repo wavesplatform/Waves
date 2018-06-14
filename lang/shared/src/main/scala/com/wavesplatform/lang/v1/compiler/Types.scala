@@ -21,7 +21,7 @@ object Types {
     override type Underlying = T
   }
 
-  case object NOTHING    extends AUTO_TAGGED_TYPE[Nothing]
+  case object NOTHING    extends AUTO_TAGGED_TYPE[Nothing] { override val name = "Nothing" }
   case object UNIT       extends AUTO_TAGGED_TYPE[Unit] { override val name = "Unit" }
   case object LONG       extends AUTO_TAGGED_TYPE[Long] { override val name = "Int" }
   case object BYTEVECTOR extends AUTO_TAGGED_TYPE[ByteVector]  { override val name = "ByteVector" }
@@ -29,9 +29,11 @@ object Types {
   case object STRING     extends AUTO_TAGGED_TYPE[String] { override val name = "String" }
   case class OPTION(innerType: TYPE) extends TYPE {
     type Underlying = Option[innerType.Underlying]
+    override def toString: String = "OPTION("++innerType.toString++")"
   }
   case class LIST(innerType: TYPE) extends TYPE {
     type Underlying = IndexedSeq[innerType.Underlying]
+    override def toString: String = "LIST("++innerType.toString++")"
   }
   case class CASETYPEREF(override val name: String, override val fields: List[(String, TYPE)])   extends AUTO_TAGGED_TYPE[CaseObj]
   class UNION(override val l: List[TYPE]) extends AUTO_TAGGED_TYPE[CaseObj] {
