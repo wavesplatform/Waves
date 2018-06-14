@@ -10,9 +10,11 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
@@ -288,6 +290,53 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val r = sigVerifyTest(bodyBytes, publicKey, Signature("signature".getBytes()))._2
     r.isLeft shouldBe false
+  }
+
+  property("take works as the native one") {
+    val gen = for {
+      n     <- Gen.choose(0, 100)
+      bytes <- Gen.containerOfN[Array, Byte](n, Arbitrary.arbByte.arbitrary).map(ByteVector(_))
+      takeN <- Gen.choose(0, n)
+    } yield (bytes, takeN)
+
+    forAll(gen) {
+      case (bytes, takeN) =>
+        val expr = FUNCTION_CALL(
+          FunctionHeader.Predef(TAKE_BYTES),
+          List(
+            CONST_BYTEVECTOR(bytes),
+            CONST_LONG(takeN)
+          )
+        )
+        ev[ByteVector](expr = expr)._2 shouldBe Right(bytes.take(takeN))
+    }
+  }
+
+  property("addressFromPublicKey works as the native one") {
+    val gen = for {
+      seed <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
+    } yield {
+      val (_, pk) = Curve25519.createKeyPair(seed)
+      pk
+    }
+
+    val environment = Common.emptyBlockchainEnvironment()
+    val ctx = Monoid.combineAll(
+      Seq(
+        CryptoContext.build(Global),
+        PureContext.ctx,
+        WavesContext.build(environment)
+      )
+    )
+
+    forAll(gen) { pkBytes =>
+      val expr = FUNCTION_CALL(
+        FunctionHeader.User("addressFromPublicKey"),
+        List(CONST_BYTEVECTOR(ByteVector(pkBytes)))
+      )
+
+      ev[ByteVector](ctx.evaluationContext, expr)._2 shouldBe Right(ByteVector(Common.addressFromPublicKey(environment.networkByte, pkBytes)))
+    }
   }
 
   private def sigVerifyTest(bodyBytes: Array[Byte],

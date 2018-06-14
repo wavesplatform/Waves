@@ -1,11 +1,12 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
 import com.wavesplatform.lang.v1.traits._
+import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 
@@ -28,13 +29,55 @@ object WavesContext {
     val getByteArrayF: BaseFunction = getdataF("getByteArray", DATA_BYTES, DataType.ByteArray)
     val getStringF: BaseFunction    = getdataF("getString", DATA_STRING, DataType.String)
 
-    val addressFromPublicKeyF: BaseFunction =
-      PredefFunction("addressFromPublicKey", 100, ADDRESSFROMPUBKEY, addressType.typeRef, "publicKey" -> BYTEVECTOR) {
-        case (pk: ByteVector) :: Nil =>
-          val r = environmentFunctions.addressFromPublicKey(pk)
-          Right(CaseObj(addressType.typeRef, Map("bytes" -> r)))
-        case _ => ???
-      }
+    def secureHashExpr(xs: EXPR): EXPR = FUNCTION_CALL(
+      FunctionHeader.Predef(KECCAK256),
+      List(
+        FUNCTION_CALL(
+          FunctionHeader.Predef(BLAKE256),
+          List(xs)
+        )
+      )
+    )
+
+    val addressFromPublicKeyF: BaseFunction = UserFunction("addressFromPublicKey", 100, BYTEVECTOR, "publicKey" -> BYTEVECTOR) {
+      case pk :: Nil =>
+        Right(
+          BLOCK(
+            LET(
+              "$afpk_withoutChecksum",
+              FUNCTION_CALL(
+                FunctionHeader.Predef(SUM_BYTES),
+                List(
+                  CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion, env.networkByte)),
+                  // publicKeyHash
+                  FUNCTION_CALL(
+                    FunctionHeader.Predef(TAKE_BYTES),
+                    List(
+                      secureHashExpr(pk),
+                      CONST_LONG(EnvironmentFunctions.HashLength)
+                    )
+                  )
+                )
+              )
+            ),
+            // bytes
+            FUNCTION_CALL(
+              FunctionHeader.Predef(SUM_BYTES),
+              List(
+                REF("$afpk_withoutChecksum"),
+                FUNCTION_CALL(
+                  FunctionHeader.Predef(TAKE_BYTES),
+                  List(
+                    secureHashExpr(REF("$afpk_withoutChecksum")),
+                    CONST_LONG(EnvironmentFunctions.ChecksumLength)
+                  )
+                )
+              )
+            )
+          )
+        )
+      case _ => ???
+    }
 
     val addressFromStringF: BaseFunction = PredefFunction("addressFromString", 100, ADDRESSFROMSTRING, optionAddress, "string" -> STRING) {
       case (addressString: String) :: Nil =>
@@ -46,7 +89,7 @@ object WavesContext {
     val addressFromRecipientF: BaseFunction =
       PredefFunction("addressFromRecipient", 100, ADDRESSFROMRECIPIENT, addressType.typeRef, "AddressOrAlias" -> addressOrAliasType) {
         case (c @ CaseObj(addressType.typeRef, _)) :: Nil => Right(c)
-        case c @ CaseObj(aliasType.typeRef, fields) :: Nil =>
+        case CaseObj(aliasType.typeRef, fields) :: Nil =>
           environmentFunctions
             .addressFromAlias(fields("alias").asInstanceOf[String])
             .map(resolved => CaseObj(addressType.typeRef, Map("bytes" -> resolved.bytes)))

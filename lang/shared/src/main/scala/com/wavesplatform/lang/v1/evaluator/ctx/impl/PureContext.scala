@@ -60,6 +60,11 @@ object PureContext {
     case _                       => ???
   }
 
+  val take: BaseFunction = PredefFunction("take", 1, TAKE_BYTES, BYTEVECTOR, "byteVector" -> BYTEVECTOR, "number" -> LONG) {
+    case (bv: ByteVector) :: (number: Long) :: Nil => Right(bv.take(number))
+    case _                                         => ???
+  }
+
   private def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (t.Underlying, t.Underlying) => r.Underlying): BaseFunction =
     PredefFunction(opsToFunctions(op), 1, func, r, "a" -> t, "b" -> t) {
       case a :: b :: Nil =>
@@ -142,7 +147,7 @@ object PureContext {
   )
 
   private val vars      = Map(("None", (OPTION(NOTHING), none)), (errRef, (NOTHING, err)))
-  private val functions = Seq(fraction, extract, isDefined, some, size, _isInstanceOf) ++ operators
+  private val functions = Seq(fraction, extract, isDefined, some, size, take, _isInstanceOf) ++ operators
 
   lazy val ctx                              = CTX(Seq.empty, vars, functions)
   lazy val evalContext: EvaluationContext   = ctx.evaluationContext
