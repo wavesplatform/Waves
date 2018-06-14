@@ -22,35 +22,38 @@ trait ApiError {
 }
 
 object ApiError {
-  def fromValidationError(e: ValidationError): ApiError = e match {
-    case ValidationError.InvalidAddress(_)               => InvalidAddress
-    case ValidationError.NegativeAmount(x, of)           => NegativeAmount(s"$x of $of")
-    case ValidationError.NegativeMinFee(x, of)           => NegativeMinFee(s"$x per $of")
-    case ValidationError.InsufficientFee(x)              => InsufficientFee(x)
-    case ValidationError.InvalidName                     => InvalidName
-    case ValidationError.InvalidSignature(_, _)          => InvalidSignature
-    case ValidationError.InvalidRequestSignature         => InvalidSignature
-    case ValidationError.TooBigArray                     => TooBigArrayAllocation
-    case ValidationError.OverflowError                   => OverflowError
-    case ValidationError.ToSelf                          => ToSelfError
-    case ValidationError.MissingSenderPrivateKey         => MissingSenderPrivateKey
-    case ValidationError.GenericError(ge)                => CustomValidationError(ge)
-    case ValidationError.AlreadyInTheState(tx, txHeight) => CustomValidationError(s"Transaction $tx is already in the state on a height of $txHeight")
-    case ValidationError.AccountBalanceError(errs)       => CustomValidationError(errs.values.mkString(", "))
-    case ValidationError.AliasDoesNotExist(tx)           => AliasDoesNotExist(tx)
-    case ValidationError.OrderValidationError(_, m)      => CustomValidationError(m)
-    case ValidationError.UnsupportedTransactionType      => CustomValidationError("UnsupportedTransactionType")
-    case ValidationError.Mistiming(err)                  => Mistiming(err)
-    case ValidationError.TransactionNotAllowedByScript(tx, vars, scriptSrc, isTokenScript) =>
-      TransactionNotAllowedByScript(tx, vars, scriptSrc, isTokenScript)
-    case ValidationError.ScriptExecutionError(tx, err, src, vars, isToken) =>
-      ScriptExecutionError(tx, err, src, vars, isToken)
-    case TransactionValidationError(error, tx) =>
-      error match {
-        case ValidationError.Mistiming(errorMessage) => Mistiming(errorMessage)
-        case _                                       => StateCheckFailed(tx, fromValidationError(error).message)
-      }
-    case error => CustomValidationError(error.toString)
+  def fromValidationError(e: ValidationError): ApiError = {
+    e match {
+      case ValidationError.InvalidAddress(_)       => InvalidAddress
+      case ValidationError.NegativeAmount(x, of)   => NegativeAmount(s"$x of $of")
+      case ValidationError.NegativeMinFee(x, of)   => NegativeMinFee(s"$x per $of")
+      case ValidationError.InsufficientFee(x)      => InsufficientFee(x)
+      case ValidationError.InvalidName             => InvalidName
+      case ValidationError.InvalidSignature(_, _)  => InvalidSignature
+      case ValidationError.InvalidRequestSignature => InvalidSignature
+      case ValidationError.TooBigArray             => TooBigArrayAllocation
+      case ValidationError.OverflowError           => OverflowError
+      case ValidationError.ToSelf                  => ToSelfError
+      case ValidationError.MissingSenderPrivateKey => MissingSenderPrivateKey
+      case ValidationError.GenericError(ge)        => CustomValidationError(ge)
+      case ValidationError.AlreadyInTheState(tx, txHeight) =>
+        CustomValidationError(s"Transaction $tx is already in the state on a height of $txHeight")
+      case ValidationError.AccountBalanceError(errs)  => CustomValidationError(errs.values.mkString(", "))
+      case ValidationError.AliasDoesNotExist(tx)      => AliasDoesNotExist(tx)
+      case ValidationError.OrderValidationError(_, m) => CustomValidationError(m)
+      case ValidationError.UnsupportedTransactionType => CustomValidationError("UnsupportedTransactionType")
+      case ValidationError.Mistiming(err)             => Mistiming(err)
+      case TransactionValidationError(error, tx) =>
+        error match {
+          case ValidationError.Mistiming(errorMessage) => Mistiming(errorMessage)
+          case ValidationError.TransactionNotAllowedByScript(vars, scriptSrc, isTokenScript) =>
+            TransactionNotAllowedByScript(tx, vars, scriptSrc, isTokenScript)
+          case ValidationError.ScriptExecutionError(err, src, vars, isToken) =>
+            ScriptExecutionError(tx, err, src, vars, isToken)
+          case _ => StateCheckFailed(tx, fromValidationError(error).message)
+        }
+      case error => CustomValidationError(error.toString)
+    }
   }
 }
 
@@ -264,10 +267,10 @@ case class TransactionNotAllowedByScript(tx: Transaction, vars: Map[String, Lazy
       "script"      -> scriptSrc,
       "vars" -> Json.obj(
         "calculated" -> calculated.map({
-          case (k, v) => Json.obj(k -> v.value.toString)
+          case (k, v) => Json.obj(k -> v.value.value().toString)
         }),
         "notcalculated" -> notCalculated.map({
-          case (k, v) => Json.obj(k -> v.value.toString)
+          case (k, v) => Json.obj(k -> v.value.value().toString)
         })
       )
     )

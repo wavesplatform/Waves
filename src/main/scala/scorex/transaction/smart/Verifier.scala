@@ -40,9 +40,9 @@ object Verifier {
                                transaction: T,
                                isTokenScript: Boolean): Either[ValidationError, T] = {
     ScriptRunner[Boolean, T](height, transaction, blockchain, script) match {
-      case (ctx, Left(execError)) => Left(ScriptExecutionError(transaction, script.text, execError, ctx.letDefs, isTokenScript))
+      case (ctx, Left(execError)) => Left(ScriptExecutionError(script.text, execError, ctx.letDefs, isTokenScript))
       case (ctx, Right(false)) =>
-        Left(TransactionNotAllowedByScript(transaction, ctx.letDefs.filter({ case (_, lv) => lv.evaluated.read() }), script.text, isTokenScript))
+        Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, isTokenScript))
       case (_, Right(true)) => Right(transaction)
     }
   }
