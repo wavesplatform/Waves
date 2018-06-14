@@ -24,10 +24,10 @@ object Types {
     "version"   -> LONG,
   )
   val proven = List(
-    "sender"    -> addressType.typeRef,
-    "senderPk"  -> BYTEVECTOR,
-    "bodyBytes" -> BYTEVECTOR,
-    "proofs"    -> listByteVector
+    "sender"          -> addressType.typeRef,
+    "senderPublicKey" -> BYTEVECTOR,
+    "bodyBytes"       -> BYTEVECTOR,
+    "proofs"          -> listByteVector
   )
 
   val genesisTransactionType = CaseType(
@@ -121,6 +121,7 @@ object Types {
   val orderType = CaseType(
     "Order",
     List(
+      "sender"           -> addressType.typeRef,
       "senderPublicKey"  -> BYTEVECTOR,
       "matcherPublicKey" -> BYTEVECTOR,
       "assetPair"        -> assetPairType.typeRef,

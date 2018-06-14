@@ -9,7 +9,6 @@ import scorex.account.{Address, Alias}
 import scorex.transaction.ProvenTransaction
 
 class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
-
   def provenPart(t: ProvenTransaction): String = {
     def pg(i: Int) = s"let proof$i = t.proofs[$i] == base58'${t.proofs.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).base58}'"
     s"""
@@ -17,14 +16,14 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
        |   let fee = t.fee == ${t.assetFee._2}
        |   let timestamp = t.timestamp == ${t.timestamp}
        |   let bodyBytes = t.bodyBytes == base58'${ByteStr(t.bodyBytes.apply()).base58}'
-       |   let sender = t.sender == addressFromPublicKey(base58'${t.sender.bytes.base58}')
-       |   let senderPk = t.senderPk == base58'${ByteStr(t.sender.publicKey).base58}'
+       |   let sender = t.sender == addressFromPublicKey(base58'${ByteStr(t.sender.publicKey).base58}')
+       |   let senderPublicKey = t.senderPublicKey == base58'${ByteStr(t.sender.publicKey).base58}'
        |   ${Range(0, 8).map(pg).mkString("\n")}
      """.stripMargin
   }
 
   val assertProvenPart =
-    "id && fee && timestamp && senderPk && proof0 && proof1 && proof2 && proof3 && proof4 && proof5 && proof6 && proof7 && bodyBytes"
+    "id && fee && timestamp && sender && senderPublicKey && proof0 && proof1 && proof2 && proof3 && proof4 && proof5 && proof6 && proof7 && bodyBytes"
 
   property("TransferTransaction binding") {
     forAll(Gen.oneOf(transferV1Gen, transferV2Gen)) { t =>
@@ -51,7 +50,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            | case other => throw
            | }
            |""".stripMargin,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -78,7 +78,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
       val result = runScript[Boolean](
         s,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -97,7 +98,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw
           | }
           |""".stripMargin,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -117,7 +119,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw
           | }
           |""".stripMargin,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -135,7 +138,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw
           | }
           |""".stripMargin,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -157,7 +161,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw
           | }
           |""".stripMargin,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -175,7 +180,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw
           | }
           |""".stripMargin,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -195,7 +201,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw
           | }
           |""".stripMargin,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -215,7 +222,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            | case other => throw
            | }
            |""".stripMargin,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -254,7 +262,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
       val result = runScript[Boolean](
         s,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -296,7 +305,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
       val result = runScript[Boolean](
         script,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
