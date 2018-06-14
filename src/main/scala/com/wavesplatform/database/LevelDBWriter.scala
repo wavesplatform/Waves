@@ -79,6 +79,12 @@ object LevelDBWriter {
         .exists(h => db.has(v(h)))
   }
 
+  implicit class RWExt(val db: RW) extends AnyVal {
+    def fromHistory[A](historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
+      for {
+        lastChange <- db.get(historyKey).headOption
+      } yield db.get(valueKey(lastChange))
+  }
 }
 
 class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize: Int = 100000) extends Caches with ScorexLogging {
@@ -272,11 +278,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     }
 
     for ((assetId, assetInfo) <- reissuedAssets) {
-      val maybeLastChangeHeight: Option[Int] = rw.get(Keys.assetInfoHistory(assetId)).headOption
-      val maybeLastAssetInfo: Option[AssetInfo] = maybeLastChangeHeight.map { h =>
-        rw.get(Keys.assetInfo(assetId)(h))
-      }
-      val combinedAssetInfo: AssetInfo = maybeLastAssetInfo.fold(assetInfo) { p =>
+      val combinedAssetInfo = rw.fromHistory(Keys.assetInfoHistory(assetId), Keys.assetInfo(assetId)).fold(assetInfo) { p =>
         Monoid.combine(p, assetInfo)
       }
       rw.put(Keys.assetInfo(assetId)(height), combinedAssetInfo)
