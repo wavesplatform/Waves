@@ -16,7 +16,8 @@ sealed trait BaseFunction {
 
 case class FunctionTypeSignature(result: TYPEPLACEHOLDER, args: Seq[TYPEPLACEHOLDER], header: FunctionHeader)
 
-case class PredefFunction(name: String, cost: Long, signature: FunctionTypeSignature, ev: List[Any] => Either[String, Any]) extends BaseFunction {
+case class PredefFunction private (name: String, cost: Long, signature: FunctionTypeSignature, ev: List[Any] => Either[String, Any])
+    extends BaseFunction {
   def eval(args: List[Any]): TrampolinedExecResult[Any] = EitherT.fromEither[Coeval](ev(args))
 }
 
@@ -28,7 +29,8 @@ object PredefFunction {
 
 }
 
-case class UserFunction(name: String, cost: Long, signature: FunctionTypeSignature, ev: List[EXPR] => Either[String, EXPR]) extends BaseFunction
+case class UserFunction private (name: String, cost: Long, signature: FunctionTypeSignature, ev: List[EXPR] => Either[String, EXPR])
+    extends BaseFunction
 
 object UserFunction {
 
