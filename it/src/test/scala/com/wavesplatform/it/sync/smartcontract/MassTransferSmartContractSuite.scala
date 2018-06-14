@@ -1,7 +1,8 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
@@ -66,7 +67,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
     // set script
     val script = ScriptV1(scriptText).explicitGet()
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(SetScriptTransaction.supportedVersions.head, sender.privateKey, Some(script), fee, System.currentTimeMillis())
+      .selfSigned(SetScriptTransaction.supportedVersions.head, sender.privateKey, Some(script), minWavesFee, System.currentTimeMillis())
       .explicitGet()
 
     val setScriptId = sender

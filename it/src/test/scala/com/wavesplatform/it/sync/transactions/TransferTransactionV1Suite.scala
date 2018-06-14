@@ -28,10 +28,10 @@ class TransferTransactionV1Suite extends BaseTransactionSuite with TransferSendi
     notMiner.assertBalances(firstAddress, firstBalance - issueFee, firstEffBalance - issueFee)
     notMiner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
 
-    val transferTransactionId = sender.transfer(firstAddress, secondAddress, someAssetAmount, fee, Some(issuedAssetId)).id
+    val transferTransactionId = sender.transfer(firstAddress, secondAddress, someAssetAmount, minWavesFee, Some(issuedAssetId)).id
     nodes.waitForHeightAriseAndTxPresent(transferTransactionId)
 
-    notMiner.assertBalances(firstAddress, firstBalance - fee - issueFee, firstEffBalance - fee - issueFee)
+    notMiner.assertBalances(firstAddress, firstBalance - minWavesFee - issueFee, firstEffBalance - minWavesFee - issueFee)
     notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance)
     notMiner.assertAssetBalance(firstAddress, issuedAssetId, 0)
     notMiner.assertAssetBalance(secondAddress, issuedAssetId, someAssetAmount)
@@ -41,11 +41,11 @@ class TransferTransactionV1Suite extends BaseTransactionSuite with TransferSendi
     val (firstBalance, firstEffBalance)   = notMiner.accountBalances(firstAddress)
     val (secondBalance, secondEffBalance) = notMiner.accountBalances(secondAddress)
 
-    val transferId = sender.transfer(firstAddress, secondAddress, transferAmount, fee).id
+    val transferId = sender.transfer(firstAddress, secondAddress, transferAmount, minWavesFee).id
 
     nodes.waitForHeightAriseAndTxPresent(transferId)
 
-    notMiner.assertBalances(firstAddress, firstBalance - transferAmount - fee, firstEffBalance - transferAmount - fee)
+    notMiner.assertBalances(firstAddress, firstBalance - transferAmount - minWavesFee, firstEffBalance - transferAmount - minWavesFee)
     notMiner.assertBalances(secondAddress, secondBalance + transferAmount, secondEffBalance + transferAmount)
   }
 
@@ -92,7 +92,7 @@ class TransferTransactionV1Suite extends BaseTransactionSuite with TransferSendi
   test("can not make transfer without having enough effective balance") {
     val (secondBalance, secondEffBalance) = notMiner.accountBalances(secondAddress)
 
-    assertBadRequest(sender.transfer(secondAddress, firstAddress, secondEffBalance, fee))
+    assertBadRequest(sender.transfer(secondAddress, firstAddress, secondEffBalance, minWavesFee))
     nodes.waitForHeightArise()
 
     notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance)
@@ -101,7 +101,8 @@ class TransferTransactionV1Suite extends BaseTransactionSuite with TransferSendi
   test("can not make transfer without having enough balance") {
     val (secondBalance, secondEffBalance) = notMiner.accountBalances(secondAddress)
 
-    assertBadRequestAndResponse(sender.transfer(secondAddress, firstAddress, secondBalance + 1.waves, fee), "Attempt to transfer unavailable funds")
+    assertBadRequestAndResponse(sender.transfer(secondAddress, firstAddress, secondBalance + 1.waves, minWavesFee),
+                                "Attempt to transfer unavailable funds")
     notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance)
   }
 
@@ -116,13 +117,13 @@ class TransferTransactionV1Suite extends BaseTransactionSuite with TransferSendi
     notMiner.assertBalances(firstAddress, firstBalance - issueFee, firstEffBalance - issueFee)
     notMiner.assertAssetBalance(firstAddress, assetId, someAssetAmount)
 
-    val tx1 = sender.transfer(firstAddress, firstAddress, someAssetAmount, fee, Some(assetId)).id
+    val tx1 = sender.transfer(firstAddress, firstAddress, someAssetAmount, minWavesFee, Some(assetId)).id
     nodes.waitForHeightAriseAndTxPresent(tx1)
 
-    val tx2 = sender.transfer(firstAddress, secondAddress, someAssetAmount / 2, fee, Some(assetId)).id
+    val tx2 = sender.transfer(firstAddress, secondAddress, someAssetAmount / 2, minWavesFee, Some(assetId)).id
     nodes.waitForHeightAriseAndTxPresent(tx2)
 
-    notMiner.assertBalances(firstAddress, firstBalance - issueFee - 2 * fee, firstEffBalance - issueFee - 2 * fee)
+    notMiner.assertBalances(firstAddress, firstBalance - issueFee - 2 * minWavesFee, firstEffBalance - issueFee - 2 * minWavesFee)
     notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance)
   }
 }

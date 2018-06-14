@@ -1,7 +1,8 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.sync.{minWavesFee, transferAmount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.CompilerV1
@@ -37,7 +38,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           amount = 3 * transferAmount + 3 * (0.00001.waves + 0.00002.waves), // Script fee
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = fee,
+          feeAmount = minWavesFee,
           attachment = Array.emptyByteArray
         )
         .explicitGet()
@@ -67,7 +68,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
     val script = ScriptV1(scriptText).explicitGet()
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), fee, System.currentTimeMillis())
+      .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), minWavesFee, System.currentTimeMillis())
       .explicitGet()
 
     val setScriptId = sender
@@ -97,7 +98,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = fee + 0.00001.waves + 0.00002.waves,
+          feeAmount = minWavesFee + 0.00001.waves + 0.00002.waves,
           attachment = Array.emptyByteArray
         )
         .explicitGet()
@@ -115,7 +116,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = fee + 0.004.waves,
+          feeAmount = minWavesFee + 0.004.waves,
           attachment = Array.emptyByteArray,
           proofs = Proofs.empty
         )
@@ -137,7 +138,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
         version = SetScriptTransaction.supportedVersions.head,
         sender = acc0,
         script = None,
-        fee = fee + 0.004.waves,
+        fee = minWavesFee + 0.004.waves,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs.empty
       )
@@ -164,7 +165,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = fee + 0.004.waves,
+          feeAmount = minWavesFee + 0.004.waves,
           attachment = Array.emptyByteArray
         )
         .explicitGet()

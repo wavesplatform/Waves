@@ -44,7 +44,6 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
     val minSponsorFee = Token
     val TinyFee       = Token / 2
     val SmallFee      = Token + Token / 2
-    val minWavesFee   = 0.001.waves
     val LargeFee      = 10 * Token
 
     val sponsorWavesBalance = miner.accountBalances(sponsor.address)._2
