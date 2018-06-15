@@ -242,6 +242,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     assertBadRequestAndResponse(sender.putData(firstAddress, data, calcDataFee(data)), TooBig)
     assertBadRequestAndResponse(sender.putData(firstAddress, List(LongDataEntry("", 4)), 100000), "Empty key found")
+    assertBadRequestAndResponse(sender.putData(firstAddress, List(LongDataEntry("abc", 4), LongDataEntry("abc", 5)), 100000), "Duplicate keys found")
 
     val extraValueData = List(BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1.toByte))))
     assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, calcDataFee(extraValueData)), TooBig)
