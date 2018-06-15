@@ -7,7 +7,7 @@ object Types {
 
   sealed trait TYPEPLACEHOLDER
   case class TYPEPARAM(char: Byte)               extends TYPEPLACEHOLDER
-  case class OPTIONTYPEPARAM(t: TYPEPLACEHOLDER) extends TYPEPLACEHOLDER
+//  case class OPTIONTYPEPARAM(t: TYPEPLACEHOLDER) extends TYPEPLACEHOLDER
   case class LISTTYPEPARAM(t: TYPEPLACEHOLDER)   extends TYPEPLACEHOLDER
 
   sealed trait TYPE extends TYPEPLACEHOLDER {
@@ -27,10 +27,10 @@ object Types {
   case object BYTEVECTOR extends AUTO_TAGGED_TYPE[ByteVector]  { override val name = "ByteVector" }
   case object BOOLEAN    extends AUTO_TAGGED_TYPE[Boolean] { override val name = "Boolean" }
   case object STRING     extends AUTO_TAGGED_TYPE[String] { override val name = "String" }
-  case class OPTION(innerType: TYPE) extends TYPE {
-    type Underlying = Option[innerType.Underlying]
-    override def toString: String = "OPTION("++innerType.toString++")"
-  }
+//  case class OPTION(innerType: TYPE) extends TYPE {
+//    type Underlying = Option[innerType.Underlying]
+//    override def toString: String = "OPTION("++innerType.toString++")"
+//  }
   case class LIST(innerType: TYPE) extends TYPE {
     type Underlying = IndexedSeq[innerType.Underlying]
     override def toString: String = "LIST("++innerType.toString++")"

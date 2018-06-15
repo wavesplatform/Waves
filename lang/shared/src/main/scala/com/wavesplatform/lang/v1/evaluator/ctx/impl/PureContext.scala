@@ -13,7 +13,7 @@ import scodec.bits.ByteVector
 import scala.util.Try
 
 object PureContext {
-  private val optionT                                             = OPTIONTYPEPARAM(TYPEPARAM('T'))
+//  private val optionT                                             = OPTIONTYPEPARAM(TYPEPARAM('T'))
   private val noneCoeval: Coeval[Either[String, Option[Nothing]]] = Coeval.evalOnce(Right(None))
   private val nothingCoeval: Coeval[Either[String, Nothing]]      = Coeval.defer(Coeval(Right(throw new Exception("explicit contract termination"))))
 
@@ -32,16 +32,16 @@ object PureContext {
     case _ => ???
   }
 
-  val extract: PredefFunction = PredefFunction("extract", 1, TYPEPARAM('T'), List(("opt", optionT)), EXTRACT) {
-    case Some(v) :: Nil => Right(v)
-    case None :: Nil    => Left("Extract from empty option")
-    case _              => ???
-  }
+//  val extract: PredefFunction = PredefFunction("extract", 1, TYPEPARAM('T'), List(("opt", optionT)), EXTRACT) {
+//    case Some(v) :: Nil => Right(v)
+//    case None :: Nil    => Left("Extract from empty option")
+//    case _              => ???
+//  }
 
-  val some: PredefFunction = PredefFunction("Some", 1, optionT, List(("obj", TYPEPARAM('T'))), SOME) {
-    case v :: Nil => Right(Some(v))
-    case _        => ???
-  }
+//  val some: PredefFunction = PredefFunction("Some", 1, optionT, List(("obj", TYPEPARAM('T'))), SOME) {
+//    case v :: Nil => Right(Some(v))
+//    case _        => ???
+//  }
 
   val extractU: PredefFunction = PredefFunction.create("extractU", 1L, fromNonable(TYPEPARAM('T')) _, List(("opt", TYPEPARAM('T'):TYPEPLACEHOLDER)), 1124: Short) {
     case () :: Nil    => Left("Extract from empty option")
@@ -54,6 +54,11 @@ object PureContext {
     case _        => ???
   }
 
+  val isDefinedU: PredefFunction = PredefFunction("isDefined", 1, BOOLEAN, List(("opt", TYPEPARAM('T'):TYPEPLACEHOLDER)), 1126) {
+    case (()) :: Nil => Right(false)
+    case _           => Right(true)
+  }
+
   val _isInstanceOf: PredefFunction = PredefFunction("_isInstanceOf", 1, BOOLEAN, List(("obj", TYPEPARAM('T')), ("of", STRING)), ISINSTANCEOF) {
     case (p: Boolean) :: ("Boolean") :: Nil => Right(true)
     case (p: String) :: ("String") :: Nil => Right(true)
@@ -63,11 +68,11 @@ object PureContext {
     case _                                  => Right(false)
   }
 
-  val isDefined: PredefFunction = PredefFunction("isDefined", 1, BOOLEAN, List(("opt", optionT)), ISDEFINED) {
-    case Some(_) :: Nil => Right(true)
-    case None :: Nil    => Right(false)
-    case _              => ???
-  }
+//  val isDefined: PredefFunction = PredefFunction("isDefined", 1, BOOLEAN, List(("opt", optionT)), ISDEFINED) {
+//    case Some(_) :: Nil => Right(true)
+//    case None :: Nil    => Right(false)
+//    case _              => ???
+//  }
 
   val size: PredefFunction = PredefFunction("size", 1, LONG, List(("byteVector", BYTEVECTOR)), SIZE_BYTES) {
     case (bv: ByteVector) :: Nil => Right(bv.size)
@@ -163,8 +168,8 @@ object PureContext {
     uNot
   )
 
-  private val vars      = Map(("None", (OPTION(NOTHING), none)), (errRef, (NOTHING, err)))
-  private val functions = Seq(fraction, extract, isDefined, some, size, _isInstanceOf, extractU, someU) ++ operators
+  private val vars      = Map( /*("None", (OPTION(NOTHING), none)),*/ (errRef, (NOTHING, err)))
+  private val functions = Seq(fraction, /*extract, isDefined, some,*/ size, _isInstanceOf, extractU, someU) ++ operators
 
   lazy val ctx          = CTX(Seq(
                     new DefinedType { val name = "Unit"; val typeRef: TYPE = UNIT },
