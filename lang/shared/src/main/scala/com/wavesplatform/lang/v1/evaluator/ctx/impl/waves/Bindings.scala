@@ -18,9 +18,9 @@ object Bindings {
 
   private def provenTxPart(tx: Proven): Map[String, Any] =
     Map(
-      "sender"    -> tx.sender,
-      "senderPk"  -> tx.senderPk,
-      "bodyBytes" -> tx.bodyBytes,
+      "sender"          -> senderObject(tx.sender),
+      "senderPublicKey" -> tx.senderPk,
+      "bodyBytes"       -> tx.bodyBytes,
       "proofs" -> {
         val existingProofs = tx.proofs
         val allProofs      = existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteVector.empty)
@@ -30,8 +30,8 @@ object Bindings {
 
   private def mapRecipient(r: Recipient) =
     "recipient" -> (r match {
-      case Recipient.Alias(name)    => CaseObj(aliasType.typeRef, Map("alias"   -> name))
-      case Recipient.Address(bytes) => CaseObj(addressType.typeRef, Map("bytes" -> bytes))
+      case Recipient.Alias(name) => CaseObj(aliasType.typeRef, Map("alias" -> name))
+      case x: Recipient.Address  => senderObject(x)
     })
 
   def assetPair(ap: APair): CaseObj =
@@ -53,6 +53,7 @@ object Bindings {
     CaseObj(
       orderType.typeRef,
       Map(
+        "sender"           -> senderObject(ord.sender),
         "senderPublicKey"  -> ord.senderPublicKey,
         "matcherPublicKey" -> ord.matcherPublicKey,
         "assetPair"        -> assetPair(ord.assetPair),
@@ -66,12 +67,14 @@ object Bindings {
       )
     )
 
+  def senderObject(sender: Recipient.Address): CaseObj = CaseObj(addressType.typeRef, Map("bytes" -> sender.bytes))
+
   def transactionObject(tx: Tx): CaseObj =
     tx match {
       case Tx.Genesis(h, amount, recipient) =>
         CaseObj(genesisTransactionType.typeRef, Map("amount" -> amount) ++ headerPart(h) + mapRecipient(recipient))
       case Tx.Payment(p, amount, recipient) =>
-        CaseObj(genesisTransactionType.typeRef, Map("amount" -> amount) ++ provenTxPart(p) + mapRecipient(recipient))
+        CaseObj(paymentTransactionType.typeRef, Map("amount" -> amount) ++ provenTxPart(p) + mapRecipient(recipient))
       case Tx.Transfer(p, feeAssetId, transferAssetId, amount, recipient, attachment) =>
         CaseObj(
           transferTransactionType.typeRef,
