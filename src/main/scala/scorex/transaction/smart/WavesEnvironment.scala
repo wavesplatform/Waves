@@ -18,16 +18,21 @@ class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], blo
       .map(_._2)
       .map(RealTransactionWrapper(_))
 
-  override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any] = {
-    val address = Address.fromBytes(addressBytes).explicitGet()
-    val data    = blockchain.accountData(address, key)
-    data.map((_, dataType)).flatMap {
-      case (LongDataEntry(_, value), DataType.Long)        => Some(value)
-      case (BooleanDataEntry(_, value), DataType.Boolean)  => Some(value)
-      case (BinaryDataEntry(_, value), DataType.ByteArray) => Some(ByteVector(value.arr))
-      case (StringDataEntry(_, value), DataType.String)    => Some(value)
-      case _                                               => None
-    }
+  override def data(addressOrAlias: Array[Byte], key: String, dataType: DataType): Option[Any] = {
+    (for {
+      aoa     <- AddressOrAlias.fromBytes(addressOrAlias, 0)
+      address <- blockchain.resolveAliasEi(aoa._1)
+      data = blockchain
+        .accountData(address, key)
+        .map((_, dataType))
+        .flatMap {
+          case (LongDataEntry(_, value), DataType.Long)        => Some(value)
+          case (BooleanDataEntry(_, value), DataType.Boolean)  => Some(value)
+          case (BinaryDataEntry(_, value), DataType.ByteArray) => Some(ByteVector(value.arr))
+          case (StringDataEntry(_, value), DataType.String)    => Some(value)
+          case _                                               => None
+        }
+    } yield data).fold(_ => None, identity)
   }
   override def resolveAlias(name: String): Either[String, Recipient.Address] =
     blockchain

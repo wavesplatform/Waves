@@ -20,9 +20,9 @@ object WavesContext {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getdataF(name: String, internalName: Short, dataType: DataType): BaseFunction =
-      NativeFunction(name, 100, internalName, OPTION(dataType.innerType), "address" -> addressType.typeRef, "key" -> STRING) {
-        case (addr: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addr, k, dataType)
-        case _                                     => ???
+      NativeFunction(name, 100, internalName, OPTION(dataType.innerType), "addressOrAlias" -> addressType.typeRef, "key" -> STRING) {
+        case (addressOrAlias: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addressOrAlias, k, dataType)
+        case _                                               => ???
       }
 
     val getLongF: BaseFunction      = getdataF("getLong", DATA_LONG, DataType.Long)

@@ -4,13 +4,14 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient, Tx}
 
 object WavesContext {
   val env = new Environment {
-    override def height: Int                                                                   = impl.Environment.height
-    override def networkByte: Byte                                                             = impl.Environment.networkByte
-    override def transaction: Tx                                                               = impl.Environment.transaction
-    override def transactionById(id: Array[Byte]): Option[Tx]                                  = impl.Environment.transactionById(id)
-    override def transactionHeightById(id: Array[Byte]): Option[Int]                           = impl.Environment.transactionHeightById(id)
-    override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any] = impl.Environment.data(addressBytes, key, dataType)
-    override def resolveAlias(name: String): Either[String, Recipient.Address]                 = impl.Environment.resolveAddress(name)
+    override def height: Int                                         = impl.Environment.height
+    override def networkByte: Byte                                   = impl.Environment.networkByte
+    override def transaction: Tx                                     = impl.Environment.transaction
+    override def transactionById(id: Array[Byte]): Option[Tx]        = impl.Environment.transactionById(id)
+    override def transactionHeightById(id: Array[Byte]): Option[Int] = impl.Environment.transactionHeightById(id)
+    override def data(addressOrAlias: Array[Byte], key: String, dataType: DataType): Option[Any] =
+      impl.Environment.data(addressOrAlias, key, dataType)
+    override def resolveAlias(name: String): Either[String, Recipient.Address] = impl.Environment.resolveAddress(name)
     override def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] =
       impl.Environment.accountBalanceOf(addressOrAlias, assetId)
   }
