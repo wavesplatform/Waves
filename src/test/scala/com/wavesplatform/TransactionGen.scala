@@ -585,15 +585,15 @@ trait TransactionGenBase extends ScriptGen {
   import DataEntry.MaxKeySize
 
   val dataKeyGen = for {
-    size <- Gen.choose[Byte](0, MaxKeySize)
+    size <- Gen.choose[Byte](1, MaxKeySize)
   } yield Random.nextString(size)
 
   val dataScriptsKeyGen = for {
-    size <- Gen.choose[Byte](0, 10)
+    size <- Gen.choose[Byte](1, 10)
   } yield Random.nextString(size)
 
   val dataAsciiKeyGen = for {
-    size <- Gen.choose[Byte](0, MaxKeySize)
+    size <- Gen.choose[Byte](1, MaxKeySize)
   } yield Random.alphanumeric.take(size).mkString
 
   def longEntryGen(keyGen: Gen[String] = dataKeyGen) =
@@ -633,9 +633,12 @@ trait TransactionGenBase extends ScriptGen {
       timestamp <- timestampGen
       size      <- Gen.choose(0, maxEntryCount)
       maxEntrySize = if (useForScript) 200 else (DataTransaction.MaxBytes - 122) / (size max 1) min DataEntry.MaxValueSize
-      data    <- if (useForScript) Gen.listOfN(size, dataEntryGen(maxEntrySize, dataScriptsKeyGen)) else Gen.listOfN(size, dataEntryGen(maxEntrySize))
+      data <- if (useForScript) Gen.listOfN(size, dataEntryGen(maxEntrySize, dataScriptsKeyGen)) else Gen.listOfN(size, dataEntryGen(maxEntrySize))
+      uniq = data.foldRight(List.empty[DataEntry[_]]) { (e, es) =>
+        if (es.exists(_.key == e.key)) es else e :: es
+      }
       version <- Gen.oneOf(DataTransaction.supportedVersions.toSeq)
-    } yield DataTransaction.selfSigned(version, sender, data, 15000000, timestamp).explicitGet())
+    } yield DataTransaction.selfSigned(version, sender, uniq, 15000000, timestamp).explicitGet())
       .label("DataTransaction")
 
   def dataTransactionGenP(sender: PrivateKeyAccount, data: List[DataEntry[_]]): Gen[DataTransaction] =
