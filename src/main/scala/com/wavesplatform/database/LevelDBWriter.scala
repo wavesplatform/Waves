@@ -499,8 +499,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         seqNr          <- (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).view
         (txType, txId) <- db.get(Keys.addressTransactionIds(addressId, seqNr))
         if types.isEmpty || types.contains(txType.toByte)
-        (_, tx) <- db.get(Keys.transactionInfo(txId))
-      } yield (seqNr, tx)
+        (h, tx) <- db.get(Keys.transactionInfo(txId))
+      } yield (h, tx)
 
       txs.slice(from, count).force
     }
