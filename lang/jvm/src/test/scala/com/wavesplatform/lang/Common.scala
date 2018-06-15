@@ -66,7 +66,7 @@ object Common {
 
     override def transactionById(id: Array[Byte]): Option[Tx]                                                      = ???
     override def transactionHeightById(id: Array[Byte]): Option[Int]                                               = ???
-    override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any]                     = ???
+    override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                          = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                     = ???
     override def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = ???
   }
