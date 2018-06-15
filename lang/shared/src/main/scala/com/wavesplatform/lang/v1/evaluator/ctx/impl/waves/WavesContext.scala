@@ -102,44 +102,16 @@ object WavesContext {
       str
     )
 
-    def dropRightExpr(xs: EXPR, number: Long): EXPR = FUNCTION_CALL(
-      FunctionHeader.Native(TAKE_BYTES),
-      List(
-        xs,
-        FUNCTION_CALL(
-          FunctionHeader.Native(SUB_LONG),
-          List(
-            FUNCTION_CALL(FunctionHeader.Native(SIZE_BYTES), List(xs)),
-            CONST_LONG(number)
-          )
-        )
-      )
-    )
-
-    def takeRightExpr(xs: EXPR, number: Long): EXPR = FUNCTION_CALL(
-      FunctionHeader.Native(DROP_BYTES),
-      List(
-        xs,
-        FUNCTION_CALL(
-          FunctionHeader.Native(SUB_LONG),
-          List(
-            FUNCTION_CALL(FunctionHeader.Native(SIZE_BYTES), List(xs)),
-            CONST_LONG(number)
-          )
-        )
-      )
-    )
-
     def verifyAddressChecksumExpr(addressBytes: EXPR): EXPR = FUNCTION_CALL(
       FunctionHeader.Native(EQ),
       List(
         // actual checksum
-        takeRightExpr(addressBytes, EnvironmentFunctions.ChecksumLength),
+        FUNCTION_CALL(FunctionHeader.User("takeRightBytes"), List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
         // generated checksum
         FUNCTION_CALL(
           FunctionHeader.Native(TAKE_BYTES),
           List(
-            secureHashExpr(dropRightExpr(addressBytes, EnvironmentFunctions.ChecksumLength)),
+            secureHashExpr(FUNCTION_CALL(FunctionHeader.User("dropRightBytes"), List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength)))),
             CONST_LONG(EnvironmentFunctions.ChecksumLength)
           )
         )
