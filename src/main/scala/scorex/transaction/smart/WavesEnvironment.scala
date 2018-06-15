@@ -4,7 +4,7 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient, Tx =>
 import com.wavesplatform.state._
 import monix.eval.Coeval
 import scodec.bits.ByteVector
-import scorex.account.{Address, AddressOrAlias, Alias}
+import scorex.account.{AddressOrAlias, Alias}
 import scorex.transaction.Transaction
 
 class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], blockchain: Blockchain) extends Environment {
