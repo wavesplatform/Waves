@@ -51,11 +51,13 @@ object EvaluatorV1 extends ExprEvaluator {
       result <- funcs
         .get(ctx)
         .get(header)
-        .fold(raiseError[EvaluationContext, ExecutionError, Any](s"function '$header' not found")) { func =>
-          args
-            .traverse[EvalM, Any](a => evalExpr(a))
-            .map(func.eval)
-            .flatMap(r => liftTER[Any](r.value))
+        .fold(raiseError[EvaluationContext, ExecutionError, Any](s"function '$header' not found")) {
+          case func: UserFunction => func.ev(args).liftTo[EvalM].flatMap(evalExpr)
+          case func: NativeFunction =>
+            args
+              .traverse[EvalM, Any](a => evalExpr(a))
+              .map(func.eval)
+              .flatMap(r => liftTER[Any](r.value))
         }
     } yield result
 
@@ -64,11 +66,11 @@ object EvaluatorV1 extends ExprEvaluator {
   private def evalExpr(t: EXPR): EvalM[Any] = t match {
     case BLOCK(let, inner)           => evalBlock(let, inner)
     case REF(str)                    => evalRef(str)
-    case CONST_LONG(v)                  => pureAny(v)
-    case CONST_BYTEVECTOR(v)            => pureAny(v)
-    case CONST_STRING(v)                => pureAny(v)
-    case TRUE                           => pureAny(true)
-    case FALSE                          => pureAny(false)
+    case CONST_LONG(v)               => pureAny(v)
+    case CONST_BYTEVECTOR(v)         => pureAny(v)
+    case CONST_STRING(v)             => pureAny(v)
+    case TRUE                        => pureAny(true)
+    case FALSE                       => pureAny(false)
     case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
     case GETTER(expr, field)         => evalGetter(expr, field)
     case FUNCTION_CALL(header, args) => evalFunctionCall(header, args)
