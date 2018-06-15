@@ -14,7 +14,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, EnvironmentFunctions, PureContext}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.utils.{Base58, Base64}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -357,7 +357,52 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(Arbitrary.arbString.arbitrary) { xs =>
       val expr   = FUNCTION_CALL(FunctionHeader.Native(SIZE_STRING), List(CONST_STRING(xs)))
       val actual = ev[Int](PureContext.ctx.evaluationContext, expr)._2
-      actual shouldBe Right(xs.size)
+      actual shouldBe Right(xs.length)
+    }
+  }
+
+  property("fromBase58String(String) works as the native one") {
+    val gen = for {
+      len <- Gen.choose(0, 512)
+      xs  <- Gen.containerOfN[Array, Byte](len, Arbitrary.arbByte.arbitrary)
+    } yield Base58.encode(xs)
+
+    val ctx = CryptoContext.evalContext(Global)
+
+    forAll(gen) { xs =>
+      val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(CONST_STRING(xs)))
+      val actual = ev[ByteVector](ctx, expr)._2
+      actual shouldBe Right(ByteVector(Base58.decode(xs).get))
+    }
+  }
+
+  property("fromBase64String(String) works as the native one: without prefix") {
+    val gen = for {
+      len <- Gen.choose(0, 512)
+      xs  <- Gen.containerOfN[Array, Byte](len, Arbitrary.arbByte.arbitrary)
+    } yield Base64.encode(xs)
+
+    val ctx = CryptoContext.evalContext(Global)
+
+    forAll(gen) { xs =>
+      val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE64), List(CONST_STRING(xs)))
+      val actual = ev[ByteVector](ctx, expr)._2
+      actual shouldBe Right(ByteVector(Base64.decode(xs).get))
+    }
+  }
+
+  property("fromBase64String(String) works as the native one: with prefix") {
+    val gen = for {
+      len <- Gen.choose(0, 512)
+      xs  <- Gen.containerOfN[Array, Byte](len, Arbitrary.arbByte.arbitrary)
+    } yield s"base64:${Base64.encode(xs)}"
+
+    val ctx = CryptoContext.evalContext(Global)
+
+    forAll(gen) { xs =>
+      val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE64), List(CONST_STRING(xs)))
+      val actual = ev[ByteVector](ctx, expr)._2
+      actual shouldBe Right(ByteVector(Base64.decode(xs).get))
     }
   }
 
