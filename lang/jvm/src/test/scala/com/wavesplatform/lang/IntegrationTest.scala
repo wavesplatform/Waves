@@ -98,7 +98,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   private def eval[T](code: String, pointInstance: Option[CaseObj] = None): Either[String, T] = {
     val untyped = Parser(code).get.value
     require(untyped.size == 1)
-    val lazyVal                                     = LazyVal(EitherT.pure(pointInstance.getOrElse(null)))
+    val lazyVal                                     = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, (TYPE, LazyVal)] = Map(("p", (AorBorC, lazyVal)))
     val ctx: CTX =
       Monoid.combine(PureContext.ctx, CTX(sampleTypes, stringToTuple, Seq.empty))

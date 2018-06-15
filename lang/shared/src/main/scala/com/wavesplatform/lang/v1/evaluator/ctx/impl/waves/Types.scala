@@ -24,10 +24,10 @@ object Types {
     "version"   -> LONG,
   )
   val proven = List(
-    "sender"    -> addressType.typeRef,
-    "senderPk"  -> BYTEVECTOR,
-    "bodyBytes" -> BYTEVECTOR,
-    "proofs"    -> listByteVector
+    "sender"          -> addressType.typeRef,
+    "senderPublicKey" -> BYTEVECTOR,
+    "bodyBytes"       -> BYTEVECTOR,
+    "proofs"          -> listByteVector
   )
 
   val genesisTransactionType = CaseType(
@@ -121,6 +121,8 @@ object Types {
   val orderType = CaseType(
     "Order",
     List(
+      "id"               -> BYTEVECTOR,
+      "sender"           -> addressType.typeRef,
       "senderPublicKey"  -> BYTEVECTOR,
       "matcherPublicKey" -> BYTEVECTOR,
       "assetPair"        -> assetPairType.typeRef,
@@ -200,5 +202,5 @@ object Types {
   val outgoingTransactionType = UNION(activeTransactionTypes.map(_.typeRef))
   val anyTransactionType      = UNION(transactionTypes.map(_.typeRef))
 
-  val wavesTypes = Seq(addressType, aliasType, transfer) ++ dataEntryTypes ++ transactionTypes
+  val wavesTypes = Seq(addressType, aliasType, transfer, orderType, assetPairType) ++ dataEntryTypes ++ transactionTypes
 }

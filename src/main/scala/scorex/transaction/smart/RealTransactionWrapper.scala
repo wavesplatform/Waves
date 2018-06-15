@@ -28,8 +28,10 @@ object RealTransactionWrapper {
   implicit def assetPair(a: AssetPair): APair = APair(a.amountAsset.map(toByteVector), a.priceAsset.map(toByteVector))
   implicit def ord(o: Order): Ord =
     Ord(
-      senderPublicKey = o.senderPublicKey.toAddress.bytes,
-      matcherPublicKey = o.matcherPublicKey.toAddress.bytes,
+      id = ByteVector(o.id.value),
+      sender = Recipient.Address(ByteVector(o.sender.bytes.arr)),
+      senderPublicKey = ByteVector(o.senderPublicKey.publicKey),
+      matcherPublicKey = ByteVector(o.matcherPublicKey.publicKey),
       assetPair = o.assetPair,
       orderType = o.orderType match {
         case BUY  => OrdType.Buy

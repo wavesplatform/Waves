@@ -29,7 +29,9 @@ object DataItem {
   case class Str(k: String, v: String)     extends DataItem
 }
 
-case class Ord(senderPublicKey: ByteVector,
+case class Ord(id: ByteVector,
+               sender: Recipient.Address,
+               senderPublicKey: ByteVector,
                matcherPublicKey: ByteVector,
                assetPair: APair,
                orderType: OrdType,

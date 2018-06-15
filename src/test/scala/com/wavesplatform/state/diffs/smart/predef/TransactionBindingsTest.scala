@@ -7,9 +7,9 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{Address, Alias}
 import scorex.transaction.ProvenTransaction
+import scorex.transaction.assets.exchange.Order
 
 class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
-
   def provenPart(t: ProvenTransaction): String = {
     def pg(i: Int) = s"let proof$i = t.proofs[$i] == base58'${t.proofs.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).base58}'"
     s"""
@@ -17,14 +17,14 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
        |   let fee = t.fee == ${t.assetFee._2}
        |   let timestamp = t.timestamp == ${t.timestamp}
        |   let bodyBytes = t.bodyBytes == base58'${ByteStr(t.bodyBytes.apply()).base58}'
-       |   let sender = t.sender == addressFromPublicKey(base58'${t.sender.bytes.base58}')
-       |   let senderPk = t.senderPk == base58'${ByteStr(t.sender.publicKey).base58}'
+       |   let sender = t.sender == addressFromPublicKey(base58'${ByteStr(t.sender.publicKey).base58}')
+       |   let senderPublicKey = t.senderPublicKey == base58'${ByteStr(t.sender.publicKey).base58}'
        |   ${Range(0, 8).map(pg).mkString("\n")}
      """.stripMargin
   }
 
   val assertProvenPart =
-    "id && fee && timestamp && senderPk && proof0 && proof1 && proof2 && proof3 && proof4 && proof5 && proof6 && proof7 && bodyBytes"
+    "id && fee && timestamp && sender && senderPublicKey && proof0 && proof1 && proof2 && proof3 && proof4 && proof5 && proof6 && proof7 && bodyBytes"
 
   property("TransferTransaction binding") {
     forAll(Gen.oneOf(transferV1Gen, transferV2Gen)) { t =>
@@ -51,7 +51,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            | case other => throw
            | }
            |""".stripMargin,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -78,7 +79,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
       val result = runScript[Boolean](
         s,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -97,7 +99,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw
           | }
           |""".stripMargin,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -117,7 +120,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw
           | }
           |""".stripMargin,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -135,7 +139,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw
           | }
           |""".stripMargin,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -157,7 +162,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw
           | }
           |""".stripMargin,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -175,7 +181,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw
           | }
           |""".stripMargin,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -195,7 +202,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw
           | }
           |""".stripMargin,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -215,7 +223,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            | case other => throw
            | }
            |""".stripMargin,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -254,7 +263,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
       val result = runScript[Boolean](
         s,
-        t
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
@@ -296,7 +306,75 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
       val result = runScript[Boolean](
         script,
-        t
+        t,
+        'T'
+      )
+      result shouldBe Right(true)
+    }
+  }
+
+  property("ExchangeTransaction binding") {
+    forAll(exchangeTransactionGen) { t =>
+      def pg(ord: Order) = {
+        val oType = ord.orderType.toString
+        val script = s"""
+           |   let ${oType}Id = t.${oType}Order.id == base58'${ByteStr(ord.id.value).base58}'
+           |   let ${oType}Sender = t.${oType}Order.sender == addressFromPublicKey(base58'${ByteStr(ord.sender.publicKey).base58}')
+           |   let ${oType}SenderPk = t.${oType}Order.senderPublicKey == base58'${ByteStr(ord.sender.publicKey).base58}'
+           |   let ${oType}MatcherPk = t.${oType}Order.matcherPublicKey == base58'${ByteStr(ord.matcherPublicKey.publicKey).base58}'
+           |   let ${oType}Price = t.${oType}Order.price == ${ord.price}
+           |   let ${oType}Amount = t.${oType}Order.amount == ${ord.amount}
+           |   let ${oType}Timestamp = t.${oType}Order.timestamp == ${ord.timestamp}
+           |   let ${oType}Expiration = t.${oType}Order.expiration == ${ord.expiration}
+           |   let ${oType}OrderMatcherFee = t.${oType}Order.matcherFee == ${ord.matcherFee}
+           |   let ${oType}Signature = t.${oType}Order.signature == base58'${ByteStr(ord.signature).base58}'
+           |   let ${oType}AssetPairAmount = if (${ord.assetPair.amountAsset.isDefined}) then extract(t.${oType}Order.assetPair.amountAsset) == base58'${ord.assetPair.amountAsset
+                          .getOrElse(ByteStr.empty)
+                          .base58}'
+           |   else isDefined(t.${oType}Order.assetPair.amountAsset) == false
+           |   let ${oType}AssetPairPrice = if (${ord.assetPair.priceAsset.isDefined}) then extract(t.${oType}Order.assetPair.priceAsset) == base58'${ord.assetPair.priceAsset
+                          .getOrElse(ByteStr.empty)
+                          .base58}'
+           |   else isDefined(t.${oType}Order.assetPair.priceAsset) == false
+           |   # let ${oType}OrderType = t.${oType}Order.orderType ==
+         """.stripMargin
+
+        val lets = List("Id",
+                        "Sender",
+                        "SenderPk",
+                        "MatcherPk",
+                        "Price",
+                        "Amount",
+                        "Timestamp",
+                        "Expiration",
+                        "OrderMatcherFee",
+                        "Signature",
+                        "AssetPairAmount",
+                        "AssetPairPrice")
+          .map(i => s"${oType}$i")
+          .mkString(" && ")
+
+        (script, lets)
+      }
+
+      val s = s"""|match tx {
+                | case t : ExchangeTransaction =>
+                |   ${provenPart(t)}
+                |   let price = t.price == ${t.price}
+                |   let amount = t.amount == ${t.amount}
+                |   let buyMatcherFee = t.buyMatcherFee == ${t.buyMatcherFee}
+                |   let sellMatcherFee = t.sellMatcherFee == ${t.sellMatcherFee} 
+                |   ${pg(t.buyOrder)._1}
+                |   ${pg(t.sellOrder)._1}
+                |   $assertProvenPart && price && amount && buyMatcherFee && sellMatcherFee && ${pg(t.buyOrder)._2} && ${pg(t.sellOrder)._2}
+                | case other => throw
+                | }
+                |""".stripMargin
+
+      val result = runScript[Boolean](
+        s,
+        t,
+        'T'
       )
       result shouldBe Right(true)
     }
