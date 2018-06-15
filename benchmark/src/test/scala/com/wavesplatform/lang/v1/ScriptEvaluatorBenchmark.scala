@@ -21,6 +21,6 @@ class ScriptEvaluatorBenchmark {
 
 object ScriptEvaluatorBenchmark {
   class St extends BigSum {
-    val context = PureContext.instance
+    val context = PureContext.evalContext
   }
 }

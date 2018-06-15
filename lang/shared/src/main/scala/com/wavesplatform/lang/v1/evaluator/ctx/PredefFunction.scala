@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.compiler.Terms.TYPEPLACEHOLDER
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.TrampolinedExecResult
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction.FunctionTypeSignature

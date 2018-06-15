@@ -938,7 +938,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         |  case b => 1
         |}""".stripMargin
 
-    parseAll(script) shouldBe List(
+    parseAll(script)(0) shouldBe
       MATCH(
         0,
         46,
@@ -949,12 +949,11 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
             30,
             Some(PART.VALID(18, 19, "a")),
             List(),
-            BINARY_OP(23, 30, TRUE(23, 27), AND_OP, INVALID(33, 33, "expected a second operator", None))
+            BINARY_OP(23, 33, TRUE(23, 27), AND_OP, INVALID(33, 33, "expected a second operator", None))
           ),
           MATCH_CASE(33, 44, Some(PART.VALID(38, 39, "b")), List(), CONST_LONG(43, 44, 1))
         )
       )
-    )
   }
 
   property("if expressions") {
@@ -1074,7 +1073,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parseOne(code) shouldBe IF(
       0,
       38,
-      BINARY_OP(3, 17, CONST_LONG(8, 10, 15), LT_OP, CONST_LONG(3, 5, 10)),
+      BINARY_OP(3, 10, CONST_LONG(8, 10, 15), LT_OP, CONST_LONG(3, 5, 10)),
       TRUE(23, 27),
       FALSE(33, 38)
     )
@@ -1352,6 +1351,41 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       22,
       PART.VALID(2, 22, "getElement"),
       List(REF(0, 2, PART.VALID(0, 2, "xs")), CONST_LONG(12, 13, 1))
+    )
+  }
+
+  property("operations priority") {
+    parseOne("a-b+c") shouldBe BINARY_OP(0,
+                                         5,
+                                         BINARY_OP(0, 3, REF(0, 1, PART.VALID(0, 1, "a")), SUB_OP, REF(2, 3, PART.VALID(2, 3, "b"))),
+                                         SUM_OP,
+                                         REF(4, 5, PART.VALID(4, 5, "c")))
+    parseOne("a+b-c") shouldBe BINARY_OP(0,
+                                         5,
+                                         BINARY_OP(0, 3, REF(0, 1, PART.VALID(0, 1, "a")), SUM_OP, REF(2, 3, PART.VALID(2, 3, "b"))),
+                                         SUB_OP,
+                                         REF(4, 5, PART.VALID(4, 5, "c")))
+    parseOne("a+b*c") shouldBe BINARY_OP(0,
+                                         5,
+                                         REF(0, 1, PART.VALID(0, 1, "a")),
+                                         SUM_OP,
+                                         BINARY_OP(2, 5, REF(2, 3, PART.VALID(2, 3, "b")), MUL_OP, REF(4, 5, PART.VALID(4, 5, "c"))))
+    parseOne("a*b-c") shouldBe BINARY_OP(0,
+                                         5,
+                                         BINARY_OP(0, 3, REF(0, 1, PART.VALID(0, 1, "a")), MUL_OP, REF(2, 3, PART.VALID(2, 3, "b"))),
+                                         SUB_OP,
+                                         REF(4, 5, PART.VALID(4, 5, "c")))
+    parseOne("a/b*c") shouldBe BINARY_OP(0,
+                                         5,
+                                         BINARY_OP(0, 3, REF(0, 1, PART.VALID(0, 1, "a")), DIV_OP, REF(2, 3, PART.VALID(2, 3, "b"))),
+                                         MUL_OP,
+                                         REF(4, 5, PART.VALID(4, 5, "c")))
+    parseOne("a<b==c>=d") shouldBe BINARY_OP(
+      0,
+      9,
+      BINARY_OP(0, 3, REF(2, 3, PART.VALID(2, 3, "b")), LT_OP, REF(0, 1, PART.VALID(0, 1, "a"))),
+      EQ_OP,
+      BINARY_OP(5, 9, REF(5, 6, PART.VALID(5, 6, "c")), GE_OP, REF(8, 9, PART.VALID(8, 9, "d")))
     )
   }
 }

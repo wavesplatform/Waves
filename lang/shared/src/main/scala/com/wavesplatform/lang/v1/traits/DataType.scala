@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.traits
 
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types._
 
 sealed abstract case class DataType(innerType: TYPE)
 object DataType {
