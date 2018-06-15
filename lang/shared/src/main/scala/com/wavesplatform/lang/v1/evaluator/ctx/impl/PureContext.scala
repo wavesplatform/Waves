@@ -61,7 +61,7 @@ object PureContext {
   }
 
   val sizeString: BaseFunction = NativeFunction("size", 1, SIZE_STRING, LONG, "xs" -> STRING) {
-    case (bv: String) :: Nil => Right(bv.length)
+    case (bv: String) :: Nil => Right(bv.length.toLong)
     case xs                  => notImplemented("size(String)", xs)
   }
 
@@ -115,13 +115,15 @@ object PureContext {
     case xs => notImplemented("dropRight(xs: byte[], number: Long)", xs)
   }
 
+  private def trimLongToInt(x: Long): Int = Math.toIntExact(Math.max(Math.min(x, Int.MaxValue), Int.MinValue))
+
   val takeString: BaseFunction = NativeFunction("take", 1, TAKE_STRING, STRING, "xs" -> STRING, "number" -> LONG) {
-    case (xs: String) :: (number: Long) :: Nil => Right(xs.take(Math.toIntExact(number)))
+    case (xs: String) :: (number: Long) :: Nil => Right(xs.take(trimLongToInt(number)))
     case xs                                    => notImplemented("take(xs: String, number: Long)", xs)
   }
 
   val dropString: BaseFunction = NativeFunction("drop", 1, DROP_STRING, STRING, "xs" -> STRING, "number" -> LONG) {
-    case (xs: String) :: (number: Long) :: Nil => Right(xs.drop(Math.toIntExact(number)))
+    case (xs: String) :: (number: Long) :: Nil => Right(xs.drop(trimLongToInt(number)))
     case xs                                    => notImplemented("drop(xs: String, number: Long)", xs)
   }
 

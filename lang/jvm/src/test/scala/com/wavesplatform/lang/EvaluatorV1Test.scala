@@ -331,6 +331,24 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
   }
 
+  property("dropRightBytes(ByteVector, Long) works as the native one") {
+    forAll(genBytesAndNumber) {
+      case (xs, number) =>
+        val expr   = FUNCTION_CALL(FunctionHeader.User("dropRightBytes"), List(CONST_BYTEVECTOR(xs), CONST_LONG(number)))
+        val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)._2
+        actual shouldBe Right(xs.dropRight(number))
+    }
+  }
+
+  property("takeRightBytes(ByteVector, Long) works as the native one") {
+    forAll(genBytesAndNumber) {
+      case (xs, number) =>
+        val expr   = FUNCTION_CALL(FunctionHeader.User("takeRightBytes"), List(CONST_BYTEVECTOR(xs), CONST_LONG(number)))
+        val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)._2
+        actual shouldBe Right(xs.takeRight(number))
+    }
+  }
+
   private val genStringAndNumber = for {
     xs     <- Arbitrary.arbString.arbitrary
     number <- Arbitrary.arbInt.arbitrary
@@ -340,7 +358,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genStringAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(FunctionHeader.Native(DROP_STRING), List(CONST_STRING(xs), CONST_LONG(number)))
-        val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)._2
+        val actual = ev[String](PureContext.ctx.evaluationContext, expr)._2
         actual shouldBe Right(xs.drop(number))
     }
   }
@@ -349,8 +367,26 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genStringAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_STRING), List(CONST_STRING(xs), CONST_LONG(number)))
-        val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)._2
+        val actual = ev[String](PureContext.ctx.evaluationContext, expr)._2
         actual shouldBe Right(xs.take(number))
+    }
+  }
+
+  property("dropRight(String, Long) works as the native one") {
+    forAll(genStringAndNumber) {
+      case (xs, number) =>
+        val expr   = FUNCTION_CALL(FunctionHeader.User("dropRight"), List(CONST_STRING(xs), CONST_LONG(number)))
+        val actual = ev[String](PureContext.ctx.evaluationContext, expr)._2
+        actual shouldBe Right(xs.dropRight(number))
+    }
+  }
+
+  property("takeRight(String, Long) works as the native one") {
+    forAll(genStringAndNumber) {
+      case (xs, number) =>
+        val expr   = FUNCTION_CALL(FunctionHeader.User("takeRight"), List(CONST_STRING(xs), CONST_LONG(number)))
+        val actual = ev[String](PureContext.ctx.evaluationContext, expr)._2
+        actual shouldBe Right(xs.takeRight(number))
     }
   }
 
