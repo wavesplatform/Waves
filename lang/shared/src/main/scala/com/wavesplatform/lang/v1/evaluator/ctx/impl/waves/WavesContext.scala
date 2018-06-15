@@ -20,7 +20,7 @@ object WavesContext {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getdataF(name: String, internalName: Short, dataType: DataType): BaseFunction =
-      PredefFunction(name, 100, internalName, OPTION(dataType.innerType), "address" -> addressType.typeRef, "key" -> STRING) {
+      NativeFunction(name, 100, internalName, OPTION(dataType.innerType), "address" -> addressType.typeRef, "key" -> STRING) {
         case (addr: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addr, k, dataType)
         case _                                     => ???
       }
@@ -31,16 +31,16 @@ object WavesContext {
     val getStringF: BaseFunction    = getdataF("getString", DATA_STRING, DataType.String)
 
     def secureHashExpr(xs: EXPR): EXPR = FUNCTION_CALL(
-      FunctionHeader.Predef(KECCAK256),
+      FunctionHeader.Native(KECCAK256),
       List(
         FUNCTION_CALL(
-          FunctionHeader.Predef(BLAKE256),
+          FunctionHeader.Native(BLAKE256),
           List(xs)
         )
       )
     )
 
-    val addressFromBytesF = PredefFunction("addressFromBytes", 1, ADDRESSFROMBYTES, addressType.typeRef, "bytes" -> BYTEVECTOR) {
+    val addressFromBytesF = NativeFunction("addressFromBytes", 1, ADDRESSFROMBYTES, addressType.typeRef, "bytes" -> BYTEVECTOR) {
       case (bytes: ByteVector) :: Nil => Right(CaseObj(addressType.typeRef, Map("bytes" -> bytes)))
       case _                          => ???
     }
@@ -49,18 +49,18 @@ object WavesContext {
       case pk :: Nil =>
         Right(
           FUNCTION_CALL(
-            FunctionHeader.Predef(ADDRESSFROMBYTES),
+            FunctionHeader.Native(ADDRESSFROMBYTES),
             List(
               BLOCK(
                 LET(
                   "@afpk_withoutChecksum",
                   FUNCTION_CALL(
-                    FunctionHeader.Predef(SUM_BYTES),
+                    FunctionHeader.Native(SUM_BYTES),
                     List(
                       CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion, env.networkByte)),
                       // publicKeyHash
                       FUNCTION_CALL(
-                        FunctionHeader.Predef(TAKE_BYTES),
+                        FunctionHeader.Native(TAKE_BYTES),
                         List(
                           secureHashExpr(pk),
                           CONST_LONG(EnvironmentFunctions.HashLength)
@@ -71,11 +71,11 @@ object WavesContext {
                 ),
                 // bytes
                 FUNCTION_CALL(
-                  FunctionHeader.Predef(SUM_BYTES),
+                  FunctionHeader.Native(SUM_BYTES),
                   List(
                     REF("@afpk_withoutChecksum"),
                     FUNCTION_CALL(
-                      FunctionHeader.Predef(TAKE_BYTES),
+                      FunctionHeader.Native(TAKE_BYTES),
                       List(
                         secureHashExpr(REF("@afpk_withoutChecksum")),
                         CONST_LONG(EnvironmentFunctions.ChecksumLength)
@@ -90,7 +90,7 @@ object WavesContext {
       case _ => ???
     }
 
-    val addressFromStringF: BaseFunction = PredefFunction("addressFromString", 100, ADDRESSFROMSTRING, optionAddress, "string" -> STRING) {
+    val addressFromStringF: BaseFunction = NativeFunction("addressFromString", 100, ADDRESSFROMSTRING, optionAddress, "string" -> STRING) {
       case (addressString: String) :: Nil =>
         val r = environmentFunctions.addressFromString(addressString)
         r.map(_.map(x => CaseObj(addressType.typeRef, Map("bytes" -> x))))
@@ -98,7 +98,7 @@ object WavesContext {
     }
 
     val addressFromRecipientF: BaseFunction =
-      PredefFunction("addressFromRecipient", 100, ADDRESSFROMRECIPIENT, addressType.typeRef, "AddressOrAlias" -> addressOrAliasType) {
+      NativeFunction("addressFromRecipient", 100, ADDRESSFROMRECIPIENT, addressType.typeRef, "AddressOrAlias" -> addressOrAliasType) {
         case (c @ CaseObj(addressType.typeRef, _)) :: Nil => Right(c)
         case CaseObj(aliasType.typeRef, fields) :: Nil =>
           environmentFunctions
@@ -112,7 +112,7 @@ object WavesContext {
 
     val txByIdF: BaseFunction = {
       val returnType = OPTION(anyTransactionType)
-      PredefFunction("getTransactionById", 100, GETTRANSACTIONBYID, returnType, "id" -> BYTEVECTOR) {
+      NativeFunction("getTransactionById", 100, GETTRANSACTIONBYID, returnType, "id" -> BYTEVECTOR) {
         case (id: ByteVector) :: Nil =>
           val maybeDomainTx = env.transactionById(id.toArray).map(transactionObject)
           Right(maybeDomainTx).map(_.asInstanceOf[returnType.Underlying])
@@ -120,7 +120,7 @@ object WavesContext {
       }
     }
 
-    val accountBalanceF: BaseFunction = PredefFunction("accountBalance", 100, ACCOUNTBALANCE, LONG, "addressOrAlias" -> addressOrAliasType) {
+    val accountBalanceF: BaseFunction = NativeFunction("accountBalance", 100, ACCOUNTBALANCE, LONG, "addressOrAlias" -> addressOrAliasType) {
       case CaseObj(_, fields) :: Nil =>
         val acc = fields("bytes").asInstanceOf[ByteVector].toArray
         env.accountBalanceOf(acc, None)
@@ -129,7 +129,7 @@ object WavesContext {
     }
 
     val accountAssetBalanceF: BaseFunction =
-      PredefFunction("accountAssetBalance", 100, ACCOUNTASSETBALANCE, LONG, "addressOrAlias" -> addressOrAliasType, "assetId" -> BYTEVECTOR) {
+      NativeFunction("accountAssetBalance", 100, ACCOUNTASSETBALANCE, LONG, "addressOrAlias" -> addressOrAliasType, "assetId" -> BYTEVECTOR) {
         case CaseObj(_, fields) :: (assetId: ByteVector) :: Nil =>
           val acc = fields("bytes").asInstanceOf[ByteVector]
           env.accountBalanceOf(acc.toArray, Some(assetId.toArray))
@@ -137,7 +137,7 @@ object WavesContext {
         case _ => ???
       }
 
-    val txHeightByIdF: BaseFunction = PredefFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, OPTION(LONG), "id" -> BYTEVECTOR) {
+    val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, OPTION(LONG), "id" -> BYTEVECTOR) {
       case (id: ByteVector) :: Nil => Right(env.transactionHeightById(id.toArray))
       case _                       => ???
     }

@@ -34,11 +34,11 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
   private val expectedExpr = BLOCK(
     LET("x", CONST_LONG(10)),
     FUNCTION_CALL(
-      FunctionHeader.Predef(EQ),
+      FunctionHeader.Native(EQ),
       List(
         CONST_LONG(20),
         FUNCTION_CALL(
-          FunctionHeader.Predef(SUM_LONG),
+          FunctionHeader.Native(SUM_LONG),
           List(REF("x"), REF("x"))
         )
       )

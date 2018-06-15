@@ -8,13 +8,13 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 class BigSum {
   private val bigSum = (1 to 100).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
     FUNCTION_CALL(
-      function = FunctionHeader.Predef(SUM_LONG),
+      function = FunctionHeader.Native(SUM_LONG),
       args = List(r, CONST_LONG(i))
     )
   }
 
   val expr: EXPR = FUNCTION_CALL(
-    function = FunctionHeader.Predef(EQ),
+    function = FunctionHeader.Native(EQ),
     args = List(CONST_LONG(1), bigSum)
   )
 }

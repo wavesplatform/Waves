@@ -156,7 +156,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("let is evaluated maximum once") {
     var functionEvaluated = 0
 
-    val f = PredefFunction("F", 1, 258, LONG, "_" -> LONG) { _ =>
+    val f = NativeFunction("F", 1, 258, LONG, "_" -> LONG) { _ =>
       functionEvaluated = functionEvaluated + 1
       Right(1L)
     }
@@ -191,7 +191,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on function call getter evaluation") {
     val fooType = CaseType("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = PredefFunction("createFoo", 1, 259, fooType.typeRef, List.empty: _*) { _ =>
+    val fooCtor = NativeFunction("createFoo", 1, 259, fooType.typeRef, List.empty: _*) { _ =>
       Right(CaseObj(fooType.typeRef, Map("bar" -> "bAr", "buz" -> 1L)))
     }
 
@@ -207,7 +207,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on block getter evaluation") {
     val fooType = CaseType("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = PredefFunction("createFoo", 1, 259, fooType.typeRef, List.empty: _*) { _ =>
+    val fooCtor = NativeFunction("createFoo", 1, 259, fooType.typeRef, List.empty: _*) { _ =>
       Right(
         CaseObj(
           fooType.typeRef,
@@ -217,7 +217,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
           )
         ))
     }
-    val fooTransform = PredefFunction("transformFoo", 1, 260, fooType.typeRef, "foo" -> fooType.typeRef) {
+    val fooTransform = NativeFunction("transformFoo", 1, 260, fooType.typeRef, "foo" -> fooType.typeRef) {
       case (fooObj: CaseObj) :: Nil => Right(fooObj.copy(fields = fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
       case _                        => ???
     }
@@ -306,7 +306,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(gen) {
       case (bytes, takeN) =>
         val expr = FUNCTION_CALL(
-          FunctionHeader.Predef(TAKE_BYTES),
+          FunctionHeader.Native(TAKE_BYTES),
           List(
             CONST_BYTEVECTOR(bytes),
             CONST_LONG(takeN)
@@ -378,7 +378,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[Boolean](
       context = context,
       expr = FUNCTION_CALL(
-        function = FunctionHeader.Predef(SIGVERIFY),
+        function = FunctionHeader.Native(SIGVERIFY),
         args = List(
           GETTER(REF("tx"), "bodyBytes"),
           GETTER(REF("tx"), "proof0"),
@@ -457,7 +457,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[ByteVector](
       context = context,
       expr = FUNCTION_CALL(
-        function = FunctionHeader.Predef(funcName),
+        function = FunctionHeader.Native(funcName),
         args = List(CONST_BYTEVECTOR(ByteVector(bodyBytes)))
       )
     )

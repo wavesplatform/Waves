@@ -16,16 +16,16 @@ sealed trait BaseFunction {
 
 case class FunctionTypeSignature(result: TYPEPLACEHOLDER, args: Seq[TYPEPLACEHOLDER], header: FunctionHeader)
 
-case class PredefFunction private (name: String, cost: Long, signature: FunctionTypeSignature, ev: List[Any] => Either[String, Any])
+case class NativeFunction private (name: String, cost: Long, signature: FunctionTypeSignature, ev: List[Any] => Either[String, Any])
     extends BaseFunction {
   def eval(args: List[Any]): TrampolinedExecResult[Any] = EitherT.fromEither[Coeval](ev(args))
 }
 
-object PredefFunction {
+object NativeFunction {
 
   def apply(name: String, cost: Long, internalName: Short, resultType: TYPEPLACEHOLDER, args: (String, TYPEPLACEHOLDER)*)(
       ev: List[Any] => Either[String, Any]) =
-    new PredefFunction(name, cost, FunctionTypeSignature(resultType, args.map(_._2), FunctionHeader.Predef(internalName)), ev)
+    new NativeFunction(name, cost, FunctionTypeSignature(resultType, args.map(_._2), FunctionHeader.Native(internalName)), ev)
 
 }
 

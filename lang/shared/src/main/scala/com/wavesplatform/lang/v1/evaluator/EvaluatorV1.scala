@@ -53,7 +53,7 @@ object EvaluatorV1 extends ExprEvaluator {
         .get(header)
         .fold(raiseError[EvaluationContext, ExecutionError, Any](s"function '$header' not found")) {
           case func: UserFunction => func.ev(args).liftTo[EvalM].flatMap(evalExpr)
-          case func: PredefFunction =>
+          case func: NativeFunction =>
             args
               .traverse[EvalM, Any](a => evalExpr(a))
               .map(func.eval)

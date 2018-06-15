@@ -41,7 +41,7 @@ object CompilationError {
   }
   final case class AlreadyDefined(start: Int, end: Int, name: String, isFunction: Boolean) extends CompilationError {
     val message =
-      if (isFunction) s"Value '$name' can't be defined because function with such name is predefined"
+      if (isFunction) s"Value '$name' can't be defined because function with this name is already defined"
       else s"Value '$name' already defined in the scope"
   }
   final case class NonExistingType(start: Int, end: Int, name: String, existing: List[String]) extends CompilationError {

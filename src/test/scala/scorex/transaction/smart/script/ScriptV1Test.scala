@@ -23,7 +23,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
     val expr = (1 to 21)
       .map { _ =>
         FUNCTION_CALL(
-          function = FunctionHeader.Predef(SIGVERIFY),
+          function = FunctionHeader.Native(SIGVERIFY),
           args = List(byteVector, byteVector, byteVector)
         )
       }
@@ -35,13 +35,13 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
   property("ScriptV1.apply should deny too big scripts") {
     val bigSum = (1 to 100).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
       FUNCTION_CALL(
-        function = FunctionHeader.Predef(SUM_LONG),
+        function = FunctionHeader.Native(SUM_LONG),
         args = List(r, CONST_LONG(i))
       )
     }
     val expr = (1 to 9).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
       FUNCTION_CALL(
-        function = FunctionHeader.Predef(EQ),
+        function = FunctionHeader.Native(EQ),
         args = List(r, bigSum)
       )
     }
@@ -54,7 +54,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
     val expr = (1 to 19)
       .map { _ =>
         FUNCTION_CALL(
-          function = FunctionHeader.Predef(SIGVERIFY),
+          function = FunctionHeader.Native(SIGVERIFY),
           args = List(byteVector, byteVector, byteVector)
         )
       }

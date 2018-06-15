@@ -55,7 +55,7 @@ trait TypedScriptGen {
   def FUNCTION_CALLgen(resultType: TYPE): Gen[EXPR] =
     Gen.const(
       FUNCTION_CALL(
-        function = FunctionHeader.Predef(SUM_LONG),
+        function = FunctionHeader.Native(SUM_LONG),
         args = List(CONST_LONG(1), CONST_LONG(1))
       )
     )
