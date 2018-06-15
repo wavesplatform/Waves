@@ -11,9 +11,10 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, EnvironmentFunctions, PureContext}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
+import com.wavesplatform.utils.Base58
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -324,7 +325,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       pk
     }
 
-    val environment = Common.emptyBlockchainEnvironment()
+    val environment = emptyBlockchainEnvironment()
     val ctx = Monoid.combineAll(
       Seq(
         CryptoContext.build(Global),
@@ -340,9 +341,70 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
 
       val actual = ev[CaseObj](ctx.evaluationContext, expr)._2.map(_.fields("bytes"))
-      actual shouldBe Right(ByteVector(Common.addressFromPublicKey(environment.networkByte, pkBytes)))
+      actual shouldBe Right(ByteVector(addressFromPublicKey(environment.networkByte, pkBytes)))
     }
   }
+
+  property("addressFromString works as the native one: sunny without prefix") {
+    val environment = Common.emptyBlockchainEnvironment()
+    val gen = for {
+      seed <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
+    } yield {
+      val (_, pk) = Curve25519.createKeyPair(seed)
+      Base58.encode(addressFromPublicKey(environment.networkByte, pk))
+    }
+
+    val ctx = Monoid.combineAll(
+      Seq(
+        CryptoContext.build(Global),
+        PureContext.ctx,
+        WavesContext.build(environment)
+      )
+    )
+
+    forAll(gen) { addrStr =>
+      val expr = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
+      try {
+        ev[Option[CaseObj]](ctx.evaluationContext, expr)._2.map(_.map(_.fields("bytes")))
+      } catch {
+        case e: Throwable => println(e)
+      }
+      val actual = ev[Option[CaseObj]](ctx.evaluationContext, expr)._2.map(_.map(_.fields("bytes")))
+      actual shouldBe addressFromString(environment.networkByte, addrStr).map(_.map(ByteVector(_)))
+    }
+  }
+
+  property("addressFromString works as the native one: sunny with prefix") {
+    val environment = Common.emptyBlockchainEnvironment()
+    val gen = for {
+      seed <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
+    } yield {
+      val (_, pk) = Curve25519.createKeyPair(seed)
+      EnvironmentFunctions.AddressPrefix + Base58.encode(addressFromPublicKey(environment.networkByte, pk))
+    }
+
+    val ctx = Monoid.combineAll(
+      Seq(
+        CryptoContext.build(Global),
+        PureContext.ctx,
+        WavesContext.build(environment)
+      )
+    )
+
+    forAll(gen) { addrStr =>
+      val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
+      val actual = ev[Option[CaseObj]](ctx.evaluationContext, expr)._2.map(_.map(_.fields("bytes")))
+      actual shouldBe addressFromString(environment.networkByte, addrStr).map(_.map(ByteVector(_)))
+    }
+  }
+
+  property("addressFromString works as the native one: wrong address version") {}
+
+  property("addressFromString works as the native one: from other network") {}
+
+  property("addressFromString works as the native one: wrong length") {}
+
+  property("addressFromString works as the native one: wrong checksum") {}
 
   private def sigVerifyTest(bodyBytes: Array[Byte],
                             publicKey: PublicKey,

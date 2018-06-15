@@ -55,21 +55,40 @@ object PureContext {
     case _              => ???
   }
 
-  val size: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "byteVector" -> BYTEVECTOR) {
+  val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "byteVector" -> BYTEVECTOR) {
     case (bv: ByteVector) :: Nil => Right(bv.size)
-    case _                       => ???
+    case xs                      => notImplemented("size(byte[])", xs)
   }
 
-  val take: BaseFunction = NativeFunction("take", 1, TAKE_BYTES, BYTEVECTOR, "byteVector" -> BYTEVECTOR, "number" -> LONG) {
-    case (bv: ByteVector) :: (number: Long) :: Nil => Right(bv.take(number))
-    case _                                         => ???
+  val sizeString: BaseFunction = NativeFunction("size", 1, SIZE_STRING, LONG, "xs" -> STRING) {
+    case (bv: String) :: Nil => Right(bv.length)
+    case xs                  => notImplemented("size(String)", xs)
+  }
+
+  val takeBytes: BaseFunction = NativeFunction("take", 1, TAKE_BYTES, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
+    case (xs: ByteVector) :: (number: Long) :: Nil => Right(xs.take(number))
+    case xs                                        => notImplemented("take(xs: byte[], number: Long)", xs)
+  }
+
+  val dropBytes: BaseFunction = NativeFunction("drop", 1, DROP_BYTES, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
+    case (xs: ByteVector) :: (number: Long) :: Nil => Right(xs.drop(number))
+    case xs                                        => notImplemented("drop(xs: byte[], number: Long)", xs)
+  }
+
+  val takeString: BaseFunction = NativeFunction("take", 1, TAKE_STRING, STRING, "xs" -> STRING, "number" -> LONG) {
+    case (xs: String) :: (number: Long) :: Nil => Right(xs.take(Math.toIntExact(number)))
+    case xs                                    => notImplemented("take(xs: String, number: Long)", xs)
+  }
+
+  val dropString: BaseFunction = NativeFunction("drop", 1, DROP_STRING, STRING, "xs" -> STRING, "number" -> LONG) {
+    case (xs: String) :: (number: Long) :: Nil => Right(xs.drop(Math.toIntExact(number)))
+    case xs                                    => notImplemented("drop(xs: String, number: Long)", xs)
   }
 
   private def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (t.Underlying, t.Underlying) => r.Underlying): BaseFunction =
     NativeFunction(opsToFunctions(op), 1, func, r, "a" -> t, "b" -> t) {
-      case a :: b :: Nil =>
-        Right(body(a.asInstanceOf[t.Underlying], b.asInstanceOf[t.Underlying]))
-      case _ => ???
+      case a :: b :: Nil => Right(body(a.asInstanceOf[t.Underlying], b.asInstanceOf[t.Underlying]))
+      case _             => ???
     }
 
   val getElement: BaseFunction =
@@ -147,7 +166,7 @@ object PureContext {
   )
 
   private val vars      = Map(("None", (OPTION(NOTHING), none)), (errRef, (NOTHING, err)))
-  private val functions = Seq(fraction, extract, isDefined, some, size, take, _isInstanceOf) ++ operators
+  private val functions = Seq(fraction, extract, isDefined, some, sizeBytes, takeBytes, dropBytes, sizeString, takeString, dropString, _isInstanceOf) ++ operators
 
   lazy val ctx                              = CTX(Seq.empty, vars, functions)
   lazy val evalContext: EvaluationContext   = ctx.evaluationContext

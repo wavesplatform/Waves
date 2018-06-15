@@ -12,7 +12,7 @@ class EnvironmentFunctions(environment: Environment) {
   private val Global = com.wavesplatform.lang.hacks.Global // Hack for IDEA
 
   def addressFromString(str: String): Either[String, Option[ByteVector]] = {
-    val base58String = if (str.startsWith(Prefix)) str.drop(Prefix.length) else str
+    val base58String = if (str.startsWith(AddressPrefix)) str.drop(AddressPrefix.length) else str
     Global.base58Decode(base58String, Global.MaxAddressLength) match {
       case Left(e) => Left(e)
       case Right(addressBytes) =>
@@ -41,9 +41,9 @@ class EnvironmentFunctions(environment: Environment) {
 }
 
 object EnvironmentFunctions {
-  val ChecksumLength        = 4
-  val HashLength            = 20
-  val AddressVersion: Byte  = 1
-  private val AddressLength = 1 + 1 + ChecksumLength + HashLength
-  private val Prefix        = "address:"
+  val ChecksumLength       = 4
+  val HashLength           = 20
+  val AddressVersion: Byte = 1
+  val AddressLength: Int   = 1 + 1 + ChecksumLength + HashLength
+  val AddressPrefix        = "address:"
 }

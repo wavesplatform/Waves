@@ -76,4 +76,24 @@ object Common {
     val withoutChecksum = EnvironmentFunctions.AddressVersion +: networkByte +: publicKeyHash
     withoutChecksum ++ Global.secureHash(withoutChecksum).take(EnvironmentFunctions.ChecksumLength)
   }
+
+  def addressFromString(networkByte: Byte, str: String): Either[String, Option[Array[Byte]]] = {
+    val base58String = if (str.startsWith(EnvironmentFunctions.AddressPrefix)) str.drop(EnvironmentFunctions.AddressPrefix.length) else str
+    Global.base58Decode(base58String, Global.MaxAddressLength) match {
+      case Left(e) => Left(e)
+      case Right(addressBytes) =>
+        val version = addressBytes.head
+        val network = addressBytes.tail.head
+        lazy val checksumCorrect = {
+          val checkSum = addressBytes.takeRight(EnvironmentFunctions.ChecksumLength)
+          val checkSumGenerated =
+            Global.secureHash(addressBytes.dropRight(EnvironmentFunctions.ChecksumLength)).take(EnvironmentFunctions.ChecksumLength)
+          checkSum sameElements checkSumGenerated
+        }
+
+        if (version == EnvironmentFunctions.AddressVersion && network == networkByte && addressBytes.length == EnvironmentFunctions.AddressLength && checksumCorrect)
+          Right(Some(addressBytes))
+        else Right(None)
+    }
+  }
 }
