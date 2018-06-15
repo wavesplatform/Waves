@@ -53,6 +53,7 @@ object Bindings {
     CaseObj(
       orderType.typeRef,
       Map(
+        "id"               -> ord.id,
         "sender"           -> senderObject(ord.sender),
         "senderPublicKey"  -> ord.senderPublicKey,
         "matcherPublicKey" -> ord.matcherPublicKey,
