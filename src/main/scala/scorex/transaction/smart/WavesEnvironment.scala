@@ -1,10 +1,12 @@
 package scorex.transaction.smart
 
+import cats.implicits._
+import com.wavesplatform.lang.v1.traits.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient, Tx => ContractTransaction}
 import com.wavesplatform.state._
 import monix.eval.Coeval
 import scodec.bits.ByteVector
-import scorex.account.{Address, AddressOrAlias, Alias}
+import scorex.account.AddressOrAlias
 import scorex.transaction.Transaction
 
 class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], blockchain: Blockchain) extends Environment {
@@ -18,20 +20,33 @@ class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], blo
       .map(_._2)
       .map(RealTransactionWrapper(_))
 
-  override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any] = {
-    val address = Address.fromBytes(addressBytes).explicitGet()
-    val data    = blockchain.accountData(address, key)
-    data.map((_, dataType)).flatMap {
-      case (LongDataEntry(_, value), DataType.Long)        => Some(value)
-      case (BooleanDataEntry(_, value), DataType.Boolean)  => Some(value)
-      case (BinaryDataEntry(_, value), DataType.ByteArray) => Some(ByteVector(value.arr))
-      case (StringDataEntry(_, value), DataType.String)    => Some(value)
-      case _                                               => None
-    }
+  override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any] = {
+    for {
+      address <- recipient match {
+        case Address(bytes) =>
+          scorex.account.Address
+            .fromBytes(bytes.toArray)
+            .toOption
+        case Alias(name) =>
+          scorex.account.Alias
+            .buildWithCurrentNetworkByte(name)
+            .toOption >>= blockchain.resolveAlias
+      }
+      data <- blockchain
+        .accountData(address, key)
+        .map((_, dataType))
+        .flatMap {
+          case (LongDataEntry(_, value), DataType.Long)        => Some(value)
+          case (BooleanDataEntry(_, value), DataType.Boolean)  => Some(value)
+          case (BinaryDataEntry(_, value), DataType.ByteArray) => Some(ByteVector(value.arr))
+          case (StringDataEntry(_, value), DataType.String)    => Some(value)
+          case _                                               => None
+        }
+    } yield data
   }
   override def resolveAlias(name: String): Either[String, Recipient.Address] =
     blockchain
-      .resolveAliasEi(Alias.buildWithCurrentNetworkByte(name).explicitGet())
+      .resolveAliasEi(scorex.account.Alias.buildWithCurrentNetworkByte(name).explicitGet())
       .left
       .map(_.toString)
       .right
