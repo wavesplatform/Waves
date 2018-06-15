@@ -11,9 +11,9 @@ object Types {
 
   val transfer = CaseType("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
 
-  val optionByteVector: OPTION = OPTION(BYTEVECTOR)
-  val optionAddress            = OPTION(addressType.typeRef)
-  val optionLong: OPTION       = OPTION(LONG)
+  val optionByteVector         = UNION(BYTEVECTOR, UNIT)
+  val optionAddress            = UNION(addressType.typeRef, UNIT)
+  val optionLong               = UNION(LONG, UNIT)
   val listByteVector: LIST     = LIST(BYTEVECTOR)
   val listTransfers            = LIST(transfer.typeRef)
 

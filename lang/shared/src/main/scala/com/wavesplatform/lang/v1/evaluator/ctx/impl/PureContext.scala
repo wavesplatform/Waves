@@ -179,4 +179,7 @@ object PureContext {
   lazy val evalContext     = ctx.evaluationContext
   lazy val compilerContext = ctx.compilerContext
 
+  def fromOption[T](v: Option[T]): Any = {
+    v.getOrElse(():Any)
+  }
 }

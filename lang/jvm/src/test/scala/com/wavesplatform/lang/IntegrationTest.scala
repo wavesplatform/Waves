@@ -139,8 +139,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("equals should work with Option") {
-    eval[Boolean]("Some(1) == Some(1)") shouldBe Right(true)
-    eval[Boolean]("Some(true) == Some(false)") shouldBe Right(false)
+    eval[Boolean]("SomeU(1) == SomeU(1)") shouldBe Right(true)
+    eval[Boolean]("SomeU(true) == SomeU(false)") shouldBe Right(false)
   }
 
   property("equals some lang structure") {

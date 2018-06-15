@@ -42,7 +42,7 @@ class TypeInferrerTest extends FreeSpec with Matchers {
 
     "option" - {
       "as plain type" in {
-        TypeInferrer(Seq((OPTION(LONG), typeparamT))) shouldBe Right(Map(typeparamT -> OPTION(LONG)))
+        TypeInferrer(Seq((LIST(LONG), typeparamT))) shouldBe Right(Map(typeparamT -> LIST(LONG)))
       }
 
       "containing inner type" in {
@@ -54,14 +54,14 @@ class TypeInferrerTest extends FreeSpec with Matchers {
       }
 
       "containing best common type" in {
-        TypeInferrer(Seq((LONG, typeparamT), (OPTION(NOTHING), OPTIONTYPEPARAM(typeparamT)))) shouldBe Right(Map(typeparamT -> LONG))
+        TypeInferrer(Seq((LONG, typeparamT), (LIST(NOTHING), LISTTYPEPARAM(typeparamT)))) shouldBe Right(Map(typeparamT -> LONG))
       }
 
       "fails if no common type" in {
         TypeInferrer(Seq((BYTEVECTOR, typeparamT), (BYTEVECTOR, LISTTYPEPARAM(typeparamT)))) should produce("Non-matching types")
         TypeInferrer(Seq((LONG, typeparamT), (LIST(LIST(NOTHING)), LISTTYPEPARAM(typeparamT)))) should produce("Can't match inferred types")
         TypeInferrer(Seq((BYTEVECTOR, typeparamT), (LIST(LONG), LISTTYPEPARAM(typeparamT)))) should produce("Can't match inferred types")
-        TypeInferrer(Seq((OPTION(BYTEVECTOR), typeparamT), (LIST(LONG), LISTTYPEPARAM(typeparamT)))) should produce("Can't match inferred types")
+//        TypeInferrer(Seq((OPTION(BYTEVECTOR), typeparamT), (LIST(LONG), LISTTYPEPARAM(typeparamT)))) should produce("Can't match inferred types")
       }
     }
   }

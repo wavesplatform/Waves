@@ -37,7 +37,7 @@ class EnvironmentFunctions(environment: Environment) {
     }
   }
 
-  def getData(addr: CaseObj, key: String, dataType: DataType): Either[String, Any] = {
+  def getData(addr: CaseObj, key: String, dataType: DataType): Either[String, Option[Any]] = {
     val rawAddressBytes = addr.fields("bytes")
     for {
       addressBytes <- Try(rawAddressBytes.asInstanceOf[ByteVector].toArray).toEither.left.map(_.getMessage)
