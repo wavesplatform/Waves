@@ -320,7 +320,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     } yield (addressId, (tx.builder.typeId.toInt, id))).groupBy(_._1).mapValues(_.map(_._2))
 
     for ((addressId, txs) <- accountTransactions) {
-      rw.put(Keys.addressTransactionIds(height, addressId), txs)
+      val kk        = Keys.addressTransactionSeqNr(addressId)
+      val nextSeqNr = rw.get(kk) + 1
+      rw.put(Keys.addressTransactionIds(addressId, nextSeqNr), txs)
+      rw.put(kk, nextSeqNr)
     }
 
     for ((alias, addressId) <- aliases) {
@@ -493,11 +496,11 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = readOnly { db =>
     db.get(Keys.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { addressId =>
       val txs = for {
-        h              <- (db.get(Keys.height) to 1 by -1).view
-        (txType, txId) <- db.get(Keys.addressTransactionIds(h, addressId))
+        seqNr          <- (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).view
+        (txType, txId) <- db.get(Keys.addressTransactionIds(addressId, seqNr))
         if types.isEmpty || types.contains(txType.toByte)
         (_, tx) <- db.get(Keys.transactionInfo(txId))
-      } yield (h, tx)
+      } yield (seqNr, tx)
 
       txs.slice(from, count).force
     }
