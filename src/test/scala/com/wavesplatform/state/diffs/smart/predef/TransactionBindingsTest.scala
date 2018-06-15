@@ -15,7 +15,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
        |   let id = t.id == base58'${t.id().base58}'
        |   let fee = t.fee == ${t.assetFee._2}
        |   let timestamp = t.timestamp == ${t.timestamp}
-       |   let bodyBytes = t.bodyBytes == base58'${ByteStr(t.bodyBytes.apply()).base58}'
+       |   let bodyBytes = t.bodyBytes == base64'${ByteStr(t.bodyBytes.apply()).base64}'
        |   let sender = t.sender == addressFromPublicKey(base58'${ByteStr(t.sender.publicKey).base58}')
        |   let senderPublicKey = t.senderPublicKey == base58'${ByteStr(t.sender.publicKey).base58}'
        |   ${Range(0, 8).map(pg).mkString("\n")}
@@ -230,7 +230,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   }
 
   property("DataTransaction binding") {
-    forAll(dataTransactionGen(5, true)) { t =>
+    forAll(dataTransactionGen(10)) { t =>
       def pg(i: Int) = {
         val v = t.data(i) match {
           case x: LongDataEntry    => s"case a: LongDataEntry => a.value == ${x.value}"
@@ -270,7 +270,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   }
 
   property("MassTransferTransaction binding") {
-    forAll(massTransferGen(10)) { t =>
+    forAll(massTransferGen) { t =>
       def pg(i: Int) =
         s"""let recipient$i = match (t.transfers[$i].recipient) {
            |case a: Address => a.bytes == base58'${t.transfers(i).address.cast[Address].map(_.bytes.base58).getOrElse("")}'
