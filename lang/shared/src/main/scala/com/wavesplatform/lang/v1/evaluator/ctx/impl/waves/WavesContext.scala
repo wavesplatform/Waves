@@ -160,18 +160,19 @@ object WavesContext {
                 )
               ),
               IF(
+                // version
                 FUNCTION_CALL(
                   FunctionHeader.Native(EQ),
                   List(
-                    FUNCTION_CALL(FunctionHeader.Native(TAKE_BYTES), List(REF("@afs_addrBytes"), CONST_LONG(1))), // version
+                    FUNCTION_CALL(FunctionHeader.Native(TAKE_BYTES), List(REF("@afs_addrBytes"), CONST_LONG(1))),
                     CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion))
                   )
                 ),
                 IF(
+                  // networkByte
                   FUNCTION_CALL(
                     FunctionHeader.Native(EQ),
                     List(
-                      // networkByte
                       FUNCTION_CALL(
                         FunctionHeader.Native(TAKE_BYTES),
                         List(

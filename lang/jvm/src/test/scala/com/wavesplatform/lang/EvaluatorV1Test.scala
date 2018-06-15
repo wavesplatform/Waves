@@ -297,23 +297,67 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     r.isLeft shouldBe false
   }
 
-  property("take works as the native one") {
+  property("drop(ByteVector, Long) works as the native one") {
     val gen = for {
-      n     <- Gen.choose(0, 100)
-      bytes <- Gen.containerOfN[Array, Byte](n, Arbitrary.arbByte.arbitrary).map(ByteVector(_))
-      takeN <- Gen.choose(0, n)
-    } yield (bytes, takeN)
+      xs     <- Gen.containerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
+      number <- Arbitrary.arbInt.arbitrary
+    } yield (ByteVector(xs), number)
 
     forAll(gen) {
-      case (bytes, takeN) =>
-        val expr = FUNCTION_CALL(
-          FunctionHeader.Native(TAKE_BYTES),
-          List(
-            CONST_BYTEVECTOR(bytes),
-            CONST_LONG(takeN)
-          )
-        )
-        ev[ByteVector](expr = expr)._2 shouldBe Right(bytes.take(takeN))
+      case (xs, number) =>
+        val expr   = FUNCTION_CALL(FunctionHeader.Native(DROP_BYTES), List(CONST_BYTEVECTOR(xs), CONST_LONG(number)))
+        val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)._2
+        actual shouldBe Right(xs.drop(number))
+    }
+  }
+
+  property("take(ByteVector, Long) works as the native one") {
+    val gen = for {
+      xs     <- Gen.containerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
+      number <- Arbitrary.arbInt.arbitrary
+    } yield (ByteVector(xs), number)
+
+    forAll(gen) {
+      case (xs, number) =>
+        val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_BYTES), List(CONST_BYTEVECTOR(xs), CONST_LONG(number)))
+        val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)._2
+        actual shouldBe Right(xs.take(number))
+    }
+  }
+
+  property("drop(String, Long) works as the native one") {
+    val gen = for {
+      xs     <- Arbitrary.arbString.arbitrary
+      number <- Arbitrary.arbInt.arbitrary
+    } yield (xs, number)
+
+    forAll(gen) {
+      case (xs, number) =>
+        val expr   = FUNCTION_CALL(FunctionHeader.Native(DROP_STRING), List(CONST_STRING(xs), CONST_LONG(number)))
+        val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)._2
+        actual shouldBe Right(xs.drop(number))
+    }
+  }
+
+  property("take(String, Long) works as the native one") {
+    val gen = for {
+      xs     <- Arbitrary.arbString.arbitrary
+      number <- Arbitrary.arbInt.arbitrary
+    } yield (xs, number)
+
+    forAll(gen) {
+      case (xs, number) =>
+        val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_STRING), List(CONST_STRING(xs), CONST_LONG(number)))
+        val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)._2
+        actual shouldBe Right(xs.take(number))
+    }
+  }
+
+  property("size(String) works as the native one") {
+    forAll(Arbitrary.arbString.arbitrary) { xs =>
+      val expr   = FUNCTION_CALL(FunctionHeader.Native(SIZE_STRING), List(CONST_STRING(xs)))
+      val actual = ev[Int](PureContext.ctx.evaluationContext, expr)._2
+      actual shouldBe Right(xs.size)
     }
   }
 
