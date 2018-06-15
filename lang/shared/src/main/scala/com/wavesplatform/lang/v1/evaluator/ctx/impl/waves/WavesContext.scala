@@ -90,27 +90,7 @@ object WavesContext {
       case _ => ???
     }
 
-    /*
-  def addressFromString(str: String): Either[String, Option[ByteVector]] = {
-    val base58String = if (str.startsWith(Prefix)) str.drop(Prefix.length) else str
-    Global.base58Decode(base58String, Global.MaxAddressLength) match {
-      case Left(e) => Left(e)
-      case Right(addressBytes) =>
-        val version = addressBytes.head
-        val network = addressBytes.tail.head
-        lazy val checksumCorrect = {
-          val checkSum          = addressBytes.takeRight(ChecksumLength)
-          val checkSumGenerated = Global.secureHash(addressBytes.dropRight(ChecksumLength)).take(ChecksumLength)
-          checkSum sameElements checkSumGenerated
-        }
-
-        if (version == AddressVersion && network == environment.networkByte && addressBytes.length == AddressLength && checksumCorrect)
-          Right(Some(ByteVector(addressBytes)))
-        else Right(None)
-    }
-  }
-     */
-    def removePrefix(str: EXPR, prefix: String): EXPR = IF(
+    def removePrefixExpr(str: EXPR, prefix: String): EXPR = IF(
       FUNCTION_CALL(
         FunctionHeader.Native(EQ),
         List(
@@ -122,11 +102,55 @@ object WavesContext {
       str
     )
 
+    def dropRightExpr(xs: EXPR, number: Long): EXPR = FUNCTION_CALL(
+      FunctionHeader.Native(TAKE_BYTES),
+      List(
+        xs,
+        FUNCTION_CALL(
+          FunctionHeader.Native(SUB_LONG),
+          List(
+            FUNCTION_CALL(FunctionHeader.Native(SIZE_BYTES), List(xs)),
+            CONST_LONG(number)
+          )
+        )
+      )
+    )
+
+    def takeRightExpr(xs: EXPR, number: Long): EXPR = FUNCTION_CALL(
+      FunctionHeader.Native(DROP_BYTES),
+      List(
+        xs,
+        FUNCTION_CALL(
+          FunctionHeader.Native(SUB_LONG),
+          List(
+            FUNCTION_CALL(FunctionHeader.Native(SIZE_BYTES), List(xs)),
+            CONST_LONG(number)
+          )
+        )
+      )
+    )
+
+    def verifyAddressChecksumExpr(addressBytes: EXPR): EXPR = FUNCTION_CALL(
+      FunctionHeader.Native(EQ),
+      List(
+        // actual checksum
+        takeRightExpr(addressBytes, EnvironmentFunctions.ChecksumLength),
+        // generated checksum
+        FUNCTION_CALL(
+          FunctionHeader.Native(TAKE_BYTES),
+          List(
+            secureHashExpr(dropRightExpr(addressBytes, EnvironmentFunctions.ChecksumLength)),
+            CONST_LONG(EnvironmentFunctions.ChecksumLength)
+          )
+        )
+      )
+    )
+
     val addressFromStringF: BaseFunction = UserFunction("addressFromString", 100, optionAddress, "string" -> STRING) {
       case (str: EXPR) :: Nil =>
         Right(
           BLOCK(
-            LET("@afs_addrBytes", FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefix(str, EnvironmentFunctions.AddressPrefix)))),
+            LET("@afs_addrBytes", FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(str, EnvironmentFunctions.AddressPrefix)))),
             IF(
               FUNCTION_CALL(
                 FunctionHeader.Native(EQ),
@@ -158,9 +182,13 @@ object WavesContext {
                       CONST_BYTEVECTOR(ByteVector(env.networkByte))
                     )
                   ),
-                  FUNCTION_CALL(
-                    FunctionHeader.Native(SOME),
-                    List(FUNCTION_CALL(FunctionHeader.Native(ADDRESSFROMBYTES), List(REF("@afs_addrBytes"))))
+                  IF(
+                    verifyAddressChecksumExpr(REF("@afs_addrBytes")),
+                    FUNCTION_CALL(
+                      FunctionHeader.Native(SOME),
+                      List(FUNCTION_CALL(FunctionHeader.Native(ADDRESSFROMBYTES), List(REF("@afs_addrBytes"))))
+                    ),
+                    REF("None")
                   ),
                   REF("None")
                 ),

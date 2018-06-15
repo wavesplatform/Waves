@@ -71,9 +71,9 @@ object Common {
     override def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = ???
   }
 
-  def addressFromPublicKey(networkByte: Byte, pk: Array[Byte]): Array[Byte] = {
+  def addressFromPublicKey(networkByte: Byte, pk: Array[Byte], addressVersion: Byte = EnvironmentFunctions.AddressVersion): Array[Byte] = {
     val publicKeyHash   = Global.secureHash(pk).take(EnvironmentFunctions.HashLength)
-    val withoutChecksum = EnvironmentFunctions.AddressVersion +: networkByte +: publicKeyHash
+    val withoutChecksum = addressVersion +: networkByte +: publicKeyHash
     withoutChecksum ++ Global.secureHash(withoutChecksum).take(EnvironmentFunctions.ChecksumLength)
   }
 
