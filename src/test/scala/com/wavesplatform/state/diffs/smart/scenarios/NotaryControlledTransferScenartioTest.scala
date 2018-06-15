@@ -127,12 +127,10 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
     eval[Boolean](s"""toBase64String(base64'$s') == \"$s\"""").explicitGet() shouldBe true
   }
 
-  property("addressFromString() fails when address is too long") {
+  property("addressFromString() returns None when address is too long") {
     import Global.MaxAddressLength
     val longAddress = "A" * (MaxAddressLength + 1)
-    val r           = eval[ByteVector](s"""addressFromString("$longAddress")""")
-    r.isLeft shouldBe true
-    r.left.get shouldBe s"base58Decode input exceeds $MaxAddressLength"
+    eval[ByteVector](s"""addressFromString("$longAddress")""") shouldBe Right(None)
   }
 
   property("Scenario") {
