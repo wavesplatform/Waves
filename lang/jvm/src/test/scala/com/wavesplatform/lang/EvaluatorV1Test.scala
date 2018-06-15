@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, EnvironmentFunctions, PureContext}
 import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.utils.{Base58, Base64}
 import org.scalacheck.{Arbitrary, Gen}
@@ -23,6 +24,16 @@ import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+
+  private val defaultCryptoContext = CryptoContext.build(Global)
+
+  private def defaultFullContext(environment: Environment): CTX = Monoid.combineAll(
+    Seq(
+      defaultCryptoContext,
+      PureContext.ctx,
+      WavesContext.build(environment)
+    )
+  )
 
   private def ev[T](context: EvaluationContext = PureContext.evalContext, expr: EXPR): (EvaluationContext, Either[ExecutionError, T]) =
     EvaluatorV1[T](context, expr)
@@ -297,13 +308,13 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     r.isLeft shouldBe false
   }
 
-  property("drop(ByteVector, Long) works as the native one") {
-    val gen = for {
-      xs     <- Gen.containerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
-      number <- Arbitrary.arbInt.arbitrary
-    } yield (ByteVector(xs), number)
+  private val genBytesAndNumber = for {
+    xs     <- Gen.containerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
+    number <- Arbitrary.arbInt.arbitrary
+  } yield (ByteVector(xs), number)
 
-    forAll(gen) {
+  property("drop(ByteVector, Long) works as the native one") {
+    forAll(genBytesAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(FunctionHeader.Native(DROP_BYTES), List(CONST_BYTEVECTOR(xs), CONST_LONG(number)))
         val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)._2
@@ -312,12 +323,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("take(ByteVector, Long) works as the native one") {
-    val gen = for {
-      xs     <- Gen.containerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
-      number <- Arbitrary.arbInt.arbitrary
-    } yield (ByteVector(xs), number)
-
-    forAll(gen) {
+    forAll(genBytesAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_BYTES), List(CONST_BYTEVECTOR(xs), CONST_LONG(number)))
         val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)._2
@@ -325,13 +331,13 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
   }
 
-  property("drop(String, Long) works as the native one") {
-    val gen = for {
-      xs     <- Arbitrary.arbString.arbitrary
-      number <- Arbitrary.arbInt.arbitrary
-    } yield (xs, number)
+  private val genStringAndNumber = for {
+    xs     <- Arbitrary.arbString.arbitrary
+    number <- Arbitrary.arbInt.arbitrary
+  } yield (xs, number)
 
-    forAll(gen) {
+  property("drop(String, Long) works as the native one") {
+    forAll(genStringAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(FunctionHeader.Native(DROP_STRING), List(CONST_STRING(xs), CONST_LONG(number)))
         val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)._2
@@ -340,12 +346,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("take(String, Long) works as the native one") {
-    val gen = for {
-      xs     <- Arbitrary.arbString.arbitrary
-      number <- Arbitrary.arbInt.arbitrary
-    } yield (xs, number)
-
-    forAll(gen) {
+    forAll(genStringAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_STRING), List(CONST_STRING(xs), CONST_LONG(number)))
         val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)._2
@@ -367,11 +368,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       xs  <- Gen.containerOfN[Array, Byte](len, Arbitrary.arbByte.arbitrary)
     } yield Base58.encode(xs)
 
-    val ctx = CryptoContext.evalContext(Global)
-
     forAll(gen) { xs =>
       val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(CONST_STRING(xs)))
-      val actual = ev[ByteVector](ctx, expr)._2
+      val actual = ev[ByteVector](defaultCryptoContext.evaluationContext, expr)._2
       actual shouldBe Right(ByteVector(Base58.decode(xs).get))
     }
   }
@@ -382,11 +381,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       xs  <- Gen.containerOfN[Array, Byte](len, Arbitrary.arbByte.arbitrary)
     } yield Base64.encode(xs)
 
-    val ctx = CryptoContext.evalContext(Global)
-
     forAll(gen) { xs =>
       val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE64), List(CONST_STRING(xs)))
-      val actual = ev[ByteVector](ctx, expr)._2
+      val actual = ev[ByteVector](defaultCryptoContext.evaluationContext, expr)._2
       actual shouldBe Right(ByteVector(Base64.decode(xs).get))
     }
   }
@@ -397,31 +394,21 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       xs  <- Gen.containerOfN[Array, Byte](len, Arbitrary.arbByte.arbitrary)
     } yield s"base64:${Base64.encode(xs)}"
 
-    val ctx = CryptoContext.evalContext(Global)
-
     forAll(gen) { xs =>
       val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE64), List(CONST_STRING(xs)))
-      val actual = ev[ByteVector](ctx, expr)._2
+      val actual = ev[ByteVector](defaultCryptoContext.evaluationContext, expr)._2
       actual shouldBe Right(ByteVector(Base64.decode(xs).get))
     }
   }
 
   property("addressFromPublicKey works as the native one") {
-    val gen = for {
-      seed <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
-    } yield {
+    val environment = emptyBlockchainEnvironment()
+    val ctx         = defaultFullContext(environment)
+
+    val gen = Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary).map { seed =>
       val (_, pk) = Curve25519.createKeyPair(seed)
       pk
     }
-
-    val environment = emptyBlockchainEnvironment()
-    val ctx = Monoid.combineAll(
-      Seq(
-        CryptoContext.build(Global),
-        PureContext.ctx,
-        WavesContext.build(environment)
-      )
-    )
 
     forAll(gen) { pkBytes =>
       val expr = FUNCTION_CALL(
@@ -436,20 +423,12 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("addressFromString works as the native one: sunny without prefix") {
     val environment = Common.emptyBlockchainEnvironment()
-    val gen = for {
-      seed <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
-    } yield {
+    val ctx         = defaultFullContext(environment)
+
+    val gen = Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary).map { seed =>
       val (_, pk) = Curve25519.createKeyPair(seed)
       Base58.encode(addressFromPublicKey(environment.networkByte, pk))
     }
-
-    val ctx = Monoid.combineAll(
-      Seq(
-        CryptoContext.build(Global),
-        PureContext.ctx,
-        WavesContext.build(environment)
-      )
-    )
 
     forAll(gen) { addrStr =>
       val expr = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
@@ -465,20 +444,12 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("addressFromString works as the native one: sunny with prefix") {
     val environment = Common.emptyBlockchainEnvironment()
-    val gen = for {
-      seed <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
-    } yield {
+    val ctx         = defaultFullContext(environment)
+
+    val gen = Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary).map { seed =>
       val (_, pk) = Curve25519.createKeyPair(seed)
       EnvironmentFunctions.AddressPrefix + Base58.encode(addressFromPublicKey(environment.networkByte, pk))
     }
-
-    val ctx = Monoid.combineAll(
-      Seq(
-        CryptoContext.build(Global),
-        PureContext.ctx,
-        WavesContext.build(environment)
-      )
-    )
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
@@ -489,20 +460,12 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("addressFromString works as the native one: wrong length") {
     val environment = Common.emptyBlockchainEnvironment()
-    val gen = for {
-      seed <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
-    } yield {
+    val ctx         = defaultFullContext(environment)
+
+    val gen = Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary).map { seed =>
       val (_, pk) = Curve25519.createKeyPair(seed)
       EnvironmentFunctions.AddressPrefix + Base58.encode(addressFromPublicKey(environment.networkByte, pk) :+ (1: Byte))
     }
-
-    val ctx = Monoid.combineAll(
-      Seq(
-        CryptoContext.build(Global),
-        PureContext.ctx,
-        WavesContext.build(environment)
-      )
-    )
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
@@ -513,6 +476,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("addressFromString works as the native one: wrong address version") {
     val environment = Common.emptyBlockchainEnvironment()
+    val ctx         = defaultFullContext(environment)
+
     val gen = for {
       seed           <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
       addressVersion <- Gen.choose[Byte](0, 100)
@@ -521,14 +486,6 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       val (_, pk) = Curve25519.createKeyPair(seed)
       EnvironmentFunctions.AddressPrefix + Base58.encode(addressFromPublicKey(environment.networkByte, pk, addressVersion))
     }
-
-    val ctx = Monoid.combineAll(
-      Seq(
-        CryptoContext.build(Global),
-        PureContext.ctx,
-        WavesContext.build(environment)
-      )
-    )
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
@@ -539,6 +496,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("addressFromString works as the native one: from other network") {
     val environment = Common.emptyBlockchainEnvironment()
+    val ctx         = defaultFullContext(environment)
+
     val gen = for {
       seed        <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
       networkByte <- Gen.choose[Byte](0, 100)
@@ -547,14 +506,6 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       val (_, pk) = Curve25519.createKeyPair(seed)
       EnvironmentFunctions.AddressPrefix + Base58.encode(addressFromPublicKey(networkByte, pk))
     }
-
-    val ctx = Monoid.combineAll(
-      Seq(
-        CryptoContext.build(Global),
-        PureContext.ctx,
-        WavesContext.build(environment)
-      )
-    )
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
@@ -565,6 +516,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("addressFromString works as the native one: wrong checksum") {
     val environment = Common.emptyBlockchainEnvironment()
+    val ctx         = defaultFullContext(environment)
+
     val gen = for {
       seed <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
       bytes = {
@@ -575,14 +528,6 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       wrongCheckSum <- Gen.containerOfN[Array, Byte](EnvironmentFunctions.ChecksumLength, Arbitrary.arbByte.arbitrary)
       if !checkSum.sameElements(wrongCheckSum)
     } yield EnvironmentFunctions.AddressPrefix + Base58.encode(bytes.dropRight(EnvironmentFunctions.ChecksumLength) ++ wrongCheckSum)
-
-    val ctx = Monoid.combineAll(
-      Seq(
-        CryptoContext.build(Global),
-        PureContext.ctx,
-        WavesContext.build(environment)
-      )
-    )
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
@@ -615,7 +560,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val context = Monoid.combineAll(
       Seq(
         PureContext.evalContext,
-        CryptoContext.evalContext(Global),
+        defaultCryptoContext.evaluationContext,
         EvaluationContext.build(
           letDefs = Map("tx" -> LazyVal(EitherT.pure(txObj))),
           functions = Seq.empty
@@ -670,7 +615,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val context = Monoid.combineAll(
       Seq(
         PureContext.ctx,
-        CryptoContext.build(Global),
+        defaultCryptoContext,
         CTX(Seq(txType), vars, Seq.empty)
       ))
 
@@ -694,12 +639,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   private def hashFuncTest(bodyBytes: Array[Byte], funcName: Short): (EvaluationContext, Either[ExecutionError, ByteVector]) = {
-    val context = Monoid.combineAll(
-      Seq(
-        PureContext.evalContext,
-        CryptoContext.evalContext(Global)
-      )
-    )
+    val context = Monoid.combineAll(Seq(PureContext.evalContext, defaultCryptoContext.evaluationContext))
 
     ev[ByteVector](
       context = context,
