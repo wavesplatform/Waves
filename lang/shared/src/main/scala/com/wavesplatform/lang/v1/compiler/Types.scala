@@ -38,7 +38,7 @@ object Types {
   case class CASETYPEREF(override val name: String, override val fields: List[(String, TYPE)])   extends AUTO_TAGGED_TYPE[CaseObj]
   class UNION(override val l: List[TYPE]) extends AUTO_TAGGED_TYPE[CaseObj] {
     override lazy val fields: List[(String, TYPE)] = l.map(_.fields.toSet).reduce(_ intersect _).toList
-    override def toString: String = "UNION("++l.mkString("|")++")"
+    override def toString: String = "UNION("++l.sortBy(_.toString).mkString("|")++")"
   }
   object UNION {
     def of(l: CaseType*): TYPE = UNION.create(l.map(_.typeRef).toList)
@@ -48,7 +48,7 @@ object Types {
        case t => List(t)
     } match {
        case Seq(t) => t
-       case l => new UNION(l.toList)
+       case l => new UNION(l.distinct.toList)
     }
     def apply(l: TYPE*): TYPE = create(l.toList)
     def unapply(u: UNION): Option[List[TYPE]] = Some(u.l)
@@ -78,4 +78,18 @@ object Types {
     }
     case t => t
   })
+  def canBeEq(type1: TYPEPARAM, type2: TYPEPARAM)(t: Map[TYPEPARAM, TYPE]) = {
+    (t(type1), t(type2)) match {
+      case (UNION(l1), UNION(l2)) =>
+        Either.cond(l1.exists(l2.toSet), BOOLEAN, "Comparing values have incompatible types")
+      case (UNION(l), t) =>
+        Either.cond(l.contains(t), BOOLEAN, "Comparing values have incompatible types")
+      case (t, UNION(l)) =>
+        Either.cond(l.contains(t), BOOLEAN, "Comparing values have incompatible types")
+      case (NOTHING, _) => Right(BOOLEAN)
+      case (_, NOTHING) => Right(BOOLEAN)
+      case (t1, t2) =>
+        Either.cond(t1 == t1, BOOLEAN, "Comparing values have incompatible types")
+    }
+  }
 }

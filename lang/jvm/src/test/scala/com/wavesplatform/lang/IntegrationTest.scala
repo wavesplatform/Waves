@@ -139,8 +139,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("equals should work with Option") {
-    eval[Boolean]("SomeU(1) == SomeU(1)") shouldBe Right(true)
-    eval[Boolean]("SomeU(true) == SomeU(false)") shouldBe Right(false)
+    eval[Boolean]("Some(1) == Some(1)") shouldBe Right(true)
+    eval[Boolean]("Some(true) == Some(false)") shouldBe Right(false)
   }
 
   property("equals some lang structure") {
@@ -195,10 +195,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("Extract from Some") {
-    eval[Long]("extractU(SomeU(1))+1") shouldBe Right(2)
+    eval[Long]("extract(Some(1))+1") shouldBe Right(2)
   }
 
   property("Match with not case types") {
-    eval[Long]("match SomeU(1) { case x: Int => x \n case y: Unit => 2 }") shouldBe Right(1)
+    eval[Long]("match Some(1) { case x: Int => x \n case y: Unit => 2 }") shouldBe Right(1)
   }
 }

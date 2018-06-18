@@ -164,7 +164,7 @@ object Types {
     "MassTransferTransaction",
     List(
       "feeAssetId"    -> optionByteVector,
-      "assetId"       -> optionByteVector,
+      "transferAssetId"       -> optionByteVector,
       "totalAmount"   -> LONG,
       "transfers"     -> listTransfers,
       "transferCount" -> LONG,
