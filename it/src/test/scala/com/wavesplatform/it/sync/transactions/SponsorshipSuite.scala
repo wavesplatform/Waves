@@ -100,8 +100,8 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       val (sponsorBalance, sponsorEffectiveBalance) = sponsor.accountBalances(sponsor.address)
       val sponsorLeaseAllAvaliableWaves             = sponsor.lease(sponsor.address, bob.address, sponsorEffectiveBalance - leasingFee, leasingFee).id
       nodes.waitForHeightAriseAndTxPresent(sponsorLeaseAllAvaliableWaves)
-      assertBadRequest(alice.transfer(alice.address, bob.address, 10 * Token, LargeFee, Some(sponsorAssetId), Some(sponsorAssetId)),
-                       "unavailable funds")
+      assertBadRequestAndResponse(alice.transfer(alice.address, bob.address, 10 * Token, LargeFee, Some(sponsorAssetId), Some(sponsorAssetId)),
+                                  "unavailable funds")
       val cancelLeasingTx = sponsor.cancelLease(sponsor.address, sponsorLeaseAllAvaliableWaves, leasingFee).id
       nodes.waitForHeightAriseAndTxPresent(cancelLeasingTx)
     }
