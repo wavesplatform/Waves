@@ -88,6 +88,7 @@ object TypeInferrer {
           if (biDirectional && (r equivalent a)) Some(r)
           else if (!biDirectional && (r >= a)) Some(r)
           else None
+        case (r: UNION, a: CASETYPEREF) if r.l.contains(a) => Some(r)
         case _ => None
       }
 }

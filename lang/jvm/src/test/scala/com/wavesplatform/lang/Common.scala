@@ -57,7 +57,7 @@ object Common {
   val sampleTypes = Seq(pointTypeA, pointTypeB, pointTypeC) ++ Seq(UnionType("PointAB", AorB.l), UnionType("PointBC", BorC.l))
 
   def sampleUnionContext(instance: CaseObj) =
-    EvaluationContext.build(Map("p" -> LazyVal(EitherT.pure(instance))), Seq.empty)
+    EvaluationContext.build(Map.empty, Map("p" -> LazyVal(EitherT.pure(instance))), Seq.empty)
 
   def emptyBlockchainEnvironment(h: Int = 1, tx: Coeval[Tx] = Coeval(???), nByte: Byte = 'T'): Environment = new Environment {
     override def height: Int       = h
