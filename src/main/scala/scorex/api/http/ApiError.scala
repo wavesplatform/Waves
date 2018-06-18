@@ -243,18 +243,19 @@ case class ScriptExecutionError(tx: Transaction, error: String, scriptSrc: Strin
       "transaction" -> tx.json(),
       "script"      -> scriptSrc,
       "vars" -> Json.obj(
-        "calculated" -> calculated.map({
-          case (k, v) => Json.obj(k -> v.value.toString)
-        }),
-        "notcalculated" -> notCalculated.map({
-          case (k, v) => Json.obj(k -> v.value.toString)
-        })
+        "calculated" -> Json.arr(
+          calculated.map({ case (k, v) => Json.obj(k -> JsString(LazyVal.print(v))) })
+        ),
+        "notcalculated" -> Json.arr(
+          notCalculated.map({ case (k, v) => Json.obj(k -> JsString(LazyVal.print(v))) })
+        )
       )
     )
   }
 }
 
 case class TransactionNotAllowedByScript(tx: Transaction, vars: Map[String, LazyVal], scriptSrc: String, isTokenScript: Boolean) extends ApiError {
+
   override val id: Int          = 307
   override val code: StatusCode = StatusCodes.BadRequest
   override val message: String  = s"Transaction not allowed by ${if (isTokenScript) "token" else "account"}-script"
@@ -266,12 +267,12 @@ case class TransactionNotAllowedByScript(tx: Transaction, vars: Map[String, Lazy
       "transaction" -> tx.json(),
       "script"      -> scriptSrc,
       "vars" -> Json.obj(
-        "calculated" -> calculated.map({
-          case (k, v) => Json.obj(k -> v.value.value().toString)
-        }),
-        "notcalculated" -> notCalculated.map({
-          case (k, v) => Json.obj(k -> v.value.value().toString)
-        })
+        "calculated" -> Json.arr(
+          calculated.map({ case (k, v) => Json.obj(k -> JsString(LazyVal.print(v))) })
+        ),
+        "notcalculated" -> Json.arr(
+          notCalculated.map({ case (k, v) => Json.obj(k -> JsString(LazyVal.print(v))) })
+        )
       )
     )
   }

@@ -15,7 +15,7 @@ import scala.util.Try
 object PureContext {
   private val optionT                                             = OPTIONTYPEPARAM(TYPEPARAM('T'))
   private val noneCoeval: Coeval[Either[String, Option[Nothing]]] = Coeval.evalOnce(Right(None))
-  private val nothingCoeval: Coeval[Either[String, Nothing]]      = Coeval.defer(Coeval(Right(throw new Exception("explicit contract termination"))))
+  private val nothingCoeval: Coeval[Either[String, Nothing]]      = Coeval.evalOnce(Left("explicit contract termination"))
 
   val none: LazyVal = LazyVal(EitherT(noneCoeval).subflatMap(Right(_: Option[Nothing]))) // IDEA HACK
   val err           = LazyVal(EitherT(nothingCoeval))
