@@ -121,6 +121,7 @@ object Types {
   val orderType = CaseType(
     "Order",
     List(
+      "id"               -> BYTEVECTOR,
       "sender"           -> addressType.typeRef,
       "senderPublicKey"  -> BYTEVECTOR,
       "matcherPublicKey" -> BYTEVECTOR,
@@ -201,5 +202,5 @@ object Types {
   val outgoingTransactionType = UNION.create(activeTransactionTypes.map(_.typeRef))
   val anyTransactionType      = UNION.create(transactionTypes.map(_.typeRef))
 
-  val wavesTypes = Seq(addressType, aliasType, transfer) ++ dataEntryTypes ++ transactionTypes
+  val wavesTypes = Seq(addressType, aliasType, transfer, orderType, assetPairType) ++ dataEntryTypes ++ transactionTypes
 }
