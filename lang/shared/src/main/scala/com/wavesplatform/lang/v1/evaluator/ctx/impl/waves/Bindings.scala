@@ -39,8 +39,8 @@ object Bindings {
     CaseObj(
       assetPairType.typeRef,
       Map(
-        "amountAsset" -> ap.amountAsset.asInstanceOf[optionByteVector.Underlying],
-        "priceAsset"  -> ap.priceAsset.asInstanceOf[optionByteVector.Underlying]
+        "amountAsset" -> fromOption(ap.amountAsset),
+        "priceAsset"  -> fromOption(ap.priceAsset)
       )
     )
 
