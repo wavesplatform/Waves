@@ -29,7 +29,10 @@ object Keys {
   private def historyKey(prefix: Short, b: Array[Byte]) = Key(bytes(prefix, b), readIntSeq, writeIntSeq)
 
   private def intKey(prefix: Short, default: Int = 0): Key[Int] =
-    Key[Int](Shorts.toByteArray(prefix), Option(_).fold(default)(Ints.fromByteArray), Ints.toByteArray)
+    Key(Shorts.toByteArray(prefix), Option(_).fold(default)(Ints.fromByteArray), Ints.toByteArray)
+
+  private def bytesSeqNr(prefix: Short, b: Array[Byte]): Key[Int] =
+    Key(bytes(prefix, b), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
 
   private def unsupported[A](message: String): A => Array[Byte] = _ => throw new UnsupportedOperationException(message)
 
@@ -110,10 +113,10 @@ object Keys {
   val addressesForWavesSeqNr: Key[Int]                = intKey(37)
   def addressesForWaves(seqNr: Int): Key[Seq[BigInt]] = Key(h(38, seqNr), readBigIntSeq, writeBigIntSeq)
 
-  def addressesForAssetSeqNr(assetId: ByteStr): Key[Int]                = intKey(39)
+  def addressesForAssetSeqNr(assetId: ByteStr): Key[Int]                = bytesSeqNr(39, assetId.arr)
   def addressesForAsset(assetId: ByteStr, seqNr: Int): Key[Seq[BigInt]] = Key(hBytes(40, seqNr, assetId.arr), readBigIntSeq, writeBigIntSeq)
 
-  def addressTransactionSeqNr(addressId: BigInt): Key[Int] = intKey(41)
+  def addressTransactionSeqNr(addressId: BigInt): Key[Int] = bytesSeqNr(41, addressId.toByteArray)
   def addressTransactionIds(addressId: BigInt, seqNr: Int): Key[Seq[(Int, ByteStr)]] =
     Key(hBytes(42, seqNr, addressId.toByteArray), readTransactionIds, writeTransactionIds)
 }
