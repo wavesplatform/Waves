@@ -291,8 +291,10 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       val script = s"""
                       |match tx {
                       | case t : MassTransferTransaction =>
-                      |    let assetId = if (${t.assetId.isDefined}) then extract(t.assetId) == base58'${t.assetId.getOrElse(ByteStr.empty).base58}'
-                      |      else isDefined(t.assetId) == false
+                      |    let assetId = if (${t.assetId.isDefined}) then extract(t.transferAssetId) == base58'${t.assetId
+                        .getOrElse(ByteStr.empty)
+                        .base58}'
+                      |      else isDefined(t.transferAssetId) == false
                       |     let transferCount = t.transferCount == ${t.transfers.length}
                       |     let totalAmount = t.totalAmount == ${t.transfers.map(_.amount).sum}
                       |     let attachment = t.attachment == base58'${ByteStr(t.attachment).base58}'
