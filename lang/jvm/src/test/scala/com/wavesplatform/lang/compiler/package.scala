@@ -4,7 +4,6 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.Common.multiplierFunction
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, NativeFunction}
 
