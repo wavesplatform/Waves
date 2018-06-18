@@ -488,4 +488,15 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[Long](expr = frac2)._2 shouldBe Left(s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1")
     ev[Long](expr = frac3)._2 shouldBe Left(s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1")
   }
+
+  property("data constructors") {
+    val point     = "Point"
+    val pointType = CaseType(point, List("X" -> LONG, "Y" -> LONG))
+    val pointCtor = FunctionHeader.User(point)
+
+    ev[CaseObj](
+      context = EvaluationContext(typeDefs = Map(point -> pointType), letDefs = Map.empty, functions = Map.empty),
+      FUNCTION_CALL(pointCtor, List(CONST_LONG(1), CONST_LONG(2)))
+    )._2 shouldBe Right(CaseObj(CASETYPEREF(point), Map("X" -> 1, "Y" -> 2)))
+  }
 }
