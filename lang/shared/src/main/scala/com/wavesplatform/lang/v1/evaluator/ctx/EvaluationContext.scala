@@ -23,12 +23,12 @@ object EvaluationContext {
       EvaluationContext(typeDefs = x.typeDefs ++ y.typeDefs, letDefs = x.letDefs ++ y.letDefs, functions = x.functions ++ y.functions)
   }
 
-  def build(types: Map[String, DefinedType], letDefs: Map[String, LazyVal], functions: Seq[BaseFunction]): EvaluationContext = {
+  def build(typeDefs: Map[String, DefinedType], letDefs: Map[String, LazyVal], functions: Seq[BaseFunction]): EvaluationContext = {
     if (functions.distinct.size != functions.size) {
       val dups = functions.groupBy(_.header).filter(_._2.size != 1)
       throw new Exception(s"Duplicate runtime functions names: $dups")
     }
-    EvaluationContext(typeDefs = types, letDefs = letDefs, functions = functions.map(f => f.header -> f).toMap)
+    EvaluationContext(typeDefs = typeDefs, letDefs = letDefs, functions = functions.map(f => f.header -> f).toMap)
   }
 
   def functionCosts(xs: Iterable[BaseFunction]): Map[FunctionHeader, Long] =

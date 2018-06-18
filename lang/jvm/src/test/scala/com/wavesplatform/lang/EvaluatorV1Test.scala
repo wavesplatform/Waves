@@ -120,6 +120,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[Long](
       context = Monoid.combine(PureContext.evalContext,
                                EvaluationContext(
+                                 typeDefs = Map.empty,
                                  letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance)))),
                                  functions = Map.empty
                                )),
@@ -143,6 +144,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val context = Monoid.combine(
       PureContext.evalContext,
       EvaluationContext(
+        typeDefs = Map.empty,
         letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance))), ("badVal", LazyVal(EitherT.leftT("Error")))),
         functions = Map.empty
       )
@@ -163,6 +165,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val context = Monoid.combine(PureContext.evalContext,
                                  EvaluationContext(
+                                   typeDefs = Map.empty,
                                    letDefs = Map.empty,
                                    functions = Map(f.header -> f)
                                  ))
@@ -180,6 +183,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val fooInstance = CaseObj(fooType.typeRef, Map("bar" -> "bAr", "buz" -> 1L))
 
     val context = EvaluationContext(
+      typeDefs = Map.empty,
       letDefs = Map("fooInstance" -> LazyVal(EitherT.pure(fooInstance))),
       functions = Map.empty
     )
@@ -196,6 +200,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
 
     val context = EvaluationContext(
+      typeDefs = Map.empty,
       letDefs = Map.empty,
       functions = Map(fooCtor.header -> fooCtor)
     )
@@ -223,6 +228,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
 
     val context = EvaluationContext(
+      typeDefs = Map.empty,
       letDefs = Map.empty,
       functions = Map(
         fooCtor.header      -> fooCtor,
@@ -244,6 +250,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("successful on simple function evaluation") {
     ev[Long](
       context = EvaluationContext(
+        typeDefs = Map.empty,
         letDefs = Map.empty,
         functions = Map(multiplierFunction.header -> multiplierFunction)
       ),
@@ -370,6 +377,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         PureContext.evalContext,
         CryptoContext.evalContext(Global),
         EvaluationContext.build(
+          typeDefs = Map.empty,
           letDefs = Map("tx" -> LazyVal(EitherT.pure(txObj))),
           functions = Seq.empty
         )
