@@ -259,4 +259,4 @@ lazy val generator = project
 
 lazy val benchmark = project
   .enablePlugins(JmhPlugin)
-  .dependsOn(node % "compile->compile;test->test")
+  .dependsOn(node % "compile->compile;test->test", langJVM % "compile->compile;test->test")

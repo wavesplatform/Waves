@@ -10,9 +10,11 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
@@ -125,6 +127,16 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     )._2 shouldBe Right(5)
   }
 
+  property("ne works") {
+    ev[Boolean](
+      expr = FUNCTION_CALL(FunctionHeader.User(PureContext.ne.name), List(CONST_LONG(1), CONST_LONG(2)))
+    )._2 shouldBe Right(true)
+
+    ev[Boolean](
+      expr = FUNCTION_CALL(FunctionHeader.User(PureContext.ne.name), List(CONST_LONG(1), CONST_LONG(1)))
+    )._2 shouldBe Right(false)
+  }
+
   property("lazy let evaluation doesn't throw if not used") {
     val pointType     = CaseType("Point", List(("X", LONG), ("Y", LONG)))
     val pointInstance = CaseObj(pointType.typeRef, Map("X" -> 3L, "Y" -> 4L))
@@ -144,7 +156,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("let is evaluated maximum once") {
     var functionEvaluated = 0
 
-    val f = PredefFunction("F", 1, LONG, List(("_", LONG)), 258) { _ =>
+    val f = NativeFunction("F", 1, 258, LONG, "_" -> LONG) { _ =>
       functionEvaluated = functionEvaluated + 1
       Right(1L)
     }
@@ -160,7 +172,6 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     )._2 shouldBe Right(2L)
 
     functionEvaluated shouldBe 1
-
   }
 
   property("successful on ref getter evaluation") {
@@ -180,11 +191,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on function call getter evaluation") {
     val fooType = CaseType("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = PredefFunction("createFoo", 1, fooType.typeRef, List.empty, 259) { _ =>
-      Right(
-        CaseObj(fooType.typeRef, Map("bar" -> "bAr", "buz" -> 1L))
-      )
-
+    val fooCtor = NativeFunction("createFoo", 1, 259, fooType.typeRef, List.empty: _*) { _ =>
+      Right(CaseObj(fooType.typeRef, Map("bar" -> "bAr", "buz" -> 1L)))
     }
 
     val context = EvaluationContext(
@@ -199,15 +207,17 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on block getter evaluation") {
     val fooType = CaseType("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = PredefFunction("createFoo", 1, fooType.typeRef, List.empty, 259) { _ =>
+    val fooCtor = NativeFunction("createFoo", 1, 259, fooType.typeRef, List.empty: _*) { _ =>
       Right(
-        CaseObj(fooType.typeRef,
-                Map(
-                  "bar" -> "bAr",
-                  "buz" -> 1L
-                )))
+        CaseObj(
+          fooType.typeRef,
+          Map(
+            "bar" -> "bAr",
+            "buz" -> 1L
+          )
+        ))
     }
-    val fooTransform = PredefFunction("transformFoo", 1, fooType.typeRef, List(("foo", fooType.typeRef)), 260) {
+    val fooTransform = NativeFunction("transformFoo", 1, 260, fooType.typeRef, "foo" -> fooType.typeRef) {
       case (fooObj: CaseObj) :: Nil => Right(fooObj.copy(fields = fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
       case _                        => ???
     }
@@ -286,6 +296,54 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     r.isLeft shouldBe false
   }
 
+  property("take works as the native one") {
+    val gen = for {
+      n     <- Gen.choose(0, 100)
+      bytes <- Gen.containerOfN[Array, Byte](n, Arbitrary.arbByte.arbitrary).map(ByteVector(_))
+      takeN <- Gen.choose(0, n)
+    } yield (bytes, takeN)
+
+    forAll(gen) {
+      case (bytes, takeN) =>
+        val expr = FUNCTION_CALL(
+          FunctionHeader.Native(TAKE_BYTES),
+          List(
+            CONST_BYTEVECTOR(bytes),
+            CONST_LONG(takeN)
+          )
+        )
+        ev[ByteVector](expr = expr)._2 shouldBe Right(bytes.take(takeN))
+    }
+  }
+
+  property("addressFromPublicKey works as the native one") {
+    val gen = for {
+      seed <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
+    } yield {
+      val (_, pk) = Curve25519.createKeyPair(seed)
+      pk
+    }
+
+    val environment = Common.emptyBlockchainEnvironment()
+    val ctx = Monoid.combineAll(
+      Seq(
+        CryptoContext.build(Global),
+        PureContext.ctx,
+        WavesContext.build(environment)
+      )
+    )
+
+    forAll(gen) { pkBytes =>
+      val expr = FUNCTION_CALL(
+        FunctionHeader.User("addressFromPublicKey"),
+        List(CONST_BYTEVECTOR(ByteVector(pkBytes)))
+      )
+
+      val actual = ev[CaseObj](ctx.evaluationContext, expr)._2.map(_.fields("bytes"))
+      actual shouldBe Right(ByteVector(Common.addressFromPublicKey(environment.networkByte, pkBytes)))
+    }
+  }
+
   private def sigVerifyTest(bodyBytes: Array[Byte],
                             publicKey: PublicKey,
                             signature: Signature): (EvaluationContext, Either[ExecutionError, Boolean]) = {
@@ -320,7 +378,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[Boolean](
       context = context,
       expr = FUNCTION_CALL(
-        function = FunctionHeader(SIGVERIFY),
+        function = FunctionHeader.Native(SIGVERIFY),
         args = List(
           GETTER(REF("tx"), "bodyBytes"),
           GETTER(REF("tx"), "proof0"),
@@ -399,7 +457,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[ByteVector](
       context = context,
       expr = FUNCTION_CALL(
-        function = FunctionHeader(funcName),
+        function = FunctionHeader.Native(funcName),
         args = List(CONST_BYTEVECTOR(ByteVector(bodyBytes)))
       )
     )

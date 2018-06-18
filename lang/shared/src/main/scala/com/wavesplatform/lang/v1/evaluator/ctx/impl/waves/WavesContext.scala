@@ -1,15 +1,16 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.fromOption
 import com.wavesplatform.lang.v1.traits._
+import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import monix.eval.Coeval
 import scodec.bits.ByteVector
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 
 object WavesContext {
 
@@ -19,36 +20,88 @@ object WavesContext {
   def build(env: Environment): CTX = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
-    def getdataF(name: String, internalName: Short, dataType: DataType) =
-      PredefFunction(name, 100, UNION(dataType.innerType, UNIT), List(("address", addressType.typeRef), ("key", STRING)), internalName) {
+    def getdataF(name: String, internalName: Short, dataType: DataType): BaseFunction =
+      NativeFunction(name, 100, internalName, UNION(dataType.innerType, UNIT), "address" -> addressType.typeRef, "key" -> STRING) {
         case (addr: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addr, k, dataType).map(fromOption)
         case _                                     => ???
       }
 
-    val getLongF: PredefFunction      = getdataF("getLong", DATA_LONG, DataType.Long)
-    val getBooleanF: PredefFunction   = getdataF("getBoolean", DATA_BOOLEAN, DataType.Boolean)
-    val getByteArrayF: PredefFunction = getdataF("getByteArray", DATA_BYTES, DataType.ByteArray)
-    val getStringF: PredefFunction    = getdataF("getString", DATA_STRING, DataType.String)
+    val getLongF: BaseFunction      = getdataF("getLong", DATA_LONG, DataType.Long)
+    val getBooleanF: BaseFunction   = getdataF("getBoolean", DATA_BOOLEAN, DataType.Boolean)
+    val getByteArrayF: BaseFunction = getdataF("getByteArray", DATA_BYTES, DataType.ByteArray)
+    val getStringF: BaseFunction    = getdataF("getString", DATA_STRING, DataType.String)
 
-    val addressFromPublicKeyF: PredefFunction =
-      PredefFunction("addressFromPublicKey", 100, addressType.typeRef, List(("publicKey", BYTEVECTOR)), ADDRESSFROMPUBKEY) {
-        case (pk: ByteVector) :: Nil =>
-          val r = environmentFunctions.addressFromPublicKey(pk)
-          Right(CaseObj(addressType.typeRef, Map("bytes" -> r)))
-        case _ => ???
-      }
+    def secureHashExpr(xs: EXPR): EXPR = FUNCTION_CALL(
+      FunctionHeader.Native(KECCAK256),
+      List(
+        FUNCTION_CALL(
+          FunctionHeader.Native(BLAKE256),
+          List(xs)
+        )
+      )
+    )
 
-    val addressFromStringF: PredefFunction = PredefFunction("addressFromString", 100, optionAddress, List(("string", STRING)), ADDRESSFROMSTRING) {
+    val addressFromBytesF = NativeFunction("addressFromBytes", 1, ADDRESSFROMBYTES, addressType.typeRef, "bytes" -> BYTEVECTOR) {
+      case (bytes: ByteVector) :: Nil => Right(CaseObj(addressType.typeRef, Map("bytes" -> bytes)))
+      case _                          => ???
+    }
+
+    val addressFromPublicKeyF: BaseFunction = UserFunction("addressFromPublicKey", 100, addressType.typeRef, "publicKey" -> BYTEVECTOR) {
+      case pk :: Nil =>
+        Right(
+          FUNCTION_CALL(
+            FunctionHeader.Native(ADDRESSFROMBYTES),
+            List(
+              BLOCK(
+                LET(
+                  "@afpk_withoutChecksum",
+                  FUNCTION_CALL(
+                    FunctionHeader.Native(SUM_BYTES),
+                    List(
+                      CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion, env.networkByte)),
+                      // publicKeyHash
+                      FUNCTION_CALL(
+                        FunctionHeader.Native(TAKE_BYTES),
+                        List(
+                          secureHashExpr(pk),
+                          CONST_LONG(EnvironmentFunctions.HashLength)
+                        )
+                      )
+                    )
+                  )
+                ),
+                // bytes
+                FUNCTION_CALL(
+                  FunctionHeader.Native(SUM_BYTES),
+                  List(
+                    REF("@afpk_withoutChecksum"),
+                    FUNCTION_CALL(
+                      FunctionHeader.Native(TAKE_BYTES),
+                      List(
+                        secureHashExpr(REF("@afpk_withoutChecksum")),
+                        CONST_LONG(EnvironmentFunctions.ChecksumLength)
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      case _ => ???
+    }
+
+    val addressFromStringF: BaseFunction = NativeFunction("addressFromString", 100, ADDRESSFROMSTRING, optionAddress, "string" -> STRING) {
       case (addressString: String) :: Nil =>
         val r = environmentFunctions.addressFromString(addressString)
         r.map(_.map(x => CaseObj(addressType.typeRef, Map("bytes" -> x)))).map(fromOption)
       case _ => ???
     }
 
-    val addressFromRecipientF: PredefFunction =
-      PredefFunction("addressFromRecipient", 100, addressType.typeRef, List(("AddressOrAlias", addressOrAliasType)), ADDRESSFROMRECIPIENT) {
+    val addressFromRecipientF: BaseFunction =
+      NativeFunction("addressFromRecipient", 100, ADDRESSFROMRECIPIENT, addressType.typeRef, "AddressOrAlias" -> addressOrAliasType) {
         case (c @ CaseObj(addressType.typeRef, _)) :: Nil => Right(c)
-        case c @ CaseObj(aliasType.typeRef, fields) :: Nil =>
+        case CaseObj(aliasType.typeRef, fields) :: Nil =>
           environmentFunctions
             .addressFromAlias(fields("alias").asInstanceOf[String])
             .map(resolved => CaseObj(addressType.typeRef, Map("bytes" -> resolved.bytes)))
@@ -58,9 +111,9 @@ object WavesContext {
     val txCoeval: Coeval[Either[String, CaseObj]]  = Coeval.evalOnce(Right(transactionObject(env.transaction)))
     val heightCoeval: Coeval[Either[String, Long]] = Coeval.evalOnce(Right(env.height))
 
-    val txByIdF = {
+    val txByIdF: BaseFunction = {
       val returnType = UNION(anyTransactionType, UNIT)
-      PredefFunction("getTransactionById", 100, returnType, List(("id", BYTEVECTOR)), GETTRANSACTIONBYID) {
+      NativeFunction("getTransactionById", 100, GETTRANSACTIONBYID, returnType, "id" -> BYTEVECTOR) {
         case (id: ByteVector) :: Nil =>
           val maybeDomainTx = env.transactionById(id.toArray).map(transactionObject)
           Right(fromOption(maybeDomainTx))
@@ -68,17 +121,16 @@ object WavesContext {
       }
     }
 
-    val accountBalanceF: PredefFunction =
-      PredefFunction("accountBalance", 100, LONG, List(("addressOrAlias", addressOrAliasType)), ACCOUNTBALANCE) {
-        case CaseObj(_, fields) :: Nil =>
-          val acc = fields("bytes").asInstanceOf[ByteVector].toArray
-          env.accountBalanceOf(acc, None)
+    val accountBalanceF: BaseFunction = NativeFunction("accountBalance", 100, ACCOUNTBALANCE, LONG, "addressOrAlias" -> addressOrAliasType) {
+      case CaseObj(_, fields) :: Nil =>
+        val acc = fields("bytes").asInstanceOf[ByteVector].toArray
+        env.accountBalanceOf(acc, None)
 
-        case _ => ???
-      }
+      case _ => ???
+    }
 
-    val accountAssetBalanceF: PredefFunction =
-      PredefFunction("accountAssetBalance", 100, LONG, List(("addressOrAlias", addressOrAliasType), ("assetId", BYTEVECTOR)), ACCOUNTASSETBALANCE) {
+    val accountAssetBalanceF: BaseFunction =
+      NativeFunction("accountAssetBalance", 100, ACCOUNTASSETBALANCE, LONG, "addressOrAlias" -> addressOrAliasType, "assetId" -> BYTEVECTOR) {
         case CaseObj(_, fields) :: (assetId: ByteVector) :: Nil =>
           val acc = fields("bytes").asInstanceOf[ByteVector]
           env.accountBalanceOf(acc.toArray, Some(assetId.toArray))
@@ -86,14 +138,16 @@ object WavesContext {
         case _ => ???
       }
 
-    val txHeightByIdF =
-      PredefFunction("transactionHeightById", 100, optionLong, List(("id", BYTEVECTOR)), TRANSACTIONHEIGHTBYID) {
+    val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, optionLong, "id" -> BYTEVECTOR) {
         case (id: ByteVector) :: Nil => Right(fromOption(env.transactionHeightById(id.toArray)))
         case _                       => ???
-      }
+    }
 
-    val vars: Map[String, (TYPE, LazyVal)] =
-      Map(("height", (LONG, LazyVal(EitherT(heightCoeval)))), ("tx", (outgoingTransactionType, LazyVal(EitherT(txCoeval)))))
+    val vars: Map[String, (TYPE, LazyVal)] = Map(
+      ("height", (LONG, LazyVal(EitherT(heightCoeval)))),
+      ("tx", (outgoingTransactionType, LazyVal(EitherT(txCoeval))))
+    )
+
     val functions = Seq(
       txByIdF,
       txHeightByIdF,
@@ -101,12 +155,14 @@ object WavesContext {
       getBooleanF,
       getByteArrayF,
       getStringF,
+      addressFromBytesF,
       addressFromPublicKeyF,
       addressFromStringF,
       addressFromRecipientF,
       accountBalanceF,
       accountAssetBalanceF
     )
+
     CTX(Types.wavesTypes, vars, functions)
   }
 }

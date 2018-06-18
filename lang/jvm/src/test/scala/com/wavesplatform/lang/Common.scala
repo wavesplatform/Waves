@@ -4,8 +4,10 @@ import cats.data.EitherT
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext}
+import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient, Tx}
+import monix.eval.Coeval
 import org.scalacheck.Shrink
 import org.scalatest.matchers.{MatchResult, Matcher}
 
@@ -35,7 +37,7 @@ object Common {
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
-  val multiplierFunction: PredefFunction = PredefFunction("MULTIPLY", 1, LONG, List(("x1", LONG), ("x2", LONG)), 512) {
+  val multiplierFunction: NativeFunction = NativeFunction("MULTIPLY", 1, 10005, LONG, "x1" -> LONG, "x2" -> LONG) {
     case (x1: Long) :: (x2: Long) :: Nil => Try(x1 * x2).toEither.left.map(_.toString)
     case _                               => ??? // suppress pattern match warning
   }
@@ -56,4 +58,22 @@ object Common {
 
   def sampleUnionContext(instance: CaseObj) =
     EvaluationContext.build(Map("p" -> LazyVal(EitherT.pure(instance))), Seq.empty)
+
+  def emptyBlockchainEnvironment(h: Int = 1, tx: Coeval[Tx] = Coeval(???), nByte: Byte = 'T'): Environment = new Environment {
+    override def height: Int       = h
+    override def networkByte: Byte = nByte
+    override def transaction: Tx   = tx()
+
+    override def transactionById(id: Array[Byte]): Option[Tx]                                                      = ???
+    override def transactionHeightById(id: Array[Byte]): Option[Int]                                               = ???
+    override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any]                     = ???
+    override def resolveAlias(name: String): Either[String, Recipient.Address]                                     = ???
+    override def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = ???
+  }
+
+  def addressFromPublicKey(networkByte: Byte, pk: Array[Byte]): Array[Byte] = {
+    val publicKeyHash   = Global.secureHash(pk).take(EnvironmentFunctions.HashLength)
+    val withoutChecksum = EnvironmentFunctions.AddressVersion +: networkByte +: publicKeyHash
+    withoutChecksum ++ Global.secureHash(withoutChecksum).take(EnvironmentFunctions.ChecksumLength)
+  }
 }

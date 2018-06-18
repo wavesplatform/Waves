@@ -25,7 +25,7 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
       LET(AnyPos, PART.VALID(AnyPos, "None"), CONST_LONG(AnyPos, 2), Seq.empty),
       TRUE(AnyPos)
     ),
-    "can't define LET with the same name as predefined function" -> "function with such name is predefined" -> BLOCK(
+    "can't define LET with the same name as predefined function" -> "function with this name is already defined" -> BLOCK(
       AnyPos,
       LET(AnyPos, PART.VALID(AnyPos, "Some"), CONST_LONG(AnyPos, 2), Seq.empty),
       TRUE(AnyPos)

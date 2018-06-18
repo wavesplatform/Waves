@@ -2,8 +2,7 @@ package com.wavesplatform.lang.v1.compiler
 
 import cats.Show
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.PredefFunction.FunctionTypeSignature
-
+import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 
 sealed trait CompilationError {
   def start: Int
@@ -42,7 +41,7 @@ object CompilationError {
   }
   final case class AlreadyDefined(start: Int, end: Int, name: String, isFunction: Boolean) extends CompilationError {
     val message =
-      if (isFunction) s"Value '$name' can't be defined because function with such name is predefined"
+      if (isFunction) s"Value '$name' can't be defined because function with this name is already defined"
       else s"Value '$name' already defined in the scope"
   }
   final case class NonExistingType(start: Int, end: Int, name: String, existing: List[String]) extends CompilationError {
