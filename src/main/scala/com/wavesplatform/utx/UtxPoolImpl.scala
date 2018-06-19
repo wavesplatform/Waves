@@ -155,6 +155,11 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
     case _                                                                            => Right(())
   }
 
+  private def checkAlias(b: Blockchain, tx: Transaction) = tx match {
+    case cat: CreateAliasTransaction if b.resolveAlias(cat.alias).isDefined => Left(GenericError("Alias already claimed"))
+    case _                                                                  => Right(())
+  }
+
   private def putIfNew(b: Blockchain, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
     putRequestStats.increment()
     measureSuccessful(
@@ -162,6 +167,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
         for {
           _    <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
           _    <- checkNotBlacklisted(tx)
+          _    <- checkAlias(b, tx)
           _    <- canReissue(b, tx)
           _    <- feeCalculator.enoughFee(tx, blockchain, fs)
           diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
