@@ -22,6 +22,7 @@ import scorex.api.http.leasing._
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.transaction.assets._
+import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease._
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.transfer._
@@ -264,6 +265,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case DataTransaction          => jsv.as[SignedDataRequest].toTx
               case SetScriptTransaction     => jsv.as[SignedSetScriptRequest].toTx
               case SponsorFeeTransaction    => jsv.as[SignedSponsorFeeRequest].toTx
+//              case ExchangeTransaction      => jsv.as[ExchangeTransaction].toTx
 
             }
         }

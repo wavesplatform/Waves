@@ -194,4 +194,26 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }
   }
 
+  property("Extract from Some") {
+    eval[Long]("extract(Some(1))+1") shouldBe Right(2)
+  }
+
+  property("Match with not case types") {
+    eval[Long]("match Some(1) { case x: Int => x \n case y: Unit => 2 }") shouldBe Right(1)
+  }
+
+  property("allow unions in pattern matching") {
+    val sampleScript =
+      """match p {
+        |  case p1: PointBC => {
+        |    match p1 {
+        |      case pb: PointB => pb.X
+        |      case pc: PointC => pc.YB
+        |    }
+        |  }
+        |  case other => throw
+        |}""".stripMargin
+    eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(3)
+    eval[Long](sampleScript, Some(pointCInstance)) shouldBe Right(42)
+  }
 }

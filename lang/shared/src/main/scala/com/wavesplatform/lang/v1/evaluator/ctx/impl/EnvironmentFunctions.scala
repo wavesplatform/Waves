@@ -30,7 +30,7 @@ class EnvironmentFunctions(environment: Environment) {
     }
   }
 
-  def getData(addressOrAlias: CaseObj, key: String, dataType: DataType): Either[String, Any] = {
+  def getData(addressOrAlias: CaseObj, key: String, dataType: DataType): Either[String, Option[Any]] = {
     val objTypeName = addressOrAlias.caseType.name
 
     val recipientEi =
