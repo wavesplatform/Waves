@@ -4,7 +4,6 @@ import cats.implicits._
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext.Lenses._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.task.imports._
@@ -60,10 +59,10 @@ object EvaluatorV1 extends ExprEvaluator {
           // no such function, try data constructor
           header match {
             case FunctionHeader.User(typeName) =>
-              types.get(ctx).get(typeName).collect { case CaseType(_, fields) =>
+              types.get(ctx).get(typeName).collect { case (t@CaseType(_, fields)) =>
                 args
                   .traverse[EvalM, Any](a => evalExpr(a))
-                  .map(argValues => CaseObj(CASETYPEREF(typeName), fields.map(_._1).zip(argValues).toMap))
+                  .map(argValues => CaseObj(t.typeRef, fields.map(_._1).zip(argValues).toMap))
               }
             case _ => None
           }
