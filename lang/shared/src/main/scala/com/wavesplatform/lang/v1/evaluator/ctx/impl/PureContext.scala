@@ -15,7 +15,6 @@ import scodec.bits.ByteVector
 import scala.util.Try
 
 object PureContext {
-//  private val optionT                                             = OPTIONTYPEPARAM(TYPEPARAM('T'))
   private val noneCoeval: Coeval[Either[String, Unit]] = Coeval.evalOnce(Right( () ))
   private val nothingCoeval: Coeval[Either[String, Nothing]]      = Coeval.defer(Coeval(Right(throw new Exception("explicit contract termination"))))
 
@@ -33,18 +32,18 @@ object PureContext {
     case _ => ???
   }
 
-  val extractU: NativeFunction = NativeFunction.create("extract", 1L, fromNonable(TYPEPARAM('T')) _, List(("opt", TYPEPARAM('T'):TYPEPLACEHOLDER)), 1124: Short) {
+  val extract: NativeFunction = NativeFunction.create("extract", 1L, fromNonable(TYPEPARAM('T')) _, List(("opt", TYPEPARAM('T'):TYPEPLACEHOLDER)), EXTRACT) {
     case () :: Nil    => Left("Extract from empty option")
     case v :: Nil => Right(v)
     case _              => ???
   }
 
-  val someU: NativeFunction = NativeFunction.create("Some", 1L, asNonable(TYPEPARAM('T')) _, List(("obj", TYPEPARAM('T'):TYPEPLACEHOLDER)), 1125: Short) {
+  val some: NativeFunction = NativeFunction.create("Some", 1L, asNonable(TYPEPARAM('T')) _, List(("obj", TYPEPARAM('T'):TYPEPLACEHOLDER)), SOME) {
     case v :: Nil => Right(v)
     case _        => ???
   }
 
-  val isDefinedU: NativeFunction = NativeFunction("isDefined", 1, 1126:Short, BOOLEAN, ("opt" -> (TYPEPARAM('T'):TYPEPLACEHOLDER))) {
+  val isDefined: NativeFunction = NativeFunction("isDefined", 1, ISDEFINED, BOOLEAN, ("opt" -> (TYPEPARAM('T'):TYPEPLACEHOLDER))) {
     case (()) :: Nil => Right(false)
     case _           => Right(true)
   }
@@ -57,23 +56,6 @@ object PureContext {
     case (p: CaseObj) :: (s: String) :: Nil => Right(p.caseType.name == s)
     case _                                  => Right(false)
   }
-
-//  val extract: BaseFunction = NativeFunction("extract", 1, EXTRACT, TYPEPARAM('T'), "opt" -> optionT) {
-//    case Some(v) :: Nil => Right(v)
-//    case None :: Nil    => Left("Extract from empty option")
-//    case _              => ???
-//  }
-
-//  val some: BaseFunction = NativeFunction("Some", 1, SOME, optionT, "obj" -> TYPEPARAM('T')) {
-//    case v :: Nil => Right(Some(v))
-//    case _        => ???
-//  }
-
-//  val isDefined: BaseFunction = NativeFunction("isDefined", 1, ISDEFINED, BOOLEAN, "opt" -> optionT) {
-//    case Some(_) :: Nil => Right(true)
-//    case None :: Nil    => Right(false)
-//    case _              => ???
-//  }
 
   val size: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "byteVector" -> BYTEVECTOR) {
     case (bv: ByteVector) :: Nil => Right(bv.size)
@@ -167,7 +149,7 @@ object PureContext {
   )
 
   private val vars      = Map( ("None", (UNION(NOTHING, UNIT), none)), (errRef, (NOTHING, err)))
-  private val functions = Seq(fraction, /*extract, isDefined, some,*/ size, take, _isInstanceOf, extractU, someU, isDefinedU) ++ operators
+  private val functions = Seq(fraction, extract, isDefined, some, size, take, _isInstanceOf) ++ operators
 
   lazy val ctx          = CTX(Seq(
                     new DefinedType { val name = "Unit"; val typeRef: TYPE = UNIT },

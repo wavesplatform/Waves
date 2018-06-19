@@ -109,7 +109,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
         )
       )
     ),
-    expectedResult = Right((FUNCTION_CALL(idOptionLong.header, List((FUNCTION_CALL(someU.header, List(REF("None")))))), UNIT))
+    expectedResult = Right((FUNCTION_CALL(idOptionLong.header, List((FUNCTION_CALL(some.header, List(REF("None")))))), UNIT))
   )
 
   treeTypeTest("idOptionLong(SOME(CONST_LONG(3)))")(
@@ -126,7 +126,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
       )
     ),
     expectedResult = Right(
-      (FUNCTION_CALL(idOptionLong.header, List(FUNCTION_CALL(someU.header, List(FUNCTION_CALL(someU.header, List(CONST_LONG(3))))))), UNIT)
+      (FUNCTION_CALL(idOptionLong.header, List(FUNCTION_CALL(some.header, List(FUNCTION_CALL(some.header, List(CONST_LONG(3))))))), UNIT)
     )
   )
 
