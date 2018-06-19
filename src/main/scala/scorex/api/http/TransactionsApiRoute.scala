@@ -81,7 +81,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
                         JsArray(
                           blockchain
                             .addressTransactions(a, Set.empty, limit, 0)
-                            .sorted(Ordering.by[(Int, Transaction), (Int, Long)]({ case (h: Int, tx: Transaction) => (h, -tx.timestamp) }))
+                            .sorted(Ordering.by[(Int, Transaction), (Int, Long)]({ case (h: Int, tx: Transaction) => (-h, -tx.timestamp) }))
                             .map({ case (h, tx) => txToCompactJson(a, tx) + ("height" -> JsNumber(h)) }))))
                   case Some(limit) if limit > MaxTransactionsPerRequest =>
                     complete(TooBigArrayAllocation)
