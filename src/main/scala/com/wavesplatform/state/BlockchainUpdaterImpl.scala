@@ -18,7 +18,6 @@ import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.transaction.Transaction.Type
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import scorex.transaction._
-import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.lease._
 import scorex.transaction.smart.script.Script
 import scorex.utils.{ScorexLogging, Time}
@@ -403,42 +402,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
 
   override def assetDescription(id: AssetId): Option[AssetDescription] = ngState.fold(blockchain.assetDescription(id)) { ng =>
     val diff = ng.bestLiquidDiff
-    blockchain.assetDescription(id) match {
-      case Some(ad) =>
-        ng.bestLiquidDiff.issuedAssets
-          .get(id)
-          .map { newAssetInfo =>
-            ad.copy(
-              reissuable = newAssetInfo.isReissuable,
-              totalVolume = ad.totalVolume + newAssetInfo.volume,
-              script = newAssetInfo.script
-            )
-          }
-          .orElse(Some(ad))
-          .map { ad =>
-            diff.sponsorship.get(id).fold(ad) {
-              case SponsorshipValue(sponsorship) =>
-                ad.copy(sponsorship = sponsorship)
-              case SponsorshipNoInfo =>
-                ad
-            }
-          }
-      case None =>
-        val sponsorship = diff.sponsorship.get(id).fold(0L) {
-          case SponsorshipValue(sponsorship) =>
-            sponsorship
-          case SponsorshipNoInfo =>
-            0L
-        }
-        ng.bestLiquidDiff.transactions
-          .get(id)
-          .collectFirst {
-            case (_, it: IssueTransaction, _) =>
-              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, it.script, sponsorship)
-          }
-          .map(z =>
-            ng.bestLiquidDiff.issuedAssets.get(id).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = r.script)))
-    }
+    CompositeBlockchain.composite(blockchain, diff).assetDescription(id)
   }
 
   override def resolveAlias(a: Alias): Option[Address] =
