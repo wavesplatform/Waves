@@ -471,7 +471,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     db.get(Keys.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { addressId =>
       val txs = for {
         h              <- (db.get(Keys.height) to 1 by -1).view
-        (txType, txId) <- db.get(Keys.addressTransactionIds(h, addressId))
+        (txType, txId) <- db.get(Keys.addressTransactionIds(h, addressId)).reverse
         if types.isEmpty || types.contains(txType.toByte)
         (_, tx) <- db.get(Keys.transactionInfo(txId))
       } yield (h, tx)
