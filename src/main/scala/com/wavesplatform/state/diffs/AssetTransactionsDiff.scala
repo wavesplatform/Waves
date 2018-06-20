@@ -31,9 +31,9 @@ object AssetTransactionsDiff {
         case (h, t: BurnTransaction) if t.assetId == tx.assetId => true
         case _                                                  => false
       }
-      val isBurnAnyActivated = blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, blockchain.height)
-      if (oldInfo.reissuable || (blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) || (!isBurnAnyActivated && wasBurnt)) {
-        if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume && isBurnAnyActivated) {
+      val isDataTxActivated = blockchain.isFeatureActivated(BlockchainFeatures.DataTransaction, blockchain.height)
+      if (oldInfo.reissuable || (blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) || (!isDataTxActivated && wasBurnt)) {
+        if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume && isDataTxActivated) {
           Left(GenericError("Asset total value overflow"))
         } else {
           Right(

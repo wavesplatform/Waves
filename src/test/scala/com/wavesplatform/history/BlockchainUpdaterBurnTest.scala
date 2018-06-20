@@ -36,9 +36,11 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
 
   val localBlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings
-      .copy(featureCheckBlocksPeriod = 1,
-            blocksForFeatureActivation = 1,
-            preActivatedFeatures = Map(BlockchainFeatures.NG.id -> 0, BlockchainFeatures.BurnAnyTokens.id -> 0)))
+      .copy(
+        featureCheckBlocksPeriod = 1,
+        blocksForFeatureActivation = 1,
+        preActivatedFeatures = Map(BlockchainFeatures.NG.id -> 0, BlockchainFeatures.DataTransaction.id -> 0)
+      ))
   val localWavesSettings: WavesSettings = settings.copy(blockchainSettings = localBlockchainSettings)
 
   property("issue -> burn -> reissue in sequential blocks works correctly") {
