@@ -29,15 +29,29 @@ object CryptoContext {
 
     def toBase58StringF: BaseFunction = NativeFunction("toBase58String", 10, TOBASE58, STRING, "bytes" -> BYTEVECTOR) {
       case (bytes: ByteVector) :: Nil => global.base58Encode(bytes.toArray)
-      case _                          => ???
+      case xs                         => notImplemented("toBase58String(bytes: byte[])", xs)
+    }
+
+    def fromBase58StringF: BaseFunction = NativeFunction("fromBase58String", 10, FROMBASE58, BYTEVECTOR, "str" -> STRING) {
+      case (str: String) :: Nil => global.base58Decode(str).map(ByteVector(_))
+      case xs                   => notImplemented("fromBase58String(str: String)", xs)
     }
 
     def toBase64StringF: BaseFunction = NativeFunction("toBase64String", 10, TOBASE64, STRING, "bytes" -> BYTEVECTOR) {
       case (bytes: ByteVector) :: Nil => global.base64Encode(bytes.toArray)
-      case _                          => ???
+      case xs                         => notImplemented("toBase64String(bytes: byte[])", xs)
     }
 
-    CTX(Seq.empty, Map.empty, Seq(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF, toBase64StringF))
+    def fromBase64StringF: BaseFunction = NativeFunction("fromBase64String", 10, FROMBASE64, BYTEVECTOR, "str" -> STRING) {
+      case (str: String) :: Nil => global.base64Decode(str).map(ByteVector(_))
+      case xs                   => notImplemented("fromBase64String(str: String)", xs)
+    }
+
+    CTX(
+      Seq.empty,
+      Map.empty,
+      Seq(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF, fromBase58StringF, toBase64StringF, fromBase64StringF)
+    )
   }
 
   def evalContext(global: BaseGlobal): EvaluationContext   = build(global).evaluationContext
