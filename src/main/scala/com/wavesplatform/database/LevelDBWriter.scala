@@ -402,11 +402,9 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
           val txIdsAtHeight = Keys.transactionIdsAtHeight(currentHeight)
           for (txId <- rw.get(txIdsAtHeight)) {
             forgetTransaction(txId)
-            val ktxId         = Keys.transactionInfo(txId)
-            val Some((_, tx)) = rw.get(ktxId)
+            val ktxId = Keys.transactionInfo(txId)
 
-            rw.delete(ktxId)
-            tx match {
+            for ((_, tx) <- rw.get(ktxId)) tx match {
               case _: GenesisTransaction                                                       => // genesis transaction can not be rolled back
               case _: PaymentTransaction | _: TransferTransaction | _: MassTransferTransaction => // balances already restored
 
@@ -440,6 +438,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
                 rollbackOrderFill(rw, ByteStr(tx.buyOrder.id()), currentHeight)
                 rollbackOrderFill(rw, ByteStr(tx.sellOrder.id()), currentHeight)
             }
+
+            rw.delete(ktxId)
           }
 
           rw.delete(txIdsAtHeight)
