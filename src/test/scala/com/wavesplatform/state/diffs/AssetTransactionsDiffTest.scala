@@ -138,7 +138,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     val fs =
       TestFunctionalitySettings.Enabled
         .copy(
-          preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.BurnAnyTokens.id -> 0)
+          preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.DataTransaction.id -> 0)
         )
 
     forAll(setup) {
@@ -196,7 +196,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     val fs =
       TestFunctionalitySettings.Enabled
         .copy(
-          preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.BurnAnyTokens.id -> 0)
+          preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.DataTransaction.id -> 0)
         )
 
     forAll(setup) {
