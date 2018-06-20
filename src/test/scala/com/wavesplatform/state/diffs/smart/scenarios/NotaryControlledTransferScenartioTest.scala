@@ -14,7 +14,6 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scodec.bits.ByteVector
 import scorex.account.AddressScheme
 import scorex.transaction.assets.IssueTransactionV2
 import scorex.transaction.smart.script.v1.ScriptV1
@@ -127,12 +126,10 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
     eval[Boolean](s"""toBase64String(base64'$s') == \"$s\"""").explicitGet() shouldBe true
   }
 
-  property("addressFromString() fails when address is too long") {
+  property("addressFromString() returns None when address is too long") {
     import Global.MaxAddressLength
     val longAddress = "A" * (MaxAddressLength + 1)
-    val r           = eval[ByteVector](s"""addressFromString("$longAddress")""")
-    r.isLeft shouldBe true
-    r.left.get shouldBe s"base58Decode input exceeds $MaxAddressLength"
+    eval[Any](s"""addressFromString("$longAddress")""") shouldBe Right(())
   }
 
   property("Scenario") {

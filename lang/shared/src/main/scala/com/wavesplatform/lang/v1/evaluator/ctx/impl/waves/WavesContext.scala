@@ -91,10 +91,87 @@ object WavesContext {
       case _ => ???
     }
 
-    val addressFromStringF: BaseFunction = NativeFunction("addressFromString", 100, ADDRESSFROMSTRING, optionAddress, "string" -> STRING) {
-      case (addressString: String) :: Nil =>
-        val r = environmentFunctions.addressFromString(addressString)
-        r.map(_.map(x => CaseObj(addressType.typeRef, Map("bytes" -> x)))).map(fromOption)
+    def removePrefixExpr(str: EXPR, prefix: String): EXPR = IF(
+      FUNCTION_CALL(
+        FunctionHeader.Native(EQ),
+        List(
+          FUNCTION_CALL(FunctionHeader.Native(TAKE_STRING), List(str, CONST_LONG(prefix.length))),
+          CONST_STRING(prefix)
+        )
+      ),
+      FUNCTION_CALL(FunctionHeader.Native(DROP_STRING), List(str, CONST_LONG(prefix.length))),
+      str
+    )
+
+    def verifyAddressChecksumExpr(addressBytes: EXPR): EXPR = FUNCTION_CALL(
+      FunctionHeader.Native(EQ),
+      List(
+        // actual checksum
+        FUNCTION_CALL(FunctionHeader.User("takeRightBytes"), List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
+        // generated checksum
+        FUNCTION_CALL(
+          FunctionHeader.Native(TAKE_BYTES),
+          List(
+            secureHashExpr(FUNCTION_CALL(FunctionHeader.User("dropRightBytes"), List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength)))),
+            CONST_LONG(EnvironmentFunctions.ChecksumLength)
+          )
+        )
+      )
+    )
+
+    val addressFromStringF: BaseFunction = UserFunction("addressFromString", 100, optionAddress, "string" -> STRING) {
+      case (str: EXPR) :: Nil =>
+        Right(
+          BLOCK(
+            LET("@afs_addrBytes", FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(str, EnvironmentFunctions.AddressPrefix)))),
+            IF(
+              FUNCTION_CALL(
+                FunctionHeader.Native(EQ),
+                List(
+                  FUNCTION_CALL(FunctionHeader.Native(SIZE_BYTES), List(REF("@afs_addrBytes"))),
+                  CONST_LONG(EnvironmentFunctions.AddressLength)
+                )
+              ),
+              IF(
+                // version
+                FUNCTION_CALL(
+                  FunctionHeader.Native(EQ),
+                  List(
+                    FUNCTION_CALL(FunctionHeader.Native(TAKE_BYTES), List(REF("@afs_addrBytes"), CONST_LONG(1))),
+                    CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion))
+                  )
+                ),
+                IF(
+                  // networkByte
+                  FUNCTION_CALL(
+                    FunctionHeader.Native(EQ),
+                    List(
+                      FUNCTION_CALL(
+                        FunctionHeader.Native(TAKE_BYTES),
+                        List(
+                          FUNCTION_CALL(FunctionHeader.Native(DROP_BYTES), List(REF("@afs_addrBytes"), CONST_LONG(1))),
+                          CONST_LONG(1)
+                        )
+                      ),
+                      CONST_BYTEVECTOR(ByteVector(env.networkByte))
+                    )
+                  ),
+                  IF(
+                    verifyAddressChecksumExpr(REF("@afs_addrBytes")),
+                    FUNCTION_CALL(
+                      FunctionHeader.Native(SOME),
+                      List(FUNCTION_CALL(FunctionHeader.Native(ADDRESSFROMBYTES), List(REF("@afs_addrBytes"))))
+                    ),
+                    REF("None")
+                  ),
+                  REF("None")
+                ),
+                REF("None")
+              ),
+              REF("None")
+            )
+          )
+        )
       case _ => ???
     }
 
