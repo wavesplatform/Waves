@@ -4,7 +4,11 @@ import cats._
 import com.wavesplatform.lang.v1.FunctionHeader
 import shapeless.{Lens, lens}
 
-case class EvaluationContext(typeDefs: Map[String, DefinedType], letDefs: Map[String, LazyVal], functions: Map[FunctionHeader, BaseFunction])
+case class EvaluationContext(typeDefs: Map[String, DefinedType], letDefs: Map[String, LazyVal], functions: Map[FunctionHeader, BaseFunction]) {
+  lazy val functionCosts: Map[FunctionHeader, Long] =
+    functions.mapValues(_.cost) ++
+      typeDefs.collect { case (typeName, CaseType(_, fields)) => FunctionHeader.User(typeName) -> fields.size.toLong }
+}
 
 object EvaluationContext {
 
@@ -30,9 +34,4 @@ object EvaluationContext {
     }
     EvaluationContext(typeDefs = typeDefs, letDefs = letDefs, functions = functions.map(f => f.header -> f).toMap)
   }
-
-  def functionCosts(xs: Iterable[BaseFunction]): Map[FunctionHeader, Long] =
-    xs.map { x =>
-      x.header -> x.cost
-    }(collection.breakOut)
 }
