@@ -6,6 +6,7 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.fromOption
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import monix.eval.Coeval
@@ -20,8 +21,8 @@ object WavesContext {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getdataF(name: String, internalName: Short, dataType: DataType): BaseFunction =
-      NativeFunction(name, 100, internalName, OPTION(dataType.innerType), "addressOrAlias" -> addressType.typeRef, "key" -> STRING) {
-        case (addressOrAlias: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addressOrAlias, k, dataType)
+      NativeFunction(name, 100, internalName, UNION(dataType.innerType, UNIT), "addressOrAlias" -> addressType.typeRef, "key" -> STRING) {
+        case (addressOrAlias: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addressOrAlias, k, dataType).map(fromOption)
         case _                                               => ???
       }
 
@@ -93,7 +94,7 @@ object WavesContext {
     val addressFromStringF: BaseFunction = NativeFunction("addressFromString", 100, ADDRESSFROMSTRING, optionAddress, "string" -> STRING) {
       case (addressString: String) :: Nil =>
         val r = environmentFunctions.addressFromString(addressString)
-        r.map(_.map(x => CaseObj(addressType.typeRef, Map("bytes" -> x))))
+        r.map(_.map(x => CaseObj(addressType.typeRef, Map("bytes" -> x)))).map(fromOption)
       case _ => ???
     }
 
@@ -111,11 +112,11 @@ object WavesContext {
     val heightCoeval: Coeval[Either[String, Long]] = Coeval.evalOnce(Right(env.height))
 
     val txByIdF: BaseFunction = {
-      val returnType = OPTION(anyTransactionType)
+      val returnType = UNION(anyTransactionType, UNIT)
       NativeFunction("getTransactionById", 100, GETTRANSACTIONBYID, returnType, "id" -> BYTEVECTOR) {
         case (id: ByteVector) :: Nil =>
           val maybeDomainTx = env.transactionById(id.toArray).map(transactionObject)
-          Right(maybeDomainTx).map(_.asInstanceOf[returnType.Underlying])
+          Right(fromOption(maybeDomainTx))
         case _ => ???
       }
     }
@@ -137,9 +138,9 @@ object WavesContext {
         case _ => ???
       }
 
-    val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, OPTION(LONG), "id" -> BYTEVECTOR) {
-      case (id: ByteVector) :: Nil => Right(env.transactionHeightById(id.toArray))
-      case _                       => ???
+    val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, optionLong, "id" -> BYTEVECTOR) {
+        case (id: ByteVector) :: Nil => Right(fromOption(env.transactionHeightById(id.toArray)))
+        case _                       => ???
     }
 
     val vars: Map[String, (TYPE, LazyVal)] = Map(

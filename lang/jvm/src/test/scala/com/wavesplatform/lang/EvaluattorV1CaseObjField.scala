@@ -33,6 +33,5 @@ class EvaluattorV1CaseObjField extends PropSpec with PropertyChecks with Matcher
     testAccess(pointBInstance, "X") shouldBe Right(5)
     testAccess(pointAInstance, "YA") shouldBe Right(42)
     testAccess(pointBInstance, "YB") shouldBe Right(43)
-    testAccess(pointAInstance, "YB") should produce("field 'YB' not found")
   }
 }

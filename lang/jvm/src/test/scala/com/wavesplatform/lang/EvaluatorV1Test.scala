@@ -497,6 +497,6 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[CaseObj](
       context = EvaluationContext(typeDefs = Map(point -> pointType), letDefs = Map.empty, functions = Map.empty),
       FUNCTION_CALL(pointCtor, List(CONST_LONG(1), CONST_LONG(2)))
-    )._2 shouldBe Right(CaseObj(CASETYPEREF(point), Map("X" -> 1, "Y" -> 2)))
+    )._2 shouldBe Right(CaseObj(pointType.typeRef, Map("X" -> 1, "Y" -> 2)))
   }
 }

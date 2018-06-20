@@ -4,7 +4,6 @@ import cats.implicits._
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext.Lenses._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.task.imports._
@@ -39,11 +38,8 @@ object EvaluatorV1 extends ExprEvaluator {
     }
 
   private def evalGetter(expr: EXPR, field: String) =
-    evalExpr(expr).map(_.asInstanceOf[CaseObj]) flatMap {
-      _.fields.get(field) match {
-        case Some(eager) => eager.pure[EvalM]
-        case None        => raiseError[EvaluationContext, ExecutionError, Any](s"field '$field' not found")
-      }
+    evalExpr(expr).map(_.asInstanceOf[CaseObj]) map {
+      _.fields(field)
     }
 
   private def evalFunctionCall(header: FunctionHeader, args: List[EXPR]): EvalM[Any] =
@@ -63,10 +59,10 @@ object EvaluatorV1 extends ExprEvaluator {
           // no such function, try data constructor
           header match {
             case FunctionHeader.User(typeName) =>
-              types.get(ctx).get(typeName).collect { case CaseType(_, fields) =>
+              types.get(ctx).get(typeName).collect { case (t@CaseType(_, fields)) =>
                 args
                   .traverse[EvalM, Any](a => evalExpr(a))
-                  .map(argValues => CaseObj(CASETYPEREF(typeName), fields.map(_._1).zip(argValues).toMap))
+                  .map(argValues => CaseObj(t.typeRef, fields.map(_._1).zip(argValues).toMap))
               }
             case _ => None
           }
