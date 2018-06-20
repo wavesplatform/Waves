@@ -41,7 +41,7 @@ object Explorer extends ScorexLogging {
     "filled-volume-and-fee",
     "transaction-info",
     "address-transaction-history",
-    "address-transaction-ids",
+    "address-transaction-ids-at-height",
     "changed-addresses",
     "transaction-ids-at-height",
     "address-id-of-alias",
@@ -61,7 +61,9 @@ object Explorer extends ScorexLogging {
     "addresses-for-waves-seq-nr",
     "addresses-for-waves",
     "addresses-for-asset-seq-nr",
-    "addresses-for-asset"
+    "addresses-for-asset",
+    "address-transaction-ids-seq-nr",
+    "address-transaction-ids"
   )
 
   def main(args: Array[String]): Unit = {
@@ -155,17 +157,6 @@ object Explorer extends ScorexLogging {
 
           for ((k, v) <- result.asScala if v > 1) {
             log.info(s"$k,$v")
-          }
-
-        case "T" =>
-          val address   = Address.fromString(args(2)).explicitGet()
-          val aid       = Keys.addressId(address)
-          val addressId = aid.parse(db.get(aid.keyBytes)).get
-          log.info(s"Address id = $addressId")
-          val ktxidh = Keys.addressTransactionIds(args(3).toInt, addressId)
-
-          for ((t, id) <- ktxidh.parse(db.get(ktxidh.keyBytes))) {
-            log.info(s"$id of type $t")
           }
 
         case "AA" =>

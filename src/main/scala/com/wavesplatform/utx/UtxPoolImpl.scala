@@ -17,6 +17,7 @@ import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
 import scorex.transaction._
+import scorex.transaction.assets.ReissueTransaction
 import scorex.transaction.transfer._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -149,6 +150,16 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
     override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = outer.putIfNew(b, tx)
   }
 
+  private def canReissue(b: Blockchain, tx: Transaction) = tx match {
+    case r: ReissueTransaction if b.assetDescription(r.assetId).exists(!_.reissuable) => Left(GenericError(s"Asset is not reissuable"))
+    case _                                                                            => Right(())
+  }
+
+  private def checkAlias(b: Blockchain, tx: Transaction) = tx match {
+    case cat: CreateAliasTransaction if b.resolveAlias(cat.alias).isDefined => Left(GenericError("Alias already claimed"))
+    case _                                                                  => Right(())
+  }
+
   private def putIfNew(b: Blockchain, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
     putRequestStats.increment()
     measureSuccessful(
@@ -156,6 +167,8 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
         for {
           _    <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
           _    <- checkNotBlacklisted(tx)
+          _    <- checkAlias(b, tx)
+          _    <- canReissue(b, tx)
           _    <- feeCalculator.enoughFee(tx, blockchain, fs)
           diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
         } yield {
@@ -166,7 +179,6 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
       }
     )
   }
-
 }
 
 object UtxPoolImpl {

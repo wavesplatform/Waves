@@ -12,7 +12,6 @@ import scorex.transaction.{AssetId, ProvenTransaction, ValidationError}
 import scala.util.{Left, Right}
 
 object AssetTransactionsDiff {
-
   def issue(height: Int)(tx: IssueTransaction): Either[ValidationError, Diff] = {
     val info = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity, script = tx.script)
     Right(
@@ -28,21 +27,26 @@ object AssetTransactionsDiff {
       tx: ReissueTransaction): Either[ValidationError, Diff] =
     validateAsset(tx, blockchain, tx.assetId, issuerOnly = true).flatMap { _ =>
       val oldInfo = blockchain.assetDescription(tx.assetId).get
-      if (!oldInfo.reissuable && blockTime > settings.allowInvalidReissueInSameBlockUntilTimestamp) {
-        Left(
-          GenericError(s"Asset is not reissuable and blockTime=$blockTime is greater than " +
-            s"settings.allowInvalidReissueInSameBlockUntilTimestamp=${settings.allowInvalidReissueInSameBlockUntilTimestamp}"))
-      } else if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume && blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens,
-                                                                                                      blockchain.height)) {
-        Left(GenericError(s"Asset total value overflow"))
+      def wasBurnt = blockchain.addressTransactions(tx.sender, Set(BurnTransaction.typeId), Int.MaxValue, 0).exists {
+        case (h, t: BurnTransaction) if t.assetId == tx.assetId => true
+        case _                                                  => false
+      }
+      val isBurnAnyActivated = blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, blockchain.height)
+      if (oldInfo.reissuable || (blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) || (!isBurnAnyActivated && wasBurnt)) {
+        if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume && isBurnAnyActivated) {
+          Left(GenericError("Asset total value overflow"))
+        } else {
+          Right(
+            Diff(
+              height = height,
+              tx = tx,
+              portfolios =
+                Map(tx.sender.toAddress   -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.assetId -> tx.quantity))),
+              assetInfos = Map(tx.assetId -> AssetInfo(volume = tx.quantity, isReissuable = tx.reissuable, script = None))
+            ))
+        }
       } else {
-        Right(
-          Diff(
-            height = height,
-            tx = tx,
-            portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.assetId -> tx.quantity))),
-            assetInfos = Map(tx.assetId          -> AssetInfo(volume = tx.quantity, isReissuable = tx.reissuable, script = None))
-          ))
+        Left(GenericError("Asset is not reissuable"))
       }
     }
 

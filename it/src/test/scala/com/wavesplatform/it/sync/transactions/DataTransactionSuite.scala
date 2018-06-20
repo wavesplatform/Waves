@@ -77,15 +77,11 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("max transaction size") {
-    import DataEntry.MaxKeySize
-
-    val maxKey = "\u6fae" * MaxKeySize
-    val data   = List.tabulate(26)(n => BinaryDataEntry("\u6fae" * MaxKeySize, ByteStr(Array.fill(5598)(n.toByte))))
-    val fee    = calcDataFee(data)
-    val txId   = sender.putData(firstAddress, data, fee).id
-
+    val key  = "\u6fae" * (DataEntry.MaxKeySize - 1)
+    val data = List.tabulate(26)(n => BinaryDataEntry(key + n.toChar, ByteStr(Array.fill(5599)(n.toByte))))
+    val fee  = calcDataFee(data)
+    val txId = sender.putData(firstAddress, data, fee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
-    sender.getData(firstAddress, maxKey) shouldBe data.last
   }
 
   test("data definition and retrieval") {
@@ -166,18 +162,6 @@ class DataTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(noDataTx)
     sender.getData(thirdAddress) shouldBe List.empty
 
-    val emptyKey   = List(LongDataEntry("", 7))
-    val emptyKeyTx = sender.putData(thirdAddress, emptyKey, fee).id
-    nodes.waitForHeightAriseAndTxPresent(emptyKeyTx)
-    sender.getData(thirdAddress, "") shouldBe emptyKey.head
-
-    val latinKey    = "C,u!"
-    val multiKey    = List.tabulate(5)(LongDataEntry(latinKey, _))
-    val multiKeyFee = calcDataFee(multiKey)
-    val multiKeyTx  = sender.putData(thirdAddress, multiKey, multiKeyFee).id
-    nodes.waitForHeightAriseAndTxPresent(multiKeyTx)
-    sender.getData(thirdAddress, latinKey) shouldBe multiKey.last
-
     val nonLatinKey   = "\u05EA\u05E8\u05D1\u05D5\u05EA, \u05E1\u05E4\u05D5\u05E8\u05D8 \u05D5\u05EA\u05D9\u05D9\u05E8\u05D5\u05EA"
     val typeChange    = List(BooleanDataEntry(nonLatinKey, true))
     val typeChangeFee = calcDataFee(typeChange)
@@ -252,27 +236,28 @@ class DataTransactionSuite extends BaseTransactionSuite {
     import DataEntry.{MaxKeySize, MaxValueSize}
     import DataTransaction.MaxEntryCount
 
-    val message  = "Too big sequences requested"
+    val TooBig   = "Too big sequences requested"
     val extraKey = "a" * (MaxKeySize + 1)
     val data     = List(BooleanDataEntry(extraKey, false))
 
-    assertBadRequestAndResponse(sender.putData(firstAddress, data, calcDataFee(data)), message)
-    nodes.waitForHeightArise()
+    assertBadRequestAndResponse(sender.putData(firstAddress, data, calcDataFee(data)), TooBig)
+    assertBadRequestAndResponse(sender.putData(firstAddress, List(LongDataEntry("", 4)), 100000), "Empty key found")
+    assertBadRequestAndResponse(sender.putData(firstAddress, List(LongDataEntry("abc", 4), LongDataEntry("abc", 5)), 100000), "Duplicate keys found")
 
     val extraValueData = List(BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1.toByte))))
-    assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, calcDataFee(extraValueData)), message)
+    assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, calcDataFee(extraValueData)), TooBig)
     nodes.waitForHeightArise()
 
     val largeBinData = List.tabulate(5)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
-    assertBadRequestAndResponse(sender.putData(firstAddress, largeBinData, calcDataFee(largeBinData)), message)
+    assertBadRequestAndResponse(sender.putData(firstAddress, largeBinData, calcDataFee(largeBinData)), TooBig)
     nodes.waitForHeightArise()
 
     val largeStrData = List.tabulate(5)(n => StringDataEntry(extraKey, "A" * MaxValueSize))
-    assertBadRequestAndResponse(sender.putData(firstAddress, largeStrData, calcDataFee(largeStrData)), message)
+    assertBadRequestAndResponse(sender.putData(firstAddress, largeStrData, calcDataFee(largeStrData)), TooBig)
     nodes.waitForHeightArise()
 
     val tooManyEntriesData = List.tabulate(MaxEntryCount + 1)(n => LongDataEntry("key", 88))
-    assertBadRequestAndResponse(sender.putData(firstAddress, tooManyEntriesData, calcDataFee(tooManyEntriesData)), message)
+    assertBadRequestAndResponse(sender.putData(firstAddress, tooManyEntriesData, calcDataFee(tooManyEntriesData)), TooBig)
     nodes.waitForHeightArise()
   }
 }

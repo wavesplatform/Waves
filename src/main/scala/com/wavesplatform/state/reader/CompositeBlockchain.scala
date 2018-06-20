@@ -1,6 +1,7 @@
 package com.wavesplatform.state.reader
 
 import cats.implicits._
+import cats.kernel.Monoid
 import com.wavesplatform.state._
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}
@@ -25,11 +26,9 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
         diff.issuedAssets
           .get(id)
           .map { newAssetInfo =>
-            ad.copy(
-              reissuable = newAssetInfo.isReissuable,
-              totalVolume = ad.totalVolume + newAssetInfo.volume,
-              script = newAssetInfo.script
-            )
+            val oldAssetInfo = AssetInfo(ad.reissuable, ad.totalVolume, ad.script)
+            val combination  = Monoid.combine(oldAssetInfo, newAssetInfo)
+            ad.copy(reissuable = combination.isReissuable, totalVolume = combination.volume, script = combination.script)
           }
           .orElse(Some(ad))
           .map { ad =>
