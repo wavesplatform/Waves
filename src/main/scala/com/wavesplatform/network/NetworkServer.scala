@@ -4,11 +4,10 @@ import java.net.{InetSocketAddress, NetworkInterface}
 import java.nio.channels.ClosedChannelException
 import java.util.concurrent.ConcurrentHashMap
 
+import com.wavesplatform.Version
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network.MessageObserver.Messages
 import com.wavesplatform.settings._
-import com.wavesplatform.Version
-import com.wavesplatform.state.NG
 import com.wavesplatform.utx.UtxPool
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
@@ -20,7 +19,6 @@ import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepende
 import io.netty.util.concurrent.DefaultThreadFactory
 import monix.reactive.Observable
 import org.influxdb.dto.Point
-import scorex.transaction._
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
@@ -39,9 +37,6 @@ trait NS {
 object NetworkServer extends ScorexLogging {
 
   def apply(settings: WavesSettings,
-            lastBlockInfos: Observable[LastBlockInfo],
-            ng: NG,
-            historyReplier: HistoryReplier,
             utxPool: UtxPool,
             peerDatabase: PeerDatabase,
             allChannels: ChannelGroup,
@@ -88,9 +83,8 @@ object NetworkServer extends ScorexLogging {
     val inboundConnectionFilter: PipelineInitializer.HandlerWrapper =
       new InboundConnectionFilter(peerDatabase, settings.networkSettings.maxInboundConnections, settings.networkSettings.maxConnectionsPerHost)
 
-    val (mesageObserver, newtworkMessages)            = MessageObserver()
+    val (messageObserver, networkMessages)            = MessageObserver()
     val (channelClosedHandler, closedChannelsSubject) = ChannelClosedHandler()
-    val discardingHandler                             = new DiscardingHandler(lastBlockInfos.map(_.ready))
     val peerConnections                               = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
     val serverHandshakeHandler                        = new HandshakeHandler.Server(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
 
@@ -114,13 +108,11 @@ object NetworkServer extends ScorexLogging {
           new LegacyFrameCodec(peerDatabase),
           channelClosedHandler,
           trafficWatcher,
-          discardingHandler,
           messageCodec,
           trafficLogger,
           writeErrorHandler,
           peerSynchronizer,
-          historyReplier,
-          mesageObserver,
+          messageObserver,
           fatalErrorHandler
         )))
         .bind(settings.networkSettings.bindAddress)
@@ -144,13 +136,11 @@ object NetworkServer extends ScorexLogging {
         new LegacyFrameCodec(peerDatabase),
         channelClosedHandler,
         trafficWatcher,
-        discardingHandler,
         messageCodec,
         trafficLogger,
         writeErrorHandler,
         peerSynchronizer,
-        historyReplier,
-        mesageObserver,
+        messageObserver,
         fatalErrorHandler
       )))
 
@@ -238,7 +228,7 @@ object NetworkServer extends ScorexLogging {
       } finally {
         workerGroup.shutdownGracefully().await()
         bossGroup.shutdownGracefully().await()
-        mesageObserver.shutdown()
+        messageObserver.shutdown()
         channelClosedHandler.shutdown()
       }
 
@@ -247,7 +237,7 @@ object NetworkServer extends ScorexLogging {
 
       override def shutdown(): Unit = doShutdown()
 
-      override val messages: Messages = newtworkMessages
+      override val messages: Messages = networkMessages
 
       override val closedChannels: Observable[Channel] = closedChannelsSubject
     }
