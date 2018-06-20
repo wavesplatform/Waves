@@ -132,6 +132,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[Long](
       context = Monoid.combine(PureContext.evalContext,
                                EvaluationContext(
+                                 typeDefs = Map.empty,
                                  letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance)))),
                                  functions = Map.empty
                                )),
@@ -155,6 +156,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val context = Monoid.combine(
       PureContext.evalContext,
       EvaluationContext(
+        typeDefs = Map.empty,
         letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance))), ("badVal", LazyVal(EitherT.leftT("Error")))),
         functions = Map.empty
       )
@@ -175,6 +177,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val context = Monoid.combine(PureContext.evalContext,
                                  EvaluationContext(
+                                   typeDefs = Map.empty,
                                    letDefs = Map.empty,
                                    functions = Map(f.header -> f)
                                  ))
@@ -192,6 +195,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val fooInstance = CaseObj(fooType.typeRef, Map("bar" -> "bAr", "buz" -> 1L))
 
     val context = EvaluationContext(
+      typeDefs = Map.empty,
       letDefs = Map("fooInstance" -> LazyVal(EitherT.pure(fooInstance))),
       functions = Map.empty
     )
@@ -208,6 +212,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
 
     val context = EvaluationContext(
+      typeDefs = Map.empty,
       letDefs = Map.empty,
       functions = Map(fooCtor.header -> fooCtor)
     )
@@ -235,6 +240,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
 
     val context = EvaluationContext(
+      typeDefs = Map.empty,
       letDefs = Map.empty,
       functions = Map(
         fooCtor.header      -> fooCtor,
@@ -256,6 +262,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("successful on simple function evaluation") {
     ev[Long](
       context = EvaluationContext(
+        typeDefs = Map.empty,
         letDefs = Map.empty,
         functions = Map(multiplierFunction.header -> multiplierFunction)
       ),
@@ -457,6 +464,13 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
   }
 
+  def toOption[T](actual: Any) = {
+    actual match {
+      case v: CaseObj => Some(v)
+      case _: Unit    => None
+    }
+  }
+
   property("addressFromString works as the native one: sunny without prefix") {
     val environment = Common.emptyBlockchainEnvironment()
     val ctx         = defaultFullContext(environment)
@@ -467,14 +481,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
 
     forAll(gen) { addrStr =>
-      val expr = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
-      try {
-        ev[Option[CaseObj]](ctx.evaluationContext, expr)._2.map(_.map(_.fields("bytes")))
-      } catch {
-        case e: Throwable => println(e)
-      }
-      val actual = ev[Option[CaseObj]](ctx.evaluationContext, expr)._2.map(_.map(_.fields("bytes")))
-      actual shouldBe addressFromString(environment.networkByte, addrStr).map(_.map(ByteVector(_)))
+      val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
+      val actual = ev[Any](ctx.evaluationContext, expr)._2
+      actual.map(toOption[CaseObj]).map(_.map(_.fields("bytes"))) shouldBe addressFromString(environment.networkByte, addrStr)
+        .map(_.map(ByteVector(_)))
     }
   }
 
@@ -489,8 +499,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
-      val actual = ev[Option[CaseObj]](ctx.evaluationContext, expr)._2.map(_.map(_.fields("bytes")))
-      actual shouldBe addressFromString(environment.networkByte, addrStr).map(_.map(ByteVector(_)))
+      val actual = ev[Any](ctx.evaluationContext, expr)._2
+      actual.map(toOption[CaseObj]).map(_.map(_.fields("bytes"))) shouldBe addressFromString(environment.networkByte, addrStr)
+        .map(_.map(ByteVector(_)))
     }
   }
 
@@ -505,8 +516,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
-      val actual = ev[Option[CaseObj]](ctx.evaluationContext, expr)._2.map(_.map(_.fields("bytes")))
-      actual shouldBe Right(None)
+      val actual = ev[Any](ctx.evaluationContext, expr)._2
+      actual.map(toOption[CaseObj]).map(_.map(_.fields("bytes"))) shouldBe Right(None)
     }
   }
 
@@ -525,8 +536,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
-      val actual = ev[Option[CaseObj]](ctx.evaluationContext, expr)._2.map(_.map(_.fields("bytes")))
-      actual shouldBe Right(None)
+      val actual = ev[Any](ctx.evaluationContext, expr)._2
+      actual.map(toOption[CaseObj]).map(_.map(_.fields("bytes"))) shouldBe Right(None)
     }
   }
 
@@ -545,8 +556,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
-      val actual = ev[Option[CaseObj]](ctx.evaluationContext, expr)._2.map(_.map(_.fields("bytes")))
-      actual shouldBe Right(None)
+      val actual = ev[Any](ctx.evaluationContext, expr)._2
+      actual.map(toOption[CaseObj]).map(_.map(_.fields("bytes"))) shouldBe Right(None)
     }
   }
 
@@ -567,8 +578,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
-      val actual = ev[Option[CaseObj]](ctx.evaluationContext, expr)._2.map(_.map(_.fields("bytes")))
-      actual shouldBe Right(None)
+      val actual = ev[Any](ctx.evaluationContext, expr)._2
+      actual.map(toOption[CaseObj]) shouldBe Right(None)
     }
   }
 
@@ -598,6 +609,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         PureContext.evalContext,
         defaultCryptoContext.evaluationContext,
         EvaluationContext.build(
+          typeDefs = Map.empty,
           letDefs = Map("tx" -> LazyVal(EitherT.pure(txObj))),
           functions = Seq.empty
         )
@@ -702,5 +714,16 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[Long](expr = frac)._2 shouldBe Right(Long.MaxValue / 2)
     ev[Long](expr = frac2)._2 shouldBe Left(s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1")
     ev[Long](expr = frac3)._2 shouldBe Left(s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1")
+  }
+
+  property("data constructors") {
+    val point     = "Point"
+    val pointType = CaseType(point, List("X" -> LONG, "Y" -> LONG))
+    val pointCtor = FunctionHeader.User(point)
+
+    ev[CaseObj](
+      context = EvaluationContext(typeDefs = Map(point -> pointType), letDefs = Map.empty, functions = Map.empty),
+      FUNCTION_CALL(pointCtor, List(CONST_LONG(1), CONST_LONG(2)))
+    )._2 shouldBe Right(CaseObj(pointType.typeRef, Map("X" -> 1, "Y" -> 2)))
   }
 }

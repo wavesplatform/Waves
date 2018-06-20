@@ -15,11 +15,10 @@ import scodec.bits.ByteVector
 import scala.util.Try
 
 object PureContext {
-  private val optionT                                             = OPTIONTYPEPARAM(TYPEPARAM('T'))
-  private val noneCoeval: Coeval[Either[String, Option[Nothing]]] = Coeval.evalOnce(Right(None))
+  private val noneCoeval: Coeval[Either[String, Unit]] = Coeval.evalOnce(Right( () ))
   private val nothingCoeval: Coeval[Either[String, Nothing]]      = Coeval.defer(Coeval(Right(throw new Exception("explicit contract termination"))))
 
-  val none: LazyVal = LazyVal(EitherT(noneCoeval).subflatMap(Right(_: Option[Nothing]))) // IDEA HACK
+  val none: LazyVal = LazyVal(EitherT(noneCoeval).subflatMap(Right(_: Unit))) // IDEA HACK
   val err           = LazyVal(EitherT(nothingCoeval))
   val errRef        = "throw"
 
@@ -33,26 +32,29 @@ object PureContext {
     case _ => ???
   }
 
-  val extract: BaseFunction = NativeFunction("extract", 1, EXTRACT, TYPEPARAM('T'), "opt" -> optionT) {
-    case Some(v) :: Nil => Right(v)
-    case None :: Nil    => Left("Extract from empty option")
+  val extract: NativeFunction = NativeFunction.create("extract", 1L, fromNonable(TYPEPARAM('T')) _, List(("opt", TYPEPARAM('T'):TYPEPLACEHOLDER)), EXTRACT) {
+    case () :: Nil    => Left("Extract from empty option")
+    case v :: Nil => Right(v)
     case _              => ???
   }
 
-  val some: BaseFunction = NativeFunction("Some", 1, SOME, optionT, "obj" -> TYPEPARAM('T')) {
-    case v :: Nil => Right(Some(v))
+  val some: NativeFunction = NativeFunction.create("Some", 1L, asNonable(TYPEPARAM('T')) _, List(("obj", TYPEPARAM('T'):TYPEPLACEHOLDER)), SOME) {
+    case v :: Nil => Right(v)
     case _        => ???
   }
 
-  val _isInstanceOf: BaseFunction = NativeFunction("_isInstanceOf", 1, ISINSTANCEOF, BOOLEAN, "obj" -> TYPEPARAM('T'), "of" -> STRING) {
-    case (p: CaseObj) :: (s: String) :: Nil => Right(p.caseType.name == s)
-    case _                                  => ???
+  val isDefined: NativeFunction = NativeFunction("isDefined", 1, ISDEFINED, BOOLEAN, ("opt" -> (TYPEPARAM('T'):TYPEPLACEHOLDER))) {
+    case (()) :: Nil => Right(false)
+    case _           => Right(true)
   }
 
-  val isDefined: BaseFunction = NativeFunction("isDefined", 1, ISDEFINED, BOOLEAN, "opt" -> optionT) {
-    case Some(_) :: Nil => Right(true)
-    case None :: Nil    => Right(false)
-    case _              => ???
+  val _isInstanceOf: BaseFunction = NativeFunction("_isInstanceOf", 1, ISINSTANCEOF, BOOLEAN, "obj" -> TYPEPARAM('T'), "of" -> STRING) {
+    case (p: Boolean) :: ("Boolean") :: Nil => Right(true)
+    case (p: String) :: ("String") :: Nil => Right(true)
+    case (p: Long) :: ("Int") :: Nil => Right(true)
+    case (()) :: ("Unit") :: Nil => Right(true)
+    case (p: CaseObj) :: (s: String) :: Nil => Right(p.caseType.name == s)
+    case _                                  => Right(false)
   }
 
   val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "byteVector" -> BYTEVECTOR) {
@@ -217,7 +219,7 @@ object PureContext {
   val sge: BaseFunction           = createOp(GE_OP, STRING, BOOLEAN, GE_STRING)(_ >= _)
   val sgt: BaseFunction           = createOp(GT_OP, STRING, BOOLEAN, GT_STRING)(_ > _)
 
-  val eq: BaseFunction = NativeFunction(EQ_OP.func, 1, EQ, BOOLEAN, "a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')) {
+  val eq: BaseFunction = NativeFunction.create(EQ_OP.func, 1, canBeEq(TYPEPARAM('A'), TYPEPARAM('B')) _, List("a" -> TYPEPARAM('A'), "b" -> TYPEPARAM('B')), EQ) {
     case a :: b :: Nil => Right(a == b)
     case _             => ???
   }
@@ -247,7 +249,7 @@ object PureContext {
     uNot
   )
 
-  private val vars = Map(("None", (OPTION(NOTHING), none)), (errRef, (NOTHING, err)))
+  private val vars = Map(("None", (UNION(NOTHING, UNIT), none)), (errRef, (NOTHING, err)))
   private val functions = Seq(
     fraction,
     extract,
@@ -266,8 +268,15 @@ object PureContext {
     _isInstanceOf
   ) ++ operators
 
-  lazy val ctx                              = CTX(Seq.empty, vars, functions)
-  lazy val evalContext: EvaluationContext   = ctx.evaluationContext
+  lazy val ctx          = CTX(Seq(
+                    new DefinedType { val name = "Unit"; val typeRef: TYPE = UNIT },
+                    new DefinedType { val name = "Int"; val typeRef: TYPE = LONG },
+                    new DefinedType { val name = "String"; val typeRef: TYPE = STRING }
+                  ), vars, functions)
+  lazy val evalContext     = ctx.evaluationContext
   lazy val compilerContext: CompilerContext = ctx.compilerContext
 
+  def fromOption[T](v: Option[T]): Any = {
+    v.getOrElse(():Any)
+  }
 }

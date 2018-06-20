@@ -264,6 +264,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case DataTransaction          => jsv.as[SignedDataRequest].toTx
               case SetScriptTransaction     => jsv.as[SignedSetScriptRequest].toTx
               case SponsorFeeTransaction    => jsv.as[SignedSponsorFeeRequest].toTx
+//              case ExchangeTransaction      => jsv.as[ExchangeTransaction].toTx
 
             }
         }

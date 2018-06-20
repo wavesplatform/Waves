@@ -175,8 +175,6 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     val to          = 8 + MaxLiteralLength
     parseOne(s"base58'$longLiteral'") shouldBe
       CONST_BYTEVECTOR(Pos(0, to + 1), PART.INVALID(Pos(8, to), s"base58Decode input exceeds $MaxLiteralLength"))
-    parseOne(s"base64'base64:$longLiteral'") shouldBe
-      CONST_BYTEVECTOR(Pos(0, to + 8), PART.INVALID(Pos(8, to + 7), s"base58Decode input exceeds $MaxLiteralLength"))
   }
 
   property("string is consumed fully") {

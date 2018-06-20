@@ -1,8 +1,8 @@
 package com.wavesplatform.lang
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext}
@@ -46,18 +46,18 @@ object Common {
   val pointTypeB = CaseType("PointB", List("X"  -> LONG, "YB" -> LONG))
   val pointTypeC = CaseType("PointC", List("YB" -> LONG))
 
-  val AorB    = UNION.of(pointTypeA, pointTypeB)
-  val AorBorC = UNION.of(pointTypeA, pointTypeB, pointTypeC)
+  val AorB    = UNION(pointTypeA.typeRef, pointTypeB.typeRef)
+  val AorBorC = UNION(pointTypeA.typeRef, pointTypeB.typeRef, pointTypeC.typeRef)
   val BorC    = UNION.of(pointTypeB, pointTypeC)
 
   val pointAInstance = CaseObj(pointTypeA.typeRef, Map("X"  -> 3L, "YA" -> 40L))
   val pointBInstance = CaseObj(pointTypeB.typeRef, Map("X"  -> 3L, "YB" -> 41L))
   val pointCInstance = CaseObj(pointTypeC.typeRef, Map("YB" -> 42L))
 
-  val sampleTypes: Seq[DefinedType] = Seq(pointTypeA, pointTypeB, pointTypeC) ++ Seq(UnionType("PointAB", AorB.l), UnionType("PointBC", BorC.l))
+  val sampleTypes = Seq(pointTypeA, pointTypeB, pointTypeC) ++ Seq(UnionType("PointAB", AorB.l), UnionType("PointBC", BorC.l))
 
   def sampleUnionContext(instance: CaseObj) =
-    EvaluationContext.build(Map("p" -> LazyVal(EitherT.pure(instance))), Seq.empty)
+    EvaluationContext.build(Map.empty, Map("p" -> LazyVal(EitherT.pure(instance))), Seq.empty)
 
   def emptyBlockchainEnvironment(h: Int = 1, tx: Coeval[Tx] = Coeval(???), nByte: Byte = 'T'): Environment = new Environment {
     override def height: Int       = h
@@ -66,7 +66,7 @@ object Common {
 
     override def transactionById(id: Array[Byte]): Option[Tx]                                                      = ???
     override def transactionHeightById(id: Array[Byte]): Option[Int]                                               = ???
-    override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any]                     = ???
+    override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                          = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                     = ???
     override def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = ???
   }

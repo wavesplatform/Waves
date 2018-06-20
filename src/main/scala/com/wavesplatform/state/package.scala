@@ -52,7 +52,7 @@ package object state {
     }
 
     def genesis: Block = blockchain.blockAt(1).get
-    def resolveAliasEi[T <: Transaction](aoa: AddressOrAlias): Either[ValidationError, Address] =
+    def resolveAliasEi(aoa: AddressOrAlias): Either[ValidationError, Address] =
       aoa match {
         case a: Address => Right(a)
         case a: Alias   => blockchain.resolveAlias(a).toRight(AliasDoesNotExist(a))
