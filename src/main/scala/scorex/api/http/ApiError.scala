@@ -55,6 +55,27 @@ object ApiError {
       case error => CustomValidationError(error.toString)
     }
   }
+
+  implicit val lvWrites: Writes[LazyVal] = Writes { lv =>
+    lv.value.value.attempt
+      .map({
+        case Left(thr) =>
+          Json.obj(
+            "status" -> "Failed",
+            "error"  -> thr.getMessage
+          )
+        case Right(Left(err)) =>
+          Json.obj(
+            "status" -> "Failed",
+            "error"  -> err
+          )
+        case Right(Right(lv)) =>
+          Json.obj(
+            "status" -> "Success",
+            "error"  -> lv.toString
+          )
+      })()
+  }
 }
 
 case object Unknown extends ApiError {
@@ -244,10 +265,10 @@ case class ScriptExecutionError(tx: Transaction, error: String, scriptSrc: Strin
       "script"      -> scriptSrc,
       "vars" -> Json.obj(
         "calculated" -> Json.arr(
-          calculated.map({ case (k, v) => Json.obj(k -> JsString(LazyVal.print(v))) })
+          calculated.map({ case (k, v) => Json.obj(k -> Json.toJson(v)(ApiError.lvWrites)) })
         ),
         "notcalculated" -> Json.arr(
-          notCalculated.map({ case (k, v) => Json.obj(k -> JsString(LazyVal.print(v))) })
+          notCalculated.map({ case (k, v) => Json.obj(k -> Json.toJson(v)(ApiError.lvWrites)) })
         )
       )
     )
@@ -268,10 +289,10 @@ case class TransactionNotAllowedByScript(tx: Transaction, vars: Map[String, Lazy
       "script"      -> scriptSrc,
       "vars" -> Json.obj(
         "calculated" -> Json.arr(
-          calculated.map({ case (k, v) => Json.obj(k -> JsString(LazyVal.print(v))) })
+          calculated.map({ case (k, v) => Json.obj(k -> Json.toJson(v)(ApiError.lvWrites)) })
         ),
         "notcalculated" -> Json.arr(
-          notCalculated.map({ case (k, v) => Json.obj(k -> JsString(LazyVal.print(v))) })
+          notCalculated.map({ case (k, v) => Json.obj(k -> Json.toJson(v)(ApiError.lvWrites)) })
         )
       )
     )

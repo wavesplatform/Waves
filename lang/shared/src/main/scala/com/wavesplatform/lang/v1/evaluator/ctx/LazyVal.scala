@@ -45,13 +45,4 @@ object LazyVal {
   }
 
   def apply(v: TrampolinedExecResult[Any]): LazyVal = LazyValImpl(v)
-
-  def print(v: LazyVal): String = {
-    v.value.value.attempt
-      .map({
-        case Left(thr)        => s"Error: ${thr.getMessage}"
-        case Right(Left(err)) => s"Error: $err"
-        case Right(Right(lv)) => s"Value: $lv"
-      })()
-  }
 }
