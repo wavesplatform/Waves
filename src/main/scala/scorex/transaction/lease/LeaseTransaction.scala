@@ -47,7 +47,7 @@ object LeaseTransaction {
     } else Right(())
 
   def parseBase(bytes: Array[Byte], start: Int) = {
-    val sender = PublicKeyAccount(bytes.slice(start, KeyLength))
+    val sender = PublicKeyAccount(bytes.slice(start, start + KeyLength))
     for {
       recRes <- AddressOrAlias.fromBytes(bytes, start + KeyLength)
       (recipient, recipientEnd) = recRes
