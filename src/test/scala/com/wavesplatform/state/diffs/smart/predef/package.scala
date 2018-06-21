@@ -12,15 +12,14 @@ import scorex.transaction.smart.BlockchainContext
 package object predef {
   val networkByte: Byte = 'u'
 
-  def runScript[T](script: String, tx: Transaction = null): Either[String, T] = {
+  def runScript[T](script: String, tx: Transaction = null, networkByte: Byte = networkByte): Either[String, T] = {
     val Success(expr, _) = Parser(script)
-    if (expr.size == 1) {
-      val Right((typedExpr, tpe)) = CompilerV1(dummyCompilerContext, expr.head)
-      val r                       = EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr)
-      r._2
-    } else {
-      Left(expr.mkString("\n"))
-    }
+    for {
+      _             <- Either.cond(expr.size == 1, (), expr.mkString("\n"))
+      compileResult <- CompilerV1(dummyCompilerContext, expr.head)
+      (typedExpr, tpe) = compileResult
+      r <- EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr)._2
+    } yield r
   }
 
 }

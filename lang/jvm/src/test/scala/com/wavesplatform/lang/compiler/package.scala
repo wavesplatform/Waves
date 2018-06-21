@@ -4,24 +4,24 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.Common.multiplierFunction
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, PredefFunction}
+import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, NativeFunction}
 
 package object compiler {
 
   val pointType = CaseType("Point", List("x" -> LONG, "y" -> LONG))
 
-  val idT = PredefFunction("idT", 1, TYPEPARAM('T'), List("p1" -> TYPEPARAM('T')), 256)(Right(_))
-  val extract = PredefFunction("extract", 1, TYPEPARAM('T'), List("p1" -> OPTIONTYPEPARAM(TYPEPARAM('T'))), EXTRACT) {
+  val idT = NativeFunction("idT", 1, 10000: Short, TYPEPARAM('T'), "p1" -> TYPEPARAM('T'))(Right(_))
+  val extract = NativeFunction.create("extract", 1, fromNonable(TYPEPARAM('T')) _, List("p1" -> (TYPEPARAM('T'): TYPEPLACEHOLDER)), 1001: Short) {
     case Some(vl) :: Nil => Right(vl)
     case _               => Left("extracting from empty option")
   }
-  val undefinedOptionLong = PredefFunction("undefinedOptionLong", 1, OPTION(LONG), List.empty, 257)(_ => ???)
-  val idOptionLong        = PredefFunction("idOptionLong", 1, UNIT, List("opt" -> OPTION(OPTION(LONG))), 258)(_ => Right(()))
-  val unitOnNone          = PredefFunction("unitOnNone", 1, UNIT, List("opt" -> OPTION(NOTHING)), 259)(_ => Right(()))
+  val undefinedOptionLong = NativeFunction("undefinedOptionLong", 1, 1002: Short, UNION(LONG, UNIT): TYPEPLACEHOLDER)(_ => ???)
+  val idOptionLong        = NativeFunction("idOptionLong", 1, 1003: Short, UNIT, ("opt" -> UNION(LONG, UNIT)))(_ => Right(()))
+  val unitOnNone          = NativeFunction("unitOnNone", 1, 1004: Short, UNIT, ("opt" -> UNION(NOTHING, UNIT)))(_ => Right(()))
   val functionWithTwoPrarmsOfTheSameType =
-    PredefFunction("functionWithTwoPrarmsOfTheSameType", 1, TYPEPARAM('T'), List("p1" -> TYPEPARAM('T'), "p2" -> TYPEPARAM('T')), 260)(Right(_))
+    NativeFunction("functionWithTwoPrarmsOfTheSameType", 1, 1005: Short, TYPEPARAM('T'), ("p1" -> TYPEPARAM('T')), ("p2" -> TYPEPARAM('T')))(l =>
+      Right(l.head))
 
   val compilerContext = Monoid
     .combine(

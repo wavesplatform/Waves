@@ -175,8 +175,6 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     val to          = 8 + MaxLiteralLength
     parseOne(s"base58'$longLiteral'") shouldBe
       CONST_BYTEVECTOR(Pos(0, to + 1), PART.INVALID(Pos(8, to), s"base58Decode input exceeds $MaxLiteralLength"))
-    parseOne(s"base64'base64:$longLiteral'") shouldBe
-      CONST_BYTEVECTOR(Pos(0, to + 8), PART.INVALID(Pos(8, to + 7), s"base58Decode input exceeds $MaxLiteralLength"))
   }
 
   property("string is consumed fully") {
@@ -212,15 +210,11 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("string literal with special symbols") {
-    parseOne("\"\\t\"") shouldBe CONST_STRING(AnyPos, PART.VALID(AnyPos, "\t"))
+    parseOne("\"\\t\\n\\r\\\\\\\"\"") shouldBe CONST_STRING(AnyPos, PART.VALID(AnyPos, "\t\n\r\\\""))
   }
 
   property("should parse invalid special symbols") {
     parseOne("\"\\ test\"") shouldBe CONST_STRING(AnyPos, PART.INVALID(AnyPos, "unknown escaped symbol: '\\ '. The valid are \b, \f, \n, \r, \t"))
-  }
-
-  property("should parse incomplete special symbols") {
-    parseOne("\"foo \\\"") shouldBe CONST_STRING(AnyPos, PART.INVALID(AnyPos, "invalid escaped symbol: '\\'. The valid are \b, \f, \n, \r, \t"))
   }
 
   property("block: multiline without ;") {

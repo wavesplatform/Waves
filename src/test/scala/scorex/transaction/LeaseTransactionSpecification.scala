@@ -66,7 +66,7 @@ class LeaseTransactionSpecification extends PropSpec with PropertyChecks with Ma
   property("JSON format validation for LeaseTransactionV2") {
     val js = Json.parse("""{
                         "type": 8,
-                        "id": "DJWkQxRyJNqWhq9qSQpK2D4tsrct6eZbjSv3AH4PSha6",
+                        "id": "UL85wuJDXXe6BtQUob4KNb72kTaf8RN9Gp1NajvGMeU",
                         "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
                         "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
                         "fee": 1000000,
@@ -94,5 +94,19 @@ class LeaseTransactionSpecification extends PropSpec with PropertyChecks with Ma
       .get
 
     js shouldEqual tx.json()
+  }
+
+  property("forbid assetId in LeaseTransactionV2") {
+    val leaseV2Gen      = leaseGen.filter(_.version == 2)
+    val assetIdBytesGen = assetIdGen.filter(_.nonEmpty).map(_.get.arr)
+    forAll(leaseV2Gen, assetIdBytesGen) { (tx, assetId) =>
+      val bytes = tx.bytes()
+      // hack in an assetId
+      bytes(3) = 1: Byte
+      val bytesWithAssetId = bytes.take(4) ++ assetId ++ bytes.drop(4)
+      val parsed           = tx.builder.parseBytes(bytesWithAssetId)
+      parsed.isFailure shouldBe true
+      parsed.failed.get.getMessage.contains("Leasing assets is not supported yet") shouldBe true
+    }
   }
 }

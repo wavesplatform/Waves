@@ -6,7 +6,7 @@ import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.LevelDBFactory
-import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.traits.{Environment, Recipient}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.WavesEnvironmentBenchmark._
 import com.wavesplatform.state.bench.DataTestData
@@ -65,7 +65,7 @@ class WavesEnvironmentBenchmark {
   @Benchmark
   def data_test(st: DataSt, bh: Blackhole): Unit = {
     val x = st.data.random
-    bh.consume(st.environment.data(x.addr.toArray, x.key, x.dataType))
+    bh.consume(st.environment.data(Recipient.Address(x.addr), x.key, x.dataType))
   }
 
 }

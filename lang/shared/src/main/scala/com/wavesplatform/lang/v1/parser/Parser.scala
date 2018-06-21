@@ -26,7 +26,7 @@ object Parser {
   private val digit          = CharIn('0' to '9')
   private val unicodeSymbolP = P("\\u" ~/ Pass ~~ (char | digit).repX(min = 0, max = 4))
   private val notEndOfString = CharPred(_ != '\"')
-  private val specialSymbols = P("\\" ~~ notEndOfString.?)
+  private val specialSymbols = P("\\" ~~ AnyChar)
   private val comment        = P("#" ~~ CharPred(_ != '\n').repX).rep
 
   private val escapedUnicodeSymbolP: P[(Int, String, Int)] = P(Index ~~ (NoCut(unicodeSymbolP) | specialSymbols).! ~~ Index)
@@ -64,6 +64,8 @@ object Parser {
                 case 'n' => "\n"
                 case 'r' => "\r"
                 case 't' => "\t"
+                case '\\' => "\\"
+                case '"' => "\""
                 case _ =>
                   errors :+= s"""unknown escaped symbol: '$x'. The valid are \b, \f, \n, \r, \t"""
                   x

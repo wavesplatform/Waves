@@ -88,9 +88,8 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   property("positive validation cases") {
     import DataTransaction.MaxEntryCount
     import com.wavesplatform.state._
-    val keyRepeatCountGen = Gen.choose(2, MaxEntryCount)
-    forAll(dataTransactionGen, dataEntryGen(500), keyRepeatCountGen) {
-      case (DataTransaction(version, sender, data, fee, timestamp, proofs), entry, keyRepeatCount) =>
+    forAll(dataTransactionGen, dataEntryGen(500)) {
+      case (DataTransaction(version, sender, data, fee, timestamp, proofs), entry) =>
         def check(data: List[DataEntry[_]]): Assertion = {
           val txEi = DataTransaction.create(version, sender, data, fee, timestamp, proofs)
           txEi shouldBe Right(DataTransaction(version, sender, data, fee, timestamp, proofs))
@@ -100,8 +99,6 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         check(List.empty)                                                               // no data
         check(List.tabulate(MaxEntryCount)(n => LongDataEntry(n.toString, n)))          // maximal data
         check(List.tabulate(30)(n => StringDataEntry(n.toString, "a" * 5109)))          // maximal data
-        check(List.fill[DataEntry[_]](keyRepeatCount)(entry))                           // repeating keys
-        check(List(BooleanDataEntry("", false)))                                        // empty key
         check(List(LongDataEntry("a" * MaxKeySize, 0xa)))                               // max key size
         check(List(BinaryDataEntry("bin", ByteStr.empty)))                              // empty binary
         check(List(BinaryDataEntry("bin", ByteStr(Array.fill(MaxValueSize)(1: Byte))))) // max binary value size
@@ -117,9 +114,13 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         val badVersionEi = DataTransaction.create(badVersion, sender, data, fee, timestamp, proofs)
         badVersionEi shouldBe Left(ValidationError.UnsupportedVersion(badVersion))
 
-        val dataTooBig   = List.fill(100)(StringDataEntry("key", "a" * 1527))
+        val dataTooBig   = List.tabulate(100)(n => StringDataEntry((100 + n).toString, "a" * 1527))
         val dataTooBigEi = DataTransaction.create(version, sender, dataTooBig, fee, timestamp, proofs)
         dataTooBigEi shouldBe Left(ValidationError.TooBigArray)
+
+        val emptyKey   = List(LongDataEntry("", 2))
+        val emptyKeyEi = DataTransaction.create(version, sender, emptyKey, fee, timestamp, proofs)
+        emptyKeyEi shouldBe Left(ValidationError.GenericError("Empty key found"))
 
         val keyTooLong   = data :+ BinaryDataEntry("a" * (MaxKeySize + 1), ByteStr(Array(1, 2)))
         val keyTooLongEi = DataTransaction.create(version, sender, keyTooLong, fee, timestamp, proofs)
@@ -128,6 +129,11 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         val valueTooLong   = data :+ BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1: Byte)))
         val valueTooLongEi = DataTransaction.create(version, sender, valueTooLong, fee, timestamp, proofs)
         valueTooLongEi shouldBe Left(ValidationError.TooBigArray)
+
+        val e               = BooleanDataEntry("dupe", true)
+        val duplicateKeys   = e +: data.drop(3) :+ e
+        val duplicateKeysEi = DataTransaction.create(version, sender, duplicateKeys, fee, timestamp, proofs)
+        duplicateKeysEi shouldBe Left(ValidationError.GenericError("Duplicate keys found"))
 
         val noFeeEi = DataTransaction.create(version, sender, data, 0, timestamp, proofs)
         noFeeEi shouldBe Left(ValidationError.InsufficientFee())

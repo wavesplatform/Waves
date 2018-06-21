@@ -6,8 +6,9 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Assertions, Matchers, PropSpec}
 import scodec.bits.ByteVector
-import scorex.account.Address
+import scorex.account.{Address, Alias}
 import org.scalacheck.Gen
+import scorex.transaction.{DataTransaction, Proofs}
 
 class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -47,8 +48,8 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
   }
 
   property("Some/None/extract/isDefined") {
-    runScript[Any]("Some(3)".stripMargin) shouldBe Right(Some(3L))
-    runScript[Any]("None".stripMargin) shouldBe Right(None)
+    runScript[Any]("Some(3)".stripMargin) shouldBe Right(3L)
+    runScript[Any]("None".stripMargin) shouldBe Right(())
     runScript[Boolean]("isDefined(Some(3))".stripMargin) shouldBe Right(true)
     runScript[Boolean]("isDefined(None)".stripMargin) shouldBe Right(false)
     runScript[Long]("extract(Some(3))".stripMargin) shouldBe Right(3L)
@@ -208,4 +209,76 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
     }
   }
 
+  property("data constructors") {
+    forAll(transferV2Gen, longEntryGen(dataAsciiKeyGen)) { (t, entry) =>
+      val compareClause = t.recipient match {
+        case addr: Address => s"tx.recipient == Address(base58'${addr.address}')"
+        case alias: Alias  => s"""tx.recipient == Alias("${alias.name}")"""
+      }
+      val transferResult = runScript[Boolean](
+        s"""
+           |match tx {
+           |  case tx: TransferTransaction =>
+           |    let goodEq = $compareClause
+           |    let badAddressEq = tx.recipient == Address(base58'Mbembangwana')
+           |    let badAddressNe = tx.recipient != Address(base58'3AfZaKieM5')
+           |    let badAliasEq = tx.recipient == Alias("Ramakafana")
+           |    let badAliasNe = tx.recipient != Alias("Nuripitia")
+           |    goodEq && !badAddressEq && badAddressNe && !badAliasEq && badAliasNe
+           |  case _ => throw
+           |}
+           |""".stripMargin,
+        t
+      )
+      transferResult shouldBe Right(true)
+
+      val dataTx = DataTransaction.create(1: Byte, t.sender, List(entry), 100000L, t.timestamp, Proofs(Seq.empty)).explicitGet()
+      val dataResult = runScript[Boolean](
+        s"""
+           |match tx {
+           |  case tx: DataTransaction =>
+           |    let intEq = tx.data[0] == LongDataEntry("${entry.key}", ${entry.value})
+           |    let intNe = tx.data[0] != LongDataEntry("${entry.key}", ${entry.value})
+           |    let boolEq = tx.data[0] == BoolDataEntry("${entry.key}", true)
+           |    let boolNe = tx.data[0] != BoolDataEntry("${entry.key}", true)
+           |    let binEq = tx.data[0] == ByteVectorDataEntry("${entry.key}", base64'WROOooommmmm')
+           |    let binNe = tx.data[0] != ByteVectorDataEntry("${entry.key}", base64'FlapFlap')
+           |    let strEq = tx.data[0] == StrDataEntry("${entry.key}", "${entry.value}")
+           |    let strNe = tx.data[0] != StrDataEntry("${entry.key}", "Zam")
+           |    intEq && !intNe && !boolEq && boolNe && !binEq && binNe && !strEq && strNe
+           |  case _ => throw
+           |}
+         """.stripMargin,
+        dataTx
+      )
+      dataResult shouldBe Right(true)
+    }
+  }
+
+  property("data constructors bad syntax") {
+    val realAddr = "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"
+    val cases = Seq(
+      (s"""Address(\"$realAddr\")""", "Compilation failed: Non-matching types"),
+      ("Address(base58'GzumLunBoK', 4)", "Function 'Address' requires 1 arguments, but 2 are provided"),
+      ("Address()", "Function 'Address' requires 1 arguments, but 0 are provided"),
+      (s"Addr(base58'$realAddr')", "Can't find a function 'Addr'")
+    )
+    for ((clause, err) <- cases) {
+      try {
+        runScript[Unit](
+          s"""
+             |match tx {
+             |  case tx: TransferTransaction =>
+             |    let dza = $clause
+             |    throw
+             |  case _ => throw
+             |}
+             |""".stripMargin
+        )
+      } catch {
+        case ex: MatchError => Assertions.assert(ex.getMessage().contains(err))
+        case e: Throwable   => Assertions.fail("Unexpected error", e)
+      }
+    }
+  }
 }

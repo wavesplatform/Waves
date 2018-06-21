@@ -4,7 +4,7 @@ import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.CTX
-import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.{CompilerV1, Terms}
 import com.wavesplatform.lang.v1.compiler.Types.TYPE
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -98,7 +98,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   private def eval[T](code: String, pointInstance: Option[CaseObj] = None): Either[String, T] = {
     val untyped = Parser(code).get.value
     require(untyped.size == 1)
-    val lazyVal                                     = LazyVal(EitherT.pure(pointInstance.getOrElse(null)))
+    val lazyVal                                     = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, (TYPE, LazyVal)] = Map(("p", (AorBorC, lazyVal)))
     val ctx: CTX =
       Monoid.combine(PureContext.ctx, CTX(sampleTypes, stringToTuple, Seq.empty))
@@ -160,6 +160,17 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long]("fraction(9223372036854775807, -2, -4)") shouldBe Right(Long.MaxValue / 2)
   }
 
+  def compile(script: String): Either[String, Terms.EXPR] = {
+    val compiler = new CompilerV1(CTX.empty.compilerContext)
+    compiler.compile(script, List.empty)
+  }
+
+  property("wrong script return type") {
+    compile("1") should produce("should return boolean")
+    compile(""" "string" """) should produce("should return boolean")
+    compile(""" base58'string' """) should produce("should return boolean")
+  }
+
   property("equals works on elements from Gens") {
     List(CONST_LONGgen, SUMgen(50), INTGen(50)).foreach(gen =>
       forAll(for {
@@ -183,4 +194,26 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }
   }
 
+  property("Extract from Some") {
+    eval[Long]("extract(Some(1))+1") shouldBe Right(2)
+  }
+
+  property("Match with not case types") {
+    eval[Long]("match Some(1) { case x: Int => x \n case y: Unit => 2 }") shouldBe Right(1)
+  }
+
+  property("allow unions in pattern matching") {
+    val sampleScript =
+      """match p {
+        |  case p1: PointBC => {
+        |    match p1 {
+        |      case pb: PointB => pb.X
+        |      case pc: PointC => pc.YB
+        |    }
+        |  }
+        |  case other => throw
+        |}""".stripMargin
+    eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(3)
+    eval[Long](sampleScript, Some(pointCInstance)) shouldBe Right(42)
+  }
 }

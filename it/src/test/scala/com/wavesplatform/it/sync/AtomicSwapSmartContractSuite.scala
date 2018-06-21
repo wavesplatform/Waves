@@ -49,13 +49,13 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val beforeHeight = sender.height
     val sc1 = {
       val untyped = Parser(s"""
-    let Bob = extract(addressFromString("$BobBC1")).bytes
-    let Alice = extract(addressFromString("$AliceBC1")).bytes
+    let Bob = Address(base58'$BobBC1').bytes
+    let Alice = Address(base58'$AliceBC1').bytes
     let AlicesPK = base58'${ByteStr(AlicesPK.publicKey)}'
     match tx {
       case ttx: TransferTransaction =>
         let txRecipient = addressFromRecipient(ttx.recipient).bytes
-        let txSender = addressFromPublicKey(ttx.senderPk).bytes
+        let txSender = addressFromPublicKey(ttx.senderPublicKey).bytes
 
         let txToBob = (txRecipient == Bob) && (sha256(ttx.proofs[0]) == base58'$shaSecret') && ((20 + $beforeHeight) >= height)
         let backToAliceAfterHeight = ((height >= (21 + $beforeHeight)) && (txRecipient == Alice))

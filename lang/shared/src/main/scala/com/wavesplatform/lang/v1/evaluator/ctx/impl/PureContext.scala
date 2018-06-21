@@ -1,101 +1,203 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.v1.compiler.CompilerContext
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
-import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, LazyVal, PredefFunction}
+import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
+import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 
 import scala.util.Try
 
 object PureContext {
-  private val optionT                                             = OPTIONTYPEPARAM(TYPEPARAM('T'))
-  private val noneCoeval: Coeval[Either[String, Option[Nothing]]] = Coeval.evalOnce(Right(None))
-  private val nothingCoeval: Coeval[Either[String, Nothing]]      = Coeval.evalOnce(Left("explicit contract termination"))
+  private val noneCoeval: Coeval[Either[String, Unit]] = Coeval.evalOnce(Right( () ))
+  private val nothingCoeval: Coeval[Either[String, Nothing]]      = Coeval.defer(Coeval(Right(throw new Exception("explicit contract termination"))))
 
-  val none: LazyVal = LazyVal(EitherT(noneCoeval).subflatMap(Right(_: Option[Nothing]))) // IDEA HACK
+  val none: LazyVal = LazyVal(EitherT(noneCoeval).subflatMap(Right(_: Unit))) // IDEA HACK
   val err           = LazyVal(EitherT(nothingCoeval))
   val errRef        = "throw"
 
-  val fraction: PredefFunction = PredefFunction("fraction", 1, LONG, List(("value", LONG), ("numerator", LONG), ("denominator", LONG)), FRACTION) {
-    case (v: Long) :: (n: Long) :: (d: Long) :: Nil => {
+  val fraction: BaseFunction = NativeFunction("fraction", 1, FRACTION, LONG, "value" -> LONG, "numerator" -> LONG, "denominator" -> LONG) {
+    case (v: Long) :: (n: Long) :: (d: Long) :: Nil =>
       val result = BigInt(v) * n / d
       for {
         _ <- Either.cond(result < Long.MaxValue, (), s"Long overflow: value `$result` greater than 2^63-1")
         _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^63-1")
       } yield result.toLong
-    }
     case _ => ???
   }
 
-  val extract: PredefFunction = PredefFunction("extract", 1, TYPEPARAM('T'), List(("opt", optionT)), EXTRACT) {
-    case Some(v) :: Nil => Right(v)
-    case None :: Nil    => Left("Extract from empty option")
+  val extract: NativeFunction = NativeFunction.create("extract", 1L, fromNonable(TYPEPARAM('T')) _, List(("opt", TYPEPARAM('T'):TYPEPLACEHOLDER)), EXTRACT) {
+    case () :: Nil    => Left("Extract from empty option")
+    case v :: Nil => Right(v)
     case _              => ???
   }
 
-  val some: PredefFunction = PredefFunction("Some", 1, optionT, List(("obj", TYPEPARAM('T'))), SOME) {
-    case v :: Nil => Right(Some(v))
+  val some: NativeFunction = NativeFunction.create("Some", 1L, asNonable(TYPEPARAM('T')) _, List(("obj", TYPEPARAM('T'):TYPEPLACEHOLDER)), SOME) {
+    case v :: Nil => Right(v)
     case _        => ???
   }
 
-  val _isInstanceOf: PredefFunction = PredefFunction("_isInstanceOf", 1, BOOLEAN, List(("obj", TYPEPARAM('T')), ("of", STRING)), ISINSTANCEOF) {
+  val isDefined: NativeFunction = NativeFunction("isDefined", 1, ISDEFINED, BOOLEAN, ("opt" -> (TYPEPARAM('T'):TYPEPLACEHOLDER))) {
+    case (()) :: Nil => Right(false)
+    case _           => Right(true)
+  }
+
+  val _isInstanceOf: BaseFunction = NativeFunction("_isInstanceOf", 1, ISINSTANCEOF, BOOLEAN, "obj" -> TYPEPARAM('T'), "of" -> STRING) {
+    case (p: Boolean) :: ("Boolean") :: Nil => Right(true)
+    case (p: String) :: ("String") :: Nil => Right(true)
+    case (p: Long) :: ("Int") :: Nil => Right(true)
+    case (()) :: ("Unit") :: Nil => Right(true)
     case (p: CaseObj) :: (s: String) :: Nil => Right(p.caseType.name == s)
-    case _                                  => ???
+    case _                                  => Right(false)
   }
 
-  val isDefined: PredefFunction = PredefFunction("isDefined", 1, BOOLEAN, List(("opt", optionT)), ISDEFINED) {
-    case Some(_) :: Nil => Right(true)
-    case None :: Nil    => Right(false)
-    case _              => ???
-  }
-
-  val size: PredefFunction = PredefFunction("size", 1, LONG, List(("byteVector", BYTEVECTOR)), SIZE_BYTES) {
+  val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "byteVector" -> BYTEVECTOR) {
     case (bv: ByteVector) :: Nil => Right(bv.size)
-    case _                       => ???
+    case xs                      => notImplemented("size(byte[])", xs)
   }
 
-  private def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
-    PredefFunction(opsToFunctions(op), 1, r, List("a" -> t, "b" -> t), func) {
-      case a :: b :: Nil =>
-        Right(body(a.asInstanceOf[t.Underlying], b.asInstanceOf[t.Underlying]))
-      case _ => ???
+  val sizeString: BaseFunction = NativeFunction("size", 1, SIZE_STRING, LONG, "xs" -> STRING) {
+    case (bv: String) :: Nil => Right(bv.length.toLong)
+    case xs                  => notImplemented("size(String)", xs)
+  }
+
+  val takeBytes: BaseFunction = NativeFunction("take", 1, TAKE_BYTES, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
+    case (xs: ByteVector) :: (number: Long) :: Nil => Right(xs.take(number))
+    case xs                                        => notImplemented("take(xs: byte[], number: Long)", xs)
+  }
+
+  val dropBytes: BaseFunction = NativeFunction("drop", 1, DROP_BYTES, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
+    case (xs: ByteVector) :: (number: Long) :: Nil => Right(xs.drop(number))
+    case xs                                        => notImplemented("drop(xs: byte[], number: Long)", xs)
+  }
+
+  val takeRightBytes: BaseFunction = UserFunction("takeRightBytes", 1, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
+    case (xs: EXPR) :: (number: EXPR) :: Nil =>
+      Right(
+        FUNCTION_CALL(
+          FunctionHeader.Native(DROP_BYTES),
+          List(
+            xs,
+            FUNCTION_CALL(
+              FunctionHeader.Native(SUB_LONG),
+              List(
+                FUNCTION_CALL(FunctionHeader.Native(SIZE_BYTES), List(xs)),
+                number
+              )
+            )
+          )
+        )
+      )
+    case xs => notImplemented("takeRight(xs: byte[], number: Long)", xs)
+  }
+
+  val dropRightBytes: BaseFunction = UserFunction("dropRightBytes", 1, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
+    case (xs: EXPR) :: (number: EXPR) :: Nil =>
+      Right(
+        FUNCTION_CALL(
+          FunctionHeader.Native(TAKE_BYTES),
+          List(
+            xs,
+            FUNCTION_CALL(
+              FunctionHeader.Native(SUB_LONG),
+              List(
+                FUNCTION_CALL(FunctionHeader.Native(SIZE_BYTES), List(xs)),
+                number
+              )
+            )
+          )
+        )
+      )
+    case xs => notImplemented("dropRight(xs: byte[], number: Long)", xs)
+  }
+
+  private def trimLongToInt(x: Long): Int = Math.toIntExact(Math.max(Math.min(x, Int.MaxValue), Int.MinValue))
+
+  val takeString: BaseFunction = NativeFunction("take", 1, TAKE_STRING, STRING, "xs" -> STRING, "number" -> LONG) {
+    case (xs: String) :: (number: Long) :: Nil => Right(xs.take(trimLongToInt(number)))
+    case xs                                    => notImplemented("take(xs: String, number: Long)", xs)
+  }
+
+  val dropString: BaseFunction = NativeFunction("drop", 1, DROP_STRING, STRING, "xs" -> STRING, "number" -> LONG) {
+    case (xs: String) :: (number: Long) :: Nil => Right(xs.drop(trimLongToInt(number)))
+    case xs                                    => notImplemented("drop(xs: String, number: Long)", xs)
+  }
+
+  val takeRightString: BaseFunction = UserFunction("takeRight", 1, STRING, "xs" -> STRING, "number" -> LONG) {
+    case (xs: EXPR) :: (number: EXPR) :: Nil =>
+      Right(
+        FUNCTION_CALL(
+          FunctionHeader.Native(DROP_STRING),
+          List(
+            xs,
+            FUNCTION_CALL(
+              FunctionHeader.Native(SUB_LONG),
+              List(
+                FUNCTION_CALL(FunctionHeader.Native(SIZE_STRING), List(xs)),
+                number
+              )
+            )
+          )
+        )
+      )
+    case xs => notImplemented("takeRight(xs: String, number: Long)", xs)
+  }
+
+  val dropRightString: BaseFunction = UserFunction("dropRight", 1, STRING, "xs" -> STRING, "number" -> LONG) {
+    case (xs: EXPR) :: (number: EXPR) :: Nil =>
+      Right(
+        FUNCTION_CALL(
+          FunctionHeader.Native(TAKE_STRING),
+          List(
+            xs,
+            FUNCTION_CALL(
+              FunctionHeader.Native(SUB_LONG),
+              List(
+                FUNCTION_CALL(FunctionHeader.Native(SIZE_STRING), List(xs)),
+                number
+              )
+            )
+          )
+        )
+      )
+    case xs => notImplemented("dropRight(xs: String, number: Long)", xs)
+  }
+
+  private def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (t.Underlying, t.Underlying) => r.Underlying): BaseFunction =
+    NativeFunction(opsToFunctions(op), 1, func, r, "a" -> t, "b" -> t) {
+      case a :: b :: Nil => Right(body(a.asInstanceOf[t.Underlying], b.asInstanceOf[t.Underlying]))
+      case _             => ???
     }
-  }
 
-  val getElement = PredefFunction("getElement", 2, TYPEPARAM('T'), List("arr" -> LISTTYPEPARAM(TYPEPARAM('T')), "pos" -> LONG), GET_LIST) {
-    case (arr: IndexedSeq[_]) :: (pos: Long) :: Nil => Try(arr(pos.toInt)).toEither.left.map(_.toString)
-    case _                                          => ???
-  }
-
-  val getListSize = PredefFunction("size", 2, LONG, List("arr" -> LISTTYPEPARAM(TYPEPARAM('T'))), SIZE_LIST) {
-    case (arr: IndexedSeq[_]) :: Nil => {
-
-      Right(arr.size.toLong)
+  val getElement: BaseFunction =
+    NativeFunction("getElement", 2, GET_LIST, TYPEPARAM('T'), "arr" -> LISTTYPEPARAM(TYPEPARAM('T')), "pos" -> LONG) {
+      case (arr: IndexedSeq[_]) :: (pos: Long) :: Nil => Try(arr(pos.toInt)).toEither.left.map(_.toString)
+      case _                                          => ???
     }
-    case _ => ???
+
+  val getListSize: BaseFunction = NativeFunction("size", 2, SIZE_LIST, LONG, "arr" -> LISTTYPEPARAM(TYPEPARAM('T'))) {
+    case (arr: IndexedSeq[_]) :: Nil => Right(arr.size.toLong)
+    case _                           => ???
   }
 
-  val uMinus = PredefFunction("-", 1, LONG, List("n" -> LONG), MINUS_LONG) {
-    case (n: Long) :: Nil => {
-      Right(Math.negateExact(n))
-    }
-    case _ => ???
+  val uMinus: BaseFunction = NativeFunction("-", 1, MINUS_LONG, LONG, "n" -> LONG) {
+    case (n: Long) :: Nil => Right(Math.negateExact(n))
+    case _                => ???
   }
 
-  val uNot = PredefFunction("!", 1, BOOLEAN, List("p" -> BOOLEAN), NOT_BOOLEAN) {
-    case (p: Boolean) :: Nil => {
-      Right(!p)
-    }
-    case _ => ???
+  val uNot: BaseFunction = NativeFunction("!", 1, NOT_BOOLEAN, BOOLEAN, "p" -> BOOLEAN) {
+    case (p: Boolean) :: Nil => Right(!p)
+    case _                   => ???
   }
 
-  private def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (t.Underlying, t.Underlying) => r.Underlying) = {
-    PredefFunction(opsToFunctions(op), 1, r, List("a" -> t, "b" -> t), func) {
+  private def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (t.Underlying, t.Underlying) => r.Underlying): BaseFunction =
+    NativeFunction(opsToFunctions(op), 1, func, r, "a" -> t, "b" -> t) {
       case a :: b :: Nil =>
         try {
           Right(body(a.asInstanceOf[t.Underlying], b.asInstanceOf[t.Underlying]))
@@ -104,31 +206,30 @@ object PureContext {
         }
       case _ => ???
     }
-  }
 
-  val mulLong       = createTryOp(MUL_OP, LONG, LONG, MUL_LONG)(Math.multiplyExact)
-  val divLong       = createTryOp(DIV_OP, LONG, LONG, DIV_LONG)(Math.floorDiv)
-  val modLong       = createTryOp(MOD_OP, LONG, LONG, MOD_LONG)(Math.floorMod)
-  val sumLong       = createTryOp(SUM_OP, LONG, LONG, SUM_LONG)(Math.addExact)
-  val subLong       = createTryOp(SUB_OP, LONG, LONG, SUB_LONG)(Math.subtractExact)
-  val sumString     = createOp(SUM_OP, STRING, STRING, SUM_STRING)(_ + _)
-  val sumByteVector = createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES)((a, b) => ByteVector(a.toArray ++ b.toArray))
-  val ge            = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)(_ >= _)
-  val gt            = createOp(GT_OP, LONG, BOOLEAN, GT_LONG)(_ > _)
-  val sge           = createOp(GE_OP, STRING, BOOLEAN, GE_STRING)(_ >= _)
-  val sgt           = createOp(GT_OP, STRING, BOOLEAN, GT_STRING)(_ > _)
+  val mulLong: BaseFunction       = createTryOp(MUL_OP, LONG, LONG, MUL_LONG)(Math.multiplyExact)
+  val divLong: BaseFunction       = createTryOp(DIV_OP, LONG, LONG, DIV_LONG)(Math.floorDiv)
+  val modLong: BaseFunction       = createTryOp(MOD_OP, LONG, LONG, MOD_LONG)(Math.floorMod)
+  val sumLong: BaseFunction       = createTryOp(SUM_OP, LONG, LONG, SUM_LONG)(Math.addExact)
+  val subLong: BaseFunction       = createTryOp(SUB_OP, LONG, LONG, SUB_LONG)(Math.subtractExact)
+  val sumString: BaseFunction     = createOp(SUM_OP, STRING, STRING, SUM_STRING)(_ + _)
+  val sumByteVector: BaseFunction = createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES)((a, b) => ByteVector(a.toArray ++ b.toArray))
+  val ge: BaseFunction            = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)(_ >= _)
+  val gt: BaseFunction            = createOp(GT_OP, LONG, BOOLEAN, GT_LONG)(_ > _)
+  val sge: BaseFunction           = createOp(GE_OP, STRING, BOOLEAN, GE_STRING)(_ >= _)
+  val sgt: BaseFunction           = createOp(GT_OP, STRING, BOOLEAN, GT_STRING)(_ > _)
 
-  val eq = PredefFunction(EQ_OP.func, 1, BOOLEAN, List("a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')), EQ) {
+  val eq: BaseFunction = NativeFunction.create(EQ_OP.func, 1, canBeEq(TYPEPARAM('A'), TYPEPARAM('B')) _, List("a" -> TYPEPARAM('A'), "b" -> TYPEPARAM('B')), EQ) {
     case a :: b :: Nil => Right(a == b)
-    case _ => ???
+    case _             => ???
   }
 
-  val ne = PredefFunction(NE_OP.func, 1, BOOLEAN, List("a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')), NE) {
-    case a :: b :: Nil => Right(a != b)
-    case _ => ???
+  val ne: BaseFunction = UserFunction(NE_OP.func, 1, BOOLEAN, "a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')) {
+    case a :: b :: Nil => Right(FUNCTION_CALL(FunctionHeader.Native(NOT_BOOLEAN), List(FUNCTION_CALL(FunctionHeader.Native(EQ), List(a, b)))))
+    case _             => ???
   }
 
-  val operators: Seq[PredefFunction] = Seq(
+  val operators: Seq[BaseFunction] = Seq(
     mulLong,
     divLong,
     modLong,
@@ -148,11 +249,34 @@ object PureContext {
     uNot
   )
 
-  private val vars      = Map(("None", (OPTION(NOTHING), none)), (errRef, (NOTHING, err)))
-  private val functions = Seq(fraction, extract, isDefined, some, size, _isInstanceOf) ++ operators
+  private val vars = Map(("None", (UNION(NOTHING, UNIT), none)), (errRef, (NOTHING, err)))
+  private val functions = Seq(
+    fraction,
+    extract,
+    isDefined,
+    some,
+    sizeBytes,
+    takeBytes,
+    dropBytes,
+    takeRightBytes,
+    dropRightBytes,
+    sizeString,
+    takeString,
+    dropString,
+    takeRightString,
+    dropRightString,
+    _isInstanceOf
+  ) ++ operators
 
-  lazy val ctx             = CTX(Seq.empty, vars, functions)
+  lazy val ctx          = CTX(Seq(
+                    new DefinedType { val name = "Unit"; val typeRef: TYPE = UNIT },
+                    new DefinedType { val name = "Int"; val typeRef: TYPE = LONG },
+                    new DefinedType { val name = "String"; val typeRef: TYPE = STRING }
+                  ), vars, functions)
   lazy val evalContext     = ctx.evaluationContext
-  lazy val compilerContext = ctx.compilerContext
+  lazy val compilerContext: CompilerContext = ctx.compilerContext
 
+  def fromOption[T](v: Option[T]): Any = {
+    v.getOrElse(():Any)
+  }
 }
