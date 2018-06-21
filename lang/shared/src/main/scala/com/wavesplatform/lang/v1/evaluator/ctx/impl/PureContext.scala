@@ -16,7 +16,7 @@ import scala.util.Try
 
 object PureContext {
   private val noneCoeval: Coeval[Either[String, Unit]] = Coeval.evalOnce(Right( () ))
-  private val nothingCoeval: Coeval[Either[String, Nothing]]      = Coeval.defer(Coeval(Right(throw new Exception("explicit contract termination"))))
+  private val nothingCoeval: Coeval[Either[String, Nothing]]      = Coeval.defer(Coeval(Left("explicit contract termination")))
 
   val none: LazyVal = LazyVal(EitherT(noneCoeval).subflatMap(Right(_: Unit))) // IDEA HACK
   val err           = LazyVal(EitherT(nothingCoeval))
