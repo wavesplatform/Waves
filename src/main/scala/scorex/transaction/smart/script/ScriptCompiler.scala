@@ -29,7 +29,7 @@ object ScriptCompiler {
       expr <- v match {
         case V1 => v1Compiler.compile(scriptWithoutDirectives, directives)
       }
-      script <- ScriptV1(expr)
+      script     <- ScriptV1(expr)
       complexity <- ScriptEstimator(functionCosts, expr)
     } yield (script, complexity)
   }
