@@ -23,8 +23,13 @@ class UtxPoolImpl(time: Time, utxSettings: UtxSettings) extends ScorexLogging wi
     for {
       _ <- checkNotBlacklisted(tx)
       r = tx match {
-        case stx: SignedTransaction => stx.signatureValid()
-        case _                      => false
+        case stx: SignedTransaction =>
+          val v = stx.signatureValid()
+          if (v) log.info(s"UTX Transaction processed: ${stx.signature.base58}")
+          else
+            log.warn(s"INVALID UTX transaction: ${stx.signature.base58}")
+          v
+        case _ => false
       }
     } yield (r, Diff.empty)
   }

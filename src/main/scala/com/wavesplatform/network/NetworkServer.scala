@@ -8,7 +8,6 @@ import com.wavesplatform.Version
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network.MessageObserver.Messages
 import com.wavesplatform.settings._
-import com.wavesplatform.utx.UtxPool
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
 import io.netty.channel.group.ChannelGroup
@@ -36,11 +35,7 @@ trait NS {
 
 object NetworkServer extends ScorexLogging {
 
-  def apply(settings: WavesSettings,
-            utxPool: UtxPool,
-            peerDatabase: PeerDatabase,
-            allChannels: ChannelGroup,
-            peerInfo: ConcurrentHashMap[Channel, PeerInfo]): NS = {
+  def apply(settings: WavesSettings, peerDatabase: PeerDatabase, allChannels: ChannelGroup, peerInfo: ConcurrentHashMap[Channel, PeerInfo]): NS = {
     @volatile var shutdownInitiated = false
 
     val bossGroup   = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-boss-group", true))

@@ -10,8 +10,9 @@ import io.netty.channel.Channel
 import io.netty.channel.group.{ChannelGroup, ChannelMatcher}
 import monix.execution.{CancelableFuture, Scheduler}
 import scorex.transaction.Transaction
+import scorex.utils.ScorexLogging
 
-object UtxPoolSynchronizer {
+object UtxPoolSynchronizer extends ScorexLogging {
   def start(utx: UtxPool,
             settings: UtxSynchronizerSettings,
             allChannels: ChannelGroup,
@@ -37,6 +38,7 @@ object UtxPoolSynchronizer {
         }
 
         if (toAdd.nonEmpty) {
+          log.info(s"Retransmitting transaction, total cache size: ${knownTransactions.size()}")
           utx.batched { ops =>
             toAdd
               .groupBy { case (channel, _) => channel }

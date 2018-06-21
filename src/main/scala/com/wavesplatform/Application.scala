@@ -60,7 +60,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     maybeUtx = Some(utxStorage)
 
     val network =
-      NetworkServer(settings, utxStorage, peerDatabase, allChannels, establishedConnections)
+      NetworkServer(settings, peerDatabase, allChannels, establishedConnections)
     maybeNetwork = Some(network)
     val transactions = network.messages
 
