@@ -119,4 +119,8 @@ object Keys {
   def addressTransactionSeqNr(addressId: BigInt): Key[Int] = bytesSeqNr(41, addressId.toByteArray)
   def addressTransactionIds(addressId: BigInt, seqNr: Int): Key[Seq[(Int, ByteStr)]] =
     Key(hBytes(42, seqNr, addressId.toByteArray), readTransactionIds, writeTransactionIds)
+
+  val AliasIsDisabledPrefix: Short = 43
+  def aliasIsDisabled(alias: Alias): Key[Boolean] =
+    Key(bytes(AliasIsDisabledPrefix, alias.bytes.arr), Option(_).exists(_(0) == 1), if (_) Array[Byte](1) else Array[Byte](0))
 }

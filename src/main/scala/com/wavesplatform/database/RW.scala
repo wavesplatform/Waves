@@ -1,6 +1,6 @@
 package com.wavesplatform.database
 
-import org.iq80.leveldb.{DB, ReadOptions}
+import org.iq80.leveldb.{DB, DBIterator, ReadOptions}
 
 class RW(db: DB) extends AutoCloseable {
   private val batch       = db.createWriteBatch()
@@ -17,6 +17,8 @@ class RW(db: DB) extends AutoCloseable {
 
   def filterHistory(key: Key[Seq[Int]], heightToRemove: Int): Unit =
     put(key, get(key).filterNot(_ == heightToRemove))
+
+  def iterator: DBIterator = db.iterator()
 
   override def close(): Unit = {
     try { db.write(batch) } finally {

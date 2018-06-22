@@ -13,6 +13,7 @@ import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
 import monix.eval.Task
 import monix.execution.Scheduler
+import monix.execution.schedulers.SchedulerService
 import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
@@ -34,7 +35,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
 
   import com.wavesplatform.utx.UtxPoolImpl._
 
-  private implicit val scheduler = Scheduler.singleThread("utx-pool-cleanup")
+  private implicit val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
 
   private val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private val pessimisticPortfolios = new PessimisticPortfolios
@@ -156,8 +157,8 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
   }
 
   private def checkAlias(b: Blockchain, tx: Transaction) = tx match {
-    case cat: CreateAliasTransaction if b.resolveAlias(cat.alias).isDefined => Left(GenericError("Alias already claimed"))
-    case _                                                                  => Right(())
+    case cat: CreateAliasTransaction if !blockchain.canCreateAlias(cat.alias) => Left(GenericError("Alias already claimed"))
+    case _                                                                    => Right(())
   }
 
   private def putIfNew(b: Blockchain, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
