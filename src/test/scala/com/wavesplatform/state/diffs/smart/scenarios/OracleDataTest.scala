@@ -11,7 +11,6 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.Alias
 import scorex.api.http.ScriptExecutionError
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.smart.SetScriptTransaction
