@@ -116,6 +116,9 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
 
   override def containsTransaction(id: ByteStr): Boolean = diff.transactions.contains(id) || inner.containsTransaction(id)
 
+  override def forgetTransactions(pred: (AssetId, Long) => Boolean) = inner.forgetTransactions(pred)
+  override def learnTransactions(values: Map[AssetId, Long]): Unit  = inner.learnTransactions(values)
+
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
 
