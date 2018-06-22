@@ -21,7 +21,7 @@ object WavesContext {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getdataF(name: String, internalName: Short, dataType: DataType): BaseFunction =
-      NativeFunction(name, 100, internalName, UNION(dataType.innerType, UNIT), "addressOrAlias" -> addressType.typeRef, "key" -> STRING) {
+      NativeFunction(name, 100, internalName, UNION(dataType.innerType, UNIT), "addressOrAlias" -> addressOrAliasType, "key" -> STRING) {
         case (addressOrAlias: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addressOrAlias, k, dataType).map(fromOption)
         case _                                               => ???
       }
@@ -216,8 +216,8 @@ object WavesContext {
       }
 
     val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, optionLong, "id" -> BYTEVECTOR) {
-        case (id: ByteVector) :: Nil => Right(fromOption(env.transactionHeightById(id.toArray)))
-        case _                       => ???
+      case (id: ByteVector) :: Nil => Right(fromOption(env.transactionHeightById(id.toArray)))
+      case _                       => ???
     }
 
     val vars: Map[String, (TYPE, LazyVal)] = Map(
