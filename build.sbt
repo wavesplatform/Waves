@@ -136,7 +136,7 @@ inConfig(Universal)(
       "-J-server",
       // JVM memory tuning for 2g ram
       "-J-Xms128m",
-      "-J-Xmx2g",
+      "-J-Xmx768m",
       "-J-XX:+ExitOnOutOfMemoryError",
       // Java 9 support
       "-J-XX:+IgnoreUnrecognizedVMOptions",
