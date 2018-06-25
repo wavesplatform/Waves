@@ -31,6 +31,7 @@ case class RawBytes(code: Byte, data: Array[Byte]) extends Message
 
 object RawBytes {
   def from(tx: Transaction): RawBytes = RawBytes(TransactionSpec.messageCode, tx.bytes())
+  def from(b: Block): RawBytes        = RawBytes(BlockSpec.messageCode, b.bytes())
 }
 
 case class BlockForged(block: Block) extends Message
