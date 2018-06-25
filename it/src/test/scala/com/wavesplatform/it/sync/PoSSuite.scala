@@ -10,7 +10,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.network.RawBytes
 import com.wavesplatform.state._
 import com.wavesplatform.utils.Base58
-import play.api.libs.json.Json
+import play.api.libs.json.{JsSuccess, Json, Reads}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -20,7 +20,12 @@ import scala.concurrent.duration._
 
 class PoSSuite extends BaseTransactionSuite {
 
-  implicit val nxtCDataReads = Json.reads[NxtLikeConsensusBlockData]
+  implicit val nxtCDataReads = Reads { json =>
+    val bt = (json \ "base-target").as[Long]
+    val gs = (json \ "generation-signature").as[String]
+
+    JsSuccess(NxtLikeConsensusBlockData(bt, ByteStr.decodeBase58(gs).get))
+  }
 
   test("Block with invalid timestamp (min valid time - 1 second)") {
     nodes.waitFor[Int]("height")(5 seconds)(_.height, _.head < 10)
