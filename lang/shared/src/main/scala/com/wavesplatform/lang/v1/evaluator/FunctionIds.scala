@@ -6,11 +6,12 @@ object FunctionIds {
   val GT_LONG: Short  = 4
   val GE_LONG: Short  = 5
 
-  val SUM_STRING: Short = 50
-  val GT_STRING: Short  = 51
-  val GE_STRING: Short  = 52
-
-  val SUM_BYTES: Short = 100
+  val SUM_STRING: Short  = 50
+  val GT_STRING: Short   = 51
+  val GE_STRING: Short   = 52
+  val TAKE_STRING: Short = 53
+  val DROP_STRING: Short = 54
+  val SIZE_STRING: Short = 55
 
   val EQ: Short = 150
 
@@ -26,6 +27,8 @@ object FunctionIds {
 
   val SIZE_BYTES: Short = 350
   val TAKE_BYTES: Short = 351
+  val DROP_BYTES: Short = 352
+  val SUM_BYTES: Short  = 353
 
   val SOME: Short      = 400
   val ISDEFINED: Short = 401
@@ -41,8 +44,10 @@ object FunctionIds {
   val BLAKE256: Short  = 552
   val SHA256: Short    = 553
 
-  val TOBASE58: Short = 600
-  val TOBASE64: Short = 601
+  val TOBASE58: Short   = 600
+  val FROMBASE58: Short = 601
+  val TOBASE64: Short   = 602
+  val FROMBASE64: Short = 603
 
   // Waves
   val DATA_LONG: Short    = 650
@@ -50,10 +55,8 @@ object FunctionIds {
   val DATA_BYTES: Short   = 652
   val DATA_STRING: Short  = 653
 
-  val ADDRESSFROMPUBKEY: Short    = 700
-  val ADDRESSFROMSTRING: Short    = 701
-  val ADDRESSFROMRECIPIENT: Short = 702
-  val ADDRESSFROMBYTES: Short     = 703
+  val ADDRESSFROMRECIPIENT: Short = 700
+  val ADDRESSFROMBYTES: Short     = 701
 
   val GETTRANSACTIONBYID: Short    = 750
   val ACCOUNTBALANCE: Short        = 751

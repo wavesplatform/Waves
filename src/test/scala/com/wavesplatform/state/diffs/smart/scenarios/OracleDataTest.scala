@@ -11,6 +11,7 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import scorex.api.http.ScriptExecutionError
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
@@ -31,12 +32,20 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       bin             <- binaryEntryGen(MaxBase58Bytes, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key)
       str             <- stringEntryGen(500, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key && e.key != bin.key)
       dataTransaction <- dataTransactionGenP(oracle, List(long, bool, bin, str))
-      allFieldsRequiredScript = s"""let oracle = extract(addressFromString("${oracle.address}"))
-                                   |let long = extract(getLong(oracle,"${long.key}")) == ${long.value}
-                                   |let bool = extract(getBoolean(oracle,"${bool.key}")) == ${bool.value}
-                                   |let bin = extract(getByteArray(oracle,"${bin.key}")) == base58'${bin.value.base58}'
-                                   |let str = extract(getString(oracle,"${str.key}")) == "${str.value}"
-                                   |long && bool && bin && str""".stripMargin
+      allFieldsRequiredScript = s"""
+                                   | match tx {
+                                   | case t : DataTransaction =>
+                                   |   let txId = extract(getTransactionById(t.id)).bodyBytes == base64'${ByteStr(dataTransaction.bodyBytes.apply()).base64}'
+                                   |   let txHeightId = extract(transactionHeightById(t.id)) > 0
+                                   |   txId && txHeightId
+                                   |  case other =>
+                                   |   let oracle = Address(base58'${oracle.address}')
+                                   |   let long = extract(getLong(oracle,"${long.key}")) == ${long.value}
+                                   |   let bool = extract(getBoolean(oracle,"${bool.key}")) == ${bool.value}
+                                   |   let bin = extract(getByteArray(oracle,"${bin.key}")) == base58'${bin.value.base58}'
+                                   |   let str = extract(getString(oracle,"${str.key}")) == "${str.value}"
+                                   |   long && bool && bin && str
+                                   |}""".stripMargin
       setScript <- {
         val untypedAllFieldsRequiredScript = Parser(allFieldsRequiredScript).get.value
         assert(untypedAllFieldsRequiredScript.size == 1)
@@ -54,7 +63,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
                            TestBlock.create(Seq(transferFromScripted)),
                            smartEnabledFS) { case _ => () }
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, genesis2, setScript))), TestBlock.create(Seq(transferFromScripted)), smartEnabledFS)(
-          totalDiffEi => totalDiffEi should produce("Script execution error"))
+          totalDiffEi => totalDiffEi shouldBe Left(_: ScriptExecutionError))
     }
   }
 }

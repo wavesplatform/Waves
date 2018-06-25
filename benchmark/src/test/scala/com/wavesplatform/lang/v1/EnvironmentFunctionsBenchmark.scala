@@ -82,7 +82,7 @@ object EnvironmentFunctionsBenchmark {
     override def networkByte: Byte                                                                                 = NetworkByte
     override def transaction: Tx                                                                                   = ???
     override def transactionById(id: Array[Byte]): Option[Tx]                                                      = ???
-    override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any]                     = ???
+    override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                          = ???
     override def resolveAlias(alias: String): Either[String, Recipient.Address]                                    = ???
     override def transactionHeightById(id: Array[Byte]): Option[Int]                                               = ???
     override def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = ???

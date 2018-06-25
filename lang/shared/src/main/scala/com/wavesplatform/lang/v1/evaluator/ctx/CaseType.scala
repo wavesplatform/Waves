@@ -8,9 +8,9 @@ trait DefinedType {
 }
 
 case class CaseType(name: String, fields: List[(String, TYPE)]) extends DefinedType {
-  lazy val typeRef = CASETYPEREF(name)
+  lazy val typeRef = CASETYPEREF(name, fields)
 }
 
-case class UnionType(name: String, types: List[CASETYPEREF]) extends DefinedType {
-  lazy val typeRef = UNION(types)
+case class UnionType(name: String, types: List[TYPE]) extends DefinedType {
+  lazy val typeRef = UNION.create(types)
 }
