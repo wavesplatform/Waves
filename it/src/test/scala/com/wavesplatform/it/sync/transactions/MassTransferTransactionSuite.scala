@@ -74,7 +74,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
     val transfers        = List(Transfer(secondAddress, transferAmount))
 
-    assertBadRequestAndResponse(sender.massTransfer(firstAddress, transfers, minWavesFee), "Fee .* does not exceed minimal value")
+    assertBadRequestAndResponse(sender.massTransfer(firstAddress, transfers, minFee), "Fee .* does not exceed minimal value")
     nodes.waitForHeightArise()
     notMiner.assertBalances(firstAddress, balance1, eff1)
     notMiner.assertBalances(secondAddress, balance2, eff2)
@@ -83,14 +83,14 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   test("can not make mass transfer without having enough of effective balance") {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
-    val transfers        = List(Transfer(secondAddress, balance1 - 2 * minWavesFee))
+    val transfers        = List(Transfer(secondAddress, balance1 - 2 * minFee))
 
-    val leaseTxId = sender.lease(firstAddress, secondAddress, leasingAmount, minWavesFee).id
+    val leaseTxId = sender.lease(firstAddress, secondAddress, leasingAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(leaseTxId)
 
     assertBadRequestAndResponse(sender.massTransfer(firstAddress, transfers, calcMassTransferFee(transfers.size)), "negative waves balance")
     nodes.waitForHeightArise()
-    notMiner.assertBalances(firstAddress, balance1 - minWavesFee, eff1 - leasingAmount - minWavesFee)
+    notMiner.assertBalances(firstAddress, balance1 - minFee, eff1 - leasingAmount - minFee)
     notMiner.assertBalances(secondAddress, balance2, eff2 + leasingAmount)
   }
 
@@ -194,9 +194,9 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     val alias = "masstest_alias"
 
     val aliasFee = if (!sender.aliasByAddress(secondAddress).exists(_.endsWith(alias))) {
-      val aliasId = sender.createAlias(secondAddress, alias, minWavesFee).id
+      val aliasId = sender.createAlias(secondAddress, alias, minFee).id
       nodes.waitForHeightAriseAndTxPresent(aliasId)
-      minWavesFee
+      minFee
     } else 0
 
     val aliasFull = sender.aliasByAddress(secondAddress).find(_.endsWith(alias)).get

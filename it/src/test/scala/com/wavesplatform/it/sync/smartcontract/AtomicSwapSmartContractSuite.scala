@@ -39,10 +39,10 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
   private val shaSecret  = "BN6RTYGWcwektQfSFzH8raYo9awaLgQ7pLyWLQY4S4F5"
 
   test("step1: Balances initialization") {
-    val toAliceBC1TxId = sender.transfer(sender.address, AliceBC1, 10 * transferAmount, minWavesFee).id
+    val toAliceBC1TxId = sender.transfer(sender.address, AliceBC1, 10 * transferAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(toAliceBC1TxId)
 
-    val toSwapBC1TxId = sender.transfer(sender.address, swapBC1, minWavesFee, minWavesFee).id
+    val toSwapBC1TxId = sender.transfer(sender.address, swapBC1, minFee, minFee).id
     nodes.waitForHeightAriseAndTxPresent(toSwapBC1TxId)
   }
 
@@ -74,7 +74,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
       .selfSigned(version = SetScriptTransaction.supportedVersions.head,
                   sender = pkSwapBC1,
                   script = Some(script),
-                  fee = minWavesFee,
+                  fee = minFee,
                   timestamp = System.currentTimeMillis())
       .explicitGet()
 
@@ -98,10 +98,10 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           assetId = None,
           sender = PrivateKeyAccount.fromSeed(sender.seed(AliceBC1)).explicitGet(),
           recipient = PrivateKeyAccount.fromSeed(sender.seed(swapBC1)).explicitGet(),
-          amount = transferAmount + minWavesFee + smartFee,
+          amount = transferAmount + minFee + smartFee,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = minWavesFee + smartFee,
+          feeAmount = minFee + smartFee,
           attachment = Array.emptyByteArray
         )
         .explicitGet()
@@ -123,7 +123,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = minWavesFee + smartFee,
+          feeAmount = minFee + smartFee,
           attachment = Array.emptyByteArray
         )
         .explicitGet()
@@ -148,7 +148,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = minWavesFee + smartFee,
+          feeAmount = minFee + smartFee,
           attachment = Array.emptyByteArray,
           proofs = Proofs.empty
         )
@@ -163,8 +163,8 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     nodes.waitForHeightAriseAndTxPresent(versionedTransferId)
 
     notMiner.assertBalances(swapBC1,
-                            swapBalance - transferAmount - (minWavesFee + smartFee),
-                            swapEffBalance - transferAmount - (minWavesFee + smartFee))
+                            swapBalance - transferAmount - (minFee + smartFee),
+                            swapEffBalance - transferAmount - (minFee + smartFee))
     notMiner.assertBalances(BobBC1, bobBalance + transferAmount, bobEffBalance + transferAmount)
     notMiner.assertBalances(AliceBC1, aliceBalance, aliceEffBalance)
 
@@ -181,7 +181,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         amount = transferAmount,
         timestamp = System.currentTimeMillis(),
         feeAssetId = None,
-        feeAmount = minWavesFee + smartFee,
+        feeAmount = minFee + smartFee,
         attachment = Array.emptyByteArray
       )
       .explicitGet()
@@ -191,8 +191,8 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     nodes.waitForHeightAriseAndTxPresent(transferToAlice)
 
     notMiner.assertBalances(swapBC1,
-                            swapBalance - transferAmount - (minWavesFee + smartFee),
-                            swapEffBalance - transferAmount - (minWavesFee + smartFee))
+                            swapBalance - transferAmount - (minFee + smartFee),
+                            swapEffBalance - transferAmount - (minFee + smartFee))
     notMiner.assertBalances(BobBC1, bobBalance, bobEffBalance)
     notMiner.assertBalances(AliceBC1, aliceBalance + transferAmount, aliceEffBalance + transferAmount)
   }

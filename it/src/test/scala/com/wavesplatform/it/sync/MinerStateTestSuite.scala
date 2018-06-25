@@ -24,7 +24,7 @@ class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFro
     val (balance1, eff1)    = nodeWithZeroBalance.accountBalances(newMinerAddress)
     val nodeMinerInfoBefore = nodeWithZeroBalance.debugMinerInfo()
     all(nodeMinerInfoBefore) shouldNot matchPattern { case State(`newMinerAddress`, _, ts) if ts > 0 => }
-    val txId = miner.transfer(miner.address, newMinerAddress, transferAmount, minWavesFee).id
+    val txId = miner.transfer(miner.address, newMinerAddress, transferAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
     val heightAfterTransfer = miner.height
