@@ -185,7 +185,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
           // Cleanup
           nodes.waitForHeightArise()
-          val cancelLeaseId = bobNode.cancelLease(bobNode.address, leaseId, fee).id
+          val cancelLeaseId = bobNode.cancelLease(bobNode.address, leaseId, minFee).id
           nodes.waitForHeightAriseAndTxPresent(cancelLeaseId)
         }
 
