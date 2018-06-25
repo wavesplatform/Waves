@@ -169,6 +169,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                       miningConstraints.total
                     }
 
+                    val expiredTransactions = blockchain.forgetTransactions((_, txTs) => block.timestamp - txTs > 2 * 60 * 60 * 1000)
+
                     val diff = BlockDiffer
                       .fromBlock(
                         functionalitySettings,
@@ -177,6 +179,11 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                         block,
                         constraint
                       )
+
+                    diff.left.foreach { _ =>
+                      log.trace(s"Could not append new block, remembering ${expiredTransactions.size} transaction(s)")
+                      blockchain.learnTransactions(expiredTransactions)
+                    }
 
                     diff.map { hardenedDiff =>
                       blockchain.append(referencedLiquidDiff, referencedForgedBlock)
@@ -399,6 +406,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
   override def containsTransaction(id: AssetId): Boolean = ngState.fold(blockchain.containsTransaction(id)) { ng =>
     ng.bestLiquidDiff.transactions.contains(id) || blockchain.containsTransaction(id)
   }
+
+  override def forgetTransactions(pred: (AssetId, Long) => Boolean): Map[AssetId, Long] = blockchain.forgetTransactions(pred)
+
+  override def learnTransactions(values: Map[AssetId, Long]): Unit = blockchain.learnTransactions(values)
 
   override def assetDescription(id: AssetId): Option[AssetDescription] = ngState.fold(blockchain.assetDescription(id)) { ng =>
     val diff = ng.bestLiquidDiff

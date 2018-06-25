@@ -32,9 +32,22 @@ trait Caches extends Blockchain {
   protected def loadLastBlock(): Option[Block]
   override def lastBlock: Option[Block] = lastBlockCache
 
-  private val transactionIds                             = new util.HashMap[ByteStr, Long]()
-  protected def forgetTransaction(id: ByteStr): Unit     = transactionIds.remove(id)
-  override def containsTransaction(id: ByteStr): Boolean = transactionIds.containsKey(id)
+  private val transactionIds                                       = new util.HashMap[ByteStr, Long]()
+  protected def forgetTransaction(id: ByteStr): Unit               = transactionIds.remove(id)
+  override def containsTransaction(id: ByteStr): Boolean           = transactionIds.containsKey(id)
+  override def learnTransactions(values: Map[ByteStr, Long]): Unit = transactionIds.putAll(values.asJava)
+  override def forgetTransactions(pred: (ByteStr, Long) => Boolean): Map[ByteStr, Long] = {
+    val removedTransactions = Map.newBuilder[ByteStr, Long]
+    val iterator            = transactionIds.entrySet().iterator()
+    while (iterator.hasNext) {
+      val e = iterator.next()
+      if (pred(e.getKey, e.getValue)) {
+        removedTransactions += e.getKey -> e.getValue
+        iterator.remove()
+      }
+    }
+    removedTransactions.result()
+  }
 
   private val portfolioCache: LoadingCache[Address, Portfolio] = cache(maxCacheSize, loadPortfolio)
   protected def loadPortfolio(address: Address): Portfolio
@@ -109,8 +122,6 @@ trait Caches extends Blockchain {
     def addressId(address: Address): BigInt = (newAddressIds.get(address) orElse addressIdCache.get(address)).get
 
     lastAddressId += newAddressIds.size
-
-    transactionIds.entrySet().removeIf(kv => block.timestamp - kv.getValue > 2 * 60 * 60 * 1000)
 
     val wavesBalances = Map.newBuilder[BigInt, Long]
     val assetBalances = Map.newBuilder[BigInt, Map[ByteStr, Long]]
