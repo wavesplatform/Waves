@@ -190,17 +190,15 @@ object NetworkServer extends ScorexLogging {
     }
 
     def doConnect(remoteAddress: InetSocketAddress): Unit =
-      if (!excludedAddresses.contains(remoteAddress)) {
-        outgoingChannels.computeIfAbsent(
-          remoteAddress,
-          _ => {
-            val newConnFuture = bootstrap.connect(remoteAddress)
+      outgoingChannels.computeIfAbsent(
+        remoteAddress,
+        _ => {
+          val newConnFuture = bootstrap.connect(remoteAddress)
 
-            log.trace(s"${id(newConnFuture.channel())} Connecting to $remoteAddress")
-            newConnFuture.addListener(handleConnectionAttempt(remoteAddress)).channel()
-          }
-        )
-      }
+          log.trace(s"${id(newConnFuture.channel())} Connecting to $remoteAddress")
+          newConnFuture.addListener(handleConnectionAttempt(remoteAddress)).channel()
+        }
+      )
 
     val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
       import scala.collection.JavaConverters._

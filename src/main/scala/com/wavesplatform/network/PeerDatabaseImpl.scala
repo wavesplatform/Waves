@@ -102,7 +102,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     }
     // excluded only contains local addresses, our declared address, and external declared addresses we already have
     // connection to, so it's safe to filter out all matching candidates
-    unverifiedPeers.removeIf(excluded(_))
+    unverifiedPeers.removeIf(a => excluded(a) || a.getAddress.isAnyLocalAddress)
     val unverified = Option(unverifiedPeers.peek()).filterNot(excludeAddress)
     val verified   = Random.shuffle(knownPeers.keySet.diff(excluded).toSeq).headOption.filterNot(excludeAddress)
 

@@ -88,9 +88,7 @@ abstract class HandshakeHandler(localHandshake: Handshake,
           s"Remote application name ${remoteHandshake.applicationName} does not match local ${localHandshake.applicationName}")
       else if (!versionIsSupported(remoteHandshake.applicationVersion))
         peerDatabase.blacklistAndClose(ctx.channel(), s"Remote application version ${remoteHandshake.applicationVersion} is not supported")
-      else if (remoteHandshake.nodeNonce == localHandshake.nodeNonce) {
-        peerDatabase.blacklistAndClose(ctx.channel(), s"Remote node has the same nonce ${remoteHandshake.nodeNonce}, probably connecting to itself")
-      } else {
+      else {
         PeerKey(ctx, remoteHandshake.nodeNonce) match {
           case None =>
             log.warn(s"Can't get PeerKey from ${id(ctx)}")
