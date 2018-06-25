@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import scorex.account.{Address, Alias}
+import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.block.Block
 import scorex.transaction.ValidationError.{AliasDoesNotExist, GenericError}
 import scorex.transaction._
@@ -52,6 +52,11 @@ package object state {
     }
 
     def genesis: Block = blockchain.blockAt(1).get
+
+    def resolveAlias(a: AddressOrAlias): Either[ValidationError, Address] = a match {
+      case addr: Address => Right(addr)
+      case alias: Alias  => blockchain.resolveAlias(alias)
+    }
 
     def canCreateAlias(alias: Alias): Boolean = blockchain.resolveAlias(alias) match {
       case Left(AliasDoesNotExist(_)) => true

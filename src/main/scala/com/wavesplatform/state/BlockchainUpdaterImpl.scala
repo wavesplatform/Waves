@@ -12,7 +12,7 @@ import com.wavesplatform.utils.{UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
-import scorex.account.{Address, AddressOrAlias}
+import scorex.account.{Address, Alias}
 import scorex.block.Block.BlockId
 import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.transaction.Transaction.Type
@@ -416,8 +416,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     CompositeBlockchain.composite(blockchain, diff).assetDescription(id)
   }
 
-  override def resolveAlias(a: AddressOrAlias): Either[ValidationError, Address] = ngState.fold(blockchain.resolveAlias(a)) { ng =>
-    CompositeBlockchain.composite(blockchain, ng.bestLiquidDiff).resolveAlias(a)
+  override def resolveAlias(alias: Alias): Either[ValidationError, Address] = ngState.fold(blockchain.resolveAlias(alias)) { ng =>
+    CompositeBlockchain.composite(blockchain, ng.bestLiquidDiff).resolveAlias(alias)
   }
 
   override def leaseDetails(leaseId: AssetId): Option[LeaseDetails] = ngState match {
