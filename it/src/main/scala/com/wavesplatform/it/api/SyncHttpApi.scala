@@ -2,7 +2,6 @@ package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.it.Node
-import com.wavesplatform.lang.v1.traits.Recipient
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state.{ByteStr, DataEntry}
 import org.asynchttpclient.util.HttpConstants
