@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import com.wavesplatform.state.reader.LeaseDetails
-import scorex.account.{Address, AddressOrAlias}
+import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.block.{Block, BlockHeader}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.script.Script
@@ -47,7 +47,7 @@ trait Blockchain {
 
   def assetDescription(id: ByteStr): Option[AssetDescription]
 
-  def resolveAlias(a: AddressOrAlias): Either[ValidationError, Address]
+  def resolveAlias(a: Alias): Either[ValidationError, Address]
 
   def leaseDetails(leaseId: ByteStr): Option[LeaseDetails]
 

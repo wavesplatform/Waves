@@ -8,7 +8,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import org.iq80.leveldb.{DB, ReadOptions}
-import scorex.account.{Address, AddressOrAlias, Alias}
+import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}
 import scorex.transaction.Transaction.Type
 import scorex.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled}
@@ -513,16 +513,12 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     }
   }
 
-  override def resolveAlias(a: AddressOrAlias): Either[ValidationError, Address] = a match {
-    case addr: Address => Right(addr)
-    case alias: Alias =>
-      readOnly { db =>
-        if (db.get(Keys.aliasIsDisabled(alias))) Left(AliasIsDisabled(alias))
-        else
-          db.get(Keys.addressIdOfAlias(alias))
-            .map(addressId => db.get(Keys.idToAddress(addressId)))
-            .toRight(AliasDoesNotExist(alias))
-      }
+  override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>
+    if (db.get(Keys.aliasIsDisabled(alias))) Left(AliasIsDisabled(alias))
+    else
+      db.get(Keys.addressIdOfAlias(alias))
+        .map(addressId => db.get(Keys.idToAddress(addressId)))
+        .toRight(AliasDoesNotExist(alias))
   }
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
