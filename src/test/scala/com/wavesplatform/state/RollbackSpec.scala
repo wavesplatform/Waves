@@ -9,6 +9,7 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.lagonaki.mocks.TestBlock
+import scorex.transaction.ValidationError.AliasDoesNotExist
 import scorex.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
 import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import scorex.transaction.smart.SetScriptTransaction
@@ -183,7 +184,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
           val genesisBlockId = d.lastBlockId
 
-          d.blockchainUpdater.resolveAlias(alias) shouldBe 'empty
+          d.blockchainUpdater.resolveAlias(alias) shouldBe Left(AliasDoesNotExist(alias))
           d.appendBlock(
             TestBlock.create(
               nextTs,
@@ -191,10 +192,10 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
               Seq(CreateAliasTransactionV1.selfSigned(sender, alias, 1, nextTs).explicitGet())
             ))
 
-          d.blockchainUpdater.resolveAlias(alias) should contain(sender.toAddress)
+          d.blockchainUpdater.resolveAlias(alias) shouldBe Right(sender.toAddress)
           d.removeAfter(genesisBlockId)
 
-          d.blockchainUpdater.resolveAlias(alias) shouldBe 'empty
+          d.blockchainUpdater.resolveAlias(alias) shouldBe Left(AliasDoesNotExist(alias))
         }
     }
 

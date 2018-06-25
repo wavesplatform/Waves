@@ -28,7 +28,7 @@ object AssetTransactionsDiff {
     validateAsset(tx, blockchain, tx.assetId, issuerOnly = true).flatMap { _ =>
       val oldInfo = blockchain.assetDescription(tx.assetId).get
       def wasBurnt = blockchain.addressTransactions(tx.sender, Set(BurnTransaction.typeId), Int.MaxValue, 0).exists {
-        case (h, t: BurnTransaction) if t.assetId == tx.assetId => true
+        case (_, t: BurnTransaction) if t.assetId == tx.assetId => true
         case _                                                  => false
       }
       val isDataTxActivated = blockchain.isFeatureActivated(BlockchainFeatures.DataTransaction, blockchain.height)
@@ -53,14 +53,14 @@ object AssetTransactionsDiff {
   def burn(blockchain: Blockchain, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] = {
     val burnAnyTokensEnabled = blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens, blockchain.height)
 
-    validateAsset(tx, blockchain, tx.assetId, !burnAnyTokensEnabled).map(itx => {
+    validateAsset(tx, blockchain, tx.assetId, !burnAnyTokensEnabled).map { _ =>
       Diff(
         height = height,
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.assetId -> -tx.quantity))),
         assetInfos = Map(tx.assetId          -> AssetInfo(isReissuable = true, volume = -tx.quantity, None))
       )
-    })
+    }
   }
 
   def sponsor(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(

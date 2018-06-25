@@ -2,13 +2,16 @@ package com.wavesplatform.database
 
 import cats.kernel.Monoid
 import com.google.common.cache.CacheBuilder
+import com.wavesplatform.database.patch.DisableHijackedAliases
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import org.iq80.leveldb.{DB, ReadOptions}
-import scorex.account.{Address, Alias}
+import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.block.{Block, BlockHeader}
 import scorex.transaction.Transaction.Type
+import scorex.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -25,10 +28,6 @@ import scala.collection.{immutable, mutable}
 object LevelDBWriter {
   private def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr): Boolean =
     db.get(Keys.leaseStatusHistory(leaseId)).headOption.fold(false)(h => db.get(Keys.leaseStatus(leaseId)(h)))
-
-  private def resolveAlias(db: ReadOnlyDB, alias: Alias): Option[Address] = {
-    db.get(Keys.addressIdOfAlias(alias)).map(addressId => db.get(Keys.idToAddress(addressId)))
-  }
 
   /** {{{
     * ([10, 7, 4], 5, 11) => [10, 7, 4]
@@ -360,6 +359,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     rw.put(Keys.transactionIdsAtHeight(height), transactions.keys.toSeq)
 
     expiredKeys.foreach(rw.delete)
+
+    if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height)) {
+      DisableHijackedAliases(rw)
+    }
   }
 
   override protected def doRollback(targetBlockId: ByteStr): Seq[Block] = {
@@ -452,6 +455,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
           rw.delete(Keys.blockAt(currentHeight))
           rw.delete(Keys.heightOf(discardedBlock.uniqueId))
+
+          if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(currentHeight)) {
+            DisableHijackedAliases.revert(rw)
+          }
         }
 
         portfoliosToInvalidate.result().foreach(discardPortfolio)
@@ -506,7 +513,17 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     }
   }
 
-  override def resolveAlias(a: Alias): Option[Address] = readOnly(db => LevelDBWriter.resolveAlias(db, a))
+  override def resolveAlias(a: AddressOrAlias): Either[ValidationError, Address] = a match {
+    case addr: Address => Right(addr)
+    case alias: Alias =>
+      readOnly { db =>
+        if (db.get(Keys.aliasIsDisabled(alias))) Left(AliasIsDisabled(alias))
+        else
+          db.get(Keys.addressIdOfAlias(alias))
+            .map(addressId => db.get(Keys.idToAddress(addressId)))
+            .toRight(AliasDoesNotExist(alias))
+      }
+  }
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
     db.get(Keys.transactionInfo(leaseId)) match {

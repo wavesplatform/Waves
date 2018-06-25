@@ -3,13 +3,14 @@ package com.wavesplatform.state.reader
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.state._
-import scorex.account.{Address, Alias}
+import scorex.account.{Address, AddressOrAlias}
 import scorex.block.{Block, BlockHeader}
 import scorex.transaction.Transaction.Type
+import scorex.transaction.ValidationError.AliasDoesNotExist
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.script.Script
-import scorex.transaction.{AssetId, Transaction}
+import scorex.transaction.{AssetId, Transaction, ValidationError}
 
 class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends Blockchain {
 
@@ -91,7 +92,11 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
     }
   }
 
-  override def resolveAlias(a: Alias): Option[Address] = diff.aliases.get(a).orElse(inner.resolveAlias(a))
+  override def resolveAlias(a: AddressOrAlias): Either[ValidationError, Address] =
+    inner.resolveAlias(a).left.flatMap {
+      case adne @ AliasDoesNotExist(alias) => diff.aliases.get(alias).toRight(adne)
+      case other                           => Left(other)
+    }
 
   override def allActiveLeases: Set[LeaseTransaction] = {
     val (active, canceled) = diff.leaseState.partition(_._2)
