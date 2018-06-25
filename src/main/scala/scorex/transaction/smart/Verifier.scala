@@ -16,7 +16,7 @@ object Verifier {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
         (pt, blockchain.accountScript(pt.sender)) match {
-          case (_, Some(script))              => verify(blockchain, script, currentBlockHeight, pt)
+          case (_, Some(script))              => verify(blockchain, script, currentBlockHeight, pt, false)
           case (stx: SignedTransaction, None) => stx.signaturesValid()
           case _                              => verifyAsEllipticCurveSignature(pt)
         }
@@ -31,14 +31,19 @@ object Verifier {
         }
 
         script <- blockchain.assetDescription(assetId).flatMap(_.script)
-      } yield verify(blockchain, script, currentBlockHeight, tx)
+      } yield verify(blockchain, script, currentBlockHeight, tx, true)
     }.getOrElse(Either.right(tx)))
 
-  def verify[T <: Transaction](blockchain: Blockchain, script: Script, height: Int, transaction: T): Either[ValidationError, T] = {
+  def verify[T <: Transaction](blockchain: Blockchain,
+                               script: Script,
+                               height: Int,
+                               transaction: T,
+                               isTokenScript: Boolean): Either[ValidationError, T] = {
     ScriptRunner[Boolean, T](height, transaction, blockchain, script) match {
-      case (ctx, Left(execError)) => Left(ScriptExecutionError(transaction, execError, ctx.letDefs))
-      case (ctx, Right(false))    => Left(TransactionNotAllowedByScript(transaction, ctx.letDefs.filter({ case (_, lv) => lv.evaluated.read() })))
-      case (_, Right(true))       => Right(transaction)
+      case (ctx, Left(execError)) => Left(ScriptExecutionError(script.text, execError, ctx.letDefs, isTokenScript))
+      case (ctx, Right(false)) =>
+        Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, isTokenScript))
+      case (_, Right(true)) => Right(transaction)
     }
   }
 

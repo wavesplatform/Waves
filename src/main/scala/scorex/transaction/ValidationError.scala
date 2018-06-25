@@ -46,22 +46,9 @@ object ValidationError {
     override def toString: String = s"InvalidSignature(${s.toString + " reason: " + details})"
   }
 
-  case class ScriptExecutionError(t: Transaction, error: String, letDefs: Map[String, LazyVal]) extends ValidationError {
-    override def toString: String =
-      s"""
-         |Script execution error: $error
-         |Transaction: $t
-         |Variables: ${letDefs.mkString("[\n\t\t", "\n\t\t", "\n\t]")}
-       """.stripMargin
-  }
+  case class ScriptExecutionError(error: String, scriptSrc: String, letDefs: Map[String, LazyVal], isTokenScript: Boolean) extends ValidationError
 
-  case class TransactionNotAllowedByScript(t: Transaction, letDefs: Map[String, LazyVal]) extends ValidationError {
-    override def toString: String =
-      s"""
-         |TransactionNotAllowedByScript($t)
-         |Variables: ${letDefs.mkString("[\n\t\t", "\n\t\t", "\n\t]")}
-       """.stripMargin
-  }
+  case class TransactionNotAllowedByScript(letDefs: Map[String, LazyVal], scriptSrc: String, isTokenScript: Boolean) extends ValidationError
 
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {
     override def toString: String = s"MicroBlockAppendError($err, ${microBlock.totalResBlockSig} ~> ${microBlock.prevResBlockSig.trim}])"

@@ -48,8 +48,8 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
   }
 
   property("Some/None/extract/isDefined") {
-    runScript[Any]("Some(3)".stripMargin) shouldBe Right(Some(3L))
-    runScript[Any]("None".stripMargin) shouldBe Right(None)
+    runScript[Any]("Some(3)".stripMargin) shouldBe Right(3L)
+    runScript[Any]("None".stripMargin) shouldBe Right(())
     runScript[Boolean]("isDefined(Some(3))".stripMargin) shouldBe Right(true)
     runScript[Boolean]("isDefined(None)".stripMargin) shouldBe Right(false)
     runScript[Long]("extract(Some(3))".stripMargin) shouldBe Right(3L)

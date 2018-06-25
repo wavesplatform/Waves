@@ -8,6 +8,7 @@ import org.scalatest.prop.PropertyChecks
 import scorex.account.{Address, Alias}
 import scorex.transaction.ProvenTransaction
 import scorex.transaction.assets.exchange.Order
+import play.api.libs.json.Json // For string escapes.
 
 class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   def provenPart(t: ProvenTransaction): String = {
@@ -44,7 +45,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |      else isDefined(t.transferAssetId) == false
            |   let recipient = match (t.recipient) {
            |       case a: Address => a.bytes == base58'${t.recipient.cast[Address].map(_.bytes.base58).getOrElse("")}'
-           |       case a: Alias => a.alias == "${t.recipient.cast[Alias].map(_.name).getOrElse("")}"
+           |       case a: Alias => a.alias == ${Json.toJson(t.recipient.cast[Alias].map(_.name).getOrElse(""))}
            |      }
            |    let attachment = t.attachment == base58'${ByteStr(t.attachment).base58}'
            |   $assertProvenPart && amount && feeAssetId && transferAssetId && recipient && attachment
@@ -134,7 +135,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           |match tx {
           | case t : CreateAliasTransaction =>
           |   ${provenPart(t)}
-          |   let alias = t.alias == "${t.alias.name}"
+          |   let alias = t.alias == ${Json.toJson(t.alias.name)}
           |   $assertProvenPart && alias
           | case other => throw
           | }
@@ -156,7 +157,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           |   let amount = t.amount == ${t.amount}
           |   let recipient = match (t.recipient) {
           |       case a: Address => a.bytes == base58'${t.recipient.cast[Address].map(_.bytes.base58).getOrElse("")}'
-          |       case a: Alias => a.alias == "${t.recipient.cast[Alias].map(_.name).getOrElse("")}"
+          |       case a: Alias => a.alias == ${Json.toJson(t.recipient.cast[Alias].map(_.name).getOrElse(""))}
           |      }
           |   $assertProvenPart && amount && recipient
           | case other => throw
@@ -237,10 +238,10 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           case x: LongDataEntry    => s"case a: LongDataEntry => a.value == ${x.value}"
           case x: BooleanDataEntry => s"case a: BoolDataEntry => a.value == ${x.value}"
           case x: BinaryDataEntry  => s"case a: ByteVectorDataEntry => a.value == base64'${x.value.base64}'"
-          case x: StringDataEntry  => s"""case a: StrDataEntry => a.value == "${x.value}""""
+          case x: StringDataEntry  => s"""case a: StrDataEntry => a.value == ${Json.toJson(x.value)}"""
         }
 
-        s"""let key$i = t.data[$i].key == "${t.data(i).key}"
+        s"""let key$i = t.data[$i].key == ${Json.toJson(t.data(i).key)}
            |let value$i = match (t.data[$i]) {
            | $v
            | case other => true
@@ -275,7 +276,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       def pg(i: Int) =
         s"""let recipient$i = match (t.transfers[$i].recipient) {
            |case a: Address => a.bytes == base58'${t.transfers(i).address.cast[Address].map(_.bytes.base58).getOrElse("")}'
-           |case a: Alias => a.alias == "${t.transfers(i).address.cast[Alias].map(_.name).getOrElse("")}"
+           |case a: Alias => a.alias == ${Json.toJson(t.transfers(i).address.cast[Alias].map(_.name).getOrElse(""))}
            |}
            |let amount$i = t.transfers[$i].amount == ${t.transfers(i).amount}
          """.stripMargin
@@ -292,8 +293,10 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       val script = s"""
                       |match tx {
                       | case t : MassTransferTransaction =>
-                      |    let assetId = if (${t.assetId.isDefined}) then extract(t.assetId) == base58'${t.assetId.getOrElse(ByteStr.empty).base58}'
-                      |      else isDefined(t.assetId) == false
+                      |    let assetId = if (${t.assetId.isDefined}) then extract(t.transferAssetId) == base58'${t.assetId
+                        .getOrElse(ByteStr.empty)
+                        .base58}'
+                      |      else isDefined(t.transferAssetId) == false
                       |     let transferCount = t.transferCount == ${t.transfers.length}
                       |     let totalAmount = t.totalAmount == ${t.transfers.map(_.amount).sum}
                       |     let attachment = t.attachment == base58'${ByteStr(t.attachment).base58}'

@@ -102,6 +102,15 @@ object AsyncHttpApi extends Assertions {
     def getOrderbookByPublicKeyActive(publicKey: String, timestamp: Long, signature: ByteStr): Future[Seq[OrderbookHistory]] =
       matcherGetWithSignature(s"/matcher/orderbook/$publicKey?activeOnly=true", timestamp, signature).as[Seq[OrderbookHistory]]
 
+    def waitOrderStatus(assetId: String,
+                        orderId: String,
+                        expectedStatus: String,
+                        retryInterval: FiniteDuration = 1.second): Future[MatcherStatusResponse] = {
+      waitFor[MatcherStatusResponse](s"order(asset=$assetId, orderId=$orderId) status == $expectedStatus")(_.getOrderStatus(assetId, orderId),
+                                                                                                           _.status == expectedStatus,
+                                                                                                           5.seconds)
+    }
+
     def getReservedBalance(publicKey: String, timestamp: Long, signature: ByteStr): Future[Map[String, Long]] =
       matcherGetWithSignature(s"/matcher/balance/reserved/$publicKey", timestamp, signature).as[Map[String, Long]]
 
