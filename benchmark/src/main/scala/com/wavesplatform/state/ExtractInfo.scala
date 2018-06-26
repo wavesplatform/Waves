@@ -104,7 +104,7 @@ object ExtractInfo extends App with ScorexLogging {
           case tx: DataTransaction =>
             val addr = ByteVector(tx.sender.toAddress.bytes.arr)
             tx.data.collectFirst {
-              case x: LongDataEntry    => DataTestData(addr, x.key, DataType.Long)
+              case x: IntegerDataEntry    => DataTestData(addr, x.key, DataType.Long)
               case x: BooleanDataEntry => DataTestData(addr, x.key, DataType.Boolean)
               case x: BinaryDataEntry  => DataTestData(addr, x.key, DataType.ByteArray)
               case x: StringDataEntry  => DataTestData(addr, x.key, DataType.String)

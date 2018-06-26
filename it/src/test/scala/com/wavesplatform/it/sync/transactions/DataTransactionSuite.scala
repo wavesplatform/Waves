@@ -5,7 +5,7 @@ import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import com.wavesplatform.it.sync.{calcDataFee, fee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, EitherExt2, LongDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, EitherExt2, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.utils.Base58
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
@@ -19,7 +19,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
   test("sender's waves balance is decreased by fee.") {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
-    val entry            = LongDataEntry("int", 0xcafebabe)
+    val entry            = IntegerDataEntry("int", 0xcafebabe)
     val data             = List(entry)
     val transferFee      = calcDataFee(data)
     val txId             = sender.putData(firstAddress, data, transferFee).id
@@ -45,7 +45,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("invalid transaction should not be in UTX or blockchain") {
-    def data(entries: List[DataEntry[_]] = List(LongDataEntry("int", 177)),
+    def data(entries: List[DataEntry[_]] = List(IntegerDataEntry("int", 177)),
              fee: Long = 100000,
              timestamp: Long = System.currentTimeMillis,
              version: Byte = DataTransaction.supportedVersions.head): DataTransaction =
@@ -86,7 +86,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
   test("data definition and retrieval") {
     // define first int entry
-    val intEntry = LongDataEntry("int", 8)
+    val intEntry = IntegerDataEntry("int", 8)
     val intList  = List(intEntry)
     val tx1      = sender.putData(secondAddress, intList, calcDataFee(intList)).id
     nodes.waitForHeightAriseAndTxPresent(tx1)
@@ -112,7 +112,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     sender.getData(secondAddress) shouldBe boolList ++ intList ++ stringList
 
     // redefine int entry
-    val reIntEntry = LongDataEntry("int", 10)
+    val reIntEntry = IntegerDataEntry("int", 10)
     val reIntList  = List(reIntEntry)
     val tx3        = sender.putData(secondAddress, reIntList, calcDataFee(reIntList)).id
     nodes.waitForHeightAriseAndTxPresent(tx3)
@@ -123,7 +123,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     // define tx with all types
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
-    val intEntry2        = LongDataEntry("int", -127)
+    val intEntry2        = IntegerDataEntry("int", -127)
     val boolEntry2       = BooleanDataEntry("bool", false)
     val blobEntry2       = BinaryDataEntry("blob", ByteStr(Array[Byte](127.toByte, 0, 1, 1)))
     val stringEntry2     = StringDataEntry("str", "BBBB")
@@ -211,7 +211,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
         Json.obj("version" -> 1,
                  "type"    -> DataTransaction.typeId,
                  "sender"  -> firstAddress,
-                 "data"    -> List(LongDataEntry("int", 333)),
+                 "data"    -> List(IntegerDataEntry("int", 333)),
                  "fee"     -> 100000)
       )
       Json.parse(rs.getResponseBody).as[JsObject]
@@ -241,7 +241,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val data     = List(BooleanDataEntry(extraKey, false))
 
     assertBadRequestAndResponse(sender.putData(firstAddress, data, calcDataFee(data)), TooBig)
-    assertBadRequestAndResponse(sender.putData(firstAddress, List(LongDataEntry("", 4)), 100000), "Empty key found")
+    assertBadRequestAndResponse(sender.putData(firstAddress, List(IntegerDataEntry("", 4)), 100000), "Empty key found")
 
     val extraValueData = List(BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1.toByte))))
     assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, calcDataFee(extraValueData)), TooBig)
@@ -255,7 +255,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndResponse(sender.putData(firstAddress, largeStrData, calcDataFee(largeStrData)), TooBig)
     nodes.waitForHeightArise()
 
-    val tooManyEntriesData = List.tabulate(MaxEntryCount + 1)(n => LongDataEntry("key", 88))
+    val tooManyEntriesData = List.tabulate(MaxEntryCount + 1)(n => IntegerDataEntry("key", 88))
     assertBadRequestAndResponse(sender.putData(firstAddress, tooManyEntriesData, calcDataFee(tooManyEntriesData)), TooBig)
     nodes.waitForHeightArise()
   }
