@@ -28,6 +28,9 @@ class PoSSuite extends BaseTransactionSuite {
   }
 
   test("Block with invalid timestamp (min valid time - 1 second)") {
+
+    val signerPK = PrivateKeyAccount.fromSeed(nodeConfigs.last.getString("account-seed")).explicitGet()
+
     nodes.waitFor[Int]("height")(5 seconds)(_.height, _.head < 10)
 
     val height = nodes.last.height
@@ -43,8 +46,6 @@ class PoSSuite extends BaseTransactionSuite {
     val lastBlockTS = (lastBlock \ "timestamp").as[Long]
 
     val lastBlockCData = (lastBlock \ "nxt-consensus").as[NxtLikeConsensusBlockData]
-
-    val signerPK = PrivateKeyAccount(Base58.decode(nodeConfigs.last.getString("private-key")).get)
 
     val genSig: ByteStr = ByteStr(generatorSignature(lastBlockCData.generationSignature.arr, signerPK.publicKey))
 
@@ -87,7 +88,6 @@ class PoSSuite extends BaseTransactionSuite {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(3))
-      .overrideBase(_.raw("waves.miner.enabled = false"))
       .withDefault(3)
       .withSpecial(_.nonMiner)
       .buildNonConflicting()
