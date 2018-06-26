@@ -20,6 +20,8 @@ import scala.concurrent.duration._
 
 class PoSSuite extends BaseTransactionSuite {
 
+  val signerPK = PrivateKeyAccount.fromSeed(nodeConfigs.last.getString("account-seed")).explicitGet()
+
   implicit val nxtCDataReads = Reads { json =>
     val bt = (json \ "base-target").as[Long]
     val gs = (json \ "generation-signature").as[String]
@@ -27,62 +29,51 @@ class PoSSuite extends BaseTransactionSuite {
     JsSuccess(NxtLikeConsensusBlockData(bt, ByteStr.decodeBase58(gs).get))
   }
 
-  test("Block with invalid timestamp (min valid time - 1 second)") {
+  test("Accept correct block") {
 
-    val signerPK = PrivateKeyAccount.fromSeed(nodeConfigs.last.getString("account-seed")).explicitGet()
+    waitForHeight(10)
 
-    nodes.waitFor[Int]("height")(5 seconds)(_.height, _.head < 10)
-
-    val height = nodes.last.height
-
-    nodes.last.close()
-
+    val height     = nodes.last.height
     val ggParentTS = (Json.parse(nodes.head.get(s"/blocks/at/${height - 2}").getResponseBody) \ "timestamp").as[Long]
 
-    val lastBlock = Json.parse(nodes.head.get("/blocks/last").getResponseBody)
+    val (lastBlockId, lastBlockTS, lastBlockCData) = previousBlockInfo(height)
 
-    val lastBlockId = Base58.decode((lastBlock \ "signature").as[String]).get
+    val block = forgeBlock(
+      height,
+      signerPK,
+      ByteStr(lastBlockId),
+      lastBlockTS,
+      lastBlockCData,
+      ggParentTS
+    )()
 
-    val lastBlockTS = (lastBlock \ "timestamp").as[Long]
+    nodes.head.sendByNetwork(RawBytes.from(block))
 
+    waitForHeight(height + 1)
+
+    val newBlockSig = blockSignature(height + 1)
+
+    newBlockSig sameElements block.uniqueId.arr
+  }
+
+  def previousBlockInfo(height: Int) = {
+    val lastBlock      = Json.parse(nodes.head.get(s"/blocks/at/$height").getResponseBody)
+    val lastBlockId    = Base58.decode((lastBlock \ "signature").as[String]).get
+    val lastBlockTS    = (lastBlock \ "timestamp").as[Long]
     val lastBlockCData = (lastBlock \ "nxt-consensus").as[NxtLikeConsensusBlockData]
 
-    val genSig: ByteStr = ByteStr(generatorSignature(lastBlockCData.generationSignature.arr, signerPK.publicKey))
+    (lastBlockId, lastBlockTS, lastBlockCData)
+  }
 
-    val validBlockDelay: Long = NxtPoSCalculator
-      .calculateDelay(
-        hit(genSig.arr),
-        lastBlockCData.baseTarget,
-        nodes.head.accountBalances(signerPK.address)._2
-      )
-
-    val bastTarget: Long = NxtPoSCalculator
-      .calculateBaseTarget(
-        60,
-        height,
-        lastBlockCData.baseTarget,
-        lastBlockTS,
-        Some(ggParentTS),
-        validBlockDelay
-      )
-
-    val cData: NxtLikeConsensusBlockData = NxtLikeConsensusBlockData(bastTarget, genSig)
-
-    val block = Block
-      .buildAndSign(
-        version = 3: Byte,
-        timestamp = lastBlockTS + validBlockDelay - 1000,
-        reference = ByteStr(lastBlockId),
-        consensusData = cData,
-        transactionData = Nil,
-        signer = signerPK,
-        featureVotes = Set.empty
-      )
-      .explicitGet()
-
-    val futureResponse = nodes.head.sendByNetwork(RawBytes.from(block))
-
-    Await.result(futureResponse, 5 seconds)
+  def blockSignature(h: Int): Array[Byte] = {
+    Base58
+      .decode(
+        (Json.parse(
+          nodes.last
+            .get(s"/blocks/at/$h")
+            .getResponseBody
+        ) \ "signature").as[String])
+      .get
   }
 
   override protected def nodeConfigs: Seq[Config] =
@@ -97,6 +88,60 @@ class PoSSuite extends BaseTransactionSuite {
     System.arraycopy(signature, 0, s, 0, crypto.DigestSize)
     System.arraycopy(publicKey, 0, s, crypto.DigestSize, crypto.DigestSize)
     crypto.fastHash(s)
+  }
+
+  def waitForHeight(h: Int): Unit = {
+    nodes.waitFor[Int]("height")(1.seconds)(_.height, _.head > h)
+  }
+
+  def forgeBlock(height: Int,
+                 signerPK: PrivateKeyAccount,
+                 lastBlockId: ByteStr,
+                 lastBlockTS: Long,
+                 lastBlockCData: NxtLikeConsensusBlockData,
+                 ggpTS: Long)(updateDelay: Long => Long = identity,
+                              updateBaseTarget: Long => Long = identity,
+                              updateGenSig: ByteStr => ByteStr = identity): Block = {
+
+    val genSig: ByteStr =
+      updateGenSig(
+        ByteStr(generatorSignature(lastBlockCData.generationSignature.arr, signerPK.publicKey))
+      )
+
+    val validBlockDelay: Long = updateDelay(
+      NxtPoSCalculator
+        .calculateDelay(
+          hit(genSig.arr),
+          lastBlockCData.baseTarget,
+          nodes.head.accountBalances(signerPK.address)._2
+        )
+    )
+
+    val bastTarget: Long = updateBaseTarget(
+      NxtPoSCalculator
+        .calculateBaseTarget(
+          60,
+          height,
+          lastBlockCData.baseTarget,
+          lastBlockTS,
+          Some(ggpTS),
+          validBlockDelay
+        )
+    )
+
+    val cData: NxtLikeConsensusBlockData = NxtLikeConsensusBlockData(bastTarget, genSig)
+
+    Block
+      .buildAndSign(
+        version = 3: Byte,
+        timestamp = lastBlockTS + validBlockDelay /*- 1000*/,
+        reference = lastBlockId,
+        consensusData = cData,
+        transactionData = Nil,
+        signer = signerPK,
+        featureVotes = Set.empty
+      )
+      .explicitGet()
   }
 
   private def hit(generatorSignature: Array[Byte]): BigInt = BigInt(1, generatorSignature.take(8).reverse)
