@@ -599,7 +599,7 @@ trait TransactionGenBase extends ScriptGen {
     for {
       key   <- keyGen
       value <- Gen.choose[Long](Long.MinValue, Long.MaxValue)
-    } yield LongDataEntry(key, value)
+    } yield IntegerDataEntry(key, value)
 
   def booleanEntryGen(keyGen: Gen[String] = dataKeyGen) =
     for {

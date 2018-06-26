@@ -195,7 +195,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
         "version" -> 1,
         "sender"  -> firstAddress,
         "data" -> List(
-          LongDataEntry("int", 923275292849183L),
+          IntegerDataEntry("int", 923275292849183L),
           BooleanDataEntry("bool", true),
           BinaryDataEntry("blob", ByteStr(Array.tabulate(445)(_.toByte))),
           StringDataEntry("str", "AAA-AAA")
