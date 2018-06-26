@@ -45,7 +45,9 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
   }
 
   override def addCandidate(socketAddress: InetSocketAddress): Boolean = unverifiedPeers.synchronized {
-    val r = Option(peersPersistence.getIfPresent(socketAddress)).isEmpty && !unverifiedPeers.contains(socketAddress)
+    val r = !socketAddress.getAddress.isAnyLocalAddress &&
+      Option(peersPersistence.getIfPresent(socketAddress)).isEmpty &&
+      !unverifiedPeers.contains(socketAddress)
     if (r) unverifiedPeers.add(socketAddress)
     r
   }
@@ -102,7 +104,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     }
     // excluded only contains local addresses, our declared address, and external declared addresses we already have
     // connection to, so it's safe to filter out all matching candidates
-    unverifiedPeers.removeIf(a => excluded(a) || a.getAddress.isAnyLocalAddress)
+    unverifiedPeers.removeIf(excluded(_))
     val unverified = Option(unverifiedPeers.peek()).filterNot(excludeAddress)
     val verified   = Random.shuffle(knownPeers.keySet.diff(excluded).toSeq).headOption.filterNot(excludeAddress)
 
