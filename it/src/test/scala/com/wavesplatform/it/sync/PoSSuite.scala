@@ -15,7 +15,6 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class PoSSuite extends BaseTransactionSuite {
@@ -31,21 +30,12 @@ class PoSSuite extends BaseTransactionSuite {
 
   test("Accept correct block") {
 
-    waitForHeight(10)
+    waitForHeight(3)
 
-    val height     = nodes.last.height
-    val ggParentTS = (Json.parse(nodes.head.get(s"/blocks/at/${height - 2}").getResponseBody) \ "timestamp").as[Long]
+    val height = nodes.last.height
+    val block  = forgeBlock(height, signerPK)()
 
-    val (lastBlockId, lastBlockTS, lastBlockCData) = previousBlockInfo(height)
-
-    val block = forgeBlock(
-      height,
-      signerPK,
-      ByteStr(lastBlockId),
-      lastBlockTS,
-      lastBlockCData,
-      ggParentTS
-    )()
+    Thread.sleep(block.timestamp - System.currentTimeMillis())
 
     nodes.head.sendByNetwork(RawBytes.from(block))
 
@@ -54,6 +44,40 @@ class PoSSuite extends BaseTransactionSuite {
     val newBlockSig = blockSignature(height + 1)
 
     newBlockSig sameElements block.uniqueId.arr
+  }
+
+  test("Reject block with invalid delay") {
+    waitForHeight(3)
+
+    val height = nodes.last.height
+    val block  = forgeBlock(height, signerPK)(updateDelay = _ - 1000)
+
+    Thread.sleep(block.timestamp - System.currentTimeMillis())
+
+    nodes.head.sendByNetwork(RawBytes.from(block))
+
+    waitForHeight(height + 1)
+
+    val newBlockSig = blockSignature(height + 1)
+
+    newBlockSig should not be block.uniqueId.arr
+  }
+
+  test("Reject block with invalid BT") {
+    waitForHeight(3)
+
+    val height = nodes.last.height
+    val block  = forgeBlock(height, signerPK)(updateBaseTarget = _ + 2)
+
+    Thread.sleep(block.timestamp - System.currentTimeMillis())
+
+    nodes.head.sendByNetwork(RawBytes.from(block))
+
+    waitForHeight(height + 1)
+
+    val newBlockSig = blockSignature(height + 1)
+
+    newBlockSig should not be block.uniqueId.arr
   }
 
   def previousBlockInfo(height: Int) = {
@@ -94,14 +118,18 @@ class PoSSuite extends BaseTransactionSuite {
     nodes.waitFor[Int]("height")(1.seconds)(_.height, _.head > h)
   }
 
-  def forgeBlock(height: Int,
-                 signerPK: PrivateKeyAccount,
-                 lastBlockId: ByteStr,
-                 lastBlockTS: Long,
-                 lastBlockCData: NxtLikeConsensusBlockData,
-                 ggpTS: Long)(updateDelay: Long => Long = identity,
-                              updateBaseTarget: Long => Long = identity,
-                              updateGenSig: ByteStr => ByteStr = identity): Block = {
+  def forgeBlock(height: Int, signerPK: PrivateKeyAccount)(updateDelay: Long => Long = identity,
+                                                           updateBaseTarget: Long => Long = identity,
+                                                           updateGenSig: ByteStr => ByteStr = identity): Block = {
+
+    val ggParentTS =
+      if (height >= 3)
+        Some(
+          (Json
+            .parse(nodes.head.get(s"/blocks/at/${height - 2}").getResponseBody) \ "timestamp").as[Long])
+      else None
+
+    val (lastBlockId, lastBlockTS, lastBlockCData) = previousBlockInfo(height)
 
     val genSig: ByteStr =
       updateGenSig(
@@ -124,7 +152,7 @@ class PoSSuite extends BaseTransactionSuite {
           height,
           lastBlockCData.baseTarget,
           lastBlockTS,
-          Some(ggpTS),
+          ggParentTS,
           validBlockDelay
         )
     )
@@ -135,7 +163,7 @@ class PoSSuite extends BaseTransactionSuite {
       .buildAndSign(
         version = 3: Byte,
         timestamp = lastBlockTS + validBlockDelay /*- 1000*/,
-        reference = lastBlockId,
+        reference = ByteStr(lastBlockId),
         consensusData = cData,
         transactionData = Nil,
         signer = signerPK,
