@@ -28,19 +28,11 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
       CompilerV1(
         compilerContext,
         FUNCTION_CALL(Pos(0, 0),
-                      PART.VALID(Pos(0, 0), extract.name),
+                      PART.VALID(Pos(0, 0), "extract"),
                       List(FUNCTION_CALL(Pos(0, 0), PART.VALID(Pos(0, 0), undefinedOptionLong.name), List.empty)))
       )
     v._2 shouldBe LONG
   }
-
-  treeTypeTest("unitOnNone(NONE)")(
-    ctx = compilerContext,
-    expr = Expressions.FUNCTION_CALL(Pos(0, 0),
-                                     Expressions.PART.VALID(Pos(0, 0), unitOnNone.name),
-                                     List(Expressions.REF(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "None")))),
-    expectedResult = Right((FUNCTION_CALL(unitOnNone.header, List(REF("None"))), UNIT))
-  )
 
   property("successful on very deep expressions(stack overflow check)") {
     val expr = (1 to 100000).foldLeft[Expressions.EXPR](Expressions.CONST_LONG(Pos(0, 0), 0)) { (acc, _) =>
@@ -86,49 +78,49 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
     expectedResult = Right((FUNCTION_CALL(multiplierFunction.header, List(CONST_LONG(1), CONST_LONG(2))), LONG))
   )
 
-  treeTypeTest("idOptionLong(NONE)")(
+  treeTypeTest("idOptionLong(())")(
     ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(
       Pos(0, 0),
       Expressions.PART.VALID(Pos(0, 0), idOptionLong.name),
-      List(Expressions.REF(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "None")))
+      List(Expressions.REF(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "unit")))
     ),
-    expectedResult = Right((FUNCTION_CALL(idOptionLong.header, List(REF("None"))), UNIT))
+    expectedResult = Right((FUNCTION_CALL(idOptionLong.header, List(REF("unit"))), UNIT))
   )
 
-  treeTypeTest("idOptionLong(SOME(NONE))")(
-    ctx = compilerContext,
-    expr = Expressions.FUNCTION_CALL(
-      Pos(0, 0),
-      Expressions.PART.VALID(Pos(0, 0), idOptionLong.name),
-      List(
-        Expressions.FUNCTION_CALL(
-          Pos(0, 0),
-          Expressions.PART.VALID(Pos(0, 0), "Some"),
-          List(Expressions.REF(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "None")))
-        )
-      )
-    ),
-    expectedResult = Right((FUNCTION_CALL(idOptionLong.header, List((FUNCTION_CALL(some.header, List(REF("None")))))), UNIT))
-  )
-
-  treeTypeTest("idOptionLong(SOME(CONST_LONG(3)))")(
-    ctx = compilerContext,
-    expr = Expressions.FUNCTION_CALL(
-      Pos(0, 0),
-      Expressions.PART.VALID(Pos(0, 0), idOptionLong.name),
-      List(
-        Expressions.FUNCTION_CALL(
-          Pos(0, 0),
-          Expressions.PART.VALID(Pos(0, 0), "Some"),
-          List(Expressions.FUNCTION_CALL(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "Some"), List(Expressions.CONST_LONG(Pos(0, 0), 3))))
-        )
-      )
-    ),
-    expectedResult = Right(
-      (FUNCTION_CALL(idOptionLong.header, List(FUNCTION_CALL(some.header, List(FUNCTION_CALL(some.header, List(CONST_LONG(3))))))), UNIT)
-    )
-  )
+//  treeTypeTest("idOptionLong(SOME(NONE))")(
+//    ctx = compilerContext,
+//    expr = Expressions.FUNCTION_CALL(
+//      Pos(0, 0),
+//      Expressions.PART.VALID(Pos(0, 0), idOptionLong.name),
+//      List(
+//        Expressions.FUNCTION_CALL(
+//          Pos(0, 0),
+//          Expressions.PART.VALID(Pos(0, 0), "Some"),
+//          List(Expressions.REF(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "None")))
+//        )
+//      )
+//    ),
+//    expectedResult = Right((FUNCTION_CALL(idOptionLong.header, List((FUNCTION_CALL(some.header, List(REF("None")))))), UNIT))
+//  )
+//
+//  treeTypeTest("idOptionLong(SOME(CONST_LONG(3)))")(
+//    ctx = compilerContext,
+//    expr = Expressions.FUNCTION_CALL(
+//      Pos(0, 0),
+//      Expressions.PART.VALID(Pos(0, 0), idOptionLong.name),
+//      List(
+//        Expressions.FUNCTION_CALL(
+//          Pos(0, 0),
+//          Expressions.PART.VALID(Pos(0, 0), "Some"),
+//          List(Expressions.FUNCTION_CALL(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "Some"), List(Expressions.CONST_LONG(Pos(0, 0), 3))))
+//        )
+//      )
+//    ),
+//    expectedResult = Right(
+//      (FUNCTION_CALL(idOptionLong.header, List(FUNCTION_CALL(some.header, List(FUNCTION_CALL(some.header, List(CONST_LONG(3))))))), UNIT)
+//    )
+//  )
 
   treeTypeTest("pattern matching - allow shadowing of ref with the same name")(
     ctx = compilerContext,

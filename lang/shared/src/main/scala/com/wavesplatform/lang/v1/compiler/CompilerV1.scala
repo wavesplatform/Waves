@@ -77,11 +77,11 @@ object CompilerV1 {
     })
   }
 
-  def flat(typeDefs: Map[String, DefinedType], tl: List[String]): List[TYPE] =
+  def flat(typeDefs: Map[String, DefinedType], tl: List[String]): List[PLAIN_TYPE] =
     tl.flatMap(typeName =>
-      typeDefs.get(typeName).fold(List[TYPE]()) {
-        case UnionType(_, types) => types
-        case simple              => List(simple.typeRef)
+      typeDefs.get(typeName) match {
+        case Some(value) => List(value.typeRef)
+        case None        => List.empty
     })
 
   private def compileMatch(p: Pos, expr: Expressions.EXPR, cases: List[Expressions.MATCH_CASE]): CompileM[(Terms.EXPR, TYPE)] = {
@@ -140,9 +140,9 @@ object CompilerV1 {
       field       <- handlePart(fieldPart)
       compiledRef <- compileExpr(refExpr)
       result <- (compiledRef._2 match {
-        case (t@CASETYPEREF(_, fielsd)) => mkGetter(p, ctx, List(t), field, compiledRef._1)
-        case UNION(tl)         => mkGetter(p, ctx, tl, field, compiledRef._1)
-        case _                 => Generic(p.start, p.end, "Unexpected ref type: neither simple type nor union type").asLeft[(EXPR, TYPE)]
+        case (t @ CASETYPEREF(_, fielsd)) => mkGetter(p, ctx, List(t), field, compiledRef._1)
+        case UNION(tl)                    => mkGetter(p, ctx, tl, field, compiledRef._1)
+        case _                            => Generic(p.start, p.end, "Unexpected ref type: neither simple type nor union type").asLeft[(EXPR, TYPE)]
       }).toCompileM
     } yield result
   }
@@ -194,15 +194,14 @@ object CompilerV1 {
       for {
         resolvedTypeParams <- TypeInferrer(typePairs).leftMap(Generic(p.start, p.end, _))
         resolvedResultType <- f.result(resolvedTypeParams).leftMap(Generic(p.start, p.end, _))
-        args   = typedExpressionArgumentsAndTypedPlaceholders.map(_._1._1)
+        args = typedExpressionArgumentsAndTypedPlaceholders.map(_._1._1)
       } yield (FUNCTION_CALL(f.header, args): EXPR, resolvedResultType)
     }
   }
 
   def mkIf(p: Pos, cond: EXPR, ifTrue: (EXPR, TYPE), ifFalse: (EXPR, TYPE)): Either[CompilationError, (EXPR, TYPE)] = {
-   TypeInferrer
-     .findCommonType(ifTrue._2, ifFalse._2)
-     .fold(UnexpectedType(p.start, p.end, ifTrue._2.toString, ifFalse._2.toString).asLeft[(IF, TYPE)])(t => (IF(cond, ifTrue._1, ifFalse._1), t).asRight)
+    val t = TypeInferrer.findCommonType(ifTrue._2, ifFalse._2)
+    (IF(cond, ifTrue._1, ifFalse._1), t).asRight
   }
 
   def mkIfCases(ctx: CompilerContext, cases: List[MATCH_CASE], refTmp: Expressions.REF, allowShadowVarName: Option[String]): Expressions.EXPR = {
@@ -229,14 +228,10 @@ object CompilerV1 {
     })
   }
 
-  private def mkGetter(p: Pos,
-                       ctx: CompilerContext,
-                       types: List[TYPE],
-                       fieldName: String,
-                       expr: EXPR): Either[CompilationError, (GETTER, TYPE)] = {
+  private def mkGetter(p: Pos, ctx: CompilerContext, types: List[TYPE], fieldName: String, expr: EXPR): Either[CompilationError, (GETTER, TYPE)] = {
     types
       .traverse[Option, TYPE](ctr => {
-          ctr.fields.find(_._1 == fieldName).map(_._2)
+        ctr.fields.find(_._1 == fieldName).map(_._2)
       })
       .fold((FieldNotFound(p.start, p.end, fieldName, s"Union($types)"): CompilationError).asLeft[(GETTER, TYPE)])(ts => {
         TypeInferrer.findCommonType(ts) match {

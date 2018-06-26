@@ -55,18 +55,21 @@ object EvaluatorV1 extends ExprEvaluator {
               .traverse[EvalM, Any](a => evalExpr(a))
               .map(func.eval)
               .flatMap(r => liftTER[Any](r.value))
-        }.orElse(
+        }
+        .orElse(
           // no such function, try data constructor
           header match {
             case FunctionHeader.User(typeName) =>
-              types.get(ctx).get(typeName).collect { case (t@CaseType(_, fields)) =>
-                args
-                  .traverse[EvalM, Any](a => evalExpr(a))
-                  .map(argValues => CaseObj(t.typeRef, fields.map(_._1).zip(argValues).toMap))
+              types.get(ctx).get(typeName).collect {
+                case t @ CaseType(_, fields) =>
+                  args
+                    .traverse[EvalM, Any](a => evalExpr(a))
+                    .map(argValues => CaseObj(t.typeRef, fields.map(_._1).zip(argValues).toMap))
               }
             case _ => None
           }
-        ).getOrElse(raiseError[EvaluationContext, ExecutionError, Any](s"function '$header' not found"))
+        )
+        .getOrElse(raiseError[EvaluationContext, ExecutionError, Any](s"function '$header' not found"))
     } yield result
 
   private def pureAny[A](v: A): EvalM[Any] = v.pure[EvalM].map(_.asInstanceOf[Any])

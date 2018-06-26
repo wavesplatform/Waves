@@ -26,10 +26,16 @@ object NativeFunction {
 
   def apply(name: String, cost: Long, internalName: Short, resultType: TYPEPLACEHOLDER, args: (String, TYPEPLACEHOLDER)*)(
       ev: List[Any] => Either[String, Any]) =
-    new NativeFunction(name, cost, FunctionTypeSignature((r => inferResultType(resultType, r)), args.map(_._2), FunctionHeader.Native(internalName)), ev)
+    new NativeFunction(name,
+                       cost,
+                       FunctionTypeSignature((r => inferResultType(resultType, r)), args.map(_._2), FunctionHeader.Native(internalName)),
+                       ev)
 
-  def create(name: String, cost: Long, resultType: Map[TYPEPARAM, TYPE] => Either[String, TYPE], args: List[(String, TYPEPLACEHOLDER)], internalName: Short)(
-      ev: List[Any] => Either[String, Any]): NativeFunction =
+  def create(name: String,
+             cost: Long,
+             resultType: Map[TYPEPARAM, TYPE] => Either[String, TYPE],
+             args: List[(String, TYPEPLACEHOLDER)],
+             internalName: Short)(ev: List[Any] => Either[String, Any]): NativeFunction =
     new NativeFunction(name, cost, FunctionTypeSignature(resultType, args.map(_._2), FunctionHeader.Native(internalName)), ev)
 }
 
@@ -40,5 +46,12 @@ object UserFunction {
 
   def apply(name: String, cost: Long, resultType: TYPEPLACEHOLDER, args: (String, TYPEPLACEHOLDER)*)(ev: List[EXPR] => Either[String, EXPR]) =
     new UserFunction(name, cost, FunctionTypeSignature((r => inferResultType(resultType, r)), args.map(_._2), FunctionHeader.User(name)), ev)
+
+  def create(name: String, cost: Long, resultType: Map[TYPEPARAM, TYPE] => Either[String, TYPE], args: List[(String, TYPEPLACEHOLDER)])(
+      ev: List[EXPR] => Either[String, EXPR]): UserFunction =
+    new UserFunction(name = name,
+                     cost = cost,
+                     signature = FunctionTypeSignature(result = resultType, args = args.map(_._2), header = FunctionHeader.User(name)),
+                     ev = ev)
 
 }

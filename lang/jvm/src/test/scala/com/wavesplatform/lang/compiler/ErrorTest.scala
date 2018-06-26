@@ -22,12 +22,12 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
     ),
     "can't define LET with the same name as predefined constant" -> "already defined in the scope" -> BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "None"), CONST_LONG(AnyPos, 2), Seq.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "unit"), CONST_LONG(AnyPos, 2), Seq.empty),
       TRUE(AnyPos)
     ),
     "can't define LET with the same name as predefined function" -> "function with this name is already defined" -> BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "Some"), CONST_LONG(AnyPos, 2), Seq.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "drop"), CONST_LONG(AnyPos, 2), Seq.empty),
       TRUE(AnyPos)
     ),
     "BINARY_OP with wrong types"                   -> "Compilation failed: Can't find a function '+'" -> BINARY_OP(AnyPos, TRUE(AnyPos), SUM_OP, CONST_LONG(AnyPos, 1)),
@@ -37,11 +37,6 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
       AnyPos,
       PART.VALID(AnyPos, multiplierFunction.name),
       List(CONST_LONG(AnyPos, 0))
-    ),
-    "FUNCTION_CALL with upper type" -> "Non-matching types" -> FUNCTION_CALL(
-      AnyPos,
-      PART.VALID(AnyPos, unitOnNone.name),
-      List(FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "Some"), List(CONST_LONG(AnyPos, 3))))
     ),
     "FUNCTION_CALL with wrong type of argument" -> "Compilation failed: Non-matching types: expected: Int, actual: Boolean" -> FUNCTION_CALL(
       AnyPos,

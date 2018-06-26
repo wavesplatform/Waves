@@ -28,8 +28,8 @@ object WavesContext {
 
     val getIntegerF: BaseFunction = getdataF("getInteger", DATA_LONG, DataType.Long)
     val getBooleanF: BaseFunction = getdataF("getBoolean", DATA_BOOLEAN, DataType.Boolean)
-    val getBinaryF: BaseFunction = getdataF("getBinary", DATA_BYTES, DataType.ByteArray)
-    val getStringF: BaseFunction = getdataF("getString", DATA_STRING, DataType.String)
+    val getBinaryF: BaseFunction  = getdataF("getBinary", DATA_BYTES, DataType.ByteArray)
+    val getStringF: BaseFunction  = getdataF("getString", DATA_STRING, DataType.String)
 
     def secureHashExpr(xs: EXPR): EXPR = FUNCTION_CALL(
       FunctionHeader.Native(KECCAK256),
@@ -162,13 +162,13 @@ object WavesContext {
                       FunctionHeader.Native(SOME),
                       List(FUNCTION_CALL(FunctionHeader.Native(ADDRESSFROMBYTES), List(REF("@afs_addrBytes"))))
                     ),
-                    REF("None")
+                    REF("unit")
                   ),
-                  REF("None")
+                  REF("unit")
                 ),
-                REF("None")
+                REF("unit")
               ),
-              REF("None")
+              REF("unit")
             )
           )
         )
@@ -189,7 +189,7 @@ object WavesContext {
     val heightCoeval: Coeval[Either[String, Long]] = Coeval.evalOnce(Right(env.height))
 
     val txByIdF: BaseFunction = {
-      val returnType = UNION(anyTransactionType, UNIT)
+      val returnType = UNION.create(UNIT +: anyTransactionType.l)
       NativeFunction("getTransactionById", 100, GETTRANSACTIONBYID, returnType, "id" -> BYTEVECTOR) {
         case (id: ByteVector) :: Nil =>
           val maybeDomainTx = env.transactionById(id.toArray).map(transactionObject)
@@ -216,8 +216,8 @@ object WavesContext {
       }
 
     val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, optionLong, "id" -> BYTEVECTOR) {
-        case (id: ByteVector) :: Nil => Right(fromOption(env.transactionHeightById(id.toArray)))
-        case _                       => ???
+      case (id: ByteVector) :: Nil => Right(fromOption(env.transactionHeightById(id.toArray)))
+      case _                       => ???
     }
 
     val vars: Map[String, (TYPE, LazyVal)] = Map(
