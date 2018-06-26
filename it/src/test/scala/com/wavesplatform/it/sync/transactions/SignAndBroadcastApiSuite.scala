@@ -308,7 +308,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
       usesProofs = false
     )
 
-    val buyer               = pkFromAddress(firstAddress)ge
+    val buyer               = pkFromAddress(firstAddress)
     val seller              = pkFromAddress(secondAddress)
     val matcher             = pkFromAddress(thirdAddress)
     val time                = NTP.correctedTime()
