@@ -9,13 +9,14 @@ import com.wavesplatform.state.{BlockchainUpdaterImpl, EitherExt2}
 import com.wavesplatform.{RequestGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.account.PrivateKeyAccount
+import scorex.account.{Address, PrivateKeyAccount}
 import scorex.block.Block
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.GenesisTransaction
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.transfer.{TransferTransaction, TransferTransactionV1}
+import scorex.transaction.{GenesisTransaction, Transaction}
 import scorex.utils.{Time, TimeImpl}
 
 class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestGen {
@@ -98,23 +99,66 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
 
     def resetTest(f: (LevelDBWriter, PrivateKeyAccount) => Unit): Unit = baseTest(t => resetGen(t.correctedTime()))(f)
 
-    def baseTest(gen: Time => Gen[(PrivateKeyAccount, Seq[Block])])(f: (LevelDBWriter, PrivateKeyAccount) => Unit): Unit = {
-      val time          = new TimeImpl
-      val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub)
-      val bcu           = new BlockchainUpdaterImpl(defaultWriter, WavesSettings.fromConfig(loadConfig(ConfigFactory.load())), time)
-      try {
-        val (account, blocks) = gen(time).sample.get
-        blocks.foreach { block =>
-          bcu.processBlock(block).explicitGet()
-        }
+  }
 
-        bcu.shutdown()
-        f(defaultWriter, account)
-      } finally {
-        time.close()
-        bcu.shutdown()
-        db.close()
+  def baseTest(gen: Time => Gen[(PrivateKeyAccount, Seq[Block])])(f: (LevelDBWriter, PrivateKeyAccount) => Unit): Unit = {
+    val time          = new TimeImpl
+    val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub)
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, WavesSettings.fromConfig(loadConfig(ConfigFactory.load())), time)
+    try {
+      val (account, blocks) = gen(time).sample.get
+
+      blocks.foreach { block =>
+        bcu.processBlock(block).explicitGet()
       }
+
+      bcu.shutdown()
+      f(defaultWriter, account)
+    } finally {
+      time.close()
+      bcu.shutdown()
+      db.close()
+    }
+  }
+
+  "addressTransactions" - {
+    "return txs in correct ordering" in {
+      val preconditions = (ts: Long) => {
+        for {
+          master    <- accountGen
+          recipient <- accountGen
+          genesisBlock = TestBlock
+            .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
+          block1 = TestBlock
+            .create(
+              ts + 3,
+              genesisBlock.uniqueId,
+              Seq(
+                createTransfer(master, recipient.toAddress, ts + 1),
+                createTransfer(master, recipient.toAddress, ts + 2)
+              )
+            )
+          emptyBlock = TestBlock.create(ts + 5, block1.uniqueId, Seq())
+        } yield (master, List(genesisBlock, block1, emptyBlock))
+      }
+
+      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
+        val txs = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, 0)
+
+        val ordering = Ordering
+          .by[(Int, Transaction), (Int, Long)]({ case (h, t) => (-h, -t.timestamp) })
+
+        txs.length shouldBe 2
+
+        txs.sorted(ordering) shouldBe txs
+      }
+    }
+
+    def createTransfer(master: PrivateKeyAccount, recipient: Address, ts: Long): TransferTransaction = {
+      TransferTransactionV1
+        .selfSigned(None, master, recipient, ENOUGH_AMT / 5, ts, None, 1000000, Array.emptyByteArray)
+        .explicitGet()
     }
   }
 }

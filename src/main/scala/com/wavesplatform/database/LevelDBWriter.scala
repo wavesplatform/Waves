@@ -200,6 +200,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
                                   leaseBalances: Map[BigInt, LeaseBalance],
                                   leaseStates: Map[ByteStr, Boolean],
                                   transactions: Map[ByteStr, (Transaction, Set[BigInt])],
+                                  addressTransactions: Map[BigInt, List[(Int, ByteStr)]],
                                   reissuedAssets: Map[ByteStr, AssetInfo],
                                   filledQuantity: Map[ByteStr, VolumeAndFee],
                                   scripts: Map[BigInt, Option[Script]],
@@ -314,12 +315,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       }
     }
 
-    val accountTransactions = (for {
-      (id, (tx, addresses)) <- transactions.toSeq
-      addressId             <- addresses
-    } yield (addressId, (tx.builder.typeId.toInt, id))).groupBy(_._1).mapValues(_.map(_._2))
-
-    for ((addressId, txs) <- accountTransactions) {
+    for ((addressId, txs) <- addressTransactions) {
       rw.put(Keys.addressTransactionIds(height, addressId), txs)
     }
 
