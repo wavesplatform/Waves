@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync
 import com.google.common.primitives.Longs
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
-import com.wavesplatform.it.api.MatcherStatusResponse
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state.ByteStr

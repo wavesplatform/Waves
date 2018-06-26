@@ -1,6 +1,5 @@
 package scorex.transaction.smart
 
-import cats.implicits._
 import com.wavesplatform.lang.v1.traits.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient, Tx => ContractTransaction}
 import com.wavesplatform.state._
@@ -30,7 +29,8 @@ class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], blo
         case Alias(name) =>
           scorex.account.Alias
             .buildWithCurrentNetworkByte(name)
-            .toOption >>= blockchain.resolveAlias
+            .flatMap(blockchain.resolveAlias)
+            .toOption
       }
       data <- blockchain
         .accountData(address, key)
@@ -46,7 +46,7 @@ class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], blo
   }
   override def resolveAlias(name: String): Either[String, Recipient.Address] =
     blockchain
-      .resolveAliasEi(scorex.account.Alias.buildWithCurrentNetworkByte(name).explicitGet())
+      .resolveAlias(scorex.account.Alias.buildWithCurrentNetworkByte(name).explicitGet())
       .left
       .map(_.toString)
       .right
@@ -57,7 +57,7 @@ class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], blo
   override def accountBalanceOf(addressOrAlias: Array[Byte], maybeAssetId: Option[Array[Byte]]): Either[String, Long] = {
     (for {
       aoa     <- AddressOrAlias.fromBytes(bytes = addressOrAlias, position = 0)
-      address <- blockchain.resolveAliasEi(aoa._1)
+      address <- blockchain.resolveAlias(aoa._1)
       balance = blockchain.balance(address, maybeAssetId.map(ByteStr(_)))
     } yield balance).left.map(_.toString)
   }

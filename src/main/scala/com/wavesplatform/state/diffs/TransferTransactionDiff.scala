@@ -16,7 +16,7 @@ object TransferTransactionDiff {
     val sender = Address.fromPublicKey(tx.sender.publicKey)
 
     val isInvalidEi = for {
-      recipient <- blockchain.resolveAliasEi(tx.recipient)
+      recipient <- blockchain.resolveAlias(tx.recipient)
       _ <- Either.cond((tx.feeAssetId >>= blockchain.assetDescription >>= (_.script)).isEmpty,
                        (),
                        GenericError("Smart assets can't participate in TransferTransactions as a fee"))

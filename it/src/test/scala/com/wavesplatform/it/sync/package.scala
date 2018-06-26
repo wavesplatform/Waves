@@ -24,4 +24,6 @@ package object sync {
   def calcMassTransferFee(numberOfRecipients: Int): Long = {
     fee + massTransferFeePerTransfer * (numberOfRecipients + 1)
   }
+
+  val supportedVersions = List(null, "2") //sign and broadcast use default for V1
 }
