@@ -13,7 +13,7 @@ object MassTransferTransactionDiff {
   def apply(blockchain: Blockchain, blockTime: Long, height: Int)(tx: MassTransferTransaction): Either[ValidationError, Diff] = {
     def parseTransfer(xfer: ParsedTransfer): Validation[(Map[Address, Portfolio], Long)] = {
       for {
-        recipientAddr <- blockchain.resolveAliasEi(xfer.address)
+        recipientAddr <- blockchain.resolveAlias(xfer.address)
         portfolio = tx.assetId match {
           case None      => Map(recipientAddr -> Portfolio(xfer.amount, LeaseBalance.empty, Map.empty))
           case Some(aid) => Map(recipientAddr -> Portfolio(0, LeaseBalance.empty, Map(aid -> xfer.amount)))
