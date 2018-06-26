@@ -46,9 +46,8 @@ object TypeInferrer {
         Either.cond(matchType(realType, actual).isDefined, None, err)
       case (tp @ TYPEPARAM(char), _) =>
         Right(Some(MatchResult(actual, tp)))
-//      case (tp @ OPTIONTYPEPARAM(innerTypeParam), OPTION(t)) => matchTypes(t, innerTypeParam)
-      case (tp @ LISTTYPEPARAM(innerTypeParam), LIST(t))     => matchTypes(t, innerTypeParam)
-      case _                                                 => Left(err)
+      case (tp @ LISTTYPEPARAM(innerTypeParam), LIST(t)) => matchTypes(t, innerTypeParam)
+      case _                                             => Left(err)
     }
   }
 
@@ -60,8 +59,7 @@ object TypeInferrer {
           case None    => Left(s"Unknown function return type $tp")
           case Some(r) => Right(r)
         }
-//      case OPTIONTYPEPARAM(t) => inferResultType(t, resolved).map(OPTION)
-      case LISTTYPEPARAM(t)   => inferResultType(t, resolved).map(LIST)
+      case LISTTYPEPARAM(t) => inferResultType(t, resolved).map(LIST)
     }
   }
 
@@ -77,20 +75,18 @@ object TypeInferrer {
   def matchType(required: TYPE, actual: TYPE): Option[TYPE] = findCommonType(required, actual, biDirectional = false)
 
   private def findCommonType(required: TYPE, actual: TYPE, biDirectional: Boolean): Option[TYPE] = {
-//    println((required, actual, biDirectional))
     if (actual == NOTHING) Some(required)
     else if (required == NOTHING && biDirectional) Some(actual)
     else if (required == actual) Some(required)
     else
       (required, actual) match {
-//        case (OPTION(it1), OPTION(it2)) => findCommonType(it1, it2, biDirectional).map(OPTION)
         case (LIST(it1), LIST(it2)) => findCommonType(it1, it2, biDirectional).map(LIST)
         case (r: UNION, a: UNION) =>
           if (biDirectional && (r equivalent a)) Some(r)
           else if (!biDirectional && (r >= UNION.create(a.l.filter(_ != NOTHING)))) Some(r)
           else None
         case (r: UNION, a: TYPE) if r.l.contains(a) => Some(r)
-        case _ => None
+        case _                                      => None
       }
   }
 }
