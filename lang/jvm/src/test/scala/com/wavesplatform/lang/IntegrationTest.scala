@@ -1,20 +1,67 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.TypeInfo._
+import com.wavesplatform.lang.v1.{EvaluatorV1, Parser, TypeChecker}
+import com.wavesplatform.lang.v1.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.ctx._
 
-class IntegrationTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
+class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
 
-  private def eval(code: String) = {
+  private def eval[T: TypeInfo](code: String) = {
     val untyped = Parser(code).get.value
-    val ctx     = Context(Map.empty, Map.empty, Map(multiplierFunction.name -> multiplierFunction))
+    val ctx     = PureContext.instance
     val typed   = TypeChecker(TypeChecker.TypeCheckerContext.fromContext(ctx), untyped)
-    typed.flatMap(Evaluator(ctx, _))
+    typed.flatMap(EvaluatorV1[T](ctx, _))
   }
 
   property("function call") {
-    eval("MULTIPLY(3,4)".stripMargin) shouldBe Right(12)
+    eval[Long]("10 + 2") shouldBe Right(12)
   }
+
+  property("equals works on primitive types") {
+    eval[Boolean]("base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8' == base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8'") shouldBe Right(true)
+    eval[Boolean]("1 == 2") shouldBe Right(false)
+    eval[Boolean]("3 == 3") shouldBe Right(true)
+    eval[Boolean]("false == false") shouldBe Right(true)
+    eval[Boolean]("true == false") shouldBe Right(false)
+    eval[Boolean]("true == true") shouldBe Right(true)
+    eval[Boolean]("""   "x" == "x"     """) shouldBe Right(true)
+    eval[Boolean]("""   "x" == "y"     """) shouldBe Right(false)
+  }
+
+  property("equals shouldn't compile on option") {
+    eval[Boolean]("Some(1) == Some(2)") should produce("Can't find a function '=='")
+  }
+
+  property("equals some lang structure") {
+    eval[Boolean]("let x = (-7763390488025868909>-1171895536391400041) let v = false (v&&true)") shouldBe Right(false)
+    eval[Boolean]("let mshUmcl = (if(true) then true else true) true || mshUmcl") shouldBe Right(true)
+    eval[Long]("""if(((1+-1)==-1)) then 1 else (1+1)""") shouldBe Right(2)
+    eval[Boolean]("""((((if(true) then 1 else 1)==2)||((if(true)
+                    |then true else true)&&(true||true)))||(if(((1>1)||(-1>=-1)))
+                    |then (-1>=1) else false))""".stripMargin) shouldBe Right(true)
+  }
+
+  property("equals works on elements from Gens") {
+    List(CONST_LONGgen, SUMgen(50), INTGen(50)).foreach(gen =>
+      forAll(for {
+        expr <- gen
+        str  <- toString(expr)
+      } yield str) {
+        case str =>
+          eval[Boolean](s"$str == 0 || true") shouldBe Right(true)
+    })
+
+    forAll(for {
+      expr <- BOOLgen(50)
+      str  <- toString(expr)
+    } yield str) {
+      case str =>
+        eval[Boolean](s"$str || true") shouldBe Right(true)
+    }
+  }
+
 }

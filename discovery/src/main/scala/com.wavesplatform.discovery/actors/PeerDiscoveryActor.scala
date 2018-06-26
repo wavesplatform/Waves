@@ -75,12 +75,13 @@ class PeerDiscoveryActor(chainId: Char) extends Actor {
         new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
         new LegacyFrameCodec(peerDatabaseStub),
         new MessageCodec(),
-        new MessageHandler({ case (msg, ctx) =>
-          msg match {
-            case hs: Handshake => ctx.writeAndFlush(GetPeers)
-            case KnownPeers(p) => peers = p.toSet; ctx.close()
-            case _ =>
-          }
+        new MessageHandler({
+          case (msg, ctx) =>
+            msg match {
+              case hs: Handshake => ctx.writeAndFlush(GetPeers)
+              case KnownPeers(p) => peers = p.toSet; ctx.close()
+              case _             =>
+            }
         })
       )))
       .remoteAddress(address.getAddress, address.getPort)

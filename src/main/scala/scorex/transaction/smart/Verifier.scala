@@ -1,44 +1,41 @@
 package scorex.transaction.smart
 
+import cats.syntax.all._
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.Evaluator
-import com.wavesplatform.state2.reader.SnapshotStateReader
-import monix.eval.Coeval
-import scorex.account.AddressScheme
+import com.wavesplatform.state._
 import scorex.transaction.ValidationError.{GenericError, TransactionNotAllowedByScript}
 import scorex.transaction._
 import scorex.transaction.assets._
-import cats.syntax.all._
+import scorex.transaction.smart.script.{Script, ScriptRunner}
+import scorex.transaction.transfer._
 
 object Verifier {
 
-  def apply(s: SnapshotStateReader, currentBlockHeight: Int)(tx: Transaction): Either[ValidationError, Transaction] =
+  def apply(blockchain: Blockchain, currentBlockHeight: Int)(tx: Transaction): Either[ValidationError, Transaction] =
     (tx match {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
-        (pt, s.accountScript(pt.sender)) match {
-          case (_, Some(script))              => verify(s, script, currentBlockHeight, pt)
+        (pt, blockchain.accountScript(pt.sender)) match {
+          case (_, Some(script))              => verify(blockchain, script, currentBlockHeight, pt)
           case (stx: SignedTransaction, None) => stx.signaturesValid()
           case _                              => verifyAsEllipticCurveSignature(pt)
         }
     }).flatMap(tx => {
       for {
         assetId <- tx match {
-          case t: TransferTransaction          => t.assetId
-          case t: VersionedTransferTransaction => t.assetId
-          case t: MassTransferTransaction      => t.assetId
-          case t: BurnTransaction              => Some(t.assetId)
-          case t: ReissueTransaction           => Some(t.assetId)
-          case _                               => None
+          case t: TransferTransaction     => t.assetId
+          case t: MassTransferTransaction => t.assetId
+          case t: BurnTransaction         => Some(t.assetId)
+          case t: ReissueTransaction      => Some(t.assetId)
+          case _                          => None
         }
 
-        script <- s.assetDescription(assetId).flatMap(_.script)
-      } yield verify(s, script, currentBlockHeight, tx)
+        script <- blockchain.assetDescription(assetId).flatMap(_.script)
+      } yield verify(blockchain, script, currentBlockHeight, tx)
     }.getOrElse(Either.right(tx)))
 
-  def verify[T <: Transaction](s: SnapshotStateReader, script: Script, height: Int, transaction: T): Either[ValidationError, T] = {
-    val context = new BlockchainContext(AddressScheme.current.chainId, Coeval.evalOnce(transaction), Coeval.evalOnce(height), s).build()
-    Evaluator[Boolean](context, script.script) match {
+  def verify[T <: Transaction](blockchain: Blockchain, script: Script, height: Int, transaction: T): Either[ValidationError, T] = {
+    ScriptRunner[Boolean, T](height, transaction, blockchain, script) match {
       case Left(execError) => Left(GenericError(s"Script execution error: $execError"))
       case Right(false)    => Left(TransactionNotAllowedByScript(transaction))
       case Right(true)     => Right(transaction)

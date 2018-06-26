@@ -3,27 +3,28 @@ package com.wavesplatform
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
+import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{Transaction, TransactionParser}
+import scorex.transaction.Transaction
 
 package object history {
   val MaxTransactionsPerBlockDiff = 10
-  val MaxBlocksInMemory = 5
-  val DefaultBaseTarget = 1000L
+  val MaxBlocksInMemory           = 5
+  val DefaultBaseTarget           = 1000L
   val DefaultBlockchainSettings = BlockchainSettings(
     addressSchemeCharacter = 'N',
     maxTransactionsPerBlockDiff = MaxTransactionsPerBlockDiff,
     minBlocksInMemory = MaxBlocksInMemory,
     functionalitySettings = TestFunctionalitySettings.Enabled,
-    genesisSettings = null)
+    genesisSettings = null
+  )
 
-
-  val config = ConfigFactory.load()
+  val config   = ConfigFactory.load()
   val settings = WavesSettings.fromConfig(config)
 
   val MicroblocksActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
@@ -33,47 +34,57 @@ package object history {
 
   val DefaultWavesSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings)
 
-  val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
+  val defaultSigner       = PrivateKeyAccount(Array.fill(KeyLength)(0))
   val generationSignature = ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))
 
   def buildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction]): Block = customBuildBlockOfTxs(refTo, txs, defaultSigner, 1, 0L)
 
-  def customBuildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction],
-                            signer: PrivateKeyAccount, version: Byte, timestamp: Long, bTarget: Long = DefaultBaseTarget): Block =
-    Block.buildAndSign(
-      version = version,
-      timestamp = timestamp,
-      reference = refTo,
-      consensusData = NxtLikeConsensusBlockData(
-        baseTarget = bTarget,
-        generationSignature = generationSignature),
-      transactionData = txs,
-      signer = signer,
-      Set.empty).explicitGet()
+  def customBuildBlockOfTxs(refTo: ByteStr,
+                            txs: Seq[Transaction],
+                            signer: PrivateKeyAccount,
+                            version: Byte,
+                            timestamp: Long,
+                            bTarget: Long = DefaultBaseTarget): Block =
+    Block
+      .buildAndSign(
+        version = version,
+        timestamp = timestamp,
+        reference = refTo,
+        consensusData = NxtLikeConsensusBlockData(baseTarget = bTarget, generationSignature = generationSignature),
+        transactionData = txs,
+        signer = signer,
+        Set.empty
+      )
+      .explicitGet()
 
-
-  def customBuildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction],
-                                 signer: PrivateKeyAccount, version: Byte, ts: Long): (Block, MicroBlock) = {
+  def customBuildMicroBlockOfTxs(totalRefTo: ByteStr,
+                                 prevTotal: Block,
+                                 txs: Seq[Transaction],
+                                 signer: PrivateKeyAccount,
+                                 version: Byte,
+                                 ts: Long): (Block, MicroBlock) = {
     val newTotalBlock = customBuildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
-    val nonSigned = MicroBlock.buildAndSign(
-      generator = signer,
-      transactionData = txs,
-      prevResBlockSig = prevTotal.uniqueId,
-      totalResBlockSig = newTotalBlock.uniqueId
-    ).explicitGet()
+    val nonSigned = MicroBlock
+      .buildAndSign(
+        generator = signer,
+        transactionData = txs,
+        prevResBlockSig = prevTotal.uniqueId,
+        totalResBlockSig = newTotalBlock.uniqueId
+      )
+      .explicitGet()
     (newTotalBlock, nonSigned)
   }
 
-
-  def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction],
-                           signer: PrivateKeyAccount): (Block, MicroBlock) = {
+  def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: PrivateKeyAccount): (Block, MicroBlock) = {
     val newTotalBlock = buildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs)
-    val nonSigned = MicroBlock.buildAndSign(
-      generator = signer,
-      transactionData = txs,
-      prevResBlockSig = prevTotal.uniqueId,
-      totalResBlockSig = newTotalBlock.uniqueId
-    ).explicitGet()
+    val nonSigned = MicroBlock
+      .buildAndSign(
+        generator = signer,
+        transactionData = txs,
+        prevResBlockSig = prevTotal.uniqueId,
+        totalResBlockSig = newTotalBlock.uniqueId
+      )
+      .explicitGet()
     (newTotalBlock, nonSigned)
   }
 
@@ -93,13 +104,20 @@ package object history {
   def chainBaseAndMicro(totalRefTo: ByteStr, base: Transaction, micros: Seq[Seq[Transaction]]): (Block, Seq[MicroBlock]) =
     chainBaseAndMicro(totalRefTo, Seq(base), micros, defaultSigner, 3, 0L)
 
-  def chainBaseAndMicro(totalRefTo: ByteStr, base: Seq[Transaction], micros: Seq[Seq[Transaction]],
-                        signer: PrivateKeyAccount, version: Byte, timestamp: Long): (Block, Seq[MicroBlock]) = {
+  def chainBaseAndMicro(totalRefTo: ByteStr,
+                        base: Seq[Transaction],
+                        micros: Seq[Seq[Transaction]],
+                        signer: PrivateKeyAccount,
+                        version: Byte,
+                        timestamp: Long): (Block, Seq[MicroBlock]) = {
     val block = customBuildBlockOfTxs(totalRefTo, base, signer, version, timestamp)
-    val microBlocks = micros.foldLeft((block, Seq.empty[MicroBlock])) { case ((lastTotal, allMicros), txs) =>
-      val (newTotal, micro) = customBuildMicroBlockOfTxs(totalRefTo, lastTotal, txs, signer, version, timestamp)
-      (newTotal, allMicros :+ micro)
-    }._2
+    val microBlocks = micros
+      .foldLeft((block, Seq.empty[MicroBlock])) {
+        case ((lastTotal, allMicros), txs) =>
+          val (newTotal, micro) = customBuildMicroBlockOfTxs(totalRefTo, lastTotal, txs, signer, version, timestamp)
+          (newTotal, allMicros :+ micro)
+      }
+      ._2
     (block, microBlocks)
   }
 

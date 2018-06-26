@@ -1,13 +1,12 @@
 package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import org.scalatest.{FlatSpec, Matchers}
 
 class CheckpointsSettingsSpecification extends FlatSpec with Matchers {
   "CheckpointsSettings" should "read values" in {
-    val config = ConfigFactory.parseString(
-      """
+    val config   = ConfigFactory.parseString("""
         |waves {
         |  checkpoints {
         |    public-key: "BASE58PUBKEY"

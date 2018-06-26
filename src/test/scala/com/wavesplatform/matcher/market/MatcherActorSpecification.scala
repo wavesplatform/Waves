@@ -13,17 +13,16 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.LevelAgg
 import com.wavesplatform.settings.WalletSettings
-import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{AssetDescription, ByteStr, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, LeaseBalance, Portfolio}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.AssetId
+import scorex.transaction.assets.IssueTransactionV1
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.transaction.{AssetId, History}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
@@ -40,13 +39,12 @@ class MatcherActorSpecification
     with ScorexLogging
     with PathMockFactory {
 
-  val storedState: SnapshotStateReader = stub[SnapshotStateReader]
+  val blockchain: Blockchain = stub[Blockchain]
 
   val settings = matcherSettings.copy(
     account = MatcherAccount.address,
     balanceWatching = BalanceWatcherWorkerActor.Settings(enable = false, oneAddressProcessingTimeout = 1.second)
   )
-  val history               = stub[History]
   val functionalitySettings = TestFunctionalitySettings.Stub
   val wallet                = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
   wallet.generateNewAccount()
@@ -57,24 +55,24 @@ class MatcherActorSpecification
       case _                   =>
     }
   })
-  var actor: ActorRef = system.actorOf(
-    Props(
-      new MatcherActor(orderHistoryRef, storedState, wallet, mock[UtxPool], mock[ChannelGroup], settings, history, functionalitySettings)
-      with RestartableActor))
+  var actor: ActorRef = system.actorOf(Props(
+    new MatcherActor(orderHistoryRef, wallet, mock[UtxPool], mock[ChannelGroup], settings, blockchain, functionalitySettings) with RestartableActor))
 
-  val i1 = IssueTransaction
+  val i1 = IssueTransactionV1
     .create(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
     .right
     .get
-  val i2 = IssueTransaction
+  val i2 = IssueTransactionV1
     .create(PrivateKeyAccount(Array.empty), "ForbiddenName".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
     .right
     .get
-  (storedState.assetDescription _).when(i2.id()).returns(Some(AssetDescription(i2.sender, "ForbiddenName".getBytes, 8, false, i2.quantity, None)))
-  (storedState.assetDescription _)
+  (blockchain.assetDescription _)
+    .when(i2.id())
+    .returns(Some(AssetDescription(i2.sender, "ForbiddenName".getBytes, "".getBytes, 8, false, i2.quantity, None, 0)))
+  (blockchain.assetDescription _)
     .when(*)
-    .returns(Some(AssetDescription(PublicKeyAccount(Array(0: Byte)), "Unknown".getBytes, 8, false, i1.quantity, None)))
-  (storedState.portfolio _).when(*).returns(Portfolio(Long.MaxValue, LeaseBalance.empty, Map(ByteStr("123".getBytes) -> Long.MaxValue)))
+    .returns(Some(AssetDescription(PublicKeyAccount(Array(0: Byte)), "Unknown".getBytes, "".getBytes, 8, false, i1.quantity, None, 0)))
+  (blockchain.portfolio _).when(*).returns(Portfolio(Long.MaxValue, LeaseBalance.empty, Map(ByteStr("123".getBytes) -> Long.MaxValue)))
 
   override protected def beforeEach() = {
     val tp = TestProbe()
@@ -84,7 +82,7 @@ class MatcherActorSpecification
 
     actor = system.actorOf(
       Props(
-        new MatcherActor(orderHistoryRef, storedState, wallet, mock[UtxPool], mock[ChannelGroup], settings, history, functionalitySettings)
+        new MatcherActor(orderHistoryRef, wallet, mock[UtxPool], mock[ChannelGroup], settings, blockchain, functionalitySettings)
         with RestartableActor))
   }
 

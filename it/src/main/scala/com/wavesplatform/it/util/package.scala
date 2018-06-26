@@ -19,8 +19,6 @@ package object util {
       p.future
     }
 
-    def sleep(term: FiniteDuration): Future[Unit] = schedule(Future.successful(()), term)
-
     def retryUntil[A](f: => Future[A], cond: A => Boolean, retryInterval: FiniteDuration)(implicit ec: ExecutionContext): Future[A] =
       f.flatMap(v => if (cond(v)) Future.successful(v) else schedule(retryUntil(f, cond, retryInterval), retryInterval))
   }

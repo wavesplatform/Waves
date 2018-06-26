@@ -8,7 +8,8 @@ import com.google.common.cache.CacheBuilder
 class ExpirationSet[T <: Object](expirationTimeMilis: Long) extends scala.collection.mutable.Set[T] {
   private val emptyItem = new Object()
 
-  private var inner = CacheBuilder.newBuilder()
+  private var inner = CacheBuilder
+    .newBuilder()
     .expireAfterWrite(expirationTimeMilis, TimeUnit.MILLISECONDS)
     .build[T, Object]()
 

@@ -16,8 +16,7 @@ class Pool[T] {
       val item = queue.dequeue()
       queue.enqueue(item)
       Some(item)
-    }
-    else None
+    } else None
   }
 
   def remove(item: T): Unit = {

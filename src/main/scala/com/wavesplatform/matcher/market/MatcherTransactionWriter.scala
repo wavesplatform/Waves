@@ -6,17 +6,16 @@ import com.wavesplatform.db.{OrderToTxIdsCodec, SubStorage}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.MatcherResponse
 import com.wavesplatform.matcher.model.Events._
-import com.wavesplatform.state2._
+import com.wavesplatform.state._
 import org.iq80.leveldb.DB
 import play.api.libs.json.JsArray
 import scorex.transaction.assets.exchange.ExchangeTransaction
 
-class MatcherTransactionWriter(db: DB, val settings: MatcherSettings)
-  extends SubStorage(db, "matcher") with Actor {
+class MatcherTransactionWriter(db: DB, val settings: MatcherSettings) extends SubStorage(db, "matcher") with Actor {
 
   import MatcherTransactionWriter._
 
-  private val TransactionsPrefix = "transactions".getBytes(Charset)
+  private val TransactionsPrefix  = "transactions".getBytes(Charset)
   private val OrdersToTxIdsPrefix = "ord-to-tx-ids".getBytes(Charset)
 
   override def preStart(): Unit = {
@@ -32,7 +31,9 @@ class MatcherTransactionWriter(db: DB, val settings: MatcherSettings)
 
   def fetchTransactionsByOrder(orderId: String): Unit = {
     val txs = get(makeKey(OrdersToTxIdsPrefix, orderId))
-      .map(OrderToTxIdsCodec.decode).map(_.explicitGet().value).getOrElse(Set())
+      .map(OrderToTxIdsCodec.decode)
+      .map(_.explicitGet().value)
+      .getOrElse(Set())
       .flatMap(id => get(makeKey(TransactionsPrefix, id)))
       .flatMap(b => ExchangeTransaction.parseBytes(b).toOption)
 
@@ -66,7 +67,7 @@ object MatcherTransactionWriter {
   case class GetTransactionsByOrder(orderId: String)
 
   case class GetTransactionsResponse(txs: Seq[ExchangeTransaction]) extends MatcherResponse {
-    val json = JsArray(txs.map(_.json()))
+    val json                      = JsArray(txs.map(_.json()))
     val code: StatusCodes.Success = StatusCodes.OK
   }
 

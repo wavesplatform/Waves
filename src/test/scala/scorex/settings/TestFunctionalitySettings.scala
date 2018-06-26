@@ -1,5 +1,6 @@
 package scorex.settings
 
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
 
 object TestFunctionalitySettings {
@@ -7,13 +8,16 @@ object TestFunctionalitySettings {
     featureCheckBlocksPeriod = 10000,
     blocksForFeatureActivation = 9000,
     allowTemporaryNegativeUntil = 0L,
-    requireSortedTransactionsAfter = 0L, generationBalanceDepthFrom50To1000AfterHeight = 0,
+    requireSortedTransactionsAfter = 0L,
+    generationBalanceDepthFrom50To1000AfterHeight = 0,
     minimalGeneratingBalanceAfter = 0L,
-    allowTransactionsFromFutureUntil = Long.MaxValue, allowUnissuedAssetsUntil = 0L,
+    allowTransactionsFromFutureUntil = Long.MaxValue,
+    allowUnissuedAssetsUntil = 0L,
     allowInvalidReissueInSameBlockUntilTimestamp = 0L,
-    allowMultipleLeaseCancelTransactionUntilTimestamp = 0L, resetEffectiveBalancesAtHeight = 0,
+    allowMultipleLeaseCancelTransactionUntilTimestamp = 0L,
+    resetEffectiveBalancesAtHeight = 0,
     blockVersion3AfterHeight = 0,
-    preActivatedFeatures = Map.empty,
+    preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0),
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue
   )
 

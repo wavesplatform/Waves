@@ -8,10 +8,9 @@ import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
 
-class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDuration)
-  extends ChannelInboundHandlerAdapter with ScorexLogging {
+class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDuration) extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  private var peersRequested = false
+  private var peersRequested  = false
   private var declaredAddress = Option.empty[InetSocketAddress]
 
   def requestPeers(ctx: ChannelHandlerContext): Unit = if (ctx.channel().isActive) {
@@ -28,7 +27,7 @@ class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDu
     msg match {
       case hs: Handshake =>
         val rda = for {
-          rda <- hs.declaredAddress
+          rda        <- hs.declaredAddress
           rdaAddress <- Option(rda.getAddress)
           ctxAddress <- ctx.remoteAddress.map(_.getAddress)
           if rdaAddress == ctxAddress
@@ -67,7 +66,7 @@ object PeerSynchronizer {
 
     override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {
       msg match {
-        case GetPeers =>
+        case GetPeers      =>
         case KnownPeers(_) =>
         case _ =>
           super.channelRead(ctx, msg)

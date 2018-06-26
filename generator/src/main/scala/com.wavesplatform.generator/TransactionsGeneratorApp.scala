@@ -39,7 +39,9 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
     help("help").text("display this help message")
 
     cmd("narrow")
-      .action { (_, c) => c.copy(mode = Mode.NARROW) }
+      .action { (_, c) =>
+        c.copy(mode = Mode.NARROW)
+      }
       .text("Run transactions between pre-defined accounts")
       .children(
         opt[Int]("transactions").abbr("t").optional().text("number of transactions").action { (x, c) =>
@@ -48,7 +50,9 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       )
 
     cmd("wide")
-      .action { (_, c) => c.copy(mode = Mode.WIDE) }
+      .action { (_, c) =>
+        c.copy(mode = Mode.WIDE)
+      }
       .text("Run transactions those transfer funds to another accounts")
       .children(
         opt[Int]("transactions").abbr("t").optional().text("number of transactions").action { (x, c) =>
@@ -60,7 +64,9 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       )
 
     cmd("dyn-wide")
-      .action { (_, c) => c.copy(mode = Mode.DYN_WIDE) }
+      .action { (_, c) =>
+        c.copy(mode = Mode.DYN_WIDE)
+      }
       .text("Like wide, but the number of transactions is changed during the iteration")
       .children(
         opt[Int]("start").abbr("s").optional().text("initial amount of transactions").action { (x, c) =>
@@ -89,12 +95,12 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       }
 
       val generator: TransactionGenerator = finalConfig.mode match {
-        case Mode.NARROW => new NarrowTransactionGenerator(finalConfig.narrow, finalConfig.privateKeyAccounts)
-        case Mode.WIDE => new WideTransactionGenerator(finalConfig.wide, finalConfig.privateKeyAccounts)
+        case Mode.NARROW   => new NarrowTransactionGenerator(finalConfig.narrow, finalConfig.privateKeyAccounts)
+        case Mode.WIDE     => new WideTransactionGenerator(finalConfig.wide, finalConfig.privateKeyAccounts)
         case Mode.DYN_WIDE => new DynamicWideTransactionGenerator(finalConfig.dynWide, finalConfig.privateKeyAccounts)
       }
 
-      val threadPool = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
+      val threadPool                            = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(threadPool)
 
       val sender = new NetworkSender(finalConfig.addressScheme, "generator", nonce = Random.nextLong())

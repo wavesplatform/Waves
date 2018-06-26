@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.crypto
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 
 trait FastHashId extends ProvenTransaction {

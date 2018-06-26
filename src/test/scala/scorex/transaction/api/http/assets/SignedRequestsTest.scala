@@ -5,7 +5,6 @@ import play.api.libs.json.Json
 import scorex.api.http.assets._
 import scorex.crypto.encode.Base58
 
-
 class SignedRequestsTest extends FunSuite with Matchers {
 
   test("AssetIssueRequest json parsing works") {
@@ -23,7 +22,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
           "fee": 100000
         }
       """
-    val req = Json.parse(json).validate[SignedIssueRequest].get
+    val req = Json.parse(json).validate[SignedIssueV1Request].get
     req.name shouldBe "string"
     req.quantity shouldBe 100000L
     req.fee shouldBe 100000L
@@ -54,7 +53,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
         |"signature":"4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
         |}
       """.stripMargin
-    val req = Json.parse(json).validate[SignedReissueRequest].get
+    val req = Json.parse(json).validate[SignedReissueV1Request].get
     req.assetId shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
     req.signature shouldBe "4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
     req.fee shouldBe 100000L
@@ -86,7 +85,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
         |   "attachment":"A"
         |}
       """.stripMargin
-    val req = Json.parse(json).validate[SignedTransferRequest].get
+    val req = Json.parse(json).validate[SignedTransferV1Request].get
     req.recipient shouldBe "3Myss6gmMckKYtka3cKCM563TBJofnxvfD7"
     req.timestamp shouldBe 1479462208828L
     req.assetId shouldBe Some("GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u")
@@ -121,7 +120,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
         |   "attachment":"2Kk7Zsr1e9jsqSBM5hpF"
         |}
       """.stripMargin
-    val req = Json.parse(json).validate[SignedTransferRequest].get
+    val req = Json.parse(json).validate[SignedTransferV1Request].get
     req.recipient shouldBe "3N9UuGeWuDt9NfWbC5oEACHyRoeEMApXAeq"
     req.timestamp shouldBe 1489054107569L
     req.assetId shouldBe Some("6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL")
@@ -154,7 +153,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
         |"signature":"H3F8gAsKYeJAPmxCagLaCHycqkr8KiYvzJ4dhophZs31Unmg3dLwVK5k1v1M2Z5zLuQySthpf3DeEyhL6cdpbqp"
         |}
       """.stripMargin
-    val req = Json.parse(json).validate[SignedBurnRequest].get
+    val req = Json.parse(json).validate[SignedBurnV1Request].get
     req.senderPublicKey shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
     req.signature shouldBe "H3F8gAsKYeJAPmxCagLaCHycqkr8KiYvzJ4dhophZs31Unmg3dLwVK5k1v1M2Z5zLuQySthpf3DeEyhL6cdpbqp"
     req.fee shouldBe 100000000L

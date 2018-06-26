@@ -1,22 +1,18 @@
 package scorex.api.http
 
 import cats.implicits._
-import com.wavesplatform.state2.DataEntry
+import com.wavesplatform.state.DataEntry
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
 import scorex.transaction.{DataTransaction, Proofs, ValidationError}
 
 object DataRequest {
-  implicit val unsignedReads = Json.reads[DataRequest]
-  implicit val signedReads = Json.reads[SignedDataRequest]
+  implicit val unsignedDataRequestReads = Json.reads[DataRequest]
+  implicit val signedDataRequestReads   = Json.reads[SignedDataRequest]
 }
 
-case class DataRequest(version: Byte,
-                       sender: String,
-                       data: List[DataEntry[_]],
-                       fee: Long,
-                       timestamp: Option[Long] = None)
+case class DataRequest(version: Byte, sender: String, data: List[DataEntry[_]], fee: Long, timestamp: Option[Long] = None)
 
 @ApiModel(value = "Signed Data transaction")
 case class SignedDataRequest(@ApiModelProperty(required = true)
@@ -30,11 +26,13 @@ case class SignedDataRequest(@ApiModelProperty(required = true)
                              @ApiModelProperty(required = true)
                              timestamp: Long,
                              @ApiModelProperty(required = true)
-                             proofs: List[String]) extends BroadcastRequest {
-  def toTx: Either[ValidationError, DataTransaction] = for {
-    _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
-    _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
-    _proofs <- Proofs.create(_proofBytes)
-    t <- DataTransaction.create(version, _sender, data, fee, timestamp, _proofs)
-  } yield t
+                             proofs: List[String])
+    extends BroadcastRequest {
+  def toTx: Either[ValidationError, DataTransaction] =
+    for {
+      _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
+      _proofs     <- Proofs.create(_proofBytes)
+      t           <- DataTransaction.create(version, _sender, data, fee, timestamp, _proofs)
+    } yield t
 }

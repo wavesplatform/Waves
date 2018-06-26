@@ -1,88 +1,72 @@
 package scorex.transaction
 
-import com.wavesplatform.utils.base58Length
-import scorex.transaction.assets._
-import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.smart.SetScriptTransaction
+import scala.reflect.ClassTag
+import scala.util.Try
 
-import scala.util.{Failure, Try}
+trait TransactionParser {
+  type TransactionT <: Transaction
+  def classTag: ClassTag[TransactionT]
 
-object TransactionParser {
+  def typeId: Byte
+  def supportedVersions: Set[Byte]
 
-  object TransactionType extends Enumeration {
-    val GenesisTransaction = Value(1)
-    val PaymentTransaction = Value(2)
-    val IssueTransaction = Value(3)
-    val TransferTransaction = Value(4)
-    val ReissueTransaction = Value(5)
-    val BurnTransaction = Value(6)
-    val ExchangeTransaction = Value(7)
-    val LeaseTransaction = Value(8)
-    val LeaseCancelTransaction = Value(9)
-    val CreateAliasTransaction = Value(10)
-    val MassTransferTransaction = Value(11)
-    val DataTransaction = Value(12)
-    val SetScriptTransaction = Value(13)
-    val VersionedTransferTransaction = Value(14)
-    val SmartIssueTransaction = Value(15)
+  def parseBytes(bytes: Array[Byte]): Try[TransactionT] = parseHeader(bytes).flatMap {
+    case (version, offset) =>
+      parseTail(version, bytes.drop(offset))
   }
 
-  val TimestampLength = 8
-  val AmountLength = 8
-  val TypeLength = 1
-  val SignatureLength = 64
-  val SignatureStringLength: Int = base58Length(SignatureLength)
-  val KeyLength = 32
-  val KeyStringLength: Int = base58Length(KeyLength)
+  /**
+    * @return (version, offset)
+    */
+  protected def parseHeader(bytes: Array[Byte]): Try[(Byte, Int)]
+  protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT]
+}
 
-  def parseBytes(data: Array[Byte]): Try[Transaction] =
-    data.head match {
-      case txType: Byte if txType == TransactionType.GenesisTransaction.id =>
-        GenesisTransaction.parseTail(data.tail)
+object TransactionParser {
+  trait HardcodedVersion1 extends TransactionParser {
+    override val supportedVersions: Set[Byte] = Set(1)
 
-      case txType: Byte if txType == TransactionType.PaymentTransaction.id =>
-        PaymentTransaction.parseTail(data.tail)
+    override protected def parseHeader(bytes: Array[Byte]): Try[(Byte, Int)] = Try {
+      if (bytes.length < 1) throw new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements")
 
-      case txType: Byte if txType == TransactionType.IssueTransaction.id =>
-        IssueTransaction.parseTail(data.tail)
-
-      case txType: Byte if txType == TransactionType.TransferTransaction.id =>
-        TransferTransaction.parseTail(data.tail)
-
-      case txType: Byte if txType == TransactionType.ReissueTransaction.id =>
-        ReissueTransaction.parseTail(data.tail)
-
-      case txType: Byte if txType == TransactionType.BurnTransaction.id =>
-        BurnTransaction.parseTail(data.tail)
-
-      case txType: Byte if txType == TransactionType.ExchangeTransaction.id =>
-        ExchangeTransaction.parseTail(data.tail)
-
-      case txType: Byte if txType == TransactionType.LeaseTransaction.id =>
-        LeaseTransaction.parseTail(data.tail)
-
-      case txType: Byte if txType == TransactionType.LeaseCancelTransaction.id =>
-        LeaseCancelTransaction.parseTail(data.tail)
-
-      case txType: Byte if txType == TransactionType.CreateAliasTransaction.id =>
-        CreateAliasTransaction.parseTail(data.tail)
-
-      case txType: Byte if txType == TransactionType.MassTransferTransaction.id =>
-        MassTransferTransaction.parseTail(data.tail)
-
-      case txType: Byte if txType == TransactionType.SetScriptTransaction.id =>
-        SetScriptTransaction.parseTail(data.tail)
-
-      case txType: Byte if txType == TransactionType.VersionedTransferTransaction.id =>
-        VersionedTransferTransaction.parseTail(data.tail)
-
-      case txType: Byte if txType == TransactionType.SmartIssueTransaction.id =>
-        SmartIssueTransaction.parseTail(data.tail)
-
-      case txType: Byte if txType == TransactionType.DataTransaction.id =>
-        DataTransaction.parseTail(data.tail)
-
-      case txType => Failure(new Exception(s"Invalid transaction type: $txType"))
+      val parsedTypeId = bytes.head
+      if (parsedTypeId != typeId) throw new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'")
+      (1, 1)
     }
+  }
+
+  trait OneVersion extends TransactionParser {
+    def version: Byte
+    override def supportedVersions: Set[Byte] = Set(version)
+
+    override protected def parseHeader(bytes: Array[Byte]): Try[(Byte, Int)] = Try {
+      if (bytes.length < 2) throw new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements")
+
+      val Array(parsedTypeId, parsedVersion) = bytes.take(2)
+      if (parsedTypeId != typeId) throw new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'")
+      if (!supportedVersions.contains(parsedVersion))
+        throw new IllegalArgumentException(s"Expected version of transaction: $version, but got '$parsedVersion'")
+
+      (parsedVersion, 2)
+    }
+  }
+
+  trait MultipleVersions extends TransactionParser {
+    override protected def parseHeader(bytes: Array[Byte]): Try[(Byte, Int)] = Try {
+      if (bytes.length < 3) throw new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements")
+
+      val Array(parsedMark, parsedTypeId, parsedVersion) = bytes.take(3)
+      if (parsedMark != 0) throw new IllegalArgumentException(s"Expected the '0' byte, but got '$parsedMark'")
+      if (parsedTypeId != typeId) throw new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'")
+      if (!supportedVersions.contains(parsedVersion))
+        throw new IllegalArgumentException(s"Expected version of transaction ${supportedVersions.mkString(", ")}, but got '$parsedVersion'")
+
+      (parsedVersion, 3)
+    }
+  }
+
+}
+
+abstract class TransactionParserFor[T <: Transaction](implicit override val classTag: ClassTag[T]) extends TransactionParser {
+  override type TransactionT = T
 }

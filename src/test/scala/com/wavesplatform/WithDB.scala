@@ -9,7 +9,6 @@ import org.scalatest.{BeforeAndAfterEach, TestSuite}
 
 import scala.reflect.io.Path
 
-
 trait WithDB extends BeforeAndAfterEach {
   this: TestSuite =>
 
@@ -32,8 +31,8 @@ trait WithDB extends BeforeAndAfterEach {
   }
 
   private def createDB: (DB, Path) = {
-    val dir = Files.createTempDirectory("lvl").toAbsolutePath.toString
-    val path = Path(dir)
+    val dir     = Files.createTempDirectory("lvl").toAbsolutePath.toString
+    val path    = Path(dir)
     val options = new Options()
     options.createIfMissing(true)
     val db = LevelDBFactory.factory.open(new File(dir), options)

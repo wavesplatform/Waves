@@ -1,8 +1,9 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.ctx.PredefFunction
+import com.wavesplatform.lang.v1.Terms
+import com.wavesplatform.lang.v1.ctx.PredefFunction
 import org.scalacheck.Shrink
-import org.scalatest.matchers.{Matcher, MatchResult}
+import org.scalatest.matchers.{MatchResult, Matcher}
 
 import scala.util.{Left, Right, Try}
 
@@ -27,8 +28,8 @@ object Common {
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
-  val multiplierFunction: PredefFunction = PredefFunction("MULTIPLY", Terms.LONG, List(("x1", Terms.LONG), ("x2", Terms.LONG))) {
+  val multiplierFunction: PredefFunction = PredefFunction("MULTIPLY", 1, Terms.LONG, List(("x1", Terms.LONG), ("x2", Terms.LONG))) {
     case (x1: Long) :: (x2: Long) :: Nil => Try(x1 * x2).toEither.left.map(_.toString)
-    case _                             => ??? // suppress pattern match warning
+    case _                               => ??? // suppress pattern match warning
   }
 }

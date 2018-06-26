@@ -1,15 +1,17 @@
 package com.wavesplatform.it.async
 
+import com.wavesplatform.crypto
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.state2.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry}
+import com.wavesplatform.state._
 import org.asynchttpclient.util.HttpConstants
-import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
-import scorex.api.http.assets.MassTransferRequest
+import play.api.libs.json._
+import scorex.account.PrivateKeyAccount
+import scorex.api.http.assets.{MassTransferRequest, SignedTransferV1Request}
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.MassTransferTransaction.Transfer
+import scorex.transaction.transfer.MassTransferTransaction.Transfer
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -21,7 +23,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
   test("height should always be reported for transactions") {
     val f = for {
       txId <- sender.transfer(firstAddress, secondAddress, 1.waves, fee = 1.waves).map(_.id)
-      _    <- nodes.waitForHeightAraiseAndTxPresent(txId)
+      _    <- nodes.waitForHeightAriseAndTxPresent(txId)
 
       jsv1 <- sender.get(s"/transactions/info/$txId").as[JsValue]
       hasPositiveHeight1 = (jsv1 \ "height").asOpt[Int].map(_ > 0)
@@ -36,14 +38,14 @@ class TransactionsApiSuite extends BaseTransactionSuite {
   }
 
   test("/transactions/sign should handle erroneous input") {
-    def assertSignBadJson(json: JsObject) =
-      assertBadRequestAndMessage(sender.postJsonWithApiKey("/transactions/sign", json), "failed to parse json message")
+    def assertSignBadJson(json: JsObject, expectedMessage: String) =
+      assertBadRequestAndMessage(sender.postJsonWithApiKey("/transactions/sign", json), expectedMessage)
 
     val json = Json.obj("type" -> 10, "sender" -> firstAddress, "alias" -> "alias", "fee" -> 100000)
     val f = for {
-      _ <- assertSignBadJson(json - "type")
-      _ <- assertSignBadJson(json + ("type" -> Json.toJson(-100)))
-      _ <- assertSignBadJson(json - "alias")
+      _ <- assertSignBadJson(json - "type", "failed to parse json message")
+      _ <- assertSignBadJson(json + ("type" -> Json.toJson(-100)), "Bad transaction type")
+      _ <- assertSignBadJson(json - "alias", "failed to parse json message")
     } yield succeed
 
     Await.result(f, timeout)
@@ -76,7 +78,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
     )
     val f = for {
       _ <- assertBroadcastBadJson(json - "type", "failed to parse json message")
-      _ <- assertBroadcastBadJson(json - "type" + ("type" -> Json.toJson(88)), "failed to parse json message")
+      _ <- assertBroadcastBadJson(json - "type" + ("type" -> Json.toJson(88)), "Bad transaction type")
       _ <- assertBroadcastBadJson(json - "alias", "failed to parse json message")
       _ <- assertBroadcastBadJson(json, "invalid signature")
     } yield succeed
@@ -153,13 +155,75 @@ class TransactionsApiSuite extends BaseTransactionSuite {
         "type"    -> 12,
         "version" -> 1,
         "sender"  -> firstAddress,
-        "data" -> List(IntegerDataEntry("int", 923275292849183L),
+        "data" -> List(LongDataEntry("int", 923275292849183L),
                        BooleanDataEntry("bool", true),
-                       BinaryDataEntry("blob", Array.tabulate(445)(_.toByte))),
+                       BinaryDataEntry("blob", ByteStr(Array.tabulate(445)(_.toByte)))),
         "fee" -> 100000
       ),
       usesProofs = true
     )
+  }
+
+  test("/transactions/sign should produce sponsor transactions that are good for /transactions/broadcast") {
+    val assetId = signAndBroadcast(
+      Json.obj(
+        "type"        -> 3,
+        "name"        -> "Sponsored Coin",
+        "quantity"    -> 100.waves,
+        "description" -> "Sponsored Coin",
+        "sender"      -> firstAddress,
+        "decimals"    -> 2,
+        "reissuable"  -> false,
+        "fee"         -> 1.waves
+      ))
+
+    signAndBroadcast(
+      Json.obj(
+        "type"                 -> 14,
+        "version"              -> 1,
+        "sender"               -> firstAddress,
+        "assetId"              -> assetId,
+        "minSponsoredAssetFee" -> 100,
+        "fee"                  -> 1.waves
+      ),
+      usesProofs = true
+    )
+
+    signAndBroadcast(
+      Json.obj(
+        "type"                 -> 14,
+        "version"              -> 1,
+        "sender"               -> firstAddress,
+        "assetId"              -> assetId,
+        "minSponsoredAssetFee" -> JsNull,
+        "fee"                  -> 1.waves
+      ),
+      usesProofs = true
+    )
+  }
+
+  test("/transactions/sign/{signerAddress} should sign a transaction by key of signerAddress") {
+    val json = Json.obj(
+      "type"      -> 4,
+      "sender"    -> firstAddress,
+      "recipient" -> secondAddress,
+      "fee"       -> 100000,
+      "amount"    -> 1.waves
+    )
+
+    val f = for {
+      signedRequestResponse <- sender.postJsonWithApiKey(s"/transactions/sign/$thirdAddress", json)
+      seed                  <- sender.seed(thirdAddress)
+    } yield {
+      assert(signedRequestResponse.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
+      val signedRequestJson = Json.parse(signedRequestResponse.getResponseBody)
+      val signature         = Base58.decode((signedRequestJson \ "signature").as[String]).get
+      val tx                = signedRequestJson.as[SignedTransferV1Request].toTx.explicitGet()
+      val privateKey        = PrivateKeyAccount.fromSeed(seed).explicitGet()
+      assert(crypto.verify(signature, tx.bodyBytes(), privateKey.publicKey))
+    }
+
+    Await.result(f, timeout)
   }
 
   private def signAndBroadcast(json: JsObject, usesProofs: Boolean = false): String = {
@@ -176,7 +240,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       _  = assert(rb.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
       id = (Json.parse(rb.getResponseBody) \ "id").as[String]
       _  = assert(id.nonEmpty)
-      _ <- nodes.waitForHeightAraiseAndTxPresent(id)
+      _ <- nodes.waitForHeightAriseAndTxPresent(id)
     } yield id
 
     Await.result(f, timeout)
@@ -186,28 +250,31 @@ class TransactionsApiSuite extends BaseTransactionSuite {
     json.validate[Seq[JsObject]].getOrElse(Seq.empty[JsValue]).filter(_("type").as[Int] == t)
 
   test("reporting MassTransfer transactions") {
-    implicit val mtFormat = Json.format[MassTransferRequest]
+    implicit val mtFormat: Format[MassTransferRequest] = Json.format[MassTransferRequest]
 
     val transfers = List(Transfer(firstAddress, 5.waves), Transfer(secondAddress, 2.waves), Transfer(thirdAddress, 3.waves))
     val f = for {
-      txId <- sender.massTransfer(firstAddress, transfers, 250000).map(_.id)
-      _    <- nodes.waitForHeightAraiseAndTxPresent(txId)
+      txId <- sender.massTransfer(firstAddress, transfers, 300000).map(_.id)
+      _    <- nodes.waitForHeightAriseAndTxPresent(txId)
 
       // /transactions/txInfo should return complete list of transfers
       txInfo <- sender.get(s"/transactions/info/$txId").as[MassTransferRequest]
       _ = assert(txInfo.transfers.size == 3)
 
       // /transactions/address should return complete transfers list for the sender...
-      txSender <- sender.get(s"/transactions/address/$firstAddress/limit/1").as[JsArray].map(js => extractTransactionByType(js.apply(0), 11).head)
+      txSender <- sender.get(s"/transactions/address/$firstAddress/limit/10").as[JsArray].map(js => extractTransactionByType(js.apply(0), 11).head)
       _                   = assert(txSender.as[MassTransferRequest].transfers.size == 3)
       _                   = assert((txSender \ "transferCount").as[Int] == 3)
       _                   = assert((txSender \ "totalAmount").as[Long] == 10.waves)
       transfersAfterTrans = txSender.as[MassTransferRequest].transfers
 
-      _ = assert((transfers.equals(transfersAfterTrans)))
+      _ = assert(transfers.equals(transfersAfterTrans))
 
       // ...and compact list for recipients
-      txRecipient <- sender.get(s"/transactions/address/$secondAddress/limit/1").as[JsArray].map(js => extractTransactionByType(js.apply(0), 11).head)
+      txRecipient <- sender
+        .get(s"/transactions/address/$secondAddress/limit/10")
+        .as[JsArray]
+        .map(js => extractTransactionByType(js.apply(0), 11).head)
       _                = assert(txRecipient.as[MassTransferRequest].transfers.size == 1)
       _                = assert((txRecipient \ "transferCount").as[Int] == 3)
       _                = assert((txRecipient \ "totalAmount").as[Long] == 10.waves)

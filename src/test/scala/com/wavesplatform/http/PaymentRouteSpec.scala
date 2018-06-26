@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.state2.Diff
+import com.wavesplatform.state.Diff
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestWallet, TransactionGen}
 import io.netty.channel.group.ChannelGroup
@@ -10,11 +10,11 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, Json}
 import scorex.api.http.{ApiKeyNotValid, PaymentApiRoute}
 import scorex.transaction.Transaction
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.transfer._
 import scorex.utils.Time
 
 class PaymentRouteSpec
-  extends RouteSpec("/payment")
+    extends RouteSpec("/payment")
     with MockFactory
     with PropertyChecks
     with RestAPISettingsHelper
@@ -29,7 +29,6 @@ class PaymentRouteSpec
   "accepts payments" in {
     forAll(accountOrAliasGen.label("recipient"), positiveLongGen.label("amount"), smallFeeGen.label("fee")) {
       case (recipient, amount, fee) =>
-
         val timestamp = System.currentTimeMillis()
 
         val time = new Time {
@@ -39,7 +38,7 @@ class PaymentRouteSpec
         }
 
         val sender = testWallet.privateKeyAccounts.head
-        val tx = TransferTransaction.create(None, sender, recipient, amount, timestamp, None, fee, Array())
+        val tx     = TransferTransactionV1.create(None, sender, recipient, amount, timestamp, None, fee, Array())
 
         val route = PaymentApiRoute(restAPISettings, testWallet, utx, allChannels, time).route
 

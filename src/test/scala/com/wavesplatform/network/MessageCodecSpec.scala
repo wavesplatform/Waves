@@ -8,30 +8,26 @@ import io.netty.channel.embedded.EmbeddedChannel
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.IssueTransactionV1
 import scorex.transaction.{SignedTransaction, Transaction}
 
-class MessageCodecSpec extends FreeSpec
-  with Matchers
-  with MockFactory
-  with PropertyChecks
-  with TransactionGen {
+class MessageCodecSpec extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen {
 
   "should block a sender of invalid messages" in {
     val codec = new SpiedMessageCodec
-    val ch = new EmbeddedChannel(codec)
+    val ch    = new EmbeddedChannel(codec)
 
     ch.writeInbound(RawBytes(TransactionSpec.messageCode, "foo".getBytes(StandardCharsets.UTF_8)))
-    ch.readInbound[IssueTransaction]()
+    ch.readInbound[IssueTransactionV1]()
 
     codec.blockCalls shouldBe 1
   }
 
-  "should not block a sender of valid messages" in forAll(randomTransactionGen) { origTx : SignedTransaction =>
+  "should not block a sender of valid messages" in forAll(randomTransactionGen) { origTx: SignedTransaction =>
     val codec = new SpiedMessageCodec
-    val ch = new EmbeddedChannel(codec)
+    val ch    = new EmbeddedChannel(codec)
 
-    ch.writeInbound(RawBytes(TransactionSpec.messageCode, origTx.bytes()))
+    ch.writeInbound(RawBytes.from(origTx))
     val decodedTx = ch.readInbound[Transaction]()
 
     decodedTx shouldBe origTx

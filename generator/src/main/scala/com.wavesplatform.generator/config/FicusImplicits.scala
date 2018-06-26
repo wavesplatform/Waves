@@ -6,7 +6,7 @@ import com.google.common.base.CaseFormat
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.{CollectionReaders, ValueReader}
-import scorex.transaction.TransactionParser.TransactionType
+import scorex.transaction.{TransactionParser, TransactionParsers}
 
 trait FicusImplicits {
   implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = { (config: Config, path: String) =>
@@ -16,9 +16,9 @@ trait FicusImplicits {
     )
   }
 
-  implicit val distributionsReader: ValueReader[Map[TransactionType.Value, Double]] = {
-    val converter = CaseFormat.LOWER_HYPHEN.converterTo(CaseFormat.UPPER_CAMEL)
-    def toTxType(key: String): TransactionType.Value = TransactionType.withName(s"${converter.convert(key)}Transaction")
+  implicit val distributionsReader: ValueReader[Map[TransactionParser, Double]] = {
+    val converter                                = CaseFormat.LOWER_HYPHEN.converterTo(CaseFormat.UPPER_CAMEL)
+    def toTxType(key: String): TransactionParser = TransactionParsers.by(s"${converter.convert(key)}Transaction").get
 
     CollectionReaders.mapValueReader[Double].map { xs =>
       xs.map { case (k, v) => toTxType(k) -> v }

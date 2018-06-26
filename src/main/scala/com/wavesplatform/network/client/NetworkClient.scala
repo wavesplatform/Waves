@@ -15,18 +15,17 @@ import scorex.utils.ScorexLogging
 
 import scala.concurrent.{Future, Promise}
 
-class NetworkClient(chainId: Char,
-                    nodeName: String,
-                    nonce: Long,
-                    allChannels: ChannelGroup) extends ScorexLogging {
+class NetworkClient(chainId: Char, nodeName: String, nonce: Long, allChannels: ChannelGroup) extends ScorexLogging {
 
   private val workerGroup = new NioEventLoopGroup()
-  private val handshake = Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, nodeName, nonce, None)
+  private val handshake   = Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, nodeName, nonce, None)
 
   def connect(remoteAddress: InetSocketAddress): Future[Channel] = {
     val p = Promise[Channel]
 
-    val bootstrap = new Bootstrap().group(workerGroup).channel(classOf[NioSocketChannel])
+    val bootstrap = new Bootstrap()
+      .group(workerGroup)
+      .channel(classOf[NioSocketChannel])
       .handler(new LegacyChannelInitializer(handshake, p))
 
     log.debug(s"Connecting to $remoteAddress")
@@ -50,10 +49,11 @@ class NetworkClient(chainId: Char,
     p.future
   }
 
-  def shutdown(): Unit = try {
-    allChannels.close().await()
-    log.debug("Closed all channels")
-  } finally {
-    workerGroup.shutdownGracefully()
-  }
+  def shutdown(): Unit =
+    try {
+      allChannels.close().await()
+      log.debug("Closed all channels")
+    } finally {
+      workerGroup.shutdownGracefully()
+    }
 }

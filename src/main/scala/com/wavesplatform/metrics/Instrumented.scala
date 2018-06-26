@@ -52,9 +52,16 @@ trait Instrumented {
 object Instrumented {
 
   def withTime[R](f: => R): (R, Long) = {
-    val t0 = System.currentTimeMillis()
+    val t0   = System.currentTimeMillis()
     val r: R = f
-    val t1 = System.currentTimeMillis()
+    val t1   = System.currentTimeMillis()
     (r, t1 - t0)
   }
+
+  def measure[R](h: Histogram)(f: => R): R = {
+    val (r, time) = withTime(f)
+    h.record(time)
+    r
+  }
+
 }

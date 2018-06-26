@@ -83,13 +83,12 @@ class BlockHeadersTestSuite
 
   "lastBlock content should be equal to lastBlockHeader, except transactions info" in {
     val f = for {
-      baseHeight    <- traverse(nodes)(_.height).map(_.max)
-      _             <- txRequestsGen(30, 2.waves)
-      _             <- traverse(nodes)(_.waitForHeight(baseHeight + 1))
-      blocks        <- traverse(nodes)(_.lastBlock)
-      blocksHeaders <- traverse(nodes)(_.lastBlockHeaders)
+      baseHeight             <- traverse(nodes)(_.height).map(_.max)
+      _                      <- txRequestsGen(30, 2.waves)
+      _                      <- traverse(nodes)(_.waitForHeight(baseHeight + 1))
+      blocksAndBlocksHeaders <- traverse(nodes)(b => (b.lastBlock zip b.lastBlockHeaders))
     } yield {
-      assertBlockInfo(blocks, blocksHeaders)
+      assertBlockInfo(blocksAndBlocksHeaders.map(_._1), blocksAndBlocksHeaders.map(_._2))
     }
 
     Await.result(f, 2.minute)
@@ -99,7 +98,7 @@ class BlockHeadersTestSuite
     val f = for {
       baseHeight   <- traverse(nodes)(_.height).map(_.max)
       _            <- txRequestsGen(30, 2.waves)
-      _            <- nodes.waitForSameBlocksAt(3.seconds, baseHeight + 3)
+      _            <- nodes.waitForSameBlocksAt(baseHeight + 3)
       blocks       <- nodes.head.blockSeq(baseHeight + 1, baseHeight + 3)
       blockHeaders <- nodes.head.blockHeadersSeq(baseHeight + 1, baseHeight + 3)
     } yield {

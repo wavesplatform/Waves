@@ -1,15 +1,12 @@
 package scorex.transaction
 
-import com.wavesplatform.settings.FeesSettings
-import com.wavesplatform.state2.ByteStr
-import scorex.transaction.TransactionParser.TransactionType
+import com.wavesplatform.settings.{FeesSettings, FunctionalitySettings}
+import com.wavesplatform.state._
+import scorex.transaction.FeeCalculator._
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.MassTransferTransaction
+import scorex.transaction.transfer._
 
-/**
-  * Class to check, that transaction contains enough fee to put it to UTX pool
-  */
-class FeeCalculator(settings: FeesSettings) {
+class FeeCalculator(settings: FeesSettings, blockchain: Blockchain) {
 
   private val Kb = 1024
 
@@ -18,40 +15,51 @@ class FeeCalculator(settings: FeesSettings) {
       val transactionType = fs._1
       fs._2.map { v =>
         val maybeAsset = if (v.asset.toUpperCase == "WAVES") None else ByteStr.decodeBase58(v.asset).toOption
-        val fee = v.fee
+        val fee        = v.fee
 
         TransactionAssetFee(transactionType, maybeAsset).key -> fee
       }
     }
   }
 
-  def enoughFee[T <: Transaction](tx: T): Either[ValidationError, T] = {
-    val feeSpec = map.get(TransactionAssetFee(tx.transactionType.id, tx.assetFee._1).key)
-    val feeValue = tx match {
-      case dt: DataTransaction =>
-        val sizeInKb = 1 + (dt.bytes().length - 1) / Kb
-        feeSpec.map(_ * sizeInKb)
-      case mtt: MassTransferTransaction =>
-        val transferFeeSpec = map.get(TransactionAssetFee(TransactionType.TransferTransaction.id, tx.assetFee._1).key)
-        feeSpec.flatMap(mfee => transferFeeSpec.map(tfee => tfee + mfee * mtt.transfers.size))
-      case _ => feeSpec
-    }
+  def enoughFee[T <: Transaction](tx: T, blockchain: Blockchain, fs: FunctionalitySettings): Either[ValidationError, T] =
+    if (blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) Right(tx)
+    else enoughFee(tx)
 
-    feeValue match {
-      case Some(minimumFee) =>
-        if (minimumFee <= tx.assetFee._2) {
-          Right(tx)
-        } else {
-          Left(GenericError(s"Fee in ${tx.assetFee._1.fold("WAVES")(_.toString)} for ${tx.transactionType} transaction does not exceed minimal value of $minimumFee"))
+  def enoughFee[T <: Transaction](tx: T): Either[ValidationError, T] = {
+    val (txFeeAssetId, txFeeValue) = tx.assetFee
+    val txAssetFeeKey              = TransactionAssetFee(tx.builder.typeId, txFeeAssetId).key
+    for {
+      txMinBaseFee <- Either.cond(map.contains(txAssetFeeKey), map(txAssetFeeKey), GenericError(s"Minimum fee is not defined for $txAssetFeeKey"))
+      minTxFee = minFeeFor(tx, txFeeAssetId, txMinBaseFee)
+      _ <- Either.cond(
+        txFeeValue >= minTxFee,
+        (),
+        GenericError {
+          s"Fee in ${txFeeAssetId.fold("WAVES")(_.toString)} for ${tx.builder.classTag} transaction does not exceed minimal value of $minTxFee"
         }
-      case None =>
-        Left(GenericError(s"Minimum fee is not defined for ${TransactionAssetFee(tx.transactionType.id, tx.assetFee._1).key}"))
-    }
+      )
+    } yield tx
+  }
+
+  private def minFeeFor(tx: Transaction, txFeeAssetId: Option[AssetId], txMinBaseFee: Long): Long = tx match {
+    case tx: DataTransaction =>
+      val sizeInKb = 1 + (tx.bytes().length - 1) / Kb
+      txMinBaseFee * sizeInKb
+    case tx: MassTransferTransaction =>
+      val transferFeeSpec = map.getOrElse(
+        TransactionAssetFee(TransferTransactionV1.typeId, txFeeAssetId).key,
+        throw new IllegalStateException("Can't find spec for TransferTransaction")
+      )
+      transferFeeSpec + txMinBaseFee * tx.transfers.size
+    case _ => txMinBaseFee
   }
 }
 
-case class TransactionAssetFee(txType: Int, assetId: Option[AssetId]) {
+object FeeCalculator {
 
-  val key = s"TransactionAssetFee($txType, ${assetId.map(_.base58)})"
+  private case class TransactionAssetFee(txType: Int, assetId: Option[AssetId]) {
+    val key = s"TransactionAssetFee($txType, ${assetId.map(_.base58)})"
+  }
 
 }

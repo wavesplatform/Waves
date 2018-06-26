@@ -4,7 +4,7 @@ import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util._
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
-import scorex.transaction.TransactionParser.TransactionType
+import scorex.transaction.transfer._
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -12,18 +12,24 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers with ScalaFutures
-  with IntegrationPatience with RecoverMethods with IntegrationTestsScheme
-  with Nodes with ScorexLogging {
+trait IntegrationSuiteWithThreeAddresses
+    extends BeforeAndAfterAll
+    with Matchers
+    with ScalaFutures
+    with IntegrationPatience
+    with RecoverMethods
+    with IntegrationTestsScheme
+    with Nodes
+    with ScorexLogging {
   this: Suite =>
 
   def notMiner: Node
 
   protected def sender: Node = notMiner
 
-  protected lazy val firstAddress: String = Await.result(sender.createAddress, 2.minutes)
+  protected lazy val firstAddress: String  = Await.result(sender.createAddress, 2.minutes)
   protected lazy val secondAddress: String = Await.result(sender.createAddress, 2.minutes)
-  protected lazy val thirdAddress: String = Await.result(sender.createAddress, 2.minutes)
+  protected lazy val thirdAddress: String  = Await.result(sender.createAddress, 2.minutes)
 
   abstract protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -37,14 +43,14 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
         }
         .map { info =>
           val formatted = info
-            .map { case (account, (balance, effectiveBalance)) =>
-              f"$account: balance = $balance, effective = $effectiveBalance"
+            .map {
+              case (account, (balance, effectiveBalance)) =>
+                f"$account: balance = $balance, effective = $effectiveBalance"
             }
             .mkString("\n")
           log.debug(s"$label:\n$formatted")
         }
     }
-
 
     def waitForTxsToReachAllNodes(txIds: Seq[String]): Future[_] = {
       val txNodePairs = for {
@@ -55,14 +61,14 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
     }
 
     def makeTransfers(accounts: Seq[String]): Future[Seq[String]] = traverse(accounts) { acc =>
-      sender.transfer(sender.address, acc, defaultBalance, sender.fee(TransactionType.TransferTransaction)).map(_.id)
+      sender.transfer(sender.address, acc, defaultBalance, sender.fee(TransferTransactionV1.typeId)).map(_.id)
     }
 
     val correctStartBalancesFuture = for {
       _ <- traverse(nodes)(_.waitForHeight(2))
       accounts = Seq(firstAddress, secondAddress, thirdAddress)
 
-      _ <- dumpBalances(sender, accounts, "initial")
+      _   <- dumpBalances(sender, accounts, "initial")
       txs <- makeTransfers(accounts)
 
       height <- traverse(nodes)(_.height).map(_.max)

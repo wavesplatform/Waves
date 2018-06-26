@@ -1,7 +1,8 @@
 package scorex.account
 
+import com.wavesplatform.utils.base58Length
 import scorex.crypto.encode.Base58
-import scorex.transaction.TransactionParser
+import scorex.crypto.signatures.Curve25519
 import scorex.transaction.ValidationError.InvalidAddress
 
 trait PublicKeyAccount {
@@ -9,7 +10,7 @@ trait PublicKeyAccount {
 
   override def equals(b: Any): Boolean = b match {
     case a: PublicKeyAccount => publicKey.sameElements(a.publicKey)
-    case _ => false
+    case _                   => false
   }
 
   override def hashCode(): Int = publicKey.hashCode()
@@ -18,6 +19,8 @@ trait PublicKeyAccount {
 }
 
 object PublicKeyAccount {
+
+  val KeyStringLength: Int = base58Length(Curve25519.KeyLength)
 
   private case class PublicKeyAccountImpl(publicKey: Array[Byte]) extends PublicKeyAccount
 
@@ -31,7 +34,7 @@ object PublicKeyAccount {
 
   def fromBase58String(s: String): Either[InvalidAddress, PublicKeyAccount] =
     (for {
-      _ <- Either.cond(s.length <= TransactionParser.KeyStringLength, (), "Bad public key string length")
+      _     <- Either.cond(s.length <= KeyStringLength, (), "Bad public key string length")
       bytes <- Base58.decode(s).toEither.left.map(ex => s"Unable to decode base58: ${ex.getMessage}")
     } yield PublicKeyAccount(bytes)).left.map(err => InvalidAddress(s"Invalid sender: $err"))
 }

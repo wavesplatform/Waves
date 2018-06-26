@@ -5,7 +5,7 @@ import java.io.File
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.WalletSettings
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import com.wavesplatform.utils.{JsonFileStorage, _}
 import play.api.libs.json._
 import scorex.account.{Address, PrivateKeyAccount}
@@ -37,10 +37,11 @@ trait Wallet {
 object Wallet extends ScorexLogging {
 
   implicit class WalletExtension(w: Wallet) {
-    def findWallet(addressString: String): Either[ValidationError, PrivateKeyAccount] = for {
-      acc <- Address.fromString(addressString)
-      privKeyAcc <- w.privateKeyAccount(acc)
-    } yield privKeyAcc
+    def findWallet(addressString: String): Either[ValidationError, PrivateKeyAccount] =
+      for {
+        acc        <- Address.fromString(addressString)
+        privKeyAcc <- w.privateKeyAccount(acc)
+      } yield privKeyAcc
 
     def exportAccountSeed(account: Address): Either[ValidationError, Array[Byte]] = w.privateKeyAccount(account).map(_.seed)
   }
@@ -59,16 +60,16 @@ object Wallet extends ScorexLogging {
 
   def apply(settings: WalletSettings): Wallet = new WalletImpl(settings.file, settings.password, settings.seed)
 
-  private class WalletImpl(maybeFile: Option[File], password: String, maybeSeedFromConfig: Option[ByteStr])
-    extends ScorexLogging with Wallet {
+  private class WalletImpl(maybeFile: Option[File], password: String, maybeSeedFromConfig: Option[ByteStr]) extends ScorexLogging with Wallet {
 
     private val key = JsonFileStorage.prepareKey(password)
 
-    private def loadOrImport(f: File): Option[WalletData] = try {
-      Some(JsonFileStorage.load[WalletData](f.getCanonicalPath, Some(key)))
-    } catch {
-      case NonFatal(_) => None
-    }
+    private def loadOrImport(f: File): Option[WalletData] =
+      try {
+        Some(JsonFileStorage.load[WalletData](f.getCanonicalPath, Some(key)))
+      } catch {
+        case NonFatal(_) => None
+      }
 
     private lazy val actualSeed = maybeSeedFromConfig.getOrElse {
       val randomSeed = ByteStr(randomBytes(64))
@@ -83,7 +84,8 @@ object Wallet extends ScorexLogging {
         val file = maybeFile.get
         if (file.exists() && file.length() > 0) {
           val wd = loadOrImport(maybeFile.get)
-          if (wd.isDefined) wd.get else {
+          if (wd.isDefined) wd.get
+          else {
             throw new IllegalStateException(s"Failed to open existing wallet file '${maybeFile.get}' maybe provided password is incorrect")
           }
         } else WalletData(actualSeed, Set.empty, 0)
@@ -102,7 +104,7 @@ object Wallet extends ScorexLogging {
     private def save(): Unit = maybeFile.foreach(f => JsonFileStorage.save(walletData, f.getCanonicalPath, Some(key)))
 
     private def generateNewAccountWithoutSave(): Option[PrivateKeyAccount] = lock {
-      val nonce = getAndIncrementNonce()
+      val nonce   = getAndIncrementNonce()
       val account = Wallet.generateNewAccount(seed, nonce)
 
       val address = account.address

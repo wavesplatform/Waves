@@ -11,10 +11,11 @@ import scorex.utils.ScorexLogging
 
 @Sharable
 class InboundConnectionFilter(peerDatabase: PeerDatabase, maxInboundConnections: Int, maxConnectionsPerHost: Int)
-  extends AbstractRemoteAddressFilter[InetSocketAddress] with ScorexLogging {
+    extends AbstractRemoteAddressFilter[InetSocketAddress]
+    with ScorexLogging {
   private val inboundConnectionCount = new AtomicInteger(0)
   private val perHostConnectionCount = new ConcurrentHashMap[InetAddress, Int]
-  private val emptyChannelFuture = null.asInstanceOf[ChannelFuture]
+  private val emptyChannelFuture     = null.asInstanceOf[ChannelFuture]
 
   private def dec(remoteAddress: InetAddress) = {
     inboundConnectionCount.decrementAndGet()
@@ -29,9 +30,9 @@ class InboundConnectionFilter(peerDatabase: PeerDatabase, maxInboundConnections:
       false
 
     case Some(address) =>
-      val newTotal = inboundConnectionCount.incrementAndGet()
+      val newTotal        = inboundConnectionCount.incrementAndGet()
       val newCountPerHost = perHostConnectionCount.compute(address, (_, cnt) => Option(cnt).fold(1)(_ + 1))
-      val isBlacklisted = peerDatabase.blacklistedHosts.contains(address)
+      val isBlacklisted   = peerDatabase.blacklistedHosts.contains(address)
 
       val accepted = newTotal <= maxInboundConnections &&
         newCountPerHost <= maxConnectionsPerHost &&

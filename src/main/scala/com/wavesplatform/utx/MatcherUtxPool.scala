@@ -5,7 +5,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.mining.TwoDimensionalMiningConstraint
-import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
+import com.wavesplatform.state.{ByteStr, Diff, Portfolio}
 import scorex.account.Address
 import scorex.transaction.{AssetId, Authorized, Transaction, ValidationError}
 import scorex.utils.ScorexLogging
@@ -85,7 +85,7 @@ class MatcherUtxPool(underlying: UtxPool, matcherSettings: MatcherSettings, even
       txDiff.portfolios.foreach {
         case (addr, txPortfolio) =>
           if (addr.stringRepr != matcherSettings.account) {
-            val prevPortfolio = accountInfos.getOrElse(addr, Monoid[Portfolio].empty)
+            val prevPortfolio       = accountInfos.getOrElse(addr, Monoid[Portfolio].empty)
             val overriddenPortfolio = Monoid.combine(prevPortfolio, txPortfolio.pessimistic)
             accountInfos.update(addr, overriddenPortfolio)
           }
@@ -105,9 +105,7 @@ class MatcherUtxPool(underlying: UtxPool, matcherSettings: MatcherSettings, even
           if (changedAssets.isEmpty) List.empty
           else {
             val accPortfolio = accountPortfolio(addr)
-            val combined = Monoid.combine(portfolio, accPortfolio)
-
-            log.debug(s"\n=== $addr ====\naccPortfolio: $accPortfolio\nportfolio: $portfolio\ncombined: $combined")
+            val combined     = Monoid.combine(portfolio, accPortfolio)
             List(addr -> BalanceChanged.Changes(combined, changedAssets))
           }
       }

@@ -1,13 +1,13 @@
 package scorex.account
 
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import scorex.serialization.Deser
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
 
 sealed trait Alias extends AddressOrAlias {
   lazy val stringRepr: String = Alias.Prefix + networkByte.toChar + ":" + name
-  lazy val bytes: ByteStr = ByteStr(Alias.AddressVersion +: networkByte +: Deser.serializeArray(name.getBytes("UTF-8")))
+  lazy val bytes: ByteStr     = ByteStr(Alias.AddressVersion +: networkByte +: Deser.serializeArray(name.getBytes("UTF-8")))
 
   val name: String
   val networkByte: Byte
@@ -18,8 +18,8 @@ object Alias {
   val Prefix: String = "alias:"
 
   val AddressVersion: Byte = 2
-  val MinLength = 4
-  val MaxLength = 30
+  val MinLength            = 4
+  val MaxLength            = 30
 
   val aliasAlphabet = "-.0123456789@_abcdefghijklmnopqrstuvwxyz"
 
@@ -44,7 +44,6 @@ object Alias {
       Right(AliasImpl(networkByte, name))
   }
 
-
   def buildWithCurrentNetworkByte(name: String): Either[ValidationError, Alias] = buildAlias(schemeByte, name)
 
   def fromString(str: String): Either[ValidationError, Alias] =
@@ -52,8 +51,8 @@ object Alias {
       Left(GenericError(AliasPatternInfo))
     } else {
       val charSemicolonAlias = str.drop(Prefix.length)
-      val networkByte = charSemicolonAlias(0).toByte
-      val name = charSemicolonAlias.drop(2)
+      val networkByte        = charSemicolonAlias(0).toByte
+      val name               = charSemicolonAlias.drop(2)
       if (charSemicolonAlias(1) != ':') {
         Left(GenericError(AliasPatternInfo))
       } else {

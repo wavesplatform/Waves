@@ -12,7 +12,7 @@ import com.wavesplatform.network.{RawBytes, TransactionSpec}
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import scorex.account.Address
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.transfer._
 
 import scala.concurrent.Await
 import scala.concurrent.Future.traverse
@@ -32,21 +32,21 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
   private def node = nodes.head
 
   test("valid tx send by network to node should be in blockchain") {
-    val tx = TransferTransaction
+    val tx = TransferTransactionV1
       .create(None, node.privateKey, Address.fromString(node.address).right.get, 1L, System.currentTimeMillis(), None, 100000L, Array())
       .right
       .get
     val f = for {
-      _  <- node.sendByNetwork(RawBytes(TransactionSpec.messageCode, tx.bytes()))
-      tx <- node.waitForTransaction(tx.id().base58)
+      _          <- node.sendByNetwork(RawBytes.from(tx))
+      txFromNode <- node.waitForTransaction(tx.id().base58)
     } yield {
-      tx shouldBe Transaction(tx.`type`, tx.id, tx.fee, tx.timestamp)
+      txFromNode.id shouldBe tx.id().toString
     }
     Await.result(f, waitCompletion)
   }
 
   test("invalid tx send by network to node should be not in UTX or blockchain") {
-    val tx = TransferTransaction
+    val tx = TransferTransactionV1
       .create(None,
               node.privateKey,
               Address.fromString(node.address).right.get,
@@ -58,7 +58,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
       .right
       .get
     val f = for {
-      _         <- node.sendByNetwork(RawBytes(TransactionSpec.messageCode, tx.bytes()))
+      _         <- node.sendByNetwork(RawBytes.from(tx))
       maxHeight <- traverse(nodes)(_.height).map(_.max)
       _         <- traverse(nodes)(_.waitForHeight(maxHeight + 1))
       _         <- traverse(nodes)(_.ensureTxDoesntExist(tx.id().base58))
