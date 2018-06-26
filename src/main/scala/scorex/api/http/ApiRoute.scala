@@ -5,8 +5,8 @@ import akka.http.scaladsl.server._
 import com.wavesplatform.crypto
 import com.wavesplatform.http.{ApiMarshallers, PlayJsonException, api_key, deprecated_api_key}
 import com.wavesplatform.settings.RestAPISettings
-import play.api.libs.json.Reads
 import com.wavesplatform.utils.Base58
+import play.api.libs.json.Reads
 
 trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
   val settings: RestAPISettings
@@ -27,7 +27,7 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
     }
   }
 
-  def withAuth: Directive0 = apiKeyHash.fold(pass) { hashFromSettings =>
+  def withAuth: Directive0 = apiKeyHash.fold[Directive0](complete(ApiKeyNotValid)) { hashFromSettings =>
     optionalHeaderValueByType[api_key](()).flatMap {
       case Some(k) if crypto.secureHash(k.value.getBytes()).sameElements(hashFromSettings) => pass
       case _ =>
