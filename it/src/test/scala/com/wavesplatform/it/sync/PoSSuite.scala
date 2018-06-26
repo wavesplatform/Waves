@@ -12,7 +12,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.utils.Base58
 import play.api.libs.json.{JsSuccess, Json, Reads}
 import scorex.account.PrivateKeyAccount
-import scorex.block.Block
+import scorex.block.{Block, SignerData}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 
 import scala.concurrent.duration._
@@ -35,7 +35,7 @@ class PoSSuite extends BaseTransactionSuite {
     val height = nodes.last.height
     val block  = forgeBlock(height, signerPK)()
 
-    Thread.sleep(block.timestamp - System.currentTimeMillis())
+    waitForBlockTime(block)
 
     nodes.head.sendByNetwork(RawBytes.from(block))
 
@@ -52,7 +52,7 @@ class PoSSuite extends BaseTransactionSuite {
     val height = nodes.last.height
     val block  = forgeBlock(height, signerPK)(updateDelay = _ - 1000)
 
-    Thread.sleep(block.timestamp - System.currentTimeMillis())
+    waitForBlockTime(block)
 
     nodes.head.sendByNetwork(RawBytes.from(block))
 
@@ -69,7 +69,7 @@ class PoSSuite extends BaseTransactionSuite {
     val height = nodes.last.height
     val block  = forgeBlock(height, signerPK)(updateBaseTarget = _ + 2)
 
-    Thread.sleep(block.timestamp - System.currentTimeMillis())
+    waitForBlockTime(block)
 
     nodes.head.sendByNetwork(RawBytes.from(block))
 
@@ -80,7 +80,36 @@ class PoSSuite extends BaseTransactionSuite {
     newBlockSig should not be block.uniqueId.arr
   }
 
-  def previousBlockInfo(height: Int) = {
+  test("Reject block with invalid signature") {
+    waitForHeight(3)
+
+    val otherNodePK = PrivateKeyAccount.fromSeed(nodeConfigs.head.getString("account-seed")).explicitGet()
+
+    val height = nodes.last.height
+    val block  = forgeBlock(height, signerPK)(updateBaseTarget = _ + 2)
+
+    val resignedBlock =
+      block
+        .copy(signerData = SignerData(signerPK, ByteStr(crypto.sign(otherNodePK, block.bytes()))))
+
+    waitForBlockTime(resignedBlock)
+
+    nodes.head.sendByNetwork(RawBytes.from(resignedBlock))
+
+    waitForHeight(height + 1)
+
+    val newBlockSig = blockSignature(height + 1)
+
+    newBlockSig should not be resignedBlock.uniqueId.arr
+  }
+
+  def waitForBlockTime(block: Block): Unit = {
+    val timeout = block.timestamp - System.currentTimeMillis()
+
+    if (timeout > 0) Thread.sleep(timeout)
+  }
+
+  def previousBlockInfo(height: Int): (Array[Byte], Long, NxtLikeConsensusBlockData) = {
     val lastBlock      = Json.parse(nodes.head.get(s"/blocks/at/$height").getResponseBody)
     val lastBlockId    = Base58.decode((lastBlock \ "signature").as[String]).get
     val lastBlockTS    = (lastBlock \ "timestamp").as[Long]
