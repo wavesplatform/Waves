@@ -39,7 +39,7 @@ object TypeInferrer {
     }
   }
 
-  def matchT(placeholder: TYPE, arg: TYPE): Boolean = {
+  private def matchT(placeholder: TYPE, arg: TYPE): Boolean = {
     (placeholder, arg) match {
       case (_, NOTHING) => true
       case (NOTHING, _) => false
@@ -47,7 +47,7 @@ object TypeInferrer {
     }
   }
 
-  def matchPlainCandidate(required: TYPE, actual: PLAIN_TYPE): Boolean =
+  private def matchPlainCandidate(required: TYPE, actual: PLAIN_TYPE): Boolean =
     required match {
       case UNION(plaintypes) => plaintypes contains actual
       case p: PLAIN_TYPE     => p == actual
@@ -58,7 +58,7 @@ object TypeInferrer {
 
     (placeholder, argType) match {
       case (placeholder: TYPE, _) =>
-        Either.cond(matchPlainCandidate(placeholder, argType), None, err)
+        Either.cond(matchT(placeholder, argType), None, err)
       case (tp @ TYPEPLACEHOLDER.TYPEPARAM(char), _) =>
         Right(Some(MatchResult(argType, tp)))
       case (tp @ TYPEPLACEHOLDER.LISTTYPEPARAM(innerTypeParam), LIST(t)) => matchTypes(t, innerTypeParam)
