@@ -12,7 +12,7 @@ case class CompilerContext(predefTypes: Map[String, DefinedType], varDefs: Varia
     case (_, t @ CaseType(typeName, fields)) =>
       typeName -> List(
         FunctionTypeSignature(TYPEPLACEHOLDER.CASETYPEREF(typeName),
-                              fields.map(_._2).map(Types.typeToTypePlaceholder),
+                              fields.map(_._2).map(Types.typeToConcretePlaceholder),
                               FunctionHeader.User(typeName)))
   } ++ functionDefs
 

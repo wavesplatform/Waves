@@ -77,7 +77,7 @@ object CompilerV1 {
     })
   }
 
-  def flat(typeDefs: Map[String, DefinedType], tl: List[String]): List[PLAIN_TYPE] =
+  def flat(typeDefs: Map[String, DefinedType], tl: List[String]): List[SINGLE_TYPE] =
     tl.flatMap(typeName =>
       typeDefs.get(typeName) match {
         case Some(value) => List(value.typeRef)
@@ -194,30 +194,12 @@ object CompilerV1 {
 
       val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case (typedExpr, tph) => (typedExpr._2, tph) }
       for {
-        resolvedTypeParams <- TypeInferrer(typePairs).leftMap(Generic(p.start, p.end, _))
+        resolvedTypeParams <- TypeInferrer(typePairs, predefTypes).leftMap(Generic(p.start, p.end, _))
         args = typedExpressionArgumentsAndTypedPlaceholders.map(_._1._1)
       } yield {
         val resultType = typePlaceholdertoType(f.result, resolvedTypeParams, predefTypes)
         (FUNCTION_CALL(f.header, args): EXPR, resultType)
       }
-    }
-  }
-
-  def typePlaceholdertoType(resultType: TYPEPLACEHOLDER,
-                            resolvedPlaceholders: Map[TYPEPLACEHOLDER.TYPEPARAM, TYPE],
-                            knownTypes: Map[String, DefinedType]): TYPE = {
-    resultType match {
-      case tp @ TYPEPLACEHOLDER.TYPEPARAM(char) => resolvedPlaceholders(tp)
-      case TYPEPLACEHOLDER.LISTTYPEPARAM(t)     => LIST(typePlaceholdertoType(t, resolvedPlaceholders, knownTypes))
-      case TYPEPLACEHOLDER.UNION(l)             => UNION.create(l.flatMap(l1 => typePlaceholdertoType(l1, resolvedPlaceholders, knownTypes).l))
-      case TYPEPLACEHOLDER.UNIT                 => UNIT
-      case TYPEPLACEHOLDER.LONG                 => LONG
-      case TYPEPLACEHOLDER.BYTEVECTOR           => BYTEVECTOR
-      case TYPEPLACEHOLDER.BOOLEAN              => BOOLEAN
-      case TYPEPLACEHOLDER.STRING               => STRING
-      case TYPEPLACEHOLDER.CASETYPEREF(name) =>
-        val casetyperef = knownTypes(name)
-        CASETYPEREF(casetyperef.name, casetyperef.fields)
     }
   }
 

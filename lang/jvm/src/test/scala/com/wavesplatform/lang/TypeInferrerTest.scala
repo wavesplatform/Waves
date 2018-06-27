@@ -4,15 +4,18 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import org.scalatest.{FreeSpec, Matchers}
 import Common._
 import com.wavesplatform.lang.v1.compiler.TypeInferrer
+import com.wavesplatform.lang.v1.compiler.Types.TYPEPLACEHOLDER.{LISTTYPEPARAM, TYPEPARAM}
 
 class TypeInferrerTest extends FreeSpec with Matchers {
+
+  implicit def t0(t: TYPE): TYPEPLACEHOLDER = com.wavesplatform.lang.v1.compiler.Types.typeToConcretePlaceholder(t)
 
   val typeparamT = TYPEPARAM('T')
   val typeparamG = TYPEPARAM('G')
 
   "no types to infer" - {
     "all types are correct" in {
-      TypeInferrer(Seq((LONG, LONG), (LONG, LONG), (CASETYPEREF("User", List()), CASETYPEREF("User", List())))) shouldBe Right(Map.empty)
+      TypeInferrer(Seq((STRING, STRING), (STRING, STRING), (CASETYPEREF("User", List()), CASETYPEREF("User", List())))) shouldBe Right(Map.empty)
     }
     "fails if no simple common type" in {
       TypeInferrer(Seq((LONG, BYTEVECTOR))) should produce("Non-matching types")

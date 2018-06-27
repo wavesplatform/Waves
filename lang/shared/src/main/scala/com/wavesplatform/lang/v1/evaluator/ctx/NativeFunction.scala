@@ -25,7 +25,7 @@ object NativeFunction {
 
   def apply(name: String, cost: Long, internalName: Short, resultType: TYPEPLACEHOLDER, args: (String, TYPEPLACEHOLDER)*)(
       ev: List[Any] => Either[String, Any]) =
-    new NativeFunction(name, cost, FunctionTypeSignature(???, args.map(_._2), FunctionHeader.Native(internalName)), ev)
+    new NativeFunction(name, cost, FunctionTypeSignature(resultType, args.map(_._2), FunctionHeader.Native(internalName)), ev)
 
 }
 
@@ -34,6 +34,6 @@ case class UserFunction private (name: String, cost: Long, signature: FunctionTy
 object UserFunction {
 
   def apply(name: String, cost: Long, resultType: TYPEPLACEHOLDER, args: (String, TYPEPLACEHOLDER)*)(ev: List[EXPR] => EXPR) =
-    new UserFunction(name, cost, FunctionTypeSignature(???, args.map(_._2), FunctionHeader.User(name)), ev)
+    new UserFunction(name, cost, FunctionTypeSignature(resultType, args.map(_._2), FunctionHeader.User(name)), ev)
 
 }

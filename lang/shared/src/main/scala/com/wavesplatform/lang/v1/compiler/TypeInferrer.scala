@@ -3,13 +3,15 @@ package com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.Types.UNION._
 import com.wavesplatform.lang._
+import com.wavesplatform.lang.v1.evaluator.ctx.DefinedType
 
 object TypeInferrer {
 
   case class MatchResult(tpe: TYPE, name: TYPEPLACEHOLDER.TYPEPARAM)
   // (ACTUAL, EXPECTED)
-  def apply(seq: Seq[(TYPE, TYPEPLACEHOLDER)]): Either[String, Map[TYPEPLACEHOLDER.TYPEPARAM, TYPE]] = {
-    val matching = seq.map(x => matchTypes(x._1, x._2))
+  def apply(seq: Seq[(TYPE, TYPEPLACEHOLDER)],
+            knownTypes: Map[String, DefinedType] = Map.empty): Either[String, Map[TYPEPLACEHOLDER.TYPEPARAM, TYPE]] = {
+    val matching = seq.map(x => matchTypes(x._1, x._2, knownTypes))
     matching.find(_.isLeft) match {
       case Some(left) => left.asInstanceOf[Left[String, Nothing]]
       case None =>
@@ -24,7 +26,7 @@ object TypeInferrer {
           case matchResults @ (h :: t) =>
             val commonType = t.map(_.tpe).toVector.foldLeft(h.tpe)(findCommonType)
             commonType match {
-              case p: PLAIN_TYPE => Right(p)
+              case p: SINGLE_TYPE => Right(p)
               case u @ UNION(plainTypes) =>
                 val commonTypeExists = plainTypes.exists { p =>
                   matchResults.map(_.tpe).forall(e => matchPlainCandidate(e, p))
@@ -38,31 +40,21 @@ object TypeInferrer {
         }
     }
   }
-
-  private def matchT(placeholder: TYPE, arg: TYPE): Boolean = {
-    (placeholder, arg) match {
-      case (_, NOTHING) => true
-      case (NOTHING, _) => false
-      case (p, a)       => UNION.create(p.l) >= UNION.create(a.l)
-    }
-  }
-
-  private def matchPlainCandidate(required: TYPE, actual: PLAIN_TYPE): Boolean =
+  private def matchPlainCandidate(required: TYPE, actual: SINGLE_TYPE): Boolean =
     required match {
       case UNION(plaintypes) => plaintypes contains actual
-      case p: PLAIN_TYPE     => p == actual
+      case p: SINGLE_TYPE    => p == actual
     }
 
-  def matchTypes(argType: TYPE, placeholder: TYPEPLACEHOLDER): Either[String, Option[MatchResult]] = {
+  def matchTypes(argType: TYPE, placeholder: TYPEPLACEHOLDER, knownTypes: Map[String, DefinedType]): Either[String, Option[MatchResult]] = {
     lazy val err = s"Non-matching types: expected: $placeholder, actual: $argType"
 
     (placeholder, argType) match {
-      case (placeholder: TYPE, _) =>
-        Either.cond(matchT(placeholder, argType), None, err)
       case (tp @ TYPEPLACEHOLDER.TYPEPARAM(char), _) =>
         Right(Some(MatchResult(argType, tp)))
-      case (tp @ TYPEPLACEHOLDER.LISTTYPEPARAM(innerTypeParam), LIST(t)) => matchTypes(t, innerTypeParam)
-      case _                                                             => Left(err)
+      case (tp @ TYPEPLACEHOLDER.LISTTYPEPARAM(innerTypeParam), LIST(t)) => matchTypes(t, innerTypeParam, knownTypes)
+      case (tp @ TYPEPLACEHOLDER.LISTTYPEPARAM(_), _)                    => Left(err)
+      case (placeholder: CONCRETE, _)                                    => Either.cond(Types.concreteToType(placeholder, knownTypes) >= UNION.create(argType.l), None, err)
     }
   }
 
@@ -82,12 +74,12 @@ object TypeInferrer {
 
     case (r @ LIST(it1), a @ LIST(it2)) =>
       findCommonType(it1, it2) match {
-        case UNION(_)      => UNION(r, a)
-        case p: PLAIN_TYPE => LIST(p)
+        case UNION(_)       => UNION(r, a)
+        case p: SINGLE_TYPE => LIST(p)
       }
-    case (p1: PLAIN_TYPE, p2: PLAIN_TYPE) => if (p1 == p2) p1 else UNION(p1, p2)
-    case (r: UNION, a: UNION)             => UNION.create((r.l.toSet ++ a.l.toSet).toSeq)
-    case (r: UNION, t: PLAIN_TYPE)        => findCommonType(r, UNION(t))
-    case (r: PLAIN_TYPE, t: UNION)        => findCommonType(UNION(r), t)
+    case (p1: SINGLE_TYPE, p2: SINGLE_TYPE) => if (p1 == p2) p1 else UNION(p1, p2)
+    case (r: UNION, a: UNION)               => UNION.create((r.l.toSet ++ a.l.toSet).toSeq)
+    case (r: UNION, t: SINGLE_TYPE)         => findCommonType(r, UNION(t))
+    case (r: SINGLE_TYPE, t: UNION)         => findCommonType(UNION(r), t)
   }
 }

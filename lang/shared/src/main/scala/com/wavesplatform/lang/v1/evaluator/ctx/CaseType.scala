@@ -1,10 +1,10 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
-import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, PLAIN_TYPE, TYPE}
+import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, SINGLE_TYPE, TYPE}
 
 trait DefinedType {
   def name: String
-  def typeRef: PLAIN_TYPE
+  def typeRef: SINGLE_TYPE
   def fields: List[(String, TYPE)]
 }
 
