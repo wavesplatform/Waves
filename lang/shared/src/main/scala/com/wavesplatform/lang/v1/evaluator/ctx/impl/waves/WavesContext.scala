@@ -21,15 +21,15 @@ object WavesContext {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getdataF(name: String, internalName: Short, dataType: DataType): BaseFunction =
-      NativeFunction(name, 100, internalName, UNION(dataType.innerType, UNIT), "addressOrAlias" -> addressType.typeRef, "key" -> STRING) {
+      NativeFunction(name, 100, internalName, UNION(dataType.innerType, UNIT), "addressOrAlias" -> addressOrAliasType, "key" -> STRING) {
         case (addressOrAlias: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addressOrAlias, k, dataType).map(fromOption)
         case _                                               => ???
       }
 
-    val getLongF: BaseFunction      = getdataF("getLong", DATA_LONG, DataType.Long)
-    val getBooleanF: BaseFunction   = getdataF("getBoolean", DATA_BOOLEAN, DataType.Boolean)
-    val getByteArrayF: BaseFunction = getdataF("getByteArray", DATA_BYTES, DataType.ByteArray)
-    val getStringF: BaseFunction    = getdataF("getString", DATA_STRING, DataType.String)
+    val getIntegerF: BaseFunction = getdataF("getInteger", DATA_LONG, DataType.Long)
+    val getBooleanF: BaseFunction = getdataF("getBoolean", DATA_BOOLEAN, DataType.Boolean)
+    val getBinaryF: BaseFunction = getdataF("getBinary", DATA_BYTES, DataType.ByteArray)
+    val getStringF: BaseFunction = getdataF("getString", DATA_STRING, DataType.String)
 
     def secureHashExpr(xs: EXPR): EXPR = FUNCTION_CALL(
       FunctionHeader.Native(KECCAK256),
@@ -228,9 +228,9 @@ object WavesContext {
     val functions = Seq(
       txByIdF,
       txHeightByIdF,
-      getLongF,
+      getIntegerF,
       getBooleanF,
-      getByteArrayF,
+      getBinaryF,
       getStringF,
       addressFromBytesF,
       addressFromPublicKeyF,

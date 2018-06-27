@@ -3,11 +3,11 @@ package com.wavesplatform
 import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.block.Block
 import scorex.transaction.ValidationError.{AliasDoesNotExist, GenericError}
-import scorex.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
 import scorex.transaction._
+import scorex.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
 
 import scala.reflect.ClassTag
-import scala.util.{Left, Right, Try}
+import scala.util.Try
 
 package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
@@ -52,11 +52,16 @@ package object state {
     }
 
     def genesis: Block = blockchain.blockAt(1).get
-    def resolveAliasEi(aoa: AddressOrAlias): Either[ValidationError, Address] =
+    def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
       aoa match {
         case a: Address => Right(a)
-        case a: Alias   => blockchain.resolveAlias(a).toRight(AliasDoesNotExist(a))
+        case a: Alias   => blockchain.resolveAlias(a)
       }
+
+    def canCreateAlias(alias: Alias): Boolean = blockchain.resolveAlias(alias) match {
+      case Left(AliasDoesNotExist(_)) => true
+      case _                          => false
+    }
 
     def effectiveBalance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
