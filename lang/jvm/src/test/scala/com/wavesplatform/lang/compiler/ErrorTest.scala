@@ -30,15 +30,15 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
       LET(AnyPos, PART.VALID(AnyPos, "drop"), CONST_LONG(AnyPos, 2), Seq.empty),
       TRUE(AnyPos)
     ),
-    "BINARY_OP with wrong types"                   -> "Compilation failed: Can't find a function '+'" -> BINARY_OP(AnyPos, TRUE(AnyPos), SUM_OP, CONST_LONG(AnyPos, 1)),
-    "IF can't find common"                         -> "Unexpected type, required: Boolean" -> IF(AnyPos, TRUE(AnyPos), TRUE(AnyPos), CONST_LONG(AnyPos, 0)),
+    "BINARY_OP with wrong types" -> "Compilation failed: Can't find a function '+'" -> BINARY_OP(AnyPos, TRUE(AnyPos), SUM_OP, CONST_LONG(AnyPos, 1)),
+//    "IF can't find common"                         -> "Unexpected type, required: Boolean" -> IF(AnyPos, TRUE(AnyPos), TRUE(AnyPos), CONST_LONG(AnyPos, 0)),
     "IF clause must be boolean"                    -> "Unexpected type, required: Boolean" -> IF(AnyPos, CONST_LONG(AnyPos, 0), TRUE(AnyPos), FALSE(AnyPos)),
     "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(
       AnyPos,
       PART.VALID(AnyPos, multiplierFunction.name),
       List(CONST_LONG(AnyPos, 0))
     ),
-    "FUNCTION_CALL with wrong type of argument" -> "Compilation failed: Non-matching types: expected: Int, actual: Boolean" -> FUNCTION_CALL(
+    "FUNCTION_CALL with wrong type of argument" -> "Compilation failed: Non-matching types" -> FUNCTION_CALL(
       AnyPos,
       PART.VALID(AnyPos, multiplierFunction.name),
       List(CONST_LONG(AnyPos, 0), FALSE(AnyPos))

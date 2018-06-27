@@ -5,6 +5,7 @@ import org.scalatest.{FreeSpec, Matchers}
 import Common._
 import com.wavesplatform.lang.v1.compiler.TypeInferrer
 import com.wavesplatform.lang.v1.compiler.Types.TYPEPLACEHOLDER.{LISTTYPEPARAM, TYPEPARAM}
+import com.wavesplatform.lang.v1.evaluator.ctx.CaseType
 
 class TypeInferrerTest extends FreeSpec with Matchers {
 
@@ -15,14 +16,16 @@ class TypeInferrerTest extends FreeSpec with Matchers {
 
   "no types to infer" - {
     "all types are correct" in {
-      TypeInferrer(Seq((STRING, STRING), (STRING, STRING), (CASETYPEREF("User", List()), CASETYPEREF("User", List())))) shouldBe Right(Map.empty)
+      TypeInferrer(Seq((STRING, STRING), (STRING, STRING), (CASETYPEREF("User", List()), CASETYPEREF("User", List()))),
+                   Map("User" -> CaseType("User", List.empty))) shouldBe Right(Map.empty)
     }
     "fails if no simple common type" in {
       TypeInferrer(Seq((LONG, BYTEVECTOR))) should produce("Non-matching types")
     }
 
     "fails if no obj common type" in {
-      TypeInferrer(Seq((CASETYPEREF("User", List()), CASETYPEREF("Admin", List())))) should produce("Non-matching types")
+      TypeInferrer(Seq((CASETYPEREF("User", List()), CASETYPEREF("Admin", List()))),
+                   Map("User" -> CaseType("User", List.empty), "Admin" -> CaseType("Admin", List.empty))) should produce("Non-matching types")
     }
   }
 
