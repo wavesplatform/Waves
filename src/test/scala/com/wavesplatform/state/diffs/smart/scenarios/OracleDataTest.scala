@@ -43,7 +43,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
                                    |   txId && txHeightId
                                    | case t : CreateAliasTransaction => true
                                    | case other =>
-                                   |   let oracle = Alias("$alias")
+                                   |   let oracle = Alias("${alias.name}")
                                    |   let long = extract(getLong(oracle,"${long.key}")) == ${long.value}
                                    |   let bool = extract(getBoolean(oracle,"${bool.key}")) == ${bool.value}
                                    |   let bin = extract(getByteArray(oracle,"${bin.key}")) == base58'${bin.value.base58}'
@@ -63,11 +63,12 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
   property("simple oracle value required to transfer") {
     forAll(preconditions) {
       case (genesis, genesis2, createAlias, setScript, dataTransaction, transferFromScripted) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, genesis2, setScript, dataTransaction))),
+        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, genesis2, createAlias, setScript, dataTransaction))),
                            TestBlock.create(Seq(transferFromScripted)),
                            smartEnabledFS) { case _ => () }
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis, genesis2, setScript))), TestBlock.create(Seq(transferFromScripted)), smartEnabledFS)(
-          totalDiffEi => totalDiffEi shouldBe Left(_: ScriptExecutionError))
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis, genesis2, createAlias, setScript))),
+                     TestBlock.create(Seq(transferFromScripted)),
+                     smartEnabledFS)(totalDiffEi => totalDiffEi shouldBe Left(_: ScriptExecutionError))
     }
   }
 }
