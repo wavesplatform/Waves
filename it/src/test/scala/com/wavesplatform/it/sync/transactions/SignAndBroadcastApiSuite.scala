@@ -2,16 +2,19 @@ package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.sync.{issueFee, someAssetAmount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state._
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json._
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.api.http.assets.{SignedTransferV1Request}
+import scorex.api.http.assets.SignedTransferV1Request
 import com.wavesplatform.utils.Base58
+import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.it.sync._
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
+import scorex.utils.NTP
 
 import scala.util.Random
 
@@ -285,6 +288,58 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
     val seed       = sender.seed(thirdAddress)
     val privateKey = PrivateKeyAccount.fromSeed(seed).explicitGet()
     assert(crypto.verify(signature, tx.bodyBytes(), privateKey.publicKey))
+  }
+
+  test("/transactions/broadcast should produce ExchangeTransaction with custom asset") {
+    def pkFromAddress(address: String) = PrivateKeyAccount.fromSeed(sender.seed(address)).explicitGet()
+
+    val issueTx = signAndBroadcast(
+      Json.obj(
+        "type"        -> 3,
+        "name"        -> "ExchangeCoin",
+        "quantity"    -> 1000 * someAssetAmount,
+        "description" -> "ExchangeCoin Description",
+        "sender"      -> firstAddress,
+        "decimals"    -> 2,
+        "reissuable"  -> true,
+        "fee"         -> issueFee
+      ),
+      usesProofs = false
+    )
+
+    val buyer               = pkFromAddress(firstAddress)
+    val seller              = pkFromAddress(secondAddress)
+    val matcher             = pkFromAddress(thirdAddress)
+    val time                = NTP.correctedTime()
+    val expirationTimestamp = time + Order.MaxLiveTime
+    val buyPrice            = 1 * Order.PriceConstant
+    val sellPrice           = (0.50 * Order.PriceConstant).toLong
+    val mf                  = 300000L
+    val buyAmount           = 2
+    val sellAmount          = 3
+    val assetPair           = AssetPair.createAssetPair("WAVES", issueTx).get
+    val buy                 = Order.buy(buyer, matcher, assetPair, buyPrice, buyAmount, time, expirationTimestamp, mf)
+    val sell                = Order.sell(seller, matcher, assetPair, sellPrice, sellAmount, time, expirationTimestamp, mf)
+
+    val amount = math.min(buy.amount, sell.amount)
+    val tx = ExchangeTransaction
+      .create(
+        matcher = matcher,
+        buyOrder = buy,
+        sellOrder = sell,
+        price = sellPrice,
+        amount = amount,
+        buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
+        sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
+        fee = mf,
+        timestamp = NTP.correctedTime()
+      )
+      .explicitGet()
+      .json()
+
+    val txId = sender.signedBroadcast(tx).id
+    nodes.waitForHeightAriseAndTxPresent(txId)
+
   }
 
   private def signAndBroadcast(json: JsObject, usesProofs: Boolean, version: String = null): String = {
