@@ -5,6 +5,7 @@ import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, PLAIN_TYPE, TYPE}
 trait DefinedType {
   def name: String
   def typeRef: PLAIN_TYPE
+  def fields: List[(String, TYPE)]
 }
 
 case class CaseType(name: String, fields: List[(String, TYPE)]) extends DefinedType {

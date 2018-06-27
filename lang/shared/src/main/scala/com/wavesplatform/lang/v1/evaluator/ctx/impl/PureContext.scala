@@ -3,7 +3,8 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 import cats.data.EitherT
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Types}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Types.TYPEPLACEHOLDER
+import com.wavesplatform.lang.v1.compiler.Types.TYPEPLACEHOLDER._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
@@ -28,13 +29,6 @@ object PureContext {
       } yield result.toLong
     case _ => ???
   }
-
-//  val extract: NativeFunction =
-//    NativeFunction.create("extract", 1L, fromNonable(TYPEPARAM('T')) _, List(("opt", TYPEPARAM('T'): TYPEPLACEHOLDER)), EXTRACT) {
-//      case () :: Nil => Left("Extract from empty option")
-//      case v :: Nil  => Right(v)
-//      case _         => ???
-//    }
 
   val _isInstanceOf: BaseFunction = NativeFunction("_isInstanceOf", 1, ISINSTANCEOF, BOOLEAN, "obj" -> TYPEPARAM('T'), "of" -> STRING) {
     case (p: Boolean) :: ("Boolean") :: Nil => Right(true)
@@ -67,37 +61,33 @@ object PureContext {
 
   val takeRightBytes: BaseFunction = UserFunction("takeRightBytes", 1, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
     case (xs: EXPR) :: (number: EXPR) :: Nil =>
-      Right(
-        FUNCTION_CALL(
-          FunctionHeader.Native(DROP_BYTES),
-          List(
-            xs,
-            FUNCTION_CALL(
-              FunctionHeader.Native(SUB_LONG),
-              List(
-                FUNCTION_CALL(FunctionHeader.Native(SIZE_BYTES), List(xs)),
-                number
-              )
+      FUNCTION_CALL(
+        FunctionHeader.Native(DROP_BYTES),
+        List(
+          xs,
+          FUNCTION_CALL(
+            FunctionHeader.Native(SUB_LONG),
+            List(
+              FUNCTION_CALL(FunctionHeader.Native(SIZE_BYTES), List(xs)),
+              number
             )
           )
         )
       )
-    case xs => notImplemented("takeRight(xs: byte[], number: Long)", xs)
+    case xs => ???
   }
 
   val dropRightBytes: BaseFunction = UserFunction("dropRightBytes", 1, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
     case (xs: EXPR) :: (number: EXPR) :: Nil =>
-      Right(
-        FUNCTION_CALL(
-          FunctionHeader.Native(TAKE_BYTES),
-          List(
-            xs,
-            FUNCTION_CALL(
-              FunctionHeader.Native(SUB_LONG),
-              List(
-                FUNCTION_CALL(FunctionHeader.Native(SIZE_BYTES), List(xs)),
-                number
-              )
+      FUNCTION_CALL(
+        FunctionHeader.Native(TAKE_BYTES),
+        List(
+          xs,
+          FUNCTION_CALL(
+            FunctionHeader.Native(SUB_LONG),
+            List(
+              FUNCTION_CALL(FunctionHeader.Native(SIZE_BYTES), List(xs)),
+              number
             )
           )
         )
@@ -119,17 +109,15 @@ object PureContext {
 
   val takeRightString: BaseFunction = UserFunction("takeRight", 1, STRING, "xs" -> STRING, "number" -> LONG) {
     case (xs: EXPR) :: (number: EXPR) :: Nil =>
-      Right(
-        FUNCTION_CALL(
-          FunctionHeader.Native(DROP_STRING),
-          List(
-            xs,
-            FUNCTION_CALL(
-              FunctionHeader.Native(SUB_LONG),
-              List(
-                FUNCTION_CALL(FunctionHeader.Native(SIZE_STRING), List(xs)),
-                number
-              )
+      FUNCTION_CALL(
+        FunctionHeader.Native(DROP_STRING),
+        List(
+          xs,
+          FUNCTION_CALL(
+            FunctionHeader.Native(SUB_LONG),
+            List(
+              FUNCTION_CALL(FunctionHeader.Native(SIZE_STRING), List(xs)),
+              number
             )
           )
         )
@@ -139,17 +127,15 @@ object PureContext {
 
   val dropRightString: BaseFunction = UserFunction("dropRight", 1, STRING, "xs" -> STRING, "number" -> LONG) {
     case (xs: EXPR) :: (number: EXPR) :: Nil =>
-      Right(
-        FUNCTION_CALL(
-          FunctionHeader.Native(TAKE_STRING),
-          List(
-            xs,
-            FUNCTION_CALL(
-              FunctionHeader.Native(SUB_LONG),
-              List(
-                FUNCTION_CALL(FunctionHeader.Native(SIZE_STRING), List(xs)),
-                number
-              )
+      FUNCTION_CALL(
+        FunctionHeader.Native(TAKE_STRING),
+        List(
+          xs,
+          FUNCTION_CALL(
+            FunctionHeader.Native(SUB_LONG),
+            List(
+              FUNCTION_CALL(FunctionHeader.Native(SIZE_STRING), List(xs)),
+              number
             )
           )
         )
@@ -157,9 +143,9 @@ object PureContext {
     case xs => notImplemented("dropRight(xs: String, number: Long)", xs)
   }
 
-  private def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (t.Underlying, t.Underlying) => r.Underlying): BaseFunction =
+  private def createOp(op: BinaryOperation, t: TYPEPLACEHOLDER, r: TYPEPLACEHOLDER, func: Short)(body: (Any, Any) => Any): BaseFunction =
     NativeFunction(opsToFunctions(op), 1, func, r, "a" -> t, "b" -> t) {
-      case a :: b :: Nil => Right(body(a.asInstanceOf[t.Underlying], b.asInstanceOf[t.Underlying]))
+      case a :: b :: Nil => Right(body(a, b))
       case _             => ???
     }
 
@@ -184,38 +170,37 @@ object PureContext {
     case _                   => ???
   }
 
-  private def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (t.Underlying, t.Underlying) => r.Underlying): BaseFunction =
+  private def createTryOp(op: BinaryOperation, t: TYPEPLACEHOLDER, r: TYPEPLACEHOLDER, func: Short)(body: (Any, Any) => Any): BaseFunction =
     NativeFunction(opsToFunctions(op), 1, func, r, "a" -> t, "b" -> t) {
       case a :: b :: Nil =>
         try {
-          Right(body(a.asInstanceOf[t.Underlying], b.asInstanceOf[t.Underlying]))
+          Right(body(a, b))
         } catch {
           case e: Throwable => Left(e.getMessage())
         }
       case _ => ???
     }
 
-  val mulLong: BaseFunction       = createTryOp(MUL_OP, LONG, LONG, MUL_LONG)(Math.multiplyExact)
-  val divLong: BaseFunction       = createTryOp(DIV_OP, LONG, LONG, DIV_LONG)(Math.floorDiv)
-  val modLong: BaseFunction       = createTryOp(MOD_OP, LONG, LONG, MOD_LONG)(Math.floorMod)
-  val sumLong: BaseFunction       = createTryOp(SUM_OP, LONG, LONG, SUM_LONG)(Math.addExact)
-  val subLong: BaseFunction       = createTryOp(SUB_OP, LONG, LONG, SUB_LONG)(Math.subtractExact)
-  val sumString: BaseFunction     = createOp(SUM_OP, STRING, STRING, SUM_STRING)(_ + _)
-  val sumByteVector: BaseFunction = createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES)((a, b) => ByteVector(a.toArray ++ b.toArray))
-  val ge: BaseFunction            = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)(_ >= _)
-  val gt: BaseFunction            = createOp(GT_OP, LONG, BOOLEAN, GT_LONG)(_ > _)
-  val sge: BaseFunction           = createOp(GE_OP, STRING, BOOLEAN, GE_STRING)(_ >= _)
-  val sgt: BaseFunction           = createOp(GT_OP, STRING, BOOLEAN, GT_STRING)(_ > _)
+  val mulLong: BaseFunction   = createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => Math.multiplyExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+  val divLong: BaseFunction   = createTryOp(DIV_OP, LONG, LONG, DIV_LONG)((a, b) => Math.floorDiv(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+  val modLong: BaseFunction   = createTryOp(MOD_OP, LONG, LONG, MOD_LONG)((a, b) => Math.floorMod(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+  val sumLong: BaseFunction   = createTryOp(SUM_OP, LONG, LONG, SUM_LONG)((a, b) => Math.addExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+  val subLong: BaseFunction   = createTryOp(SUB_OP, LONG, LONG, SUB_LONG)((a, b) => Math.subtractExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+  val sumString: BaseFunction = createOp(SUM_OP, STRING, STRING, SUM_STRING)((a, b) => a.asInstanceOf[String] + b.asInstanceOf[String])
+  val sumByteVector: BaseFunction =
+    createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES)((a, b) => ByteVector.concat(Seq(a.asInstanceOf[ByteVector], b.asInstanceOf[ByteVector])))
+  val ge: BaseFunction = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)((a, b) => a.asInstanceOf[Long] >= b.asInstanceOf[Long])
+  val gt: BaseFunction = createOp(GT_OP, LONG, BOOLEAN, GT_LONG)((a, b) => a.asInstanceOf[Long] > b.asInstanceOf[Long])
 
   val eq: BaseFunction =
-    NativeFunction.create(EQ_OP.func, 1, canBeEq(TYPEPARAM('A'), TYPEPARAM('B')) _, List("a" -> TYPEPARAM('A'), "b" -> TYPEPARAM('B')), EQ) {
+    NativeFunction(EQ_OP.func, 1, EQ, BOOLEAN, "a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')) {
       case a :: b :: Nil => Right(a == b)
       case _             => ???
     }
 
   val ne: BaseFunction =
-    UserFunction.create(NE_OP.func, 1, canBeEq(TYPEPARAM('A'), TYPEPARAM('B')) _, List("a" -> TYPEPARAM('A'), "b" -> TYPEPARAM('B'))) {
-      case a :: b :: Nil => Right(FUNCTION_CALL(FunctionHeader.Native(NOT_BOOLEAN), List(FUNCTION_CALL(FunctionHeader.Native(EQ), List(a, b)))))
+    UserFunction(NE_OP.func, 1, BOOLEAN, "a" -> TYPEPARAM('A'), "b" -> TYPEPARAM('B')) {
+      case a :: b :: Nil => FUNCTION_CALL(FunctionHeader.Native(NOT_BOOLEAN), List(FUNCTION_CALL(FunctionHeader.Native(EQ), List(a, b))))
       case _             => ???
     }
 
@@ -231,15 +216,13 @@ object PureContext {
     ne,
     ge,
     gt,
-    sge,
-    sgt,
     getElement,
     getListSize,
     uMinus,
     uNot
   )
 
-  private val vars: Map[String, (Types.TYPE, LazyVal)] = Map((errRef, (NOTHING, err)), ("unit", (UNIT, LazyVal(EitherT.pure(())))))
+  private val vars: Map[String, (Types.TYPE, LazyVal)] = Map((errRef, (Types.NOTHING, err)), ("unit", (Types.UNIT, LazyVal(EitherT.pure(())))))
   private val functions = Seq(
     fraction,
     sizeBytes,
@@ -257,9 +240,9 @@ object PureContext {
 
   lazy val ctx = CTX(
     Seq(
-      new DefinedType { val name = "Unit"; val typeRef   = UNIT   },
-      new DefinedType { val name = "Int"; val typeRef    = LONG   },
-      new DefinedType { val name = "String"; val typeRef = STRING }
+      new DefinedType { val name = "Unit"; val typeRef   = Types.UNIT; val fields   = List.empty },
+      new DefinedType { val name = "Int"; val typeRef    = Types.LONG; val fields   = List.empty },
+      new DefinedType { val name = "String"; val typeRef = Types.STRING; val fields = List.empty }
     ),
     vars,
     functions

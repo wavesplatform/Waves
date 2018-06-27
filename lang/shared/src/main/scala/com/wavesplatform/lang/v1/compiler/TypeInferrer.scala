@@ -75,21 +75,19 @@ object TypeInferrer {
   }
 
   // if-then-else
-  def findCommonType(t1: TYPE, t2: TYPE): TYPE = {
-    if (t2 == NOTHING) t1
-    else if (t1 == NOTHING) t2
-    else if (t1 == t2) t1
-    else
-      (t1, t2) match {
-        case (r @ LIST(it1), a @ LIST(it2)) =>
-          findCommonType(it1, it2) match {
-            case UNION(_)      => UNION(r, a)
-            case p: PLAIN_TYPE => LIST(p)
-          }
-        case (p1: PLAIN_TYPE, p2: PLAIN_TYPE) => if (p1 == p2) p1 else UNION(p1, p2)
-        case (r: UNION, a: UNION)             => UNION.create((r.l.toSet ++ a.l.toSet).toSeq)
-        case (r: UNION, t: PLAIN_TYPE)        => findCommonType(r, UNION(t))
-        case (r: PLAIN_TYPE, t: UNION)        => findCommonType(UNION(r), t)
+  def findCommonType(t1: TYPE, t2: TYPE): TYPE = (t1, t2) match {
+    case (t1, NOTHING)        => t1
+    case (NOTHING, t2)        => t2
+    case (t1, t2) if t1 == t2 => t1
+
+    case (r @ LIST(it1), a @ LIST(it2)) =>
+      findCommonType(it1, it2) match {
+        case UNION(_)      => UNION(r, a)
+        case p: PLAIN_TYPE => LIST(p)
       }
+    case (p1: PLAIN_TYPE, p2: PLAIN_TYPE) => if (p1 == p2) p1 else UNION(p1, p2)
+    case (r: UNION, a: UNION)             => UNION.create((r.l.toSet ++ a.l.toSet).toSeq)
+    case (r: UNION, t: PLAIN_TYPE)        => findCommonType(r, UNION(t))
+    case (r: PLAIN_TYPE, t: UNION)        => findCommonType(UNION(r), t)
   }
 }

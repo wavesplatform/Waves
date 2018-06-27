@@ -49,7 +49,7 @@ object EvaluatorV1 extends ExprEvaluator {
         .get(ctx)
         .get(header)
         .map {
-          case func: UserFunction => func.ev(args).liftTo[EvalM].flatMap(evalExpr)
+          case func: UserFunction => func.ev(args).pure[EvalM].flatMap(evalExpr)
           case func: NativeFunction =>
             args
               .traverse[EvalM, Any](a => evalExpr(a))

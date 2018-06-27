@@ -8,7 +8,7 @@ import com.wavesplatform.lang.directives.Directive
 import com.wavesplatform.lang.v1.compiler.CompilationError._
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Types.{TYPEPLACEHOLDER, _}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
@@ -149,15 +149,16 @@ object CompilerV1 {
 
   private def compileFunctionCall(p: Pos, namePart: PART[String], args: List[Expressions.EXPR]): CompileM[(EXPR, TYPE)] = {
     for {
+      ctx          <- get[CompilerContext, CompilationError]
       name         <- handlePart(namePart)
       signatures   <- get[CompilerContext, CompilationError].map(_.functionTypeSignaturesByName(name))
       compiledArgs <- args.traverse(compileExpr)
       result <- (signatures match {
         case Nil           => FunctionNotFound(p.start, p.end, name, compiledArgs.map(_._2.toString)).asLeft[(EXPR, TYPE)]
-        case single :: Nil => matchFuncOverload(p, name, args, compiledArgs, single)
+        case single :: Nil => matchFuncOverload(p, name, args, compiledArgs, ctx.predefTypes, single)
         case many =>
           val matchedSigs = many
-            .map(matchFuncOverload(p, name, args, compiledArgs, _))
+            .map(matchFuncOverload(p, name, args, compiledArgs, ctx.predefTypes, _))
             .collect({ case Right(ex) => ex })
 
           matchedSigs match {
@@ -183,6 +184,7 @@ object CompilerV1 {
                                 funcName: String,
                                 funcArgs: List[Expressions.EXPR],
                                 resolvedArgs: List[(EXPR, TYPE)],
+                                predefTypes: Map[String, DefinedType],
                                 f: FunctionTypeSignature): Either[CompilationError, (EXPR, TYPE)] = {
     val argTypes = f.args
     if (funcArgs.lengthCompare(argTypes.size) != 0)
@@ -193,9 +195,29 @@ object CompilerV1 {
       val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case (typedExpr, tph) => (typedExpr._2, tph) }
       for {
         resolvedTypeParams <- TypeInferrer(typePairs).leftMap(Generic(p.start, p.end, _))
-        resolvedResultType <- f.result(resolvedTypeParams).leftMap(Generic(p.start, p.end, _))
         args = typedExpressionArgumentsAndTypedPlaceholders.map(_._1._1)
-      } yield (FUNCTION_CALL(f.header, args): EXPR, resolvedResultType)
+      } yield {
+        val resultType = typePlaceholdertoType(f.result, resolvedTypeParams, predefTypes)
+        (FUNCTION_CALL(f.header, args): EXPR, resultType)
+      }
+    }
+  }
+
+  def typePlaceholdertoType(resultType: TYPEPLACEHOLDER,
+                            resolvedPlaceholders: Map[TYPEPLACEHOLDER.TYPEPARAM, TYPE],
+                            knownTypes: Map[String, DefinedType]): TYPE = {
+    resultType match {
+      case tp @ TYPEPLACEHOLDER.TYPEPARAM(char) => resolvedPlaceholders(tp)
+      case TYPEPLACEHOLDER.LISTTYPEPARAM(t)     => LIST(typePlaceholdertoType(t, resolvedPlaceholders, knownTypes))
+      case TYPEPLACEHOLDER.UNION(l)             => UNION.create(l.flatMap(l1 => typePlaceholdertoType(l1, resolvedPlaceholders, knownTypes).l))
+      case TYPEPLACEHOLDER.UNIT                 => UNIT
+      case TYPEPLACEHOLDER.LONG                 => LONG
+      case TYPEPLACEHOLDER.BYTEVECTOR           => BYTEVECTOR
+      case TYPEPLACEHOLDER.BOOLEAN              => BOOLEAN
+      case TYPEPLACEHOLDER.STRING               => STRING
+      case TYPEPLACEHOLDER.CASETYPEREF(name) =>
+        val casetyperef = knownTypes(name)
+        CASETYPEREF(casetyperef.name, casetyperef.fields)
     }
   }
 
@@ -234,10 +256,8 @@ object CompilerV1 {
         ctr.fields.find(_._1 == fieldName).map(_._2)
       })
       .fold((FieldNotFound(p.start, p.end, fieldName, s"Union($types)"): CompilationError).asLeft[(GETTER, TYPE)])(ts => {
-        TypeInferrer.findCommonType(ts) match {
-          case Some(ct) => (GETTER(expr, fieldName), ct).asRight[CompilationError]
-          case None     => UnexpectedType(p.start, p.end, s"UNION($types)", s"UNION($ts)").asLeft[(GETTER, TYPE)]
-        }
+        val ct = TypeInferrer.findCommonType(ts)
+        (GETTER(expr, fieldName), ct).asRight[CompilationError]
       })
   }
 
