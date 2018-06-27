@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.UnexpectedStatusCodeException
-import com.wavesplatform.it.sync.{calcDataFee, fee}
+import com.wavesplatform.it.sync.{calcDataFee, minFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, EitherExt2, IntegerDataEntry, StringDataEntry}
@@ -36,12 +36,12 @@ class DataTransactionSuite extends BaseTransactionSuite {
     notMiner.assertBalances(firstAddress, balance1, eff1)
 
     val leaseAmount = 1.waves
-    val leaseId     = sender.lease(firstAddress, secondAddress, leaseAmount, fee).id
+    val leaseId     = sender.lease(firstAddress, secondAddress, leaseAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(leaseId)
 
     assertBadRequestAndResponse(sender.putData(firstAddress, data, balance1 - leaseAmount), "negative effective balance")
     nodes.waitForHeightArise()
-    notMiner.assertBalances(firstAddress, balance1 - fee, eff1 - leaseAmount - fee)
+    notMiner.assertBalances(firstAddress, balance1 - minFee, eff1 - leaseAmount - minFee)
   }
 
   test("invalid transaction should not be in UTX or blockchain") {
@@ -173,7 +173,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("malformed JSON") {
-    def request(item: JsObject) = Json.obj("version" -> 1, "sender"   -> secondAddress, "fee" -> fee, "data" -> Seq(item))
+    def request(item: JsObject) = Json.obj("version" -> 1, "sender"   -> secondAddress, "fee" -> minFee, "data" -> Seq(item))
     val validItem               = Json.obj("key"     -> "key", "type" -> "integer", "value"   -> 8)
 
     assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "key")), "key is missing")
