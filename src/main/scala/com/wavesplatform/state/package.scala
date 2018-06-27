@@ -3,9 +3,8 @@ package com.wavesplatform
 import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.block.Block
 import scorex.transaction.ValidationError.{AliasDoesNotExist, GenericError}
-import scorex.transaction._
 import scorex.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
-import scorex.transaction.{AssetId, CreateAliasTransactionV1, Transaction, ValidationError}
+import scorex.transaction._
 
 import scala.reflect.ClassTag
 import scala.util.{Left, Right, Try}
@@ -45,7 +44,7 @@ package object state {
     def blockAt(height: Int): Option[Block]        = blockchain.blockBytes(height).flatMap(bb => Block.parseBytes(bb).toOption)
 
     def lastBlockHeaderAndSize: Option[(Block, Int)] = blockchain.lastBlock.map(b => (b, b.bytes().length))
-    def lastBlockId: Option[AssetId]                 = blockchain.lastBlockHeaderAndSize.map(_._1.signerData.signature)
+    def lastBlockId: Option[ByteStr]                 = blockchain.lastBlockHeaderAndSize.map(_._1.uniqueId)
     def lastBlockTimestamp: Option[Long]             = blockchain.lastBlockHeaderAndSize.map(_._1.timestamp)
 
     def lastBlocks(howMany: Int): Seq[Block] = {
@@ -53,7 +52,7 @@ package object state {
     }
 
     def genesis: Block = blockchain.blockAt(1).get
-    def resolveAliasEi[T <: Transaction](aoa: AddressOrAlias): Either[ValidationError, Address] =
+    def resolveAliasEi(aoa: AddressOrAlias): Either[ValidationError, Address] =
       aoa match {
         case a: Address => Right(a)
         case a: Alias   => blockchain.resolveAlias(a).toRight(AliasDoesNotExist(a))
@@ -80,6 +79,11 @@ package object state {
       blockchain
         .addressTransactions(address, Set(LeaseTransactionV1.typeId), Int.MaxValue, 0)
         .collect { case (h, l: LeaseTransaction) if blockchain.leaseDetails(l.id()).exists(_.isActive) => h -> l }
+
+    def unsafeHeightOf(id: ByteStr): Int =
+      blockchain
+        .heightOf(id)
+        .getOrElse(throw new IllegalStateException(s"Can't find a block: $id"))
   }
 
 }

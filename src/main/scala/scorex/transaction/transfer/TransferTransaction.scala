@@ -6,7 +6,7 @@ import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{AddressOrAlias, PublicKeyAccount}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.serialization.Deser
 import scorex.transaction._
@@ -29,6 +29,7 @@ trait TransferTransaction extends ProvenTransaction {
       "recipient"  -> recipient.stringRepr,
       "assetId"    -> assetId.map(_.base58),
       "feeAssetId" -> feeAssetId.map(_.base58),
+      "feeAsset"   -> feeAssetId.map(_.base58), // legacy v0.11.1 compat
       "amount"     -> amount,
       "attachment" -> Base58.encode(attachment)
     ))
@@ -59,11 +60,16 @@ object TransferTransaction {
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
   def validate(amount: Long, feeAmount: Long, attachment: Array[Byte]): Either[ValidationError, Unit] = {
-    (validateAmount(amount, "waves"), validateFee(feeAmount), validateAttachment(attachment), validateSum(Seq(amount, feeAmount)))
-      .mapN { case _ => () }
+    (
+      validateAmount(amount, "waves"),
+      validateFee(feeAmount),
+      validateAttachment(attachment),
+      validateSum(Seq(amount, feeAmount))
+    ).mapN { case _ => () }
       .toEither
       .leftMap(_.head)
   }
+
   def parseBase(bytes: Array[Byte], start: Int) = {
     val sender              = PublicKeyAccount(bytes.slice(start, start + KeyLength))
     val (assetIdOpt, s0)    = Deser.parseByteArrayOption(bytes, start + KeyLength, AssetIdLength)

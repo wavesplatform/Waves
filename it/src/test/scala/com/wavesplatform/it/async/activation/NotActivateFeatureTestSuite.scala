@@ -4,6 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.{FeatureActivationStatus, NodeFeatureStatus}
 import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.BlockHeaders
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
@@ -55,9 +56,9 @@ class NotActivateFeatureTestSuite
   }
 
   "supported blocks is not increased when nobody votes for feature" in {
-    val generatedBlocks              = Await.result(nodes.head.blockSeq(1, votingInterval - 1), 2.minute)
-    val featuresMapInGeneratedBlocks = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
-    val votesForFeature1             = featuresMapInGeneratedBlocks.getOrElse(votingFeatureNum, Seq.empty).length
+    val generatedBlocks: Seq[BlockHeaders] = Await.result(nodes.head.blockHeadersSeq(1, votingInterval - 1), 2.minute)
+    val featuresMapInGeneratedBlocks       = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
+    val votesForFeature1                   = featuresMapInGeneratedBlocks.getOrElse(votingFeatureNum, Seq.empty).length
 
     votesForFeature1 shouldBe 0
     activationStatusInfoBefore.foreach(assertVotingStatus(_, votesForFeature1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Implemented))

@@ -5,7 +5,7 @@ import java.util.concurrent.ThreadLocalRandom
 import cats.Show
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
 import com.wavesplatform.state.DataEntry.{MaxValueSize, Type}
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, LongDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, EitherExt2, IntegerDataEntry}
 import org.slf4j.LoggerFactory
 import scorex.account.{Alias, PrivateKeyAccount}
 import scorex.transaction._
@@ -42,7 +42,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
   def generate(n: Int): Seq[Transaction] = {
     val issueTransactionSender = randomFrom(accounts).get
     val tradeAssetIssue = IssueTransactionV1
-      .create(
+      .selfSigned(
         issueTransactionSender,
         "TRADE".getBytes,
         "Waves DEX is the best exchange ever".getBytes,
@@ -58,14 +58,14 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
     val tradeAssetDistribution = {
       tradeAssetIssue +: accounts.map(acc => {
         TransferTransactionV1
-          .create(Some(tradeAssetIssue.id()),
-                  issueTransactionSender,
-                  acc,
-                  5,
-                  System.currentTimeMillis(),
-                  None,
-                  100000,
-                  Array.fill(r.nextInt(100))(r.nextInt().toByte))
+          .selfSigned(Some(tradeAssetIssue.id()),
+                      issueTransactionSender,
+                      acc,
+                      5,
+                      System.currentTimeMillis(),
+                      None,
+                      100000,
+                      Array.fill(r.nextInt(100))(r.nextInt().toByte))
           .right
           .get
       })
@@ -95,7 +95,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
             val amount     = 100000000L + Random.nextInt(Int.MaxValue)
             logOption(
               IssueTransactionV1
-                .create(sender, name, description, amount, Random.nextInt(9).toByte, reissuable, 100000000L + r.nextInt(100000000), ts))
+                .selfSigned(sender, name, description, amount, Random.nextInt(9).toByte, reissuable, 100000000L + r.nextInt(100000000), ts))
           case TransferTransactionV1 =>
             val useAlias  = r.nextBoolean()
             val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
@@ -109,19 +109,27 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
             } else Some((randomFrom(accounts).get, None))
             senderAndAssetOpt.flatMap {
               case (sender, asset) =>
-                logOption(TransferTransactionV1
-                  .create(asset, sender, recipient, r.nextInt(500000), ts, None, moreThatStandartFee, Array.fill(r.nextInt(100))(r.nextInt().toByte)))
+                logOption(
+                  TransferTransactionV1
+                    .selfSigned(asset,
+                                sender,
+                                recipient,
+                                r.nextInt(500000),
+                                ts,
+                                None,
+                                moreThatStandartFee,
+                                Array.fill(r.nextInt(100))(r.nextInt().toByte)))
             }
           case ReissueTransactionV1 =>
             val reissuable = r.nextBoolean()
             randomFrom(reissuableIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
-              logOption(ReissueTransactionV1.create(sender, assetTx.id(), Random.nextInt(Int.MaxValue), reissuable, moreThatStandartFee, ts))
+              logOption(ReissueTransactionV1.selfSigned(sender, assetTx.id(), Random.nextInt(Int.MaxValue), reissuable, moreThatStandartFee, ts))
             })
           case BurnTransactionV1 =>
             randomFrom(validIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
-              logOption(BurnTransactionV1.create(sender, assetTx.id(), Random.nextInt(1000), moreThatStandartFee, ts))
+              logOption(BurnTransactionV1.selfSigned(sender, assetTx.id(), Random.nextInt(1000), moreThatStandartFee, ts))
             })
           case ExchangeTransaction =>
             val matcher   = randomFrom(accounts).get
@@ -137,16 +145,16 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
             val recipientOpt =
               if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender)).map(_.alias)
               else randomFrom(accounts.filter(_ != sender).map(_.toAddress))
-            recipientOpt.flatMap(recipient => logOption(LeaseTransactionV1.create(sender, 1, moreThatStandartFee * 3, ts, recipient)))
+            recipientOpt.flatMap(recipient => logOption(LeaseTransactionV1.selfSigned(sender, 1, moreThatStandartFee * 3, ts, recipient)))
           case LeaseCancelTransactionV1 =>
             randomFrom(activeLeaseTransactions).flatMap(lease => {
               val sender = accounts.find(_.address == lease.sender.address).get
-              logOption(LeaseCancelTransactionV1.create(sender, lease.id(), moreThatStandartFee * 3, ts))
+              logOption(LeaseCancelTransactionV1.selfSigned(sender, lease.id(), moreThatStandartFee * 3, ts))
             })
           case CreateAliasTransactionV1 =>
             val sender      = randomFrom(accounts).get
             val aliasString = NarrowTransactionGenerator.generateAlias()
-            logOption(CreateAliasTransactionV1.create(sender, Alias.buildWithCurrentNetworkByte(aliasString).right.get, 100000, ts))
+            logOption(CreateAliasTransactionV1.selfSigned(sender, Alias.buildWithCurrentNetworkByte(aliasString).explicitGet(), 100000, ts))
           case MassTransferTransaction =>
             val transferCount = r.nextInt(MassTransferTransaction.MaxTransferCount)
             val transfers = for (i <- 0 to transferCount) yield {
@@ -185,7 +193,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
               etype  = r.nextInt(Type.maxId)
             } yield
               etype match {
-                case t if t == Type.Integer.id => LongDataEntry(key, r.nextLong)
+                case t if t == Type.Integer.id => IntegerDataEntry(key, r.nextLong)
                 case t if t == Type.Boolean.id => BooleanDataEntry(key, r.nextBoolean)
                 case t if t == Type.Binary.id =>
                   val size = r.nextInt(MaxValueSize + 1)

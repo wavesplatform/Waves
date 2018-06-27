@@ -31,7 +31,7 @@ object Exporter extends ScorexLogging {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
-    val db               = openDB(settings.dataDirectory, settings.levelDbCacheSize)
+    val db               = openDB(settings.dataDirectory)
     val blockchain       = StorageFactory(settings, db, NTP)
     val blockchainHeight = blockchain.height
     val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))

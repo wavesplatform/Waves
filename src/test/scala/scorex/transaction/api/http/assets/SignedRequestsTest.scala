@@ -1,9 +1,10 @@
 package scorex.transaction.api.http.assets
 
+import com.wavesplatform.state.EitherExt2
+import com.wavesplatform.utils.Base58
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
 import scorex.api.http.assets._
-import scorex.crypto.encode.Base58
 
 class SignedRequestsTest extends FunSuite with Matchers {
 
@@ -30,7 +31,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.timestamp shouldBe 1484064349669L
     req.reissuable shouldBe true
 
-    val tx = req.toTx.right.get
+    val tx = req.toTx.explicitGet()
     Base58.encode(tx.name) shouldBe "zVbyBrMk"
     Base58.encode(tx.description) shouldBe "zVbyBrMk"
     tx.reissuable shouldBe true
@@ -61,7 +62,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.timestamp shouldBe 1234L
     req.reissuable shouldBe true
 
-    val tx = req.toTx.right.get
+    val tx = req.toTx.explicitGet()
     tx.assetId.base58 shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
     tx.reissuable shouldBe true
     tx.fee shouldBe 100000L
@@ -95,7 +96,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.signature shouldBe "4dPRTW6XyRQUTQwwpuZDCNy1UDHYG9WGsEQnn5v49Lj5uyh4XGDdwtEq3t6ZottweAXHieK32UokHwiTxGFtz9bQ"
     req.attachment shouldBe Some("A")
 
-    val tx = req.toTx.right.get
+    val tx = req.toTx.explicitGet()
     Base58.encode(tx.sender.publicKey) shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
     tx.timestamp shouldBe 1479462208828L
     tx.attachment shouldBe Base58.decode("A").get
@@ -131,7 +132,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.signature shouldBe "UAhYXYdkFAFBuwAuUFP3yw7E8aRTyx56ZL4UPbT4ufomBzVLMRpdW2dCtJmfpCuPPMhGTvdzhXwb7o4ER6HAUpJ"
     req.attachment shouldBe Some("2Kk7Zsr1e9jsqSBM5hpF")
 
-    val tx = req.toTx.right.get
+    val tx = req.toTx.explicitGet()
     Base58.encode(tx.sender.publicKey) shouldBe "FJuErRxhV9JaFUwcYLabFK5ENvDRfyJbRz8FeVfYpBLn"
     tx.timestamp shouldBe 1489054107569L
     tx.attachment shouldBe Base58.decode("2Kk7Zsr1e9jsqSBM5hpF").get

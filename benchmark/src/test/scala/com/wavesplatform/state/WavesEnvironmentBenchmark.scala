@@ -6,7 +6,7 @@ import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.LevelDBFactory
-import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.traits.{Environment, Recipient}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.WavesEnvironmentBenchmark._
 import com.wavesplatform.state.bench.DataTestData
@@ -33,13 +33,13 @@ import scala.io.Codec
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(1)
 @Fork(1)
-@Warmup(iterations = 1)
-@Measurement(iterations = 5)
+@Warmup(iterations = 10)
+@Measurement(iterations = 10)
 class WavesEnvironmentBenchmark {
 
   @Benchmark
   def resolveAddress_test(st: ResolveAddressSt, bh: Blackhole): Unit = {
-    bh.consume(st.environment.resolveAddress(st.aliases.random))
+    bh.consume(st.environment.resolveAlias(st.aliases.random))
   }
 
   @Benchmark
@@ -65,7 +65,7 @@ class WavesEnvironmentBenchmark {
   @Benchmark
   def data_test(st: DataSt, bh: Blackhole): Unit = {
     val x = st.data.random
-    bh.consume(st.environment.data(x.addr.toArray, x.key, x.dataType))
+    bh.consume(st.environment.data(Recipient.Address(x.addr), x.key, x.dataType))
   }
 
 }
@@ -74,7 +74,7 @@ object WavesEnvironmentBenchmark {
 
   @State(Scope.Benchmark)
   class ResolveAddressSt extends BaseSt {
-    val aliases: Vector[Array[Byte]] = load("resolveAddress", benchSettings.aliasesFile)(x => Alias.fromString(x).explicitGet().bytes.arr)
+    val aliases: Vector[String] = load("resolveAddress", benchSettings.aliasesFile)(x => Alias.fromString(x).explicitGet().name)
   }
 
   @State(Scope.Benchmark)

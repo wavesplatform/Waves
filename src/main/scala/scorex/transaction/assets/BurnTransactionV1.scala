@@ -10,7 +10,7 @@ import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
-case class BurnTransactionV1 private (sender: PublicKeyAccount, assetId: ByteStr, amount: Long, fee: Long, timestamp: Long, signature: ByteStr)
+case class BurnTransactionV1 private (sender: PublicKeyAccount, assetId: ByteStr, quantity: Long, fee: Long, timestamp: Long, signature: ByteStr)
     extends BurnTransaction
     with SignedTransaction
     with FastHashId {
@@ -48,8 +48,16 @@ object BurnTransactionV1 extends TransactionParserFor[BurnTransactionV1] with Tr
       .validateBurnParams(quantity, fee)
       .map(_ => BurnTransactionV1(sender, assetId, quantity, fee, timestamp, signature))
 
-  def create(sender: PrivateKeyAccount, assetId: ByteStr, quantity: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] =
+  def signed(sender: PublicKeyAccount,
+             assetId: ByteStr,
+             quantity: Long,
+             fee: Long,
+             timestamp: Long,
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
     create(sender, assetId, quantity, fee, timestamp, ByteStr.empty).right.map { unverified =>
-      unverified.copy(signature = ByteStr(crypto.sign(sender, unverified.bodyBytes())))
+      unverified.copy(signature = ByteStr(crypto.sign(signer, unverified.bodyBytes())))
     }
+
+  def selfSigned(sender: PrivateKeyAccount, assetId: ByteStr, quantity: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] =
+    signed(sender, assetId, quantity, fee, timestamp, sender)
 }

@@ -18,7 +18,7 @@ case class SignedSetScriptRequest(@ApiModelProperty(required = true)
                                   version: Byte,
                                   @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                                   senderPublicKey: String,
-                                  @ApiModelProperty(value = "Base58 encoded script(including version and checksum)", required = true)
+                                  @ApiModelProperty(value = "Base64 encoded script(including version and checksum)", required = true)
                                   script: Option[String],
                                   @ApiModelProperty(required = true)
                                   fee: Long,
@@ -32,7 +32,7 @@ case class SignedSetScriptRequest(@ApiModelProperty(required = true)
       _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _script <- script match {
         case None    => Right(None)
-        case Some(s) => Script.fromBase58String(s).map(Some(_))
+        case Some(s) => Script.fromBase64String(s).map(Some(_))
       }
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)

@@ -84,6 +84,23 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
       _ <- IssueTransaction.validateIssueParams(name, description, quantity, decimals, reissuable, fee)
     } yield IssueTransactionV2(version, chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs)
 
+  def signed(version: Byte,
+             chainId: Byte,
+             sender: PublicKeyAccount,
+             name: Array[Byte],
+             description: Array[Byte],
+             quantity: Long,
+             decimals: Byte,
+             reissuable: Boolean,
+             script: Option[Script],
+             fee: Long,
+             timestamp: Long,
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
+    for {
+      unverified <- create(version, chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty)
+      proofs     <- Proofs.create(Seq(ByteStr(crypto.sign(signer, unverified.bodyBytes()))))
+    } yield unverified.copy(proofs = proofs)
+
   def selfSigned(version: Byte,
                  chainId: Byte,
                  sender: PrivateKeyAccount,
@@ -95,8 +112,5 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
                  script: Option[Script],
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] =
-    for {
-      unverified <- create(version, chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty)
-      proofs     <- Proofs.create(Seq(ByteStr(crypto.sign(sender, unverified.bodyBytes()))))
-    } yield unverified.copy(proofs = proofs)
+    signed(version, chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender)
 }

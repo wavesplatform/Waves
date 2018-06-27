@@ -3,9 +3,9 @@ package com.wavesplatform.it.sync.transactions
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.Json
+import com.wavesplatform.it.sync._
 import scorex.transaction.lease.LeaseTransaction.Status.{Active, Canceled}
 
 class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -13,16 +13,13 @@ class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure 
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  private val transferFee   = 0.001.waves
-  private val leasingAmount = 10.waves
-
   test("verification of leasing status") {
-    val createdLeaseTxId = sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee = transferFee).id
+    val createdLeaseTxId = sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee = fee).id
     nodes.waitForHeightAriseAndTxPresent(createdLeaseTxId)
     val status = getStatus(createdLeaseTxId)
     status shouldBe Active
 
-    val cancelLeaseTxId = sender.cancelLease(firstAddress, createdLeaseTxId, fee = transferFee).id
+    val cancelLeaseTxId = sender.cancelLease(firstAddress, createdLeaseTxId, fee = fee).id
     notMiner.waitForTransaction(cancelLeaseTxId)
     val status1 = getStatus(createdLeaseTxId)
     status1 shouldBe Canceled

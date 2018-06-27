@@ -1,16 +1,19 @@
 package com.wavesplatform.lang.impl
 
 import scala.scalajs.js.annotation.JSGlobalScope
-import scala.scalajs.{js => platform}
+import scala.scalajs.js.typedarray.ArrayBuffer
+import scala.scalajs.js.{Object, UndefOr, native}
 
-@platform.native
+@native
 @JSGlobalScope
-object Global extends platform.Object {
-  def base58Encode(input: Array[Byte]): String                 = platform.native
-  def base58Decode(input: String): Either[String, Array[Byte]] = platform.native
+object Global extends Object {
+  def base58Encode(input: ArrayBuffer): String          = native
+  def base58Decode(input: String): UndefOr[ArrayBuffer] = native
+  def base64Encode(input: ArrayBuffer): String          = native
+  def base64Decode(input: String): UndefOr[ArrayBuffer] = native
 
-  def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean = platform.native
-  def keccak256(message: Array[Byte]): Array[Byte]                                        = platform.native
-  def blake2b256(message: Array[Byte]): Array[Byte]                                       = platform.native
-  def sha256(message: Array[Byte]): Array[Byte]                                           = platform.native
+  def curve25519verify(message: ArrayBuffer, sig: ArrayBuffer, pub: ArrayBuffer): Boolean = native
+  def keccak256(message: ArrayBuffer): ArrayBuffer                                        = native
+  def blake2b256(message: ArrayBuffer): ArrayBuffer                                       = native
+  def sha256(message: ArrayBuffer): ArrayBuffer                                           = native
 }

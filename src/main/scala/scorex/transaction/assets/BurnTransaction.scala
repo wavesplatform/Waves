@@ -15,7 +15,7 @@ trait BurnTransaction extends ProvenTransaction {
 
   def assetId: ByteStr
 
-  def amount: Long
+  def quantity: Long
 
   def fee: Long
 
@@ -28,7 +28,7 @@ trait BurnTransaction extends ProvenTransaction {
       "chainId" -> chainByte,
       "version" -> version,
       "assetId" -> assetId.base58,
-      "amount"  -> amount,
+      "amount"  -> quantity,
       "fee"     -> fee
     )
   }
@@ -37,7 +37,7 @@ trait BurnTransaction extends ProvenTransaction {
     Bytes.concat(
       sender.publicKey,
       assetId.arr,
-      Longs.toByteArray(amount),
+      Longs.toByteArray(quantity),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     )

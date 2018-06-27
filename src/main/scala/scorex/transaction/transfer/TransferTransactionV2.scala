@@ -69,6 +69,21 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
     } yield TransferTransactionV2(version, sender, recipient, assetId, amount, timestamp, feeAssetId, feeAmount, attachment, proofs)
   }
 
+  def signed(version: Byte,
+             assetId: Option[AssetId],
+             sender: PublicKeyAccount,
+             recipient: AddressOrAlias,
+             amount: Long,
+             timestamp: Long,
+             feeAssetId: Option[AssetId],
+             feeAmount: Long,
+             attachment: Array[Byte],
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+    create(version, assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, Proofs.empty).right.map { unsigned =>
+      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
+    }
+  }
+
   def selfSigned(version: Byte,
                  assetId: Option[AssetId],
                  sender: PrivateKeyAccount,
@@ -78,8 +93,6 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
                  feeAssetId: Option[AssetId],
                  feeAmount: Long,
                  attachment: Array[Byte]): Either[ValidationError, TransactionT] = {
-    create(version, assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, Proofs.empty).right.map { unsigned =>
-      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes())))).explicitGet())
-    }
+    signed(version, assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, sender)
   }
 }

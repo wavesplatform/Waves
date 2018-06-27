@@ -1,9 +1,10 @@
 package scorex.account
 
+import java.nio.ByteBuffer
+
 import com.wavesplatform.crypto
 import com.wavesplatform.state.ByteStr
-import com.wavesplatform.utils.base58Length
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.{Base58, base58Length}
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.InvalidAddress
 import scorex.utils.ScorexLogging
@@ -22,7 +23,7 @@ object Address extends ScorexLogging {
   val AddressVersion: Byte = 1
   val ChecksumLength       = 4
   val HashLength           = 20
-  val AddressLength        = 1 + 1 + ChecksumLength + HashLength
+  val AddressLength        = 1 + 1 + HashLength + ChecksumLength
   val AddressStringLength  = base58Length(AddressLength)
 
   private def scheme = AddressScheme.current
@@ -30,9 +31,9 @@ object Address extends ScorexLogging {
   private class AddressImpl(val bytes: ByteStr) extends Address
 
   def fromPublicKey(publicKey: Array[Byte], chainId: Byte = scheme.chainId): Address = {
-    val publicKeyHash   = crypto.secureHash(publicKey).take(HashLength)
-    val withoutChecksum = AddressVersion +: chainId +: publicKeyHash
-    val bytes           = withoutChecksum ++ calcCheckSum(withoutChecksum)
+    val publicKeyHash   = crypto.secureHash(publicKey)
+    val withoutChecksum = ByteBuffer.allocate(1 + 1 + HashLength).put(AddressVersion).put(chainId).put(publicKeyHash, 0, HashLength).array()
+    val bytes           = ByteBuffer.allocate(AddressLength).put(withoutChecksum).put(crypto.secureHash(withoutChecksum), 0, ChecksumLength).array()
     new AddressImpl(ByteStr(bytes))
   }
 
@@ -56,7 +57,7 @@ object Address extends ScorexLogging {
     for {
       _ <- Either.cond(base58String.length <= AddressStringLength,
                        (),
-                       InvalidAddress(s"Wrong address string length: max=$AddressStringLength, actual: address.length"))
+                       InvalidAddress(s"Wrong address string length: max=$AddressStringLength, actual: ${base58String.length}"))
       byteArray <- Base58.decode(base58String).toEither.left.map(ex => InvalidAddress(s"Unable to decode base58: ${ex.getMessage}"))
       address   <- fromBytes(byteArray)
     } yield address

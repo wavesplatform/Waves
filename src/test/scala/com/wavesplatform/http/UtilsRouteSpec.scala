@@ -3,17 +3,18 @@ package com.wavesplatform.http
 import com.wavesplatform.crypto
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.Terms.{BOOLEAN, Typed}
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.state.diffs.CommonValidation
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue}
 import scorex.api.http.{TooBigArrayAllocation, UtilsApiRoute}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.utils.Time
+import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks {
   private val route = UtilsApiRoute(
@@ -24,27 +25,29 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     restAPISettings
   ).route
 
+  val script = FUNCTION_CALL(
+    function = FunctionHeader.Native(EQ),
+    args = List(CONST_LONG(1), CONST_LONG(2))
+  )
+
   routePath("/script/compile") in {
     Post(routePath("/script/compile"), "1 == 2") ~> route ~> check {
-      val json = responseAs[JsValue]
-      val expectedScript = ScriptV1(
-        Typed.FUNCTION_CALL(
-          function = FunctionHeader("==", List(FunctionHeader.FunctionHeaderType.LONG, FunctionHeader.FunctionHeaderType.LONG)),
-          args = List(Typed.CONST_LONG(1), Typed.CONST_LONG(2)),
-          tpe = BOOLEAN
-        )).explicitGet()
+      val json           = responseAs[JsValue]
+      val expectedScript = ScriptV1(script).explicitGet()
 
-      Script.fromBase58String((json \ "script").as[String]) shouldBe Right(expectedScript)
+      Script.fromBase64String((json \ "script").as[String]) shouldBe Right(expectedScript)
       (json \ "complexity").as[Long] shouldBe 3
       (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }
   }
 
   routePath("/script/estimate") in {
-    Post(routePath("/script/estimate"), "ENDztao2K4J3jX4YPmCkBynkAeuK7ZXgDLF22c9FPhC74jDE3DQKMfT") ~> route ~> check {
+    val base64 = ScriptV1(script).explicitGet().bytes().base64
+
+    Post(routePath("/script/estimate"), base64) ~> route ~> check {
       val json = responseAs[JsValue]
-      (json \ "script").as[String] shouldBe "ENDztao2K4J3jX4YPmCkBynkAeuK7ZXgDLF22c9FPhC74jDE3DQKMfT"
-      (json \ "scriptText").as[String] shouldBe "FUNCTION_CALL(FunctionHeader(==,List(LONG, LONG)),List(CONST_LONG(1), CONST_LONG(2)),BOOLEAN)"
+      (json \ "script").as[String] shouldBe base64
+      (json \ "scriptText").as[String] shouldBe s"FUNCTION_CALL(Native($EQ),List(CONST_LONG(1), CONST_LONG(2)))"
       (json \ "complexity").as[Long] shouldBe 3
       (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }

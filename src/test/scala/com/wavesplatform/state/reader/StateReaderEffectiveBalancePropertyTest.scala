@@ -1,5 +1,6 @@
 package com.wavesplatform.state.reader
 
+import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -12,7 +13,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChec
   val setup: Gen[(GenesisTransaction, Int, Int, Int)] = for {
     master <- accountGen
     ts     <- positiveIntGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     emptyBlocksAmt <- Gen.choose(1, 10)
     atHeight       <- Gen.choose(1, 20)
     confirmations  <- Gen.choose(1, 20)
@@ -20,7 +21,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChec
 
   property("No-interactions genesis account's effectiveBalance doesn't depend on depths") {
     forAll(setup) {
-      case ((genesis: GenesisTransaction, emptyBlocksAmt, atHeight, confirmations)) =>
+      case (genesis: GenesisTransaction, emptyBlocksAmt, atHeight, confirmations) =>
         val genesisBlock = TestBlock.create(Seq(genesis))
         val nextBlocks   = List.fill(emptyBlocksAmt - 1)(TestBlock.create(Seq.empty))
         assertDiffAndState(genesisBlock +: nextBlocks, TestBlock.create(Seq.empty)) { (_, newState) =>

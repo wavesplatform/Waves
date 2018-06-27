@@ -14,7 +14,7 @@ final case class BurnTransactionV2 private (version: Byte,
                                             chainId: Byte,
                                             sender: PublicKeyAccount,
                                             assetId: ByteStr,
-                                            amount: Long,
+                                            quantity: Long,
                                             fee: Long,
                                             timestamp: Long,
                                             proofs: Proofs)
@@ -63,6 +63,19 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
       .validateBurnParams(quantity, fee)
       .map(_ => BurnTransactionV2(version, chainId, sender, assetId, quantity, fee, timestamp, proofs))
 
+  def signed(version: Byte,
+             chainId: Byte,
+             sender: PublicKeyAccount,
+             assetId: ByteStr,
+             quantity: Long,
+             fee: Long,
+             timestamp: Long,
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
+    for {
+      unsigned <- create(version, chainId, sender, assetId, quantity, fee, timestamp, Proofs.empty)
+      proofs   <- Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes()))))
+    } yield unsigned.copy(proofs = proofs)
+
   def selfSigned(version: Byte,
                  chainId: Byte,
                  sender: PrivateKeyAccount,
@@ -70,8 +83,5 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
                  quantity: Long,
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] =
-    for {
-      unsigned <- create(version, chainId, sender, assetId, quantity, fee, timestamp, Proofs.empty)
-      proofs   <- Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes()))))
-    } yield unsigned.copy(proofs = proofs)
+    signed(version, chainId, sender, assetId, quantity, fee, timestamp, sender)
 }

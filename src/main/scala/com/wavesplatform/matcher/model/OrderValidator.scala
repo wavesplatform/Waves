@@ -20,7 +20,7 @@ trait OrderValidator {
   val settings: MatcherSettings
   val wallet: Wallet
 
-  lazy val matcherPubKey: PublicKeyAccount = wallet.findWallet(settings.account).explicitGet()
+  lazy val matcherPubKey: PublicKeyAccount = wallet.findPrivateKey(settings.account).explicitGet()
   val MinExpiration                        = 60 * 1000L
 
   def isBalanceWithOpenOrdersEnough(order: Order): Validation = {

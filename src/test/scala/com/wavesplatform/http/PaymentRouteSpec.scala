@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.state.Diff
+import com.wavesplatform.state.{Diff, EitherExt2}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestWallet, TransactionGen}
 import io.netty.channel.group.ChannelGroup
@@ -38,7 +38,7 @@ class PaymentRouteSpec
         }
 
         val sender = testWallet.privateKeyAccounts.head
-        val tx     = TransferTransactionV1.create(None, sender, recipient, amount, timestamp, None, fee, Array())
+        val tx     = TransferTransactionV1.selfSigned(None, sender, recipient, amount, timestamp, None, fee, Array())
 
         val route = PaymentApiRoute(restAPISettings, testWallet, utx, allChannels, time).route
 
@@ -48,13 +48,13 @@ class PaymentRouteSpec
         Post(routePath(""), req) ~> api_key(apiKey) ~> route ~> check {
           val resp = responseAs[JsObject]
 
-          (resp \ "id").as[String] shouldEqual tx.right.get.id().toString
+          (resp \ "id").as[String] shouldEqual tx.explicitGet().id().toString
           (resp \ "assetId").asOpt[String] shouldEqual None
           (resp \ "feeAsset").asOpt[String] shouldEqual None
           (resp \ "type").as[Int] shouldEqual 4
           (resp \ "fee").as[Int] shouldEqual fee
           (resp \ "amount").as[Long] shouldEqual amount
-          (resp \ "timestamp").as[Long] shouldEqual tx.right.get.timestamp
+          (resp \ "timestamp").as[Long] shouldEqual tx.explicitGet().timestamp
           (resp \ "sender").as[String] shouldEqual sender.address
           (resp \ "recipient").as[String] shouldEqual recipient.stringRepr
         }

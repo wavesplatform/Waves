@@ -3,7 +3,7 @@ package scorex.transaction.smart
 import cats.syntax.all._
 import com.wavesplatform.crypto
 import com.wavesplatform.state._
-import scorex.transaction.ValidationError.{GenericError, TransactionNotAllowedByScript}
+import scorex.transaction.ValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.smart.script.{Script, ScriptRunner}
@@ -16,7 +16,7 @@ object Verifier {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
         (pt, blockchain.accountScript(pt.sender)) match {
-          case (_, Some(script))              => verify(blockchain, script, currentBlockHeight, pt)
+          case (_, Some(script))              => verify(blockchain, script, currentBlockHeight, pt, false)
           case (stx: SignedTransaction, None) => stx.signaturesValid()
           case _                              => verifyAsEllipticCurveSignature(pt)
         }
@@ -31,14 +31,19 @@ object Verifier {
         }
 
         script <- blockchain.assetDescription(assetId).flatMap(_.script)
-      } yield verify(blockchain, script, currentBlockHeight, tx)
+      } yield verify(blockchain, script, currentBlockHeight, tx, true)
     }.getOrElse(Either.right(tx)))
 
-  def verify[T <: Transaction](blockchain: Blockchain, script: Script, height: Int, transaction: T): Either[ValidationError, T] = {
+  def verify[T <: Transaction](blockchain: Blockchain,
+                               script: Script,
+                               height: Int,
+                               transaction: T,
+                               isTokenScript: Boolean): Either[ValidationError, T] = {
     ScriptRunner[Boolean, T](height, transaction, blockchain, script) match {
-      case Left(execError) => Left(GenericError(s"Script execution error: $execError"))
-      case Right(false)    => Left(TransactionNotAllowedByScript(transaction))
-      case Right(true)     => Right(transaction)
+      case (ctx, Left(execError)) => Left(ScriptExecutionError(script.text, execError, ctx.letDefs, isTokenScript))
+      case (ctx, Right(false)) =>
+        Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, isTokenScript))
+      case (_, Right(true)) => Right(transaction)
     }
   }
 

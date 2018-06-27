@@ -90,13 +90,22 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
       Right(SponsorFeeTransaction(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs))
     }
 
-  def create(version: Byte,
-             sender: PrivateKeyAccount,
+  def signed(version: Byte,
+             sender: PublicKeyAccount,
              assetId: ByteStr,
              minSponsoredAssetFee: Option[Long],
              fee: Long,
-             timestamp: Long): Either[ValidationError, TransactionT] =
+             timestamp: Long,
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
     create(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, Proofs.empty).right.map { unsigned =>
-      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(sender, unsigned.bodyBytes())))).explicitGet())
+      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
+
+  def selfSigned(version: Byte,
+                 sender: PrivateKeyAccount,
+                 assetId: ByteStr,
+                 minSponsoredAssetFee: Option[Long],
+                 fee: Long,
+                 timestamp: Long): Either[ValidationError, TransactionT] =
+    signed(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, sender)
 }

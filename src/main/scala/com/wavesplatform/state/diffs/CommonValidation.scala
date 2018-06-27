@@ -197,7 +197,7 @@ object CommonValidation {
       } else Right(inputFee)
 
     def hasSmartAccountScript: Boolean = tx match {
-      case tx: Transaction with Authorized => blockchain.accountScript(tx.sender).isDefined
+      case tx: Transaction with Authorized => blockchain.hasScript(tx.sender)
       case _                               => false
     }
 

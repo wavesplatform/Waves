@@ -13,7 +13,7 @@ import org.scalatest.Matchers
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
 import scorex.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation, TransactionsApiRoute}
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.wallet.Wallet
 
 class TransactionsRouteSpec

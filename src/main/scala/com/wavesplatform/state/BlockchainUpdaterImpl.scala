@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{Instrumented, TxsInBlockchainStats}
-import com.wavesplatform.mining.MiningEstimators
+import com.wavesplatform.mining.{MiningConstraint, MiningConstraints, MultiDimensionalMiningConstraint}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
@@ -34,10 +34,13 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
 
   private lazy val maxBlockReadinessAge = settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
 
-  private var ngState: Option[NgState] = Option.empty
+  private var ngState: Option[NgState]              = Option.empty
+  private var restTotalConstraint: MiningConstraint = MiningConstraints(settings.minerSettings, blockchain, blockchain.height).total
 
   private val service               = monix.execution.Scheduler.singleThread("last-block-info-publisher")
   private val internalLastBlockInfo = ConcurrentSubject.publish[LastBlockInfo](service)
+
+  override def isLastBlockId(id: ByteStr): Boolean = ngState.exists(_.contains(id)) || lastBlock.exists(_.uniqueId == id)
 
   override val lastBlockInfo: Observable[LastBlockInfo] = internalLastBlockInfo.cache(1)
   lastBlockInfo.subscribe()(monix.execution.Scheduler.global) // Start caching
@@ -114,28 +117,38 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                 val logDetails = s"The referenced block(${block.reference})" +
                   s" ${if (blockchain.contains(block.reference)) "exits, it's not last persisted" else "doesn't exist"}"
                 Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
-              case _ =>
+              case lastBlockId =>
+                val height            = lastBlockId.fold(0)(blockchain.unsafeHeightOf)
+                val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
                 BlockDiffer
-                  .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block)
-                  .map(d => Some((d, Seq.empty[Transaction])))
+                  .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
+                  .map(r => Some((r, Seq.empty[Transaction])))
             }
           case Some(ng) =>
             if (ng.base.reference == block.reference) {
               if (block.blockScore() > ng.base.blockScore()) {
-                BlockDiffer.fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block).map { diff =>
-                  log.trace(
-                    s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})")
-                  Some((diff, ng.transactions))
-                }
+                val height            = blockchain.unsafeHeightOf(ng.base.reference)
+                val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
+
+                BlockDiffer
+                  .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
+                  .map { r =>
+                    log.trace(
+                      s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})")
+                    Some((r, ng.transactions))
+                  }
               } else if (areVersionsOfSameBlock(block, ng.base)) {
                 if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
                   log.trace(s"Existing liquid block is better than new one, discarding $block")
                   Right(None)
                 } else {
-                  log.trace(s"New liquid block is better version of exsting, swapping")
+                  log.trace(s"New liquid block is better version of existing, swapping")
+                  val height            = blockchain.unsafeHeightOf(ng.base.reference)
+                  val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
+
                   BlockDiffer
-                    .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block)
-                    .map(d => Some((d, Seq.empty[Transaction])))
+                    .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
+                    .map(r => Some((r, Seq.empty[Transaction])))
                 }
               } else
                 Left(BlockAppendError(
@@ -151,11 +164,20 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                       microBlockForkHeightStats.record(discarded.size)
                     }
 
+                    val constraint: MiningConstraint = {
+                      val height            = blockchain.heightOf(referencedForgedBlock.reference).getOrElse(0)
+                      val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
+                      miningConstraints.total
+                    }
+
                     val diff = BlockDiffer
-                      .fromBlock(functionalitySettings,
-                                 CompositeBlockchain.composite(blockchain, referencedLiquidDiff),
-                                 Some(referencedForgedBlock),
-                                 block)
+                      .fromBlock(
+                        functionalitySettings,
+                        CompositeBlockchain.composite(blockchain, referencedLiquidDiff),
+                        Some(referencedForgedBlock),
+                        block,
+                        constraint
+                      )
 
                     diff.map { hardenedDiff =>
                       blockchain.append(referencedLiquidDiff, referencedForgedBlock)
@@ -170,10 +192,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
               }
         }).map {
           _ map {
-            case ((newBlockDiff, discarded)) =>
-              val height     = blockchain.height + 1
-              val estimators = MiningEstimators(settings.minerSettings, blockchain, blockchain.height)
-              ngState = Some(new NgState(block, newBlockDiff, featuresApprovedWithBlock(block), estimators.total))
+            case ((newBlockDiff, updatedTotalConstraint), discarded) =>
+              val height = blockchain.height + 1
+              restTotalConstraint = updatedTotalConstraint
+              ngState = Some(new NgState(block, newBlockDiff, featuresApprovedWithBlock(block)))
               lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
               if ((block.timestamp > time
                     .getTimestamp() - settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (height % 100 == 0)) {
@@ -212,12 +234,16 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
             Left(MicroBlockAppendError("It doesn't reference last known microBlock(which exists)", microBlock))
           case _ =>
             for {
-              _    <- microBlock.signaturesValid()
-              diff <- BlockDiffer.fromMicroBlock(functionalitySettings, this, blockchain.lastBlockTimestamp, microBlock, ng.base.timestamp)
-              _ <- Either.cond(ng.append(microBlock, diff, System.currentTimeMillis),
-                               (),
-                               MicroBlockAppendError("Limit of txs was reached", microBlock))
+              _ <- microBlock.signaturesValid()
+              r <- {
+                val constraints  = MiningConstraints(settings.minerSettings, blockchain, blockchain.height)
+                val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
+                BlockDiffer.fromMicroBlock(functionalitySettings, this, blockchain.lastBlockTimestamp, microBlock, ng.base.timestamp, mdConstraint)
+              }
             } yield {
+              val (diff, updatedMdConstraint) = r
+              restTotalConstraint = updatedMdConstraint.constraints.head
+              ng.append(microBlock, diff, System.currentTimeMillis)
               log.info(s"$microBlock appended")
               internalLastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, height, score, ready = true))
             }
@@ -450,6 +476,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     }
   }
 
+  override def hasScript(address: Address): Boolean = ngState.fold(blockchain.hasScript(address)) { ng =>
+    ng.bestLiquidDiff.scripts.contains(address) || blockchain.hasScript(address)
+  }
+
   override def accountData(acc: Address): AccountDataInfo = ngState.fold(blockchain.accountData(acc)) { ng =>
     val fromInner = blockchain.accountData(acc)
     val fromDiff  = ng.bestLiquidDiff.accountData.get(acc).orEmpty
@@ -470,14 +500,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
         } yield address -> f(address)
       }
 
-  override def assetDistribution(height: Int, assetId: AssetId): Map[Address, Long] = ngState.fold(blockchain.assetDistribution(height, assetId)) {
-    ng =>
-      val innerDistribution = blockchain.assetDistribution(height, assetId)
-      if (height < this.height) innerDistribution
-      else {
-        innerDistribution ++ changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
-      }
-  }
+  override def assetDistribution(assetId: AssetId): Map[Address, Long] =
+    blockchain.assetDistribution(assetId) ++ changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
 
   override def wavesDistribution(height: Int): Map[Address, Long] = ngState.fold(blockchain.wavesDistribution(height)) { ng =>
     val innerDistribution = blockchain.wavesDistribution(height)

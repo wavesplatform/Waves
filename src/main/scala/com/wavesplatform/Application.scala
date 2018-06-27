@@ -11,6 +11,7 @@ import akka.stream.ActorMaterializer
 import cats.instances.all._
 import com.typesafe.config._
 import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
@@ -55,7 +56,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   import monix.execution.Scheduler.Implicits.{global => scheduler}
 
-  private val db = openDB(settings.dataDirectory, settings.levelDbCacheSize)
+  private val db = openDB(settings.dataDirectory)
 
   private val LocalScoreBroadcastDebounce = 1.second
 
@@ -123,19 +124,25 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     maybeUtx = Some(utxStorage)
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
+
+    val pos = new PoSSelector(blockchainUpdater, settings.blockchainSettings)
+
     val miner =
       if (settings.minerSettings.enable)
-        new MinerImpl(allChannels, blockchainUpdater, checkpointService, settings, time, utxStorage, wallet, minerScheduler, appenderScheduler)
+        new MinerImpl(allChannels, blockchainUpdater, checkpointService, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler)
       else Miner.Disabled
 
     val processBlock =
-      BlockAppender(checkpointService, blockchainUpdater, time, utxStorage, settings, allChannels, peerDatabase, miner, appenderScheduler) _
+      BlockAppender(checkpointService, blockchainUpdater, time, utxStorage, pos, settings, allChannels, peerDatabase, miner, appenderScheduler) _
+
     val processCheckpoint =
       CheckpointAppender(checkpointService, blockchainUpdater, blockchainUpdater, peerDatabase, miner, allChannels, appenderScheduler) _
+
     val processFork = ExtensionAppender(
       checkpointService,
       blockchainUpdater,
       utxStorage,
+      pos,
       time,
       settings,
       knownInvalidBlocks,
@@ -196,14 +203,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       syncWithChannelClosed,
       extensionLoaderScheduler,
       timeoutSubject
-    ) { case ((c, b)) => processFork(c, b.blocks) }
+    ) { case (c, b) => processFork(c, b.blocks) }
 
     rxExtensionLoaderShutdown = Some(sh)
 
     UtxPoolSynchronizer.start(utxStorage, settings.synchronizationSettings.utxSynchronizerSettings, allChannels, transactions)
     val microBlockSink = microblockDatas.mapTask(scala.Function.tupled(processMicroBlock))
     val blockSink      = newBlocks.mapTask(scala.Function.tupled(processBlock))
-    val checkpointSink = checkpoints.mapTask { case ((s, c)) => processCheckpoint(Some(s), c) }
+    val checkpointSink = checkpoints.mapTask { case (s, c) => processCheckpoint(Some(s), c) }
 
     Observable.merge(microBlockSink, blockSink, checkpointSink).subscribe()
     miner.scheduleMining()
@@ -218,7 +225,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
-        BlocksApiRoute(settings.restAPISettings, blockchainUpdater, blockchainUpdater, allChannels, c => processCheckpoint(None, c)),
+        BlocksApiRoute(settings.restAPISettings, blockchainUpdater, allChannels, c => processCheckpoint(None, c)),
         TransactionsApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, allChannels, time),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater, settings.blockchainSettings.functionalitySettings),
         WalletApiRoute(settings.restAPISettings, wallet),
@@ -378,6 +385,7 @@ object Application extends ScorexLogging {
   }
 
   def main(args: Array[String]): Unit = {
+
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
     // http://stackoverflow.com/a/17219327
     System.setProperty("sun.net.inetaddr.ttl", "0")

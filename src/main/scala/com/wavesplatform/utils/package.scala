@@ -1,15 +1,20 @@
 package com.wavesplatform
 
+import cats.kernel.Monoid
 import com.google.common.base.Throwables
 import com.wavesplatform.db.{Storage, VersionedStorage}
-import com.wavesplatform.lang.v1.TypeChecker
-import com.wavesplatform.lang.v1.ctx.Context
+import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.v1.compiler.CompilerContext
+import com.wavesplatform.lang.v1.compiler.CompilerContext._
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import monix.eval.Coeval
 import monix.execution.UncaughtExceptionReporter
 import org.joda.time.Duration
 import org.joda.time.format.PeriodFormat
 import scorex.account.AddressScheme
-import scorex.transaction.smart.BlockchainContext
+import scorex.transaction.smart.{BlockchainContext, WavesEnvironment}
 import scorex.utils.ScorexLogging
 
 import scala.util.Try
@@ -75,7 +80,14 @@ package object utils extends ScorexLogging {
     }
   }
 
-  lazy val dummyNetworkByte: Byte                                  = AddressScheme.current.chainId
-  lazy val dummyContext: Context                                   = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), null)
-  lazy val dummyTypeCheckerContext: TypeChecker.TypeCheckerContext = TypeChecker.TypeCheckerContext.fromContext(dummyContext)
+  lazy val dummyNetworkByte: Byte                    = AddressScheme.current.chainId
+  lazy val dummyEvaluationContext: EvaluationContext = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), null)
+  lazy val dummyCompilerContext: CompilerContext =
+    Monoid.combineAll(
+      Seq(
+        CryptoContext.compilerContext(Global),
+        WavesContext.build(new WavesEnvironment(dummyNetworkByte, Coeval(???), Coeval(???), null)).compilerContext,
+        PureContext.compilerContext
+      ))
+
 }

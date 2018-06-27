@@ -29,8 +29,10 @@ object ScriptReader {
             .validateBytes(scriptBytes)
             .flatMap { _ =>
               Serde.codec.decode(scodec.bits.BitVector(scriptBytes)) match {
-                case Failure(e)    => Left(e.toString())
-                case Successful(x) => ScriptV1(x.value, checkSize = false)
+                case Failure(e) => Left(e.toString())
+                case Successful(x) =>
+                  if (x.remainder.isEmpty) ScriptV1(x.value, checkSize = false)
+                  else Left(s"${x.remainder.size} bytes left")
               }
             }
             .left

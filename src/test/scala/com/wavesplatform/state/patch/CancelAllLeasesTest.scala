@@ -1,5 +1,6 @@
 package com.wavesplatform.state.patch
 
+import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -23,11 +24,11 @@ class CancelAllLeasesTest extends PropSpec with PropertyChecks with Matchers wit
         otherAccount  <- accountGen
         otherAccount2 <- accountGen
         ts            <- timestampGen
-        genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-        genesis2: GenesisTransaction = GenesisTransaction.create(otherAccount, ENOUGH_AMT, ts).right.get
+        genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+        genesis2: GenesisTransaction = GenesisTransaction.create(otherAccount, ENOUGH_AMT, ts).explicitGet()
         (lease, _) <- leaseAndCancelGeneratorP(master, recipient, master)
         fee2       <- smallFeeGen
-        unleaseOther = LeaseCancelTransactionV1.create(otherAccount, lease.id(), fee2, ts + 1).right.get
+        unleaseOther = LeaseCancelTransactionV1.selfSigned(otherAccount, lease.id(), fee2, ts + 1).explicitGet()
         (lease2, _) <- leaseAndCancelGeneratorP(master, otherAccount2, master)
       } yield (genesis, genesis2, lease, unleaseOther, lease2)
 

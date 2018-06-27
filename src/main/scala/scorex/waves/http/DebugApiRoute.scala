@@ -23,7 +23,7 @@ import scorex.account.Address
 import scorex.api.http._
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
@@ -125,8 +125,8 @@ case class DebugApiRoute(ws: WavesSettings,
       )
     ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json portfolio")))
-  def portfolios: Route = path("portfolios" / Segment) { (rawAddress) =>
-    (get & withAuth & parameter('considerUnspent.as[Boolean])) { (considerUnspent) =>
+  def portfolios: Route = path("portfolios" / Segment) { rawAddress =>
+    (get & withAuth & parameter('considerUnspent.as[Boolean])) { considerUnspent =>
       Address.fromString(rawAddress) match {
         case Left(_) => complete(InvalidAddress)
         case Right(address) =>

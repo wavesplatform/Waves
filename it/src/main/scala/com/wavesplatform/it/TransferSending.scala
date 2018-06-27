@@ -6,10 +6,11 @@ import com.typesafe.config.Config
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.Transaction
+import com.wavesplatform.state.EitherExt2
+import com.wavesplatform.utils.Base58
 import org.scalatest.Suite
 import scorex.account.{Address, AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import scorex.api.http.assets.SignedTransferV1Request
-import scorex.crypto.encode.Base58
 import scorex.transaction.transfer._
 import scorex.utils.ScorexLogging
 
@@ -29,13 +30,36 @@ trait TransferSending extends ScorexLogging {
     override val chainId: Byte = 'I'.toByte
   }
 
+  def generateTransfersFromAccount(n: Int, accountAddress: String): Seq[Req] = {
+    val fee      = 100000 + 400000 // + 400000 for scripted accounts
+    val seedSize = 32
+
+    val srcSeed = NodeConfigs.Default
+      .collectFirst {
+        case x if x.getString("address") == accountAddress => x.getString("account-seed")
+      }
+      .getOrElse(throw new RuntimeException(s"Can't find address '$accountAddress' in nodes.conf"))
+
+    val sourceAndDest = (1 to n).map { _ =>
+      val destPk = Array.fill[Byte](seedSize)(Random.nextInt(Byte.MaxValue).toByte)
+      Address.fromPublicKey(destPk).address
+    }
+
+    val requests = sourceAndDest.foldLeft(List.empty[Req]) {
+      case (rs, dstAddr) =>
+        rs :+ Req(srcSeed, dstAddr, fee, fee)
+    }
+
+    requests
+  }
+
   def generateTransfersBetweenAccounts(n: Int, balances: Map[Config, Long]): Seq[Req] = {
     val fee = 100000
     val srcDest = balances.toSeq
       .map {
         case (config, _) =>
           val accountSeed = config.getString("account-seed")
-          (config, PrivateKeyAccount.fromSeed(accountSeed).right.get)
+          (config, PrivateKeyAccount.fromSeed(accountSeed).explicitGet())
       }
 
     val sourceAndDest = (1 to n).map { _ =>
@@ -88,10 +112,10 @@ trait TransferSending extends ScorexLogging {
         case (x, i) =>
           createSignedTransferRequest(
             TransferTransactionV1
-              .create(
+              .selfSigned(
                 assetId = None,
-                sender = PrivateKeyAccount.fromSeed(x.senderSeed).right.get,
-                recipient = AddressOrAlias.fromString(x.targetAddress).right.get,
+                sender = PrivateKeyAccount.fromSeed(x.senderSeed).explicitGet(),
+                recipient = AddressOrAlias.fromString(x.targetAddress).explicitGet(),
                 amount = x.amount,
                 timestamp = start + i,
                 feeAssetId = None,

@@ -1,6 +1,7 @@
 package com.wavesplatform.state.appender
 
 import cats.data.EitherT
+import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network._
@@ -25,20 +26,19 @@ object BlockAppender extends ScorexLogging with Instrumented {
             blockchainUpdater: BlockchainUpdater with Blockchain,
             time: Time,
             utxStorage: UtxPool,
+            pos: PoSSelector,
             settings: WavesSettings,
             scheduler: Scheduler)(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
       measureSuccessful(
         blockProcessingTimeStats, {
-          if (blockchainUpdater.contains(newBlock)) Right(None)
-          else
-            for {
-              _ <- Either.cond(blockchainUpdater.heightOf(newBlock.reference).exists(_ >= blockchainUpdater.height - 1),
-                               (),
-                               BlockAppendError("Irrelevant block", newBlock))
-              _ = log.debug(s"Appending $newBlock")
-              maybeBaseHeight <- appendBlock(checkpoint, blockchainUpdater, utxStorage, time, settings)(newBlock)
-            } yield maybeBaseHeight map (_ => blockchainUpdater.score)
+          if (blockchainUpdater.isLastBlockId(newBlock.reference)) {
+            appendBlock(checkpoint, blockchainUpdater, utxStorage, pos, time, settings)(newBlock).map(_ => Some(blockchainUpdater.score))
+          } else if (blockchainUpdater.contains(newBlock.uniqueId)) {
+            Right(None)
+          } else {
+            Left(BlockAppendError("Block is not a child of the last block", newBlock))
+          }
         }
       )
     }.executeOn(scheduler)
@@ -47,6 +47,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
             blockchainUpdater: BlockchainUpdater with Blockchain,
             time: Time,
             utxStorage: UtxPool,
+            pos: PoSSelector,
             settings: WavesSettings,
             allChannels: ChannelGroup,
             peerDatabase: PeerDatabase,
@@ -56,7 +57,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
     blockReceivingLag.safeRecord(System.currentTimeMillis() - newBlock.timestamp)
     (for {
       _                <- EitherT(Task.now(newBlock.signaturesValid()))
-      validApplication <- EitherT(apply(checkpoint, blockchainUpdater, time, utxStorage, settings, scheduler)(newBlock))
+      validApplication <- EitherT(apply(checkpoint, blockchainUpdater, time, utxStorage, pos, settings, scheduler)(newBlock))
     } yield validApplication).value.map {
       case Right(None) => // block already appended
       case Right(Some(_)) =>

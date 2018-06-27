@@ -3,9 +3,8 @@ package com.wavesplatform.utx
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
-import com.wavesplatform.lang.v1.CompilerV1
-import com.wavesplatform.lang.v1.Terms.Typed
-import com.wavesplatform.lang.v1.TypeChecker.TypeCheckerContext
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs._
@@ -21,11 +20,11 @@ import scorex.block.Block
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.ValidationError.SenderIsBlacklisted
-import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets.IssueTransactionV1
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
+import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.transfer._
 import scorex.transaction.{FeeCalculator, GenesisTransaction, Transaction}
 import scorex.utils.Time
@@ -41,7 +40,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
       TransferTransactionV1,
       MassTransferTransaction,
       SetScriptTransaction
-    ).map(_.typeId.toInt -> List(FeeSettings("", 0))).toMap
+    ).map(_.typeId.toInt -> List(FeeSettings("WAVES", 0))).toMap
   )
   import CommonValidation.{ScriptExtraFee => extraFee}
 
@@ -75,14 +74,14 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
       amount    <- chooseNum(1, (maxAmount * 0.9).toLong)
       recipient <- accountGen
       fee       <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
-    } yield TransferTransactionV1.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
+    } yield TransferTransactionV1.selfSigned(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).explicitGet())
       .label("transferTransaction")
 
   private def transferWithRecipient(sender: PrivateKeyAccount, recipient: PublicKeyAccount, maxAmount: Long, time: Time) =
     (for {
       amount <- chooseNum(1, (maxAmount * 0.9).toLong)
       fee    <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
-    } yield TransferTransactionV1.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
+    } yield TransferTransactionV1.selfSigned(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).explicitGet())
       .label("transferWithRecipient")
 
   private def massTransferWithRecipients(sender: PrivateKeyAccount, recipients: List[PublicKeyAccount], maxAmount: Long, time: Time) = {
@@ -91,7 +90,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     val txs = for {
       version <- Gen.oneOf(MassTransferTransaction.supportedVersions.toSeq)
       fee     <- chooseNum(extraFee, amount)
-    } yield MassTransferTransaction.selfSigned(version, None, sender, transfers, time.getTimestamp(), fee, Array.empty[Byte]).right.get
+    } yield MassTransferTransaction.selfSigned(version, None, sender, transfers, time.getTimestamp(), fee, Array.empty[Byte]).explicitGet()
     txs.label("transferWithRecipient")
   }
 
@@ -123,7 +122,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
         UtxSettings(10, 10.minutes, Set.empty, Set.empty, 5.minutes)
       )
     val amountPart = (senderBalance - fee) / 2 - fee
-    val txs        = for (_ <- 1 to n) yield createWavesTransfer(sender, recipient, amountPart, fee, time.getTimestamp()).right.get
+    val txs        = for (_ <- 1 to n) yield createWavesTransfer(sender, recipient, amountPart, fee, time.getTimestamp()).explicitGet()
     (utx, time, txs, (offset + 1000).millis)
   }).label("twoOutOfManyValidPayments")
 
@@ -222,13 +221,13 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
       (utx, time, tx1, (offset + 1000).millis, tx2)
     }
 
-  private val expr: Typed.EXPR = {
+  private val expr: EXPR = {
     val code =
       """let x = 1
         |let y = 2
         |true""".stripMargin
 
-    val compiler = new CompilerV1(TypeCheckerContext.empty)
+    val compiler = new CompilerV1(CompilerContext.empty)
     compiler.compile(code, List.empty).explicitGet()
   }
 
@@ -261,7 +260,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
   }
 
   private def transactionGen(sender: PrivateKeyAccount, ts: Long, feeAmount: Long): Gen[TransferTransactionV1] = accountGen.map { recipient =>
-    TransferTransactionV1.create(None, sender, recipient, waves(1), ts, None, feeAmount, Array.emptyByteArray).explicitGet()
+    TransferTransactionV1.selfSigned(None, sender, recipient, waves(1), ts, None, feeAmount, Array.emptyByteArray).explicitGet()
   }
 
   private val notEnoughFeeTxWithScriptedAccount = for {
@@ -427,13 +426,9 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     }
   }
 
-  private def limitByNumber(n: Int): TwoDimensionalMiningConstraint =
-    TwoDimensionalMiningConstraint.full(new CounterEstimator(n), new CounterEstimator(n))
-
-  private class CounterEstimator(val max: Long) extends Estimator {
-    override implicit def estimate(x: Block): Long = x.transactionCount
-
-    override implicit def estimate(x: Transaction): Long = 1
-  }
+  private def limitByNumber(n: Int): MultiDimensionalMiningConstraint = MultiDimensionalMiningConstraint(
+    OneDimensionalMiningConstraint(n, TxEstimators.one),
+    OneDimensionalMiningConstraint(n, TxEstimators.one)
+  )
 
 }

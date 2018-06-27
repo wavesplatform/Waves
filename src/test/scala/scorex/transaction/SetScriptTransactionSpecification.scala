@@ -5,7 +5,8 @@ import com.wavesplatform.state._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.account.PrivateKeyAccount
+import play.api.libs.json.Json
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.transaction.smart.SetScriptTransaction
 
 class SetScriptTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -47,5 +48,36 @@ class SetScriptTransactionSpecification extends PropSpec with PropertyChecks wit
     first.proofs shouldEqual second.proofs
     first.bytes() shouldEqual second.bytes()
     first.script shouldEqual second.script
+  }
+
+  property("JSON format validation") {
+    val js = Json.parse("""{
+                       "type": 13,
+                       "id": "Cst37pKJ19WnUZSD6mjqywosMJDbqatuYm2sFAbXrysE",
+                       "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+                       "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+                       "fee": 100000,
+                       "timestamp": 1526983936610,
+                       "proofs": [
+                       "tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY"
+                       ],
+                       "version": 1,
+                       "script": null
+                       }
+    """)
+
+    val tx = SetScriptTransaction
+      .create(
+        1,
+        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+        None,
+        100000,
+        1526983936610L,
+        Proofs(Seq(ByteStr.decodeBase58("tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY").get))
+      )
+      .right
+      .get
+
+    js shouldEqual tx.json()
   }
 }

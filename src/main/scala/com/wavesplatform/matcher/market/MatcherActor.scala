@@ -15,7 +15,7 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.account.Address
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
@@ -135,7 +135,7 @@ class MatcherActor(orderHistory: ActorRef,
   }
 
   def getMatcherPublicKey: Array[Byte] = {
-    wallet.findWallet(settings.account).map(_.publicKey).getOrElse(Array())
+    wallet.findPrivateKey(settings.account).map(_.publicKey).getOrElse(Array())
   }
 
   def forwardToOrderBook: Receive = {

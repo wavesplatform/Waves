@@ -13,7 +13,7 @@ import play.api.libs.json._
 import scorex.BroadcastRoute
 import scorex.account.Address
 import scorex.api.http._
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base58
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
@@ -60,7 +60,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       complete {
         Success(assetId).filter(_.length <= AssetIdStringLength).flatMap(Base58.decode) match {
           case Success(byteArray) =>
-            Json.toJson(blockchain.assetDistribution(blockchain.height, ByteStr(byteArray)).map { case (a, b) => a.stringRepr -> b })
+            Json.toJson(blockchain.assetDistribution(ByteStr(byteArray)).map { case (a, b) => a.stringRepr -> b })
           case Failure(_) => ApiError.fromValidationError(scorex.transaction.ValidationError.GenericError("Must be base58-encoded assetId"))
         }
       }
@@ -237,15 +237,25 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           (for {
             (assetId, balance) <- blockchain.portfolio(acc).assets
             if balance > 0
-            assetInfo        <- blockchain.assetDescription(assetId)
-            issueTransaction <- blockchain.transactionInfo(assetId)
+            assetInfo                                 <- blockchain.assetDescription(assetId)
+            (_, (issueTransaction: IssueTransaction)) <- blockchain.transactionInfo(assetId)
+            sponsorBalance = if (assetInfo.sponsorship != 0) {
+              Some(blockchain.portfolio(issueTransaction.sender).spendableBalance)
+            } else {
+              None
+            }
           } yield
             Json.obj(
-              "assetId"          -> assetId.base58,
-              "balance"          -> balance,
-              "reissuable"       -> assetInfo.reissuable,
+              "assetId"    -> assetId.base58,
+              "balance"    -> balance,
+              "reissuable" -> assetInfo.reissuable,
+              "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
+                case 0           => JsNull
+                case sponsorship => JsNumber(sponsorship)
+              }),
+              "sponsorBalance"   -> sponsorBalance,
               "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
-              "issueTransaction" -> issueTransaction._2.json()
+              "issueTransaction" -> issueTransaction.json()
             )).toSeq)
       )
     }).left.map(ApiError.fromValidationError)
@@ -273,8 +283,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           "decimals"       -> JsNumber(tx.decimals.toInt),
           "reissuable"     -> JsBoolean(description.reissuable),
           "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
-          "script"         -> JsString(description.script.fold("")(_.bytes().base58)),
-          "scriptText"     -> JsString(description.script.fold("")(_.text)),
+          "script"         -> Json.toJson(description.script.map(_.bytes().base58)),
+          "scriptText"     -> Json.toJson(description.script.map(_.text)),
           "complexity"     -> JsNumber(complexity),
           "extraFee"       -> JsNumber(if (description.script.isEmpty) 0 else CommonValidation.ScriptExtraFee),
           "minSponsoredAssetFee" -> (description.sponsorship match {

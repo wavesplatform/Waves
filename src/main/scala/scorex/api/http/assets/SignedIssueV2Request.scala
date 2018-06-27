@@ -6,9 +6,9 @@ import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Format, Json}
 import scorex.account.{AddressScheme, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
-import scorex.transaction.{Proofs, ValidationError}
 import scorex.transaction.assets.IssueTransactionV2
 import scorex.transaction.smart.script.Script
+import scorex.transaction.{Proofs, ValidationError}
 
 object SignedIssueV2Request {
   implicit val signedExchangeRequestFormat: Format[SignedIssueV2Request] = Json.format
@@ -44,7 +44,7 @@ case class SignedIssueV2Request(@ApiModelProperty(required = true)
       _proofs     <- Proofs.create(_proofBytes)
       _script <- script match {
         case None    => Right(None)
-        case Some(s) => Script.fromBase58String(s).map(Some(_))
+        case Some(s) => Script.fromBase64String(s).map(Some(_))
       }
       t <- IssueTransactionV2.create(
         version,

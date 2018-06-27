@@ -1,11 +1,11 @@
 package scorex.transaction.smart.script
 
-import com.wavesplatform.lang
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.Versioned
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
-import scorex.crypto.encode.Base58
+import com.wavesplatform.utils.Base64
 import scorex.transaction.ValidationError.ScriptParseError
 
 trait Script extends Versioned {
@@ -25,15 +25,15 @@ object Script {
 
   val checksumLength = 4
 
-  def fromBase58String(str: String): Either[ScriptParseError, Script] =
+  def fromBase64String(str: String): Either[ScriptParseError, Script] =
     for {
-      bytes  <- Base58.decode(str).toEither.left.map(ex => ScriptParseError(s"Unable to decode base58: ${ex.getMessage}"))
+      bytes  <- Base64.decode(str).toEither.left.map(ex => ScriptParseError(s"Unable to decode base64: ${ex.getMessage}"))
       script <- ScriptReader.fromBytes(bytes)
     } yield script
 
   object Expr {
-    def unapply(arg: Script): Option[lang.v1.Terms.Typed.EXPR] = {
-      if (arg.version == V1) Some(arg.expr.asInstanceOf[lang.v1.Terms.Typed.EXPR])
+    def unapply(arg: Script): Option[Terms.EXPR] = {
+      if (arg.version == V1) Some(arg.expr.asInstanceOf[Terms.EXPR])
       else None
     }
   }

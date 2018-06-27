@@ -55,13 +55,14 @@ trait Blockchain {
   def balanceSnapshots(address: Address, from: Int, to: Int): Seq[BalanceSnapshot]
 
   def accountScript(address: Address): Option[Script]
+  def hasScript(address: Address): Boolean
 
   def accountData(acc: Address): AccountDataInfo
   def accountData(acc: Address, key: String): Option[DataEntry[_]]
 
   def balance(address: Address, mayBeAssetId: Option[AssetId]): Long
 
-  def assetDistribution(height: Int, assetId: ByteStr): Map[Address, Long]
+  def assetDistribution(assetId: ByteStr): Map[Address, Long]
   def wavesDistribution(height: Int): Map[Address, Long]
 
   // the following methods are used exclusively by patches
