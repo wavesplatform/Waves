@@ -35,8 +35,6 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
     "succeed when delay is correct" in {
       withEnv(chainGen(List(ENOUGH_AMT), 10)) {
         case Env(pos, blockchain, miner :: _) =>
-          println(blockchain.activatedFeatures)
-
           val height       = blockchain.height
           val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
           val lastBlock    = blockchain.lastBlock.get
@@ -67,7 +65,65 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
     }
   }
 
-  ""
+  "base target validation" - {
+    "succed when BT is correct" in {
+      withEnv(chainGen(List(ENOUGH_AMT), 10)) {
+        case Env(pos, blockchain, miner :: _) =>
+          val height       = blockchain.height
+          val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
+          val lastBlock    = blockchain.lastBlock.get
+          val block        = forgeBlock(miner, blockchain, pos)()
+
+          pos
+            .validateBaseTarget(
+              height + 1,
+              block,
+              lastBlock,
+              blockchain.blockAt(height - 2)
+            ) shouldBe Right(())
+      }
+    }
+
+    "failed when BT less than expected" in {
+      withEnv(chainGen(List(ENOUGH_AMT), 10)) {
+        case Env(pos, blockchain, miner :: _) =>
+          val height       = blockchain.height
+          val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
+          val lastBlock    = blockchain.lastBlock.get
+          val block        = forgeBlock(miner, blockchain, pos)(updateBT = _ - 1)
+
+          pos
+            .validateBaseTarget(
+              height + 1,
+              block,
+              lastBlock,
+              blockchain.blockAt(height - 2)
+            ) should produce("does not match calculated baseTarget")
+      }
+    }
+
+    "failed when BT greater than expected" in {
+      withEnv(chainGen(List(ENOUGH_AMT), 10)) {
+        case Env(pos, blockchain, miner :: _) =>
+          val height       = blockchain.height
+          val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
+          val lastBlock    = blockchain.lastBlock.get
+          val block        = forgeBlock(miner, blockchain, pos)(updateBT = _ + 1)
+
+          pos
+            .validateBaseTarget(
+              height + 1,
+              block,
+              lastBlock,
+              blockchain.blockAt(height - 2)
+            ) should produce("does not match calculated baseTarget")
+      }
+    }
+  }
+
+  "generation signature validation" - {
+
+  }
 
   def withEnv(gen: Time => Gen[(Seq[PrivateKeyAccount], Seq[Block])])(f: Env => Unit): Unit = {
     val time          = new TimeImpl
