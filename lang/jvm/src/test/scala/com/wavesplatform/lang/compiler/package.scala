@@ -13,8 +13,8 @@ package object compiler {
   val pointType = CaseType("Point", List("x" -> LONG, "y" -> LONG))
 
   val idT = NativeFunction("idT", 1, 10000: Short, TYPEPARAM('T'), "p1" -> TYPEPARAM('T'))(Right(_))
-  val undefinedOptionLong =
-    NativeFunction("undefinedOptionLong", 1, 1002: Short, typeToConcretePlaceholder(UNION(LONG, UNIT)): TYPEPLACEHOLDER)(_ => ???)
+  val returnsListLong =
+    NativeFunction("undefinedOptionLong", 1, 1002: Short, typeToConcretePlaceholder(LIST(LONG)): TYPEPLACEHOLDER)(_ => ???)
   val idOptionLong =
     NativeFunction("idOptionLong", 1, 1003: Short, TYPEPLACEHOLDER.UNIT, ("opt" -> typeToConcretePlaceholder(UNION(LONG, UNIT))))(_ => Right(()))
   val functionWithTwoPrarmsOfTheSameType =
@@ -27,7 +27,7 @@ package object compiler {
       CTX(
         Seq(pointType, Common.pointTypeA, Common.pointTypeB),
         Map(("p", (Common.AorB, null))),
-        Seq(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, undefinedOptionLong, idOptionLong)
+        Seq(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, returnsListLong, idOptionLong)
       )
     )
     .compilerContext

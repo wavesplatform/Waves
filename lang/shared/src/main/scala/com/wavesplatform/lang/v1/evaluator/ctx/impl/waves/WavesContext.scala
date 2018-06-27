@@ -158,10 +158,7 @@ object WavesContext {
                 ),
                 IF(
                   verifyAddressChecksumExpr(REF("@afs_addrBytes")),
-                  FUNCTION_CALL(
-                    FunctionHeader.Native(SOME),
-                    List(FUNCTION_CALL(FunctionHeader.Native(ADDRESSFROMBYTES), List(REF("@afs_addrBytes"))))
-                  ),
+                  FUNCTION_CALL(FunctionHeader.Native(ADDRESSFROMBYTES), List(REF("@afs_addrBytes"))),
                   REF("unit")
                 ),
                 REF("unit")

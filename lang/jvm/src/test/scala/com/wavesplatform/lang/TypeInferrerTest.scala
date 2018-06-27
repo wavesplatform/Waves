@@ -55,6 +55,10 @@ class TypeInferrerTest extends FreeSpec with Matchers {
         TypeInferrer(Seq((LIST(LONG), LISTTYPEPARAM(typeparamT)))) shouldBe Right(Map(typeparamT -> LONG))
       }
 
+      "containing same inner type" in {
+        TypeInferrer(Seq((LIST(LONG), LISTTYPEPARAM(typeparamT)), (LIST(LONG), LISTTYPEPARAM(typeparamT)))) shouldBe Right(Map(typeparamT -> LONG))
+      }
+
       "containing inner and separate type" in {
         TypeInferrer(Seq((LONG, typeparamT), (LIST(LONG), LISTTYPEPARAM(typeparamT)))) shouldBe Right(Map(typeparamT -> LONG))
       }
@@ -67,7 +71,6 @@ class TypeInferrerTest extends FreeSpec with Matchers {
         TypeInferrer(Seq((BYTEVECTOR, typeparamT), (BYTEVECTOR, LISTTYPEPARAM(typeparamT)))) should produce("Non-matching types")
         TypeInferrer(Seq((LONG, typeparamT), (LIST(LIST(NOTHING)), LISTTYPEPARAM(typeparamT)))) should produce("Can't match inferred types")
         TypeInferrer(Seq((BYTEVECTOR, typeparamT), (LIST(LONG), LISTTYPEPARAM(typeparamT)))) should produce("Can't match inferred types")
-//        TypeInferrer(Seq((OPTION(BYTEVECTOR), typeparamT), (LIST(LONG), LISTTYPEPARAM(typeparamT)))) should produce("Can't match inferred types")
       }
     }
   }

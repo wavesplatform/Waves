@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos
+import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -27,9 +28,9 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
     val Right(v) =
       CompilerV1(
         compilerContext,
-        FUNCTION_CALL(Pos(0, 0),
-                      PART.VALID(Pos(0, 0), "extract"),
-                      List(FUNCTION_CALL(Pos(0, 0), PART.VALID(Pos(0, 0), undefinedOptionLong.name), List.empty)))
+        FUNCTION_CALL(AnyPos,
+                      PART.VALID(AnyPos, "getElement"),
+                      List(FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, returnsListLong.name), List.empty), CONST_LONG(AnyPos, 0)))
       )
     v._2 shouldBe LONG
   }
