@@ -1,26 +1,19 @@
 package com.wavesplatform.consensus
 
-import java.nio.file.{Files, Path}
-
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.{TransactionGen, WithDB}
 import com.wavesplatform.database.LevelDBWriter
-import com.wavesplatform.db.LevelDBFactory
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{WavesSettings, _}
 import com.wavesplatform.state._
-import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, ProduceError}
-import org.iq80.leveldb.{DB, Options}
+import com.wavesplatform.{TransactionGen, WithDB}
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{FreeSpec, Matchers, PropSpec}
+import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
-import scorex.settings.TestFunctionalitySettings
-import scorex.utils.{Time, TimeImpl}
-import cats.implicits._
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.lagonaki.mocks.TestBlock
+import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.{BlockchainUpdater, GenesisTransaction}
+import scorex.utils.{Time, TimeImpl}
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -35,7 +28,8 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
   "block delay validation" - {
     "succeed when delay is correct" in {
       withEnv(chainGen(List(ENOUGH_AMT), 10)) {
-        case Env(pos, blockchain, miner :: _) =>
+        case Env(pos, blockchain, miners) =>
+          val miner        = miners.head
           val height       = blockchain.height
           val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
           val lastBlock    = blockchain.lastBlock.get
@@ -49,7 +43,8 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
 
     "failed when delay less than expected" in {
       withEnv(chainGen(List(ENOUGH_AMT), 10)) {
-        case Env(pos, blockchain, miner :: _) =>
+        case Env(pos, blockchain, miners) =>
+          val miner        = miners.head
           val height       = blockchain.height
           val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
           val lastBlock    = blockchain.lastBlock.get
@@ -69,11 +64,11 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
   "base target validation" - {
     "succeed when BT is correct" in {
       withEnv(chainGen(List(ENOUGH_AMT), 10)) {
-        case Env(pos, blockchain, miner :: _) =>
-          val height       = blockchain.height
-          val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
-          val lastBlock    = blockchain.lastBlock.get
-          val block        = forgeBlock(miner, blockchain, pos)()
+        case Env(pos, blockchain, miners) =>
+          val miner     = miners.head
+          val height    = blockchain.height
+          val lastBlock = blockchain.lastBlock.get
+          val block     = forgeBlock(miner, blockchain, pos)()
 
           pos
             .validateBaseTarget(
@@ -87,11 +82,11 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
 
     "failed when BT less than expected" in {
       withEnv(chainGen(List(ENOUGH_AMT), 10)) {
-        case Env(pos, blockchain, miner :: _) =>
-          val height       = blockchain.height
-          val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
-          val lastBlock    = blockchain.lastBlock.get
-          val block        = forgeBlock(miner, blockchain, pos)(updateBT = _ - 1)
+        case Env(pos, blockchain, miners) =>
+          val miner     = miners.head
+          val height    = blockchain.height
+          val lastBlock = blockchain.lastBlock.get
+          val block     = forgeBlock(miner, blockchain, pos)(updateBT = _ - 1)
 
           pos
             .validateBaseTarget(
@@ -105,11 +100,11 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
 
     "failed when BT greater than expected" in {
       withEnv(chainGen(List(ENOUGH_AMT), 10)) {
-        case Env(pos, blockchain, miner :: _) =>
-          val height       = blockchain.height
-          val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
-          val lastBlock    = blockchain.lastBlock.get
-          val block        = forgeBlock(miner, blockchain, pos)(updateBT = _ + 1)
+        case Env(pos, blockchain, miners) =>
+          val miner     = miners.head
+          val height    = blockchain.height
+          val lastBlock = blockchain.lastBlock.get
+          val block     = forgeBlock(miner, blockchain, pos)(updateBT = _ + 1)
 
           pos
             .validateBaseTarget(
@@ -125,11 +120,10 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
   "generation signature validation" - {
     "succeed when GS is correct" in {
       withEnv(chainGen(List(ENOUGH_AMT), 10)) {
-        case Env(pos, blockchain, miner :: _) =>
-          val height       = blockchain.height
-          val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
-          val lastBlock    = blockchain.lastBlock.get
-          val block        = forgeBlock(miner, blockchain, pos)()
+        case Env(pos, blockchain, miners) =>
+          val miner  = miners.head
+          val height = blockchain.height
+          val block  = forgeBlock(miner, blockchain, pos)()
 
           pos
             .validateGeneratorSignature(
@@ -141,11 +135,10 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
 
     "failed when GS is incorrect" in {
       withEnv(chainGen(List(ENOUGH_AMT), 100)) {
-        case Env(pos, blockchain, miner :: _) =>
-          val height       = blockchain.height
-          val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
-          val lastBlock    = blockchain.lastBlock.get
-          val block        = forgeBlock(miner, blockchain, pos)(updateGS = gs => ByteStr(gs.arr |< Random.nextBytes))
+        case Env(pos, blockchain, miners) =>
+          val miner  = miners.head
+          val height = blockchain.height
+          val block  = forgeBlock(miner, blockchain, pos)(updateGS = gs => ByteStr(gs.arr |< Random.nextBytes))
 
           pos
             .validateGeneratorSignature(
@@ -153,6 +146,20 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
               block
             ) should produce("Generation signatures does not match")
       }
+    }
+  }
+
+  "regression" - {
+    "delay" in {
+      FairPoSCalculator.calculateDelay(BigInt(1), 100l, 10000000000000l) shouldBe 705491
+      FairPoSCalculator.calculateDelay(BigInt(2), 200l, 20000000000000l) shouldBe 607358
+      FairPoSCalculator.calculateDelay(BigInt(3), 300l, 30000000000000l) shouldBe 549956
+    }
+
+    "base target" in {
+      FairPoSCalculator.calculateBaseTarget(100l, 10, 100l, 100000000000l, Some(1000000000l), 100000000000l) shouldBe 101
+      FairPoSCalculator.calculateBaseTarget(200l, 20, 200l, 200000000000l, Some(2000000000l), 200000000000l) shouldBe 202
+      FairPoSCalculator.calculateBaseTarget(300l, 30, 300l, 300000000000l, Some(3000000000l), 300000000000l) shouldBe 303
     }
   }
 
