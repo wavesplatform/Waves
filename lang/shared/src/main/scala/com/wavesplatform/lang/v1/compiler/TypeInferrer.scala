@@ -1,18 +1,19 @@
 package com.wavesplatform.lang.v1.compiler
 
 import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Types.UNION._
 import com.wavesplatform.lang._
 
 object TypeInferrer {
 
-  case class MatchResult(tpe: TYPE, name: TYPEPARAM)
+  case class MatchResult(tpe: TYPE, name: TYPEPLACEHOLDER.TYPEPARAM)
   // (ACTUAL, EXPECTED)
-  def apply(seq: Seq[(TYPE, TYPEPLACEHOLDER)]): Either[String, Map[TYPEPARAM, TYPE]] = {
+  def apply(seq: Seq[(TYPE, TYPEPLACEHOLDER)]): Either[String, Map[TYPEPLACEHOLDER.TYPEPARAM, TYPE]] = {
     val matching = seq.map(x => matchTypes(x._1, x._2))
     matching.find(_.isLeft) match {
       case Some(left) => left.asInstanceOf[Left[String, Nothing]]
       case None =>
-        val matchResults = matching.flatMap(_.explicitGet()).groupBy(_.name)
+        val matchResults: Map[TYPEPLACEHOLDER.TYPEPARAM, Seq[MatchResult]] = matching.flatMap(_.explicitGet()).groupBy(_.name)
 
         // a function like Option[T], T => Option[Option[T]]
         // can lead to different interpretations of `T`.
@@ -26,7 +27,7 @@ object TypeInferrer {
               case p: PLAIN_TYPE => Right(p)
               case u @ UNION(plainTypes) =>
                 val commonTypeExists = plainTypes.exists { p =>
-                  matchResults.map(_.tpe).forall(e => matchType(e, p))
+                  matchResults.map(_.tpe).forall(e => matchPlainCandidate(e, p))
                 }
                 Either.cond(commonTypeExists, u, s"Can't match inferred types of ${h.name} over ${matchResults.map(_.tpe)}")
             }
@@ -38,31 +39,34 @@ object TypeInferrer {
     }
   }
 
-  def matchTypes(actual: TYPE, expected: TYPEPLACEHOLDER): Either[String, Option[MatchResult]] = {
-    lazy val err = s"Non-matching types: expected: $expected, actual: $actual"
-
-    (expected, actual) match {
-      case (realType: TYPE, _) =>
-        Either.cond(matchType(realType, actual).isDefined, None, err)
-      case (tp @ TYPEPARAM(char), _) =>
-        Right(Some(MatchResult(actual, tp)))
-      case (tp @ LISTTYPEPARAM(innerTypeParam), LIST(t)) => matchTypes(t, innerTypeParam)
-      case _                                             => Left(err)
+  def matchT(placeholder: TYPE, arg: TYPE): Boolean = {
+    (placeholder, arg) match {
+      case (_, NOTHING) => true
+      case (NOTHING, _) => false
+      case (p, a)       => UNION.create(p.l) >= UNION.create(a.l)
     }
   }
 
-  def inferResultType(resultType: TYPEPLACEHOLDER, resolved: Map[TYPEPARAM, TYPE]): Either[String, TYPE] = {
-    resultType match {
-      case plainType: TYPE => Right(plainType)
-      case tp @ TYPEPARAM(_) =>
-        resolved.get(tp) match {
-          case None    => Left(s"Unknown function return type $tp")
-          case Some(r) => Right(r)
-        }
-      case LISTTYPEPARAM(t) => inferResultType(t, resolved).map(LIST)
+  def matchPlainCandidate(required: TYPE, actual: PLAIN_TYPE): Boolean =
+    required match {
+      case UNION(plaintypes) => plaintypes contains actual
+      case p: PLAIN_TYPE     => p == actual
+    }
+
+  def matchTypes(argType: TYPE, placeholder: TYPEPLACEHOLDER): Either[String, Option[MatchResult]] = {
+    lazy val err = s"Non-matching types: expected: $placeholder, actual: $argType"
+
+    (placeholder, argType) match {
+      case (placeholder: TYPE, _) =>
+        Either.cond(matchPlainCandidate(placeholder, argType), None, err)
+      case (tp @ TYPEPLACEHOLDER.TYPEPARAM(char), _) =>
+        Right(Some(MatchResult(argType, tp)))
+      case (tp @ TYPEPLACEHOLDER.LISTTYPEPARAM(innerTypeParam), LIST(t)) => matchTypes(t, innerTypeParam)
+      case _                                                             => Left(err)
     }
   }
 
+  // match, e.g. many ifs
   def findCommonType(list: Seq[TYPE]): TYPE = list match {
     case one :: Nil => one
     case head :: tail =>
@@ -70,13 +74,7 @@ object TypeInferrer {
       findCommonType(head, t)
   }
 
-  // NOTHING is not plain type
-  def matchType(required: TYPE, actual: PLAIN_TYPE): Boolean =
-    required match {
-      case UNION(plaintypes) => plaintypes contains actual
-      case p: PLAIN_TYPE     => p == actual
-    }
-
+  // if-then-else
   def findCommonType(t1: TYPE, t2: TYPE): TYPE = {
     if (t2 == NOTHING) t1
     else if (t1 == NOTHING) t2

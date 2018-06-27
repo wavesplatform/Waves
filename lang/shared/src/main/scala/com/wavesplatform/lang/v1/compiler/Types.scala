@@ -6,16 +6,37 @@ import scodec.bits.ByteVector
 object Types {
 
   sealed trait TYPEPLACEHOLDER
-  case class TYPEPARAM(char: Byte)             extends TYPEPLACEHOLDER
-  case class LISTTYPEPARAM(t: TYPEPLACEHOLDER) extends TYPEPLACEHOLDER
+  object TYPEPLACEHOLDER {
+    case class TYPEPARAM(char: Byte)             extends TYPEPLACEHOLDER
+    case class LISTTYPEPARAM(t: TYPEPLACEHOLDER) extends TYPEPLACEHOLDER
+    case object UNIT                             extends TYPEPLACEHOLDER
+    case object LONG                             extends TYPEPLACEHOLDER
+    case object BYTEVECTOR                       extends TYPEPLACEHOLDER
+    case object BOOLEAN                          extends TYPEPLACEHOLDER
+    case object STRING                           extends TYPEPLACEHOLDER
+    case class CASETYPEREF(name: String)         extends TYPEPLACEHOLDER
+    case class UNION(l: List[TYPEPLACEHOLDER])   extends TYPEPLACEHOLDER
+  }
 
-  sealed trait TYPE extends TYPEPLACEHOLDER {
+  def typeToTypePlaceholder(t: TYPE): TYPEPLACEHOLDER = t match {
+    case UNIT              => TYPEPLACEHOLDER.UNIT
+    case LONG              => TYPEPLACEHOLDER.LONG
+    case BYTEVECTOR        => TYPEPLACEHOLDER.BYTEVECTOR
+    case BOOLEAN           => TYPEPLACEHOLDER.BOOLEAN
+    case STRING            => TYPEPLACEHOLDER.STRING
+    case LIST(lt)          => TYPEPLACEHOLDER.LISTTYPEPARAM(typeToTypePlaceholder(lt))
+    case UNION(l)          => TYPEPLACEHOLDER.UNION(l map typeToTypePlaceholder)
+    case CASETYPEREF(c, _) => TYPEPLACEHOLDER.CASETYPEREF(c)
+  }
+
+  sealed trait TYPE {
     type Underlying
     def name: String
     def fields: List[(String, TYPE)] = List()
     def l: List[PLAIN_TYPE]
     override def toString: String = name
   }
+
   sealed abstract class AUTO_TAGGED_TYPE[T](override val name: String) extends TYPE {
     override type Underlying = T
   }
@@ -73,18 +94,5 @@ object Types {
     }
   }
 
-  def canBeEq(type1: TYPEPARAM, type2: TYPEPARAM)(t: Map[TYPEPARAM, TYPE]) = {
-    (t(type1), t(type2)) match {
-      case (UNION(l1), UNION(l2)) =>
-        Either.cond(l1.exists(l2.toSet), BOOLEAN, "Comparing values have incompatible types")
-      case (UNION(l), t) =>
-        Either.cond(l.contains(t), BOOLEAN, "Comparing values have incompatible types")
-      case (t, UNION(l)) =>
-        Either.cond(l.contains(t), BOOLEAN, "Comparing values have incompatible types")
-      case (NOTHING, _) => Right(BOOLEAN)
-      case (_, NOTHING) => Right(BOOLEAN)
-      case (t1, t2) =>
-        Either.cond(t1 == t1, BOOLEAN, "Comparing values have incompatible types")
-    }
-  }
+  def canBeEq(type1: TYPEPLACEHOLDER.TYPEPARAM, type2: TYPEPLACEHOLDER.TYPEPARAM)(t: Map[TYPEPLACEHOLDER.TYPEPARAM, TYPE]) = ???
 }
