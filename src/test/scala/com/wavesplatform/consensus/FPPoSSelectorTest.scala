@@ -23,6 +23,7 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.{BlockchainUpdater, GenesisTransaction}
 
 import scala.concurrent.duration._
+import scala.util.Random
 
 /***
   * Tests for PoSSelector with activated FairPoS
@@ -66,7 +67,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
   }
 
   "base target validation" - {
-    "succed when BT is correct" in {
+    "succeed when BT is correct" in {
       withEnv(chainGen(List(ENOUGH_AMT), 10)) {
         case Env(pos, blockchain, miner :: _) =>
           val height       = blockchain.height
@@ -122,7 +123,37 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
   }
 
   "generation signature validation" - {
+    "succeed when GS is correct" in {
+      withEnv(chainGen(List(ENOUGH_AMT), 10)) {
+        case Env(pos, blockchain, miner :: _) =>
+          val height       = blockchain.height
+          val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
+          val lastBlock    = blockchain.lastBlock.get
+          val block        = forgeBlock(miner, blockchain, pos)()
 
+          pos
+            .validateGeneratorSignature(
+              height + 1,
+              block
+            ) shouldBe Right(())
+      }
+    }
+
+    "failed when GS is incorrect" in {
+      withEnv(chainGen(List(ENOUGH_AMT), 100)) {
+        case Env(pos, blockchain, miner :: _) =>
+          val height       = blockchain.height
+          val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
+          val lastBlock    = blockchain.lastBlock.get
+          val block        = forgeBlock(miner, blockchain, pos)(updateGS = gs => ByteStr(gs.arr |< Random.nextBytes))
+
+          pos
+            .validateGeneratorSignature(
+              height + 1,
+              block
+            ) should produce("Generation signatures does not match")
+      }
+    }
   }
 
   def withEnv(gen: Time => Gen[(Seq[PrivateKeyAccount], Seq[Block])])(f: Env => Unit): Unit = {
@@ -149,6 +180,14 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
 }
 
 object FPPoSSelectorTest {
+
+  implicit class KComb[A](a: A) {
+    def |<(f: A => Unit): A = {
+      f(a)
+      a
+    }
+  }
+
   final case class Env(pos: PoSSelector, blockchain: BlockchainUpdater with NG, miners: Seq[PrivateKeyAccount])
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
