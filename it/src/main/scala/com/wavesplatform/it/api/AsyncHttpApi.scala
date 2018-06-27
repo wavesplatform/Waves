@@ -93,9 +93,6 @@ object AsyncHttpApi extends Assertions {
     def getOrderStatus(asset: String, orderId: String): Future[MatcherStatusResponse] =
       matcherGet(s"/matcher/orderbook/$asset/WAVES/$orderId", waitForStatus = true).as[MatcherStatusResponse]
 
-    def getOrderStatus1(asset: String, orderId: String): Future[MatcherStatusResponse] =
-      matcherGet(s"/matcher/orderbook/$asset/WAVES/$orderId").as[MatcherStatusResponse]
-
     def getOrderBook(asset: String): Future[OrderBookResponse] =
       matcherGet(s"/matcher/orderbook/$asset/WAVES").as[OrderBookResponse]
 

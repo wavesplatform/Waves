@@ -25,10 +25,10 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       assert(details1.minSponsoredAssetFee.isEmpty)
 
       // burn half of the coins and check balance
-      val burnId = sender.burn(firstAddress, issuedAssetId, issueAmount / 2, fee, version = v).id
+      val burnId = sender.burn(firstAddress, issuedAssetId, issueAmount / 2, minFee, version = v).id
 
       nodes.waitForHeightAriseAndTxPresent(burnId)
-      notMiner.assertBalances(firstAddress, balance - fee - issueFee, effectiveBalance - fee - issueFee)
+      notMiner.assertBalances(firstAddress, balance - minFee - issueFee, effectiveBalance - minFee - issueFee)
       notMiner.assertAssetBalance(firstAddress, issuedAssetId, issueAmount / 2)
       val details2 = notMiner.assetsDetails(issuedAssetId)
       assert(!details2.reissuable)
@@ -38,7 +38,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       assert(assetOpt.exists(_.balance == issueAmount / 2))
 
       // burn the rest and check again
-      val burnIdRest = sender.burn(firstAddress, issuedAssetId, issueAmount / 2, fee, version = v).id
+      val burnIdRest = sender.burn(firstAddress, issuedAssetId, issueAmount / 2, minFee, version = v).id
 
       nodes.waitForHeightAriseAndTxPresent(burnIdRest)
       notMiner.assertAssetBalance(firstAddress, issuedAssetId, 0)
@@ -63,13 +63,13 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity)
 
-      val transferId = sender.transfer(firstAddress, secondAddress, transferredQuantity, fee, issuedAssetId.some).id
+      val transferId = sender.transfer(firstAddress, secondAddress, transferredQuantity, minFee, issuedAssetId.some).id
 
       nodes.waitForHeightAriseAndTxPresent(transferId)
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity - transferredQuantity)
       sender.assertAssetBalance(secondAddress, issuedAssetId, transferredQuantity)
 
-      val burnId = sender.burn(secondAddress, issuedAssetId, transferredQuantity, fee, v).id
+      val burnId = sender.burn(secondAddress, issuedAssetId, transferredQuantity, minFee, v).id
 
       nodes.waitForHeightAriseAndTxPresent(burnId)
       sender.assertAssetBalance(secondAddress, issuedAssetId, 0)
@@ -80,7 +80,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       assert(details.extraFee == 0)
       assert(details.minSponsoredAssetFee.isEmpty)
 
-      assertBadRequestAndMessage(sender.transfer(secondAddress, firstAddress, transferredQuantity / 2, fee, issuedAssetId.some).id,
+      assertBadRequestAndMessage(sender.transfer(secondAddress, firstAddress, transferredQuantity / 2, minFee, issuedAssetId.some).id,
                                  "Attempt to transfer unavailable funds")
     }
   }
@@ -95,7 +95,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity)
 
-      assertBadRequestAndMessage(sender.burn(secondAddress, issuedAssetId, burnedQuantity, fee, v).id, "negative asset balance")
+      assertBadRequestAndMessage(sender.burn(secondAddress, issuedAssetId, burnedQuantity, minFee, v).id, "negative asset balance")
     }
   }
 
@@ -110,13 +110,13 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity)
 
-      val transferId = sender.transfer(firstAddress, secondAddress, transferredQuantity, fee, issuedAssetId.some).id
+      val transferId = sender.transfer(firstAddress, secondAddress, transferredQuantity, minFee, issuedAssetId.some).id
 
       nodes.waitForHeightAriseAndTxPresent(transferId)
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity - transferredQuantity)
       sender.assertAssetBalance(secondAddress, issuedAssetId, transferredQuantity)
 
-      assertBadRequestAndMessage(sender.burn(secondAddress, issuedAssetId, burnedQuantity, fee, v).id, "negative asset balance")
+      assertBadRequestAndMessage(sender.burn(secondAddress, issuedAssetId, burnedQuantity, minFee, v).id, "negative asset balance")
     }
   }
 
@@ -130,10 +130,10 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity)
 
-      val transferId = sender.transfer(firstAddress, secondAddress, transferredQuantity, fee, issuedAssetId.some).id
+      val transferId = sender.transfer(firstAddress, secondAddress, transferredQuantity, minFee, issuedAssetId.some).id
       nodes.waitForHeightAriseAndTxPresent(transferId)
 
-      val burnOwnerTxTd = sender.burn(firstAddress, issuedAssetId, transferredQuantity, fee, v).id
+      val burnOwnerTxTd = sender.burn(firstAddress, issuedAssetId, transferredQuantity, minFee, v).id
       nodes.waitForHeightAriseAndTxPresent(burnOwnerTxTd)
 
       sender.assertAssetBalance(firstAddress, issuedAssetId, 0)
@@ -145,7 +145,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       assert(details.extraFee == 0)
       assert(details.minSponsoredAssetFee.isEmpty)
 
-      val reissueId = sender.reissue(firstAddress, issuedAssetId, issuedQuantity, false, fee).id
+      val reissueId = sender.reissue(firstAddress, issuedAssetId, issuedQuantity, false, minFee).id
       nodes.waitForHeightAriseAndTxPresent(reissueId)
 
       val details1 = notMiner.assetsDetails(issuedAssetId)
@@ -154,10 +154,10 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       assert(details1.extraFee == 0)
       assert(details1.minSponsoredAssetFee.isEmpty)
 
-      val burn1 = sender.burn(firstAddress, issuedAssetId, issuedQuantity, fee, v).id
+      val burn1 = sender.burn(firstAddress, issuedAssetId, issuedQuantity, minFee, v).id
       nodes.waitForHeightAriseAndTxPresent(burn1)
 
-      val burn2 = sender.burn(secondAddress, issuedAssetId, transferredQuantity, fee, v).id
+      val burn2 = sender.burn(secondAddress, issuedAssetId, transferredQuantity, minFee, v).id
       nodes.waitForHeightAriseAndTxPresent(burn2)
 
       val details2 = notMiner.assetsDetails(issuedAssetId)
@@ -166,10 +166,10 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       assert(details2.extraFee == 0)
       assert(details2.minSponsoredAssetFee.isEmpty)
 
-      assertBadRequestAndMessage(sender.reissue(firstAddress, issuedAssetId, issuedQuantity, true, fee).id, "Asset is not reissuable")
-      assertBadRequestAndMessage(sender.transfer(secondAddress, thirdAddress, transferredQuantity / 2, fee, issuedAssetId.some).id,
+      assertBadRequestAndMessage(sender.reissue(firstAddress, issuedAssetId, issuedQuantity, true, minFee).id, "Asset is not reissuable")
+      assertBadRequestAndMessage(sender.transfer(secondAddress, thirdAddress, transferredQuantity / 2, minFee, issuedAssetId.some).id,
                                  "Attempt to transfer unavailable funds")
-      assertBadRequestAndMessage(sender.transfer(firstAddress, thirdAddress, transferredQuantity / 2, fee, issuedAssetId.some).id,
+      assertBadRequestAndMessage(sender.transfer(firstAddress, thirdAddress, transferredQuantity / 2, minFee, issuedAssetId.some).id,
                                  "Attempt to transfer unavailable funds")
 
     }
