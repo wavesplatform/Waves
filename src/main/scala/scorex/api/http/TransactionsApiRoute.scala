@@ -77,10 +77,10 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               path(Segment) { limitStr =>
                 Exception.allCatch.opt(limitStr.toInt) match {
                   case Some(limit) if limit > 0 && limit <= MaxTransactionsPerRequest =>
-                    complete(Json.arr(JsArray(blockchain.addressTransactions(a, Set.empty, limit, 0).map {
-                      case (h, tx) =>
-                        txToCompactJson(a, tx) + ("height" -> JsNumber(h))
-                    })))
+                    complete(
+                      Json.arr(JsArray(blockchain
+                        .addressTransactions(a, Set.empty, limit, 0)
+                        .map({ case (h, tx) => txToCompactJson(a, tx) + ("height" -> JsNumber(h)) }))))
                   case Some(limit) if limit > MaxTransactionsPerRequest =>
                     complete(TooBigArrayAllocation)
                   case _ =>

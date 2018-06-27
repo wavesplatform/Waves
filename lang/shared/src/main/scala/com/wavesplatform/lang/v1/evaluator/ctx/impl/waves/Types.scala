@@ -148,11 +148,11 @@ object Types {
 
   def buildDataEntryType(name: String, tpe: TYPE) = CaseType(name + "DataEntry", List("key" -> STRING, "value" -> tpe))
 
-  val strDataEntryType  = buildDataEntryType("Str", STRING)
-  val boolDataEntryType = buildDataEntryType("Bool", BOOLEAN)
-  val bvDataEntryType   = buildDataEntryType("ByteVector", BYTEVECTOR)
-  val longDataEntryType = buildDataEntryType("Long", LONG)
-  val dataEntryTypes    = List(strDataEntryType, boolDataEntryType, bvDataEntryType, longDataEntryType)
+  val strDataEntryType  = buildDataEntryType("String", STRING)
+  val boolDataEntryType = buildDataEntryType("Boolean", BOOLEAN)
+  val binDataEntryType   = buildDataEntryType("Binary", BYTEVECTOR)
+  val intDataEntryType = buildDataEntryType("Integer", LONG)
+  val dataEntryTypes    = List(strDataEntryType, boolDataEntryType, binDataEntryType, intDataEntryType)
 
   val listOfDataEntriesType = LIST(UNION.create(dataEntryTypes.map(_.typeRef)))
 

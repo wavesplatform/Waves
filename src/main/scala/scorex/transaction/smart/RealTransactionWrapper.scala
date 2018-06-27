@@ -92,7 +92,7 @@ object RealTransactionWrapper {
         Tx.Data(
           proven(d),
           d.data.map {
-            case LongDataEntry(key, value)    => DataItem.Lng(key, value)
+            case IntegerDataEntry(key, value) => DataItem.Lng(key, value)
             case StringDataEntry(key, value)  => DataItem.Str(key, value)
             case BooleanDataEntry(key, value) => DataItem.Bool(key, value)
             case BinaryDataEntry(key, value)  => DataItem.Bin(key, value)

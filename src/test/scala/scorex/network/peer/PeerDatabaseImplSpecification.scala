@@ -103,7 +103,12 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       database.randomPeer(Set(address1)) should contain(address2)
     }
 
-    "if blacklisting is disable" - {
+    "filters out wildcard addresses" in {
+      database.addCandidate(new InetSocketAddress("0.0.0.0", 6863))
+      database.randomPeer(Set(address1, address2)) shouldBe None
+    }
+
+    "if blacklisting is disabled" - {
       "should clear blacklist at start" in {
         val databaseFile = Files.createTempFile("waves-tests", "PeerDatabaseImplSpecification-blacklisting-clear").toAbsolutePath.toString
         val path         = if (File.separatorChar == '\\') databaseFile.replace('\\', '/') else databaseFile

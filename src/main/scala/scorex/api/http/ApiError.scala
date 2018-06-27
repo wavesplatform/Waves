@@ -72,7 +72,7 @@ object ApiError {
         case Right(Right(lv)) =>
           Json.obj(
             "status" -> "Success",
-            "error"  -> lv.toString
+            "value"  -> lv.toString
           )
       })()
   }
@@ -264,12 +264,10 @@ case class ScriptExecutionError(tx: Transaction, error: String, scriptSrc: Strin
       "transaction" -> tx.json(),
       "script"      -> scriptSrc,
       "vars" -> Json.obj(
-        "calculated" -> Json.arr(
+        "used" -> Json.arr(
           calculated.map({ case (k, v) => Json.obj(k -> Json.toJson(v)(ApiError.lvWrites)) })
         ),
-        "notcalculated" -> Json.arr(
-          notCalculated.map({ case (k, v) => Json.obj(k -> Json.toJson(v)(ApiError.lvWrites)) })
-        )
+        "notused" -> Json.arr(notCalculated.keys)
       )
     )
   }
@@ -288,12 +286,10 @@ case class TransactionNotAllowedByScript(tx: Transaction, vars: Map[String, Lazy
       "transaction" -> tx.json(),
       "script"      -> scriptSrc,
       "vars" -> Json.obj(
-        "calculated" -> Json.arr(
+        "used" -> Json.arr(
           calculated.map({ case (k, v) => Json.obj(k -> Json.toJson(v)(ApiError.lvWrites)) })
         ),
-        "notcalculated" -> Json.arr(
-          notCalculated.map({ case (k, v) => Json.obj(k -> Json.toJson(v)(ApiError.lvWrites)) })
-        )
+        "notused" -> Json.arr(notCalculated.keys)
       )
     )
   }

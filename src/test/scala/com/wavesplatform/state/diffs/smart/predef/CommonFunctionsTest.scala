@@ -237,14 +237,14 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
         s"""
            |match tx {
            |  case tx: DataTransaction =>
-           |    let intEq = tx.data[0] == LongDataEntry("${entry.key}", ${entry.value})
-           |    let intNe = tx.data[0] != LongDataEntry("${entry.key}", ${entry.value})
-           |    let boolEq = tx.data[0] == BoolDataEntry("${entry.key}", true)
-           |    let boolNe = tx.data[0] != BoolDataEntry("${entry.key}", true)
-           |    let binEq = tx.data[0] == ByteVectorDataEntry("${entry.key}", base64'WROOooommmmm')
-           |    let binNe = tx.data[0] != ByteVectorDataEntry("${entry.key}", base64'FlapFlap')
-           |    let strEq = tx.data[0] == StrDataEntry("${entry.key}", "${entry.value}")
-           |    let strNe = tx.data[0] != StrDataEntry("${entry.key}", "Zam")
+           |    let intEq = tx.data[0] == IntegerDataEntry("${entry.key}", ${entry.value})
+           |    let intNe = tx.data[0] != IntegerDataEntry("${entry.key}", ${entry.value})
+           |    let boolEq = tx.data[0] == BooleanDataEntry("${entry.key}", true)
+           |    let boolNe = tx.data[0] != BooleanDataEntry("${entry.key}", true)
+           |    let binEq = tx.data[0] == BinaryDataEntry("${entry.key}", base64'WROOooommmmm')
+           |    let binNe = tx.data[0] != BinaryDataEntry("${entry.key}", base64'FlapFlap')
+           |    let strEq = tx.data[0] == StringDataEntry("${entry.key}", "${entry.value}")
+           |    let strNe = tx.data[0] != StringDataEntry("${entry.key}", "Zam")
            |    intEq && !intNe && !boolEq && boolNe && !binEq && binNe && !strEq && strNe
            |  case _ => throw
            |}

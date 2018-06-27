@@ -235,10 +235,10 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     forAll(dataTransactionGen(10)) { t =>
       def pg(i: Int) = {
         val v = t.data(i) match {
-          case x: LongDataEntry    => s"case a: LongDataEntry => a.value == ${x.value}"
-          case x: BooleanDataEntry => s"case a: BoolDataEntry => a.value == ${x.value}"
-          case x: BinaryDataEntry  => s"case a: ByteVectorDataEntry => a.value == base64'${x.value.base64}'"
-          case x: StringDataEntry  => s"""case a: StrDataEntry => a.value == ${Json.toJson(x.value)}"""
+          case x: IntegerDataEntry => s"case a: IntegerDataEntry => a.value == ${x.value}"
+          case x: BooleanDataEntry => s"case a: BooleanDataEntry => a.value == ${x.value}"
+          case x: BinaryDataEntry  => s"case a: BinaryDataEntry => a.value == base64'${x.value.base64}'"
+          case x: StringDataEntry  => s"""case a: StringDataEntry => a.value == ${Json.toJson(x.value)}"""
         }
 
         s"""let key$i = t.data[$i].key == ${Json.toJson(t.data(i).key)}
