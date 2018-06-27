@@ -54,8 +54,8 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
     val result = Alias.buildWithCurrentNetworkByte(aliasName) match {
       case Right(alias) =>
         blockchain.resolveAlias(alias) match {
-          case Some(addr) => Right(Address(addr.stringRepr))
-          case None       => Left(AliasDoesNotExist(alias))
+          case Right(addr) => Right(Address(addr.stringRepr))
+          case _           => Left(AliasDoesNotExist(alias))
         }
       case Left(err) => Left(ApiError.fromValidationError(err))
     }

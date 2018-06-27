@@ -161,10 +161,10 @@ object Bindings {
           Map(
             "data" -> data
               .map {
-                case Lng(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> k, "value" -> v))
-                case Str(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> k, "value" -> v))
-                case Bool(k, v) => CaseObj(longDataEntryType.typeRef, Map("key" -> k, "value" -> v))
-                case Bin(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> k, "value" -> v))
+                case Lng(k, v)  => CaseObj(intDataEntryType.typeRef, Map("key" -> k, "value" -> v))
+                case Str(k, v)  => CaseObj(strDataEntryType.typeRef, Map("key" -> k, "value" -> v))
+                case Bool(k, v) => CaseObj(boolDataEntryType.typeRef, Map("key" -> k, "value" -> v))
+                case Bin(k, v)  => CaseObj(binDataEntryType.typeRef, Map("key" -> k, "value" -> v))
               }
               .asInstanceOf[listOfDataEntriesType.Underlying]) ++
             provenTxPart(p)

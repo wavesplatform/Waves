@@ -48,8 +48,8 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
             blockDiff.aliases shouldBe Map(anotherAliasTx.alias -> senderAcc)
 
             newState.aliasesOfAddress(senderAcc).toSet shouldBe Set(anotherAliasTx.alias, aliasTx.alias)
-            newState.resolveAlias(aliasTx.alias) shouldBe Some(senderAcc)
-            newState.resolveAlias(anotherAliasTx.alias) shouldBe Some(senderAcc)
+            newState.resolveAlias(aliasTx.alias) shouldBe Right(senderAcc)
+            newState.resolveAlias(anotherAliasTx.alias) shouldBe Right(senderAcc)
         }
     }
   }

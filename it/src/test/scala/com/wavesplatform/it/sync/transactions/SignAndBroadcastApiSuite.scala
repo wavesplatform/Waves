@@ -10,13 +10,12 @@ import play.api.libs.json._
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http.assets.{SignedTransferV1Request}
 import com.wavesplatform.utils.Base58
+import com.wavesplatform.it.sync._
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
 
 import scala.util.Random
 
 class SignAndBroadcastApiSuite extends BaseTransactionSuite {
-  private val supportedVersions = List(null, "2") //sign and broadcast use default for V1
-
   test("height should always be reported for transactions") {
     val txId = sender.transfer(firstAddress, secondAddress, 1.waves, fee = 1.waves).id
     nodes.waitForHeightAriseAndTxPresent(txId)
@@ -195,7 +194,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
         "version" -> 1,
         "sender"  -> firstAddress,
         "data" -> List(
-          LongDataEntry("int", 923275292849183L),
+          IntegerDataEntry("int", 923275292849183L),
           BooleanDataEntry("bool", true),
           BinaryDataEntry("blob", ByteStr(Array.tabulate(445)(_.toByte))),
           StringDataEntry("str", "AAA-AAA")

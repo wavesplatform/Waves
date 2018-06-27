@@ -45,7 +45,9 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
   }
 
   override def addCandidate(socketAddress: InetSocketAddress): Boolean = unverifiedPeers.synchronized {
-    val r = Option(peersPersistence.getIfPresent(socketAddress)).isEmpty && !unverifiedPeers.contains(socketAddress)
+    val r = !socketAddress.getAddress.isAnyLocalAddress &&
+      Option(peersPersistence.getIfPresent(socketAddress)).isEmpty &&
+      !unverifiedPeers.contains(socketAddress)
     if (r) unverifiedPeers.add(socketAddress)
     r
   }

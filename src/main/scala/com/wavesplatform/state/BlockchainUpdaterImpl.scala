@@ -18,7 +18,6 @@ import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.transaction.Transaction.Type
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import scorex.transaction._
-import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.lease._
 import scorex.transaction.smart.script.Script
 import scorex.utils.{ScorexLogging, Time}
@@ -170,6 +169,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                       miningConstraints.total
                     }
 
+                    val expiredTransactions = blockchain.forgetTransactions((_, txTs) => block.timestamp - txTs > 2 * 60 * 60 * 1000)
+
                     val diff = BlockDiffer
                       .fromBlock(
                         functionalitySettings,
@@ -178,6 +179,11 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                         block,
                         constraint
                       )
+
+                    diff.left.foreach { _ =>
+                      log.trace(s"Could not append new block, remembering ${expiredTransactions.size} transaction(s)")
+                      blockchain.learnTransactions(expiredTransactions)
+                    }
 
                     diff.map { hardenedDiff =>
                       blockchain.append(referencedLiquidDiff, referencedForgedBlock)
@@ -401,48 +407,18 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     ng.bestLiquidDiff.transactions.contains(id) || blockchain.containsTransaction(id)
   }
 
+  override def forgetTransactions(pred: (AssetId, Long) => Boolean): Map[AssetId, Long] = blockchain.forgetTransactions(pred)
+
+  override def learnTransactions(values: Map[AssetId, Long]): Unit = blockchain.learnTransactions(values)
+
   override def assetDescription(id: AssetId): Option[AssetDescription] = ngState.fold(blockchain.assetDescription(id)) { ng =>
     val diff = ng.bestLiquidDiff
-    blockchain.assetDescription(id) match {
-      case Some(ad) =>
-        ng.bestLiquidDiff.issuedAssets
-          .get(id)
-          .map { newAssetInfo =>
-            ad.copy(
-              reissuable = newAssetInfo.isReissuable,
-              totalVolume = ad.totalVolume + newAssetInfo.volume,
-              script = newAssetInfo.script
-            )
-          }
-          .orElse(Some(ad))
-          .map { ad =>
-            diff.sponsorship.get(id).fold(ad) {
-              case SponsorshipValue(sponsorship) =>
-                ad.copy(sponsorship = sponsorship)
-              case SponsorshipNoInfo =>
-                ad
-            }
-          }
-      case None =>
-        val sponsorship = diff.sponsorship.get(id).fold(0L) {
-          case SponsorshipValue(sponsorship) =>
-            sponsorship
-          case SponsorshipNoInfo =>
-            0L
-        }
-        ng.bestLiquidDiff.transactions
-          .get(id)
-          .collectFirst {
-            case (_, it: IssueTransaction, _) =>
-              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, it.script, sponsorship)
-          }
-          .map(z =>
-            ng.bestLiquidDiff.issuedAssets.get(id).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = r.script)))
-    }
+    CompositeBlockchain.composite(blockchain, diff).assetDescription(id)
   }
 
-  override def resolveAlias(a: Alias): Option[Address] =
-    ngState.fold(blockchain.resolveAlias(a))(_.bestLiquidDiff.aliases.get(a).orElse(blockchain.resolveAlias(a)))
+  override def resolveAlias(alias: Alias): Either[ValidationError, Address] = ngState.fold(blockchain.resolveAlias(alias)) { ng =>
+    CompositeBlockchain.composite(blockchain, ng.bestLiquidDiff).resolveAlias(alias)
+  }
 
   override def leaseDetails(leaseId: AssetId): Option[LeaseDetails] = ngState match {
     case Some(ng) =>

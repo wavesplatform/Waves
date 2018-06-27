@@ -38,7 +38,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val aliasFee         = calcAliasFee(firstAddress, alias)
-    assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, minFee), "already in the state")
+    assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, minFee), "Alias already claimed")
     notMiner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
   }
 
