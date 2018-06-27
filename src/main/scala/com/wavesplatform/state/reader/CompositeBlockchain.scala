@@ -1,14 +1,16 @@
 package com.wavesplatform.state.reader
 
 import cats.implicits._
+import cats.kernel.Monoid
 import com.wavesplatform.state._
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}
 import scorex.transaction.Transaction.Type
+import scorex.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.script.Script
-import scorex.transaction.{AssetId, Transaction}
+import scorex.transaction.{AssetId, Transaction, ValidationError}
 
 class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends Blockchain {
 
@@ -25,11 +27,9 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
         diff.issuedAssets
           .get(id)
           .map { newAssetInfo =>
-            ad.copy(
-              reissuable = newAssetInfo.isReissuable,
-              totalVolume = ad.totalVolume + newAssetInfo.volume,
-              script = newAssetInfo.script
-            )
+            val oldAssetInfo = AssetInfo(ad.reissuable, ad.totalVolume, ad.script)
+            val combination  = Monoid.combine(oldAssetInfo, newAssetInfo)
+            ad.copy(reissuable = combination.isReissuable, totalVolume = combination.volume, script = combination.script)
           }
           .orElse(Some(ad))
           .map { ad =>
@@ -92,7 +92,11 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
     }
   }
 
-  override def resolveAlias(a: Alias): Option[Address] = diff.aliases.get(a).orElse(inner.resolveAlias(a))
+  override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
+    case l @ Left(AliasIsDisabled(_)) => l
+    case Right(addr)                  => Right(diff.aliases.getOrElse(alias, addr))
+    case _                            => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
+  }
 
   override def allActiveLeases: Set[LeaseTransaction] = {
     val (active, canceled) = diff.leaseState.partition(_._2)
@@ -116,6 +120,9 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
   }
 
   override def containsTransaction(id: ByteStr): Boolean = diff.transactions.contains(id) || inner.containsTransaction(id)
+
+  override def forgetTransactions(pred: (AssetId, Long) => Boolean) = inner.forgetTransactions(pred)
+  override def learnTransactions(values: Map[AssetId, Long]): Unit  = inner.learnTransactions(values)
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))

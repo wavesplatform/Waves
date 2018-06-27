@@ -2,13 +2,13 @@ package com.wavesplatform.database
 
 import java.nio.ByteBuffer
 
+import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.state._
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}
 import scorex.transaction.Transaction
 import scorex.transaction.smart.script.{Script, ScriptReader}
-import com.google.common.base.Charsets.UTF_8
 
 object Keys {
   private def h(prefix: Short, height: Int): Array[Byte] =
@@ -29,7 +29,10 @@ object Keys {
   private def historyKey(prefix: Short, b: Array[Byte]) = Key(bytes(prefix, b), readIntSeq, writeIntSeq)
 
   private def intKey(prefix: Short, default: Int = 0): Key[Int] =
-    Key[Int](Shorts.toByteArray(prefix), Option(_).fold(default)(Ints.fromByteArray), Ints.toByteArray)
+    Key(Shorts.toByteArray(prefix), Option(_).fold(default)(Ints.fromByteArray), Ints.toByteArray)
+
+  private def bytesSeqNr(prefix: Short, b: Array[Byte]): Key[Int] =
+    Key(bytes(prefix, b), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
 
   private def unsupported[A](message: String): A => Array[Byte] = _ => throw new UnsupportedOperationException(message)
 
@@ -74,8 +77,8 @@ object Keys {
   def transactionHeight(txId: ByteStr): Key[Option[Int]] =
     Key.opt(hash(18, txId), readTransactionHeight, unsupported("Can't write transaction height only"))
 
-  def addressTransactionHistory(addressId: BigInt): Key[Seq[Int]] = historyKey(19, addressId.toByteArray)
-  def addressTransactionIds(height: Int, addressId: BigInt): Key[Seq[(Int, ByteStr)]] =
+  // 19: address transaction history (was never used, actually)
+  def addressTransactionIdsAtHeight(height: Int, addressId: BigInt): Key[Seq[(Int, ByteStr)]] =
     Key(hAddr(20, height, addressId), readTransactionIds, writeTransactionIds)
 
   def changedAddresses(height: Int): Key[Seq[BigInt]] = Key(h(21, height), readBigIntSeq, writeBigIntSeq)
@@ -110,6 +113,14 @@ object Keys {
   val addressesForWavesSeqNr: Key[Int]                = intKey(37)
   def addressesForWaves(seqNr: Int): Key[Seq[BigInt]] = Key(h(38, seqNr), readBigIntSeq, writeBigIntSeq)
 
-  def addressesForAssetSeqNr(assetId: ByteStr): Key[Int]                = intKey(39)
+  def addressesForAssetSeqNr(assetId: ByteStr): Key[Int]                = bytesSeqNr(39, assetId.arr)
   def addressesForAsset(assetId: ByteStr, seqNr: Int): Key[Seq[BigInt]] = Key(hBytes(40, seqNr, assetId.arr), readBigIntSeq, writeBigIntSeq)
+
+  def addressTransactionSeqNr(addressId: BigInt): Key[Int] = bytesSeqNr(41, addressId.toByteArray)
+  def addressTransactionIds(addressId: BigInt, seqNr: Int): Key[Seq[(Int, ByteStr)]] =
+    Key(hBytes(42, seqNr, addressId.toByteArray), readTransactionIds, writeTransactionIds)
+
+  val AliasIsDisabledPrefix: Short = 43
+  def aliasIsDisabled(alias: Alias): Key[Boolean] =
+    Key(bytes(AliasIsDisabledPrefix, alias.bytes.arr), Option(_).exists(_(0) == 1), if (_) Array[Byte](1) else Array[Byte](0))
 }

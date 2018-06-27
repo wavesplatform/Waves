@@ -216,8 +216,8 @@ object WavesContext {
       }
 
     val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, optionLong, "id" -> BYTEVECTOR) {
-        case (id: ByteVector) :: Nil => Right(fromOption(env.transactionHeightById(id.toArray)))
-        case _                       => ???
+      case (id: ByteVector) :: Nil => Right(fromOption(env.transactionHeightById(id.toArray)))
+      case _                       => ???
     }
 
     val vars: Map[String, (TYPE, LazyVal)] = Map(

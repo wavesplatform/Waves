@@ -13,10 +13,12 @@ import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
 import monix.eval.Task
 import monix.execution.Scheduler
+import monix.execution.schedulers.SchedulerService
 import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
 import scorex.transaction._
+import scorex.transaction.assets.ReissueTransaction
 import scorex.transaction.transfer._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -33,7 +35,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
 
   import com.wavesplatform.utx.UtxPoolImpl._
 
-  private implicit val scheduler = Scheduler.singleThread("utx-pool-cleanup")
+  private implicit val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
 
   private val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private val pessimisticPortfolios = new PessimisticPortfolios
@@ -150,6 +152,16 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
     override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = outer.putIfNew(b, tx)
   }
 
+  private def canReissue(b: Blockchain, tx: Transaction) = tx match {
+    case r: ReissueTransaction if b.assetDescription(r.assetId).exists(!_.reissuable) => Left(GenericError(s"Asset is not reissuable"))
+    case _                                                                            => Right(())
+  }
+
+  private def checkAlias(b: Blockchain, tx: Transaction) = tx match {
+    case cat: CreateAliasTransaction if !blockchain.canCreateAlias(cat.alias) => Left(GenericError("Alias already claimed"))
+    case _                                                                    => Right(())
+  }
+
   private def putIfNew(b: Blockchain, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
     putRequestStats.increment()
     measureSuccessful(
@@ -157,6 +169,8 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
         for {
           _    <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
           _    <- checkNotBlacklisted(tx)
+          _    <- checkAlias(b, tx)
+          _    <- canReissue(b, tx)
           _    <- feeCalculator.enoughFee(tx, blockchain, fs)
           diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
         } yield {
@@ -167,7 +181,6 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
       }
     )
   }
-
 }
 
 object UtxPoolImpl {
