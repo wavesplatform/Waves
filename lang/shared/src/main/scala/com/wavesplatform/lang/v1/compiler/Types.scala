@@ -117,7 +117,7 @@ object Types {
   implicit class TypeExt(l1: TYPE) {
     def equivalent(l2: TYPE): Boolean = (l1, l2) match {
       case ((l1: UNION), (l2: UNION)) => l1.l.toSet == l2.l.toSet
-      case (l1, l2)                   => l1 == l2
+      case (l1, l2)                   => UNION.create(Seq(l1)) equivalent UNION.create(Seq(l2))
     }
 
     def >=(l2: TYPE): Boolean = (l1, l2) match {

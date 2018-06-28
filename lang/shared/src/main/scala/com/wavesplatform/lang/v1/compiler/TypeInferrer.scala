@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1.compiler
 
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.compiler.Types.UNION._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.v1.evaluator.ctx.DefinedType
 
@@ -37,7 +36,13 @@ object TypeInferrer {
         }
         resolved.find(_._2.isLeft) match {
           case Some((_, left)) => left.asInstanceOf[Left[String, Nothing]]
-          case None            => Right(resolved.mapValues(_.explicitGet()))
+          case None =>
+            Right(resolved.mapValues { t =>
+              t.explicitGet() match {
+                case UNION(x :: Nil) => x
+                case x               => x
+              }
+            })
         }
     }
   }

@@ -69,7 +69,7 @@ object CompilerV1 {
     get[CompilerContext, CompilationError].flatMap(ctx => {
       (for {
         cond       <- compileExpr(condExpr).run(ctx).map(_._2)()
-        _          <- Either.cond(cond._2 == BOOLEAN, (), UnexpectedType(p.start, p.end, BOOLEAN.toString, cond._2.toString))
+        _          <- Either.cond(cond._2 equivalent BOOLEAN, (), UnexpectedType(p.start, p.end, BOOLEAN.toString, cond._2.toString))
         ifTrue     <- compileExpr(ifTrueExpr).run(ctx).map(_._2)()
         ifFalse    <- compileExpr(ifFalseExpr).run(ctx).map(_._2)()
         compiledIf <- mkIf(p, cond._1, ifTrue, ifFalse)

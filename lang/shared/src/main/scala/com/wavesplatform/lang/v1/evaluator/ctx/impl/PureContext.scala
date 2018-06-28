@@ -205,7 +205,7 @@ object PureContext {
     }
 
   val isDefined: BaseFunction =
-    UserFunction("isDefined", 1, TYPEPARAM('T'), "a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
+    UserFunction("isDefined", 1, BOOLEAN, "a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
       case a :: Nil => FUNCTION_CALL(ne.header, List(a, REF("unit")))
       case _        => ???
     }
@@ -254,9 +254,10 @@ object PureContext {
 
   lazy val ctx = CTX(
     Seq(
-      new DefinedType { val name = "Unit"; val typeRef   = Types.UNIT; val fields   = List.empty },
-      new DefinedType { val name = "Int"; val typeRef    = Types.LONG; val fields   = List.empty },
-      new DefinedType { val name = "String"; val typeRef = Types.STRING; val fields = List.empty }
+      new DefinedType { val name = "Unit"; val typeRef    = Types.UNIT; val fields    = List.empty },
+      new DefinedType { val name = "Int"; val typeRef     = Types.LONG; val fields    = List.empty },
+      new DefinedType { val name = "Boolean"; val typeRef = Types.BOOLEAN; val fields = List.empty },
+      new DefinedType { val name = "String"; val typeRef  = Types.STRING; val fields  = List.empty }
     ),
     vars,
     functions
