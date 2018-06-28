@@ -185,7 +185,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
           // Cleanup
           nodes.waitForHeightArise()
-          val cancelLeaseId = bobNode.cancelLease(bobNode.address, leaseId, fee).id
+          val cancelLeaseId = bobNode.cancelLease(bobNode.address, leaseId, minFee).id
           nodes.waitForHeightAriseAndTxPresent(cancelLeaseId)
         }
 
@@ -217,7 +217,8 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   }
 
   def bobPlacesAssetOrder(bobCoinAmount: Int, twoAssetsPair: AssetPair, assetId: String): String = {
-    val bobOrder = if (twoAssetsPair.amountAsset.contains(assetId)) {
+    val decodedAsset = ByteStr.decodeBase58(assetId).get
+    val bobOrder = if (twoAssetsPair.amountAsset.contains(decodedAsset)) {
       prepareOrder(bobNode, matcherNode, twoAssetsPair, OrderType.SELL, 1 * Order.PriceConstant, bobCoinAmount)
     } else {
       prepareOrder(bobNode, matcherNode, twoAssetsPair, OrderType.BUY, bobCoinAmount * Order.PriceConstant, 1)

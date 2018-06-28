@@ -16,10 +16,11 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.transfer._
-import scorex.transaction.{DataTransaction, GenesisTransaction, Proofs}
+import scorex.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Proofs}
 
 class OracleDataTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
-  val preconditions: Gen[(GenesisTransaction, GenesisTransaction, SetScriptTransaction, DataTransaction, TransferTransactionV2)] =
+  val preconditions
+    : Gen[(GenesisTransaction, GenesisTransaction, CreateAliasTransaction, SetScriptTransaction, DataTransaction, TransferTransactionV2)] =
     for {
       master <- accountGen
       oracle <- accountGen
@@ -27,6 +28,8 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       ts     <- positiveIntGen
       genesis  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       genesis2 = GenesisTransaction.create(oracle, ENOUGH_AMT, ts).explicitGet()
+      alias           <- aliasGen
+      createAlias     <- createAliasGen(oracle, alias, 400000, System.currentTimeMillis())
       long            <- longEntryGen(dataAsciiKeyGen)
       bool            <- booleanEntryGen(dataAsciiKeyGen).filter(_.key != long.key)
       bin             <- binaryEntryGen(MaxBase58Bytes, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key)
@@ -38,8 +41,9 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
                                    |   let txId = extract(getTransactionById(t.id)).bodyBytes == base64'${ByteStr(dataTransaction.bodyBytes.apply()).base64}'
                                    |   let txHeightId = extract(transactionHeightById(t.id)) > 0
                                    |   txId && txHeightId
-                                   |  case other =>
-                                   |   let oracle = Address(base58'${oracle.address}')
+                                   | case t : CreateAliasTransaction => true
+                                   | case other =>
+                                   |   let oracle = Alias("${alias.name}")
                                    |   let long = extract(getInteger(oracle,"${long.key}")) == ${long.value}
                                    |   let bool = extract(getBoolean(oracle,"${bool.key}")) == ${bool.value}
                                    |   let bin = extract(getBinary(oracle,"${bin.key}")) == base58'${bin.value.base58}'
@@ -54,16 +58,17 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       }
       transferFromScripted <- versionedTransferGenP(master, alice, Proofs.empty)
 
-    } yield (genesis, genesis2, setScript, dataTransaction, transferFromScripted)
+    } yield (genesis, genesis2, createAlias, setScript, dataTransaction, transferFromScripted)
 
   property("simple oracle value required to transfer") {
     forAll(preconditions) {
-      case (genesis, genesis2, setScript, dataTransaction, transferFromScripted) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, genesis2, setScript, dataTransaction))),
+      case (genesis, genesis2, createAlias, setScript, dataTransaction, transferFromScripted) =>
+        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, genesis2, createAlias, setScript, dataTransaction))),
                            TestBlock.create(Seq(transferFromScripted)),
                            smartEnabledFS) { case _ => () }
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis, genesis2, setScript))), TestBlock.create(Seq(transferFromScripted)), smartEnabledFS)(
-          totalDiffEi => totalDiffEi shouldBe Left(_: ScriptExecutionError))
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis, genesis2, createAlias, setScript))),
+                     TestBlock.create(Seq(transferFromScripted)),
+                     smartEnabledFS)(totalDiffEi => totalDiffEi shouldBe Left(_: ScriptExecutionError))
     }
   }
 }

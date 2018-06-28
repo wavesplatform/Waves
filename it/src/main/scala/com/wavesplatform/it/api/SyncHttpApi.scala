@@ -99,6 +99,9 @@ object SyncHttpApi extends Assertions {
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Transaction =
       Await.result(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee), RequestAwaitTime)
 
+    def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Transaction =
+      Await.result(async(n).payment(sourceAddress, recipient, amount, fee), RequestAwaitTime)
+
     def scriptCompile(code: String): CompiledScript =
       Await.result(async(n).scriptCompile(code), RequestAwaitTime)
 
