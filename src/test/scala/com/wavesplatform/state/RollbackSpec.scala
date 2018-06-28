@@ -30,6 +30,27 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
     TransferTransactionV1.selfSigned(None, sender, recipient, amount, nextTs, None, 1, Array.empty[Byte]).explicitGet()
 
   "Rollback resets" - {
+    "Rollback save dropped blocks order" in forAll(accountGen, positiveLongGen, Gen.choose(1, 10)) {
+      case (sender, initialBalance, blocksCount) =>
+        withDomain() { d =>
+          d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
+          val genesisSignature = d.lastBlockId
+          def newBlocks(i: Int): List[ByteStr] = {
+            if (i == blocksCount) {
+              Nil
+            } else {
+              val block = TestBlock.create(nextTs + i, d.lastBlockId, Seq())
+              d.appendBlock(block)
+              block.uniqueId :: newBlocks(i + 1)
+            }
+          }
+          val blocks        = newBlocks(0)
+          val droppedBlocks = d.removeAfter(genesisSignature)
+          droppedBlocks(0).reference shouldBe genesisSignature
+          droppedBlocks.map(_.uniqueId).toList shouldBe blocks
+        }
+    }
+
     "waves balances" in forAll(accountGen, positiveLongGen, accountGen, Gen.nonEmptyListOf(Gen.choose(1, 10))) {
       case (sender, initialBalance, recipient, txCount) =>
         withDomain() { d =>

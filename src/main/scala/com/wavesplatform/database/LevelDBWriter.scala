@@ -365,7 +365,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     readOnly(_.get(Keys.heightOf(targetBlockId))).fold(Seq.empty[Block]) { targetHeight =>
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-      val discardedBlocks = Seq.newBuilder[Block]
+      var discardedBlocks: List[Block] = Nil
 
       for (currentHeight <- height until targetHeight by -1) {
         val portfoliosToInvalidate = Seq.newBuilder[Address]
@@ -447,7 +447,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
             .get(Keys.blockAt(currentHeight))
             .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
 
-          discardedBlocks += discardedBlock
+          discardedBlocks = discardedBlock :: discardedBlocks
 
           rw.delete(Keys.blockAt(currentHeight))
           rw.delete(Keys.heightOf(discardedBlock.uniqueId))
@@ -465,7 +465,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
       log.debug(s"Rollback to block $targetBlockId at $targetHeight completed")
 
-      discardedBlocks.result()
+      discardedBlocks
     }
   }
 
