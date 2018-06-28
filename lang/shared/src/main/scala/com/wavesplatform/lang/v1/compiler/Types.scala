@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1.compiler
 
-import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, DefinedType}
-import scodec.bits.ByteVector
+import com.wavesplatform.lang.v1.evaluator.ctx.DefinedType
 
 object Types {
 
@@ -27,10 +26,10 @@ object Types {
                             resolvedPlaceholders: Map[TYPEPLACEHOLDER.TYPEPARAM, TYPE],
                             knownTypes: Map[String, DefinedType]): TYPE = {
     resultType match {
-      case tp @ TYPEPLACEHOLDER.TYPEPARAM(char)       => resolvedPlaceholders(tp)
-      case tp @ TYPEPLACEHOLDER.PARAMETERIZEDUNION(l) => UNION.create(l.map(l => typePlaceholdertoType(l, resolvedPlaceholders, knownTypes)))
-      case TYPEPLACEHOLDER.PARAMETERIZEDLIST(t)       => LIST(typePlaceholdertoType(t, resolvedPlaceholders, knownTypes))
-      case c: CONCRETE                                => concreteToType(c, knownTypes)
+      case tp: TYPEPLACEHOLDER.TYPEPARAM         => resolvedPlaceholders(tp)
+      case TYPEPLACEHOLDER.PARAMETERIZEDUNION(l) => UNION.create(l.map(l => typePlaceholdertoType(l, resolvedPlaceholders, knownTypes)))
+      case TYPEPLACEHOLDER.PARAMETERIZEDLIST(t)  => LIST(typePlaceholdertoType(t, resolvedPlaceholders, knownTypes))
+      case c: CONCRETE                           => concreteToType(c, knownTypes)
     }
   }
 
@@ -65,41 +64,25 @@ object Types {
   }
 
   sealed trait TYPE {
-    type Underlying
     def name: String
     def fields: List[(String, TYPE)] = List()
     def l: List[SINGLE_TYPE]
     override def toString: String = name
   }
 
-  sealed abstract class AUTO_TAGGED_TYPE[T](override val name: String) extends TYPE {
-    override type Underlying = T
-  }
+  case object NOTHING                                                                          extends TYPE { override val name = "Nothing"; override val l = List() }
+  sealed trait SINGLE_TYPE                                                                     extends TYPE { override val l = List(this) }
+  case object UNIT                                                                             extends SINGLE_TYPE { override val name = "Unit" }
+  case object LONG                                                                             extends SINGLE_TYPE { override val name = "Int" }
+  case object BYTEVECTOR                                                                       extends SINGLE_TYPE { override val name = "ByteVector" }
+  case object BOOLEAN                                                                          extends SINGLE_TYPE { override val name = "Boolean" }
+  case object STRING                                                                           extends SINGLE_TYPE { override val name = "String" }
+  case class LIST(innerType: TYPE)                                                             extends SINGLE_TYPE { override lazy val name: String = "LIST(" ++ innerType.toString ++ ")" }
+  case class CASETYPEREF(override val name: String, override val fields: List[(String, TYPE)]) extends SINGLE_TYPE
 
-  sealed trait SINGLE_TYPE extends TYPE {
-    override val l = List(this)
-  }
-
-  case object NOTHING extends AUTO_TAGGED_TYPE[Nothing](name = "Nothing") {
-    override val l = List()
-  }
-  case object UNIT       extends AUTO_TAGGED_TYPE[Unit](name = "Unit") with SINGLE_TYPE
-  case object LONG       extends AUTO_TAGGED_TYPE[Long](name = "Int") with SINGLE_TYPE
-  case object BYTEVECTOR extends AUTO_TAGGED_TYPE[ByteVector](name = "ByteVector") with SINGLE_TYPE
-  case object BOOLEAN    extends AUTO_TAGGED_TYPE[Boolean](name = "Boolean") with SINGLE_TYPE
-  case object STRING     extends AUTO_TAGGED_TYPE[String](name = "String") with SINGLE_TYPE
-
-  case class LIST(innerType: TYPE) extends SINGLE_TYPE {
-    type Underlying = IndexedSeq[innerType.Underlying]
-    override lazy val name: String = "LIST(" ++ innerType.toString ++ ")"
-  }
-  case class CASETYPEREF(override val name: String, override val fields: List[(String, TYPE)])
-      extends AUTO_TAGGED_TYPE[CaseObj](name)
-      with SINGLE_TYPE
-
-  case class UNION(override val l: List[SINGLE_TYPE])
-      extends AUTO_TAGGED_TYPE[CaseObj](name = "UNION(" ++ l.sortBy(_.toString).mkString("|") ++ ")") {
+  case class UNION(override val l: List[SINGLE_TYPE]) extends TYPE {
     override lazy val fields: List[(String, TYPE)] = l.map(_.fields.toSet).reduce(_ intersect _).toList
+    override val name                              = "UNION(" ++ l.sortBy(_.toString).mkString("|") ++ ")"
   }
 
   object UNION {
