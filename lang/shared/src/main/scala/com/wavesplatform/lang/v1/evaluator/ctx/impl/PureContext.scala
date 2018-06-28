@@ -150,12 +150,12 @@ object PureContext {
     }
 
   val getElement: BaseFunction =
-    NativeFunction("getElement", 2, GET_LIST, TYPEPARAM('T'), "arr" -> LISTTYPEPARAM(TYPEPARAM('T')), "pos" -> LONG) {
+    NativeFunction("getElement", 2, GET_LIST, TYPEPARAM('T'), "arr" -> PARAMETERIZEDLIST(TYPEPARAM('T')), "pos" -> LONG) {
       case (arr: IndexedSeq[_]) :: (pos: Long) :: Nil => Try(arr(pos.toInt)).toEither.left.map(_.toString)
       case _                                          => ???
     }
 
-  val getListSize: BaseFunction = NativeFunction("size", 2, SIZE_LIST, LONG, "arr" -> LISTTYPEPARAM(TYPEPARAM('T'))) {
+  val getListSize: BaseFunction = NativeFunction("size", 2, SIZE_LIST, LONG, "arr" -> PARAMETERIZEDLIST(TYPEPARAM('T'))) {
     case (arr: IndexedSeq[_]) :: Nil => Right(arr.size.toLong)
     case _                           => ???
   }
@@ -199,7 +199,7 @@ object PureContext {
     }
 
   val ne: BaseFunction =
-    UserFunction(NE_OP.func, 1, BOOLEAN, "a" -> TYPEPARAM('A'), "b" -> TYPEPARAM('B')) {
+    UserFunction(NE_OP.func, 1, BOOLEAN, "a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')) {
       case a :: b :: Nil => FUNCTION_CALL(FunctionHeader.Native(NOT_BOOLEAN), List(FUNCTION_CALL(FunctionHeader.Native(EQ), List(a, b))))
       case _             => ???
     }

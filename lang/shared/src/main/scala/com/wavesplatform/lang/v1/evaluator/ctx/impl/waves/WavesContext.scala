@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import cats.data.EitherT
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{CONCRETE, TYPE, TYPEPLACEHOLDER}
+import com.wavesplatform.lang.v1.compiler.Types.{BYTEVECTOR => _, LONG => _, STRING => _, UNIT => _, _}
 import com.wavesplatform.lang.v1.compiler.Types.TYPEPLACEHOLDER._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -18,13 +18,19 @@ object WavesContext {
   import Bindings._
   import Types._
 
-  implicit def t0(t: TYPE): CONCRETE = com.wavesplatform.lang.v1.compiler.Types.typeToConcretePlaceholder(t)
+  implicit def t0(t: SINGLE_TYPE): CONCRETE with SINGLE = com.wavesplatform.lang.v1.compiler.Types.f(t)
+  implicit def t1(t: TYPE): CONCRETE                    = com.wavesplatform.lang.v1.compiler.Types.typeToConcretePlaceholder(t)
 
   def build(env: Environment): CTX = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getdataF(name: String, internalName: Short, dataType: DataType): BaseFunction =
-      NativeFunction(name, 100, internalName, UNION(List(t0(dataType.innerType), UNIT)), "addressOrAlias" -> addressOrAliasType, "key" -> STRING) {
+      NativeFunction(name,
+                     100,
+                     internalName,
+                     TYPEPLACEHOLDER.UNION(List(t0(dataType.innerType), UNIT)),
+                     "addressOrAlias" -> t1(addressOrAliasType),
+                     "key"            -> STRING) {
         case (addressOrAlias: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addressOrAlias, k, dataType).map(fromOption)
         case _                                               => ???
       }

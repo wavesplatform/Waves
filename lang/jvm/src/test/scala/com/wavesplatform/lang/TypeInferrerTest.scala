@@ -4,7 +4,7 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import org.scalatest.{FreeSpec, Matchers}
 import Common._
 import com.wavesplatform.lang.v1.compiler.TypeInferrer
-import com.wavesplatform.lang.v1.compiler.Types.TYPEPLACEHOLDER.{LISTTYPEPARAM, TYPEPARAM}
+import com.wavesplatform.lang.v1.compiler.Types.TYPEPLACEHOLDER.{PARAMETERIZEDLIST, TYPEPARAM}
 import com.wavesplatform.lang.v1.evaluator.ctx.CaseType
 
 class TypeInferrerTest extends FreeSpec with Matchers {
@@ -52,25 +52,26 @@ class TypeInferrerTest extends FreeSpec with Matchers {
       }
 
       "containing inner type" in {
-        TypeInferrer(Seq((LIST(LONG), LISTTYPEPARAM(typeparamT)))) shouldBe Right(Map(typeparamT -> LONG))
+        TypeInferrer(Seq((LIST(LONG), PARAMETERIZEDLIST(typeparamT)))) shouldBe Right(Map(typeparamT -> LONG))
       }
 
       "containing same inner type" in {
-        TypeInferrer(Seq((LIST(LONG), LISTTYPEPARAM(typeparamT)), (LIST(LONG), LISTTYPEPARAM(typeparamT)))) shouldBe Right(Map(typeparamT -> LONG))
+        TypeInferrer(Seq((LIST(LONG), PARAMETERIZEDLIST(typeparamT)), (LIST(LONG), PARAMETERIZEDLIST(typeparamT)))) shouldBe Right(
+          Map(typeparamT -> LONG))
       }
 
       "containing inner and separate type" in {
-        TypeInferrer(Seq((LONG, typeparamT), (LIST(LONG), LISTTYPEPARAM(typeparamT)))) shouldBe Right(Map(typeparamT -> LONG))
+        TypeInferrer(Seq((LONG, typeparamT), (LIST(LONG), PARAMETERIZEDLIST(typeparamT)))) shouldBe Right(Map(typeparamT -> LONG))
       }
 
       "containing best common type" in {
-        TypeInferrer(Seq((LONG, typeparamT), (LIST(NOTHING), LISTTYPEPARAM(typeparamT)))) shouldBe Right(Map(typeparamT -> LONG))
+        TypeInferrer(Seq((LONG, typeparamT), (LIST(NOTHING), PARAMETERIZEDLIST(typeparamT)))) shouldBe Right(Map(typeparamT -> LONG))
       }
 
       "fails if no common type" in {
-        TypeInferrer(Seq((BYTEVECTOR, typeparamT), (BYTEVECTOR, LISTTYPEPARAM(typeparamT)))) should produce("Non-matching types")
-        TypeInferrer(Seq((LONG, typeparamT), (LIST(LIST(NOTHING)), LISTTYPEPARAM(typeparamT)))) should produce("Can't match inferred types")
-        TypeInferrer(Seq((BYTEVECTOR, typeparamT), (LIST(LONG), LISTTYPEPARAM(typeparamT)))) should produce("Can't match inferred types")
+        TypeInferrer(Seq((BYTEVECTOR, typeparamT), (BYTEVECTOR, PARAMETERIZEDLIST(typeparamT)))) should produce("Non-matching types")
+        TypeInferrer(Seq((LONG, typeparamT), (LIST(LIST(NOTHING)), PARAMETERIZEDLIST(typeparamT)))) should produce("Can't match inferred types")
+        TypeInferrer(Seq((BYTEVECTOR, typeparamT), (LIST(LONG), PARAMETERIZEDLIST(typeparamT)))) should produce("Can't match inferred types")
       }
     }
   }
