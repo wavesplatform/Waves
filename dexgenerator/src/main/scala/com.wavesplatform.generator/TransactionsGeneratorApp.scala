@@ -37,7 +37,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
 
   implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase // IDEA bug
 
-  val log                     = LoggerFacade(LoggerFactory.getLogger("generator"))
+  val log                     = LoggerFacade(LoggerFactory.getLogger("dexgenerator"))
   val client: AsyncHttpClient = asyncHttpClient(clientConfig().setKeepAlive(false).setNettyTimer(GlobalTimer.instance))
   val api: ApiRequests        = new ApiRequests(client)
 
