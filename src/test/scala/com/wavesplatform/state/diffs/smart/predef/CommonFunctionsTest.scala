@@ -48,12 +48,14 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
   }
 
   property("Some/None/extract/isDefined") {
-    runScript[Any]("Some(3)".stripMargin) shouldBe Right(3L)
-    runScript[Any]("None".stripMargin) shouldBe Right(())
-    runScript[Boolean]("isDefined(Some(3))".stripMargin) shouldBe Right(true)
-    runScript[Boolean]("isDefined(None)".stripMargin) shouldBe Right(false)
-    runScript[Long]("extract(Some(3))".stripMargin) shouldBe Right(3L)
-    runScript[Long]("extract(None)".stripMargin) should produce("termination")
+    val some3 = "if true then 3 else unit"
+    val none  = "if false then 3 else unit"
+    runScript[Any](some3) shouldBe Right(3L)
+    runScript[Any](none) shouldBe Right(())
+    runScript[Boolean](s"isDefined($some3)") shouldBe Right(true)
+    runScript[Boolean](s"isDefined($none)") shouldBe Right(false)
+    runScript[Long](s"extract($some3)") shouldBe Right(3L)
+    runScript[Long](s"extract($none)") should produce("termination")
   }
 
   property("size()") {
