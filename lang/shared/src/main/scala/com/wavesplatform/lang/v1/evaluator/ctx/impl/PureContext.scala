@@ -204,6 +204,18 @@ object PureContext {
       case _             => ???
     }
 
+  val isDefined: BaseFunction =
+    UserFunction("isDefined", 1, TYPEPARAM('T'), "a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
+      case a :: Nil => FUNCTION_CALL(ne.header, List(a, REF("unit")))
+      case _        => ???
+    }
+
+  val extract: BaseFunction =
+    UserFunction("extract", 1, TYPEPARAM('T'), "a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
+      case a :: Nil => IF(FUNCTION_CALL(FunctionHeader.Native(EQ), List(a, REF("unit"))), REF("throw"), a)
+      case _        => ???
+    }
+
   val operators: Seq[BaseFunction] = Seq(
     mulLong,
     divLong,
@@ -235,7 +247,9 @@ object PureContext {
     dropString,
     takeRightString,
     dropRightString,
-    _isInstanceOf
+    _isInstanceOf,
+    isDefined,
+    extract
   ) ++ operators
 
   lazy val ctx = CTX(

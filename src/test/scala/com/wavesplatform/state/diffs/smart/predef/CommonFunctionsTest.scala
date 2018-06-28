@@ -26,7 +26,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
         )
         transfer.assetId match {
           case Some(v) => result.explicitGet().toArray sameElements v.arr
-          case None    => result should produce("from empty option")
+          case None    => result should produce("termination")
         }
     }
   }
@@ -53,7 +53,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
     runScript[Boolean]("isDefined(Some(3))".stripMargin) shouldBe Right(true)
     runScript[Boolean]("isDefined(None)".stripMargin) shouldBe Right(false)
     runScript[Long]("extract(Some(3))".stripMargin) shouldBe Right(3L)
-    runScript[Long]("extract(None)".stripMargin) should produce("Extract from empty option")
+    runScript[Long]("extract(None)".stripMargin) should produce("termination")
   }
 
   property("size()") {
