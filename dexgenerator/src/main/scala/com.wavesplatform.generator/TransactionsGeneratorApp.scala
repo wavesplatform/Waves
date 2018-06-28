@@ -10,7 +10,7 @@ import com.wavesplatform.generator.utils.{ApiRequests, GenOrderType}
 import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.network.client.NetworkSender
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
@@ -20,11 +20,11 @@ import org.slf4j.LoggerFactory
 import play.api.libs.json._
 import scopt.OptionParser
 import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
-import scorex.api.http.assets.{SignedIssueRequest, SignedMassTransferRequest}
+import scorex.api.http.assets.{SignedIssueV1Request, SignedMassTransferRequest}
 import scorex.transaction.AssetId
-import scorex.transaction.TransactionParser.TransactionType
-import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
-import scorex.transaction.assets.{IssueTransaction, MassTransferTransaction}
+import scorex.transaction.assets.{IssueTransactionV1}
+import scorex.transaction.transfer.MassTransferTransaction
+import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import scorex.utils.LoggerFacade
 import settings.GeneratorSettings
 
@@ -67,16 +67,16 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
   }
 
   implicit val signedMassTransferRequestWrites: Writes[SignedMassTransferRequest] =
-    Json.writes[SignedMassTransferRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(TransactionType.MassTransferTransaction.id)))
+    Json.writes[SignedMassTransferRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt)))
 
   val defaultConfig = ConfigFactory.load().as[GeneratorSettings]("generator")
 
   def issueAssets(endpoint: String, richAddressSeed: String, n: Int)(implicit tag: String): Seq[AssetId] = {
     val node = api.to(endpoint)
 
-    val assetsTx: Seq[IssueTransaction] = (1 to n).map { _ =>
-      IssueTransaction
-        .create(
+    val assetsTx: Seq[IssueTransactionV1] = (1 to n).map { _ =>
+      IssueTransactionV1
+        .selfSigned(
           PrivateKeyAccount.fromSeed(richAddressSeed).right.get,
           name = s"asset$n".getBytes(),
           description = "asset description".getBytes(),
@@ -90,8 +90,8 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         .get
     }
 
-    val tradingAssets: Seq[AssetId]                  = assetsTx.map(tx => tx.id())
-    val signedIssueRequests: Seq[SignedIssueRequest] = assetsTx.map(tx => api.createSignedIssueRequest(tx))
+    val tradingAssets: Seq[AssetId]                    = assetsTx.map(tx => tx.id())
+    val signedIssueRequests: Seq[SignedIssueV1Request] = assetsTx.map(tx => api.createSignedIssueRequest(tx))
 
     val issued: Seq[Future[Transaction]] = signedIssueRequests
       .map { txReq =>
@@ -126,7 +126,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
           val assetsTransfers = parsedTransfersList(endpoint, assetId, transferAmount, richAccountPk, accounts)
           val tx = MassTransferTransaction
             .selfSigned(
-              version = MassTransferTransaction.Version,
+              version = MassTransferTransaction.version,
               assetId = assetId,
               sender = richAccountPk,
               transfers = assetsTransfers,

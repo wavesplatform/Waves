@@ -6,20 +6,19 @@ import cats.Show
 import com.wavesplatform.crypto
 import com.wavesplatform.generator.Worker._
 import com.wavesplatform.generator.utils.{ApiRequests, GenOrderType}
-import com.wavesplatform.it.api.{MatcherResponse, MatcherStatusResponse, OrderBookHistory, Transaction, UnexpectedStatusCodeException}
+import com.wavesplatform.it.api.{MatcherResponse, MatcherStatusResponse, OrderbookHistory, Transaction, UnexpectedStatusCodeException}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
 import org.asynchttpclient.AsyncHttpClient
 import org.slf4j.LoggerFactory
 import play.api.libs.json._
 import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
-import scorex.api.http.assets.SignedTransferRequest
+import scorex.api.http.assets.SignedTransferV1Request
 import scorex.crypto.encode.Base58
 import scorex.transaction.AssetId
-import scorex.transaction.TransactionParser.TransactionType
-import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.assets.exchange.{AssetPair, Order}
+import scorex.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import scorex.utils.LoggerFacade
 import settings.{GeneratorSettings, MatcherNodeSettings}
 
@@ -84,7 +83,7 @@ class Worker(workerSettings: Settings,
     }
   }
 
-  def orderHistory(account: PrivateKeyAccount)(implicit tag: String): Future[Seq[OrderBookHistory]] = {
+  def orderHistory(account: PrivateKeyAccount)(implicit tag: String): Future[Seq[OrderbookHistory]] = {
     to(matcherSettings.endpoint).orderHistory(account)
   }
 
@@ -105,8 +104,8 @@ class Worker(workerSettings: Settings,
     Future.sequence(fakeAccounts.map(cancelOrdersOf)).map(_.flatten)
   }
 
-  implicit val signedTransferRequestWrites: Writes[SignedTransferRequest] =
-    Json.writes[SignedTransferRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(TransactionType.TransferTransaction.id)))
+  implicit val signedTransferRequestWrites: Writes[SignedTransferV1Request] =
+    Json.writes[SignedTransferV1Request].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(TransferTransactionV1.typeId.toInt)))
 
   def transfer(sender: PrivateKeyAccount, assetId: Option[AssetId], recipient: PrivateKeyAccount, halfBalance: Boolean)(
       implicit tag: String): Future[Transaction] =
@@ -114,7 +113,7 @@ class Worker(workerSettings: Settings,
       val halfAmount     = if (halfBalance) balance / 2 else balance
       val transferAmount = assetId.fold(halfAmount - 0.001.waves)(_ => halfAmount)
 
-      TransferTransaction.create(assetId,
+      TransferTransactionV1.selfSigned(assetId,
                                  sender,
                                  AddressOrAlias.fromString(PublicKeyAccount(recipient.publicKey).address).right.get,
                                  transferAmount,

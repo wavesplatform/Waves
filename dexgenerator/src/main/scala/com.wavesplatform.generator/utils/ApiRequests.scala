@@ -3,6 +3,7 @@ package com.wavesplatform.generator.utils
 import java.io.IOException
 import java.util.concurrent.TimeoutException
 
+import akka.http.scaladsl.model.headers.ContentDispositionTypes.attachment
 import com.google.common.primitives.Longs
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.{
@@ -10,7 +11,7 @@ import com.wavesplatform.it.api.{
   Balance,
   MatcherResponse,
   MatcherStatusResponse,
-  OrderBookHistory,
+  OrderbookHistory,
   ResponseFutureExt,
   Transaction,
   UnexpectedStatusCodeException
@@ -18,19 +19,21 @@ import com.wavesplatform.it.api.{
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state.ByteStr
+
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json.Json.{stringify, toJson}
 import play.api.libs.json._
 import scorex.account.PrivateKeyAccount
-import scorex.api.http.assets.{SignedIssueRequest, SignedMassTransferRequest, SignedTransferRequest}
+import scorex.api.http.assets.{SignedIssueV1Request, SignedMassTransferRequest, SignedTransferV1Request}
 import scorex.crypto.encode.Base58
 import scorex.transaction.AssetId
-import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, Transfer}
 import scorex.transaction.assets.exchange.Order
-import scorex.transaction.assets.{IssueTransaction, MassTransferTransaction, TransferTransaction}
+import scorex.transaction.assets.IssueTransactionV1
+import scorex.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
+import scorex.transaction.transfer.{MassTransferTransaction, TransferTransactionV1}
 import scorex.utils.ScorexLogging
 
 import scala.compat.java8.FutureConverters._
@@ -72,9 +75,9 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
     executeRequest
   }
 
-  def createSignedIssueRequest(tx: IssueTransaction): SignedIssueRequest = {
+  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
     import tx._
-    SignedIssueRequest(
+    SignedIssueV1Request(
       Base58.encode(tx.sender.publicKey),
       new String(name),
       new String(description),
@@ -88,32 +91,30 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
   }
 
   def createSignedMassTransferRequest(tx: MassTransferTransaction): SignedMassTransferRequest = {
-    import tx._
     SignedMassTransferRequest(
-      MassTransferTransaction.Version,
+      MassTransferTransaction.version,
       Base58.encode(tx.sender.publicKey),
-      assetId.map(_.base58),
-      transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) },
-      fee,
-      timestamp,
-      attachment.headOption.map(_ => Base58.encode(attachment)),
-      proofs.base58().toList
+      tx.assetId.map(_.base58),
+      tx.transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) },
+      tx.fee,
+      tx.timestamp,
+      tx.attachment.headOption.map(_ => Base58.encode(tx.attachment)),
+      tx.proofs.base58().toList
     )
   }
 
-  def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {
+  def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferV1Request = {
 
-    import tx._
-    SignedTransferRequest(
+    SignedTransferV1Request(
       Base58.encode(tx.sender.publicKey),
-      assetId.map(_.base58),
-      recipient.stringRepr,
-      amount,
-      fee,
-      feeAssetId.map(_.base58),
-      timestamp,
-      attachment.headOption.map(_ => Base58.encode(attachment)),
-      signature.base58
+      tx.assetId.map(_.base58),
+      tx.recipient.stringRepr,
+      tx.amount,
+      tx.fee,
+      tx.feeAssetId.map(_.base58),
+      tx.timestamp,
+      tx.attachment.headOption.map(_ => Base58.encode(tx.attachment)),
+      tx.signature.base58
     )
   }
 
@@ -153,20 +154,20 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
       case _    => to(endpoint).assetBalance(address, asset.map(_.base58).get).map(_.balance)
     }
 
-    def signedIssue(issue: SignedIssueRequest)(implicit tag: String): Future[Transaction] =
+    def signedIssue(issue: SignedIssueV1Request)(implicit tag: String): Future[Transaction] =
       postJson("/assets/broadcast/issue", issue).as[Transaction]
 
     //    def signedMassTransfer(massTx: SignedMassTransferRequest): Future[Transaction] =
     //      postJson("/assets/broadcast/issue", massTx).as[Transaction]
 
     def orderbookByPublicKey(publicKey: String, ts: Long, signature: ByteStr, f: RequestBuilder => RequestBuilder = identity)(
-        implicit tag: String): Future[Seq[OrderBookHistory]] =
+        implicit tag: String): Future[Seq[OrderbookHistory]] =
       retrying {
         _get(s"$endpoint/matcher/orderbook/$publicKey")
           .setHeader("Timestamp", ts)
           .setHeader("Signature", signature)
           .build()
-      }.as[Seq[OrderBookHistory]]
+      }.as[Seq[OrderbookHistory]]
 
     //    def getOrderbookByPublicKey(publicKey: String, timestamp: Long, signature: ByteStr): Future[Seq[OrderbookHistory]] =
     //      matcherGetWithSignature(s"/matcher/orderbook/$publicKey", timestamp, signature).as[Seq[OrderbookHistory]]
@@ -176,7 +177,7 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
 
     def broadcastRequest[A: Writes](req: A)(implicit tag: String): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
 
-    def orderHistory(pk: PrivateKeyAccount)(implicit tag: String): Future[Seq[OrderBookHistory]] = {
+    def orderHistory(pk: PrivateKeyAccount)(implicit tag: String): Future[Seq[OrderbookHistory]] = {
       val ts        = System.currentTimeMillis()
       val signature = ByteStr(crypto.sign(pk, pk.publicKey ++ Longs.toByteArray(ts)))
       orderbookByPublicKey(Base58.encode(pk.publicKey), ts, signature)

@@ -18,9 +18,8 @@ trait FicusImplicits {
   }
 
   implicit val distributionsReader: ValueReader[Map[GenOrderType.Value, Double]] = {
-    val converter = CaseFormat.LOWER_HYPHEN.converterTo(CaseFormat.UPPER_CAMEL)
-    def toOrderType(key: String):
-      GenOrderType.Value = GenOrderType.withName(s"${converter.convert(key)}")
+    val converter                                    = CaseFormat.LOWER_HYPHEN.converterTo(CaseFormat.UPPER_CAMEL)
+    def toOrderType(key: String): GenOrderType.Value = GenOrderType.withName(s"${converter.convert(key)}")
 
     CollectionReaders.mapValueReader[Double].map { xs =>
       xs.map { case (k, v) => toOrderType(k) -> v }
