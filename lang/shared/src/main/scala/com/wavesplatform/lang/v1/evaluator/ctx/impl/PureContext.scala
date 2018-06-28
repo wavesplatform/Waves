@@ -205,7 +205,7 @@ object PureContext {
     }
 
   val isDefined: BaseFunction =
-    UserFunction("isDefined", 1, TYPEPARAM('T'), "a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
+    UserFunction("isDefined", 1, BOOLEAN, "a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
       case a :: Nil => FUNCTION_CALL(ne.header, List(a, REF("unit")))
       case _        => ???
     }
