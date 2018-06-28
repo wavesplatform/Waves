@@ -219,8 +219,8 @@ object SyncHttpApi extends Assertions {
     def placeOrder(order: Order): MatcherResponse =
       Await.result(async(n).placeOrder(order), RequestAwaitTime)
 
-    def getOrderStatus(asset: String, orderId: String): MatcherStatusResponse =
-      Await.result(async(n).getOrderStatus(asset, orderId), RequestAwaitTime)
+    def getOrderStatus(asset: String, orderId: String, waitForStatus: Boolean = true): MatcherStatusResponse =
+      Await.result(async(n).getOrderStatus(asset, orderId, waitForStatus), RequestAwaitTime)
 
     def waitOrderStatus(asset: String, orderId: String, expectedStatus: String, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(n).waitOrderStatus(asset, orderId, expectedStatus), waitTime)
