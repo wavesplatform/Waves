@@ -88,7 +88,8 @@ object Types {
       extends AUTO_TAGGED_TYPE[CaseObj](name)
       with SINGLE_TYPE
 
-  class UNION(override val l: List[SINGLE_TYPE]) extends AUTO_TAGGED_TYPE[CaseObj](name = "UNION(" ++ l.sortBy(_.toString).mkString("|") ++ ")") {
+  case class UNION(override val l: List[SINGLE_TYPE])
+      extends AUTO_TAGGED_TYPE[CaseObj](name = "UNION(" ++ l.sortBy(_.toString).mkString("|") ++ ")") {
     override lazy val fields: List[(String, TYPE)] = l.map(_.fields.toSet).reduce(_ intersect _).toList
   }
 

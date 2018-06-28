@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.compiler
 
+import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -19,7 +20,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
 
   property("should infer generic function return type") {
     import com.wavesplatform.lang.v1.parser.Expressions._
-    val Right(v) = CompilerV1(compilerContext, FUNCTION_CALL(Pos(0, 0), PART.VALID(Pos(0, 0), idT.name), List(CONST_LONG(Pos(0, 0), 1))))
+    val Right(v) = CompilerV1(compilerContext, FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, idT.name), List(CONST_LONG(AnyPos, 1))))
     v._2 shouldBe LONG
   }
 
@@ -36,8 +37,8 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   }
 
   property("successful on very deep expressions(stack overflow check)") {
-    val expr = (1 to 100000).foldLeft[Expressions.EXPR](Expressions.CONST_LONG(Pos(0, 0), 0)) { (acc, _) =>
-      Expressions.BINARY_OP(Pos(0, 0), acc, SUM_OP, Expressions.CONST_LONG(Pos(0, 0), 1))
+    val expr = (1 to 100000).foldLeft[Expressions.EXPR](Expressions.CONST_LONG(AnyPos, 0)) { (acc, _) =>
+      Expressions.BINARY_OP(AnyPos, acc, SUM_OP, Expressions.CONST_LONG(AnyPos, 1))
     }
 
     val expectedResult = Right(LONG)
@@ -50,96 +51,118 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   treeTypeTest("GETTER")(
     ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> pointType.typeRef), functionDefs = Map.empty),
     expr = Expressions.GETTER(
-      Pos(0, 0),
-      ref = Expressions.REF(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "p")),
-      field = Expressions.PART.VALID(Pos(0, 0), "x")
+      AnyPos,
+      ref = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
+      field = Expressions.PART.VALID(AnyPos, "x")
     ),
     expectedResult = Right((GETTER(expr = REF("p"), field = "x"), LONG))
   )
 
   treeTypeTest("REF(OBJECT)")(
     ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> pointType.typeRef), functionDefs = Map.empty),
-    expr = Expressions.REF(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "p")),
+    expr = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
     expectedResult = Right((REF("p"), pointType.typeRef))
   )
 
   treeTypeTest("REF x = y")(
     ctx = CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> pointType.typeRef), functionDefs = Map.empty),
-    expr = Expressions.REF(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "p")),
+    expr = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
     expectedResult = Right((REF("p"), pointType.typeRef))
   )
 
   treeTypeTest("MULTIPLY(1,2)")(
     ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(
-      Pos(0, 0),
-      Expressions.PART.VALID(Pos(0, 0), multiplierFunction.name),
-      List(Expressions.CONST_LONG(Pos(0, 0), 1), Expressions.CONST_LONG(Pos(0, 0), 2))
+      AnyPos,
+      Expressions.PART.VALID(AnyPos, multiplierFunction.name),
+      List(Expressions.CONST_LONG(AnyPos, 1), Expressions.CONST_LONG(AnyPos, 2))
     ),
     expectedResult = Right((FUNCTION_CALL(multiplierFunction.header, List(CONST_LONG(1), CONST_LONG(2))), LONG))
+  )
+
+  treeTypeTest("primitive getElement")(
+    ctx = compilerContext,
+    expr = Expressions.FUNCTION_CALL(
+      AnyPos,
+      Expressions.PART.VALID(AnyPos, getElement.name),
+      List(Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "l")), Expressions.CONST_LONG(AnyPos, 1))
+    ),
+    expectedResult = Right((FUNCTION_CALL(getElement.header, List(REF("l"), CONST_LONG(1))), LONG))
+  )
+
+  treeTypeTest(" typeref getElement")(
+    ctx = compilerContext,
+    expr = Expressions.FUNCTION_CALL(
+      AnyPos,
+      Expressions.PART.VALID(AnyPos, getElement.name),
+      List(Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "lpa")), Expressions.CONST_LONG(AnyPos, 1))
+    ),
+    expectedResult = Right((FUNCTION_CALL(getElement.header, List(REF("lpa"), CONST_LONG(1))), Common.pointTypeA.typeRef))
+  )
+
+  treeTypeTest("union getElement")(
+    ctx = compilerContext,
+    expr = Expressions.FUNCTION_CALL(
+      AnyPos,
+      Expressions.PART.VALID(AnyPos, getElement.name),
+      List(Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "lpabc")), Expressions.CONST_LONG(AnyPos, 1))
+    ),
+    expectedResult = Right((FUNCTION_CALL(getElement.header, List(REF("lpabc"), CONST_LONG(1))), Common.AorBorC))
+  )
+
+  //     let a = if (true) then 1 else ""
+  //    a == 3
+
+  treeTypeTest("union comparison")(
+    ctx = compilerContext,
+    expr = Expressions.BLOCK(
+      AnyPos,
+      Expressions.LET(
+        AnyPos,
+        Expressions.PART.VALID(AnyPos, "a"),
+        Expressions.IF(AnyPos,
+                       Expressions.TRUE(AnyPos),
+                       Expressions.CONST_LONG(AnyPos, 1),
+                       Expressions.CONST_STRING(AnyPos, Expressions.PART.VALID(AnyPos, ""))),
+        Seq.empty
+      ),
+      Expressions.FUNCTION_CALL(
+        AnyPos,
+        Expressions.PART.VALID(AnyPos, PureContext.eq.name),
+        List(Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "a")), Expressions.CONST_LONG(AnyPos, 3))
+      )
+    ),
+    expectedResult = Right(
+      (BLOCK(LET("a", IF(TRUE, CONST_LONG(1), CONST_STRING(""))), FUNCTION_CALL(PureContext.eq.header, List(REF("a"), CONST_LONG(3)))), BOOLEAN))
   )
 
   treeTypeTest("idOptionLong(())")(
     ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(
-      Pos(0, 0),
-      Expressions.PART.VALID(Pos(0, 0), idOptionLong.name),
-      List(Expressions.REF(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "unit")))
+      AnyPos,
+      Expressions.PART.VALID(AnyPos, idOptionLong.name),
+      List(Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "unit")))
     ),
     expectedResult = Right((FUNCTION_CALL(idOptionLong.header, List(REF("unit"))), UNIT))
   )
 
-//  treeTypeTest("idOptionLong(SOME(NONE))")(
-//    ctx = compilerContext,
-//    expr = Expressions.FUNCTION_CALL(
-//      Pos(0, 0),
-//      Expressions.PART.VALID(Pos(0, 0), idOptionLong.name),
-//      List(
-//        Expressions.FUNCTION_CALL(
-//          Pos(0, 0),
-//          Expressions.PART.VALID(Pos(0, 0), "Some"),
-//          List(Expressions.REF(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "None")))
-//        )
-//      )
-//    ),
-//    expectedResult = Right((FUNCTION_CALL(idOptionLong.header, List((FUNCTION_CALL(some.header, List(REF("None")))))), UNIT))
-//  )
-//
-//  treeTypeTest("idOptionLong(SOME(CONST_LONG(3)))")(
-//    ctx = compilerContext,
-//    expr = Expressions.FUNCTION_CALL(
-//      Pos(0, 0),
-//      Expressions.PART.VALID(Pos(0, 0), idOptionLong.name),
-//      List(
-//        Expressions.FUNCTION_CALL(
-//          Pos(0, 0),
-//          Expressions.PART.VALID(Pos(0, 0), "Some"),
-//          List(Expressions.FUNCTION_CALL(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "Some"), List(Expressions.CONST_LONG(Pos(0, 0), 3))))
-//        )
-//      )
-//    ),
-//    expectedResult = Right(
-//      (FUNCTION_CALL(idOptionLong.header, List(FUNCTION_CALL(some.header, List(FUNCTION_CALL(some.header, List(CONST_LONG(3))))))), UNIT)
-//    )
-//  )
-
   treeTypeTest("pattern matching - allow shadowing of ref with the same name")(
     ctx = compilerContext,
     expr = Expressions.MATCH(
-      Pos(0, 0),
-      Expressions.REF(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "p")),
+      AnyPos,
+      Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
       List(
         Expressions.MATCH_CASE(
-          Pos(0, 0),
-          Some(Expressions.PART.VALID(Pos(0, 0), "p")),
-          List(Expressions.PART.VALID(Pos(0, 0), "PointA"), Expressions.PART.VALID(Pos(0, 0), "PointB")),
-          Expressions.TRUE(Pos(0, 0))
+          AnyPos,
+          Some(Expressions.PART.VALID(AnyPos, "p")),
+          List(Expressions.PART.VALID(AnyPos, "PointA"), Expressions.PART.VALID(AnyPos, "PointB")),
+          Expressions.TRUE(AnyPos)
         ),
         Expressions.MATCH_CASE(
-          Pos(0, 0),
+          AnyPos,
           None,
           List.empty,
-          Expressions.FALSE(Pos(0, 0))
+          Expressions.FALSE(AnyPos)
         )
       )
     ),
@@ -168,23 +191,23 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   treeTypeTest("pattern matching - deny shadowing of other variable")(
     ctx = compilerContext,
     expr = Expressions.BLOCK(
-      Pos(0, 0),
-      Expressions.LET(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "foo"), Expressions.TRUE(Pos(0, 0)), Seq.empty),
+      AnyPos,
+      Expressions.LET(AnyPos, Expressions.PART.VALID(AnyPos, "foo"), Expressions.TRUE(AnyPos), Seq.empty),
       Expressions.MATCH(
-        Pos(0, 0),
-        Expressions.REF(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "p")),
+        AnyPos,
+        Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
         List(
           Expressions.MATCH_CASE(
-            Pos(0, 0),
-            Some(Expressions.PART.VALID(Pos(0, 0), "foo")),
-            List(Expressions.PART.VALID(Pos(0, 0), "PointA"), Expressions.PART.VALID(Pos(0, 0), "PointB")),
-            Expressions.TRUE(Pos(0, 0))
+            AnyPos,
+            Some(Expressions.PART.VALID(AnyPos, "foo")),
+            List(Expressions.PART.VALID(AnyPos, "PointA"), Expressions.PART.VALID(AnyPos, "PointB")),
+            Expressions.TRUE(AnyPos)
           ),
           Expressions.MATCH_CASE(
-            Pos(0, 0),
+            AnyPos,
             None,
             List.empty,
-            Expressions.FALSE(Pos(0, 0))
+            Expressions.FALSE(AnyPos)
           )
         )
       )
@@ -195,24 +218,24 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   treeTypeTest("pattern matching - deny shadowing in non-ref")(
     ctx = compilerContext,
     expr = Expressions.MATCH(
-      Pos(0, 0),
+      AnyPos,
       Expressions.FUNCTION_CALL(
-        Pos(0, 0),
-        Expressions.PART.VALID(Pos(0, 0), "idT"),
-        List(Expressions.REF(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "p")))
+        AnyPos,
+        Expressions.PART.VALID(AnyPos, "idT"),
+        List(Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")))
       ),
       List(
         Expressions.MATCH_CASE(
-          Pos(0, 0),
-          Some(Expressions.PART.VALID(Pos(0, 0), "p")),
-          List(Expressions.PART.VALID(Pos(0, 0), "PointA"), Expressions.PART.VALID(Pos(0, 0), "PointB")),
-          Expressions.TRUE(Pos(0, 0))
+          AnyPos,
+          Some(Expressions.PART.VALID(AnyPos, "p")),
+          List(Expressions.PART.VALID(AnyPos, "PointA"), Expressions.PART.VALID(AnyPos, "PointB")),
+          Expressions.TRUE(AnyPos)
         ),
         Expressions.MATCH_CASE(
-          Pos(0, 0),
+          AnyPos,
           None,
           List.empty,
-          Expressions.FALSE(Pos(0, 0))
+          Expressions.FALSE(AnyPos)
         )
       )
     ),
@@ -222,49 +245,48 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
   treeTypeTest("Invalid LET")(
     ctx = compilerContext,
     expr = Expressions.BLOCK(
-      Pos(0, 0),
-      Expressions.LET(Pos(0, 0), Expressions.PART.INVALID(Pos(0, 1), "can't parse"), Expressions.TRUE(Pos(0, 0)), Seq.empty),
-      Expressions.REF(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "x"))
+      AnyPos,
+      Expressions.LET(AnyPos, Expressions.PART.INVALID(Pos(0, 1), "can't parse"), Expressions.TRUE(AnyPos), Seq.empty),
+      Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
     ),
     expectedResult = Left("Compilation failed: can't parse in 0-1")
   )
 
   treeTypeTest("Invalid GETTER")(
     ctx = compilerContext,
-    expr = Expressions.GETTER(Pos(0, 0),
-                              Expressions.REF(Pos(0, 0), Expressions.PART.VALID(Pos(0, 0), "x")),
-                              Expressions.PART.INVALID(Pos(2, 3), "can't parse")),
+    expr =
+      Expressions.GETTER(AnyPos, Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x")), Expressions.PART.INVALID(Pos(2, 3), "can't parse")),
     expectedResult = Left("Compilation failed: can't parse in 2-3")
   )
 
   treeTypeTest("Invalid BYTEVECTOR")(
     ctx = compilerContext,
-    expr = Expressions.CONST_BYTEVECTOR(Pos(0, 0), Expressions.PART.INVALID(Pos(0, 0), "can't parse")),
-    expectedResult = Left("Compilation failed: can't parse in 0-0")
+    expr = Expressions.CONST_BYTEVECTOR(AnyPos, Expressions.PART.INVALID(AnyPos, "can't parse")),
+    expectedResult = Left("Compilation failed: can't parse in -1--1")
   )
 
   treeTypeTest("Invalid STRING")(
     ctx = compilerContext,
-    expr = Expressions.CONST_STRING(Pos(0, 0), Expressions.PART.INVALID(Pos(0, 0), "can't parse")),
-    expectedResult = Left("Compilation failed: can't parse in 0-0")
+    expr = Expressions.CONST_STRING(AnyPos, Expressions.PART.INVALID(AnyPos, "can't parse")),
+    expectedResult = Left("Compilation failed: can't parse in -1--1")
   )
 
   treeTypeTest("Invalid REF")(
     ctx = compilerContext,
-    expr = Expressions.REF(Pos(0, 0), Expressions.PART.INVALID(Pos(0, 0), "can't parse")),
-    expectedResult = Left("Compilation failed: can't parse in 0-0")
+    expr = Expressions.REF(AnyPos, Expressions.PART.INVALID(AnyPos, "can't parse")),
+    expectedResult = Left("Compilation failed: can't parse in -1--1")
   )
 
   treeTypeTest("Invalid FUNCTION_CALL")(
     ctx = compilerContext,
-    expr = Expressions.FUNCTION_CALL(Pos(0, 0), Expressions.PART.INVALID(Pos(0, 0), "can't parse"), List.empty),
-    expectedResult = Left("Compilation failed: can't parse in 0-0")
+    expr = Expressions.FUNCTION_CALL(AnyPos, Expressions.PART.INVALID(AnyPos, "can't parse"), List.empty),
+    expectedResult = Left("Compilation failed: can't parse in -1--1")
   )
 
   treeTypeTest("INVALID")(
     ctx = compilerContext,
-    expr = Expressions.INVALID(Pos(0, 0), "###"),
-    expectedResult = Left("Compilation failed: ### in 0-0")
+    expr = Expressions.INVALID(AnyPos, "###"),
+    expectedResult = Left("Compilation failed: ### in -1--1")
   )
 
   private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: Either[String, (EXPR, TYPE)], ctx: CompilerContext): Unit =

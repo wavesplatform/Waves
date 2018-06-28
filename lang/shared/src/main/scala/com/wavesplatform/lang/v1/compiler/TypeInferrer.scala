@@ -79,7 +79,7 @@ object TypeInferrer {
       }
     case (p1: SINGLE_TYPE, p2: SINGLE_TYPE) => if (p1 == p2) p1 else UNION(p1, p2)
     case (r: UNION, a: UNION)               => UNION.create((r.l.toSet ++ a.l.toSet).toSeq)
-    case (r: UNION, t: SINGLE_TYPE)         => findCommonType(r, UNION(t))
-    case (r: SINGLE_TYPE, t: UNION)         => findCommonType(UNION(r), t)
+    case (u: UNION, t: SINGLE_TYPE)         => if (u.l.contains(t)) u else UNION.create(u.l :+ t)
+    case (t: SINGLE_TYPE, u: UNION)         => if (u.l.contains(t)) u else UNION.create(u.l :+ t)
   }
 }

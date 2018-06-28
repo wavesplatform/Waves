@@ -189,10 +189,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }
   }
 
-  ignore("Match with not case types") {
+  property("Match with not case types") {
     eval[Long]("""
         |
-        |let a = if (true) then 1 else "" # make a of type Int | String
+        |let a = if (true) then 1 else ""
         |
         |match a {
         | case x: Int => x 
