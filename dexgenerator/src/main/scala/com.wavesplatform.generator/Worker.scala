@@ -114,13 +114,13 @@ class Worker(workerSettings: Settings,
       val transferAmount = assetId.fold(halfAmount - 0.001.waves)(_ => halfAmount)
 
       TransferTransactionV1.selfSigned(assetId,
-                                 sender,
-                                 AddressOrAlias.fromString(PublicKeyAccount(recipient.publicKey).address).right.get,
-                                 transferAmount,
-                                 now,
-                                 None,
-                                 fee,
-                                 Array.emptyByteArray) match {
+                                       sender,
+                                       AddressOrAlias.fromString(PublicKeyAccount(recipient.publicKey).address).right.get,
+                                       transferAmount,
+                                       now,
+                                       None,
+                                       fee,
+                                       Array.emptyByteArray) match {
         case Left(e) => throw new RuntimeException(s"[$tag] Generated transaction is wrong: $e")
         case Right(txRequest) =>
           log.info(
