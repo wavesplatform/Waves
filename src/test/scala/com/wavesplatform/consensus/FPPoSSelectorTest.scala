@@ -187,7 +187,6 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
     }
   }
 
-  //TODO: all branches
   "regression" - {
     "delay" in {
       FairPoSCalculator.calculateDelay(BigInt(1), 100l, 10000000000000l) shouldBe 705491
@@ -196,9 +195,10 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
     }
 
     "base target" in {
-      FairPoSCalculator.calculateBaseTarget(100l, 10, 100l, 100000000000l, Some(1000000000l), 100000000000l) shouldBe 101
-      FairPoSCalculator.calculateBaseTarget(200l, 20, 200l, 200000000000l, Some(2000000000l), 200000000000l) shouldBe 202
-      FairPoSCalculator.calculateBaseTarget(300l, 30, 300l, 300000000000l, Some(3000000000l), 300000000000l) shouldBe 303
+      FairPoSCalculator.calculateBaseTarget(100l, 30, 100l, 100000000000l, Some(99000l), 100000l) shouldBe 99l
+      FairPoSCalculator.calculateBaseTarget(100l, 10, 100l, 100000000000l, None, 100000000000l) shouldBe 100l
+      FairPoSCalculator.calculateBaseTarget(100l, 10, 100l, 100000000000l, Some(99999700000l), 100000000000l) shouldBe 100l
+      FairPoSCalculator.calculateBaseTarget(100l, 30, 100l, 100000000000l, Some(1l), 1000000l) shouldBe 101l
     }
   }
 
@@ -240,8 +240,6 @@ object FPPoSSelectorTest {
 
   def mkFork(blockCount: Int, miner: PrivateKeyAccount, blockchain: Blockchain): List[Block] = {
     val height = blockchain.height
-
-    val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
 
     val lastBlock = blockchain.lastBlock.get
 
