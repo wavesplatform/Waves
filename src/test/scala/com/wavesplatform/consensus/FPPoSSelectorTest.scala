@@ -10,6 +10,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
+import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.{BlockchainUpdater, GenesisTransaction}
@@ -24,6 +25,43 @@ import scala.util.Random
 class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with TransactionGen {
 
   import FPPoSSelectorTest._
+
+  "block delay" - {
+    "same on the same height in different forks" in {
+      withEnv(chainGen(List(ENOUGH_AMT / 2), 110)) {
+        case Env(pos, blockchain, miners) => {
+          val miner1 = miners.head
+
+          val miner1Balance = blockchain.effectiveBalance(miner1.toAddress, blockchain.height, 0)
+
+          val fork1 = mkFork(10, miner1, blockchain)
+          val fork2 = mkFork(10, miner1, blockchain)
+
+          val fork1Delay = {
+            val blockForHit =
+              fork1
+                .lift(100)
+                .orElse(blockchain.blockAt(blockchain.height + fork1.length - 100))
+                .getOrElse(fork1.head)
+
+            calcDelay(blockForHit, fork1.head.consensusData.baseTarget, miner1.publicKey, miner1Balance)
+          }
+
+          val fork2Delay = {
+            val blockForHit =
+              fork2
+                .lift(100)
+                .orElse(blockchain.blockAt(blockchain.height + fork2.length - 100))
+                .getOrElse(fork2.head)
+
+            calcDelay(blockForHit, fork2.head.consensusData.baseTarget, miner1.publicKey, miner1Balance)
+          }
+
+          fork1Delay shouldEqual fork2Delay
+        }
+      }
+    }
+  }
 
   "block delay validation" - {
     "succeed when delay is correct" in {
@@ -149,6 +187,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
     }
   }
 
+  //TODO: all branches
   "regression" - {
     "delay" in {
       FairPoSCalculator.calculateDelay(BigInt(1), 100l, 10000000000000l) shouldBe 705491
@@ -198,6 +237,54 @@ object FPPoSSelectorTest {
   final case class Env(pos: PoSSelector, blockchain: BlockchainUpdater with NG, miners: Seq[PrivateKeyAccount])
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
+
+  def mkFork(blockCount: Int, miner: PrivateKeyAccount, blockchain: Blockchain): List[Block] = {
+    val height = blockchain.height
+
+    val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
+
+    val lastBlock = blockchain.lastBlock.get
+
+    ((1 to blockCount) foldLeft List(lastBlock)) { (forkChain, ind) =>
+      val blockForHit =
+        forkChain
+          .lift(100)
+          .orElse(blockchain.blockAt(height + ind - 100))
+          .getOrElse(forkChain.head)
+
+      val gs =
+        PoSCalculator
+          .generatorSignature(
+            blockForHit.consensusData.generationSignature.arr,
+            miner.publicKey
+          )
+
+      val delay: Long = 60000
+
+      val bt = FairPoSCalculator.calculateBaseTarget(
+        60,
+        height + ind - 1,
+        forkChain.head.consensusData.baseTarget,
+        forkChain.head.timestamp,
+        (forkChain.lift(2) orElse blockchain.blockAt(height + ind - 3)) map (_.timestamp),
+        forkChain.head.timestamp + delay
+      )
+
+      val newBlock = Block
+        .buildAndSign(
+          3: Byte,
+          forkChain.head.timestamp + delay,
+          forkChain.head.uniqueId,
+          NxtLikeConsensusBlockData(bt, ByteStr(gs)),
+          Seq.empty,
+          miner,
+          Set.empty
+        )
+        .explicitGet()
+
+      newBlock :: forkChain
+    }
+  }
 
   def forgeBlock(miner: PrivateKeyAccount, blockchain: Blockchain with NG, pos: PoSSelector)(updateDelay: Long => Long = identity,
                                                                                              updateBT: Long => Long = identity,
@@ -269,6 +356,20 @@ object FPPoSSelectorTest {
 
         (txs.map(_._1), chain.reverse)
       }
+  }
+
+  def calcDelay(blockForHit: Block, prevBT: Long, minerPK: Array[Byte], effBalance: Long): Long = {
+
+    val gs =
+      PoSCalculator
+        .generatorSignature(
+          blockForHit.consensusData.generationSignature.arr,
+          minerPK
+        )
+
+    val hit = PoSCalculator.hit(gs)
+
+    FairPoSCalculator.calculateDelay(hit, prevBT, effBalance)
   }
 
 }
