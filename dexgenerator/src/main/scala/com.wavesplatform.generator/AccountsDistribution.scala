@@ -3,17 +3,11 @@ package com.wavesplatform.generator
 import cats.Show
 import com.wavesplatform.generator.AccountsDistribution.Settings
 
-class AccountsDistribution(settings: Settings,
-                           valid: Int,
-                           invalid: Int,
-                           fake: Int) {
-}
+class AccountsDistribution(settings: Settings, valid: Int, invalid: Int, fake: Int) {}
 
 object AccountsDistribution {
 
-  case class Settings(valid: Int,
-                      invalid: Int,
-                      fake: Int)
+  case class Settings(valid: Int, invalid: Int, fake: Int)
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>
