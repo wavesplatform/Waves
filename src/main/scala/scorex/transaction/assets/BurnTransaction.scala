@@ -8,8 +8,7 @@ import scorex.account.PublicKeyAccount
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.transaction._
 
-trait BurnTransaction extends ProvenTransaction {
-  def version: Byte
+trait BurnTransaction extends ProvenTransaction with VersionedTransaction {
 
   def chainByte: Option[Byte]
 
