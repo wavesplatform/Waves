@@ -12,6 +12,7 @@ import scala.util.{Failure, Success, Try}
 
 case class DataTransaction private (version: Byte, sender: PublicKeyAccount, data: List[DataEntry[_]], fee: Long, timestamp: Long, proofs: Proofs)
     extends ProvenTransaction
+    with VersionedTransaction
     with FastHashId {
 
   override val builder: TransactionParser        = DataTransaction
