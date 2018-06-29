@@ -14,8 +14,10 @@ import play.api.libs.json.{JsSuccess, Json, Reads}
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, SignerData}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
+import scorex.waves.http.DebugMessage
 
 import scala.concurrent.duration._
+import scala.concurrent.Await
 import scala.util.Random
 
 class PoSSuite extends BaseTransactionSuite {
@@ -29,13 +31,28 @@ class PoSSuite extends BaseTransactionSuite {
     JsSuccess(NxtLikeConsensusBlockData(bt, ByteStr.decodeBase58(gs).get))
   }
 
-  test("Accept correct block") {
-
+  test("Node mines several blocks, integration test checks that block timestamps equal to time of appearence (+-100ms)") {
     val height = nodes.last.height
     val block  = forgeBlock(height, signerPK)()
 
     waitForBlockTime(block)
 
+    waitForHeight(height + 1)
+
+    val newTimestamp = blockTimestamp(height + 1)
+
+    block.timestamp shouldBe (newTimestamp +- 1000)
+  }
+
+  test("Accept correct block") {
+
+    nodes.last.close()
+    val height = nodes.head.height
+    val block  = forgeBlock(height, signerPK)()
+
+    waitForBlockTime(block)
+
+    nodes.head.printDebugMessage(DebugMessage(s"Send block for $height"))
     nodes.head.sendByNetwork(RawBytes.from(block))
 
     waitForHeight(height + 1)
@@ -46,7 +63,7 @@ class PoSSuite extends BaseTransactionSuite {
   }
 
   test("Reject block with invalid delay") {
-    val height = nodes.last.height
+    val height = nodes.head.height
     val block  = forgeBlock(height, signerPK)(updateDelay = _ - 1000)
 
     waitForBlockTime(block)
@@ -61,7 +78,7 @@ class PoSSuite extends BaseTransactionSuite {
   }
 
   test("Reject block with invalid BT") {
-    val height = nodes.last.height
+    val height = nodes.head.height
     val block  = forgeBlock(height, signerPK)(updateBaseTarget = _ + 2)
 
     waitForBlockTime(block)
@@ -76,7 +93,7 @@ class PoSSuite extends BaseTransactionSuite {
   }
 
   test("Reject block with invalid generation signature") {
-    val height = nodes.last.height
+    val height = nodes.head.height
     val block = forgeBlock(height, signerPK)(updateGenSig = (gs: ByteStr) => {
       val arr  = gs.arr
       val init = arr.init
@@ -86,6 +103,7 @@ class PoSSuite extends BaseTransactionSuite {
 
     waitForBlockTime(block)
 
+    nodes.head.printDebugMessage(DebugMessage(s"Send invalid block for $height"))
     nodes.head.sendByNetwork(RawBytes.from(block))
 
     waitForHeight(height + 1)
@@ -98,7 +116,7 @@ class PoSSuite extends BaseTransactionSuite {
   test("Reject block with invalid signature") {
     val otherNodePK = PrivateKeyAccount.fromSeed(nodeConfigs.head.getString("account-seed")).explicitGet()
 
-    val height = nodes.last.height
+    val height = nodes.head.height
     val block  = forgeBlock(height, signerPK)(updateBaseTarget = _ + 2)
 
     val resignedBlock =
@@ -131,11 +149,19 @@ class PoSSuite extends BaseTransactionSuite {
     (lastBlockId, lastBlockTS, lastBlockCData)
   }
 
+  def blockTimestamp(h: Int): Long = {
+    (Json.parse(
+      nodes.head
+        .get(s"/blocks/at/$h")
+        .getResponseBody
+    ) \ "timestamp").as[Long]
+  }
+
   def blockSignature(h: Int): Array[Byte] = {
     Base58
       .decode(
         (Json.parse(
-          nodes.last
+          nodes.head
             .get(s"/blocks/at/$h")
             .getResponseBody
         ) \ "signature").as[String])
@@ -157,7 +183,7 @@ class PoSSuite extends BaseTransactionSuite {
   }
 
   def waitForHeight(h: Int): Unit = {
-    nodes.waitFor[Int]("height")(1.seconds)(_.height, _.head > h)
+    nodes.head.waitFor[Int]("height")((api => Await.result(api.height, 1.second)), _ > h, 1.second)
   }
 
   def forgeBlock(height: Int, signerPK: PrivateKeyAccount)(updateDelay: Long => Long = identity,

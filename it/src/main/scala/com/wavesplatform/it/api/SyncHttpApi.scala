@@ -14,6 +14,7 @@ import scorex.api.http.AddressApiRoute
 import scorex.api.http.assets.SignedIssueV1Request
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
+import scorex.waves.http.DebugMessage
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -59,6 +60,9 @@ object SyncHttpApi extends Assertions {
     def utx = Await.result(async(n).utx, RequestAwaitTime)
 
     def utxSize = Await.result(async(n).utxSize, RequestAwaitTime)
+
+    def printDebugMessage(db: DebugMessage): Response =
+      Await.result(async(n).printDebugMessage(db), RequestAwaitTime)
 
     def seed(address: String): String =
       Await.result(async(n).seed(address), RequestAwaitTime)
