@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
-import com.wavesplatform.consensus.NxtPoSCalculator
+import com.wavesplatform.consensus.FairPoSCalculator
 import com.wavesplatform.crypto
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.AsyncNetworkApi.NodeAsyncNetworkApi
@@ -24,6 +24,10 @@ class PoSSuite extends BaseTransactionSuite {
 
   val signerPK = PrivateKeyAccount.fromSeed(nodeConfigs.last.getString("account-seed")).explicitGet()
 
+  println(signerPK.address)
+  println(ByteStr(signerPK.publicKey))
+  println(ByteStr(signerPK.privateKey))
+
   implicit val nxtCDataReads = Reads { json =>
     val bt = (json \ "base-target").as[Long]
     val gs = (json \ "generation-signature").as[String]
@@ -33,13 +37,20 @@ class PoSSuite extends BaseTransactionSuite {
 
   test("Node mines several blocks, integration test checks that block timestamps equal to time of appearence (+-100ms)") {
     val height = nodes.last.height
-    val block  = forgeBlock(height, signerPK)()
 
-    waitForBlockTime(block)
+    val block = forgeBlock(height, signerPK)()
+
+//    val timeout = block.timestamp - System.currentTimeMillis() - 100
+
+//    if (timeout > 0) Thread.sleep(timeout)
 
     waitForHeight(height + 1)
 
+    val blockSig     = blockSignature(height + 1)
     val newTimestamp = blockTimestamp(height + 1)
+
+    println(block.uniqueId)
+    println(ByteStr(blockSig))
 
     block.timestamp shouldBe (newTimestamp +- 1000)
   }
@@ -140,7 +151,7 @@ class PoSSuite extends BaseTransactionSuite {
     if (timeout > 0) Thread.sleep(timeout)
   }
 
-  def previousBlockInfo(height: Int): (Array[Byte], Long, NxtLikeConsensusBlockData) = {
+  def blockInfo(height: Int): (Array[Byte], Long, NxtLikeConsensusBlockData) = {
     val lastBlock      = Json.parse(nodes.head.get(s"/blocks/at/$height").getResponseBody)
     val lastBlockId    = Base58.decode((lastBlock \ "signature").as[String]).get
     val lastBlockTS    = (lastBlock \ "timestamp").as[Long]
@@ -171,8 +182,23 @@ class PoSSuite extends BaseTransactionSuite {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(3))
+      .overrideBase(
+        _.raw(
+          """
+          |pre-activated-features = {
+          |          2 = 0
+          |          3 = 0
+          |          4 = 0
+          |          5 = 0
+          |          6 = 0
+          |          7 = 0
+          |          8 = 0
+          |        }
+        """.stripMargin
+        ))
+      .overrideBase(_.nonMiner)
       .withDefault(3)
-      .withSpecial(_.nonMiner)
+      .withSpecial(_.raw("waves.miner.enable = yes"))
       .buildNonConflicting()
 
   private def generatorSignature(signature: Array[Byte], publicKey: Array[Byte]): Array[Byte] = {
@@ -197,7 +223,7 @@ class PoSSuite extends BaseTransactionSuite {
             .parse(nodes.head.get(s"/blocks/at/${height - 2}").getResponseBody) \ "timestamp").as[Long])
       else None
 
-    val (lastBlockId, lastBlockTS, lastBlockCData) = previousBlockInfo(height)
+    val (lastBlockId, lastBlockTS, lastBlockCData) = blockInfo(height)
 
     val genSig: ByteStr =
       updateGenSig(
@@ -205,7 +231,7 @@ class PoSSuite extends BaseTransactionSuite {
       )
 
     val validBlockDelay: Long = updateDelay(
-      NxtPoSCalculator
+      FairPoSCalculator
         .calculateDelay(
           hit(genSig.arr),
           lastBlockCData.baseTarget,
@@ -214,14 +240,14 @@ class PoSSuite extends BaseTransactionSuite {
     )
 
     val bastTarget: Long = updateBaseTarget(
-      NxtPoSCalculator
+      FairPoSCalculator
         .calculateBaseTarget(
-          60,
+          10,
           height,
           lastBlockCData.baseTarget,
           lastBlockTS,
           ggParentTS,
-          validBlockDelay
+          lastBlockTS + validBlockDelay
         )
     )
 
@@ -230,7 +256,7 @@ class PoSSuite extends BaseTransactionSuite {
     Block
       .buildAndSign(
         version = 3: Byte,
-        timestamp = lastBlockTS + validBlockDelay /*- 1000*/,
+        timestamp = lastBlockTS + validBlockDelay,
         reference = ByteStr(lastBlockId),
         consensusData = cData,
         transactionData = Nil,
