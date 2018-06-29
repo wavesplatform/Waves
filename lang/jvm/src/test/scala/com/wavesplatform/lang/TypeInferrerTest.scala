@@ -4,7 +4,7 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import org.scalatest.{FreeSpec, Matchers}
 import Common._
 import com.wavesplatform.lang.v1.compiler.TypeInferrer
-import com.wavesplatform.lang.v1.compiler.Types.TYPEPLACEHOLDER.{PARAMETERIZEDLIST, TYPEPARAM}
+import com.wavesplatform.lang.v1.compiler.Types.TYPEPLACEHOLDER.{PARAMETERIZEDLIST, PARAMETERIZEDUNION, TYPEPARAM}
 import com.wavesplatform.lang.v1.evaluator.ctx.CaseType
 
 class TypeInferrerTest extends FreeSpec with Matchers {
@@ -72,6 +72,56 @@ class TypeInferrerTest extends FreeSpec with Matchers {
         TypeInferrer(Seq((BYTEVECTOR, typeparamT), (BYTEVECTOR, PARAMETERIZEDLIST(typeparamT)))) should produce("Non-matching types")
         TypeInferrer(Seq((LONG, typeparamT), (LIST(LIST(NOTHING)), PARAMETERIZEDLIST(typeparamT)))) should produce("Can't match inferred types")
         TypeInferrer(Seq((BYTEVECTOR, typeparamT), (LIST(LONG), PARAMETERIZEDLIST(typeparamT)))) should produce("Can't match inferred types")
+      }
+    }
+
+    "union" - {
+      val optionLong = UNION(LONG, UNIT)
+
+      "no types to infer" - {
+        "simple types" in {
+          TypeInferrer(Seq((LONG, optionLong))) shouldBe Right(Map.empty)
+        }
+
+        "no common simple type" in {
+          TypeInferrer(Seq((LONG, UNION(BOOLEAN, UNIT)))) should produce("Non-matching types")
+        }
+
+        "inside list" in {
+          TypeInferrer(Seq((LIST(LONG), LIST(optionLong)))) shouldBe Right(Map.empty)
+        }
+
+        "no common type inside list" in {
+          TypeInferrer(Seq((LIST(LONG), LIST(UNION(BOOLEAN, UNIT))))) should produce("Non-matching types")
+        }
+      }
+
+      "inferring" - {
+        val optionT = PARAMETERIZEDUNION(List(typeparamT, TYPEPLACEHOLDER.UNIT))
+
+        "simple types" in {
+          TypeInferrer(Seq((LONG, optionT))) shouldBe Right(Map(typeparamT -> LONG))
+        }
+
+        "inside list" in {
+          TypeInferrer(Seq((LIST(LONG), PARAMETERIZEDLIST(optionT)))) shouldBe Right(Map(typeparamT -> LONG))
+        }
+
+        "inside union" in {
+          TypeInferrer(Seq((optionLong, optionT))) shouldBe Right(Map(typeparamT -> LONG))
+        }
+
+        "Option[Int] matches type parameter" in {
+          TypeInferrer(Seq((optionLong, typeparamT))) shouldBe Right(Map(typeparamT -> optionLong))
+        }
+
+        "common type of Int and Option[Int] should be Option[Int]" in {
+          TypeInferrer(Seq((optionLong, typeparamT), (LONG, typeparamT))) shouldBe Right(Map(typeparamT -> optionLong))
+        }
+
+        "ambiguous inference" in {
+          TypeInferrer(Seq((LONG, PARAMETERIZEDUNION(List(typeparamT, typeparamG))))) should produce("Can't resolve correct type")
+        }
       }
     }
   }
