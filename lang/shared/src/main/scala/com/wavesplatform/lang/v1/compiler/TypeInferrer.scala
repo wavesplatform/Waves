@@ -6,20 +6,13 @@ import com.wavesplatform.lang.v1.evaluator.ctx.DefinedType
 
 object TypeInferrer {
 
-  case class MatchResult(tpe: TYPE, name: TYPEPLACEHOLDER.TYPEPARAM)
-  // (ACTUAL, EXPECTED)
-  def apply(seq: Seq[(TYPE, TYPEPLACEHOLDER)],
-            knownTypes: Map[String, DefinedType] = Map.empty): Either[String, Map[TYPEPLACEHOLDER.TYPEPARAM, TYPE]] = {
+  case class MatchResult(tpe: TYPE, name: TYPEPARAM)
+  def apply(seq: Seq[(TYPE, TYPE)], knownTypes: Map[String, DefinedType] = Map.empty): Either[String, Map[TYPEPARAM, FINAL]] = {
     val matching = seq.map(x => matchTypes(x._1, x._2, knownTypes))
     matching.find(_.isLeft) match {
       case Some(left) => left.asInstanceOf[Left[String, Nothing]]
       case None =>
-        val matchResults: Map[TYPEPLACEHOLDER.TYPEPARAM, Seq[MatchResult]] = matching.flatMap(_.explicitGet()).groupBy(_.name)
-
-        // a function like Option[T], T => Option[Option[T]]
-        // can lead to different interpretations of `T`.
-        // `Nothing`, `TypeRef('XXX')` should find common type of `TypeRef('XXX')`
-
+        val matchResults: Map[TYPEPARAM, Seq[MatchResult]] = matching.flatMap(_.explicitGet()).groupBy(_.name)
         val resolved = matchResults.mapValues {
           case h :: Nil => Right(h.tpe)
           case matchResults @ (h :: t) =>
@@ -47,19 +40,19 @@ object TypeInferrer {
     }
   }
 
-  def matchTypes(argType: TYPE, placeholder: TYPEPLACEHOLDER, knownTypes: Map[String, DefinedType]): Either[String, Option[MatchResult]] = {
+  def matchTypes(argType: TYPE, placeholder: TYPE, knownTypes: Map[String, DefinedType]): Either[String, Option[MatchResult]] = {
     lazy val err = s"Non-matching types: expected: $placeholder, actual: $argType"
 
     (placeholder, argType) match {
       case (_, NOTHING) => Right(None)
-      case (tp @ TYPEPLACEHOLDER.TYPEPARAM(char), _) =>
+      case (tp @ TYPEPARAM(char), _) =>
         Right(Some(MatchResult(argType, tp)))
-      case (tp @ TYPEPLACEHOLDER.PARAMETERIZEDLIST(innerTypeParam), LIST(t)) => matchTypes(t, innerTypeParam, knownTypes)
-      case (tp @ TYPEPLACEHOLDER.PARAMETERIZEDLIST(_), _)                    => Left(err)
-      case (tp @ TYPEPLACEHOLDER.PARAMETERIZEDUNION(l), _) =>
+      case (tp @ PARAMETERIZEDLIST(innerTypeParam), LIST(t)) => matchTypes(t, innerTypeParam, knownTypes)
+      case (tp @ PARAMETERIZEDLIST(_), _)                    => Left(err)
+      case (tp @ PARAMETERIZEDUNION(l), _) =>
         val conctretes = UNION.create(
-          l.filter(_.isInstanceOf[FINAL])
-            .map(_.asInstanceOf[FINAL]))
+          l.filter(_.isInstanceOf[REAL])
+            .map(_.asInstanceOf[REAL]))
         val parameterized = l
           .filter(_.isInstanceOf[PARAMETERIZED])
           .map(_.asInstanceOf[PARAMETERIZED])

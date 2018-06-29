@@ -3,8 +3,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 import cats.data.EitherT
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Types}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTEVECTOR, LONG, STRING, TYPEPLACEHOLDER, UNIT}
-import com.wavesplatform.lang.v1.compiler.Types.TYPEPLACEHOLDER._
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
@@ -143,7 +142,7 @@ object PureContext {
     case xs => notImplemented("dropRight(xs: String, number: Long)", xs)
   }
 
-  private def createOp(op: BinaryOperation, t: TYPEPLACEHOLDER, r: TYPEPLACEHOLDER, func: Short)(body: (Any, Any) => Any): BaseFunction =
+  private def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (Any, Any) => Any): BaseFunction =
     NativeFunction(opsToFunctions(op), 1, func, r, "a" -> t, "b" -> t) {
       case a :: b :: Nil => Right(body(a, b))
       case _             => ???
@@ -170,7 +169,7 @@ object PureContext {
     case _                   => ???
   }
 
-  private def createTryOp(op: BinaryOperation, t: TYPEPLACEHOLDER, r: TYPEPLACEHOLDER, func: Short)(body: (Any, Any) => Any): BaseFunction =
+  private def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (Any, Any) => Any): BaseFunction =
     NativeFunction(opsToFunctions(op), 1, func, r, "a" -> t, "b" -> t) {
       case a :: b :: Nil =>
         try {

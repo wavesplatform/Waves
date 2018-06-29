@@ -1,13 +1,13 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
-import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, SINGLE, TYPE}
+import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL}
 
 trait DefinedType {
   def name: String
-  def typeRef: SINGLE
-  def fields: List[(String, TYPE)]
+  def typeRef: FINAL
+  def fields: List[(String, FINAL)]
 }
 
-case class CaseType(name: String, fields: List[(String, TYPE)]) extends DefinedType {
+case class CaseType(name: String, fields: List[(String, FINAL)]) extends DefinedType {
   lazy val typeRef = CASETYPEREF(name, fields)
 }

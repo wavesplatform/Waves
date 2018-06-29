@@ -14,7 +14,7 @@ sealed trait BaseFunction {
   def name: String
 }
 
-case class FunctionTypeSignature(result: TYPEPLACEHOLDER, args: Seq[TYPEPLACEHOLDER], header: FunctionHeader)
+case class FunctionTypeSignature(result: TYPE, args: Seq[TYPE], header: FunctionHeader)
 
 case class NativeFunction private (name: String, cost: Long, signature: FunctionTypeSignature, ev: List[Any] => Either[String, Any])
     extends BaseFunction {
@@ -23,8 +23,7 @@ case class NativeFunction private (name: String, cost: Long, signature: Function
 
 object NativeFunction {
 
-  def apply(name: String, cost: Long, internalName: Short, resultType: TYPEPLACEHOLDER, args: (String, TYPEPLACEHOLDER)*)(
-      ev: List[Any] => Either[String, Any]) =
+  def apply(name: String, cost: Long, internalName: Short, resultType: TYPE, args: (String, TYPE)*)(ev: List[Any] => Either[String, Any]) =
     new NativeFunction(name, cost, FunctionTypeSignature(resultType, args.map(_._2), FunctionHeader.Native(internalName)), ev)
 
 }
@@ -33,7 +32,7 @@ case class UserFunction private (name: String, cost: Long, signature: FunctionTy
 
 object UserFunction {
 
-  def apply(name: String, cost: Long, resultType: TYPEPLACEHOLDER, args: (String, TYPEPLACEHOLDER)*)(ev: List[EXPR] => EXPR) =
+  def apply(name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: List[EXPR] => EXPR) =
     new UserFunction(name, cost, FunctionTypeSignature(resultType, args.map(_._2), FunctionHeader.User(name)), ev)
 
 }

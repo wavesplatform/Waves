@@ -11,11 +11,11 @@ object Types {
 
   val transfer = CaseType("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
 
-  val optionByteVector         = UNION(BYTEVECTOR, UNIT)
-  val optionAddress            = UNION(addressType.typeRef, UNIT)
-  val optionLong               = UNION(LONG, UNIT)
-  val listByteVector: LIST     = LIST(BYTEVECTOR)
-  val listTransfers            = LIST(transfer.typeRef)
+  val optionByteVector     = UNION(BYTEVECTOR, UNIT)
+  val optionAddress        = UNION(addressType.typeRef, UNIT)
+  val optionLong           = UNION(LONG, UNIT)
+  val listByteVector: LIST = LIST(BYTEVECTOR)
+  val listTransfers        = LIST(transfer.typeRef)
 
   val header = List(
     "id"        -> BYTEVECTOR,
@@ -146,12 +146,12 @@ object Types {
       ++ header ++ proven
   )
 
-  def buildDataEntryType(name: String, tpe: TYPE) = CaseType(name + "DataEntry", List("key" -> STRING, "value" -> tpe))
+  def buildDataEntryType(name: String, tpe: REAL) = CaseType(name + "DataEntry", List("key" -> STRING, "value" -> tpe))
 
   val strDataEntryType  = buildDataEntryType("String", STRING)
   val boolDataEntryType = buildDataEntryType("Boolean", BOOLEAN)
-  val binDataEntryType   = buildDataEntryType("Binary", BYTEVECTOR)
-  val intDataEntryType = buildDataEntryType("Integer", LONG)
+  val binDataEntryType  = buildDataEntryType("Binary", BYTEVECTOR)
+  val intDataEntryType  = buildDataEntryType("Integer", LONG)
   val dataEntryTypes    = List(strDataEntryType, boolDataEntryType, binDataEntryType, intDataEntryType)
 
   val listOfDataEntriesType = LIST(UNION.create(dataEntryTypes.map(_.typeRef)))
@@ -164,12 +164,12 @@ object Types {
   val massTransferTransactionType = CaseType(
     "MassTransferTransaction",
     List(
-      "feeAssetId"    -> optionByteVector,
-      "transferAssetId"       -> optionByteVector,
-      "totalAmount"   -> LONG,
-      "transfers"     -> listTransfers,
-      "transferCount" -> LONG,
-      "attachment"    -> BYTEVECTOR
+      "feeAssetId"      -> optionByteVector,
+      "transferAssetId" -> optionByteVector,
+      "totalAmount"     -> LONG,
+      "transfers"       -> listTransfers,
+      "transferCount"   -> LONG,
+      "attachment"      -> BYTEVECTOR
     ) ++ header ++ proven
   )
 

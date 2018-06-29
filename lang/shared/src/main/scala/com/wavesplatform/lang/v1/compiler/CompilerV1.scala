@@ -8,7 +8,7 @@ import com.wavesplatform.lang.directives.Directive
 import com.wavesplatform.lang.v1.compiler.CompilationError._
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{TYPEPLACEHOLDER, _}
+import com.wavesplatform.lang.v1.compiler.Types.{TYPE, _}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
@@ -77,7 +77,7 @@ object CompilerV1 {
     })
   }
 
-  def flat(typeDefs: Map[String, DefinedType], tl: List[String]): List[SINGLE] =
+  def flat(typeDefs: Map[String, DefinedType], tl: List[String]): List[FINAL] =
     tl.flatMap(typeName =>
       typeDefs.get(typeName) match {
         case Some(value) => List(value.typeRef)
@@ -190,14 +190,14 @@ object CompilerV1 {
     if (funcArgs.lengthCompare(argTypes.size) != 0)
       Left(WrongArgumentsNumber(p.start, p.end, funcName, argTypes.size, funcArgs.size))
     else {
-      val typedExpressionArgumentsAndTypedPlaceholders: List[((EXPR, TYPE), TYPEPLACEHOLDER)] = resolvedArgs.zip(argTypes)
+      val typedExpressionArgumentsAndTypedPlaceholders: List[((EXPR, TYPE), TYPE)] = resolvedArgs.zip(argTypes)
 
       val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case (typedExpr, tph) => (typedExpr._2, tph) }
       for {
         resolvedTypeParams <- TypeInferrer(typePairs, predefTypes).leftMap(Generic(p.start, p.end, _))
         args = typedExpressionArgumentsAndTypedPlaceholders.map(_._1._1)
       } yield {
-        val resultType = typePlaceholdertoType(f.result, resolvedTypeParams, predefTypes)
+        val resultType = toFinal(f.result, resolvedTypeParams)
         (FUNCTION_CALL(f.header, args): EXPR, resultType)
       }
     }

@@ -4,12 +4,12 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import org.scalatest.{FreeSpec, Matchers}
 import Common._
 import com.wavesplatform.lang.v1.compiler.TypeInferrer
-import com.wavesplatform.lang.v1.compiler.Types.TYPEPLACEHOLDER.{PARAMETERIZEDLIST, TYPEPARAM}
+import com.wavesplatform.lang.v1.compiler.Types.PLACEHOLDER.{PARAMETERIZEDLIST, TYPEPARAM}
 import com.wavesplatform.lang.v1.evaluator.ctx.CaseType
 
 class TypeInferrerTest extends FreeSpec with Matchers {
 
-  implicit def t0(t: TYPE): TYPEPLACEHOLDER = com.wavesplatform.lang.v1.compiler.Types.typeToConcretePlaceholder(t)
+  implicit def t0(t: TYPE): TYPE = com.wavesplatform.lang.v1.compiler.Types.typeToConcretePlaceholder(t)
 
   val typeparamT = TYPEPARAM('T')
   val typeparamG = TYPEPARAM('G')
