@@ -234,10 +234,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
           )
         ))
     }
-    val fooTransform = NativeFunction("transformFoo", 1, 260, fooType.typeRef, "foo" -> fooType.typeRef) {
-      case (fooObj: CaseObj) :: Nil => Right(fooObj.copy(fields = fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
-      case _                        => ???
-    }
+    val fooTransform =
+      NativeFunction("transformFoo", 1, 260, fooType.typeRef, "foo" -> fooType.typeRef) {
+        case (fooObj: CaseObj) :: Nil => Right(fooObj.copy(fields = fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
+        case _                        => ???
+      }
 
     val context = EvaluationContext(
       typeDefs = Map.empty,
@@ -654,7 +655,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
     )
 
-    val vars: Map[String, (TYPE, LazyVal)] = Map(
+    val vars: Map[String, (FINAL, LazyVal)] = Map(
       ("tx", (txType.typeRef, LazyVal(EitherT.pure(txObj)))),
       ("alicePubKey", (BYTEVECTOR, LazyVal(EitherT.pure(ByteVector(alicePK))))),
       ("bobPubKey", (BYTEVECTOR, LazyVal(EitherT.pure(ByteVector(bobPK)))))

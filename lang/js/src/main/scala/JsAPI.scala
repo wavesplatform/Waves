@@ -50,7 +50,7 @@ object JsAPI {
       override def transaction: Tx                                                                                   = ???
       override def transactionById(id: Array[Byte]): Option[Tx]                                                      = ???
       override def transactionHeightById(id: Array[Byte]): Option[Int]                                               = ???
-      override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any]                     = ???
+      override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                     = ???
       override def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = ???
       override def resolveAlias(name: String): Either[String, Recipient.Address]                                     = ???
     })
