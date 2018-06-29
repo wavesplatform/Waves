@@ -80,7 +80,8 @@ object CompilerV1 {
   def flat(typeDefs: Map[String, DefinedType], tl: List[String]): List[FINAL] =
     tl.flatMap(typeName =>
       typeDefs.get(typeName) match {
-        case Some(value) => List(value.typeRef)
+        case Some(UnionType(_, unionTypes)) => unionTypes
+        case Some(realType) => List(realType.typeRef)
         case None        => List.empty
     })
 

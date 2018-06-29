@@ -5,7 +5,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.{CompilerV1, Terms}
-import com.wavesplatform.lang.v1.compiler.Types.{FINAL, TYPE}
+import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -27,7 +27,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(1)
   }
 
-  ignore("patternMatching with named union types") {
+  property("patternMatching with named union types") {
     val sampleScript =
       """match p {
         |  case pa: PointA => 0
@@ -37,7 +37,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(1)
   }
 
-  ignore("union types have fields") {
+  property("union types have fields") {
     val sampleScript =
       """match p {
         |  case pa: PointA => pa.X
@@ -48,7 +48,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](sampleScript, Some(pointCInstance)) shouldBe Right(42)
   }
 
-  ignore("union types have  only common fields") {
+  property("union types have  only common fields") {
     val sampleScript =
       """match p {
         |  case pa: PointA => pa.X
@@ -200,7 +200,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |}""".stripMargin) shouldBe Right(1)
   }
 
-  ignore("allow unions in pattern matching") {
+  property("allow unions in pattern matching") {
     val sampleScript =
       """match p {
         |  case p1: PointBC => {

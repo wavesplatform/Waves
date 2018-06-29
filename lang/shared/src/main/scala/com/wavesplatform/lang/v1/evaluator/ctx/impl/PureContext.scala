@@ -253,10 +253,11 @@ object PureContext {
 
   lazy val ctx = CTX(
     Seq(
-      new DefinedType { val name = "Unit"; val typeRef    = Types.UNIT; val fields    = List.empty },
-      new DefinedType { val name = "Int"; val typeRef     = Types.LONG; val fields    = List.empty },
-      new DefinedType { val name = "Boolean"; val typeRef = Types.BOOLEAN; val fields = List.empty },
-      new DefinedType { val name = "String"; val typeRef  = Types.STRING; val fields  = List.empty }
+      new DefinedType { val name = "Unit"; val typeRef    = Types.UNIT },
+      new DefinedType { val name = "Int"; val typeRef     = Types.LONG },
+      new DefinedType { val name = "Boolean"; val typeRef = Types.BOOLEAN },
+      new DefinedType { val name = "ByteVector"; val typeRef = Types.BYTEVECTOR },
+      new DefinedType { val name = "String"; val typeRef  = Types.STRING }
     ),
     vars,
     functions
