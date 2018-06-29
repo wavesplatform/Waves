@@ -57,73 +57,89 @@ class MatcherMassOrdersTestSuite
     bobNode.assertAssetBalance(bobNode.address, aliceAsset, AssetQuantity / 2)
     bobNode.assertAssetBalance(bobNode.address, aliceSecondAsset, AssetQuantity / 2)
 
-    // Alice places sell order
-    val aliceOrderIdFill = matcherNode
-      .placeOrder(prepareOrder(aliceNode, matcherNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, 10.minutes))
-      .message
-      .id
+    "tradableBalance should be equals to balance" in {
+      val aliceBalance = aliceNode.accountBalances(aliceNode.address)
 
-    val alicePartialOrderId = matcherNode
-      .placeOrder(prepareOrder(aliceNode, matcherNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, 10.minutes))
-      .message
-      .id
-
-    val aliceOrderToCancelId =
-      matcherNode
-        .placeOrder(prepareOrder(aliceNode, matcherNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, 70.seconds))
+      // Alice places sell order
+      val aliceOrderIdFill = matcherNode
+        .placeOrder(prepareOrder(aliceNode, matcherNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, 10.minutes))
         .message
         .id
 
-    val aliceActiveOrderId = matcherNode
-      .placeOrder(prepareOrder(aliceNode, matcherNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant + 1, 3, 10.minutes))
-      .message
-      .id
+      val alicePartialOrderId = matcherNode
+        .placeOrder(prepareOrder(aliceNode, matcherNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, 10.minutes))
+        .message
+        .id
 
-    matcherNode.waitOrderStatus(aliceSecondAsset, aliceOrderToCancelId, "Cancelled", 2.minutes)
+      val aliceOrderToCancelId =
+        matcherNode
+          .placeOrder(prepareOrder(aliceNode, matcherNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, 70.seconds))
+          .message
+          .id
 
-    //Bob orders should partially fill one Alice order and fill another
-    ordersRequestsGen(2, bobNode, aliceSecondWavesPair, OrderType.BUY, 2)
+      val aliceActiveOrderId = matcherNode
+        .placeOrder(prepareOrder(aliceNode, matcherNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant + 1, 3, 10.minutes))
+        .message
+        .id
 
-    //check orders after filling
-    matcherNode.waitOrderStatus(aliceSecondAsset, alicePartialOrderId, "PartiallyFilled")
+      matcherNode.waitOrderStatus(aliceSecondAsset, aliceOrderToCancelId, "Cancelled", 2.minutes)
+      nodes.waitForHeightArise()
 
-    orderStatus(aliceNode, aliceOrderIdFill) shouldBe "Filled"
-    orderStatus(aliceNode, alicePartialOrderId) shouldBe "PartiallyFilled"
+      val aliceReservedBalance = getReservedBalance(aliceNode, matcherNode)
+      val aliceTradableBalance = matcherNode.getTradableBalance(aliceSecondAsset, "WAVES", aliceNode.address)
+      (aliceBalance._1 - aliceReservedBalance.head._2) shouldEqual (aliceTradableBalance("WAVES"))
 
-    "Mass orders creation with random lifetime. Active orders still in list" in {
-      val orderIds = aliceOrderHistory().map(_.id)
+      //Bob orders should partially fill one Alice order and fill another
+      ordersRequestsGen(2, bobNode, aliceSecondWavesPair, OrderType.BUY, 2)
 
-      orderIds should contain(aliceActiveOrderId)
-
-      ordersRequestsGen(orderLimit, aliceNode, aliceWavesPair, OrderType.SELL, 3)
-      //wait for some orders cancelled
-      Thread.sleep(100000)
-      ordersRequestsGen(orderLimit, bobNode, aliceWavesPair, OrderType.BUY, 2)
-
-      // Alice check that order Active order is still in list
-      val orderIdsAfterMatching = aliceOrderHistory().map(_.id)
-
-      orderIdsAfterMatching should contain(aliceActiveOrderId)
-      orderIdsAfterMatching should contain(alicePartialOrderId)
-
-      matcherNode.waitOrderStatus(aliceSecondAsset, aliceActiveOrderId, "Accepted")
+      //check orders after filling
       matcherNode.waitOrderStatus(aliceSecondAsset, alicePartialOrderId, "PartiallyFilled")
-    }
 
-    "Filled and Cancelled orders should be after Partial And Accepted" in {
-      val lastIdxOfActiveOrder  = aliceOrderHistory().lastIndexWhere(o => o.status.equals("Accepted") || o.status.equals("PartiallyFilled"))
-      val firstIdxOfClosedOrder = aliceOrderHistory().indexWhere(o => o.status.equals("Filled") || o.status.equals("Cancelled"))
-      lastIdxOfActiveOrder should be < firstIdxOfClosedOrder
-    }
+      orderStatus(aliceNode, aliceOrderIdFill) shouldBe "Filled"
+      orderStatus(aliceNode, alicePartialOrderId) shouldBe "PartiallyFilled"
+      nodes.waitForHeightArise()
 
-    "Accepted and PartiallyFilled orders should be sorted by timestamp." in {
-      val activeAndPartialOrders = aliceOrderHistory().filter(o => o.status.equals("Accepted") || o.status.equals("PartiallyFilled")).map(_.timestamp)
-      activeAndPartialOrders.reverse shouldBe sorted
-    }
+      val aliceBalanceAfterOrder = aliceNode.accountBalances(aliceNode.address)
+      aliceBalanceAfterOrder._1 shouldEqual (aliceTradableBalance("WAVES"))
+      val aliceTradableBalanceAfterOrder = matcherNode.getTradableBalance(aliceSecondAsset, "WAVES", aliceNode.address)
+      aliceBalanceAfterOrder._1 shouldEqual (aliceTradableBalanceAfterOrder("WAVES"))
 
-    "Filled and Cancelled orders should be sorted by timestamp." in {
-      val filledAndCancelledOrders = aliceOrderHistory().filter(o => o.status.equals("Filled") || o.status.equals("Cancelled")).map(_.timestamp)
-      filledAndCancelledOrders.reverse shouldBe sorted
+      "Mass orders creation with random lifetime. Active orders still in list" in {
+        val orderIds = aliceOrderHistory().map(_.id)
+
+        orderIds should contain(aliceActiveOrderId)
+
+        ordersRequestsGen(orderLimit, aliceNode, aliceWavesPair, OrderType.SELL, 3)
+        //wait for some orders cancelled
+        Thread.sleep(100000)
+        ordersRequestsGen(orderLimit, bobNode, aliceWavesPair, OrderType.BUY, 2)
+
+        // Alice check that order Active order is still in list
+        val orderIdsAfterMatching = aliceOrderHistory().map(_.id)
+
+        orderIdsAfterMatching should contain(aliceActiveOrderId)
+        orderIdsAfterMatching should contain(alicePartialOrderId)
+
+        matcherNode.waitOrderStatus(aliceSecondAsset, aliceActiveOrderId, "Accepted")
+        matcherNode.waitOrderStatus(aliceSecondAsset, alicePartialOrderId, "PartiallyFilled")
+      }
+
+      "Filled and Cancelled orders should be after Partial And Accepted" in {
+        val lastIdxOfActiveOrder  = aliceOrderHistory().lastIndexWhere(o => o.status.equals("Accepted") || o.status.equals("PartiallyFilled"))
+        val firstIdxOfClosedOrder = aliceOrderHistory().indexWhere(o => o.status.equals("Filled") || o.status.equals("Cancelled"))
+        lastIdxOfActiveOrder should be < firstIdxOfClosedOrder
+      }
+
+      "Accepted and PartiallyFilled orders should be sorted by timestamp." in {
+        val activeAndPartialOrders =
+          aliceOrderHistory().filter(o => o.status.equals("Accepted") || o.status.equals("PartiallyFilled")).map(_.timestamp)
+        activeAndPartialOrders.reverse shouldBe sorted
+      }
+
+      "Filled and Cancelled orders should be sorted by timestamp." in {
+        val filledAndCancelledOrders = aliceOrderHistory().filter(o => o.status.equals("Filled") || o.status.equals("Cancelled")).map(_.timestamp)
+        filledAndCancelledOrders.reverse shouldBe sorted
+      }
     }
   }
 

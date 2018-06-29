@@ -213,6 +213,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         }
 
       }
+
     }
   }
 
