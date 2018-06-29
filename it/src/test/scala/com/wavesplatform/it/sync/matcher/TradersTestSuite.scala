@@ -148,13 +148,11 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           // Amount of waves in order is smaller than fee
           val bobBalance = bobNode.accountBalances(bobNode.address)._1
 
-          val price = bobBalance / 2 - TransactionFee - MatcherFee
-
-          val oldestOrderId = bobPlacesWaveOrder(bobWavesPair, price, bobNewAsset, 1 * Order.PriceConstant)
-          val newestOrderId = bobPlacesWaveOrder(bobWavesPair, price, bobNewAsset, 1 * Order.PriceConstant)
+          val oldestOrderId = bobPlacesWaveOrder(bobWavesPair, 10.waves * Order.PriceConstant, bobNewAsset, 1)
+          val newestOrderId = bobPlacesWaveOrder(bobWavesPair, 10.waves * Order.PriceConstant, bobNewAsset, 1)
 
           //      waitForOrderStatus(matcherNode, bobAssetIdRaw, id, "Accepted")
-          val leaseAmount = bobBalance / 2 - TransactionFee
+          val leaseAmount = bobBalance - TransactionFee - 10.waves - MatcherFee
           val leaseId     = bobNode.lease(bobNode.address, aliceNode.address, leaseAmount, TransactionFee).id
           nodes.waitForHeightAriseAndTxPresent(leaseId)
 
@@ -162,7 +160,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
             matcherNode.waitOrderStatus(bobNewAsset, oldestOrderId, "Cancelled")
           }
           withClue(s"The newest order '$newestOrderId' is still active") {
-            matcherNode.getOrderStatus(bobNewAsset, newestOrderId, false)
+            matcherNode.getOrderStatus(bobNewAsset, newestOrderId).status shouldBe "Accepted"
           }
 
           // Cleanup
