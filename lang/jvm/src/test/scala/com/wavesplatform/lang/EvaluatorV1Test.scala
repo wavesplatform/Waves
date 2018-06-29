@@ -170,7 +170,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("let is evaluated maximum once") {
     var functionEvaluated = 0
 
-    val f = NativeFunction("F", 1, 258, TYPEPLACEHOLDER.LONG, "_" -> TYPEPLACEHOLDER.LONG) { _ =>
+    val f = NativeFunction("F", 1, 258, LONG, "_" -> LONG) { _ =>
       functionEvaluated = functionEvaluated + 1
       Right(1L)
     }

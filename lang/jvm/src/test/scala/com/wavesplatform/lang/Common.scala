@@ -38,7 +38,7 @@ object Common {
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
   val multiplierFunction: NativeFunction =
-    NativeFunction("MULTIPLY", 1, 10005, TYPEPLACEHOLDER.LONG, "x1" -> TYPEPLACEHOLDER.LONG, "x2" -> TYPEPLACEHOLDER.LONG) {
+    NativeFunction("MULTIPLY", 1, 10005, LONG, "x1" -> LONG, "x2" -> LONG) {
       case (x1: Long) :: (x2: Long) :: Nil => Try(x1 * x2).toEither.left.map(_.toString)
       case _                               => ??? // suppress pattern match warning
     }

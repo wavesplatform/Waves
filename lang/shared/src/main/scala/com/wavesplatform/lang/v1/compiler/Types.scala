@@ -13,12 +13,6 @@ object Types {
     case class PARAMETERIZEDLIST(t: TYPEPLACEHOLDER) extends PARAMETERIZED with SINGLE
     case class PARAMETERIZEDUNION(l: List[SINGLE])   extends PARAMETERIZED
     case class LIST(t: CONCRETE)                     extends CONCRETE with SINGLE
-    case object UNIT                                 extends CONCRETE with SINGLE
-    case object LONG                                 extends CONCRETE with SINGLE
-    case object BYTEVECTOR                           extends CONCRETE with SINGLE
-    case object BOOLEAN                              extends CONCRETE with SINGLE
-    case object STRING                               extends CONCRETE with SINGLE
-    case class CASETYPEREF(name: String)             extends CONCRETE with SINGLE
     case class UNION(l: List[CONCRETE with SINGLE])  extends CONCRETE
   }
 
@@ -35,26 +29,24 @@ object Types {
 
   def concreteToType(concrete: CONCRETE, knownTypes: Map[String, DefinedType]): TYPE = concrete match {
     case TYPEPLACEHOLDER.LIST(t: CONCRETE) => LIST(concreteToType(t, knownTypes))
-    case TYPEPLACEHOLDER.UNIT              => UNIT
-    case TYPEPLACEHOLDER.LONG              => LONG
-    case TYPEPLACEHOLDER.BYTEVECTOR        => BYTEVECTOR
-    case TYPEPLACEHOLDER.BOOLEAN           => BOOLEAN
-    case TYPEPLACEHOLDER.STRING            => STRING
-    case TYPEPLACEHOLDER.CASETYPEREF(name) =>
-      val casetyperef = knownTypes(name)
-      CASETYPEREF(casetyperef.name, casetyperef.fields)
-    case TYPEPLACEHOLDER.UNION(l) => UNION.create(l.flatMap(l1 => concreteToType(l1, knownTypes).l))
+    case UNIT                              => UNIT
+    case LONG                              => LONG
+    case BYTEVECTOR                        => BYTEVECTOR
+    case BOOLEAN                           => BOOLEAN
+    case STRING                            => STRING
+    case c: CASETYPEREF                    => c
+    case TYPEPLACEHOLDER.UNION(l)          => UNION.create(l.flatMap(l1 => concreteToType(l1, knownTypes).l))
 
   }
 
   def f(i: SINGLE_TYPE): CONCRETE with SINGLE = i match {
-    case UNIT              => TYPEPLACEHOLDER.UNIT
-    case LONG              => TYPEPLACEHOLDER.LONG
-    case BYTEVECTOR        => TYPEPLACEHOLDER.BYTEVECTOR
-    case BOOLEAN           => TYPEPLACEHOLDER.BOOLEAN
-    case STRING            => TYPEPLACEHOLDER.STRING
-    case LIST(lt)          => TYPEPLACEHOLDER.LIST(typeToConcretePlaceholder(lt))
-    case CASETYPEREF(c, _) => TYPEPLACEHOLDER.CASETYPEREF(c)
+    case UNIT           => UNIT
+    case LONG           => LONG
+    case BYTEVECTOR     => BYTEVECTOR
+    case BOOLEAN        => BOOLEAN
+    case STRING         => STRING
+    case LIST(lt)       => TYPEPLACEHOLDER.LIST(typeToConcretePlaceholder(lt))
+    case c: CASETYPEREF => c
   }
 
   def typeToConcretePlaceholder(t: TYPE): CONCRETE = t match {
@@ -72,13 +64,13 @@ object Types {
 
   case object NOTHING                                                                          extends TYPE { override val name = "Nothing"; override val l = List() }
   sealed trait SINGLE_TYPE                                                                     extends TYPE { override val l = List(this) }
-  case object UNIT                                                                             extends SINGLE_TYPE { override val name = "Unit" }
-  case object LONG                                                                             extends SINGLE_TYPE { override val name = "Int" }
-  case object BYTEVECTOR                                                                       extends SINGLE_TYPE { override val name = "ByteVector" }
-  case object BOOLEAN                                                                          extends SINGLE_TYPE { override val name = "Boolean" }
-  case object STRING                                                                           extends SINGLE_TYPE { override val name = "String" }
+  case object UNIT                                                                             extends SINGLE_TYPE with CONCRETE with SINGLE { override val name = "Unit" }
+  case object LONG                                                                             extends SINGLE_TYPE with CONCRETE with SINGLE { override val name = "Int" }
+  case object BYTEVECTOR                                                                       extends SINGLE_TYPE with CONCRETE with SINGLE { override val name = "ByteVector" }
+  case object BOOLEAN                                                                          extends SINGLE_TYPE with CONCRETE with SINGLE { override val name = "Boolean" }
+  case object STRING                                                                           extends SINGLE_TYPE with CONCRETE with SINGLE { override val name = "String" }
   case class LIST(innerType: TYPE)                                                             extends SINGLE_TYPE { override lazy val name: String = "LIST(" ++ innerType.toString ++ ")" }
-  case class CASETYPEREF(override val name: String, override val fields: List[(String, TYPE)]) extends SINGLE_TYPE
+  case class CASETYPEREF(override val name: String, override val fields: List[(String, TYPE)]) extends SINGLE_TYPE with CONCRETE with SINGLE
 
   case class UNION(override val l: List[SINGLE_TYPE]) extends TYPE {
     override lazy val fields: List[(String, TYPE)] = l.map(_.fields.toSet).reduce(_ intersect _).toList

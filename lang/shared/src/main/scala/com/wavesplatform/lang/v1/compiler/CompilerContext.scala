@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.compiler
 import cats.Monoid
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
-import com.wavesplatform.lang.v1.compiler.Types.{TYPE, TYPEPLACEHOLDER}
+import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, TYPE}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, CaseType, DefinedType, FunctionTypeSignature}
 import shapeless._
 
@@ -11,9 +11,7 @@ case class CompilerContext(predefTypes: Map[String, DefinedType], varDefs: Varia
   private lazy val allFuncDefs: FunctionTypes = predefTypes.collect {
     case (_, t @ CaseType(typeName, fields)) =>
       typeName -> List(
-        FunctionTypeSignature(TYPEPLACEHOLDER.CASETYPEREF(typeName),
-                              fields.map(_._2).map(Types.typeToConcretePlaceholder),
-                              FunctionHeader.User(typeName)))
+        FunctionTypeSignature(CASETYPEREF(typeName, fields), fields.map(_._2).map(Types.typeToConcretePlaceholder), FunctionHeader.User(typeName)))
   } ++ functionDefs
 
   def functionTypeSignaturesByName(name: String): List[FunctionTypeSignature] = allFuncDefs.getOrElse(name, List.empty)

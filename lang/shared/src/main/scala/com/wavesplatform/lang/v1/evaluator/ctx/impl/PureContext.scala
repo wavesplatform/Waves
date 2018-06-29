@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 import cats.data.EitherT
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Types}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.TYPEPLACEHOLDER
+import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTEVECTOR, LONG, STRING, TYPEPLACEHOLDER, UNIT}
 import com.wavesplatform.lang.v1.compiler.Types.TYPEPLACEHOLDER._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
