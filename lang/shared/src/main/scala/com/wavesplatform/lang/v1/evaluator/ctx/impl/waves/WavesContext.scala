@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTEVECTOR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.fromOption
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
@@ -55,12 +55,12 @@ object WavesContext {
               LET(
                 "@afpk_withoutChecksum",
                 FUNCTION_CALL(
-                  FunctionHeader.Native(SUM_BYTES),
+                  PureContext.sumByteVector,
                   List(
                     CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion, env.networkByte)),
                     // publicKeyHash
                     FUNCTION_CALL(
-                      FunctionHeader.Native(TAKE_BYTES),
+                      PureContext.takeBytes,
                       List(
                         secureHashExpr(pk),
                         CONST_LONG(EnvironmentFunctions.HashLength)
@@ -71,11 +71,11 @@ object WavesContext {
               ),
               // bytes
               FUNCTION_CALL(
-                FunctionHeader.Native(SUM_BYTES),
+                PureContext.sumByteVector,
                 List(
                   REF("@afpk_withoutChecksum"),
                   FUNCTION_CALL(
-                    FunctionHeader.Native(TAKE_BYTES),
+                    PureContext.takeBytes,
                     List(
                       secureHashExpr(REF("@afpk_withoutChecksum")),
                       CONST_LONG(EnvironmentFunctions.ChecksumLength)
@@ -91,26 +91,26 @@ object WavesContext {
 
     def removePrefixExpr(str: EXPR, prefix: String): EXPR = IF(
       FUNCTION_CALL(
-        FunctionHeader.Native(EQ),
+        PureContext.eq,
         List(
-          FUNCTION_CALL(FunctionHeader.Native(TAKE_STRING), List(str, CONST_LONG(prefix.length))),
+          FUNCTION_CALL(PureContext.takeString, List(str, CONST_LONG(prefix.length))),
           CONST_STRING(prefix)
         )
       ),
-      FUNCTION_CALL(FunctionHeader.Native(DROP_STRING), List(str, CONST_LONG(prefix.length))),
+      FUNCTION_CALL(PureContext.dropString, List(str, CONST_LONG(prefix.length))),
       str
     )
 
     def verifyAddressChecksumExpr(addressBytes: EXPR): EXPR = FUNCTION_CALL(
-      FunctionHeader.Native(EQ),
+      PureContext.eq,
       List(
         // actual checksum
-        FUNCTION_CALL(FunctionHeader.User("takeRightBytes"), List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
+        FUNCTION_CALL(PureContext.takeRightBytes, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
         // generated checksum
         FUNCTION_CALL(
-          FunctionHeader.Native(TAKE_BYTES),
+          PureContext.takeBytes,
           List(
-            secureHashExpr(FUNCTION_CALL(FunctionHeader.User("dropRightBytes"), List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength)))),
+            secureHashExpr(FUNCTION_CALL(PureContext.dropRightBytes, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength)))),
             CONST_LONG(EnvironmentFunctions.ChecksumLength)
           )
         )
@@ -123,30 +123,30 @@ object WavesContext {
           LET("@afs_addrBytes", FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(str, EnvironmentFunctions.AddressPrefix)))),
           IF(
             FUNCTION_CALL(
-              FunctionHeader.Native(EQ),
+              PureContext.eq,
               List(
-                FUNCTION_CALL(FunctionHeader.Native(SIZE_BYTES), List(REF("@afs_addrBytes"))),
+                FUNCTION_CALL(PureContext.sizeBytes, List(REF("@afs_addrBytes"))),
                 CONST_LONG(EnvironmentFunctions.AddressLength)
               )
             ),
             IF(
               // version
               FUNCTION_CALL(
-                FunctionHeader.Native(EQ),
+                PureContext.eq,
                 List(
-                  FUNCTION_CALL(FunctionHeader.Native(TAKE_BYTES), List(REF("@afs_addrBytes"), CONST_LONG(1))),
+                  FUNCTION_CALL(PureContext.takeBytes, List(REF("@afs_addrBytes"), CONST_LONG(1))),
                   CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion))
                 )
               ),
               IF(
                 // networkByte
                 FUNCTION_CALL(
-                  FunctionHeader.Native(EQ),
+                  PureContext.eq,
                   List(
                     FUNCTION_CALL(
-                      FunctionHeader.Native(TAKE_BYTES),
+                      PureContext.takeBytes,
                       List(
-                        FUNCTION_CALL(FunctionHeader.Native(DROP_BYTES), List(REF("@afs_addrBytes"), CONST_LONG(1))),
+                        FUNCTION_CALL(PureContext.dropBytes, List(REF("@afs_addrBytes"), CONST_LONG(1))),
                         CONST_LONG(1)
                       )
                     ),
@@ -191,19 +191,23 @@ object WavesContext {
       }
     }
 
+    def caseObjToRecipient(c: CaseObj): Recipient = c.caseType.name match {
+      case addressType.typeRef.name => Recipient.Address(c.fields("bytes").asInstanceOf[ByteVector])
+      case aliasType.typeRef.name   => Recipient.Alias(c.fields("alias").asInstanceOf[String])
+      case _                        => ???
+    }
+
     val accountBalanceF: BaseFunction = NativeFunction("accountBalance", 100, ACCOUNTBALANCE, LONG, "addressOrAlias" -> addressOrAliasType) {
-      case CaseObj(_, fields) :: Nil =>
-        val acc = fields("bytes").asInstanceOf[ByteVector].toArray
-        env.accountBalanceOf(acc, None)
+      case (c: CaseObj) :: Nil =>
+        env.accountBalanceOf(caseObjToRecipient(c), None)
 
       case _ => ???
     }
 
     val accountAssetBalanceF: BaseFunction =
       NativeFunction("accountAssetBalance", 100, ACCOUNTASSETBALANCE, LONG, "addressOrAlias" -> addressOrAliasType, "assetId" -> BYTEVECTOR) {
-        case CaseObj(_, fields) :: (assetId: ByteVector) :: Nil =>
-          val acc = fields("bytes").asInstanceOf[ByteVector]
-          env.accountBalanceOf(acc.toArray, Some(assetId.toArray))
+        case (c: CaseObj) :: (assetId: ByteVector) :: Nil =>
+          env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.toArray))
 
         case _ => ???
       }

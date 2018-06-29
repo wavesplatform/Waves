@@ -64,10 +64,6 @@ class EnvironmentFunctionsBenchmark {
   @Benchmark
   def addressFromPublicKey_test(): ByteVector = randomAddress
 
-  @Benchmark
-  def addressFromString_full_test(): Either[String, Option[ByteVector]] =
-    environmentFunctions.addressFromString(Global.base58Encode(randomAddress.toArray).explicitGet())
-
 }
 
 object EnvironmentFunctionsBenchmark {

@@ -8,5 +8,5 @@ trait Environment {
   def transactionHeightById(id: Array[Byte]): Option[Int]
   def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]
   def resolveAlias(name: String): Either[String, Recipient.Address]
-  def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long]
+  def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long]
 }

@@ -20,8 +20,6 @@ object FunctionIds {
   val SUM_BYTES: Short  = 203
 
   val SUM_STRING: Short  = 300
-  val GT_STRING: Short   = 301
-  val GE_STRING: Short   = 302
   val TAKE_STRING: Short = 303
   val DROP_STRING: Short = 304
   val SIZE_STRING: Short = 305

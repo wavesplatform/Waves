@@ -14,7 +14,7 @@ class BigSum {
   }
 
   val expr: EXPR = FUNCTION_CALL(
-    function = FunctionHeader.Native(EQ),
+    function = PureContext.eq.header,
     args = List(CONST_LONG(1), bigSum)
   )
 }

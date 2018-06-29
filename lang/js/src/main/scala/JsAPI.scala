@@ -45,14 +45,14 @@ object JsAPI {
   def compile(input: String): js.Dynamic = {
 
     val wavesContext = WavesContext.build(new Environment {
-      override def height: Int                                                                                       = ???
-      override def networkByte: Byte                                                                                 = ???
-      override def transaction: Tx                                                                                   = ???
-      override def transactionById(id: Array[Byte]): Option[Tx]                                                      = ???
-      override def transactionHeightById(id: Array[Byte]): Option[Int]                                               = ???
-      override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                     = ???
-      override def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = ???
-      override def resolveAlias(name: String): Either[String, Recipient.Address]                                     = ???
+      override def height: Int                                                                                     = ???
+      override def networkByte: Byte                                                                               = ???
+      override def transaction: Tx                                                                                 = ???
+      override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+      override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
+      override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
+      override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+      override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     })
 
     val cryptoContext = CryptoContext.build(Global)

@@ -1,14 +1,14 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, Types}
+import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, Types}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 
@@ -18,6 +18,41 @@ object PureContext {
   private val nothingCoeval: Coeval[Either[String, Nothing]] = Coeval.defer(Coeval(Left("explicit contract termination")))
   val err                                                    = LazyVal(EitherT(nothingCoeval))
   val errRef                                                 = "throw"
+
+  val mulLong: BaseFunction   = createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => Math.multiplyExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+  val divLong: BaseFunction   = createTryOp(DIV_OP, LONG, LONG, DIV_LONG)((a, b) => Math.floorDiv(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+  val modLong: BaseFunction   = createTryOp(MOD_OP, LONG, LONG, MOD_LONG)((a, b) => Math.floorMod(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+  val sumLong: BaseFunction   = createTryOp(SUM_OP, LONG, LONG, SUM_LONG)((a, b) => Math.addExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+  val subLong: BaseFunction   = createTryOp(SUB_OP, LONG, LONG, SUB_LONG)((a, b) => Math.subtractExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+  val sumString: BaseFunction = createOp(SUM_OP, STRING, STRING, SUM_STRING)((a, b) => a.asInstanceOf[String] + b.asInstanceOf[String])
+  val sumByteVector: BaseFunction =
+    createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES)((a, b) => ByteVector.concat(Seq(a.asInstanceOf[ByteVector], b.asInstanceOf[ByteVector])))
+  val ge: BaseFunction = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)((a, b) => a.asInstanceOf[Long] >= b.asInstanceOf[Long])
+  val gt: BaseFunction = createOp(GT_OP, LONG, BOOLEAN, GT_LONG)((a, b) => a.asInstanceOf[Long] > b.asInstanceOf[Long])
+
+  val eq: BaseFunction =
+    NativeFunction(EQ_OP.func, 1, EQ, BOOLEAN, "a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')) {
+      case a :: b :: Nil => Right(a == b)
+      case _             => ???
+    }
+
+  val ne: BaseFunction =
+    UserFunction(NE_OP.func, 1, BOOLEAN, "a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')) {
+      case a :: b :: Nil => FUNCTION_CALL(uNot, List(FUNCTION_CALL(eq, List(a, b))))
+      case _             => ???
+    }
+
+  val isDefined: BaseFunction =
+    UserFunction("isDefined", 1, BOOLEAN, "a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
+      case a :: Nil => FUNCTION_CALL(ne, List(a, REF("unit")))
+      case _        => ???
+    }
+
+  val extract: BaseFunction =
+    UserFunction("extract", 1, TYPEPARAM('T'), "a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
+      case a :: Nil => IF(FUNCTION_CALL(PureContext.eq, List(a, REF("unit"))), REF("throw"), a)
+      case _        => ???
+    }
 
   val fraction: BaseFunction = NativeFunction("fraction", 1, FRACTION, LONG, "value" -> LONG, "numerator" -> LONG, "denominator" -> LONG) {
     case (v: Long) :: (n: Long) :: (d: Long) :: Nil =>
@@ -58,40 +93,40 @@ object PureContext {
     case xs                                        => notImplemented("drop(xs: byte[], number: Long)", xs)
   }
 
-  val takeRightBytes: BaseFunction = UserFunction("takeRightBytes", 1, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
-    case (xs: EXPR) :: (number: EXPR) :: Nil =>
-      FUNCTION_CALL(
-        FunctionHeader.Native(DROP_BYTES),
-        List(
-          xs,
-          FUNCTION_CALL(
-            FunctionHeader.Native(SUB_LONG),
-            List(
-              FUNCTION_CALL(FunctionHeader.Native(SIZE_BYTES), List(xs)),
-              number
-            )
-          )
-        )
-      )
-    case xs => ???
-  }
-
   val dropRightBytes: BaseFunction = UserFunction("dropRightBytes", 1, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
     case (xs: EXPR) :: (number: EXPR) :: Nil =>
       FUNCTION_CALL(
-        FunctionHeader.Native(TAKE_BYTES),
+        takeBytes,
         List(
           xs,
           FUNCTION_CALL(
-            FunctionHeader.Native(SUB_LONG),
+            subLong,
             List(
-              FUNCTION_CALL(FunctionHeader.Native(SIZE_BYTES), List(xs)),
+              FUNCTION_CALL(sizeBytes, List(xs)),
               number
             )
           )
         )
       )
     case xs => notImplemented("dropRight(xs: byte[], number: Long)", xs)
+  }
+
+  val takeRightBytes: BaseFunction = UserFunction("takeRightBytes", 1, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
+    case (xs: EXPR) :: (number: EXPR) :: Nil =>
+      FUNCTION_CALL(
+        PureContext.dropRightBytes,
+        List(
+          xs,
+          FUNCTION_CALL(
+            subLong,
+            List(
+              FUNCTION_CALL(sizeBytes, List(xs)),
+              number
+            )
+          )
+        )
+      )
+    case xs => ???
   }
 
   private def trimLongToInt(x: Long): Int = Math.toIntExact(Math.max(Math.min(x, Int.MaxValue), Int.MinValue))
@@ -109,13 +144,13 @@ object PureContext {
   val takeRightString: BaseFunction = UserFunction("takeRight", 1, STRING, "xs" -> STRING, "number" -> LONG) {
     case (xs: EXPR) :: (number: EXPR) :: Nil =>
       FUNCTION_CALL(
-        FunctionHeader.Native(DROP_STRING),
+        PureContext.dropString,
         List(
           xs,
           FUNCTION_CALL(
-            FunctionHeader.Native(SUB_LONG),
+            subLong,
             List(
-              FUNCTION_CALL(FunctionHeader.Native(SIZE_STRING), List(xs)),
+              FUNCTION_CALL(PureContext.sizeString, List(xs)),
               number
             )
           )
@@ -127,13 +162,13 @@ object PureContext {
   val dropRightString: BaseFunction = UserFunction("dropRight", 1, STRING, "xs" -> STRING, "number" -> LONG) {
     case (xs: EXPR) :: (number: EXPR) :: Nil =>
       FUNCTION_CALL(
-        FunctionHeader.Native(TAKE_STRING),
+        takeString,
         List(
           xs,
           FUNCTION_CALL(
-            FunctionHeader.Native(SUB_LONG),
+            subLong,
             List(
-              FUNCTION_CALL(FunctionHeader.Native(SIZE_STRING), List(xs)),
+              FUNCTION_CALL(PureContext.sizeString, List(xs)),
               number
             )
           )
@@ -160,12 +195,12 @@ object PureContext {
   }
 
   val uMinus: BaseFunction = UserFunction("-", 1, LONG, "n" -> LONG) {
-    case n :: Nil => FUNCTION_CALL(subLong.header, List(CONST_LONG(0), n))
+    case n :: Nil => FUNCTION_CALL(subLong, List(CONST_LONG(0), n))
     case _        => ???
   }
 
   val uNot: BaseFunction = UserFunction("!", 1, BOOLEAN, "p" -> BOOLEAN) {
-    case p :: Nil => IF(FUNCTION_CALL(eq.header, List(p, FALSE)), TRUE, FALSE)
+    case p :: Nil => IF(FUNCTION_CALL(eq, List(p, FALSE)), TRUE, FALSE)
     case _        => ???
   }
 
@@ -175,44 +210,9 @@ object PureContext {
         try {
           Right(body(a, b))
         } catch {
-          case e: Throwable => Left(e.getMessage())
+          case e: Throwable => Left(e.getMessage)
         }
       case _ => ???
-    }
-
-  val mulLong: BaseFunction   = createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => Math.multiplyExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
-  val divLong: BaseFunction   = createTryOp(DIV_OP, LONG, LONG, DIV_LONG)((a, b) => Math.floorDiv(a.asInstanceOf[Long], b.asInstanceOf[Long]))
-  val modLong: BaseFunction   = createTryOp(MOD_OP, LONG, LONG, MOD_LONG)((a, b) => Math.floorMod(a.asInstanceOf[Long], b.asInstanceOf[Long]))
-  val sumLong: BaseFunction   = createTryOp(SUM_OP, LONG, LONG, SUM_LONG)((a, b) => Math.addExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
-  val subLong: BaseFunction   = createTryOp(SUB_OP, LONG, LONG, SUB_LONG)((a, b) => Math.subtractExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
-  val sumString: BaseFunction = createOp(SUM_OP, STRING, STRING, SUM_STRING)((a, b) => a.asInstanceOf[String] + b.asInstanceOf[String])
-  val sumByteVector: BaseFunction =
-    createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES)((a, b) => ByteVector.concat(Seq(a.asInstanceOf[ByteVector], b.asInstanceOf[ByteVector])))
-  val ge: BaseFunction = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)((a, b) => a.asInstanceOf[Long] >= b.asInstanceOf[Long])
-  val gt: BaseFunction = createOp(GT_OP, LONG, BOOLEAN, GT_LONG)((a, b) => a.asInstanceOf[Long] > b.asInstanceOf[Long])
-
-  val eq: BaseFunction =
-    NativeFunction(EQ_OP.func, 1, EQ, BOOLEAN, "a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')) {
-      case a :: b :: Nil => Right(a == b)
-      case _             => ???
-    }
-
-  val ne: BaseFunction =
-    UserFunction(NE_OP.func, 1, BOOLEAN, "a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')) {
-      case a :: b :: Nil => FUNCTION_CALL(uNot.header, List(FUNCTION_CALL(eq.header, List(a, b))))
-      case _             => ???
-    }
-
-  val isDefined: BaseFunction =
-    UserFunction("isDefined", 1, BOOLEAN, "a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
-      case a :: Nil => FUNCTION_CALL(ne.header, List(a, REF("unit")))
-      case _        => ???
-    }
-
-  val extract: BaseFunction =
-    UserFunction("extract", 1, TYPEPARAM('T'), "a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
-      case a :: Nil => IF(FUNCTION_CALL(FunctionHeader.Native(EQ), List(a, REF("unit"))), REF("throw"), a)
-      case _        => ???
     }
 
   val operators: Seq[BaseFunction] = Seq(
@@ -262,7 +262,7 @@ object PureContext {
     vars,
     functions
   )
-  lazy val evalContext                      = ctx.evaluationContext
+  lazy val evalContext: EvaluationContext   = ctx.evaluationContext
   lazy val compilerContext: CompilerContext = ctx.compilerContext
 
   def fromOption[T](v: Option[T]): Any = {
