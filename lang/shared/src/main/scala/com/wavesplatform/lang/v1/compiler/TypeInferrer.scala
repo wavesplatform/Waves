@@ -6,8 +6,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.DefinedType
 
 object TypeInferrer {
 
-  case class MatchResult(tpe: TYPE, name: TYPEPARAM)
-  def apply(seq: Seq[(TYPE, TYPE)], knownTypes: Map[String, DefinedType] = Map.empty): Either[String, Map[TYPEPARAM, FINAL]] = {
+  case class MatchResult(tpe: FINAL, name: TYPEPARAM)
+  def apply(seq: Seq[(FINAL, TYPE)], knownTypes: Map[String, DefinedType] = Map.empty): Either[String, Map[TYPEPARAM, FINAL]] = {
     val matching = seq.map(x => matchTypes(x._1, x._2, knownTypes))
     matching.find(_.isLeft) match {
       case Some(left) => left.asInstanceOf[Left[String, Nothing]]
@@ -40,7 +40,7 @@ object TypeInferrer {
     }
   }
 
-  def matchTypes(argType: TYPE, placeholder: TYPE, knownTypes: Map[String, DefinedType]): Either[String, Option[MatchResult]] = {
+  def matchTypes(argType: FINAL, placeholder: TYPE, knownTypes: Map[String, DefinedType]): Either[String, Option[MatchResult]] = {
     lazy val err = s"Non-matching types: expected: $placeholder, actual: $argType"
 
     (placeholder, argType) match {
@@ -75,7 +75,7 @@ object TypeInferrer {
   }
 
   // match, e.g. many ifs
-  def findCommonType(list: Seq[TYPE]): TYPE = list match {
+  def findCommonType(list: Seq[FINAL]): FINAL = list match {
     case one :: Nil => one
     case head :: tail =>
       val t = findCommonType(tail)
@@ -83,7 +83,7 @@ object TypeInferrer {
   }
 
   // if-then-else
-  def findCommonType(t1: TYPE, t2: TYPE): TYPE = (t1, t2) match {
+  def findCommonType(t1: FINAL, t2: FINAL): FINAL = (t1, t2) match {
     case (t1, NOTHING)        => t1
     case (NOTHING, t2)        => t2
     case (t1, t2) if t1 == t2 => t1

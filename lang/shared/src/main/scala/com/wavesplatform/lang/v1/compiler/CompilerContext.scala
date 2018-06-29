@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.compiler
 import cats.Monoid
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
-import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, TYPE}
+import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, CaseType, DefinedType, FunctionTypeSignature}
 import shapeless._
 
@@ -24,7 +24,7 @@ object CompilerContext {
     functionDefs = functions.groupBy(_.name).map { case (k, v) => k -> v.map(_.signature).toList }
   )
 
-  type VariableTypes = Map[String, TYPE]
+  type VariableTypes = Map[String, FINAL]
   type FunctionTypes = Map[String, List[FunctionTypeSignature]]
 
   val empty = CompilerContext(Map.empty, Map.empty, Map.empty, 0)

@@ -213,7 +213,7 @@ object WavesContext {
       case _                       => ???
     }
 
-    val vars: Map[String, (TYPE, LazyVal)] = Map(
+    val vars: Map[String, (FINAL, LazyVal)] = Map(
       ("height", (com.wavesplatform.lang.v1.compiler.Types.LONG, LazyVal(EitherT(heightCoeval)))),
       ("tx", (outgoingTransactionType, LazyVal(EitherT(txCoeval))))
     )

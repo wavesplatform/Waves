@@ -8,6 +8,7 @@ object Types {
   sealed trait FINAL extends TYPE {
     def fields: List[(String, FINAL)] = List()
     def l: List[REAL]
+    def u: UNION = UNION(l)
     def name: String
     override def toString: String = name
   }
@@ -16,7 +17,7 @@ object Types {
   case class TYPEPARAM(char: Byte)               extends PARAMETERIZED with SINGLE
   case class PARAMETERIZEDLIST(t: TYPE)          extends PARAMETERIZED with SINGLE
   case class PARAMETERIZEDUNION(l: List[SINGLE]) extends PARAMETERIZED
-  case object NOTHING                            extends TYPE
+  case object NOTHING                            extends FINAL { override val name = "Nothing"; override val l = List() }
   case object UNIT                               extends REAL { override val name = "Unit"; override val l = List(this) }
   case object LONG                               extends REAL { override val name = "Int"; override val l = List(this) }
   case object BYTEVECTOR                         extends REAL { override val name = "ByteVector"; override val l = List(this) }
@@ -48,6 +49,7 @@ object Types {
   object UNION {
     def create(l: Seq[FINAL]): UNION = {
       UNION(l.flatMap {
+        case NOTHING      => List.empty
         case UNION(inner) => inner
         case s: REAL      => List(s)
       }.toList)
@@ -56,19 +58,19 @@ object Types {
 
   }
 
-  implicit class TypeExt(l1: TYPE) {
-    def equivalent(l2: TYPE): Boolean = (l1, l2) match {
+  implicit class TypeExt(l1: FINAL) {
+    def equivalent(l2: FINAL): Boolean = (l1, l2) match {
       case (l1: UNION, l2: UNION) => l1.l.toSet == l2.l.toSet
-      case (l1: REAL, l2: REAL)   => UNION.create(Seq(l1)) equivalent UNION.create(Seq(l2))
+      case (l1: FINAL, l2: FINAL) => l1.u equivalent l2.u
     }
 
-    def >=(l2: TYPE): Boolean = (l1, l2) match {
+    def >=(l2: FINAL): Boolean = (l1, l2) match {
       case (l1: UNION, l2: UNION) =>
         val bigger = l1.l.toSet
         l2.l.forall(bigger.contains)
-      case (_, NOTHING)         => true
-      case (NOTHING, _)         => false
-      case (l1: REAL, l2: REAL) => UNION.create(Seq(l1)) >= UNION.create(Seq(l2))
+      case (_, NOTHING)           => true
+      case (NOTHING, _)           => false
+      case (l1: FINAL, l2: FINAL) => l1.u >= l2.u
     }
   }
 }

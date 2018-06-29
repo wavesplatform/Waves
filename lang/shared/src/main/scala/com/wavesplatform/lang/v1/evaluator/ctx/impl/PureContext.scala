@@ -233,7 +233,7 @@ object PureContext {
     uNot
   )
 
-  private val vars: Map[String, (Types.TYPE, LazyVal)] = Map((errRef, (Types.NOTHING, err)), ("unit", (Types.UNIT, LazyVal(EitherT.pure(())))))
+  private val vars: Map[String, (Types.FINAL, LazyVal)] = Map((errRef, (Types.NOTHING, err)), ("unit", (Types.UNIT, LazyVal(EitherT.pure(())))))
   private val functions = Seq(
     fraction,
     sizeBytes,
