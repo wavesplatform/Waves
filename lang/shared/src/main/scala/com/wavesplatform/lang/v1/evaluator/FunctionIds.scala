@@ -1,48 +1,39 @@
 package com.wavesplatform.lang.v1.evaluator
 
 object FunctionIds {
-  val SUM_LONG: Short = 0
-  val SUB_LONG: Short = 1
-  val GT_LONG: Short  = 4
-  val GE_LONG: Short  = 5
 
-  val SUM_STRING: Short  = 50
-  val GT_STRING: Short   = 51
-  val GE_STRING: Short   = 52
-  val TAKE_STRING: Short = 53
-  val DROP_STRING: Short = 54
-  val SIZE_STRING: Short = 55
+  val EQ: Short           = 0
+  val ISINSTANCEOF: Short = 1
 
-  val EQ: Short = 150
+  val SUM_LONG: Short = 100
+  val SUB_LONG: Short = 101
+  val GT_LONG: Short  = 102
+  val GE_LONG: Short  = 103
+  val MUL_LONG: Short = 104
+  val DIV_LONG: Short = 105
+  val MOD_LONG: Short = 106
+  val FRACTION: Short = 107
 
-  val MINUS_LONG: Short = 200
-  val MUL_LONG: Short   = 201
-  val DIV_LONG: Short   = 202
-  val MOD_LONG: Short   = 203
+  val SIZE_BYTES: Short = 200
+  val TAKE_BYTES: Short = 201
+  val DROP_BYTES: Short = 202
+  val SUM_BYTES: Short  = 203
 
-  val NOT_BOOLEAN: Short = 250
+  val SUM_STRING: Short  = 300
+  val GT_STRING: Short   = 301
+  val GE_STRING: Short   = 302
+  val TAKE_STRING: Short = 303
+  val DROP_STRING: Short = 304
+  val SIZE_STRING: Short = 305
 
-  val SIZE_LIST: Short = 300
-  val GET_LIST: Short  = 301
-
-  val SIZE_BYTES: Short = 350
-  val TAKE_BYTES: Short = 351
-  val DROP_BYTES: Short = 352
-  val SUM_BYTES: Short  = 353
-
-  val SOME: Short      = 400
-  val ISDEFINED: Short = 401
-  val EXTRACT: Short   = 402
-
-  val ISINSTANCEOF: Short = 450
-
-  val FRACTION: Short = 500
+  val SIZE_LIST: Short = 400
+  val GET_LIST: Short  = 401
 
   // Crypto
-  val SIGVERIFY: Short = 550
-  val KECCAK256: Short = 551
-  val BLAKE256: Short  = 552
-  val SHA256: Short    = 553
+  val SIGVERIFY: Short = 500
+  val KECCAK256: Short = 501
+  val BLAKE256: Short  = 502
+  val SHA256: Short    = 503
 
   val TOBASE58: Short   = 600
   val FROMBASE58: Short = 601
@@ -50,16 +41,15 @@ object FunctionIds {
   val FROMBASE64: Short = 603
 
   // Waves
-  val DATA_LONG: Short    = 650
-  val DATA_BOOLEAN: Short = 651
-  val DATA_BYTES: Short   = 652
-  val DATA_STRING: Short  = 653
+  val GETTRANSACTIONBYID: Short    = 700
+  val TRANSACTIONHEIGHTBYID: Short = 701
+  val ACCOUNTBALANCE: Short        = 702
+  val ACCOUNTASSETBALANCE: Short   = 703
+  val DATA_LONG: Short             = 750
+  val DATA_BOOLEAN: Short          = 751
+  val DATA_BYTES: Short            = 752
+  val DATA_STRING: Short           = 753
+  val ADDRESSFROMRECIPIENT: Short  = 760
+  val ADDRESSFROMBYTES: Short      = 761
 
-  val ADDRESSFROMRECIPIENT: Short = 700
-  val ADDRESSFROMBYTES: Short     = 701
-
-  val GETTRANSACTIONBYID: Short    = 750
-  val ACCOUNTBALANCE: Short        = 751
-  val ACCOUNTASSETBALANCE: Short   = 752
-  val TRANSACTIONHEIGHTBYID: Short = 753
 }
