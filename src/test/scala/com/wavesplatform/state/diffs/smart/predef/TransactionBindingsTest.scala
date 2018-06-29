@@ -239,22 +239,19 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     forAll(dataTransactionGen(10)) { t =>
       def pg(i: Int) = {
         val v = t.data(i) match {
-          case x: IntegerDataEntry => s"case a: IntegerDataEntry => a.value == ${x.value}"
-          case x: BooleanDataEntry => s"case a: BooleanDataEntry => a.value == ${x.value}"
-          case x: BinaryDataEntry  => s"case a: BinaryDataEntry => a.value == base64'${x.value.base64}'"
-          case x: StringDataEntry  => s"""case a: StringDataEntry => a.value == ${Json.toJson(x.value)}"""
+          case e: IntegerDataEntry => e.value.toString
+          case e: BooleanDataEntry => e.value.toString
+          case e: BinaryDataEntry  => s"base64'${e.value.base64}'"
+          case e: StringDataEntry  => Json.toJson(e.value)
         }
 
         s"""let key$i = t.data[$i].key == ${Json.toJson(t.data(i).key)}
-           |let value$i = match (t.data[$i]) {
-           | $v
-           | case other => true
-           |}
+           |let value$i = t.data[$i].value == $v
          """.stripMargin
       }
 
       val resString =
-        if (t.data.isEmpty) assertProvenPart else assertProvenPart + s" && ${Range(0, t.data.length).map(i => s"key$i && value$i").mkString(" && ")}"
+        if (t.data.isEmpty) assertProvenPart else assertProvenPart + s" && ${t.data.indices.map(i => s"key$i && value$i").mkString(" && ")}"
 
       val s = s"""
                  |match tx {
