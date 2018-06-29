@@ -6,7 +6,7 @@ import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{Address, Alias}
-import scorex.transaction.ProvenTransaction
+import scorex.transaction.{ProvenTransaction, VersionedTransaction}
 import scorex.transaction.assets.exchange.Order
 import play.api.libs.json.Json // For string escapes.
 
@@ -20,12 +20,16 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
        |   let bodyBytes = t.bodyBytes == base64'${ByteStr(t.bodyBytes.apply()).base64}'
        |   let sender = t.sender == addressFromPublicKey(base58'${ByteStr(t.sender.publicKey).base58}')
        |   let senderPublicKey = t.senderPublicKey == base58'${ByteStr(t.sender.publicKey).base58}'
+       |   let version = t.version == ${t match {
+         case v: VersionedTransaction => v.version
+         case _                       => 1
+       }}
        |   ${Range(0, 8).map(pg).mkString("\n")}
      """.stripMargin
   }
 
   val assertProvenPart =
-    "id && fee && timestamp && sender && senderPublicKey && proof0 && proof1 && proof2 && proof3 && proof4 && proof5 && proof6 && proof7 && bodyBytes"
+    "id && fee && timestamp && sender && senderPublicKey && proof0 && proof1 && proof2 && proof3 && proof4 && proof5 && proof6 && proof7 && bodyBytes && version"
 
   property("TransferTransaction binding") {
     forAll(Gen.oneOf(transferV1Gen, transferV2Gen)) { t =>

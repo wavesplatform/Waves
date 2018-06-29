@@ -22,6 +22,7 @@ case class SetScriptTransaction private (version: Byte,
                                          timestamp: Long,
                                          proofs: Proofs)
     extends ProvenTransaction
+    with VersionedTransaction
     with FastHashId {
 
   override val builder: TransactionParser = SetScriptTransaction

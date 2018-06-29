@@ -4,15 +4,15 @@ import com.google.common.primitives.{Bytes, Longs}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Address, AddressOrAlias, PublicKeyAccount}
-import scorex.transaction.{AssetId, ProvenTransaction, ValidationError}
+import scorex.transaction.{AssetId, ProvenTransaction, ValidationError, VersionedTransaction}
+
 import scala.util.Try
 import scorex.crypto.signatures.Curve25519.KeyLength
 
-trait LeaseTransaction extends ProvenTransaction {
+trait LeaseTransaction extends ProvenTransaction with VersionedTransaction {
   def amount: Long
   def fee: Long
   def recipient: AddressOrAlias
-  def version: Byte
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
   override final val json: Coeval[JsObject] = Coeval.evalOnce(
