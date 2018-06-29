@@ -28,14 +28,15 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
 
   "block delay" - {
     "same on the same height in different forks" in {
-      withEnv(chainGen(List(ENOUGH_AMT / 2), 110)) {
+      withEnv(chainGen(List(ENOUGH_AMT / 2, ENOUGH_AMT / 3), 110)) {
         case Env(pos, blockchain, miners) => {
           val miner1 = miners.head
+          val miner2 = miners.tail.head
 
           val miner1Balance = blockchain.effectiveBalance(miner1.toAddress, blockchain.height, 0)
 
           val fork1 = mkFork(10, miner1, blockchain)
-          val fork2 = mkFork(10, miner1, blockchain)
+          val fork2 = mkFork(10, miner2, blockchain)
 
           val fork1Delay = {
             val blockForHit =
