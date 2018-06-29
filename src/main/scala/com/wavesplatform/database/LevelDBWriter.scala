@@ -365,15 +365,13 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     readOnly(_.get(Keys.heightOf(targetBlockId))).fold(Seq.empty[Block]) { targetHeight =>
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-      var discardedBlocks: List[Block] = Nil
-
-      for (currentHeight <- height until targetHeight by -1) {
+      val discardedBlocks: Seq[Block] = for (currentHeight <- height until targetHeight by -1) yield {
         val portfoliosToInvalidate = Seq.newBuilder[Address]
         val assetInfoToInvalidate  = Seq.newBuilder[ByteStr]
         val ordersToInvalidate     = Seq.newBuilder[ByteStr]
         val scriptsToDiscard       = Seq.newBuilder[Address]
 
-        readWrite { rw =>
+        val discardedBlock = readWrite { rw =>
           log.trace(s"Rolling back to ${currentHeight - 1}")
           rw.put(Keys.height, currentHeight - 1)
 
@@ -447,25 +445,25 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
             .get(Keys.blockAt(currentHeight))
             .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
 
-          discardedBlocks = discardedBlock :: discardedBlocks
-
           rw.delete(Keys.blockAt(currentHeight))
           rw.delete(Keys.heightOf(discardedBlock.uniqueId))
 
           if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(currentHeight)) {
             DisableHijackedAliases.revert(rw)
           }
+          discardedBlock
         }
 
         portfoliosToInvalidate.result().foreach(discardPortfolio)
         assetInfoToInvalidate.result().foreach(discardAssetDescription)
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
         scriptsToDiscard.result().foreach(discardScript)
+        discardedBlock
       }
 
       log.debug(s"Rollback to block $targetBlockId at $targetHeight completed")
 
-      discardedBlocks
+      discardedBlocks.reverse
     }
   }
 

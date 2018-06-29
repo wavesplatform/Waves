@@ -48,6 +48,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
           val droppedBlocks = d.removeAfter(genesisSignature)
           droppedBlocks(0).reference shouldBe genesisSignature
           droppedBlocks.map(_.uniqueId).toList shouldBe blocks
+          droppedBlocks foreach d.appendBlock
         }
     }
 
