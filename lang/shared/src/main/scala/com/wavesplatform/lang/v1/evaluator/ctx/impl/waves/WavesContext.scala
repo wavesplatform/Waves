@@ -41,15 +41,10 @@ object WavesContext {
       )
     )
 
-    val addressFromBytesF = NativeFunction("addressFromBytes", 1, ADDRESSFROMBYTES, addressType.typeRef, "bytes" -> BYTEVECTOR) {
-      case (bytes: ByteVector) :: Nil => Right(CaseObj(addressType.typeRef, Map("bytes" -> bytes)))
-      case _                          => ???
-    }
-
     val addressFromPublicKeyF: BaseFunction = UserFunction("addressFromPublicKey", 100, addressType.typeRef, "publicKey" -> BYTEVECTOR) {
       case pk :: Nil =>
         FUNCTION_CALL(
-          FunctionHeader.Native(ADDRESSFROMBYTES),
+          FunctionHeader.User("Address"),
           List(
             BLOCK(
               LET(
@@ -155,7 +150,7 @@ object WavesContext {
                 ),
                 IF(
                   verifyAddressChecksumExpr(REF("@afs_addrBytes")),
-                  FUNCTION_CALL(FunctionHeader.Native(ADDRESSFROMBYTES), List(REF("@afs_addrBytes"))),
+                  FUNCTION_CALL(FunctionHeader.User("Address"), List(REF("@afs_addrBytes"))),
                   REF("unit")
                 ),
                 REF("unit")
@@ -229,7 +224,6 @@ object WavesContext {
       getBooleanF,
       getBinaryF,
       getStringF,
-      addressFromBytesF,
       addressFromPublicKeyF,
       addressFromStringF,
       addressFromRecipientF,

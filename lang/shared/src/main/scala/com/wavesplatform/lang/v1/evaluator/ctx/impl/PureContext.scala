@@ -50,7 +50,7 @@ object PureContext {
 
   val extract: BaseFunction =
     UserFunction("extract", 1, TYPEPARAM('T'), "a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
-      case a :: Nil => IF(FUNCTION_CALL(PureContext.eq, List(a, REF("unit"))), REF("throw"), a)
+      case a :: Nil => IF(FUNCTION_CALL(eq, List(a, REF("unit"))), REF("throw"), a)
       case _        => ???
     }
 
@@ -114,7 +114,7 @@ object PureContext {
   val takeRightBytes: BaseFunction = UserFunction("takeRightBytes", 1, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
     case (xs: EXPR) :: (number: EXPR) :: Nil =>
       FUNCTION_CALL(
-        PureContext.dropRightBytes,
+        dropBytes,
         List(
           xs,
           FUNCTION_CALL(
@@ -144,13 +144,13 @@ object PureContext {
   val takeRightString: BaseFunction = UserFunction("takeRight", 1, STRING, "xs" -> STRING, "number" -> LONG) {
     case (xs: EXPR) :: (number: EXPR) :: Nil =>
       FUNCTION_CALL(
-        PureContext.dropString,
+        dropString,
         List(
           xs,
           FUNCTION_CALL(
             subLong,
             List(
-              FUNCTION_CALL(PureContext.sizeString, List(xs)),
+              FUNCTION_CALL(sizeString, List(xs)),
               number
             )
           )
@@ -168,7 +168,7 @@ object PureContext {
           FUNCTION_CALL(
             subLong,
             List(
-              FUNCTION_CALL(PureContext.sizeString, List(xs)),
+              FUNCTION_CALL(sizeString, List(xs)),
               number
             )
           )

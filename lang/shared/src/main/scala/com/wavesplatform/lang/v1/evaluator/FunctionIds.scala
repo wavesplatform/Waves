@@ -48,6 +48,5 @@ object FunctionIds {
   val DATA_BYTES: Short            = 752
   val DATA_STRING: Short           = 753
   val ADDRESSFROMRECIPIENT: Short  = 760
-  val ADDRESSFROMBYTES: Short      = 761
 
 }
