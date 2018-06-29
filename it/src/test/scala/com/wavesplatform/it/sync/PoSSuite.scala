@@ -16,6 +16,7 @@ import scorex.block.{Block, SignerData}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 
 import scala.concurrent.duration._
+import scala.util.Random
 
 class PoSSuite extends BaseTransactionSuite {
 
@@ -29,8 +30,6 @@ class PoSSuite extends BaseTransactionSuite {
   }
 
   test("Accept correct block") {
-
-    waitForHeight(3)
 
     val height = nodes.last.height
     val block  = forgeBlock(height, signerPK)()
@@ -47,8 +46,6 @@ class PoSSuite extends BaseTransactionSuite {
   }
 
   test("Reject block with invalid delay") {
-    waitForHeight(3)
-
     val height = nodes.last.height
     val block  = forgeBlock(height, signerPK)(updateDelay = _ - 1000)
 
@@ -64,8 +61,6 @@ class PoSSuite extends BaseTransactionSuite {
   }
 
   test("Reject block with invalid BT") {
-    waitForHeight(3)
-
     val height = nodes.last.height
     val block  = forgeBlock(height, signerPK)(updateBaseTarget = _ + 2)
 
@@ -80,9 +75,27 @@ class PoSSuite extends BaseTransactionSuite {
     newBlockSig should not be block.uniqueId.arr
   }
 
-  test("Reject block with invalid signature") {
-    waitForHeight(3)
+  test("Reject block with invalid generation signature") {
+    val height = nodes.last.height
+    val block = forgeBlock(height, signerPK)(updateGenSig = (gs: ByteStr) => {
+      val arr  = gs.arr
+      val init = arr.init
+      Random.nextBytes(arr)
+      ByteStr(init :+ arr.last)
+    })
 
+    waitForBlockTime(block)
+
+    nodes.head.sendByNetwork(RawBytes.from(block))
+
+    waitForHeight(height + 1)
+
+    val newBlockSig = blockSignature(height + 1)
+
+    newBlockSig should not be block.uniqueId.arr
+  }
+
+  test("Reject block with invalid signature") {
     val otherNodePK = PrivateKeyAccount.fromSeed(nodeConfigs.head.getString("account-seed")).explicitGet()
 
     val height = nodes.last.height
