@@ -69,6 +69,7 @@ object TypeInferrer {
             case many => Left(s"Can't resolve correct type for parameterized $placeholder, actual: $argType")
           }
 
+      case (LIST(tp), LIST(t)) => matchTypes(t, tp, knownTypes)
       case (placeholder: FINAL, _) =>
         Either.cond(placeholder >= UNION.create(argType.l), None, err)
     }

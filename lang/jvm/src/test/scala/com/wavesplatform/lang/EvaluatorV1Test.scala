@@ -207,7 +207,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on function call getter evaluation") {
     val fooType = CaseType("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction("createFoo", 1, 259, typeToConcretePlaceholder(fooType.typeRef), List.empty: _*) { _ =>
+    val fooCtor = NativeFunction("createFoo", 1, 259, fooType.typeRef, List.empty: _*) { _ =>
       Right(CaseObj(fooType.typeRef, Map("bar" -> "bAr", "buz" -> 1L)))
     }
 
@@ -224,7 +224,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on block getter evaluation") {
     val fooType = CaseType("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction("createFoo", 1, 259, typeToConcretePlaceholder(fooType.typeRef), List.empty: _*) { _ =>
+    val fooCtor = NativeFunction("createFoo", 1, 259, fooType.typeRef, List.empty: _*) { _ =>
       Right(
         CaseObj(
           fooType.typeRef,
@@ -235,7 +235,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         ))
     }
     val fooTransform =
-      NativeFunction("transformFoo", 1, 260, typeToConcretePlaceholder(fooType.typeRef), "foo" -> typeToConcretePlaceholder(fooType.typeRef)) {
+      NativeFunction("transformFoo", 1, 260, fooType.typeRef, "foo" -> fooType.typeRef) {
         case (fooObj: CaseObj) :: Nil => Right(fooObj.copy(fields = fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
         case _                        => ???
       }
@@ -655,7 +655,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
     )
 
-    val vars: Map[String, (TYPE, LazyVal)] = Map(
+    val vars: Map[String, (FINAL, LazyVal)] = Map(
       ("tx", (txType.typeRef, LazyVal(EitherT.pure(txObj)))),
       ("alicePubKey", (BYTEVECTOR, LazyVal(EitherT.pure(ByteVector(alicePK))))),
       ("bobPubKey", (BYTEVECTOR, LazyVal(EitherT.pure(ByteVector(bobPK)))))
