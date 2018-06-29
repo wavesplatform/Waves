@@ -159,14 +159,14 @@ object PureContext {
     case _                           => ???
   }
 
-  val uMinus: BaseFunction = NativeFunction("-", 1, MINUS_LONG, LONG, "n" -> LONG) {
-    case (n: Long) :: Nil => Right(Math.negateExact(n))
-    case _                => ???
+  val uMinus: BaseFunction = UserFunction("-", 1, LONG, "n" -> LONG) {
+    case n :: Nil => FUNCTION_CALL(subLong.header, List(CONST_LONG(0), n))
+    case _        => ???
   }
 
-  val uNot: BaseFunction = NativeFunction("!", 1, NOT_BOOLEAN, BOOLEAN, "p" -> BOOLEAN) {
-    case (p: Boolean) :: Nil => Right(!p)
-    case _                   => ???
+  val uNot: BaseFunction = UserFunction("!", 1, BOOLEAN, "p" -> BOOLEAN) {
+    case p :: Nil => IF(FUNCTION_CALL(eq.header, List(p, FALSE)), TRUE, FALSE)
+    case _        => ???
   }
 
   private def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (Any, Any) => Any): BaseFunction =
@@ -199,7 +199,7 @@ object PureContext {
 
   val ne: BaseFunction =
     UserFunction(NE_OP.func, 1, BOOLEAN, "a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')) {
-      case a :: b :: Nil => FUNCTION_CALL(FunctionHeader.Native(NOT_BOOLEAN), List(FUNCTION_CALL(FunctionHeader.Native(EQ), List(a, b))))
+      case a :: b :: Nil => FUNCTION_CALL(uNot.header, List(FUNCTION_CALL(eq.header, List(a, b))))
       case _             => ???
     }
 
@@ -253,11 +253,11 @@ object PureContext {
 
   lazy val ctx = CTX(
     Seq(
-      new DefinedType { val name = "Unit"; val typeRef    = Types.UNIT },
-      new DefinedType { val name = "Int"; val typeRef     = Types.LONG },
-      new DefinedType { val name = "Boolean"; val typeRef = Types.BOOLEAN },
+      new DefinedType { val name = "Unit"; val typeRef       = Types.UNIT       },
+      new DefinedType { val name = "Int"; val typeRef        = Types.LONG       },
+      new DefinedType { val name = "Boolean"; val typeRef    = Types.BOOLEAN    },
       new DefinedType { val name = "ByteVector"; val typeRef = Types.BYTEVECTOR },
-      new DefinedType { val name = "String"; val typeRef  = Types.STRING }
+      new DefinedType { val name = "String"; val typeRef     = Types.STRING     }
     ),
     vars,
     functions
