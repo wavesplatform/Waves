@@ -14,6 +14,10 @@ sealed trait BaseFunction {
   def name: String
 }
 
+object BaseFunction {
+  implicit def header(bf: BaseFunction): FunctionHeader = bf.header
+}
+
 case class FunctionTypeSignature(result: TYPE, args: Seq[TYPE], header: FunctionHeader)
 
 case class NativeFunction private (name: String, cost: Long, signature: FunctionTypeSignature, ev: List[Any] => Either[String, Any])

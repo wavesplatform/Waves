@@ -136,6 +136,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Boolean]("true == true") shouldBe Right(true)
     eval[Boolean]("""   "x" == "x"     """) shouldBe Right(true)
     eval[Boolean]("""   "x" == "y"     """) shouldBe Right(false)
+    eval[Boolean]("""   "x" != "y"     """) shouldBe Right(true)
+    eval[Boolean]("""   "x" == 3     """) should produce("Can't match inferred types")
+    eval[Boolean]("""   "x" != 3     """) should produce("Can't match inferred types")
+    eval[Boolean](""" let union = if(true) then "x" else 3; union == "x"   """) shouldBe Right(true)
   }
 
   property("equals some lang structure") {
