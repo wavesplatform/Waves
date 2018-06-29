@@ -17,8 +17,7 @@ object WavesContext {
   import Bindings._
   import Types._
 
-  implicit def t0(t: SINGLE_TYPE): CONCRETE with SINGLE = com.wavesplatform.lang.v1.compiler.Types.f(t)
-  implicit def t1(t: TYPE): CONCRETE                    = com.wavesplatform.lang.v1.compiler.Types.typeToConcretePlaceholder(t)
+  implicit def t1(t: TYPE): FINAL = com.wavesplatform.lang.v1.compiler.Types.typeToConcretePlaceholder(t)
 
   def build(env: Environment): CTX = {
     val environmentFunctions = new EnvironmentFunctions(env)
@@ -27,7 +26,7 @@ object WavesContext {
       NativeFunction(name,
                      100,
                      internalName,
-                     TYPEPLACEHOLDER.UNION(List(t0(dataType.innerType), UNIT)),
+                     UNION.create(List(dataType.innerType, UNIT)),
                      "addressOrAlias" -> t1(addressOrAliasType),
                      "key"            -> STRING) {
         case (addressOrAlias: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addressOrAlias, k, dataType).map(fromOption)

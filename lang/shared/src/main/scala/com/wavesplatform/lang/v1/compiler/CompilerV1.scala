@@ -77,7 +77,7 @@ object CompilerV1 {
     })
   }
 
-  def flat(typeDefs: Map[String, DefinedType], tl: List[String]): List[SINGLE_TYPE] =
+  def flat(typeDefs: Map[String, DefinedType], tl: List[String]): List[SINGLE] =
     tl.flatMap(typeName =>
       typeDefs.get(typeName) match {
         case Some(value) => List(value.typeRef)

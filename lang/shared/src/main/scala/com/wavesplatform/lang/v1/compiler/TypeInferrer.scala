@@ -25,8 +25,8 @@ object TypeInferrer {
           case matchResults @ (h :: t) =>
             val commonType = t.map(_.tpe).toVector.foldLeft(h.tpe)(findCommonType)
             commonType match {
-              case NOTHING        => Right(NOTHING)
-              case p: SINGLE_TYPE => Right(p)
+              case NOTHING   => Right(NOTHING)
+              case p: SINGLE => Right(p)
               case u @ UNION(plainTypes) =>
                 val commonTypeExists = plainTypes.exists { p =>
                   matchResults.map(_.tpe).forall(e => e >= p)
@@ -58,9 +58,8 @@ object TypeInferrer {
       case (tp @ TYPEPLACEHOLDER.PARAMETERIZEDLIST(_), _)                    => Left(err)
       case (tp @ TYPEPLACEHOLDER.PARAMETERIZEDUNION(l), _) =>
         val conctretes = UNION.create(
-          l.filter(_.isInstanceOf[CONCRETE])
-            .map(_.asInstanceOf[CONCRETE])
-            .map(Types.concreteToType(_, knownTypes)))
+          l.filter(_.isInstanceOf[FINAL])
+            .map(_.asInstanceOf[FINAL]))
         val parameterized = l
           .filter(_.isInstanceOf[PARAMETERIZED])
           .map(_.asInstanceOf[PARAMETERIZED])
@@ -71,14 +70,14 @@ object TypeInferrer {
               val nonMatchedArgTypes = argType match {
                 case NOTHING         => ???
                 case UNION(argTypes) => UNION(argTypes.filterNot(conctretes.l.contains))
-                case s: SINGLE_TYPE  => s
+                case s: SINGLE       => s
               }
               matchTypes(nonMatchedArgTypes, singlePlaceholder, knownTypes)
             case many => Left(s"Can't resolve correct type for parameterized $placeholder, actual: $argType")
           }
 
-      case (placeholder: CONCRETE, _) =>
-        Either.cond(Types.concreteToType(placeholder, knownTypes) >= UNION.create(argType.l), None, err)
+      case (placeholder: FINAL, _) =>
+        Either.cond(placeholder >= UNION.create(argType.l), None, err)
     }
   }
 
@@ -98,13 +97,13 @@ object TypeInferrer {
 
     case (r @ LIST(it1), a @ LIST(it2)) =>
       findCommonType(it1, it2) match {
-        case NOTHING        => NOTHING
-        case UNION(_)       => UNION(List(r, a))
-        case p: SINGLE_TYPE => LIST(p)
+        case NOTHING   => NOTHING
+        case UNION(_)  => UNION(List(r, a))
+        case p: SINGLE => LIST(p)
       }
-    case (p1: SINGLE_TYPE, p2: SINGLE_TYPE) => if (p1 == p2) p1 else UNION(List(p1, p2))
-    case (r: UNION, a: UNION)               => UNION.create((r.l.toSet ++ a.l.toSet).toSeq)
-    case (u: UNION, t: SINGLE_TYPE)         => if (u.l.contains(t)) u else UNION.create(u.l :+ t)
-    case (t: SINGLE_TYPE, u: UNION)         => if (u.l.contains(t)) u else UNION.create(u.l :+ t)
+    case (p1: SINGLE, p2: SINGLE) => if (p1 == p2) p1 else UNION.create(List(p1, p2))
+    case (r: UNION, a: UNION)     => UNION.create((r.l.toSet ++ a.l.toSet).toSeq)
+    case (u: UNION, t: SINGLE)    => if (u.l.contains(t)) u else UNION.create(u.l :+ t)
+    case (t: SINGLE, u: UNION)    => if (u.l.contains(t)) u else UNION.create(u.l :+ t)
   }
 }
