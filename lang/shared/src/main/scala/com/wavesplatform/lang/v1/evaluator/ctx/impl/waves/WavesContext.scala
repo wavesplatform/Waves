@@ -192,17 +192,15 @@ object WavesContext {
       case _                        => ???
     }
 
-    val accountBalanceF: BaseFunction = NativeFunction("accountBalance", 100, ACCOUNTBALANCE, LONG, "addressOrAlias" -> addressOrAliasType) {
-      case (c: CaseObj) :: Nil =>
-        env.accountBalanceOf(caseObjToRecipient(c), None)
-
-      case _ => ???
-    }
-
     val accountAssetBalanceF: BaseFunction =
-      NativeFunction("accountAssetBalance", 100, ACCOUNTASSETBALANCE, LONG, "addressOrAlias" -> addressOrAliasType, "assetId" -> BYTEVECTOR) {
-        case (c: CaseObj) :: (assetId: ByteVector) :: Nil =>
-          env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.toArray))
+      NativeFunction("accountAssetBalance",
+                     100,
+                     ACCOUNTASSETBALANCE,
+                     LONG,
+                     "addressOrAlias" -> addressOrAliasType,
+                     "assetId"        -> UNION(UNIT, BYTEVECTOR)) {
+        case (c: CaseObj) :: (()) :: Nil                  => env.accountBalanceOf(caseObjToRecipient(c), None)
+        case (c: CaseObj) :: (assetId: ByteVector) :: Nil => env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.toArray))
 
         case _ => ???
       }
@@ -227,7 +225,6 @@ object WavesContext {
       addressFromPublicKeyF,
       addressFromStringF,
       addressFromRecipientF,
-      accountBalanceF,
       accountAssetBalanceF
     )
 

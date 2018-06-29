@@ -39,14 +39,13 @@ object FunctionIds {
   val FROMBASE64: Short = 603
 
   // Waves
-  val GETTRANSACTIONBYID: Short    = 700
-  val TRANSACTIONHEIGHTBYID: Short = 701
-  val ACCOUNTBALANCE: Short        = 702
-  val ACCOUNTASSETBALANCE: Short   = 703
-  val DATA_LONG: Short             = 750
-  val DATA_BOOLEAN: Short          = 751
-  val DATA_BYTES: Short            = 752
-  val DATA_STRING: Short           = 753
-  val ADDRESSFROMRECIPIENT: Short  = 760
+  val GETTRANSACTIONBYID: Short    = 1000
+  val TRANSACTIONHEIGHTBYID: Short = 1001
+  val ACCOUNTASSETBALANCE: Short   = 1003
+  val DATA_LONG: Short             = 1050
+  val DATA_BOOLEAN: Short          = 1051
+  val DATA_BYTES: Short            = 1052
+  val DATA_STRING: Short           = 1053
+  val ADDRESSFROMRECIPIENT: Short  = 1060
 
 }
