@@ -192,18 +192,18 @@ object WavesContext {
       case _                        => ???
     }
 
-    val accountAssetBalanceF: BaseFunction =
-      NativeFunction("accountAssetBalance",
-                     100,
-                     ACCOUNTASSETBALANCE,
-                     LONG,
-                     "addressOrAlias" -> addressOrAliasType,
-                     "assetId"        -> UNION(UNIT, BYTEVECTOR)) {
+    val assetBalanceF: BaseFunction =
+      NativeFunction("assetBalance", 100, ACCOUNTASSETBALANCE, LONG, "addressOrAlias" -> addressOrAliasType, "assetId" -> UNION(UNIT, BYTEVECTOR)) {
         case (c: CaseObj) :: (()) :: Nil                  => env.accountBalanceOf(caseObjToRecipient(c), None)
         case (c: CaseObj) :: (assetId: ByteVector) :: Nil => env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.toArray))
 
         case _ => ???
       }
+
+    val wavesBalanceF: UserFunction = UserFunction("wavesBalance", 100, LONG, "addressOrAlias" -> addressOrAliasType) {
+      case aoa :: Nil => FUNCTION_CALL(assetBalanceF.header, List(aoa, REF("unit")))
+      case _          => ???
+    }
 
     val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, optionLong, "id" -> BYTEVECTOR) {
       case (id: ByteVector) :: Nil => Right(fromOption(env.transactionHeightById(id.toArray)))
@@ -225,7 +225,8 @@ object WavesContext {
       addressFromPublicKeyF,
       addressFromStringF,
       addressFromRecipientF,
-      accountAssetBalanceF
+      assetBalanceF,
+      wavesBalanceF
     )
 
     CTX(Types.wavesTypes, vars, functions)
