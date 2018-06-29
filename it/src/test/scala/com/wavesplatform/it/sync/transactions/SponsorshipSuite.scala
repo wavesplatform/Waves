@@ -90,14 +90,16 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
 
     }
 
-    val sponsorId = sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = Token, fee = 1 * Waves).id
-    nodes.waitForHeightAriseAndTxPresent(sponsorId)
-
-    "check before test accounts balances" in {
+    "make asset sponsored" in {
+      val sponsorId = sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = Token, fee = 1 * Waves).id
+      nodes.waitForHeightAriseAndTxPresent(sponsorId)
       assert(!sponsorAssetId.isEmpty)
       assert(!sponsorId.isEmpty)
       assertSponsorship(sponsorAssetId, 1 * Token)
       assertMinAssetFee(sponsorId, 1 * Token)
+    }
+
+    "check before test accounts balances" in {
       miner.assertAssetBalance(sponsor.address, sponsorAssetId, sponsorAssetTotal / 2)
       miner.assertBalances(sponsor.address, sponsorWavesBalance - 2.waves - minWavesFee)
       miner.assertAssetBalance(alice.address, sponsorAssetId, sponsorAssetTotal / 2)
@@ -259,33 +261,26 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       }
     }
 
-    "issue asset make sponsor and burn" - {
-      val sponsorAssetId =
+    "issue asset make sponsor and burn" in {
+      val sponsorAssetId2 =
         sponsor
-          .issue(sponsor.address,
-                 "AnotherSponsoredAsset",
-                 "Created by Sponsorship Suite",
-                 sponsorAssetTotal,
-                 decimals = 2,
-                 reissuable = false,
-                 fee = 1 * Waves)
+          .issue(sponsor.address, "Another", "Created by Sponsorship Suite", sponsorAssetTotal, decimals = 2, reissuable = false, fee = 1 * Waves)
           .id
-      nodes.waitForHeightAriseAndTxPresent(sponsorAssetId)
-      val sponsorId         = sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = Token, fee = 1 * Waves).id
-      val transferTxToAlice = sponsor.transfer(sponsor.address, alice.address, sponsorAssetTotal / 2, minWavesFee, Some(sponsorAssetId), None).id
+      nodes.waitForHeightAriseAndTxPresent(sponsorAssetId2)
+      sponsor.sponsorAsset(sponsor.address, sponsorAssetId2, baseFee = Token, fee = 1 * Waves).id
+      val transferTxToAlice = sponsor.transfer(sponsor.address, alice.address, sponsorAssetTotal / 2, minWavesFee, Some(sponsorAssetId2), None).id
       nodes.waitForHeightAriseAndTxPresent(transferTxToAlice)
 
-      val burnTxId = sponsor.burn(sponsor.address, sponsorAssetId, sponsorAssetTotal / 2, 1.waves).id
+      val burnTxId = sponsor.burn(sponsor.address, sponsorAssetId2, sponsorAssetTotal / 2, 1.waves).id
       nodes.waitForHeightAriseAndTxPresent(burnTxId)
 
-      val assetInfo = sponsor.assetsDetails(sponsorAssetId)
-      assetInfo.minSponsoredAssetFee shouldBe Token
+      val assetInfo = sponsor.assetsDetails(sponsorAssetId2)
+      assetInfo.minSponsoredAssetFee shouldBe Some(Token)
       assetInfo.quantity shouldBe sponsorAssetTotal / 2
 
       val aliceTransferWaves = alice.transfer(alice.address, bob.address, 1.waves, SmallFee, None, Some(sponsorAssetId)).id
       nodes.waitForHeightAriseAndTxPresent(aliceTransferWaves)
       miner.assertAssetBalance(sponsor.address, sponsorAssetId, SmallFee)
-
     }
   }
 }
