@@ -209,7 +209,7 @@ class PoSSuite extends BaseTransactionSuite {
   }
 
   def waitForHeight(h: Int): Unit = {
-    nodes.head.waitFor[Int]("height")((api => Await.result(api.height, 1.second)), _ > h, 1.second)
+    nodes.head.waitFor[Int]("height")((api => Await.result(api.height, 1.second)), _ >= h, 1.second)
   }
 
   def forgeBlock(height: Int, signerPK: PrivateKeyAccount)(updateDelay: Long => Long = identity,
