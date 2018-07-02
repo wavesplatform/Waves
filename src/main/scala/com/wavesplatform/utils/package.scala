@@ -4,9 +4,11 @@ import cats.kernel.Monoid
 import com.google.common.base.Throwables
 import com.wavesplatform.db.{Storage, VersionedStorage}
 import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.v1.{FunctionHeader, ScriptEstimator}
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
-import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
+import com.wavesplatform.lang.v1.compiler.Terms.TRUE
+import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, EvaluationContext, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import monix.eval.Coeval
@@ -17,6 +19,7 @@ import scorex.account.AddressScheme
 import scorex.transaction.smart.{BlockchainContext, WavesEnvironment}
 import scorex.utils.ScorexLogging
 
+import scala.collection.mutable
 import scala.util.Try
 
 package object utils extends ScorexLogging {
@@ -82,6 +85,22 @@ package object utils extends ScorexLogging {
 
   lazy val dummyNetworkByte: Byte                    = AddressScheme.current.chainId
   lazy val dummyEvaluationContext: EvaluationContext = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), null)
+  lazy val functionCosts: Map[FunctionHeader, Coeval[Long]] = {
+    var costs: Map[FunctionHeader, Coeval[Long]] = dummyEvaluationContext.typeDefs.collect {
+      case (typeName, CaseType(_, fields)) => FunctionHeader.User(typeName) -> Coeval.now(fields.size.toLong)
+    }
+    dummyEvaluationContext.functions.values.foreach { func =>
+      val cost = func match {
+        case f: UserFunction =>
+          import f.signature.args
+          Coeval.evalOnce(ScriptEstimator(costs, f.ev(args.map(_ => TRUE).toList)).right.get - args.size)
+        case f: NativeFunction => Coeval.now(f.cost)
+      }
+      costs += func.header -> cost
+    }
+    costs
+  }
+
   lazy val dummyCompilerContext: CompilerContext =
     Monoid.combineAll(
       Seq(

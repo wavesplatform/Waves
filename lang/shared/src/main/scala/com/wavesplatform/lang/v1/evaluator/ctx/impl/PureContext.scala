@@ -37,19 +37,19 @@ object PureContext {
     }
 
   val ne: BaseFunction =
-    UserFunction(NE_OP.func, 1, BOOLEAN, "a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')) {
+    UserFunction(NE_OP.func, BOOLEAN, "a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')) {
       case a :: b :: Nil => FUNCTION_CALL(uNot, List(FUNCTION_CALL(eq, List(a, b))))
       case _             => ???
     }
 
   val isDefined: BaseFunction =
-    UserFunction("isDefined", 1, BOOLEAN, "a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
+    UserFunction("isDefined", BOOLEAN, "a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
       case a :: Nil => FUNCTION_CALL(ne, List(a, REF("unit")))
       case _        => ???
     }
 
   val extract: BaseFunction =
-    UserFunction("extract", 1, TYPEPARAM('T'), "a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
+    UserFunction("extract", TYPEPARAM('T'), "a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
       case a :: Nil => IF(FUNCTION_CALL(eq, List(a, REF("unit"))), REF("throw"), a)
       case _        => ???
     }
@@ -93,7 +93,7 @@ object PureContext {
     case xs                                        => notImplemented("drop(xs: byte[], number: Long)", xs)
   }
 
-  val dropRightBytes: BaseFunction = UserFunction("dropRightBytes", 1, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
+  val dropRightBytes: BaseFunction = UserFunction("dropRightBytes", BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
     case (xs: EXPR) :: (number: EXPR) :: Nil =>
       FUNCTION_CALL(
         takeBytes,
@@ -111,7 +111,7 @@ object PureContext {
     case xs => notImplemented("dropRight(xs: byte[], number: Long)", xs)
   }
 
-  val takeRightBytes: BaseFunction = UserFunction("takeRightBytes", 1, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
+  val takeRightBytes: BaseFunction = UserFunction("takeRightBytes", BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
     case (xs: EXPR) :: (number: EXPR) :: Nil =>
       FUNCTION_CALL(
         dropBytes,
@@ -141,7 +141,7 @@ object PureContext {
     case xs                                    => notImplemented("drop(xs: String, number: Long)", xs)
   }
 
-  val takeRightString: BaseFunction = UserFunction("takeRight", 1, STRING, "xs" -> STRING, "number" -> LONG) {
+  val takeRightString: BaseFunction = UserFunction("takeRight", STRING, "xs" -> STRING, "number" -> LONG) {
     case (xs: EXPR) :: (number: EXPR) :: Nil =>
       FUNCTION_CALL(
         dropString,
@@ -159,7 +159,7 @@ object PureContext {
     case xs => notImplemented("takeRight(xs: String, number: Long)", xs)
   }
 
-  val dropRightString: BaseFunction = UserFunction("dropRight", 1, STRING, "xs" -> STRING, "number" -> LONG) {
+  val dropRightString: BaseFunction = UserFunction("dropRight", STRING, "xs" -> STRING, "number" -> LONG) {
     case (xs: EXPR) :: (number: EXPR) :: Nil =>
       FUNCTION_CALL(
         takeString,
@@ -194,12 +194,12 @@ object PureContext {
     case _                           => ???
   }
 
-  val uMinus: BaseFunction = UserFunction("-", 1, LONG, "n" -> LONG) {
+  val uMinus: BaseFunction = UserFunction("-", LONG, "n" -> LONG) {
     case n :: Nil => FUNCTION_CALL(subLong, List(CONST_LONG(0), n))
     case _        => ???
   }
 
-  val uNot: BaseFunction = UserFunction("!", 1, BOOLEAN, "p" -> BOOLEAN) {
+  val uNot: BaseFunction = UserFunction("!", BOOLEAN, "p" -> BOOLEAN) {
     case p :: Nil => IF(FUNCTION_CALL(eq, List(p, FALSE)), TRUE, FALSE)
     case _        => ???
   }
@@ -215,7 +215,7 @@ object PureContext {
       case _ => ???
     }
 
-  val operators: Seq[BaseFunction] = Seq(
+  private val operators: Seq[BaseFunction] = Seq(
     mulLong,
     divLong,
     modLong,

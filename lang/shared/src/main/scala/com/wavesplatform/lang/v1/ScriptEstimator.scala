@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import monix.eval.Coeval
 
 object ScriptEstimator {
-  def apply(functionCosts: Map[FunctionHeader, Long], t: EXPR): Either[String, Long] = {
+  def apply(functionCosts: collection.Map[FunctionHeader, Coeval[Long]], t: EXPR): Either[String, Long] = {
     type Result[T] = EitherT[Coeval, String, T]
 
     def aux(t: Result[EXPR], syms: Map[String, EXPR]): Result[(Long, Map[String, EXPR])] = t.flatMap {
@@ -39,7 +39,7 @@ object ScriptEstimator {
           } yield (accComp + comp, out)
         }
         (argsComp, argsSyms) = args
-      } yield (callCost + argsComp, argsSyms)
+      } yield (callCost() + argsComp, argsSyms)
     }
 
     aux(EitherT.pure(t), Map.empty).value().map(_._1)
