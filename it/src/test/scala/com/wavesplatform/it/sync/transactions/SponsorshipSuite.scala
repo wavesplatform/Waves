@@ -216,7 +216,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       assetsBalance.sponsorBalance shouldBe Some(sponsorEffectiveBalance)
     }
 
-    "waves fee depends on sponsor fee and total issued sponsor tokens" in {
+    "waves fee depends on sponsor fee and spomsored token decimals" in {
       val transferTxCustomFeeAlice = alice.transfer(alice.address, bob.address, 1.waves, LargeFee, None, Some(sponsorAssetId)).id
       nodes.waitForHeightAriseAndTxPresent(transferTxCustomFeeAlice)
       assert(!transferTxCustomFeeAlice.isEmpty)
@@ -267,6 +267,9 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
     }
 
     "issue asset make sponsor and burn" in {
+      val sponsorBalance = sponsor.accountBalances(sponsor.address)
+      val minerBalance   = miner.accountBalances(miner.address)
+
       val sponsorAssetId2 =
         sponsor
           .issue(sponsor.address, "Another", "Created by Sponsorship Suite", sponsorAssetTotal, decimals = 2, reissuable = false, fee = issueFee)
@@ -285,7 +288,10 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
 
       val aliceTransferWaves = alice.transfer(alice.address, bob.address, transferAmount, SmallFee, None, Some(sponsorAssetId2)).id
       nodes.waitForHeightAriseAndTxPresent(aliceTransferWaves)
-      miner.assertAssetBalance(sponsor.address, sponsorAssetId2, SmallFee)
+      val totalWavesFee = Sponsorship.FeeUnit * SmallFee / Token + issueFee + sponsorFee + burnFee + minFee
+      miner.assertBalances(miner.address, minerBalance._1 + totalWavesFee)
+      sponsor.assertBalances(sponsor.address, sponsorBalance._1 - totalWavesFee, sponsorBalance._2 - totalWavesFee)
+      sponsor.assertAssetBalance(sponsor.address, sponsorAssetId2, SmallFee)
     }
   }
 
