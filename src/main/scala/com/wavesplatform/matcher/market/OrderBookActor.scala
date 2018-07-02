@@ -9,15 +9,14 @@ import com.wavesplatform.matcher.api.{CancelOrderRequest, MatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded, OrderExecuted}
-import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.utils.Base58
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
-import com.wavesplatform.utils.Base58
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
 import scorex.transaction.assets.exchange._
@@ -29,6 +28,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 class OrderBookActor(assetPair: AssetPair,
+                     updateSnapshot: OrderBook => Unit,
                      val orderHistory: ActorRef,
                      val blockchain: Blockchain,
                      val wallet: Wallet,
@@ -84,6 +84,7 @@ class OrderBookActor(assetPair: AssetPair,
     case SaveSnapshotFailure(metadata, reason) =>
       log.error(s"Failed to save snapshot: $metadata, $reason.")
     case DeleteOrderBookRequest(pair) =>
+      updateSnapshot(OrderBook.empty)
       orderBook.asks.values
         .++(orderBook.bids.values)
         .flatten
@@ -123,8 +124,6 @@ class OrderBookActor(assetPair: AssetPair,
       sender() ! GetOrdersResponse(orderBook.asks.values.flatten.toSeq)
     case GetBidOrdersRequest =>
       sender() ! GetOrdersResponse(orderBook.bids.values.flatten.toSeq)
-    case GetOrderBookRequest(pair, depth) =>
-      handleGetOrderBook(pair, depth)
   }
 
   private def onCancelOrder(cancel: CancelOrder): Unit = {
@@ -189,15 +188,6 @@ class OrderBookActor(assetPair: AssetPair,
     becomeFullCommands()
   }
 
-  private def handleGetOrderBook(pair: AssetPair, depth: Option[Int]): Unit = {
-    def aggregateLevel(l: (Price, Level[LimitOrder])) = LevelAgg(l._1, l._2.foldLeft(0L)((b, o) => b + o.amount))
-
-    if (pair == assetPair) {
-      val d = Math.min(depth.getOrElse(MaxDepth), MaxDepth)
-      sender() ! GetOrderBookResponse(pair, orderBook.bids.take(d).map(aggregateLevel).toSeq, orderBook.asks.take(d).map(aggregateLevel).toSeq)
-    } else sender() ! GetOrderBookResponse(pair, Seq(), Seq())
-  }
-
   private def onAddOrder(order: Order): Unit = {
     orderHistory ! ValidateOrder(order, NTP.correctedTime())
     apiSender = Some(sender())
@@ -226,6 +216,7 @@ class OrderBookActor(assetPair: AssetPair,
 
   private def applyEvent(e: Event): Unit = {
     orderBook = OrderBook.updateState(orderBook, e)
+    updateSnapshot(orderBook)
   }
 
   @tailrec
@@ -241,7 +232,7 @@ class OrderBookActor(assetPair: AssetPair,
     }
   }
 
-  private def processEvent(e: Event) = {
+  private def processEvent(e: Event): Unit = {
     persist(e)(_ => ())
     applyEvent(e)
     context.system.eventStream.publish(e)
@@ -316,6 +307,7 @@ class OrderBookActor(assetPair: AssetPair,
     case RecoveryCompleted => log.info(assetPair.toString() + " - Recovery completed!");
     case SnapshotOffer(_, snapshot: Snapshot) =>
       orderBook = snapshot.orderBook
+      updateSnapshot(orderBook)
       if (isMigrateToNewOrderHistoryStorage) {
         orderHistory ! RecoverFromOrderBook(orderBook)
       }
@@ -332,6 +324,7 @@ class OrderBookActor(assetPair: AssetPair,
 
 object OrderBookActor {
   def props(assetPair: AssetPair,
+            updateSnapshot: OrderBook => Unit,
             orderHistory: ActorRef,
             blockchain: Blockchain,
             settings: MatcherSettings,
@@ -339,7 +332,7 @@ object OrderBookActor {
             utx: UtxPool,
             allChannels: ChannelGroup,
             functionalitySettings: FunctionalitySettings): Props =
-    Props(new OrderBookActor(assetPair, orderHistory, blockchain, wallet, utx, allChannels, settings, functionalitySettings))
+    Props(new OrderBookActor(assetPair, updateSnapshot, orderHistory, blockchain, wallet, utx, allChannels, settings, functionalitySettings))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
@@ -351,8 +344,6 @@ object OrderBookActor {
   sealed trait OrderBookRequest {
     def assetPair: AssetPair
   }
-
-  case class GetOrderBookRequest(assetPair: AssetPair, depth: Option[Int]) extends OrderBookRequest
 
   case class DeleteOrderBookRequest(assetPair: AssetPair) extends OrderBookRequest
 

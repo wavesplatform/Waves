@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher
 
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.Http
@@ -9,11 +10,13 @@ import akka.stream.ActorMaterializer
 import com.wavesplatform.db._
 import com.wavesplatform.matcher.api.MatcherApiRoute
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderHistoryActor}
+import com.wavesplatform.matcher.model.OrderBook
 import com.wavesplatform.settings.{BlockchainSettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import scorex.api.http.CompositeHttpService
+import scorex.transaction.assets.exchange.AssetPair
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 
@@ -30,8 +33,13 @@ class Matcher(actorSystem: ActorSystem,
               restAPISettings: RestAPISettings,
               matcherSettings: MatcherSettings)
     extends ScorexLogging {
+
+  private val pairBuilder                                                              = new AssetPairBuilder(matcherSettings, blockchain)
+  private val orderBookCache                                                           = new ConcurrentHashMap[AssetPair, OrderBook](1000, 0.9f, 10)
+  private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBook): Unit = orderBookCache.put(assetPair, newSnapshot)
+
   lazy val matcherApiRoutes = Seq(
-    MatcherApiRoute(wallet, matcher, orderHistory, txWriter, restAPISettings, matcherSettings)
+    MatcherApiRoute(wallet, pairBuilder, matcher, orderHistory, ap => Option(orderBookCache.get(ap)), txWriter, restAPISettings, matcherSettings)
   )
 
   lazy val matcherApiTypes = Seq(
@@ -39,7 +47,15 @@ class Matcher(actorSystem: ActorSystem,
   )
 
   lazy val matcher: ActorRef = actorSystem.actorOf(
-    MatcherActor.props(orderHistory, wallet, utx, allChannels, matcherSettings, blockchain, blockchainSettings.functionalitySettings),
+    MatcherActor.props(orderHistory,
+                       pairBuilder,
+                       updateOrderBookCache,
+                       wallet,
+                       utx,
+                       allChannels,
+                       matcherSettings,
+                       blockchain,
+                       blockchainSettings.functionalitySettings),
     MatcherActor.name
   )
 

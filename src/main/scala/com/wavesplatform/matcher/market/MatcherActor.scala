@@ -5,27 +5,29 @@ import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence.{PersistentActor, RecoveryCompleted}
 import akka.routing.FromConfig
 import com.google.common.base.Charsets
-import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.BalanceChanged
+import com.wavesplatform.matcher.model.OrderBook
+import com.wavesplatform.matcher.{AssetPairBuilder, MatcherSettings}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.utils.Base58
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.account.Address
-import com.wavesplatform.utils.Base58
 import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.Validation.booleanOperators
-import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
+import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils._
 import scorex.wallet.Wallet
 
 import scala.collection.{immutable, mutable}
-import scala.language.reflectiveCalls
 
 class MatcherActor(orderHistory: ActorRef,
+                   pairBuilder: AssetPairBuilder,
+                   updateSnapshot: AssetPair => OrderBook => Unit,
                    wallet: Wallet,
                    utx: UtxPool,
                    allChannels: ChannelGroup,
@@ -41,7 +43,6 @@ class MatcherActor(orderHistory: ActorRef,
 
   def getAssetName(asset: Option[AssetId]): String =
     asset.fold(AssetPair.WavesName) { aid =>
-      // fixme: the following line will throw an exception when asset name bytes are not a valid UTF-8
       blockchain.assetDescription(aid).fold("Unknown")(d => new String(d.name, Charsets.UTF_8))
     }
 
@@ -56,46 +57,10 @@ class MatcherActor(orderHistory: ActorRef,
     )
     tradedPairs += pair -> md
 
-    context.actorOf(OrderBookActor.props(pair, orderHistory, blockchain, settings, wallet, utx, allChannels, functionalitySettings),
-                    OrderBookActor.name(pair))
-  }
-
-  def basicValidation(msg: { def assetPair: AssetPair }): Validation = {
-    val s = blockchain
-    def isAssetsExist: Validation = {
-      msg.assetPair.priceAsset.forall(s.assetDescription(_).isDefined) :|
-        s"Unknown Asset ID: ${msg.assetPair.priceAssetStr}" &&
-      msg.assetPair.amountAsset.forall(s.assetDescription(_).isDefined) :|
-        s"Unknown Asset ID: ${msg.assetPair.amountAssetStr}"
-    }
-
-    msg.assetPair.isValid :| "Invalid AssetPair" && isAssetsExist
-  }
-
-  def checkPairOrdering(aPair: AssetPair): Validation = {
-    val reversePair = AssetPair(aPair.priceAsset, aPair.amountAsset)
-
-    val isCorrectOrder =
-      if (tradedPairs.contains(aPair)) true
-      else if (tradedPairs.contains(reversePair)) false
-      else if (settings.priceAssets.contains(aPair.priceAssetStr) && settings.priceAssets.contains(aPair.amountAssetStr)) {
-        settings.priceAssets.indexOf(aPair.priceAssetStr) < settings.priceAssets.indexOf(aPair.amountAssetStr)
-      } else if (settings.priceAssets.contains(aPair.priceAssetStr)) true
-      else if (settings.priceAssets.contains(reversePair.priceAssetStr)) false
-      else compare(aPair.priceAsset.map(_.arr), aPair.amountAsset.map(_.arr)) < 0
-
-    isCorrectOrder :| s"Invalid AssetPair ordering, should be reversed: $reversePair"
-  }
-
-  def checkBlacklistRegex(aPair: AssetPair): Validation = {
-    val (amountName, priceName) = (getAssetName(aPair.amountAsset), getAssetName(aPair.priceAsset))
-    settings.blacklistedNames.forall(_.findFirstIn(amountName).isEmpty) :| s"Invalid Asset Name: $amountName" &&
-    settings.blacklistedNames.forall(_.findFirstIn(priceName).isEmpty) :| s"Invalid Asset Name: $priceName"
-  }
-
-  def checkBlacklistId(aPair: AssetPair): Validation = {
-    !settings.blacklistedAssets.contains(aPair.priceAssetStr) :| s"Invalid Asset ID: ${aPair.priceAssetStr}" &&
-    !settings.blacklistedAssets.contains(aPair.amountAssetStr) :| s"Invalid Asset ID: ${aPair.amountAssetStr}"
+    context.actorOf(
+      OrderBookActor.props(pair, updateSnapshot(pair), orderHistory, blockchain, settings, wallet, utx, allChannels, functionalitySettings),
+      OrderBookActor.name(pair)
+    )
   }
 
   def checkBlacklistedAddress(address: Address)(f: => Unit): Unit = {
@@ -120,19 +85,17 @@ class MatcherActor(orderHistory: ActorRef,
 
   def forwardReq(req: Any)(orderBook: ActorRef): Unit = orderBook forward req
 
-  def checkAssetPair[A <: { def assetPair: AssetPair }](msg: A)(f: => Unit): Unit = {
-    val v = checkBlacklistId(msg.assetPair) && basicValidation(msg) && checkBlacklistRegex(msg.assetPair)
-    if (!v) {
-      sender() ! StatusCodeMatcherResponse(StatusCodes.NotFound, v.messages())
-    } else {
-      val ov = checkPairOrdering(msg.assetPair)
-      if (!ov) {
-        sender() ! StatusCodeMatcherResponse(StatusCodes.Found, ov.messages())
-      } else {
-        f
-      }
+  def checkAssetPair(assetPair: AssetPair, msg: Any)(f: => Unit): Unit =
+    pairBuilder.validateAssetPair(assetPair) match {
+      case Right(_) => f
+      case Left(e) =>
+        sender() ! pairBuilder
+          .validateAssetPair(assetPair.reverse)
+          .fold(
+            _ => StatusCodeMatcherResponse(StatusCodes.NotFound, e),
+            _ => StatusCodeMatcherResponse(StatusCodes.Found, e)
+          )
     }
-  }
 
   def getMatcherPublicKey: Array[Byte] = {
     wallet.findPrivateKey(settings.account).map(_.publicKey).getOrElse(Array())
@@ -143,7 +106,7 @@ class MatcherActor(orderHistory: ActorRef,
       sender() ! GetMarketsResponse(getMatcherPublicKey, tradedPairs.values.toSeq)
 
     case order: Order =>
-      checkAssetPair(order) {
+      checkAssetPair(order.assetPair, order) {
         checkBlacklistedAddress(order.senderPublicKey) {
           context
             .child(OrderBookActor.name(order.assetPair))
@@ -152,7 +115,7 @@ class MatcherActor(orderHistory: ActorRef,
       }
 
     case ob: DeleteOrderBookRequest =>
-      checkAssetPair(ob) {
+      checkAssetPair(ob.assetPair, ob) {
         context
           .child(OrderBookActor.name(ob.assetPair))
           .fold(returnEmptyOrderBook(ob.assetPair))(forwardReq(ob))
@@ -160,7 +123,7 @@ class MatcherActor(orderHistory: ActorRef,
       }
 
     case x: CancelOrder =>
-      checkAssetPair(x) {
+      checkAssetPair(x.assetPair, x) {
         context
           .child(OrderBookActor.name(x.assetPair))
           .fold {
@@ -169,19 +132,12 @@ class MatcherActor(orderHistory: ActorRef,
       }
 
     case x: ForceCancelOrder =>
-      checkAssetPair(x) {
+      checkAssetPair(x.assetPair, x) {
         context
           .child(OrderBookActor.name(x.assetPair))
           .fold {
             sender() ! OrderCancelRejected(s"Order '${x.orderId}' is already cancelled or never existed in '${x.assetPair.key}' pair")
           }(forwardReq(x))
-      }
-
-    case ob: OrderBookRequest =>
-      checkAssetPair(ob) {
-        context
-          .child(OrderBookActor.name(ob.assetPair))
-          .fold(returnEmptyOrderBook(ob.assetPair))(forwardReq(ob))
       }
   }
 
@@ -224,13 +180,15 @@ object MatcherActor {
   def name = "matcher"
 
   def props(orderHistoryActor: ActorRef,
+            pairBuilder: AssetPairBuilder,
+            updateSnapshot: AssetPair => OrderBook => Unit,
             wallet: Wallet,
             utx: UtxPool,
             allChannels: ChannelGroup,
             settings: MatcherSettings,
             blockchain: Blockchain,
             functionalitySettings: FunctionalitySettings): Props =
-    Props(new MatcherActor(orderHistoryActor, wallet, utx, allChannels, settings, blockchain, functionalitySettings))
+    Props(new MatcherActor(orderHistoryActor, pairBuilder, updateSnapshot, wallet, utx, allChannels, settings, blockchain, functionalitySettings))
 
   case class OrderBookCreated(pair: AssetPair)
 
