@@ -3,13 +3,14 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.Config
 import com.wavesplatform.consensus.FairPoSCalculator
 import com.wavesplatform.crypto
-import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.AsyncNetworkApi.NodeAsyncNetworkApi
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.{NodeConfigs, WaitForHeight2}
 import com.wavesplatform.network.RawBytes
 import com.wavesplatform.state._
 import com.wavesplatform.utils.Base58
+import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
 import play.api.libs.json.{JsSuccess, Json, Reads}
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, SignerData}
@@ -18,7 +19,7 @@ import scorex.waves.http.DebugMessage
 
 import scala.util.Random
 
-class PoSSuite extends BaseTransactionSuite {
+class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForHeight2 with CancelAfterFailure {
 
   val signerPK = PrivateKeyAccount.fromSeed(nodeConfigs.last.getString("account-seed")).explicitGet()
 
@@ -30,6 +31,7 @@ class PoSSuite extends BaseTransactionSuite {
   }
 
   test("Node mines several blocks, integration test checks that block timestamps equal to time of appearence (+-1000ms)") {
+
     val height = nodes.last.height
 
     for (h <- height to (height + 10)) {
@@ -219,7 +221,7 @@ class PoSSuite extends BaseTransactionSuite {
       if (height >= 3)
         Some(
           (Json
-            .parse(nodes.head.get(s"/blocks/at/${height - 3}").getResponseBody) \ "timestamp").as[Long])
+            .parse(nodes.head.get(s"/blocks/at/${height - 2}").getResponseBody) \ "timestamp").as[Long])
       else None
 
     val (lastBlockId, lastBlockTS, lastBlockCData) = blockInfo(height)
