@@ -58,7 +58,7 @@ class PoSSuite extends BaseTransactionSuite {
     nodes.head.printDebugMessage(DebugMessage(s"Send block for $height"))
     nodes.head.sendByNetwork(RawBytes.from(block))
 
-    nodes.waitForHeightArise()
+    nodes.head.waitForHeight(height + 1)
 
     val newBlockSig = blockSignature(height + 1)
 
@@ -72,8 +72,7 @@ class PoSSuite extends BaseTransactionSuite {
     waitForBlockTime(block)
 
     nodes.head.sendByNetwork(RawBytes.from(block))
-
-    nodes.waitForHeightArise()
+    nodes.head.waitForHeight(height + 1)
 
     val newBlockSig = blockSignature(height + 1)
 
@@ -88,7 +87,7 @@ class PoSSuite extends BaseTransactionSuite {
 
     nodes.head.sendByNetwork(RawBytes.from(block))
 
-    nodes.waitForHeightArise()
+    nodes.head.waitForHeight(height + 1)
 
     val newBlockSig = blockSignature(height + 1)
 
@@ -109,7 +108,7 @@ class PoSSuite extends BaseTransactionSuite {
     nodes.head.printDebugMessage(DebugMessage(s"Send invalid block for $height"))
     nodes.head.sendByNetwork(RawBytes.from(block))
 
-    nodes.waitForHeightArise()
+    nodes.head.waitForHeight(height + 1)
 
     val newBlockSig = blockSignature(height + 1)
 
@@ -130,7 +129,7 @@ class PoSSuite extends BaseTransactionSuite {
 
     nodes.head.sendByNetwork(RawBytes.from(resignedBlock))
 
-    nodes.waitForHeightArise()
+    nodes.head.waitForHeight(height + 1)
 
     val newBlockSig = blockSignature(height + 1)
 
