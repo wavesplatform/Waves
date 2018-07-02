@@ -16,17 +16,11 @@ import scorex.block.{Block, SignerData}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.waves.http.DebugMessage
 
-import scala.concurrent.duration._
-import scala.concurrent.Await
 import scala.util.Random
 
 class PoSSuite extends BaseTransactionSuite {
 
   val signerPK = PrivateKeyAccount.fromSeed(nodeConfigs.last.getString("account-seed")).explicitGet()
-
-  println(signerPK.address)
-  println(ByteStr(signerPK.publicKey))
-  println(ByteStr(signerPK.privateKey))
 
   implicit val nxtCDataReads = Reads { json =>
     val bt = (json \ "base-target").as[Long]
@@ -35,31 +29,27 @@ class PoSSuite extends BaseTransactionSuite {
     JsSuccess(NxtLikeConsensusBlockData(bt, ByteStr.decodeBase58(gs).get))
   }
 
-  test("Node mines several blocks, integration test checks that block timestamps equal to time of appearence (+-100ms)") {
+  test("Node mines several blocks, integration test checks that block timestamps equal to time of appearence (+-1000ms)") {
     val height = nodes.last.height
 
-    val block = forgeBlock(height, signerPK)()
+    for (h <- height to (height + 10)) {
 
-//    val timeout = block.timestamp - System.currentTimeMillis() - 100
+      println(s"Checking block at $h")
 
-//    if (timeout > 0) Thread.sleep(timeout)
+      val block = forgeBlock(h, signerPK)()
 
-    waitForHeight(height + 1)
+      nodes.waitForHeightArise()
 
-    val newTimestamp = blockTimestamp(height + 1)
+      val newTimestamp = blockTimestamp(h + 1)
 
-    println(Json.prettyPrint(block.json()))
-    println("==========================")
-    println(Json.prettyPrint(Json.parse(nodes.last.get(s"/blocks/at/${height + 1}").getResponseBody)))
+      block.timestamp shouldBe (newTimestamp +- 1000)
+    }
 
-    println(s"Diff: ${block.timestamp - newTimestamp}")
-
-    block.timestamp shouldBe (newTimestamp +- 1000)
   }
 
   test("Accept correct block") {
 
-//    nodes.last.close()
+    nodes.last.close()
     val height = nodes.head.height
     val block  = forgeBlock(height, signerPK)()
 
@@ -68,7 +58,7 @@ class PoSSuite extends BaseTransactionSuite {
     nodes.head.printDebugMessage(DebugMessage(s"Send block for $height"))
     nodes.head.sendByNetwork(RawBytes.from(block))
 
-    waitForHeight(height + 1)
+    nodes.waitForHeightArise()
 
     val newBlockSig = blockSignature(height + 1)
 
@@ -83,7 +73,7 @@ class PoSSuite extends BaseTransactionSuite {
 
     nodes.head.sendByNetwork(RawBytes.from(block))
 
-    waitForHeight(height + 1)
+    nodes.waitForHeightArise()
 
     val newBlockSig = blockSignature(height + 1)
 
@@ -98,7 +88,7 @@ class PoSSuite extends BaseTransactionSuite {
 
     nodes.head.sendByNetwork(RawBytes.from(block))
 
-    waitForHeight(height + 1)
+    nodes.waitForHeightArise()
 
     val newBlockSig = blockSignature(height + 1)
 
@@ -119,7 +109,7 @@ class PoSSuite extends BaseTransactionSuite {
     nodes.head.printDebugMessage(DebugMessage(s"Send invalid block for $height"))
     nodes.head.sendByNetwork(RawBytes.from(block))
 
-    waitForHeight(height + 1)
+    nodes.waitForHeightArise()
 
     val newBlockSig = blockSignature(height + 1)
 
@@ -140,7 +130,7 @@ class PoSSuite extends BaseTransactionSuite {
 
     nodes.head.sendByNetwork(RawBytes.from(resignedBlock))
 
-    waitForHeight(height + 1)
+    nodes.waitForHeightArise()
 
     val newBlockSig = blockSignature(height + 1)
 
@@ -220,10 +210,6 @@ class PoSSuite extends BaseTransactionSuite {
     System.arraycopy(signature, 0, s, 0, crypto.DigestSize)
     System.arraycopy(publicKey, 0, s, crypto.DigestSize, crypto.DigestSize)
     crypto.fastHash(s)
-  }
-
-  def waitForHeight(h: Int): Unit = {
-    nodes.head.waitFor[Int]("height")((api => Await.result(api.height, 1.second)), _ >= h, 1.second)
   }
 
   def forgeBlock(height: Int, signerPK: PrivateKeyAccount)(updateDelay: Long => Long = identity,
