@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.{FunctionHeader, ScriptEstimator}
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
-import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, EvaluationContext, NativeFunction, UserFunction}
+import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import monix.eval.Coeval
@@ -83,13 +83,16 @@ package object utils extends ScorexLogging {
     }
   }
 
-  lazy val dummyNetworkByte: Byte                    = AddressScheme.current.chainId
-  lazy val dummyEvaluationContext: EvaluationContext = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), null)
-  lazy val functionCosts: Map[FunctionHeader, Coeval[Long]] = {
-    var costs: Map[FunctionHeader, Coeval[Long]] = dummyEvaluationContext.typeDefs.collect {
+  lazy val dummyNetworkByte: Byte                           = AddressScheme.current.chainId
+  lazy val dummyEvaluationContext: EvaluationContext        = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), null)
+  lazy val functionCosts: Map[FunctionHeader, Coeval[Long]] = estimate(dummyEvaluationContext)
+
+  def estimate(ctx: EvaluationContext): Map[FunctionHeader, Coeval[Long]] = {
+    val costs: mutable.Map[FunctionHeader, Coeval[Long]] = ctx.typeDefs.collect {
       case (typeName, CaseType(_, fields)) => FunctionHeader.User(typeName) -> Coeval.now(fields.size.toLong)
-    }
-    dummyEvaluationContext.functions.values.foreach { func =>
+    }(collection.breakOut)
+
+    ctx.functions.values.foreach { func =>
       val cost = func match {
         case f: UserFunction =>
           import f.signature.args
@@ -98,7 +101,8 @@ package object utils extends ScorexLogging {
       }
       costs += func.header -> cost
     }
-    costs
+
+    costs.toMap
   }
 
   lazy val dummyCompilerContext: CompilerContext =

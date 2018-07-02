@@ -6,11 +6,10 @@ import shapeless.{Lens, lens}
 
 case class EvaluationContext(typeDefs: Map[String, DefinedType], letDefs: Map[String, LazyVal], functions: Map[FunctionHeader, BaseFunction])
 
-
 object EvaluationContext {
 
   object Lenses {
-    val types: Lens[EvaluationContext, Map[String, DefinedType]] = lens[EvaluationContext] >> 'typeDefs
+    val types: Lens[EvaluationContext, Map[String, DefinedType]]          = lens[EvaluationContext] >> 'typeDefs
     val lets: Lens[EvaluationContext, Map[String, LazyVal]]               = lens[EvaluationContext] >> 'letDefs
     val funcs: Lens[EvaluationContext, Map[FunctionHeader, BaseFunction]] = lens[EvaluationContext] >> 'functions
   }

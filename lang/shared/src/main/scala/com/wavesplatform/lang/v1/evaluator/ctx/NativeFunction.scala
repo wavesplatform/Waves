@@ -26,8 +26,7 @@ case class NativeFunction private (name: String, cost: Long, signature: Function
 
 object NativeFunction {
 
-  def apply(name: String, cost: Long, internalName: Short, resultType: TYPE, args: (String, TYPE)*)
-           (ev: List[Any] => Either[String, Any]): NativeFunction =
+  def apply(name: String, cost: Long, internalName: Short, resultType: TYPE, args: (String, TYPE)*)(ev: List[Any] => Either[String, Any]) =
     new NativeFunction(name, cost, FunctionTypeSignature(resultType, args.map(_._2), FunctionHeader.Native(internalName)), ev)
 
 }
