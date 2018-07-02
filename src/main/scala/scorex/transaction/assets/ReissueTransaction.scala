@@ -10,12 +10,11 @@ import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.transaction.validation._
 import scorex.transaction.{AssetId, ProvenTransaction, ValidationError, _}
 
-trait ReissueTransaction extends ProvenTransaction {
+trait ReissueTransaction extends ProvenTransaction with VersionedTransaction {
   def assetId: ByteStr
   def quantity: Long
   def reissuable: Boolean
   def fee: Long
-  def version: Byte
   def chainByte: Option[Byte]
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)

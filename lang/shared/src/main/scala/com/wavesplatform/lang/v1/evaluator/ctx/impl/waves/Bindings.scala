@@ -2,7 +2,6 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.lang.v1.evaluator.ctx.CaseObj
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.fromOption
-import com.wavesplatform.lang.v1.traits.DataItem.{Bin, Bool, Lng, Str}
 import com.wavesplatform.lang.v1.traits.Tx._
 import com.wavesplatform.lang.v1.traits._
 import scodec.bits.ByteVector
@@ -24,8 +23,7 @@ object Bindings {
       "bodyBytes"       -> tx.bodyBytes,
       "proofs" -> {
         val existingProofs = tx.proofs
-        val allProofs      = existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteVector.empty)
-        allProofs.toIndexedSeq.asInstanceOf[listByteVector.Underlying]
+        (existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteVector.empty)).toIndexedSeq
       }
     ) ++ headerPart(tx.h)
 
@@ -139,13 +137,12 @@ object Bindings {
         CaseObj(
           massTransferTransactionType.typeRef,
           Map(
-            "transfers" -> (transfers
-              .map(bv => CaseObj(transfer.typeRef, Map(mapRecipient(bv.recipient), "amount" -> bv.amount)))
-              .asInstanceOf[listTransfers.Underlying]),
-            "transferAssetId"       -> fromOption(assetId),
-            "transferCount" -> transferCount,
-            "totalAmount"   -> totalAmount,
-            "attachment"    -> attachment
+            "transfers" -> transfers
+              .map(bv => CaseObj(transfer.typeRef, Map(mapRecipient(bv.recipient), "amount" -> bv.amount))),
+            "transferAssetId" -> fromOption(assetId),
+            "transferCount"   -> transferCount,
+            "totalAmount"     -> totalAmount,
+            "attachment"      -> attachment
           ) ++ provenTxPart(p)
         )
       case SetScript(p, scriptOpt) =>
@@ -158,16 +155,9 @@ object Bindings {
       case Data(p, data) =>
         CaseObj(
           dataTransactionType.typeRef,
-          Map(
-            "data" -> data
-              .map {
-                case Lng(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> k, "value" -> v))
-                case Str(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> k, "value" -> v))
-                case Bool(k, v) => CaseObj(longDataEntryType.typeRef, Map("key" -> k, "value" -> v))
-                case Bin(k, v)  => CaseObj(longDataEntryType.typeRef, Map("key" -> k, "value" -> v))
-              }
-              .asInstanceOf[listOfDataEntriesType.Underlying]) ++
-            provenTxPart(p)
+          Map("data" -> data.map(e =>
+            CaseObj(dataEntryType.typeRef, Map("key"  -> e.key, "value" -> e.value)))
+          ) ++ provenTxPart(p)
         )
       case Exchange(p, price, amount, buyMatcherFee, sellMatcherFee, buyOrder, sellOrder) =>
         CaseObj(

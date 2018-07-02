@@ -3,7 +3,7 @@ package scorex.transaction
 import com.google.common.primitives.Shorts
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state.DataEntry._
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, EitherExt2, LongDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, EitherExt2, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.utils.Base58
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
@@ -97,9 +97,9 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         }
 
         check(List.empty)                                                               // no data
-        check(List.tabulate(MaxEntryCount)(n => LongDataEntry(n.toString, n)))          // maximal data
+        check(List.tabulate(MaxEntryCount)(n => IntegerDataEntry(n.toString, n)))       // maximal data
         check(List.tabulate(30)(n => StringDataEntry(n.toString, "a" * 5109)))          // maximal data
-        check(List(LongDataEntry("a" * MaxKeySize, 0xa)))                               // max key size
+        check(List(IntegerDataEntry("a" * MaxKeySize, 0xa)))                            // max key size
         check(List(BinaryDataEntry("bin", ByteStr.empty)))                              // empty binary
         check(List(BinaryDataEntry("bin", ByteStr(Array.fill(MaxValueSize)(1: Byte))))) // max binary value size
         check(List(StringDataEntry("str", "")))                                         // empty string
@@ -118,7 +118,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         val dataTooBigEi = DataTransaction.create(version, sender, dataTooBig, fee, timestamp, proofs)
         dataTooBigEi shouldBe Left(ValidationError.TooBigArray)
 
-        val emptyKey   = List(LongDataEntry("", 2))
+        val emptyKey   = List(IntegerDataEntry("", 2))
         val emptyKeyEi = DataTransaction.create(version, sender, emptyKey, fee, timestamp, proofs)
         emptyKeyEi shouldBe Left(ValidationError.GenericError("Empty key found"))
 
@@ -175,7 +175,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
                        }
   """)
 
-    val entry1 = LongDataEntry("int", 24)
+    val entry1 = IntegerDataEntry("int", 24)
     val entry2 = BooleanDataEntry("bool", true)
     val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))
     val tx = DataTransaction

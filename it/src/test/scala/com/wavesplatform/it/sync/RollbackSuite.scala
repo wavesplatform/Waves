@@ -4,7 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{NodeConfigs, TransferSending}
-import com.wavesplatform.state.{BooleanDataEntry, LongDataEntry}
+import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry}
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
 
 import scala.concurrent.duration._
@@ -89,9 +89,9 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
 
   test("Data transaction rollback") {
     val node   = nodes.head
-    val entry1 = LongDataEntry("1", 0)
+    val entry1 = IntegerDataEntry("1", 0)
     val entry2 = BooleanDataEntry("2", true)
-    val entry3 = LongDataEntry("1", 1)
+    val entry3 = IntegerDataEntry("1", 1)
 
     val tx1 = sender.putData(firstAddress, List(entry1), calcDataFee(List(entry1))).id
     nodes.waitForHeightAriseAndTxPresent(tx1)

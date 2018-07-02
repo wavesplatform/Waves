@@ -2,10 +2,10 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import cats.data.EitherT
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Types.{BYTEVECTOR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.fromOption
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
@@ -21,15 +21,15 @@ object WavesContext {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getdataF(name: String, internalName: Short, dataType: DataType): BaseFunction =
-      NativeFunction(name, 100, internalName, UNION(dataType.innerType, UNIT), "addressOrAlias" -> addressType.typeRef, "key" -> STRING) {
+      NativeFunction(name, 100, internalName, UNION.create(List(dataType.innerType, UNIT)), "addressOrAlias" -> addressOrAliasType, "key" -> STRING) {
         case (addressOrAlias: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addressOrAlias, k, dataType).map(fromOption)
         case _                                               => ???
       }
 
-    val getLongF: BaseFunction      = getdataF("getLong", DATA_LONG, DataType.Long)
-    val getBooleanF: BaseFunction   = getdataF("getBoolean", DATA_BOOLEAN, DataType.Boolean)
-    val getByteArrayF: BaseFunction = getdataF("getByteArray", DATA_BYTES, DataType.ByteArray)
-    val getStringF: BaseFunction    = getdataF("getString", DATA_STRING, DataType.String)
+    val getIntegerF: BaseFunction = getdataF("getInteger", DATA_LONG, DataType.Long)
+    val getBooleanF: BaseFunction = getdataF("getBoolean", DATA_BOOLEAN, DataType.Boolean)
+    val getBinaryF: BaseFunction  = getdataF("getBinary", DATA_BYTES, DataType.ByteArray)
+    val getStringF: BaseFunction  = getdataF("getString", DATA_STRING, DataType.String)
 
     def secureHashExpr(xs: EXPR): EXPR = FUNCTION_CALL(
       FunctionHeader.Native(KECCAK256),
@@ -41,46 +41,39 @@ object WavesContext {
       )
     )
 
-    val addressFromBytesF = NativeFunction("addressFromBytes", 1, ADDRESSFROMBYTES, addressType.typeRef, "bytes" -> BYTEVECTOR) {
-      case (bytes: ByteVector) :: Nil => Right(CaseObj(addressType.typeRef, Map("bytes" -> bytes)))
-      case _                          => ???
-    }
-
     val addressFromPublicKeyF: BaseFunction = UserFunction("addressFromPublicKey", 100, addressType.typeRef, "publicKey" -> BYTEVECTOR) {
       case pk :: Nil =>
-        Right(
-          FUNCTION_CALL(
-            FunctionHeader.Native(ADDRESSFROMBYTES),
-            List(
-              BLOCK(
-                LET(
-                  "@afpk_withoutChecksum",
-                  FUNCTION_CALL(
-                    FunctionHeader.Native(SUM_BYTES),
-                    List(
-                      CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion, env.networkByte)),
-                      // publicKeyHash
-                      FUNCTION_CALL(
-                        FunctionHeader.Native(TAKE_BYTES),
-                        List(
-                          secureHashExpr(pk),
-                          CONST_LONG(EnvironmentFunctions.HashLength)
-                        )
+        FUNCTION_CALL(
+          FunctionHeader.User("Address"),
+          List(
+            BLOCK(
+              LET(
+                "@afpk_withoutChecksum",
+                FUNCTION_CALL(
+                  PureContext.sumByteVector,
+                  List(
+                    CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion, env.networkByte)),
+                    // publicKeyHash
+                    FUNCTION_CALL(
+                      PureContext.takeBytes,
+                      List(
+                        secureHashExpr(pk),
+                        CONST_LONG(EnvironmentFunctions.HashLength)
                       )
                     )
                   )
-                ),
-                // bytes
-                FUNCTION_CALL(
-                  FunctionHeader.Native(SUM_BYTES),
-                  List(
-                    REF("@afpk_withoutChecksum"),
-                    FUNCTION_CALL(
-                      FunctionHeader.Native(TAKE_BYTES),
-                      List(
-                        secureHashExpr(REF("@afpk_withoutChecksum")),
-                        CONST_LONG(EnvironmentFunctions.ChecksumLength)
-                      )
+                )
+              ),
+              // bytes
+              FUNCTION_CALL(
+                PureContext.sumByteVector,
+                List(
+                  REF("@afpk_withoutChecksum"),
+                  FUNCTION_CALL(
+                    PureContext.takeBytes,
+                    List(
+                      secureHashExpr(REF("@afpk_withoutChecksum")),
+                      CONST_LONG(EnvironmentFunctions.ChecksumLength)
                     )
                   )
                 )
@@ -93,26 +86,26 @@ object WavesContext {
 
     def removePrefixExpr(str: EXPR, prefix: String): EXPR = IF(
       FUNCTION_CALL(
-        FunctionHeader.Native(EQ),
+        PureContext.eq,
         List(
-          FUNCTION_CALL(FunctionHeader.Native(TAKE_STRING), List(str, CONST_LONG(prefix.length))),
+          FUNCTION_CALL(PureContext.takeString, List(str, CONST_LONG(prefix.length))),
           CONST_STRING(prefix)
         )
       ),
-      FUNCTION_CALL(FunctionHeader.Native(DROP_STRING), List(str, CONST_LONG(prefix.length))),
+      FUNCTION_CALL(PureContext.dropString, List(str, CONST_LONG(prefix.length))),
       str
     )
 
     def verifyAddressChecksumExpr(addressBytes: EXPR): EXPR = FUNCTION_CALL(
-      FunctionHeader.Native(EQ),
+      PureContext.eq,
       List(
         // actual checksum
-        FUNCTION_CALL(FunctionHeader.User("takeRightBytes"), List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
+        FUNCTION_CALL(PureContext.takeRightBytes, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
         // generated checksum
         FUNCTION_CALL(
-          FunctionHeader.Native(TAKE_BYTES),
+          PureContext.takeBytes,
           List(
-            secureHashExpr(FUNCTION_CALL(FunctionHeader.User("dropRightBytes"), List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength)))),
+            secureHashExpr(FUNCTION_CALL(PureContext.dropRightBytes, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength)))),
             CONST_LONG(EnvironmentFunctions.ChecksumLength)
           )
         )
@@ -121,55 +114,50 @@ object WavesContext {
 
     val addressFromStringF: BaseFunction = UserFunction("addressFromString", 100, optionAddress, "string" -> STRING) {
       case (str: EXPR) :: Nil =>
-        Right(
-          BLOCK(
-            LET("@afs_addrBytes", FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(str, EnvironmentFunctions.AddressPrefix)))),
+        BLOCK(
+          LET("@afs_addrBytes", FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(str, EnvironmentFunctions.AddressPrefix)))),
+          IF(
+            FUNCTION_CALL(
+              PureContext.eq,
+              List(
+                FUNCTION_CALL(PureContext.sizeBytes, List(REF("@afs_addrBytes"))),
+                CONST_LONG(EnvironmentFunctions.AddressLength)
+              )
+            ),
             IF(
+              // version
               FUNCTION_CALL(
-                FunctionHeader.Native(EQ),
+                PureContext.eq,
                 List(
-                  FUNCTION_CALL(FunctionHeader.Native(SIZE_BYTES), List(REF("@afs_addrBytes"))),
-                  CONST_LONG(EnvironmentFunctions.AddressLength)
+                  FUNCTION_CALL(PureContext.takeBytes, List(REF("@afs_addrBytes"), CONST_LONG(1))),
+                  CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion))
                 )
               ),
               IF(
-                // version
+                // networkByte
                 FUNCTION_CALL(
-                  FunctionHeader.Native(EQ),
+                  PureContext.eq,
                   List(
-                    FUNCTION_CALL(FunctionHeader.Native(TAKE_BYTES), List(REF("@afs_addrBytes"), CONST_LONG(1))),
-                    CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion))
+                    FUNCTION_CALL(
+                      PureContext.takeBytes,
+                      List(
+                        FUNCTION_CALL(PureContext.dropBytes, List(REF("@afs_addrBytes"), CONST_LONG(1))),
+                        CONST_LONG(1)
+                      )
+                    ),
+                    CONST_BYTEVECTOR(ByteVector(env.networkByte))
                   )
                 ),
                 IF(
-                  // networkByte
-                  FUNCTION_CALL(
-                    FunctionHeader.Native(EQ),
-                    List(
-                      FUNCTION_CALL(
-                        FunctionHeader.Native(TAKE_BYTES),
-                        List(
-                          FUNCTION_CALL(FunctionHeader.Native(DROP_BYTES), List(REF("@afs_addrBytes"), CONST_LONG(1))),
-                          CONST_LONG(1)
-                        )
-                      ),
-                      CONST_BYTEVECTOR(ByteVector(env.networkByte))
-                    )
-                  ),
-                  IF(
-                    verifyAddressChecksumExpr(REF("@afs_addrBytes")),
-                    FUNCTION_CALL(
-                      FunctionHeader.Native(SOME),
-                      List(FUNCTION_CALL(FunctionHeader.Native(ADDRESSFROMBYTES), List(REF("@afs_addrBytes"))))
-                    ),
-                    REF("None")
-                  ),
-                  REF("None")
+                  verifyAddressChecksumExpr(REF("@afs_addrBytes")),
+                  FUNCTION_CALL(FunctionHeader.User("Address"), List(REF("@afs_addrBytes"))),
+                  REF("unit")
                 ),
-                REF("None")
+                REF("unit")
               ),
-              REF("None")
-            )
+              REF("unit")
+            ),
+            REF("unit")
           )
         )
       case _ => ???
@@ -189,7 +177,7 @@ object WavesContext {
     val heightCoeval: Coeval[Either[String, Long]] = Coeval.evalOnce(Right(env.height))
 
     val txByIdF: BaseFunction = {
-      val returnType = UNION(anyTransactionType, UNIT)
+      val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(com.wavesplatform.lang.v1.compiler.Types.UNIT +: anyTransactionType.l)
       NativeFunction("getTransactionById", 100, GETTRANSACTIONBYID, returnType, "id" -> BYTEVECTOR) {
         case (id: ByteVector) :: Nil =>
           val maybeDomainTx = env.transactionById(id.toArray).map(transactionObject)
@@ -198,46 +186,47 @@ object WavesContext {
       }
     }
 
-    val accountBalanceF: BaseFunction = NativeFunction("accountBalance", 100, ACCOUNTBALANCE, LONG, "addressOrAlias" -> addressOrAliasType) {
-      case CaseObj(_, fields) :: Nil =>
-        val acc = fields("bytes").asInstanceOf[ByteVector].toArray
-        env.accountBalanceOf(acc, None)
-
-      case _ => ???
+    def caseObjToRecipient(c: CaseObj): Recipient = c.caseType.name match {
+      case addressType.typeRef.name => Recipient.Address(c.fields("bytes").asInstanceOf[ByteVector])
+      case aliasType.typeRef.name   => Recipient.Alias(c.fields("alias").asInstanceOf[String])
+      case _                        => ???
     }
 
-    val accountAssetBalanceF: BaseFunction =
-      NativeFunction("accountAssetBalance", 100, ACCOUNTASSETBALANCE, LONG, "addressOrAlias" -> addressOrAliasType, "assetId" -> BYTEVECTOR) {
-        case CaseObj(_, fields) :: (assetId: ByteVector) :: Nil =>
-          val acc = fields("bytes").asInstanceOf[ByteVector]
-          env.accountBalanceOf(acc.toArray, Some(assetId.toArray))
+    val assetBalanceF: BaseFunction =
+      NativeFunction("assetBalance", 100, ACCOUNTASSETBALANCE, LONG, "addressOrAlias" -> addressOrAliasType, "assetId" -> UNION(UNIT, BYTEVECTOR)) {
+        case (c: CaseObj) :: (()) :: Nil                  => env.accountBalanceOf(caseObjToRecipient(c), None)
+        case (c: CaseObj) :: (assetId: ByteVector) :: Nil => env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.toArray))
 
         case _ => ???
       }
 
-    val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, optionLong, "id" -> BYTEVECTOR) {
-        case (id: ByteVector) :: Nil => Right(fromOption(env.transactionHeightById(id.toArray)))
-        case _                       => ???
+    val wavesBalanceF: UserFunction = UserFunction("wavesBalance", 100, LONG, "addressOrAlias" -> addressOrAliasType) {
+      case aoa :: Nil => FUNCTION_CALL(assetBalanceF.header, List(aoa, REF("unit")))
+      case _          => ???
     }
 
-    val vars: Map[String, (TYPE, LazyVal)] = Map(
-      ("height", (LONG, LazyVal(EitherT(heightCoeval)))),
+    val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, optionLong, "id" -> BYTEVECTOR) {
+      case (id: ByteVector) :: Nil => Right(fromOption(env.transactionHeightById(id.toArray)))
+      case _                       => ???
+    }
+
+    val vars: Map[String, (FINAL, LazyVal)] = Map(
+      ("height", (com.wavesplatform.lang.v1.compiler.Types.LONG, LazyVal(EitherT(heightCoeval)))),
       ("tx", (outgoingTransactionType, LazyVal(EitherT(txCoeval))))
     )
 
     val functions = Seq(
       txByIdF,
       txHeightByIdF,
-      getLongF,
+      getIntegerF,
       getBooleanF,
-      getByteArrayF,
+      getBinaryF,
       getStringF,
-      addressFromBytesF,
       addressFromPublicKeyF,
       addressFromStringF,
       addressFromRecipientF,
-      accountBalanceF,
-      accountAssetBalanceF
+      assetBalanceF,
+      wavesBalanceF
     )
 
     CTX(Types.wavesTypes, vars, functions)

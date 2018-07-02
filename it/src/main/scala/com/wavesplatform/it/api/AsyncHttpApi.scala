@@ -4,7 +4,6 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeoutException
 
-import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.http.api_key
 import com.wavesplatform.it.Node
@@ -16,14 +15,14 @@ import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import org.scalactic.source.Position
-import org.scalatest.{Assertion, Assertions, Matchers}
+import org.scalatest.{Assertions, Matchers}
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json._
 import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.api.http.alias.CreateAliasV1Request
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
-import scorex.api.http.{AddressApiRoute, ApiErrorResponse, DataRequest}
+import scorex.api.http.{AddressApiRoute, DataRequest}
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.transfer._
@@ -39,34 +38,6 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object AsyncHttpApi extends Assertions {
-
-  case class ErrorMessage(error: Int, message: String)
-
-  implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
-
-  def assertBadRequest(f: Future[_]): Future[Assertion] = f transform {
-    case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Success(Assertions.assert(statusCode == StatusCodes.BadRequest.intValue))
-    case Failure(e)                                               => Success(Assertions.fail(e))
-    case _                                                        => Success(Assertions.fail(s"Expecting bad request"))
-  }
-
-  def expectErrorResponse(f: Future[_])(isExpected: ApiErrorResponse => Boolean): Future[Assertion] = f transform {
-    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
-      val parsedError = Json.parse(responseBody).validate[ApiErrorResponse].asOpt
-      parsedError match {
-        case None      => Success(Assertions.fail(s"Expecting bad request"))
-        case Some(err) => Success(Assertions.assert(statusCode == StatusCodes.BadRequest.intValue && isExpected(err)))
-      }
-    case Failure(e) => Success(Assertions.fail(e))
-    case _          => Success(Assertions.fail(s"Expecting bad request"))
-  }
-
-  def assertBadRequestAndMessage(f: Future[_], errorMessage: String): Future[Assertion] = f transform {
-    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
-      Success(Assertions.assert(statusCode == StatusCodes.BadRequest.intValue && parse(responseBody).as[ErrorMessage].message.contains(errorMessage)))
-    case Failure(e) => Success[Assertion](Assertions.fail(e))
-    case _          => Success[Assertion](Assertions.fail(s"Expecting bad request"))
-  }
 
   implicit class NodeAsyncHttpApi(n: Node) extends Assertions with Matchers {
 
@@ -90,8 +61,8 @@ object AsyncHttpApi extends Assertions {
     def matcherPost[A: Writes](path: String, body: A): Future[Response] =
       post(s"${n.matcherApiEndpoint}$path", (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
 
-    def getOrderStatus(asset: String, orderId: String): Future[MatcherStatusResponse] =
-      matcherGet(s"/matcher/orderbook/$asset/WAVES/$orderId", waitForStatus = true).as[MatcherStatusResponse]
+    def getOrderStatus(asset: String, orderId: String, waitForStatus: Boolean = true): Future[MatcherStatusResponse] =
+      matcherGet(s"/matcher/orderbook/$asset/WAVES/$orderId", waitForStatus = waitForStatus).as[MatcherStatusResponse]
 
     def getOrderBook(asset: String): Future[OrderBookResponse] =
       matcherGet(s"/matcher/orderbook/$asset/WAVES").as[OrderBookResponse]

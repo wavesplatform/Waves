@@ -26,7 +26,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
         )
         transfer.assetId match {
           case Some(v) => result.explicitGet().toArray sameElements v.arr
-          case None    => result should produce("from empty option")
+          case None    => result should produce("termination")
         }
     }
   }
@@ -48,12 +48,14 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
   }
 
   property("Some/None/extract/isDefined") {
-    runScript[Any]("Some(3)".stripMargin) shouldBe Right(3L)
-    runScript[Any]("None".stripMargin) shouldBe Right(())
-    runScript[Boolean]("isDefined(Some(3))".stripMargin) shouldBe Right(true)
-    runScript[Boolean]("isDefined(None)".stripMargin) shouldBe Right(false)
-    runScript[Long]("extract(Some(3))".stripMargin) shouldBe Right(3L)
-    runScript[Long]("extract(None)".stripMargin) should produce("Extract from empty option")
+    val some3 = "if true then 3 else unit"
+    val none  = "if false then 3 else unit"
+    runScript[Any](some3) shouldBe Right(3L)
+    runScript[Any](none) shouldBe Right(())
+    runScript[Boolean](s"isDefined($some3)") shouldBe Right(true)
+    runScript[Boolean](s"isDefined($none)") shouldBe Right(false)
+    runScript[Long](s"extract($some3)") shouldBe Right(3L)
+    runScript[Long](s"extract($none)") should produce("termination")
   }
 
   property("size()") {
@@ -237,14 +239,14 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
         s"""
            |match tx {
            |  case tx: DataTransaction =>
-           |    let intEq = tx.data[0] == LongDataEntry("${entry.key}", ${entry.value})
-           |    let intNe = tx.data[0] != LongDataEntry("${entry.key}", ${entry.value})
-           |    let boolEq = tx.data[0] == BoolDataEntry("${entry.key}", true)
-           |    let boolNe = tx.data[0] != BoolDataEntry("${entry.key}", true)
-           |    let binEq = tx.data[0] == ByteVectorDataEntry("${entry.key}", base64'WROOooommmmm')
-           |    let binNe = tx.data[0] != ByteVectorDataEntry("${entry.key}", base64'FlapFlap')
-           |    let strEq = tx.data[0] == StrDataEntry("${entry.key}", "${entry.value}")
-           |    let strNe = tx.data[0] != StrDataEntry("${entry.key}", "Zam")
+           |    let intEq = tx.data[0] == DataEntry("${entry.key}", ${entry.value})
+           |    let intNe = tx.data[0] != DataEntry("${entry.key}", ${entry.value})
+           |    let boolEq = tx.data[0] == DataEntry("${entry.key}", true)
+           |    let boolNe = tx.data[0] != DataEntry("${entry.key}", true)
+           |    let binEq = tx.data[0] == DataEntry("${entry.key}", base64'WROOooommmmm')
+           |    let binNe = tx.data[0] != DataEntry("${entry.key}", base64'FlapFlap')
+           |    let strEq = tx.data[0] == DataEntry("${entry.key}", "${entry.value}")
+           |    let strNe = tx.data[0] != DataEntry("${entry.key}", "Zam")
            |    intEq && !intNe && !boolEq && boolNe && !binEq && binNe && !strEq && strNe
            |  case _ => throw
            |}

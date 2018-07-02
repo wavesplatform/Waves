@@ -25,6 +25,7 @@ case class MassTransferTransaction private (version: Byte,
                                             attachment: Array[Byte],
                                             proofs: Proofs)
     extends ProvenTransaction
+    with VersionedTransaction
     with FastHashId {
   override val builder: MassTransferTransaction.type = MassTransferTransaction
 
