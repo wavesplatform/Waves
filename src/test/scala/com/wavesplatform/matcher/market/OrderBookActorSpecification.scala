@@ -352,6 +352,21 @@ class OrderBookActorSpecification
       expectMsg(GetOrdersResponse(Seq(SellLimitOrder(1850 * Order.PriceConstant, ((0.1 - (0.0100001 - 0.01)) * Constants.UnitsInWave).toLong, ord1))))
     }
 
+    "buy small amount of pricey asset" in {
+      val p = AssetPair(Some(ByteStr("WAVES".getBytes)), Some(ByteStr("USD".getBytes)))
+      val b = rawBuy(p, 280, 700000L)
+      val s = rawSell(p, 280, 30000000000L)
+      actor ! s
+      actor ! b
+      receiveN(2)
+
+      actor ! GetAskOrdersRequest
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(280, 30000000000L - Order.correctAmount(700000L, 280), s))))
+
+      actor ! GetBidOrdersRequest
+      expectMsg(GetOrdersResponse(Seq.empty))
+    }
+
     "cancel expired orders after OrderCleanup command" in {
       val time   = NTP.correctedTime()
       val price  = 34118

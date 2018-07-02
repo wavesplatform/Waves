@@ -3,11 +3,11 @@ package scorex.transaction.assets.exchange
 import com.google.common.primitives.Longs
 import com.wavesplatform.crypto
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.utils.Base58
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.{Coeval, Task}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.utils.Base58
 import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
 import scorex.transaction.ValidationError.{GenericError, InvalidSignature}
@@ -125,7 +125,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   @ApiModelProperty(hidden = true)
   def getSpendAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] =
     Try {
-      if (orderType == OrderType.SELL) matchAmount
+      if (orderType == OrderType.SELL) correctAmount(matchAmount, matchPrice)
       else {
         val spend = BigInt(matchAmount) * matchPrice / PriceConstant
         if (getSpendAssetId.isEmpty && !(spend + matcherFee).isValidLong) {
@@ -137,7 +137,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   @ApiModelProperty(hidden = true)
   def getReceiveAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] =
     Try {
-      if (orderType == OrderType.BUY) matchAmount
+      if (orderType == OrderType.BUY) correctAmount(matchAmount, matchPrice)
       else {
         (BigInt(matchAmount) * matchPrice / PriceConstant).bigInteger.longValueExact()
       }
@@ -196,6 +196,12 @@ object Order {
   val PriceConstant         = 100000000L
   val MaxAmount: Long       = 100 * PriceConstant * PriceConstant
   private val AssetIdLength = 32
+
+  def correctAmount(a: Long, price: Long): Long = {
+    val min = math.max(Order.PriceConstant / price, 1)
+    val k   = a / min
+    k * min
+  }
 
   def buy(sender: PrivateKeyAccount,
           matcher: PublicKeyAccount,

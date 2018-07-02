@@ -32,9 +32,10 @@ class OrderHistorySpecification
   property("New buy order added") {
     val ord1 = buy(pair, 0.0007, 10000)
 
-    oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
+    val lo = LimitOrder(ord1)
+    oh.orderAccepted(OrderAdded(lo))
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Accepted
-    oh.orderInfo(ord1.idStr()) shouldBe OrderInfo(ord1.amount, 0, false)
+    oh.orderInfo(ord1.idStr()) shouldBe OrderInfo(ord1.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset))
 
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 0L
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 7L
@@ -49,7 +50,7 @@ class OrderHistorySpecification
 
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Accepted
-    oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 10000L
+    oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 9996L
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 0L
     oh.openVolume(AssetAcc(ord1.senderPublicKey, None)) shouldBe ord1.matcherFee
 
@@ -58,7 +59,7 @@ class OrderHistorySpecification
   }
 
   property("New buy WAVES order added") {
-    val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
+    val pair = AssetPair(None, Some(ByteStr("BTC".getBytes("UTF-8"))))
     val ord1 = buy(pair, 0.0008, 10000)
 
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
@@ -97,7 +98,7 @@ class OrderHistorySpecification
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.Accepted
 
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe
-      math.max(ord1.matcherFee - ord1.getReceiveAmount(ord1.price, ord1.amount).explicitGet(), 0L) + ord2.amount + ord2.matcherFee
+      math.max(ord1.matcherFee - ord1.getReceiveAmount(ord1.price, ord1.amount).explicitGet(), 0L) + Order.correctAmount(ord2.amount, ord2.price) + ord2.matcherFee
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe
       ord1.getSpendAmount(ord1.price, ord1.amount).explicitGet()
 
@@ -146,8 +147,8 @@ class OrderHistorySpecification
     oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe empty
 
     oh.openVolume(AssetAcc(ord2.senderPublicKey, pair.amountAsset)) shouldBe
-      math.max(0L, OrderInfo.safeSum(ord2.matcherFee * 2 / 12, -20000000L))
-    oh.openVolume(AssetAcc(ord2.senderPublicKey, pair.priceAsset)) shouldBe 0.00085 * 20000000L
+      math.max(0L, OrderInfo.safeSum(ord2.matcherFee * 2 / 12, -19999056L))
+    oh.openVolume(AssetAcc(ord2.senderPublicKey, pair.priceAsset)) shouldBe (BigDecimal(0.00085) * 20000000L).toLong
     oh.allOrderIdsByAddress(ord2.senderPublicKey.address) shouldBe Set(ord2.idStr())
     oh.activeOrderIdsByAddress(ord2.senderPublicKey.address) shouldBe Set(pair.priceAsset -> ord2.idStr())
   }
@@ -202,7 +203,7 @@ class OrderHistorySpecification
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Filled
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.PartiallyFilled(100000000)
 
-    oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 110000000L + ord2.matcherFee * 11 / 21
+    oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 109999340L + ord2.matcherFee * 11 / 21
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 0L
     oh.allOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr(), ord2.idStr())
     oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(pair.amountAsset -> ord2.idStr())
@@ -351,9 +352,11 @@ class OrderHistorySpecification
 
     oh.openPortfolio(pk.address) shouldBe
       OpenPortfolio(
-        Map("WAVES"     -> (2 * matcherFee - LimitOrder(ord1).getReceiveAmount - LimitOrder(ord2).getReceiveAmount),
-            ass1.base58 -> ord1.amount,
-            ass2.base58 -> ord2.amount))
+        Map(
+          "WAVES"     -> (2 * matcherFee - LimitOrder(ord1).getReceiveAmount - LimitOrder(ord2).getReceiveAmount),
+          ass1.base58 -> Order.correctAmount(ord1.amount, ord1.price),
+          ass2.base58 -> Order.correctAmount(ord2.amount, ord2.price)
+        ))
   }
 
 }

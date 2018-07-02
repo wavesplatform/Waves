@@ -38,7 +38,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     } yield (gen1, gen2, issue1, issue2, exchange)
 
     forAll(preconditionsAndExchange) {
-      case ((gen1, gen2, issue1, issue2, exchange)) =>
+      case (gen1, gen2, issue1, issue2, exchange) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1, issue2))), TestBlock.create(Seq(exchange))) {
           case (blockDiff, state) =>
             val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)

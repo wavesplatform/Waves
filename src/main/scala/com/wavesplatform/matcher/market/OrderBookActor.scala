@@ -286,7 +286,7 @@ class OrderBookActor(assetPair: AssetPair,
             allChannels.broadcastTx(tx)
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
-            if (event.submittedRemaining > 0)
+            if (event.submittedRemaining > 0) //TODO: add remainder validation
               Some(o.partial(event.submittedRemaining))
             else None
           case Left(ex) =>

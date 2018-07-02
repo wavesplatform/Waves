@@ -84,7 +84,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
 
   private def saveOrderInfo(event: Event): Map[String, (Order, OrderInfo)] = {
     val updatedInfo = Events.createOrderInfo(event).map {
-      case (orderId, (o, oi)) => (orderId, (o, orderInfo(orderId).combine(oi)))
+      case (orderId, (o, oi)) => (orderId, (o, OrderInfo.combine(orderInfo(orderId), oi)))
     }
 
     updatedInfo.foreach {

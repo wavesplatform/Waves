@@ -39,16 +39,18 @@ sealed trait LimitOrder {
   def spentAsset: String = order.getSpendAssetId.map(_.base58).getOrElse(AssetPair.WavesName)
   def rcvAsset: String   = order.getReceiveAssetId.map(_.base58).getOrElse(AssetPair.WavesName)
   def feeAsset: String   = AssetPair.WavesName
+
+  def minAmountOfAmountAsset: Long = Order.PriceConstant / price
 }
 
 case class BuyLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
   def partial(amount: Price): LimitOrder = copy(amount = amount)
-  def getReceiveAmount: Long             = amount
+  def getReceiveAmount: Long             = Order.correctAmount(amount, price)
   def getSpendAmount: Long               = Try((BigInt(amount) * price / Order.PriceConstant).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
 }
 case class SellLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
   def partial(amount: Price): LimitOrder = copy(amount = amount)
-  def getSpendAmount: Long               = amount
+  def getSpendAmount: Long               = Order.correctAmount(amount, price)
   def getReceiveAmount: Long             = Try((BigInt(amount) * price / Order.PriceConstant).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
 }
 
@@ -112,8 +114,8 @@ object Events {
     def submittedRemaining: Long            = math.max(submitted.amount - counter.amount, 0)
     def submittedRemainingOrder: LimitOrder = submitted.partial(submittedRemaining)
     def executedAmount: Long                = math.min(submitted.amount, counter.amount)
-    def submittedExecuted                   = submitted.partial(amount = executedAmount)
-    def counterExecuted                     = counter.partial(amount = executedAmount)
+    def submittedExecuted: LimitOrder       = submitted.partial(amount = executedAmount)
+    def counterExecuted: LimitOrder         = counter.partial(amount = executedAmount)
     def isCounterFilled: Boolean            = counterRemaining == 0L
 
   }
@@ -133,15 +135,15 @@ object Events {
   def createOrderInfo(event: Event): Map[String, (Order, OrderInfo)] = {
     event match {
       case OrderAdded(lo) =>
-        Map((lo.order.idStr(), (lo.order, OrderInfo(lo.order.amount, 0L, false))))
+        Map((lo.order.idStr(), (lo.order, OrderInfo(lo.order.amount, 0L, canceled = false, Some(lo.minAmountOfAmountAsset)))))
       case oe: OrderExecuted =>
         val (o1, o2) = (oe.submittedExecuted, oe.counterExecuted)
         Map(
-          (o1.order.idStr(), (o1.order, OrderInfo(o1.order.amount, o1.amount, false))),
-          (o2.order.idStr(), (o2.order, OrderInfo(o2.order.amount, o2.amount, false)))
+          (o1.order.idStr(), (o1.order, OrderInfo(o1.order.amount, o1.amount, canceled = false, Some(o1.minAmountOfAmountAsset)))),
+          (o2.order.idStr(), (o2.order, OrderInfo(o2.order.amount, o2.amount, canceled = false, Some(o2.minAmountOfAmountAsset))))
         )
       case OrderCanceled(lo) =>
-        Map((lo.order.idStr(), (lo.order, OrderInfo(lo.order.amount, 0, true))))
+        Map((lo.order.idStr(), (lo.order, OrderInfo(lo.order.amount, 0, canceled = true, Some(lo.minAmountOfAmountAsset)))))
     }
   }
 
