@@ -30,7 +30,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     JsSuccess(NxtLikeConsensusBlockData(bt, ByteStr.decodeBase58(gs).get))
   }
 
-  test("Node mines several blocks, integration test checks that block timestamps equal to time of appearence (+-1000ms)") {
+  test("Node mines several blocks, integration test checks that block timestamps equal to time of appearence (+-1100ms)") {
 
     val height = nodes.last.height
 
@@ -44,9 +44,8 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
       val newTimestamp = blockTimestamp(h + 1)
 
-      block.timestamp shouldBe (newTimestamp +- 1000)
+      block.timestamp shouldBe (newTimestamp +- 1100)
     }
-
   }
 
   test("Accept correct block") {
