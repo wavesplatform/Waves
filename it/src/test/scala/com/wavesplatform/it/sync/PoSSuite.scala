@@ -46,18 +46,20 @@ class PoSSuite extends BaseTransactionSuite {
 
     waitForHeight(height + 1)
 
-    val blockSig     = blockSignature(height + 1)
     val newTimestamp = blockTimestamp(height + 1)
 
-    println(block.uniqueId)
-    println(ByteStr(blockSig))
+    println(Json.prettyPrint(block.json()))
+    println("==========================")
+    println(Json.prettyPrint(Json.parse(nodes.last.get(s"/blocks/at/${height + 1}").getResponseBody)))
+
+    println(s"Diff: ${block.timestamp - newTimestamp}")
 
     block.timestamp shouldBe (newTimestamp +- 1000)
   }
 
   test("Accept correct block") {
 
-    nodes.last.close()
+//    nodes.last.close()
     val height = nodes.head.height
     val block  = forgeBlock(height, signerPK)()
 
@@ -185,7 +187,15 @@ class PoSSuite extends BaseTransactionSuite {
       .overrideBase(
         _.raw(
           """
-          |pre-activated-features = {
+          |waves {
+          |  miner {
+          |      quorum = 1
+          |  }
+          |
+          |  blockchain {
+          |    custom {
+          |      functionality {
+          |        pre-activated-features = {
           |          2 = 0
           |          3 = 0
           |          4 = 0
@@ -194,6 +204,10 @@ class PoSSuite extends BaseTransactionSuite {
           |          7 = 0
           |          8 = 0
           |        }
+          |      }
+          |    }
+          |  }
+          |}
         """.stripMargin
         ))
       .overrideBase(_.nonMiner)
@@ -220,7 +234,7 @@ class PoSSuite extends BaseTransactionSuite {
       if (height >= 3)
         Some(
           (Json
-            .parse(nodes.head.get(s"/blocks/at/${height - 2}").getResponseBody) \ "timestamp").as[Long])
+            .parse(nodes.head.get(s"/blocks/at/${height - 3}").getResponseBody) \ "timestamp").as[Long])
       else None
 
     val (lastBlockId, lastBlockTS, lastBlockCData) = blockInfo(height)
