@@ -147,7 +147,7 @@ object Types {
   )
 
   private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTEVECTOR, STRING)
-  val dataEntryType = CaseType("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
+  val dataEntryType              = CaseType("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
 
   val dataTransactionType = CaseType(
     "DataTransaction",
@@ -190,7 +190,7 @@ object Types {
     dataTransactionType
   )
 
-  val transactionTypes = /*obsoleteTransactionTypes ++ */ activeTransactionTypes
+  val transactionTypes = obsoleteTransactionTypes ++ activeTransactionTypes
 
   val outgoingTransactionType = UNION.create(activeTransactionTypes.map(_.typeRef))
   val anyTransactionType      = UNION.create(transactionTypes.map(_.typeRef))
