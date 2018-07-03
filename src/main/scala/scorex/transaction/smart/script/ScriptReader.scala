@@ -4,7 +4,6 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.Serde
-import scodec.Attempt.{Failure, Successful}
 import scorex.transaction.ValidationError.ScriptParseError
 import scorex.transaction.smart.script.v1.ScriptV1
 
@@ -28,12 +27,7 @@ object ScriptReader {
           ScriptV1
             .validateBytes(scriptBytes)
             .flatMap { _ =>
-              Serde.codec.decode(scodec.bits.BitVector(scriptBytes)) match {
-                case Failure(e) => Left(e.toString())
-                case Successful(x) =>
-                  if (x.remainder.isEmpty) ScriptV1(x.value, checkSize = false)
-                  else Left(s"${x.remainder.size} bytes left")
-              }
+              Serde.deserialize(scriptBytes).flatMap(ScriptV1(_, checkSize = false))
             }
             .left
             .map(ScriptParseError)

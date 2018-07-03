@@ -6,34 +6,11 @@ import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.lang.v1.compiler.Terms._
 import monix.eval.Coeval
-import scodec._
 import scodec.bits.ByteVector
-import scodec.codecs._
 
 import scala.util.Try
 
 object Serde {
-
-  import codecs.implicits._
-
-  implicit val dFunctionHeader       = Discriminated[FunctionHeader, Int](uint8)
-  implicit val dFunctionHeaderSystem = dFunctionHeader.bind[FunctionHeader.Native](0)
-  implicit val dFunctionHeaderUser   = dFunctionHeader.bind[FunctionHeader.User](1)
-
-  implicit val d                = Discriminated[EXPR, Int](uint8)
-  implicit val dConstInt        = d.bind[CONST_LONG](0)
-  implicit val dConstByteVector = d.bind[CONST_BYTEVECTOR](1)
-  implicit val dConstString     = d.bind[CONST_STRING](2)
-  implicit val dIf              = d.bind[IF](3)
-  implicit val dComposite       = d.bind[BLOCK](4)
-  implicit val dRef             = d.bind[REF](5)
-  implicit val dTrue            = d.bind[TRUE.type](6)
-  implicit val dFalse           = d.bind[FALSE.type](7)
-  implicit val dGetter          = d.bind[GETTER](8)
-  implicit val dFunctionCall    = d.bind[FUNCTION_CALL](9)
-
-  val codec: Codec[EXPR] = Codec[EXPR]
-
   val E_LONG: Byte    = 0
   val E_BYTES: Byte   = 1
   val E_STRING: Byte  = 2
@@ -45,14 +22,15 @@ object Serde {
   val E_GETTER: Byte  = 8
   val E_FUNCALL: Byte = 9
 
-  val FH_NATIVE: Byte = 0 ///naming
+  val FH_NATIVE: Byte = 0
   val FH_USER: Byte   = 1
 
-  def deserialize(bb: ByteBuffer): Either[String, EXPR] = {
+  def deserialize(bytes: Array[Byte]): Either[String, EXPR] = {
     import cats.instances.list._
     import cats.syntax.apply._
     import cats.syntax.traverse._
 
+    val bb = ByteBuffer.wrap(bytes)
     def aux: Coeval[EXPR] = bb.get() match {
       case E_LONG   => Coeval.now(CONST_LONG(bb.getLong))
       case E_BYTES  => Coeval.now(CONST_BYTEVECTOR(bb.getByteVector))
@@ -88,19 +66,14 @@ object Serde {
   }
 
   implicit class ByteBufferOps(val self: ByteBuffer) extends AnyVal {
-    def getByteVector: ByteVector = {
-      val len   = self.getLong()
-      val bytes = new Array[Byte](Math.toIntExact(len))
-      self.get(bytes)
-      ByteVector(bytes)
-    }
-
     def getBytes: Array[Byte] = {
-      val len   = self.getInt()
+      val len   = self.getInt
       val bytes = new Array[Byte](len)
       self.get(bytes)
       bytes
     }
+
+    def getByteVector: ByteVector = ByteVector(getBytes)
 
     def getString: String = new String(getBytes, StandardCharsets.UTF_8)
 
@@ -140,54 +113,55 @@ object Serde {
     }
   }
 
-  def serialize(expr: EXPR, bb: ByteArrayOutputStream): ByteArrayOutputStream = {
+  def serialize(expr: EXPR): Array[Byte] = {
     val done: Coeval[Unit] = Coeval.now(())
 
+    val out = new ByteArrayOutputStream()
     def aux(acc: Coeval[Unit], expr: EXPR): Coeval[Unit] = acc.flatMap { _ =>
       expr match {
         case CONST_LONG(n) =>
           Coeval.now {
-            bb.write(E_LONG)
-            bb.writeLong(n)
+            out.write(E_LONG)
+            out.writeLong(n)
           }
         case CONST_BYTEVECTOR(bs) =>
           Coeval.now {
-            bb.write(E_BYTES)
-            bb.writeLong(bs.size).write(bs.toArray) /// array size long -> short?
+            out.write(E_BYTES)
+            out.writeInt(Math.toIntExact(bs.size)).write(bs.toArray)
           }
         case CONST_STRING(s) =>
           Coeval.now {
-            bb.write(E_STRING)
-            bb.writeString(s)
+            out.write(E_STRING)
+            out.writeString(s)
           }
         case IF(cond, ifTrue, ifFalse) =>
-          bb.write(E_IF)
+          out.write(E_IF)
           List(cond, ifTrue, ifFalse).foldLeft(done)(aux)
         case BLOCK(LET(name, value), body) =>
-          bb.write(E_BLOCK)
-          bb.writeString(name)
+          out.write(E_BLOCK)
+          out.writeString(name)
           List(value, body).foldLeft(done)(aux)
         case REF(key) =>
           Coeval.now {
-            bb.write(E_REF)
-            bb.writeString(key)
+            out.write(E_REF)
+            out.writeString(key)
           }
-        case TRUE  => Coeval.now(bb.write(E_TRUE))
-        case FALSE => Coeval.now(bb.write(E_FALSE))
+        case TRUE  => Coeval.now(out.write(E_TRUE))
+        case FALSE => Coeval.now(out.write(E_FALSE))
         case GETTER(obj, field) =>
-          bb.write(E_GETTER)
+          out.write(E_GETTER)
           aux(done, obj).map { _ =>
-            bb.writeString(field)
+            out.writeString(field)
           }
         case FUNCTION_CALL(header, args) =>
-          bb.write(E_FUNCALL)
-          bb.writeFunctionHeader(header)
-          bb.writeInt(args.size)
+          out.write(E_FUNCALL)
+          out.writeFunctionHeader(header)
+          out.writeInt(args.size)
           args.foldLeft(done)(aux)
       }
     }
 
     aux(acc = Coeval.now(()), expr).value
-    bb
+    out.toByteArray
   }
 }

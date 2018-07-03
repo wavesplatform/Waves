@@ -1,5 +1,3 @@
-import java.io.ByteArrayOutputStream
-
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.Serde
@@ -10,8 +8,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient, Tx}
 import fastparse.core.Parsed.{Failure, Success}
-import scodec.Attempt
-import scodec.Attempt.Successful
 
 import scala.scalajs.js
 //import scala.scalajs.js.Dynamic.{literal => jObj}
@@ -64,16 +60,8 @@ object JsAPI {
     def hash(m: Array[Byte]) = Global.keccak256(Global.blake2b256(m))
 
     def serialize(expr: EXPR): Either[String, Array[Byte]] = {
-      val out = new ByteArrayOutputStream()
-      Serde.serialize(expr, out)
-      Right[String, Array[Byte]](out.toByteArray)
-        .map(x => {
-          val s = Array(1.toByte) ++ x
-          s ++ hash(s).take(4)
-//        }) match {
-//        case Successful(value)      => Right[String, Array[Byte]](value)
-//        case Attempt.Failure(cause) => Left[String, Array[Byte]](cause.message)
-        })
+      val s = 1.toByte +: Serde.serialize(expr)
+      Right(s ++ hash(s).take(4))
     }
 
     (Parser(input) match {
