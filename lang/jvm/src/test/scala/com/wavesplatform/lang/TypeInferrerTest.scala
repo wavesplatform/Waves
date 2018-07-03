@@ -91,6 +91,10 @@ class TypeInferrerTest extends FreeSpec with Matchers {
         "no common type inside list" in {
           TypeInferrer(Seq((LIST(LONG), LIST(UNION(BOOLEAN, UNIT))))) should produce("Non-matching types")
         }
+
+        "unit in union" in {
+          TypeInferrer(Seq((UNIT, UNION(BOOLEAN, UNIT)))) shouldBe Right(Map.empty)
+        }
       }
 
       "inferring" - {

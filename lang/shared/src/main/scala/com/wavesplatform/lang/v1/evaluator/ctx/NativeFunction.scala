@@ -10,7 +10,6 @@ import monix.eval.Coeval
 sealed trait BaseFunction {
   def signature: FunctionTypeSignature
   def header: FunctionHeader = signature.header
-  def cost: Long
   def name: String
 }
 
@@ -32,11 +31,10 @@ object NativeFunction {
 
 }
 
-case class UserFunction private (name: String, cost: Long, signature: FunctionTypeSignature, ev: List[EXPR] => EXPR) extends BaseFunction
+case class UserFunction private (name: String, signature: FunctionTypeSignature, ev: List[EXPR] => EXPR) extends BaseFunction
 
 object UserFunction {
 
-  def apply(name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: List[EXPR] => EXPR) =
-    new UserFunction(name, cost, FunctionTypeSignature(resultType, args.map(_._2), FunctionHeader.User(name)), ev)
-
+  def apply(name: String, resultType: TYPE, args: (String, TYPE)*)(ev: List[EXPR] => EXPR): UserFunction =
+    new UserFunction(name, FunctionTypeSignature(resultType, args.map(_._2), FunctionHeader.User(name)), ev)
 }
