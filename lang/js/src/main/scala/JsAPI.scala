@@ -1,3 +1,5 @@
+import java.io.ByteArrayOutputStream
+
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.Serde
@@ -62,15 +64,16 @@ object JsAPI {
     def hash(m: Array[Byte]) = Global.keccak256(Global.blake2b256(m))
 
     def serialize(expr: EXPR): Either[String, Array[Byte]] = {
-      Serde.codec
-        .encode(expr)
+      val out = new ByteArrayOutputStream()
+      Serde.serialize(expr, out)
+      Right[String, Array[Byte]](out.toByteArray)
         .map(x => {
-          val s = Array(1.toByte) ++ x.toByteArray
+          val s = Array(1.toByte) ++ x
           s ++ hash(s).take(4)
-        }) match {
-        case Successful(value)      => Right[String, Array[Byte]](value)
-        case Attempt.Failure(cause) => Left[String, Array[Byte]](cause.message)
-      }
+//        }) match {
+//        case Successful(value)      => Right[String, Array[Byte]](value)
+//        case Attempt.Failure(cause) => Left[String, Array[Byte]](cause.message)
+        })
     }
 
     (Parser(input) match {
