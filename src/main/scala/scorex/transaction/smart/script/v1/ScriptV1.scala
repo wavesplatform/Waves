@@ -6,13 +6,13 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.{FunctionHeader, ScriptEstimator, Serde}
 import com.wavesplatform.state.ByteStr
-import com.wavesplatform.utils.dummyEvaluationContext.functionCosts
+import com.wavesplatform.utils.functionCosts
 import monix.eval.Coeval
 import scorex.transaction.smart.script.Script
 
 object ScriptV1 {
   private val checksumLength = 4
-  private val maxComplexity  = 20 * functionCosts(FunctionHeader.Native(SIGVERIFY))
+  private val maxComplexity  = 20 * functionCosts(FunctionHeader.Native(SIGVERIFY))()
   private val maxSizeInBytes = 8 * 1024
 
   def validateBytes(bs: Array[Byte]): Either[String, Unit] =
