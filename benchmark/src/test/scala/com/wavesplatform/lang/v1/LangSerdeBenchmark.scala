@@ -10,7 +10,6 @@ import scodec.bits.BitVector
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(4)
-@Fork(1)
 @Warmup(iterations = 10)
 @Measurement(iterations = 10)
 class LangSerdeBenchmark {
@@ -19,7 +18,10 @@ class LangSerdeBenchmark {
   def serialize_test(st: St, bh: Blackhole): Unit = bh.consume(Serde.codec.encode(st.expr).require)
 
   @Benchmark
-  def deserialize_test(st: St, bh: Blackhole): Unit = bh.consume(Serde.codec.decode(st.serilizedExpr).require.value)
+  def deserialize_test(st: St, bh: Blackhole): Unit = bh.consume(Serde.codec.decode(st.serializedExpr).require.value)
+
+  @Benchmark
+  def deserialize_own_test(st: St, bh: Blackhole): Unit = bh.consume(Serde.deserialize(st.serializedExprByteBuffer).explicitGet())
 
 }
 
@@ -27,7 +29,10 @@ object LangSerdeBenchmark {
 
   @State(Scope.Benchmark)
   class St extends BigSum {
-    val serilizedExpr: BitVector = Serde.codec.encode(expr).require.compact
+    val serializedExpr: BitVector = Serde.codec.encode(expr).require.compact
+
+    private val bb               = serializedExpr.toByteBuffer
+    def serializedExprByteBuffer = bb.duplicate()
   }
 
 }
