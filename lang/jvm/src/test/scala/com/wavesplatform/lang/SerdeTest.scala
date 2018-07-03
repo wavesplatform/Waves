@@ -64,7 +64,7 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
     }
 
     "stack safety" in {
-      val bigSum = (1 to 100).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
+      val bigSum = (1 to 10000).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
         FUNCTION_CALL(
           function = PureContext.sumLong,
           args = List(r, CONST_LONG(i))
