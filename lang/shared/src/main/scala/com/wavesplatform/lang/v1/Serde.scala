@@ -31,33 +31,38 @@ object Serde {
     import cats.syntax.traverse._
 
     val bb = ByteBuffer.wrap(bytes)
-    def aux: Coeval[EXPR] = bb.get() match {
-      case E_LONG   => Coeval.now(CONST_LONG(bb.getLong))
-      case E_BYTES  => Coeval.now(CONST_BYTEVECTOR(bb.getByteVector))
-      case E_STRING => Coeval.now(CONST_STRING(bb.getString))
-      case E_IF     => (aux, aux, aux).mapN(IF)
-      case E_BLOCK =>
-        val name = bb.getString
-        for {
-          letValue <- aux
-          body     <- aux
-        } yield
-          BLOCK(
-            let = LET(name, letValue),
-            body = body
-          )
-      case E_REF    => Coeval.now(REF(bb.getString))
-      case E_TRUE   => Coeval.now(TRUE)
-      case E_FALSE  => Coeval.now(FALSE)
-      case E_GETTER => aux.map(GETTER(_, field = bb.getString))
-      case E_FUNCALL =>
-        val header = bb.getFunctionHeader
-
-        val args: List[Coeval[EXPR]] = (1 to bb.getInt).map(_ => aux)(collection.breakOut)
-        args.sequence[Coeval, EXPR].map(FUNCTION_CALL(header, _))
+    def aux(acc: Coeval[Unit] = Coeval.now(())): Coeval[EXPR] = acc.flatMap { _ =>
+      bb.get() match {
+        case E_LONG   => Coeval.now(CONST_LONG(bb.getLong))
+        case E_BYTES  => Coeval.now(CONST_BYTEVECTOR(bb.getByteVector))
+        case E_STRING => Coeval.now(CONST_STRING(bb.getString))
+        case E_IF     => (aux(), aux(), aux()).mapN(IF)
+        case E_BLOCK =>
+          for {
+            name     <- Coeval.now(bb.getString)
+            letValue <- aux()
+            body     <- aux()
+          } yield
+            BLOCK(
+              let = LET(name, letValue),
+              body = body
+            )
+        case E_REF    => Coeval.now(REF(bb.getString))
+        case E_TRUE   => Coeval.now(TRUE)
+        case E_FALSE  => Coeval.now(FALSE)
+        case E_GETTER => aux().map(GETTER(_, field = bb.getString))
+        case E_FUNCALL =>
+          Coeval
+            .now((bb.getFunctionHeader, bb.getInt))
+            .flatMap {
+              case (header, argc) =>
+                val args: List[Coeval[EXPR]] = (1 to argc).map(_ => aux())(collection.breakOut)
+                args.sequence[Coeval, EXPR].map(FUNCTION_CALL(header, _))
+            }
+      }
     }
 
-    Try(aux.value).toEither.left
+    Try(aux().value).toEither.left
       .map(_.getMessage)
       .flatMap { r =>
         if (bb.hasRemaining) Left(s"${bb.remaining()} bytes left")
@@ -114,8 +119,6 @@ object Serde {
   }
 
   def serialize(expr: EXPR): Array[Byte] = {
-    val done: Coeval[Unit] = Coeval.now(())
-
     val out = new ByteArrayOutputStream()
     def aux(acc: Coeval[Unit], expr: EXPR): Coeval[Unit] = acc.flatMap { _ =>
       expr match {
@@ -135,12 +138,13 @@ object Serde {
             out.writeString(s)
           }
         case IF(cond, ifTrue, ifFalse) =>
-          out.write(E_IF)
-          List(cond, ifTrue, ifFalse).foldLeft(done)(aux)
+          List(cond, ifTrue, ifFalse).foldLeft(Coeval.now(out.write(E_IF)))(aux)
         case BLOCK(LET(name, value), body) =>
-          out.write(E_BLOCK)
-          out.writeString(name)
-          List(value, body).foldLeft(done)(aux)
+          val n = Coeval.now[Unit] {
+            out.write(E_BLOCK)
+            out.writeString(name)
+          }
+          List(value, body).foldLeft(n)(aux)
         case REF(key) =>
           Coeval.now {
             out.write(E_REF)
@@ -149,15 +153,16 @@ object Serde {
         case TRUE  => Coeval.now(out.write(E_TRUE))
         case FALSE => Coeval.now(out.write(E_FALSE))
         case GETTER(obj, field) =>
-          out.write(E_GETTER)
-          aux(done, obj).map { _ =>
+          aux(Coeval.now[Unit](out.write(E_GETTER)), obj).map { _ =>
             out.writeString(field)
           }
         case FUNCTION_CALL(header, args) =>
-          out.write(E_FUNCALL)
-          out.writeFunctionHeader(header)
-          out.writeInt(args.size)
-          args.foldLeft(done)(aux)
+          val n = Coeval.now[Unit] {
+            out.write(E_FUNCALL)
+            out.writeFunctionHeader(header)
+            out.writeInt(args.size)
+          }
+          args.foldLeft(n)(aux)
       }
     }
 
