@@ -32,7 +32,7 @@ object ScriptV1 {
     override val text: String = expr.toString
     override val bytes: Coeval[ByteStr] =
       Coeval.evalOnce {
-        val s = Array(version.value.toByte) ++ Serde.codec.encode(expr).require.toByteArray
+        val s = Array(version.value.toByte) ++ Serde.serialize(expr)
         ByteStr(s ++ crypto.secureHash(s).take(ScriptV1.checksumLength))
       }
   }
