@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.model
 import cats.implicits._
 import com.wavesplatform.db.{AssetIdOrderIdSetCodec, Codec, OrderIdsCodec, PortfolioCodec, SubStorage}
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.matcher.model.Events._
 import com.wavesplatform.matcher.model.LimitOrder.{Filled, OrderStatus}
 import com.wavesplatform.matcher.model.OrderHistory.OrderHistoryOrdering
 import com.wavesplatform.state._
@@ -18,7 +18,7 @@ trait OrderHistory {
 
   def orderExecuted(event: OrderExecuted): Unit
 
-  def orderCanceled(event: OrderCanceled)
+  def orderCanceled(event: OrderClosed)
 
   def orderStatus(id: String): OrderStatus
 
@@ -153,7 +153,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     }
   }
 
-  override def orderCanceled(event: OrderCanceled): Unit = {
+  override def orderCanceled(event: OrderClosed): Unit = {
     val updatedInfo = saveOrderInfo(event)
     saveOpenPortfolio(event)
 

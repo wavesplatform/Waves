@@ -87,7 +87,7 @@ class OrderBookActor(assetPair: AssetPair,
       orderBook.asks.values
         .++(orderBook.bids.values)
         .flatten
-        .foreach(x => context.system.eventStream.publish(Events.OrderCanceled(x)))
+        .foreach(x => context.system.eventStream.publish(Events.OrderClosed(x, canceled = true)))
       deleteMessages(lastSequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
       context.stop(self)
@@ -233,7 +233,7 @@ class OrderBookActor(assetPair: AssetPair,
     val (submittedRemains, counterRemains) = handleMatchEvent(OrderBook.matchOrder(orderBook, limitOrder))
     if (counterRemains.isDefined) {
       if (!counterRemains.get.isValid) {
-        val canceled = Events.OrderCanceled(counterRemains.get)
+        val canceled = Events.OrderClosed(counterRemains.get, canceled = false)
         processEvent(canceled)
       }
     }
@@ -241,7 +241,7 @@ class OrderBookActor(assetPair: AssetPair,
       if (submittedRemains.get.isValid) {
         matchOrder(submittedRemains.get)
       } else {
-        val canceled = Events.OrderCanceled(submittedRemains.get)
+        val canceled = Events.OrderClosed(submittedRemains.get, canceled = false)
         processEvent(canceled)
       }
     }
@@ -255,7 +255,7 @@ class OrderBookActor(assetPair: AssetPair,
 
   private def processInvalidTransaction(event: OrderExecuted, err: ValidationError): Option[LimitOrder] = {
     def cancelCounterOrder(): Option[LimitOrder] = {
-      processEvent(Events.OrderCanceled(event.counter))
+      processEvent(Events.OrderClosed(event.counter, canceled = true))
       Some(event.submitted)
     }
 
@@ -392,7 +392,7 @@ object OrderBookActor {
   }
 
   case class GetOrderStatusResponse(status: LimitOrder.OrderStatus) extends MatcherResponse {
-    val json = status.json
+    val json: JsValue = status.json
     val code: StatusCode = status match {
       case LimitOrder.NotFound => StatusCodes.NotFound
       case _                   => StatusCodes.OK

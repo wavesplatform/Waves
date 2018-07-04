@@ -128,7 +128,7 @@ object Events {
 
   case class OrderAdded(order: LimitOrder) extends Event
 
-  case class OrderCanceled(limitOrder: LimitOrder) extends Event
+  case class OrderClosed(limitOrder: LimitOrder, canceled: Boolean) extends Event
 
   case class ExchangeTransactionCreated(tx: ExchangeTransaction)
 
@@ -151,8 +151,8 @@ object Events {
           (o1.order.idStr(), (o1.order, OrderInfo(o1.order.amount, o1.amount, canceled = false, Some(o1.minAmountOfAmountAsset)))),
           (o2.order.idStr(), (o2.order, OrderInfo(o2.order.amount, o2.amount, canceled = false, Some(o2.minAmountOfAmountAsset))))
         )
-      case OrderCanceled(lo) =>
-        Map((lo.order.idStr(), (lo.order, OrderInfo(lo.order.amount, 0L, canceled = true, Some(lo.minAmountOfAmountAsset)))))
+      case OrderClosed(lo, canceled) =>
+        Map((lo.order.idStr(), (lo.order, OrderInfo(lo.order.amount, 0L, canceled = canceled, Some(lo.minAmountOfAmountAsset)))))
     }
   }
 
@@ -185,7 +185,7 @@ object Events {
           Map(o1.order.senderPublicKey.address -> op1),
           Map(o2.order.senderPublicKey.address -> op2)
         )
-      case OrderCanceled(lo) =>
+      case OrderClosed(lo, _) =>
         val feeDiff = if (lo.feeAcc == lo.rcvAcc) math.max(lo.remainingFee - lo.getReceiveAmount, 0L) else lo.remainingFee
         Map(
           lo.order.senderPublicKey.address ->

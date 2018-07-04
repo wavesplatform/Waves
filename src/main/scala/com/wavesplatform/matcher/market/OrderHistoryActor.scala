@@ -6,16 +6,15 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{CancelOrder, GetOrderStatusResponse}
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ExpirableOrderHistoryRequest, _}
-import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.matcher.model.LimitOrder.Filled
+import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderClosed, OrderExecuted}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.utx.UtxPool
 import org.iq80.leveldb.DB
 import play.api.libs.json._
 import scorex.account.Address
-import scorex.transaction.{AssetAcc, AssetId}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.{AssetPair, Order}
+import scorex.transaction.{AssetAcc, AssetId}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 
@@ -29,7 +28,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[OrderAdded])
     context.system.eventStream.subscribe(self, classOf[OrderExecuted])
-    context.system.eventStream.subscribe(self, classOf[OrderCanceled])
+    context.system.eventStream.subscribe(self, classOf[OrderClosed])
   }
 
   def processExpirableRequest(r: Any): Unit = r match {
@@ -37,7 +36,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       fetchOrderHistory(req)
     case req: GetAllOrderHistory =>
       fetchAllOrderHistory(req)
-    case ValidateOrder(o, ts) =>
+    case ValidateOrder(o, _) =>
       sender() ! ValidateOrderResult(validateNewOrder(o))
     case ValidateCancelOrder(co, _) =>
       sender() ! ValidateCancelResult(validateCancelOrder(co))
@@ -77,7 +76,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       orderHistory.orderAccepted(ev)
     case ev: OrderExecuted =>
       orderHistory.orderExecuted(ev)
-    case ev: OrderCanceled =>
+    case ev: OrderClosed =>
       orderHistory.orderCanceled(ev)
     case RecoverFromOrderBook(ob) =>
       recoverFromOrderBook(ob)
@@ -90,18 +89,17 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   }
 
   def fetchAllOrderHistory(req: GetAllOrderHistory): Unit = {
-    req.activeOnly match {
-      case true =>
-        sender() ! GetOrderHistoryResponse(orderHistory.fetchAllActiveOrderHistory(req.address))
-      case false =>
-        sender() ! GetOrderHistoryResponse(orderHistory.fetchAllOrderHistory(req.address))
+    if (req.activeOnly) {
+      sender() ! GetOrderHistoryResponse(orderHistory.fetchAllActiveOrderHistory(req.address))
+    } else {
+      sender() ! GetOrderHistoryResponse(orderHistory.fetchAllOrderHistory(req.address))
     }
   }
 
   def forceCancelOrder(id: String): Unit = {
     orderHistory.order(id).map((_, orderHistory.orderInfo(id))) match {
       case Some((o, oi)) =>
-        orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, o)))
+        orderHistory.orderCanceled(OrderClosed(LimitOrder.limitOrder(o.price, oi.remaining, o), canceled = true))
         sender() ! o
       case None =>
         sender() ! None
@@ -129,7 +127,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
 
   def deleteFromOrderHistory(req: DeleteOrderFromHistory): Unit = {
     orderHistory.orderStatus(req.id) match {
-      case Filled | LimitOrder.Cancelled(_) =>
+      case LimitOrder.Filled | LimitOrder.Cancelled(_) =>
         orderHistory.deleteOrder(req.address, req.id)
         sender() ! OrderDeleted(req.id)
       case _ =>

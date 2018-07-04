@@ -5,7 +5,7 @@ import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
 import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
-import com.wavesplatform.matcher.model.MatcherSerializer._
+import com.wavesplatform.matcher.model.EventSerializers._
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
