@@ -231,24 +231,17 @@ class OrderBookActor(assetPair: AssetPair,
   @tailrec
   private def matchOrder(limitOrder: LimitOrder): Unit = {
     val (submittedRemains, counterRemains) = handleMatchEvent(OrderBook.matchOrder(orderBook, limitOrder))
-    println(s"submittedRemains=$submittedRemains")
-    println(s"counterRemains=$counterRemains")
     if (counterRemains.isDefined) {
-      println(s"counterRemains.get.isValid=${counterRemains.get.isValid}")
       if (!counterRemains.get.isValid) {
         val canceled = Events.OrderCanceled(counterRemains.get)
-        println(s"COUNTER CANCELED: $canceled")
         processEvent(canceled)
       }
     }
     if (submittedRemains.isDefined) {
-      println(s"submittedRemains.get.isValid=${submittedRemains.get.isValid}")
       if (submittedRemains.get.isValid) {
-        println(s"GOINT TO MATCH: ${submittedRemains.get}")
         matchOrder(submittedRemains.get)
       } else {
         val canceled = Events.OrderCanceled(submittedRemains.get)
-        println(s"SUBMITTED CANCELED: $canceled")
         processEvent(canceled)
       }
     }
@@ -297,7 +290,6 @@ class OrderBookActor(assetPair: AssetPair,
         } yield tx) match {
           case Right(tx) if tx.isInstanceOf[ExchangeTransaction] =>
             allChannels.broadcastTx(tx)
-            println(s"TX CREATED: $tx")
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
             (if (event.submittedRemaining >= 0) Some(o.partial(event.submittedRemaining)) else None,

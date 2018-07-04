@@ -327,11 +327,8 @@ class OrderBookActorSpecification
       val ord3 = buy(pair, 0.00073697, 3075363900L)
 
       actor ! ord1
-      println("sell1 placed")
       actor ! ord2
-      println("sell2 placed")
       actor ! ord3
-      println("buy places")
       receiveN(3)
 
       actor ! GetAskOrdersRequest

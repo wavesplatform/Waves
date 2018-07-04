@@ -27,10 +27,9 @@ sealed trait LimitOrder {
 
   def getSpendAmount: Long
   def getReceiveAmount: Long
-  def feeAmount: Long       = Try((BigInt(amount) * order.matcherFee / order.amount).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
+  def feeAmount: Long       = longExact(BigInt(amount) * order.matcherFee / order.amount, Long.MaxValue)
   def remainingAmount: Long = order.amount - amount
-  val remainingFee: Long = order.matcherFee - Try((BigInt(remainingAmount) * order.matcherFee / order.amount).bigInteger.longValueExact())
-    .getOrElse(0L)
+  val remainingFee: Long    = order.matcherFee - longExact(BigInt(remainingAmount) * order.matcherFee / order.amount, 0L)
 
   def spentAcc: AssetAcc = AssetAcc(order.senderPublicKey, order.getSpendAssetId)
   def rcvAcc: AssetAcc   = AssetAcc(order.senderPublicKey, order.getReceiveAssetId)
@@ -40,42 +39,17 @@ sealed trait LimitOrder {
   def rcvAsset: String   = order.getReceiveAssetId.map(_.base58).getOrElse(AssetPair.WavesName)
   def feeAsset: String   = AssetPair.WavesName
 
-  def minAmountOfAmountAsset: Long = {
-    val r = Try((BigInt(Order.PriceConstant) / BigInt(price)).bigInteger.longValueExact()).getOrElse(0L)
-    println(s"minAmountOfAmountAsset = $r")
-    r
-  }
-  def amountOfPriceAsset: Long = {
-    val r = Try((BigInt(amount) * price / Order.PriceConstant).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
-    println(s"amountOfPriceAsset     = $r")
-    r
-  }
-  def amountOfAmountAsset: Long = {
-    val r =
-      if (minAmountOfAmountAsset > 0)
-        Try((BigInt(amount) / minAmountOfAmountAsset * minAmountOfAmountAsset).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
-      else
-        amount
-    println(s"amountOfAmountAsset    = $r")
-    r
-  }
+  def minAmountOfAmountAsset: Long         = minimalAmountOfAmountAssetByPrice(price)
+  def amountOfPriceAsset: Long             = longExact(BigInt(amount) * price / Order.PriceConstant, Long.MaxValue)
+  def amountOfAmountAsset: Long            = correctedAmountOfAmountAsset(minAmountOfAmountAsset, amount)
+  def executionAmount(o: LimitOrder): Long = correctedAmountOfAmountAsset(minimalAmountOfAmountAssetByPrice(o.price), amount)
 
-  def executedAmount(o: LimitOrder): Long = {
-    println(s"amount=$amount")
-    val p   = o.price
-    val min = Try((BigInt(Order.PriceConstant) / BigInt(p)).bigInteger.longValueExact()).getOrElse(0L)
-    println(s"min=$min")
-    val pa = Try((BigInt(amount) * p / Order.PriceConstant).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
-    if (min > 0) {
-      val r = Try(((BigInt(amount) / min) * min).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
-      println(s"ear=$r")
-      r
-      //      Try((BigInt(pa) * min).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
-    } else
-      amount
-  }
   def isValid: Boolean =
     amount > minAmountOfAmountAsset && amount < Order.MaxAmount && getSpendAmount > 0 && getReceiveAmount > 0
+
+  protected def longExact(v: BigInt, default: Long): Long              = Try(v.bigInteger.longValueExact()).getOrElse(default)
+  protected def minimalAmountOfAmountAssetByPrice(p: Long): Long       = longExact(BigInt(Order.PriceConstant) / BigInt(p), 0L)
+  protected def correctedAmountOfAmountAsset(min: Long, a: Long): Long = if (min > 0) longExact((BigInt(a) / min) * min, Long.MaxValue) else a
 }
 
 case class BuyLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
@@ -83,6 +57,7 @@ case class BuyLimitOrder(price: Price, amount: Long, order: Order) extends Limit
   def getReceiveAmount: Long            = amountOfAmountAsset
   def getSpendAmount: Long              = amountOfPriceAsset
 }
+
 case class SellLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
   def partial(amount: Long): LimitOrder = copy(amount = amount)
   def getReceiveAmount: Long            = amountOfPriceAsset
@@ -144,11 +119,7 @@ object Events {
   sealed trait Event
 
   case class OrderExecuted(submitted: LimitOrder, counter: LimitOrder) extends Event {
-    def executedAmount: Long = {
-      val r = math.min(submitted.executedAmount(counter), counter.amountOfAmountAsset)
-      println(s"executedAmount = $r")
-      r
-    }
+    def executedAmount: Long          = math.min(submitted.executionAmount(counter), counter.amountOfAmountAsset)
     def counterRemaining: Long        = math.max(counter.amount - executedAmount, 0)
     def submittedRemaining: Long      = math.max(submitted.amount - executedAmount, 0)
     def submittedExecuted: LimitOrder = submitted.partial(amount = executedAmount)
