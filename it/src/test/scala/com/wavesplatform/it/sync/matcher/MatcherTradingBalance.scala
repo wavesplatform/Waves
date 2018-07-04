@@ -16,7 +16,6 @@ import com.wavesplatform.utils.Base58
 import scorex.api.http.assets.SignedIssueV1Request
 
 import scala.concurrent.duration._
-import scala.util.Random
 
 class MatcherTradingBalance
     extends FreeSpec
