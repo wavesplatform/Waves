@@ -93,7 +93,7 @@ object PureContext {
     case xs                                        => notImplemented("drop(xs: byte[], number: Long)", xs)
   }
 
-  val dropRightBytes: BaseFunction = UserFunction("dropRightBytes", BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
+  val dropRightBytes: BaseFunction = UserFunction("dropRight", "dropRightBytes", BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
     case (xs: EXPR) :: (number: EXPR) :: Nil =>
       FUNCTION_CALL(
         takeBytes,
@@ -111,7 +111,7 @@ object PureContext {
     case xs => notImplemented("dropRight(xs: byte[], number: Long)", xs)
   }
 
-  val takeRightBytes: BaseFunction = UserFunction("takeRightBytes", BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
+  val takeRightBytes: BaseFunction = UserFunction("takeRight", "takeRightBytes", BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
     case (xs: EXPR) :: (number: EXPR) :: Nil =>
       FUNCTION_CALL(
         dropBytes,
