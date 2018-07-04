@@ -52,6 +52,51 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
         }
     }
 
+    "forget rollbacked transaction for quering" in forAll(accountGen, positiveLongGen, accountGen, Gen.nonEmptyListOf(Gen.choose(1, 2))) {
+      case (sender, initialBalance, recipient, txCount) =>
+        withDomain() { d =>
+          d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
+
+          val genesisSignature = d.lastBlockId
+
+          d.portfolio(sender.toAddress).balance shouldBe initialBalance
+          d.portfolio(recipient.toAddress).balance shouldBe 0
+
+          val totalTxCount   = txCount.sum
+          val transferAmount = initialBalance / (totalTxCount * 2)
+
+          val transfers = txCount.map(tc => Seq.fill(tc)(transfer(sender, recipient, transferAmount)))
+
+          for (transfer <- transfers) {
+            d.appendBlock(
+              TestBlock.create(
+                nextTs,
+                d.lastBlockId,
+                transfer
+              ))
+          }
+
+          val transactions1 = d.addressTransactions(recipient).sortBy(_._2.timestamp)
+          //println(s"transactions1: ${transactions1.length}")
+
+          d.removeAfter(genesisSignature)
+
+          for (transfer <- transfers) {
+            d.appendBlock(
+              TestBlock.create(
+                nextTs,
+                d.lastBlockId,
+                transfer
+              ))
+          }
+
+          val transactions2 = d.addressTransactions(recipient).sortBy(_._2.timestamp)
+          //println(s"transactions2: ${transactions2.length}")
+
+          transactions1 shouldBe transactions2
+        }
+    }
+
     "waves balances" in forAll(accountGen, positiveLongGen, accountGen, Gen.nonEmptyListOf(Gen.choose(1, 10))) {
       case (sender, initialBalance, recipient, txCount) =>
         withDomain() { d =>
