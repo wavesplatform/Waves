@@ -39,7 +39,7 @@ class MatcherTradingBalance
   nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
   // Alice issues new assets
-  val alicePair = AssetPair(None, ByteStr.decodeBase58(aliceAsset).toOption)
+  val alicePair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
 
   "one sell and many buy" - {
 
@@ -51,25 +51,28 @@ class MatcherTradingBalance
 
     "transfer some asset to bob" in {
       val bobBalance              = bobNode.accountBalances(bobNode.address)
-      val transferBobWavesToALice = bobNode.transfer(bobNode.address, aliceAddress, bobBalance._1 - 10.waves - minFee, minFee, None, None).id
+      val transferBobWavesToALice = aliceNode.transfer(aliceNode.address, bobNode.address, AssetQuantity / 2, minFee, Some(aliceAsset), None).id
       nodes.waitForHeightAriseAndTxPresent(transferBobWavesToALice)
-      // bobNode.assertAssetBalance(bobNode.address, aliceAsset, AssetQuantity / 2)
     }
 
     "alice set order" in {
       val bobOrderId = matcherNode
-        .placeOrder(prepareOrder(bobNode, matcherNode, alicePair, OrderType.SELL, 600, 2.waves, 10.minutes))
+        .placeOrder(prepareOrder(bobNode, matcherNode, alicePair, OrderType.BUY, 44543041, 200.waves, 10.minutes))
         .message
         .id
       matcherNode.waitOrderStatus(aliceAsset, bobOrderId, "Accepted")
 
-      ordersRequestsGen(2, aliceNode, alicePair, OrderType.BUY, 0.00676.waves, 600)
-      //Thread.sleep(60000)
+      ordersRequestsGen(1, aliceNode, alicePair, OrderType.SELL, 0.003123.waves, 44543041)
       nodes.waitForHeightArise()
 
-      val orderStatusesAfterMatching = aliceOrderHistory().map(_.status)
-      orderStatusesAfterMatching should not contain ("Accepted")
-      orderStatusesAfterMatching should not contain ("PartiallyFilled")
+      matcherCancelOrder(bobNode, matcherNode, alicePair, bobOrderId)
+
+      val aliceWavesTradable = matcherNode.getTradableBalance(aliceAsset, "WAVES", aliceNode.address)("WAVES")
+      val bobWavesTradable   = matcherNode.getTradableBalance(aliceAsset, "WAVES", bobNode.address)("WAVES")
+      matcherNode.getTradableBalance(aliceAsset, "WAVES", bobNode.address)
+
+      aliceWavesTradable shouldBe matcherNode.accountBalances(aliceNode.address)._2
+      bobWavesTradable shouldBe matcherNode.accountBalances(bobNode.address)._1
 
     }
   }
@@ -79,6 +82,10 @@ class MatcherTradingBalance
       matcherNode
         .placeOrder(prepareOrder(node, matcherNode, assetPair, orderType, price, amount, 10.minutes))
     })
+  }
+
+  private def bobOrderHistory(): Seq[OrderbookHistory] = {
+    getOrderBook(bobNode, matcherNode)
   }
 
   private def aliceOrderHistory(): Seq[OrderbookHistory] = {
@@ -98,10 +105,7 @@ object MatcherTradingBalance {
   import ConfigFactory._
   import NodeConfigs.Default
 
-//  val matcherNode = Default.head
   val aliceNode = Default(1)
-//  val bobNode = Default(2)
-//  val miner = Default(3)
   val aliceAddress = aliceNode.getString("address")
 
   private val seed = Default(1).getString("account-seed")
@@ -112,7 +116,7 @@ object MatcherTradingBalance {
       name = "asset".getBytes(),
       description = "asset description".getBytes(),
       quantity = AssetQuantity,
-      decimals = 2,
+      decimals = 8,
       reissuable = false,
       fee = issueFee,
       timestamp = System.currentTimeMillis()
@@ -129,7 +133,7 @@ object MatcherTradingBalance {
                                                            |  bind-address = "0.0.0.0"
                                                            |  order-match-tx-fee = 300000
                                                            |  blacklisted-assets = [$ForbiddenAssetId]
-                                                           |  price-assets: [$assetId]
+
                                                            |  order-cleanup-interval = 20s
                                                            |  rest-order-limit=$orderLimit
                                                            |}""".stripMargin)
@@ -138,7 +142,7 @@ object MatcherTradingBalance {
   private val minerConfig   = parseString("waves.miner.enable = yes")
 
   val Configs: Seq[Config] = Seq(
-    matcherConfig.withFallback(Default.head),
+    matcherConfig.withFallback(Default.last),
     minerDisabled.withFallback(Default(1)),
     minerDisabled.withFallback(Default(2)),
     minerConfig.withFallback(Default(3))
@@ -158,7 +162,4 @@ object MatcherTradingBalance {
       signature.base58
     )
   }
-//  private val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
-//    .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))
-//    .map { case (n, o) => o.withFallback(n) }
 }
