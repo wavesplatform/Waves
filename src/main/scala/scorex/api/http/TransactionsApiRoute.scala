@@ -292,8 +292,10 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   private def txToCompactJson(address: Address, tx: Transaction): JsObject = {
     import scorex.transaction.transfer._
     tx match {
-      case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(address)
-      case _                                                               => txToExtendedJson(tx)
+      case mtt: MassTransferTransaction if mtt.sender.toAddress != address =>
+        val addresses = blockchain.aliasesOfAddress(address) :+ address
+        mtt.compactJson(addresses.toSet)
+      case _ => txToExtendedJson(tx)
     }
   }
 
