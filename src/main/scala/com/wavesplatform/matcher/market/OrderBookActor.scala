@@ -1,7 +1,7 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{ActorRef, Cancellable, Props, Stash}
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence._
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.matcher.MatcherSettings
@@ -230,18 +230,31 @@ class OrderBookActor(assetPair: AssetPair,
 
   @tailrec
   private def matchOrder(limitOrder: LimitOrder): Unit = {
-    val remOrder = handleMatchEvent(OrderBook.matchOrder(orderBook, limitOrder))
-    if (remOrder.isDefined) {
-      if (LimitOrder.validateAmount(remOrder.get)) {
-        matchOrder(remOrder.get)
+    val (submittedRemains, counterRemains) = handleMatchEvent(OrderBook.matchOrder(orderBook, limitOrder))
+    println(s"submittedRemains=$submittedRemains")
+    println(s"counterRemains=$counterRemains")
+    if (counterRemains.isDefined) {
+      println(s"counterRemains.get.isValid=${counterRemains.get.isValid}")
+      if (!counterRemains.get.isValid) {
+        val canceled = Events.OrderCanceled(counterRemains.get)
+        println(s"COUNTER CANCELED: $canceled")
+        processEvent(canceled)
+      }
+    }
+    if (submittedRemains.isDefined) {
+      println(s"submittedRemains.get.isValid=${submittedRemains.get.isValid}")
+      if (submittedRemains.get.isValid) {
+        println(s"GOINT TO MATCH: ${submittedRemains.get}")
+        matchOrder(submittedRemains.get)
       } else {
-        val canceled = Events.OrderCanceled(remOrder.get)
+        val canceled = Events.OrderCanceled(submittedRemains.get)
+        println(s"SUBMITTED CANCELED: $canceled")
         processEvent(canceled)
       }
     }
   }
 
-  private def processEvent(e: Event) = {
+  private def processEvent(e: Event): Unit = {
     persist(e)(_ => ())
     applyEvent(e)
     context.system.eventStream.publish(e)
@@ -271,11 +284,11 @@ class OrderBookActor(assetPair: AssetPair,
     }
   }
 
-  private def handleMatchEvent(e: Event): Option[LimitOrder] = {
+  private def handleMatchEvent(e: Event): (Option[LimitOrder], Option[LimitOrder]) = {
     e match {
       case e: OrderAdded =>
         processEvent(e)
-        None
+        (None, None)
 
       case event @ OrderExecuted(o, c) =>
         (for {
@@ -284,16 +297,17 @@ class OrderBookActor(assetPair: AssetPair,
         } yield tx) match {
           case Right(tx) if tx.isInstanceOf[ExchangeTransaction] =>
             allChannels.broadcastTx(tx)
+            println(s"TX CREATED: $tx")
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
-            if (event.submittedRemaining > 0) //TODO: add remainder validation
-              Some(o.partial(event.submittedRemaining))
-            else None
+            (if (event.submittedRemaining >= 0) Some(o.partial(event.submittedRemaining)) else None,
+             if (event.counterRemaining >= 0) Some(c.partial(event.counterRemaining)) else None)
           case Left(ex) =>
             log.info("Can't create tx for o1: " + Json.prettyPrint(o.order.json()) + "\n, o2: " + Json.prettyPrint(c.order.json()))
-            processInvalidTransaction(event, ex)
+            (processInvalidTransaction(event, ex), None)
         }
-      case _ => None
+
+      case _ => (None, None)
     }
   }
 
@@ -304,7 +318,7 @@ class OrderBookActor(assetPair: AssetPair,
 
   override def receiveCommand: Receive = fullCommands
 
-  val isMigrateToNewOrderHistoryStorage = settings.isMigrateToNewOrderHistoryStorage
+  val isMigrateToNewOrderHistoryStorage: Boolean = settings.isMigrateToNewOrderHistoryStorage
 
   override def receiveRecover: Receive = {
     case evt: Event =>
@@ -366,36 +380,36 @@ object OrderBookActor {
   case object OrderCleanup
 
   case class OrderAccepted(order: Order) extends MatcherResponse {
-    val json = Json.obj("status" -> "OrderAccepted", "message" -> order.json())
-    val code = StatusCodes.OK
+    val json: JsObject            = Json.obj("status" -> "OrderAccepted", "message" -> order.json())
+    val code: StatusCodes.Success = StatusCodes.OK
   }
 
   case class OrderRejected(message: String) extends MatcherResponse {
-    val json = Json.obj("status" -> "OrderRejected", "message" -> message)
-    val code = StatusCodes.BadRequest
+    val json: JsObject                = Json.obj("status" -> "OrderRejected", "message" -> message)
+    val code: StatusCodes.ClientError = StatusCodes.BadRequest
   }
 
   case class OrderCanceled(orderId: String) extends MatcherResponse {
-    val json = Json.obj("status" -> "OrderCanceled", "orderId" -> orderId)
-    val code = StatusCodes.OK
+    val json: JsObject            = Json.obj("status" -> "OrderCanceled", "orderId" -> orderId)
+    val code: StatusCodes.Success = StatusCodes.OK
   }
 
   case class OrderCancelRejected(message: String) extends MatcherResponse {
-    val json = Json.obj("status" -> "OrderCancelRejected", "message" -> message)
-    val code = StatusCodes.BadRequest
+    val json: JsObject                = Json.obj("status" -> "OrderCancelRejected", "message" -> message)
+    val code: StatusCodes.ClientError = StatusCodes.BadRequest
   }
 
   case class GetOrderStatusResponse(status: LimitOrder.OrderStatus) extends MatcherResponse {
     val json = status.json
-    val code = status match {
+    val code: StatusCode = status match {
       case LimitOrder.NotFound => StatusCodes.NotFound
       case _                   => StatusCodes.OK
     }
   }
 
   case class GetOrderBookResponse(pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends MatcherResponse {
-    val json: JsValue = Json.toJson(OrderBookResult(NTP.correctedTime(), pair, bids, asks))
-    val code          = StatusCodes.OK
+    val json: JsValue             = Json.toJson(OrderBookResult(NTP.correctedTime(), pair, bids, asks))
+    val code: StatusCodes.Success = StatusCodes.OK
   }
 
   object GetOrderBookResponse {

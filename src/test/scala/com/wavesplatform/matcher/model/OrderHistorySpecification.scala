@@ -136,7 +136,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     val exec = OrderExecuted(LimitOrder(ord2), LimitOrder(ord1))
     oh.orderExecuted(exec)
-    oh.orderAccepted(OrderAdded(exec.submittedRemainingOrder))
+    oh.orderAccepted(OrderAdded(exec.submitted.partial(exec.submittedRemaining)))
 
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Filled
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.PartiallyFilled(100000000)
@@ -166,9 +166,9 @@ class OrderHistorySpecification
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.PartiallyFilled(50000000)
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.Filled
 
-    val exec2 = OrderExecuted(LimitOrder(ord3), exec1.counterRemainingOrder)
+    val exec2 = OrderExecuted(LimitOrder(ord3), exec1.counter.partial(exec1.counterRemaining))
     oh.orderExecuted(exec2)
-    oh.orderAccepted(OrderAdded(exec2.submittedRemainingOrder))
+    oh.orderAccepted(OrderAdded(exec2.submitted.partial(exec2.submittedRemaining)))
 
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Filled
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.Filled
@@ -198,7 +198,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     val exec1 = OrderExecuted(LimitOrder(ord2), LimitOrder(ord1))
     oh.orderExecuted(exec1)
-    oh.orderAccepted(OrderAdded(exec1.submittedRemainingOrder))
+    oh.orderAccepted(OrderAdded(exec1.submitted.partial(exec1.submittedRemaining)))
 
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Filled
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.PartiallyFilled(100000000)
@@ -245,7 +245,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     val exec1 = OrderExecuted(LimitOrder(ord2), LimitOrder(ord1))
     oh.orderExecuted(exec1)
-    oh.orderCanceled(OrderCanceled(exec1.counterRemainingOrder))
+    oh.orderCanceled(OrderCanceled(exec1.counter.partial(exec1.counterRemaining)))
 
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Cancelled(1000000000)
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.Filled

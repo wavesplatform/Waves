@@ -105,7 +105,7 @@ class OrderBookActorSpecification
     system.eventStream.subscribe(eventsProbe.ref, classOf[Event])
   }
 
-  "OrderBookActror" should {
+  "OrderBookActor" should {
 
     "place buy orders" in {
       val ord1 = buy(pair, 34118, 1583290045643L)
@@ -277,7 +277,7 @@ class OrderBookActorSpecification
       val ord3 = sell(pair, 100, 10 * Order.PriceConstant)
 
       val pool = stub[UtxPool]
-      (pool.putIfNew _).when(*).onCall { (tx: Transaction) =>
+      (pool.putIfNew _).when(*).onCall { tx: Transaction =>
         tx match {
           case om: ExchangeTransaction if om.buyOrder == ord2 => Left(ValidationError.GenericError("test"))
           case _: Transaction                                 => Right((true, Diff.empty))
@@ -327,14 +327,15 @@ class OrderBookActorSpecification
       val ord3 = buy(pair, 0.00073697, 3075363900L)
 
       actor ! ord1
+      println("sell1 placed")
       actor ! ord2
+      println("sell2 placed")
       actor ! ord3
+      println("buy places")
       receiveN(3)
 
       actor ! GetAskOrdersRequest
-      expectMsg(
-        GetOrdersResponse(
-          Seq(SellLimitOrder((0.0006999 * Order.PriceConstant).toLong, 1500 * Constants.UnitsInWave - (3075363900L - 3075248828L), ord1))))
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder((0.0006999 * Order.PriceConstant).toLong, 1500 * Constants.UnitsInWave - 115668L, ord1))))
     }
 
     "partially execute order with price > 1 and zero fee remaining part " in {

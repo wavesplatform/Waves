@@ -198,9 +198,11 @@ object Order {
   private val AssetIdLength = 32
 
   def correctAmount(a: Long, price: Long): Long = {
-    val min = math.max(Order.PriceConstant / price, 1)
-    val k   = a / min
-    k * min
+    val min = Try((BigInt(Order.PriceConstant) / BigInt(price)).bigInteger.longValueExact()).getOrElse(0L)
+    if (min > 0)
+      Try((BigInt(a / min) * min).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
+    else
+      a
   }
 
   def buy(sender: PrivateKeyAccount,

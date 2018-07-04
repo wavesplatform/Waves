@@ -22,15 +22,23 @@ object OrderBook {
   def matchOrder(ob: OrderBook, o: LimitOrder): Event = o match {
     case oo: BuyLimitOrder =>
       if (ob.bestAsk.exists(oo.price >= _.price)) {
-        OrderExecuted(o, ob.bestAsk.get)
+        val r = OrderExecuted(o, ob.bestAsk.get)
+        println(s"MatchOrder: $r")
+        r
       } else {
-        OrderAdded(oo)
+        val r = OrderAdded(oo)
+        println(s"MatchOrder: $r")
+        r
       }
     case oo: SellLimitOrder =>
       if (ob.bestBid.exists(oo.price <= _.price)) {
-        OrderExecuted(o, ob.bestBid.get)
+        val r = OrderExecuted(o, ob.bestBid.get)
+        println(s"MatchOrder: $r")
+        r
       } else {
-        OrderAdded(oo)
+        val r = OrderAdded(oo)
+        println(s"MatchOrder: $r")
+        r
       }
   }
 
@@ -44,7 +52,7 @@ object OrderBook {
       }
   }
 
-  private def updateCancelOrder(ob: OrderBook, limitOrder: LimitOrder): (OrderBook) = {
+  private def updateCancelOrder(ob: OrderBook, limitOrder: LimitOrder): OrderBook = {
     (limitOrder match {
       case oo @ BuyLimitOrder(p, _, _) =>
         ob.bids.get(p).map { lvl =>
