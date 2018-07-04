@@ -15,6 +15,7 @@ import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import scodec.bits.ByteVector
 
 class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
@@ -90,7 +91,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
     expectedResult = Right((FUNCTION_CALL(getElement.header, List(REF("l"), CONST_LONG(1))), LONG))
   )
 
-  treeTypeTest(" typeref getElement")(
+  treeTypeTest("typeref getElement")(
     ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(
       AnyPos,
@@ -287,6 +288,38 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
     ctx = compilerContext,
     expr = Expressions.INVALID(AnyPos, "###"),
     expectedResult = Left("Compilation failed: ### in -1--1")
+  )
+
+  private val dropRightFunctionName: String = dropRightBytes.name
+
+  treeTypeTest("user function overloading 1")(
+    ctx = compilerContext,
+    expr = Expressions.FUNCTION_CALL(
+      AnyPos,
+      Expressions.PART.VALID(AnyPos, dropRightFunctionName),
+      List(Expressions.CONST_BYTEVECTOR(AnyPos, Expressions.PART.VALID(AnyPos, ByteVector.empty)), Expressions.CONST_LONG(AnyPos, 1))
+    ),
+    expectedResult = Right((FUNCTION_CALL(dropRightBytes.header, List(CONST_BYTEVECTOR(ByteVector.empty), CONST_LONG(1))), BYTEVECTOR))
+  )
+
+  treeTypeTest("user function overloading 2")(
+    ctx = compilerContext,
+    expr = Expressions.FUNCTION_CALL(
+      AnyPos,
+      Expressions.PART.VALID(AnyPos, dropRightFunctionName),
+      List(Expressions.CONST_STRING(AnyPos, Expressions.PART.VALID(AnyPos, "")), Expressions.CONST_LONG(AnyPos, 1))
+    ),
+    expectedResult = Right((FUNCTION_CALL(dropRightString.header, List(CONST_STRING(""), CONST_LONG(1))), STRING))
+  )
+
+  treeTypeTest("incorrect user function overloading")(
+    ctx = compilerContext,
+    expr = Expressions.FUNCTION_CALL(
+      AnyPos,
+      Expressions.PART.VALID(AnyPos, dropRightFunctionName),
+      List(Expressions.TRUE(AnyPos), Expressions.CONST_LONG(AnyPos, 1))
+    ),
+    expectedResult = Left("Compilation failed: Can't find a function 'dropRight'(Boolean, Int) in -1--1")
   )
 
   private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: Either[String, (EXPR, TYPE)], ctx: CompilerContext): Unit =
