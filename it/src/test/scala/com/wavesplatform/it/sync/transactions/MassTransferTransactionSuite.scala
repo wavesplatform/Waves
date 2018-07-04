@@ -4,9 +4,11 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.utils.Base58
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json._
+import scorex.account.Alias
 import scorex.api.http.assets.{MassTransferRequest, SignedMassTransferRequest}
 import scorex.transaction.transfer.MassTransferTransaction.{MaxTransferCount, Transfer}
 import scorex.transaction.transfer.TransferTransaction.MaxAttachmentSize
@@ -215,6 +217,10 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     json.validate[Seq[JsObject]].getOrElse(Seq.empty[JsValue]).filter(_("type").as[Int] == t)
   }
 
+  private def extractTransactionById(json: JsValue, id: String): Option[JsValue] = {
+    json.validate[Seq[JsObject]].getOrElse(Seq.empty[JsValue]).find(_("id").as[String] == id)
+  }
+
   test("reporting MassTransfer transactions") {
     implicit val mtFormat: Format[MassTransferRequest] = Json.format[MassTransferRequest]
 
@@ -255,5 +261,27 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     assert((txRecipient \ "totalAmount").as[Long] == 10.waves)
     val transferToSecond = txRecipient.as[MassTransferRequest].transfers.head
     assert(transfers contains transferToSecond)
+  }
+
+  test("reporting MassTransfer transactions to aliases") {
+    val aliases        = List("alias1", "alias2")
+    val createAliasTxs = aliases.map(sender.createAlias(secondAddress, _, 100000).id)
+    createAliasTxs.foreach(sender.waitForTransaction(_))
+
+    val transfers = aliases.map { alias =>
+      Transfer(Alias.buildWithCurrentNetworkByte(alias).explicitGet().stringRepr, 2.waves)
+    }
+    val txId = sender.massTransfer(firstAddress, transfers, 300000).id
+    nodes.waitForHeightAriseAndTxPresent(txId)
+
+    val rawTxs = sender
+      .get(s"/transactions/address/$secondAddress/limit/10")
+      .getResponseBody
+
+    val recipientTx =
+      extractTransactionById(Json.parse(rawTxs).as[JsArray].head.getOrElse(fail("The returned array is empty")), txId)
+        .getOrElse(fail(s"Can't find a mass transfer transaction $txId"))
+
+    assert((recipientTx \ "transfers").as[Seq[Transfer]].size == 2)
   }
 }

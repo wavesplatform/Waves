@@ -62,7 +62,8 @@ case class MassTransferTransaction private (version: Byte,
     jsonBase() ++ Json.obj("transfers" -> toJson(transfers))
   }
 
-  def compactJson(recipient: AddressOrAlias): JsObject = jsonBase() ++ Json.obj("transfers" -> toJson(transfers.filter(_.address == recipient)))
+  def compactJson(recipients: Set[AddressOrAlias]): JsObject =
+    jsonBase() ++ Json.obj("transfers" -> toJson(transfers.filter(t => recipients.contains(t.address))))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), proofs.bytes()))
 }
