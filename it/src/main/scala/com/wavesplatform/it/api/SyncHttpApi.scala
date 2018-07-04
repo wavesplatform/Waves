@@ -18,6 +18,7 @@ import scorex.waves.http.DebugMessage
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Try}
 
 object SyncHttpApi extends Assertions {
@@ -267,6 +268,24 @@ object SyncHttpApi extends Assertions {
       Await.result(
         async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(scala.concurrent.ExecutionContext.Implicits.global), cond),
         ConditionAwaitTime)
+
+    def rollback(height: Int, returnToUTX: Boolean = true): Unit = {
+      Await.result(
+        Future.traverse(nodes) { node =>
+          com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).rollback(height, returnToUTX)
+        },
+        ConditionAwaitTime
+      )
+    }
+
+    def waitForHeight(height: Int): Unit = {
+      Await.result(
+        Future.traverse(nodes) { node =>
+          com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).waitForHeight(height)
+        },
+        ConditionAwaitTime
+      )
+    }
   }
 
 }
