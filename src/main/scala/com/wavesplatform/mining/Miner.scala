@@ -298,10 +298,9 @@ class MinerImpl(allChannels: ChannelGroup,
         _            <- checkAge(height, blockchainUpdater.lastBlockTimestamp.get)
         _            <- checkScript(account)
         balanceAndTs <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, lastBlock, account)
-        (balance, ts)    = balanceAndTs
-        calculatedOffset = ts - timeService.correctedTime()
-        offset           = Math.max(calculatedOffset, minerSettings.minimalBlockGenerationOffset.toMillis).millis
-      } yield (offset, balance)
+        (balance, ts) = balanceAndTs
+        offset        = ts - timeService.correctedTime()
+      } yield (offset.millis, balance)
     } match {
       case Right((offset, balance)) =>
         log.debug(s"Next attempt for acc=$account in $offset")

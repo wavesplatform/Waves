@@ -15,7 +15,6 @@ class MinerSettingsSpecification extends FlatSpec with Matchers {
         |    quorum: 1
         |    interval-after-last-block-then-generation-is-allowed: 1d
         |    micro-block-interval: 5s
-        |    minimal-block-generation-offset: 500ms
         |    max-transactions-in-key-block: 300
         |    max-transactions-in-micro-block: 400
         |    min-micro-block-age: 3s
@@ -28,7 +27,6 @@ class MinerSettingsSpecification extends FlatSpec with Matchers {
     settings.enable should be(true)
     settings.quorum should be(1)
     settings.microBlockInterval should be(5.seconds)
-    settings.minimalBlockGenerationOffset should be(500.millis)
     settings.maxTransactionsInKeyBlock should be(300)
     settings.maxTransactionsInMicroBlock should be(400)
     settings.minMicroBlockAge should be(3.seconds)
