@@ -220,7 +220,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     }
 
     val threshold        = height - 2000
-    val changedAddresses = Set.newBuilder[BigInt]
+    val changedAddresses = addressTransactions.keys
 
     val newAddressesForWaves = ArrayBuffer.empty[BigInt]
     for ((addressId, balance) <- wavesBalances) {
@@ -230,7 +230,6 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         newAddressesForWaves += addressId
       }
       rw.put(Keys.wavesBalance(addressId)(height), balance)
-      changedAddresses += addressId
       expiredKeys ++= updateHistory(rw, wbh, kwbh, threshold, Keys.wavesBalance(addressId))
     }
 
@@ -242,7 +241,6 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     for ((addressId, leaseBalance) <- leaseBalances) {
       rw.put(Keys.leaseBalance(addressId)(height), leaseBalance)
-      changedAddresses += addressId
       expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), threshold, Keys.leaseBalance(addressId))
     }
 
@@ -254,7 +252,6 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         newAddressesForAsset += assetId -> (newAddressesForAsset.getOrElse(assetId, Set.empty) + addressId)
       }
       rw.put(Keys.assetList(addressId), prevAssets ++ assets.keySet)
-      changedAddresses += addressId
       for ((assetId, balance) <- assets) {
         rw.put(Keys.assetBalance(addressId, assetId)(height), balance)
         expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, assetId), threshold, Keys.assetBalance(addressId, assetId))
@@ -270,7 +267,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       rw.put(key, newAddressIds.toSeq)
     }
 
-    rw.put(Keys.changedAddresses(height), changedAddresses.result().toSeq)
+    rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
 
     for ((orderId, volumeAndFee) <- filledQuantity) {
       rw.put(Keys.filledVolumeAndFee(orderId)(height), volumeAndFee)
@@ -394,88 +391,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
             portfoliosToInvalidate += address
             balanceAtHeightCache.invalidate((currentHeight, addressId))
             leaseBalanceAtHeightCache.invalidate((currentHeight, addressId))
-          }
 
-          val txIdsAtHeight = Keys.transactionIdsAtHeight(currentHeight)
-          val addressesIds = rw.get(txIdsAtHeight) flatMap { txId =>
-            forgetTransaction(txId)
-            val ktxId = Keys.transactionInfo(txId)
-
-            val addressesIds: Seq[BigInt] = rw.get(ktxId).toSeq flatMap {
-              case (_, tx) =>
-                tx match {
-                  case _: GenesisTransaction => Seq[BigInt]() // genesis transaction can not be rolled back
-                  case tx: PaymentTransaction =>
-                    val ids: Seq[BigInt] = addressId(tx.sender.toAddress).toSeq ++ resolveAlias(tx.recipient).toSeq.flatMap(addressId)
-                    ids
-                  case tx: TransferTransaction =>
-                    val ids: Seq[BigInt] = addressId(tx.sender.toAddress).toSeq ++ resolveAlias(tx.recipient).toSeq.flatMap(addressId)
-                    ids
-                  case tx: MassTransferTransaction =>
-                    val ids: Seq[BigInt] = addressId(tx.sender.toAddress).toSeq ++ tx.transfers.flatMap(t =>
-                      resolveAlias(t.address).toSeq.flatMap(addressId))
-                    ids
-                  // balances already restored
-
-                  case tx: IssueTransaction =>
-                    assetInfoToInvalidate += rollbackAssetInfo(rw, tx.id(), currentHeight)
-                    addressId(tx.sender.toAddress).toSeq: Seq[BigInt]
-                  case tx: ReissueTransaction =>
-                    assetInfoToInvalidate += rollbackAssetInfo(rw, tx.assetId, currentHeight)
-                    addressId(tx.sender.toAddress).toSeq: Seq[BigInt]
-                  case tx: BurnTransaction =>
-                    assetInfoToInvalidate += rollbackAssetInfo(rw, tx.assetId, currentHeight)
-                    addressId(tx.sender.toAddress).toSeq: Seq[BigInt]
-                  case tx: SponsorFeeTransaction =>
-                    assetInfoToInvalidate += rollbackSponsorship(rw, tx.assetId, currentHeight)
-                    addressId(tx.sender.toAddress).toSeq: Seq[BigInt]
-                  case tx: LeaseTransaction =>
-                    rollbackLeaseStatus(rw, tx.id(), currentHeight)
-                    addressId(tx.sender.toAddress).toSeq: Seq[BigInt]
-                  case tx: LeaseCancelTransaction =>
-                    rollbackLeaseStatus(rw, tx.leaseId, currentHeight)
-                    addressId(tx.sender.toAddress).toSeq: Seq[BigInt]
-
-                  case tx: SetScriptTransaction =>
-                    val address = tx.sender.toAddress
-                    scriptsToDiscard += address
-                    val addessesIds: Seq[BigInt] = addressId(address).toSeq.map { addressId =>
-                      rw.delete(Keys.addressScript(addressId)(currentHeight))
-                      rw.filterHistory(Keys.addressScriptHistory(addressId), currentHeight)
-                      addressId
-                    }
-                    addessesIds
-
-                  case tx: DataTransaction =>
-                    val address = tx.sender.toAddress
-                    val addessesIds: Seq[BigInt] = addressId(address).toSeq.map { addressId =>
-                      tx.data.foreach { e =>
-                        log.trace(s"Discarding ${e.key} for $address at $currentHeight")
-                        rw.delete(Keys.data(addressId, e.key)(currentHeight))
-                        rw.filterHistory(Keys.dataHistory(addressId, e.key), currentHeight)
-                      }
-                      addressId
-                    }
-                    addessesIds
-
-                  case tx: CreateAliasTransaction =>
-                    rw.delete(Keys.addressIdOfAlias(tx.alias))
-                    addressId(tx.sender.toAddress).toSeq: Seq[BigInt]
-
-                  case tx: ExchangeTransaction =>
-                    ordersToInvalidate += rollbackOrderFill(rw, ByteStr(tx.buyOrder.id()), currentHeight)
-                    ordersToInvalidate += rollbackOrderFill(rw, ByteStr(tx.sellOrder.id()), currentHeight)
-                    addressId(tx.sender.toAddress).toSeq: Seq[BigInt]
-
-                  case _ => ???
-                }
-            }
-
-            rw.delete(ktxId)
-            addressesIds
-          }
-
-          addressesIds.foreach { addressId =>
             val kTxSeqNr = Keys.addressTransactionSeqNr(addressId)
             val txSeqNr  = rw.get(kTxSeqNr)
             val kTxIds   = Keys.addressTransactionIds(addressId, txSeqNr)
@@ -483,6 +399,62 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
               rw.delete(kTxIds)
               rw.put(kTxSeqNr, (txSeqNr - 1).max(0))
             }
+          }
+
+          val txIdsAtHeight = Keys.transactionIdsAtHeight(currentHeight)
+          for (txId <- rw.get(txIdsAtHeight)) {
+            forgetTransaction(txId)
+            val ktxId = Keys.transactionInfo(txId)
+
+            for ((_, tx) <- rw.get(ktxId)) {
+              tx match {
+                case _: GenesisTransaction                                                       => // genesis transaction can not be rolled back
+                case _: PaymentTransaction | _: TransferTransaction | _: MassTransferTransaction =>
+                // balances already restored
+
+                case tx: IssueTransaction =>
+                  assetInfoToInvalidate += rollbackAssetInfo(rw, tx.id(), currentHeight)
+                case tx: ReissueTransaction =>
+                  assetInfoToInvalidate += rollbackAssetInfo(rw, tx.assetId, currentHeight)
+                case tx: BurnTransaction =>
+                  assetInfoToInvalidate += rollbackAssetInfo(rw, tx.assetId, currentHeight)
+                case tx: SponsorFeeTransaction =>
+                  assetInfoToInvalidate += rollbackSponsorship(rw, tx.assetId, currentHeight)
+                case tx: LeaseTransaction =>
+                  rollbackLeaseStatus(rw, tx.id(), currentHeight)
+                case tx: LeaseCancelTransaction =>
+                  rollbackLeaseStatus(rw, tx.leaseId, currentHeight)
+
+                case tx: SetScriptTransaction =>
+                  val address = tx.sender.toAddress
+                  scriptsToDiscard += address
+                  for (addressId <- addressId(address)) {
+                    rw.delete(Keys.addressScript(addressId)(currentHeight))
+                    rw.filterHistory(Keys.addressScriptHistory(addressId), currentHeight)
+                  }
+
+                case tx: DataTransaction =>
+                  val address = tx.sender.toAddress
+                  for (addressId <- addressId(address)) {
+                    tx.data.foreach { e =>
+                      log.trace(s"Discarding ${e.key} for $address at $currentHeight")
+                      rw.delete(Keys.data(addressId, e.key)(currentHeight))
+                      rw.filterHistory(Keys.dataHistory(addressId, e.key), currentHeight)
+                    }
+                  }
+
+                case tx: CreateAliasTransaction =>
+                  rw.delete(Keys.addressIdOfAlias(tx.alias))
+
+                case tx: ExchangeTransaction =>
+                  ordersToInvalidate += rollbackOrderFill(rw, ByteStr(tx.buyOrder.id()), currentHeight)
+                  ordersToInvalidate += rollbackOrderFill(rw, ByteStr(tx.sellOrder.id()), currentHeight)
+
+                case _ => ???
+              }
+            }
+
+            rw.delete(ktxId)
           }
 
           rw.delete(txIdsAtHeight)
