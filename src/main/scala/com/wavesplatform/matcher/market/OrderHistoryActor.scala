@@ -6,7 +6,7 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{CancelOrder, GetOrderStatusResponse}
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ExpirableOrderHistoryRequest, _}
-import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderClosed, OrderExecuted}
+import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.utx.UtxPool
 import org.iq80.leveldb.DB
@@ -28,7 +28,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[OrderAdded])
     context.system.eventStream.subscribe(self, classOf[OrderExecuted])
-    context.system.eventStream.subscribe(self, classOf[OrderClosed])
+    context.system.eventStream.subscribe(self, classOf[OrderCanceled])
   }
 
   def processExpirableRequest(r: Any): Unit = r match {
@@ -76,7 +76,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       orderHistory.orderAccepted(ev)
     case ev: OrderExecuted =>
       orderHistory.orderExecuted(ev)
-    case ev: OrderClosed =>
+    case ev: OrderCanceled =>
       orderHistory.orderCanceled(ev)
     case RecoverFromOrderBook(ob) =>
       recoverFromOrderBook(ob)
@@ -99,7 +99,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   def forceCancelOrder(id: String): Unit = {
     orderHistory.order(id).map((_, orderHistory.orderInfo(id))) match {
       case Some((o, oi)) =>
-        orderHistory.orderCanceled(OrderClosed(LimitOrder.limitOrder(o.price, oi.remaining, o), canceled = true))
+        orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, o), unmatchable = false))
         sender() ! o
       case None =>
         sender() ! None

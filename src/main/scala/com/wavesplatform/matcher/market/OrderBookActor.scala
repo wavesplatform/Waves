@@ -87,7 +87,7 @@ class OrderBookActor(assetPair: AssetPair,
       orderBook.asks.values
         .++(orderBook.bids.values)
         .flatten
-        .foreach(x => context.system.eventStream.publish(Events.OrderClosed(x, canceled = true)))
+        .foreach(x => context.system.eventStream.publish(Events.OrderCanceled(x, unmatchable = false)))
       deleteMessages(lastSequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
       context.stop(self)
@@ -233,7 +233,7 @@ class OrderBookActor(assetPair: AssetPair,
     val (submittedRemains, counterRemains) = handleMatchEvent(OrderBook.matchOrder(orderBook, limitOrder))
     if (counterRemains.isDefined) {
       if (!counterRemains.get.isValid) {
-        val canceled = Events.OrderClosed(counterRemains.get, canceled = false)
+        val canceled = Events.OrderCanceled(counterRemains.get, unmatchable = true)
         processEvent(canceled)
       }
     }
@@ -241,7 +241,7 @@ class OrderBookActor(assetPair: AssetPair,
       if (submittedRemains.get.isValid) {
         matchOrder(submittedRemains.get)
       } else {
-        val canceled = Events.OrderClosed(submittedRemains.get, canceled = false)
+        val canceled = Events.OrderCanceled(submittedRemains.get, unmatchable = true)
         processEvent(canceled)
       }
     }
@@ -255,7 +255,7 @@ class OrderBookActor(assetPair: AssetPair,
 
   private def processInvalidTransaction(event: OrderExecuted, err: ValidationError): Option[LimitOrder] = {
     def cancelCounterOrder(): Option[LimitOrder] = {
-      processEvent(Events.OrderClosed(event.counter, canceled = true))
+      processEvent(Events.OrderCanceled(event.counter, unmatchable = false))
       Some(event.submitted)
     }
 

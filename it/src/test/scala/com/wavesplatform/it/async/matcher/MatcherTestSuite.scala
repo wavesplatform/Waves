@@ -100,7 +100,7 @@ class MatcherTestSuite
     getReservedBalance(matcherNode, bobNode.privateKey) shouldBe Map()
   }
 
-  "and should be listed by trader's publiс key via REST" in {
+  "and should be listed by trader's public key via REST" in {
 
     val orderIds = getAllOrder(matcherNode, aliceNode.privateKey)
 

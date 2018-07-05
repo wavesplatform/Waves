@@ -18,7 +18,7 @@ trait OrderHistory {
 
   def orderExecuted(event: OrderExecuted): Unit
 
-  def orderCanceled(event: OrderClosed)
+  def orderCanceled(event: OrderCanceled)
 
   def orderStatus(id: String): OrderStatus
 
@@ -153,7 +153,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     }
   }
 
-  override def orderCanceled(event: OrderClosed): Unit = {
+  override def orderCanceled(event: OrderCanceled): Unit = {
     val updatedInfo = saveOrderInfo(event)
     saveOpenPortfolio(event)
 

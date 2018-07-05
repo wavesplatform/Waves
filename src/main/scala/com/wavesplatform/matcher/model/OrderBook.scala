@@ -34,13 +34,13 @@ object OrderBook {
       }
   }
 
-  def cancelOrder(ob: OrderBook, orderId: String): Option[OrderClosed] = {
+  def cancelOrder(ob: OrderBook, orderId: String): Option[OrderCanceled] = {
     ob.bids
       .find { case (_, v) => v.exists(_.order.idStr() == orderId) }
       .orElse(ob.asks.find { case (_, v) => v.exists(_.order.idStr() == orderId) })
-      .fold(Option.empty[OrderClosed]) {
+      .fold(Option.empty[OrderCanceled]) {
         case (_, v) =>
-          Some(OrderClosed(v.find(_.order.idStr() == orderId).get, canceled = true))
+          Some(OrderCanceled(v.find(_.order.idStr() == orderId).get, unmatchable = false))
       }
   }
 
@@ -92,6 +92,6 @@ object OrderBook {
       ob.copy(asks = ob.asks + (o.price -> (orders :+ o)))
     case e @ OrderExecuted(_, c: BuyLimitOrder)  => updateExecutedBuy(ob, c, e.counterRemaining)
     case e @ OrderExecuted(_, c: SellLimitOrder) => updateExecutedSell(ob, c, e.counterRemaining)
-    case OrderClosed(limitOrder, _)              => updateCancelOrder(ob, limitOrder)
+    case OrderCanceled(limitOrder, _)            => updateCancelOrder(ob, limitOrder)
   }
 }
