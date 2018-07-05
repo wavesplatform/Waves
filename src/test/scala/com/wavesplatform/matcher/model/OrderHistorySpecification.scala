@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.model
 
 import com.wavesplatform.WithDB
 import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderClosed, OrderExecuted}
 import com.wavesplatform.state.{ByteStr, EitherExt2}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -213,7 +213,7 @@ class OrderHistorySpecification
     val ord1 = buy(pair, 0.0008, 100000000, matcherFee = Some(300000L))
 
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
-    oh.orderCanceled(OrderCanceled(LimitOrder(ord1)))
+    oh.orderCanceled(OrderClosed(LimitOrder(ord1), canceled = true))
 
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Cancelled(0)
 
@@ -227,7 +227,7 @@ class OrderHistorySpecification
     val ord1 = sell(pair, 0.0008, 100000000, matcherFee = Some(300000L))
 
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
-    oh.orderCanceled(OrderCanceled(LimitOrder(ord1)))
+    oh.orderCanceled(OrderClosed(LimitOrder(ord1), canceled = true))
 
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Cancelled(0)
 
@@ -245,7 +245,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     val exec1 = OrderExecuted(LimitOrder(ord2), LimitOrder(ord1))
     oh.orderExecuted(exec1)
-    oh.orderCanceled(OrderCanceled(exec1.counter.partial(exec1.counterRemaining)))
+    oh.orderCanceled(OrderClosed(exec1.counter.partial(exec1.counterRemaining), canceled = true))
 
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Cancelled(1000000000)
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.Filled
@@ -297,7 +297,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord3)))
     oh.orderExecuted(OrderExecuted(LimitOrder(ord4), LimitOrder(ord1)))
     oh.orderAccepted(OrderAdded(LimitOrder.limitOrder(ord4.price, 1000000000, ord4)))
-    oh.orderCanceled(OrderCanceled(LimitOrder(ord3)))
+    oh.orderCanceled(OrderClosed(LimitOrder(ord3), canceled = true))
     oh.orderAccepted(OrderAdded(LimitOrder(ord5)))
 
     oh.fetchAllOrderHistory(ord1.senderPublicKey.address).map(_._1) shouldBe
@@ -317,7 +317,7 @@ class OrderHistorySpecification
       oh.orderAccepted(OrderAdded(LimitOrder(o)))
     }
 
-    oh.orderCanceled(OrderCanceled(LimitOrder(orders.last)))
+    oh.orderCanceled(OrderClosed(LimitOrder(orders.last), canceled = true))
     val newOrder = buy(pair, 0.001, 100000000, Some(pk), Some(300000L), Some(1L))
     oh.orderAccepted(OrderAdded(LimitOrder(newOrder)))
     oh.fetchAllOrderHistory(pk.address).map(_._1) shouldBe orders.reverse.tail.map(_.idStr()) :+ newOrder.idStr()
@@ -333,7 +333,7 @@ class OrderHistorySpecification
       oh.orderAccepted(OrderAdded(LimitOrder(o)))
     }
 
-    oh.orderCanceled(OrderCanceled(LimitOrder(orders.last)))
+    oh.orderCanceled(OrderClosed(LimitOrder(orders.last), canceled = true))
     oh.fetchAllOrderHistory(pk.address).map(_._1) shouldBe orders.reverse.tail.map(_.idStr())
   }
 
