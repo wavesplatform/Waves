@@ -4,12 +4,12 @@ import com.google.common.primitives.Longs
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.api.{AssetBalance, MatcherStatusResponse, OrderBookResponse}
+import com.wavesplatform.it.api.{AssetBalance, MatcherStatusResponse, OrderBookResponse, Transaction}
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
-import scorex.account.PrivateKeyAccount
 import com.wavesplatform.utils.Base58
-import scorex.transaction.assets.exchange.Order
+import scorex.account.PrivateKeyAccount
+import scorex.transaction.assets.exchange.{AssetPair, Order}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.{Duration, _}
@@ -33,11 +33,11 @@ trait MatcherUtils {
     (result.message.id, result.status)
   }
 
-  def issueAsset(node: Node, name: String, amount: Long): String = {
+  def issueAsset(node: Node, name: String, amount: Long, decimals: Byte = 0): String = {
     val description = "asset for integration tests of matcher"
     val fee         = 100000000L
     val futureIssueTransaction: Future[String] = for {
-      a <- node.issueAsset(node.address, name, description, amount, 0, fee, reissuable = false)
+      a <- node.issueAsset(node.address, name, description, amount, decimals, fee, reissuable = false)
       _ <- node.waitForTransaction(a.id)
     } yield a.id
 
@@ -59,6 +59,19 @@ trait MatcherUtils {
                                                                                                                      5.seconds),
       timeout
     )
+
+  def waitForOrderStatus(matcherNode: Node, assetPair: AssetPair, orderId: String, expectedStatus: String, timeout: Duration): Unit =
+    Await.result(
+      matcherNode.waitFor[MatcherStatusResponse](s"order(assetPair=$assetPair, orderId=$orderId) status == $expectedStatus")(
+        _.getOrderStatus(assetPair, orderId),
+        _.status == expectedStatus,
+        5.seconds),
+      timeout
+    )
+
+  def getTransactionsByOrder(matcherNode: Node, orderId: String, timeout: Duration = 10.seconds): Seq[Transaction] = {
+    Await.result(matcherNode.getTransactionsByOrder(orderId), timeout)
+  }
 
   def checkOrderStatusDontChange(matcherNode: Node,
                                  asset: String,

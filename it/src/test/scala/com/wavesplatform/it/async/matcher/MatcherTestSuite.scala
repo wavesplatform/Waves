@@ -291,6 +291,57 @@ class MatcherTestSuite
     )
   }
 
+  "Alice and Bob trade USD-WAVES" in {
+    val quantity = 100000
+
+    // Alice issues USD
+    val rawUsdId = issueAsset(aliceNode, "X-USD", quantity, 2)
+    val usdId    = ByteStr.decodeBase58(rawUsdId).get
+
+    Await.result(matcherNode.waitForHeightArise, 1.minute)
+    waitForAssetBalance(aliceNode, rawUsdId, quantity)
+
+    val aliceWavesBalanceBefore = Await.result(matcherNode.balance(aliceNode.address), 1.minute).balance
+    val bobWavesBalanceBefore   = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
+
+    val usdWavesPair = AssetPair(
+      amountAsset = Some(usdId),
+      priceAsset = None
+    )
+
+    // Alice wants to sell USD for Waves
+    val aliceOrder        = prepareOrder(aliceNode, matcherNode, usdWavesPair, OrderType.SELL, (0.123 * Order.PriceConstant).toLong, 10)
+    val (aliceOrderId, _) = matcherPlaceOrder(matcherNode, aliceOrder)
+    waitForOrderStatus(matcherNode, usdWavesPair, aliceOrderId, "Accepted", 1.minute)
+
+    // Bob wants to buy some USD
+    val bobOrder1        = prepareOrder(bobNode, matcherNode, usdWavesPair, OrderType.BUY, (1.123 * Order.PriceConstant).toLong, 8)
+    val (bobOrder1Id, _) = matcherPlaceOrder(matcherNode, bobOrder1)
+    waitForOrderStatus(matcherNode, usdWavesPair, bobOrder1Id, "Filled", 1.minute)
+
+    // Will not work in the branch. But ok in master
+    //    val bobOrder2        = prepareOrder(bobNode, matcherNode, usdWavesPair, OrderType.BUY, (1.123 * Order.PriceConstant).toLong, 2)
+    //    val (bobOrder2Id, _) = matcherPlaceOrder(matcherNode, bobOrder2)
+    //    waitForOrderStatus(matcherNode, usdWavesPair, bobOrder2Id, "Filled", 1.minute)
+
+    // Each side get fair amount of assets
+    val exchangeTx = getTransactionsByOrder(matcherNode, aliceOrder.idStr()).headOption.getOrElse(fail("Expected an exchange transaction"))
+    Await.ready(matcherNode.waitForTransaction(exchangeTx.id), 1.minute)
+
+    val aliceWavesBalanceAfter = Await.result(matcherNode.balance(aliceNode.address), 1.minute).balance
+    val aliceUsdBalance        = Await.result(matcherNode.assetBalance(aliceNode.address, rawUsdId), 1.minute).balance
+
+    val bobWavesBalanceAfter = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
+    val bobUsdBalance        = Await.result(matcherNode.assetBalance(bobNode.address, rawUsdId), 1.minute).balance
+
+    println(
+      s"""alice: waves: $aliceWavesBalanceBefore -> $aliceWavesBalanceAfter, diff: ${aliceWavesBalanceAfter - aliceWavesBalanceBefore}
+         |alice: usd:   $quantity -> $aliceUsdBalance, diff: ${aliceUsdBalance - quantity}
+         |bob waves:    $bobWavesBalanceBefore -> $bobWavesBalanceAfter, diff: ${bobWavesBalanceAfter - bobWavesBalanceBefore}
+         |bob usd:      0 -> $bobUsdBalance, diff: $bobUsdBalance""".stripMargin
+    )
+  }
+
   "trader should be able to place a buy waves for asset order without having waves" in {
     // Bob issues new asset
     val bobAssetQuantity = 10000

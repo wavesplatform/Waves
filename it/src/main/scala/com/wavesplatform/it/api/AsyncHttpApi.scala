@@ -24,8 +24,8 @@ import scorex.api.http.alias.CreateAliasV1Request
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
 import scorex.api.http.{AddressApiRoute, ApiErrorResponse, DataRequest}
+import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
-import scorex.transaction.assets.exchange.Order
 import scorex.transaction.transfer._
 import scorex.waves.http.DebugApiRoute._
 import scorex.waves.http.DebugMessage._
@@ -93,8 +93,15 @@ object AsyncHttpApi extends Assertions {
     def getOrderStatus(asset: String, orderId: String): Future[MatcherStatusResponse] =
       matcherGet(s"/matcher/orderbook/$asset/WAVES/$orderId", waitForStatus = true).as[MatcherStatusResponse]
 
+    def getOrderStatus(assetPair: AssetPair, orderId: String): Future[MatcherStatusResponse] =
+      matcherGet(s"/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/$orderId", waitForStatus = true)
+        .as[MatcherStatusResponse]
+
     def getOrderBook(asset: String): Future[OrderBookResponse] =
       matcherGet(s"/matcher/orderbook/$asset/WAVES").as[OrderBookResponse]
+
+    def getTransactionsByOrder(orderId: String): Future[Seq[Transaction]] =
+      matcherGet(s"/matcher/transactions/$orderId").as[Seq[Transaction]]
 
     def getOrderbookByPublicKey(publicKey: String, timestamp: Long, signature: ByteStr): Future[Seq[OrderbookHistory]] =
       matcherGetWithSignature(s"/matcher/orderbook/$publicKey", timestamp, signature).as[Seq[OrderbookHistory]]
