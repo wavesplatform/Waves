@@ -219,11 +219,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       rw.put(Keys.idToAddress(id), address)
     }
 
-    val threshold        = height - 2000
-    val changedAddresses = addressTransactions.keys
+    val threshold = height - 2000
 
     val newAddressesForWaves = ArrayBuffer.empty[BigInt]
-    for ((addressId, balance) <- wavesBalances) {
+    val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
       val kwbh = Keys.wavesBalanceHistory(addressId)
       val wbh  = rw.get(kwbh)
       if (wbh.isEmpty) {
@@ -231,7 +230,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       }
       rw.put(Keys.wavesBalance(addressId)(height), balance)
       expiredKeys ++= updateHistory(rw, wbh, kwbh, threshold, Keys.wavesBalance(addressId))
+      addressId
     }
+
+    val changedAddresses = (addressTransactions.keys ++ updatedBalanceAddresses)
 
     if (newAddressesForWaves.nonEmpty) {
       val newSeqNr = rw.get(Keys.addressesForWavesSeqNr) + 1
