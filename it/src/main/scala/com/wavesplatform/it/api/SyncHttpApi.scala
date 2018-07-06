@@ -1,6 +1,7 @@
 package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.StatusCodes
+import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.it.Node
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state.{ByteStr, DataEntry}
@@ -63,6 +64,9 @@ object SyncHttpApi extends Assertions {
 
     def printDebugMessage(db: DebugMessage): Response =
       Await.result(async(n).printDebugMessage(db), RequestAwaitTime)
+
+    def activationStatus: ActivationStatus =
+      Await.result(async(n).activationStatus, RequestAwaitTime)
 
     def seed(address: String): String =
       Await.result(async(n).seed(address), RequestAwaitTime)
@@ -196,6 +200,8 @@ object SyncHttpApi extends Assertions {
     def height: Int =
       Await.result(async(n).height, RequestAwaitTime)
 
+    def blockAt(height: Int) = Await.result(async(n).blockAt(height), RequestAwaitTime)
+
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       Await.result(async(n).rollback(to, returnToUTX), RequestAwaitTime)
 
@@ -244,6 +250,8 @@ object SyncHttpApi extends Assertions {
                     request: CancelOrderRequest,
                     waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(n).cancelOrder(amountAsset, priceAsset, request), waitTime)
+
+    def findTransactionInfo(txId: String): Option[TransactionInfo] = Await.result(async(n).findTransactionInfo(txId), RequestAwaitTime)
 
   }
 
