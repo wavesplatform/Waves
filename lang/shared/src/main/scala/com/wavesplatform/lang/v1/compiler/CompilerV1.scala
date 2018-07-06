@@ -93,6 +93,16 @@ object CompilerV1 {
         case u: UNION => u.pure[CompileM]
         case _        => raiseError[CompilerContext, CompilationError, UNION](MatchOnlyUnion(p.start, p.end))
       }
+      refTmpKey = "$match" + ctx.tmpArgsIdx
+      _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1))
+      allowShadowVarName = typedExpr._1 match {
+        case REF(k) => Some(k)
+        case _      => None
+      }
+      ifCases <- inspect[CompilerContext, CompilationError, Expressions.EXPR](updatedCtx => {
+        mkIfCases(updatedCtx, cases, Expressions.REF(Pos(1, 1), PART.VALID(Pos(1, 1), refTmpKey)), allowShadowVarName)
+      })
+      compiledMatch <- compileBlock(p, Expressions.LET(Pos(1, 1), PART.VALID(Pos(1, 1), refTmpKey), expr, Seq.empty), ifCases)
       _ <- cases
         .flatMap(_.types)
         .traverse[CompileM, String](handlePart)
@@ -106,16 +116,6 @@ object CompilerV1 {
             )
             .toCompileM
         })
-      refTmpKey = "$match" + ctx.tmpArgsIdx
-      _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1))
-      allowShadowVarName = typedExpr._1 match {
-        case REF(k) => Some(k)
-        case _      => None
-      }
-      ifCases <- inspect[CompilerContext, CompilationError, Expressions.EXPR](updatedCtx => {
-        mkIfCases(updatedCtx, cases, Expressions.REF(Pos(1, 1), PART.VALID(Pos(1, 1), refTmpKey)), allowShadowVarName)
-      })
-      compiledMatch <- compileBlock(p, Expressions.LET(Pos(1, 1), PART.VALID(Pos(1, 1), refTmpKey), expr, Seq.empty), ifCases)
     } yield compiledMatch
   }
 
