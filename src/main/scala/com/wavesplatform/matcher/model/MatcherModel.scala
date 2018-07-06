@@ -9,6 +9,7 @@ import scorex.account.Address
 import scorex.transaction.assets.exchange._
 import scorex.transaction.{AssetAcc, AssetId}
 
+import scala.math.BigDecimal.RoundingMode
 import scala.util.Try
 
 object MatcherModel {
@@ -48,7 +49,7 @@ sealed trait LimitOrder {
     amount > 0 && amount >= minAmountOfAmountAsset && amount < Order.MaxAmount && getSpendAmount > 0 && getReceiveAmount > 0
 
   protected def longExact(v: BigInt, default: Long): Long              = Try(v.bigInteger.longValueExact()).getOrElse(default)
-  protected def minimalAmountOfAmountAssetByPrice(p: Long): Long       = Order.PriceConstant / p
+  protected def minimalAmountOfAmountAssetByPrice(p: Long): Long       = (BigDecimal(Order.PriceConstant) / p).setScale(0, RoundingMode.HALF_UP).toLong
   protected def correctedAmountOfAmountAsset(min: Long, a: Long): Long = if (min > 0) longExact((BigInt(a) / min) * min, Long.MaxValue) else a
 }
 

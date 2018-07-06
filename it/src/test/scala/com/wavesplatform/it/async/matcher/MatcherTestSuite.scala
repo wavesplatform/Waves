@@ -4,6 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.{LevelResponse, MatcherStatusResponse}
+import com.wavesplatform.it.sync.CustomFeeTransactionSuite.{defaultAssetQuantity, pk, seed}
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{Node, ReportingTestName}
 import com.wavesplatform.matcher.api.CancelOrderRequest
@@ -11,11 +12,14 @@ import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.state.{ByteStr, EitherExt2}
 import com.wavesplatform.utils.Base58
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
-import scorex.api.http.assets.SignedTransferV1Request
+import scorex.account.PrivateKeyAccount
+import scorex.api.http.assets.{SignedIssueV1Request, SignedTransferV1Request}
 import scorex.api.http.leasing.{SignedLeaseCancelV1Request, SignedLeaseV1Request}
+import scorex.transaction.assets.IssueTransactionV1
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import scorex.transaction.transfer._
+import com.wavesplatform.it.util._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -64,11 +68,14 @@ class MatcherTestSuite
     aliceAssetId = ByteStr.decodeBase58(aliceAsset).get
     aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
 
+    matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
+
     // Wait for balance on Alice's account
     Await.result(matcherNode.waitForHeightArise, 1.minute)
     waitForAssetBalance(aliceNode, aliceAsset, AssetQuantity)
     waitForAssetBalance(matcherNode, aliceAsset, 0)
     waitForAssetBalance(bobNode, aliceAsset, 0)
+    waitForAssetBalance(aliceNode, UsdId.base58, defaultAssetQuantity)
 
     // Alice spent 1 Wave to issue the asset
     aliceBalance = getBalance(aliceNode)
@@ -292,54 +299,41 @@ class MatcherTestSuite
   }
 
   "Alice and Bob trade USD-WAVES" in {
-    val quantity = 100000
-
-    // Alice issues USD
-    val rawUsdId = issueAsset(aliceNode, "X-USD", quantity, 2)
-    val usdId    = ByteStr.decodeBase58(rawUsdId).get
-
     Await.result(matcherNode.waitForHeightArise, 1.minute)
-    waitForAssetBalance(aliceNode, rawUsdId, quantity)
-
     val aliceWavesBalanceBefore = Await.result(matcherNode.balance(aliceNode.address), 1.minute).balance
     val bobWavesBalanceBefore   = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
 
     val usdWavesPair = AssetPair(
-      amountAsset = Some(usdId),
-      priceAsset = None
+      amountAsset = None,
+      priceAsset = Some(UsdId)
     )
 
+    val price = 280
+
     // Alice wants to sell USD for Waves
-    val aliceOrder        = prepareOrder(aliceNode, matcherNode, usdWavesPair, OrderType.SELL, (0.123 * Order.PriceConstant).toLong, 10)
+    val aliceOrder        = prepareOrder(aliceNode, matcherNode, usdWavesPair, OrderType.BUY, price, 700000)
     val (aliceOrderId, _) = matcherPlaceOrder(matcherNode, aliceOrder)
     waitForOrderStatus(matcherNode, usdWavesPair, aliceOrderId, "Accepted", 1.minute)
 
     // Bob wants to buy some USD
-    val bobOrder1        = prepareOrder(bobNode, matcherNode, usdWavesPair, OrderType.BUY, (1.123 * Order.PriceConstant).toLong, 8)
+    val bobOrder1        = prepareOrder(bobNode, matcherNode, usdWavesPair, OrderType.SELL, price, 300000000)
     val (bobOrder1Id, _) = matcherPlaceOrder(matcherNode, bobOrder1)
-    waitForOrderStatus(matcherNode, usdWavesPair, bobOrder1Id, "Filled", 1.minute)
-
-    // Will not work in the branch. But ok in master
-    //    val bobOrder2        = prepareOrder(bobNode, matcherNode, usdWavesPair, OrderType.BUY, (1.123 * Order.PriceConstant).toLong, 2)
-    //    val (bobOrder2Id, _) = matcherPlaceOrder(matcherNode, bobOrder2)
-    //    waitForOrderStatus(matcherNode, usdWavesPair, bobOrder2Id, "Filled", 1.minute)
+    waitForOrderStatus(matcherNode, usdWavesPair, bobOrder1Id, "PartiallyFilled", 1.minute)
 
     // Each side get fair amount of assets
     val exchangeTx = getTransactionsByOrder(matcherNode, aliceOrder.idStr()).headOption.getOrElse(fail("Expected an exchange transaction"))
     Await.ready(matcherNode.waitForTransaction(exchangeTx.id), 1.minute)
 
     val aliceWavesBalanceAfter = Await.result(matcherNode.balance(aliceNode.address), 1.minute).balance
-    val aliceUsdBalance        = Await.result(matcherNode.assetBalance(aliceNode.address, rawUsdId), 1.minute).balance
+    val aliceUsdBalance        = Await.result(matcherNode.assetBalance(aliceNode.address, UsdId.base58), 1.minute).balance
 
     val bobWavesBalanceAfter = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
-    val bobUsdBalance        = Await.result(matcherNode.assetBalance(bobNode.address, rawUsdId), 1.minute).balance
+    val bobUsdBalance        = Await.result(matcherNode.assetBalance(bobNode.address, UsdId.base58), 1.minute).balance
 
-    println(
-      s"""alice: waves: $aliceWavesBalanceBefore -> $aliceWavesBalanceAfter, diff: ${aliceWavesBalanceAfter - aliceWavesBalanceBefore}
-         |alice: usd:   $quantity -> $aliceUsdBalance, diff: ${aliceUsdBalance - quantity}
-         |bob waves:    $bobWavesBalanceBefore -> $bobWavesBalanceAfter, diff: ${bobWavesBalanceAfter - bobWavesBalanceBefore}
-         |bob usd:      0 -> $bobUsdBalance, diff: $bobUsdBalance""".stripMargin
-    )
+    aliceWavesBalanceAfter - aliceWavesBalanceBefore should be(357143 - (BigInt(MatcherFee) * 357143 / 700000).bigInteger.longValue())
+    aliceUsdBalance - defaultAssetQuantity should be(-1)
+    bobWavesBalanceAfter - bobWavesBalanceBefore should be(-357143 - (BigInt(MatcherFee) * 357143 / 300000000).bigInteger.longValue())
+    bobUsdBalance should be(1)
   }
 
   "trader should be able to place a buy waves for asset order without having waves" in {
@@ -706,7 +700,50 @@ object MatcherTestSuite {
        |  balance-watching.enable = yes
        |}""".stripMargin)
 
-  private val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
+  private val _Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
     .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))
     .map { case (n, o) => o.withFallback(n) }
+
+  private val aliceSeed = _Configs(1).getString("account-seed")
+  private val pk        = PrivateKeyAccount.fromSeed(aliceSeed).explicitGet()
+  val IssueUsdTx: IssueTransactionV1 = IssueTransactionV1
+    .selfSigned(
+      sender = pk,
+      name = "USD-X".getBytes(),
+      description = "asset description".getBytes(),
+      quantity = defaultAssetQuantity,
+      decimals = 2,
+      reissuable = false,
+      fee = 1.waves,
+      timestamp = System.currentTimeMillis()
+    )
+    .right
+    .get
+
+  val UsdId = IssueUsdTx.id()
+
+  private val updatedMatcherConfig = parseString(s"""
+       |waves.matcher {
+       |  price-assets = ["WAVES", "$UsdId"]
+       |  predefined-pairs = [{amountAsset = "WAVES", priceAsset = "$UsdId"}]
+       |}
+     """.stripMargin)
+
+  private val Configs = _Configs.map(updatedMatcherConfig.withFallback(_))
+
+  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
+    import tx._
+    SignedIssueV1Request(
+      Base58.encode(tx.sender.publicKey),
+      new String(name),
+      new String(description),
+      quantity,
+      decimals,
+      reissuable,
+      fee,
+      timestamp,
+      signature.base58
+    )
+  }
+
 }

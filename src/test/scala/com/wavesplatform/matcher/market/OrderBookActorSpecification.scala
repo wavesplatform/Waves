@@ -332,7 +332,7 @@ class OrderBookActorSpecification
       receiveN(3)
 
       actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder((0.0006999 * Order.PriceConstant).toLong, 1500 * Constants.UnitsInWave - 115668L, ord1))))
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder((0.0006999 * Order.PriceConstant).toLong, 1500 * Constants.UnitsInWave - 115749L, ord1))))
     }
 
     "partially execute order with price > 1 and zero fee remaining part " in {

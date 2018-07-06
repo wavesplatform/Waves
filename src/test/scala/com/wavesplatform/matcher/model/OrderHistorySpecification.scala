@@ -50,7 +50,7 @@ class OrderHistorySpecification
 
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Accepted
-    oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 9996L
+    oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 8574L
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 0L
     oh.openVolume(AssetAcc(ord1.senderPublicKey, None)) shouldBe ord1.matcherFee
 
@@ -203,7 +203,8 @@ class OrderHistorySpecification
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Filled
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.PartiallyFilled(100000000)
 
-    oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 109999340L + ord2.matcherFee * 11 / 21
+    oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 109998942L + (BigInt(ord2.matcherFee) * (210000000 - 100000000) / 210000000).bigInteger
+      .longValue()
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 0L
     oh.allOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr(), ord2.idStr())
     oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(pair.amountAsset -> ord2.idStr())

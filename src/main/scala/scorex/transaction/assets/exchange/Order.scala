@@ -14,6 +14,7 @@ import scorex.transaction.ValidationError.{GenericError, InvalidSignature}
 import scorex.transaction._
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 
+import scala.math.BigDecimal.RoundingMode
 import scala.util.Try
 
 sealed trait OrderType {
@@ -71,8 +72,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
 
   import Order._
 
-  val sender         = senderPublicKey
-  val signatureValid = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
+  val sender: PublicKeyAccount        = senderPublicKey
+  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(price, amount) &&
@@ -198,9 +199,9 @@ object Order {
   private val AssetIdLength = 32
 
   def correctAmount(a: Long, price: Long): Long = {
-    val min = Try((BigInt(Order.PriceConstant) / BigInt(price)).bigInteger.longValueExact()).getOrElse(0L)
+    val min = (BigDecimal(Order.PriceConstant) / price).setScale(0, RoundingMode.HALF_UP)
     if (min > 0)
-      Try((BigInt(a / min) * min).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
+      ((BigDecimal(a) / min).toBigInt() * min.toBigInt()).bigInteger.longValueExact()
     else
       a
   }
