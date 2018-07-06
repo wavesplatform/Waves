@@ -104,8 +104,8 @@ object EventSerializers {
   val orderCancelledFormat = Format(
     Reads[OrderCanceled] {
       case js: JsObject =>
-        val o = js("o").as[LimitOrder]
-        val u = js("unmatchable").asOpt[Boolean]
+        val o = (js \ "o").as[LimitOrder]
+        val u = (js \ "unmatchable").asOpt[Boolean]
         JsSuccess(OrderCanceled(o, unmatchable = u.getOrElse(false)))
       case _ => JsError("failed to deserialize OrderCanceled")
     },
