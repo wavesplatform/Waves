@@ -64,6 +64,9 @@ object AsyncHttpApi extends Assertions {
     def getOrderStatus(asset: String, orderId: String, waitForStatus: Boolean = true): Future[MatcherStatusResponse] =
       matcherGet(s"/matcher/orderbook/$asset/WAVES/$orderId", waitForStatus = waitForStatus).as[MatcherStatusResponse]
 
+    def getExchangeTransactions(orderId: String): Future[Seq[Transaction]] =
+      matcherGet(s"/matcher/transactions/${orderId}").as[Seq[Transaction]]
+
     def getOrderBook(asset: String): Future[OrderBookResponse] =
       matcherGet(s"/matcher/orderbook/$asset/WAVES").as[OrderBookResponse]
 
@@ -84,6 +87,9 @@ object AsyncHttpApi extends Assertions {
 
     def getReservedBalance(publicKey: String, timestamp: Long, signature: ByteStr): Future[Map[String, Long]] =
       matcherGetWithSignature(s"/matcher/balance/reserved/$publicKey", timestamp, signature).as[Map[String, Long]]
+
+    def getTradableBalance(amountAsset: String, priceAsset: String, address: String): Future[Map[String, Long]] =
+      matcherGet(s"/matcher/orderbook/$amountAsset/$priceAsset/tradableBalance/$address").as[Map[String, Long]]
 
     def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
       retrying(f(_get(s"${n.nodeApiEndpoint}$path")).build())

@@ -236,6 +236,9 @@ object SyncHttpApi extends Assertions {
     def getReservedBalance(publicKey: String, timestamp: Long, signature: ByteStr, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
       Await.result(async(n).getReservedBalance(publicKey, timestamp, signature), waitTime)
 
+    def getTradableBalance(amountAsset: String, priceAsset: String, address: String): Map[String, Long] =
+      Await.result(async(n).getTradableBalance(amountAsset, priceAsset, address), RequestAwaitTime)
+
     def expectIncorrectOrderPlacement(order: Order, expectedStatusCode: Int, expectedStatus: String): Boolean =
       Await.result(async(n).expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus), 1.minute)
 
@@ -244,6 +247,9 @@ object SyncHttpApi extends Assertions {
                     request: CancelOrderRequest,
                     waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(n).cancelOrder(amountAsset, priceAsset, request), waitTime)
+
+    def getExchangeTransactions(orderId: String) =
+      Await.result(async(n).getExchangeTransactions(orderId), RequestAwaitTime)
 
   }
 
