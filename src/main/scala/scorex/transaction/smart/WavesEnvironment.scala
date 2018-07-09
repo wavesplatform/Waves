@@ -54,10 +54,13 @@ class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], blo
 
   override def networkByte: Byte = nByte
 
-  override def accountBalanceOf(addressOrAlias: Array[Byte], maybeAssetId: Option[Array[Byte]]): Either[String, Long] = {
+  override def accountBalanceOf(addressOrAlias: Recipient, maybeAssetId: Option[Array[Byte]]): Either[String, Long] = {
     (for {
-      aoa     <- AddressOrAlias.fromBytes(bytes = addressOrAlias, position = 0)
-      address <- blockchain.resolveAlias(aoa._1)
+      aoa <- addressOrAlias match {
+        case Address(bytes) => AddressOrAlias.fromBytes(bytes.toArray, position = 0).map(_._1)
+        case Alias(name)    => scorex.account.Alias.buildWithCurrentNetworkByte(name)
+      }
+      address <- blockchain.resolveAlias(aoa)
       balance = blockchain.balance(address, maybeAssetId.map(ByteStr(_)))
     } yield balance).left.map(_.toString)
   }

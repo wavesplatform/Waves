@@ -4,16 +4,12 @@ import cats._
 import com.wavesplatform.lang.v1.FunctionHeader
 import shapeless.{Lens, lens}
 
-case class EvaluationContext(typeDefs: Map[String, DefinedType], letDefs: Map[String, LazyVal], functions: Map[FunctionHeader, BaseFunction]) {
-  lazy val functionCosts: Map[FunctionHeader, Long] =
-    functions.mapValues(_.cost) ++
-      typeDefs.collect { case (typeName, CaseType(_, fields)) => FunctionHeader.User(typeName) -> fields.size.toLong }
-}
+case class EvaluationContext(typeDefs: Map[String, DefinedType], letDefs: Map[String, LazyVal], functions: Map[FunctionHeader, BaseFunction])
 
 object EvaluationContext {
 
   object Lenses {
-    val types: Lens[EvaluationContext, Map[String, DefinedType]] = lens[EvaluationContext] >> 'typeDefs
+    val types: Lens[EvaluationContext, Map[String, DefinedType]]          = lens[EvaluationContext] >> 'typeDefs
     val lets: Lens[EvaluationContext, Map[String, LazyVal]]               = lens[EvaluationContext] >> 'letDefs
     val funcs: Lens[EvaluationContext, Map[FunctionHeader, BaseFunction]] = lens[EvaluationContext] >> 'functions
   }

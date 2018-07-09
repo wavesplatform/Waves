@@ -145,7 +145,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       assert(details.extraFee == 0)
       assert(details.minSponsoredAssetFee.isEmpty)
 
-      val reissueId = sender.reissue(firstAddress, issuedAssetId, issuedQuantity, false, minFee).id
+      val reissueId = sender.reissue(firstAddress, issuedAssetId, issuedQuantity, false, issueFee).id
       nodes.waitForHeightAriseAndTxPresent(reissueId)
 
       val details1 = notMiner.assetsDetails(issuedAssetId)
@@ -166,7 +166,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       assert(details2.extraFee == 0)
       assert(details2.minSponsoredAssetFee.isEmpty)
 
-      assertBadRequestAndMessage(sender.reissue(firstAddress, issuedAssetId, issuedQuantity, true, minFee).id, "Asset is not reissuable")
+      assertBadRequestAndMessage(sender.reissue(firstAddress, issuedAssetId, issuedQuantity, true, issueFee).id, "Asset is not reissuable")
       assertBadRequestAndMessage(sender.transfer(secondAddress, thirdAddress, transferredQuantity / 2, minFee, issuedAssetId.some).id,
                                  "Attempt to transfer unavailable funds")
       assertBadRequestAndMessage(sender.transfer(firstAddress, thirdAddress, transferredQuantity / 2, minFee, issuedAssetId.some).id,

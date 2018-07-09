@@ -8,8 +8,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient, Tx}
 import fastparse.core.Parsed.{Failure, Success}
-import scodec.Attempt
-import scodec.Attempt.Successful
 
 import scala.scalajs.js
 //import scala.scalajs.js.Dynamic.{literal => jObj}
@@ -45,14 +43,14 @@ object JsAPI {
   def compile(input: String): js.Dynamic = {
 
     val wavesContext = WavesContext.build(new Environment {
-      override def height: Int                                                                                       = ???
-      override def networkByte: Byte                                                                                 = ???
-      override def transaction: Tx                                                                                   = ???
-      override def transactionById(id: Array[Byte]): Option[Tx]                                                      = ???
-      override def transactionHeightById(id: Array[Byte]): Option[Int]                                               = ???
-      override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any]                     = ???
-      override def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = ???
-      override def resolveAlias(name: String): Either[String, Recipient.Address]                                     = ???
+      override def height: Int                                                                                     = ???
+      override def networkByte: Byte                                                                               = ???
+      override def transaction: Tx                                                                                 = ???
+      override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+      override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
+      override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
+      override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+      override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     })
 
     val cryptoContext = CryptoContext.build(Global)
@@ -62,15 +60,8 @@ object JsAPI {
     def hash(m: Array[Byte]) = Global.keccak256(Global.blake2b256(m))
 
     def serialize(expr: EXPR): Either[String, Array[Byte]] = {
-      Serde.codec
-        .encode(expr)
-        .map(x => {
-          val s = Array(1.toByte) ++ x.toByteArray
-          s ++ hash(s).take(4)
-        }) match {
-        case Successful(value)      => Right[String, Array[Byte]](value)
-        case Attempt.Failure(cause) => Left[String, Array[Byte]](cause.message)
-      }
+      val s = 1.toByte +: Serde.serialize(expr)
+      Right(s ++ hash(s).take(4))
     }
 
     (Parser(input) match {

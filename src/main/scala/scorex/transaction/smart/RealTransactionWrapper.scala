@@ -13,7 +13,13 @@ import scorex.transaction.transfer._
 
 object RealTransactionWrapper {
 
-  private def header(tx: Transaction): Header = Header(ByteVector(tx.id().arr), tx.assetFee._2, tx.timestamp, 0)
+  private def header(tx: Transaction): Header = {
+    val v = tx match {
+      case vt: VersionedTransaction => vt.version
+      case _                        => 1
+    }
+    Header(ByteVector(tx.id().arr), tx.assetFee._2, tx.timestamp, v)
+  }
   private def proven(tx: ProvenTransaction): Proven =
     Proven(
       header(tx),

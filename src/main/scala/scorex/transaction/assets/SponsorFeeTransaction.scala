@@ -19,6 +19,7 @@ case class SponsorFeeTransaction private (version: Byte,
                                           timestamp: Long,
                                           proofs: Proofs)
     extends ProvenTransaction
+    with VersionedTransaction
     with FastHashId {
 
   override val builder: SponsorFeeTransaction.type = SponsorFeeTransaction

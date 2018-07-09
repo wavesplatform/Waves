@@ -25,7 +25,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
   val blockDelaySeconds = 60
   val defaultBaseTarget = 100L
 
-  property("Correct consensus parameters of blocks generated with FairPoS") {
+  property("Correct consensus parameters distribution of blocks generated with FairPoS") {
 
     val miners = mkMiners
     val first  = Block(0, defaultBaseTarget, PrivateKeyAccount(generationSignature), System.currentTimeMillis(), 0)

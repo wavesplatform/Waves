@@ -22,6 +22,10 @@ trait ReportingTestName extends SuiteMixin with ScorexLogging {
     import scala.concurrent.ExecutionContext.Implicits.global
     val formatted = s"---------- $text ----------"
     log.debug(formatted)
-    Await.result(Future.traverse(nodes)(_.printDebugMessage(DebugMessage(formatted))), 10.seconds)
+    try {
+      Await.result(Future.traverse(nodes)(_.printDebugMessage(DebugMessage(formatted))), 10.seconds)
+    } catch {
+      case _: Throwable => ()
+    }
   }
 }
