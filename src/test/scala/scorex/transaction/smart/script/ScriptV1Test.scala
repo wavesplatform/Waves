@@ -9,6 +9,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 import scorex.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 
 class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
 
@@ -41,7 +42,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
     }
     val expr = (1 to 9).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
       FUNCTION_CALL(
-        function = FunctionHeader.Native(EQ),
+        function = PureContext.eq.header,
         args = List(r, bigSum)
       )
     }

@@ -6,7 +6,7 @@ import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{Address, Alias}
-import scorex.transaction.ProvenTransaction
+import scorex.transaction.{ProvenTransaction, VersionedTransaction}
 import scorex.transaction.assets.exchange.Order
 import play.api.libs.json.Json // For string escapes.
 
@@ -20,12 +20,16 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
        |   let bodyBytes = t.bodyBytes == base64'${ByteStr(t.bodyBytes.apply()).base64}'
        |   let sender = t.sender == addressFromPublicKey(base58'${ByteStr(t.sender.publicKey).base58}')
        |   let senderPublicKey = t.senderPublicKey == base58'${ByteStr(t.sender.publicKey).base58}'
+       |   let version = t.version == ${t match {
+         case v: VersionedTransaction => v.version
+         case _                       => 1
+       }}
        |   ${Range(0, 8).map(pg).mkString("\n")}
      """.stripMargin
   }
 
   val assertProvenPart =
-    "id && fee && timestamp && sender && senderPublicKey && proof0 && proof1 && proof2 && proof3 && proof4 && proof5 && proof6 && proof7 && bodyBytes"
+    "id && fee && timestamp && sender && senderPublicKey && proof0 && proof1 && proof2 && proof3 && proof4 && proof5 && proof6 && proof7 && bodyBytes && version"
 
   property("TransferTransaction binding") {
     forAll(Gen.oneOf(transferV1Gen, transferV2Gen)) { t =>
@@ -235,22 +239,19 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     forAll(dataTransactionGen(10)) { t =>
       def pg(i: Int) = {
         val v = t.data(i) match {
-          case x: IntegerDataEntry => s"case a: IntegerDataEntry => a.value == ${x.value}"
-          case x: BooleanDataEntry => s"case a: BooleanDataEntry => a.value == ${x.value}"
-          case x: BinaryDataEntry  => s"case a: BinaryDataEntry => a.value == base64'${x.value.base64}'"
-          case x: StringDataEntry  => s"""case a: StringDataEntry => a.value == ${Json.toJson(x.value)}"""
+          case e: IntegerDataEntry => e.value.toString
+          case e: BooleanDataEntry => e.value.toString
+          case e: BinaryDataEntry  => s"base64'${e.value.base64}'"
+          case e: StringDataEntry  => Json.toJson(e.value)
         }
 
         s"""let key$i = t.data[$i].key == ${Json.toJson(t.data(i).key)}
-           |let value$i = match (t.data[$i]) {
-           | $v
-           | case other => true
-           |}
+           |let value$i = t.data[$i].value == $v
          """.stripMargin
       }
 
       val resString =
-        if (t.data.isEmpty) assertProvenPart else assertProvenPart + s" && ${Range(0, t.data.length).map(i => s"key$i && value$i").mkString(" && ")}"
+        if (t.data.isEmpty) assertProvenPart else assertProvenPart + s" && ${t.data.indices.map(i => s"key$i && value$i").mkString(" && ")}"
 
       val s = s"""
                  |match tx {

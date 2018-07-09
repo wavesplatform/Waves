@@ -11,11 +11,11 @@ object Types {
 
   val transfer = CaseType("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
 
-  val optionByteVector         = UNION(BYTEVECTOR, UNIT)
-  val optionAddress            = UNION(addressType.typeRef, UNIT)
-  val optionLong               = UNION(LONG, UNIT)
-  val listByteVector: LIST     = LIST(BYTEVECTOR)
-  val listTransfers            = LIST(transfer.typeRef)
+  val optionByteVector     = UNION(BYTEVECTOR, UNIT)
+  val optionAddress        = UNION(addressType.typeRef, UNIT)
+  val optionLong           = UNION(LONG, UNIT)
+  val listByteVector: LIST = LIST(BYTEVECTOR)
+  val listTransfers        = LIST(transfer.typeRef)
 
   val header = List(
     "id"        -> BYTEVECTOR,
@@ -146,30 +146,23 @@ object Types {
       ++ header ++ proven
   )
 
-  def buildDataEntryType(name: String, tpe: TYPE) = CaseType(name + "DataEntry", List("key" -> STRING, "value" -> tpe))
-
-  val strDataEntryType  = buildDataEntryType("String", STRING)
-  val boolDataEntryType = buildDataEntryType("Boolean", BOOLEAN)
-  val binDataEntryType   = buildDataEntryType("Binary", BYTEVECTOR)
-  val intDataEntryType = buildDataEntryType("Integer", LONG)
-  val dataEntryTypes    = List(strDataEntryType, boolDataEntryType, binDataEntryType, intDataEntryType)
-
-  val listOfDataEntriesType = LIST(UNION.create(dataEntryTypes.map(_.typeRef)))
+  private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTEVECTOR, STRING)
+  val dataEntryType              = CaseType("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
 
   val dataTransactionType = CaseType(
     "DataTransaction",
-    List("data" -> listOfDataEntriesType) ++ header ++ proven
+    List("data" -> LIST(dataEntryType.typeRef)) ++ header ++ proven
   )
 
   val massTransferTransactionType = CaseType(
     "MassTransferTransaction",
     List(
-      "feeAssetId"    -> optionByteVector,
-      "transferAssetId"       -> optionByteVector,
-      "totalAmount"   -> LONG,
-      "transfers"     -> listTransfers,
-      "transferCount" -> LONG,
-      "attachment"    -> BYTEVECTOR
+      "feeAssetId"      -> optionByteVector,
+      "transferAssetId" -> optionByteVector,
+      "totalAmount"     -> LONG,
+      "transfers"       -> listTransfers,
+      "transferCount"   -> LONG,
+      "attachment"      -> BYTEVECTOR
     ) ++ header ++ proven
   )
 
@@ -197,10 +190,10 @@ object Types {
     dataTransactionType
   )
 
-  val transactionTypes = /*obsoleteTransactionTypes ++ */ activeTransactionTypes
+  val transactionTypes = obsoleteTransactionTypes ++ activeTransactionTypes
 
   val outgoingTransactionType = UNION.create(activeTransactionTypes.map(_.typeRef))
   val anyTransactionType      = UNION.create(transactionTypes.map(_.typeRef))
 
-  val wavesTypes = Seq(addressType, aliasType, transfer, orderType, assetPairType) ++ dataEntryTypes ++ transactionTypes
+  val wavesTypes = Seq(addressType, aliasType, transfer, orderType, assetPairType, dataEntryType) ++ transactionTypes
 }

@@ -7,7 +7,7 @@ import com.wavesplatform.lang.directives.{Directive, DirectiveKey, DirectivePars
 import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.utils
-import com.wavesplatform.utils.dummyEvaluationContext.functionCosts
+import com.wavesplatform.utils.functionCosts
 import scorex.transaction.smart.script.v1.ScriptV1
 
 import scala.util.{Failure, Success, Try}

@@ -4,10 +4,16 @@ import com.typesafe.config.Config
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.util._
+
+import scala.concurrent.duration._
 import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
-import com.wavesplatform.state.Sponsorship
+import com.wavesplatform.state.{ByteStr, Sponsorship}
+import com.wavesplatform.utils.Base58
 import org.scalatest.{Assertion, CancelAfterFailure, FreeSpec, Matchers}
+import play.api.libs.json.{JsNumber, JsObject, Json}
+import com.wavesplatform.it.util._
+import scorex.api.http.assets.{SignedSponsorFeeRequest}
+import scorex.transaction.assets.SponsorFeeTransaction
 
 class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with ReportingTestName with CancelAfterFailure {
 
@@ -44,7 +50,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
 
   "Fee in sponsored asset works fine" - {
 
-    val sponsorWavesBalance = miner.accountBalances(sponsor.address)._2
+    val sponsorWavesBalance = sponsor.accountBalances(sponsor.address)._2
     val minerWavesBalance   = miner.accountBalances(miner.address)._2
 
     //25000000000000
@@ -90,9 +96,9 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
     }
 
     "check balance before test accounts balances" in {
-      miner.assertAssetBalance(sponsor.address, sponsorAssetId, sponsorAssetTotal / 2)
-      miner.assertBalances(sponsor.address, sponsorWavesBalance - 2 * issueFee - minFee)
-      miner.assertAssetBalance(alice.address, sponsorAssetId, sponsorAssetTotal / 2)
+      sponsor.assertAssetBalance(sponsor.address, sponsorAssetId, sponsorAssetTotal / 2)
+      sponsor.assertBalances(sponsor.address, sponsorWavesBalance - 2 * issueFee - minFee)
+      alice.assertAssetBalance(alice.address, sponsorAssetId, sponsorAssetTotal / 2)
 
       val assetInfo = alice.assetsBalance(alice.address).balances.filter(_.assetId == sponsorAssetId).head
       assetInfo.minSponsoredAssetFee shouldBe Some(Token)
@@ -106,7 +112,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
                                     "Asset was issued by other address")
       }
 
-      "not enough fee to change shonsorship" in {
+      "not enough fee to change sponsorship" in {
         val lessThanMinFee = minFee / 2
         assertBadRequestAndResponse(
           sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = 2 * Token, fee = lessThanMinFee),
@@ -163,8 +169,9 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
         nodes.waitForHeightAriseAndTxPresent(bobLeaseSomeWavesToSponsorTx)
 
         assertBadRequestAndResponse(alice.transfer(alice.address, bob.address, 10 * Token, LargeFee, Some(sponsorAssetId), Some(sponsorAssetId)),
-                                    "leased being more than own")
+                                    "trying to spend leased money")
         val cancelBobLeasingTx = bob.cancelLease(bob.address, bobLeaseSomeWavesToSponsorTx, leasingFee).id
+        nodes.waitForHeightAriseAndTxPresent(cancelBobLeasingTx)
 
         val cancelSponsorLeasingTx = sponsor.cancelLease(sponsor.address, sponsorLeaseAllAvaliableWaves, leasingFee).id
         nodes.waitForHeightAriseAndTxPresent(cancelSponsorLeasingTx)
@@ -182,8 +189,28 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       }
 
       "invalid tx timestamp" in {
-        //todo
+        def invalidTx(timestamp: Long = System.currentTimeMillis) =
+          SponsorFeeTransaction
+            .selfSigned(1, sponsor.privateKey, ByteStr.decodeBase58(sponsorAssetId).get, Some(SmallFee), minFee, timestamp + 1.day.toMillis)
+            .right
+            .get
 
+        def request(tx: SponsorFeeTransaction): SignedSponsorFeeRequest =
+          SignedSponsorFeeRequest(
+            tx.version,
+            Base58.encode(tx.sender.publicKey),
+            tx.assetId.base58,
+            tx.minSponsoredAssetFee,
+            tx.fee,
+            tx.timestamp,
+            tx.proofs.base58().toList
+          )
+
+        implicit val w =
+          Json.writes[SignedSponsorFeeRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(SponsorFeeTransaction.typeId.toInt)))
+
+        val iTx = invalidTx(timestamp = System.currentTimeMillis + 1.day.toMillis)
+        assertBadRequestAndResponse(sponsor.broadcastRequest(request(iTx)), "Transaction .* is from far future")
       }
     }
 
@@ -290,7 +317,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
     }
     "set sponsopship again" - {
 
-      "set sponorship and check new asset details, min sponsored fee changed" in {
+      "set sponsorship and check new asset details, min sponsored fee changed" in {
         val setAssetSponsoredTx = sponsor.sponsorAsset(sponsor.address, sponsorAssetId, fee = issueFee, baseFee = TinyFee).id
         nodes.waitForHeightAriseAndTxPresent(setAssetSponsoredTx)
         assert(!setAssetSponsoredTx.isEmpty)
@@ -343,8 +370,6 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       }
 
       "make transfer with updated min sponsored fee" in {
-        val sponsorFee = 3 * Token / 2
-
         val sponsoredBalance    = sponsor.accountBalances(sponsor.address)
         val sponsorAssetBalance = sponsor.assetBalance(sponsor.address, sponsorAssetId).balance
         val aliceAssetBalance   = alice.assetBalance(alice.address, sponsorAssetId).balance
@@ -364,7 +389,8 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       }
 
     }
-    "issue asset make sponsor and burn and reissue" in { //todo reissue
+
+    "issue asset make sponsor and burn and reissue" in {
       val sponsorBalance = sponsor.accountBalances(sponsor.address)
       val minerBalance   = miner.accountBalances(miner.address)
 
@@ -384,13 +410,20 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       assetInfo.minSponsoredAssetFee shouldBe Some(Token)
       assetInfo.quantity shouldBe sponsorAssetTotal / 2
 
+      val sponsorAssetId2Reissue = sponsor.reissue(sponsor.address, sponsorAssetId2, sponsorAssetTotal, true, issueFee).id
+      nodes.waitForHeightAriseAndTxPresent(sponsorAssetId2Reissue)
+      val assetInfoAfterReissue = sponsor.assetsDetails(sponsorAssetId2)
+      assetInfoAfterReissue.minSponsoredAssetFee shouldBe Some(Token)
+      assetInfoAfterReissue.quantity shouldBe sponsorAssetTotal / 2 + sponsorAssetTotal
+      assetInfoAfterReissue.reissuable shouldBe true
+
       val aliceTransferWaves = alice.transfer(alice.address, bob.address, transferAmount, SmallFee, None, Some(sponsorAssetId2)).id
       nodes.waitForHeightAriseAndTxPresent(aliceTransferWaves)
 
-      val totalWavesFee = Sponsorship.FeeUnit * SmallFee / Token + issueFee + sponsorFee + burnFee + minFee
+      val totalWavesFee = Sponsorship.FeeUnit * SmallFee / Token + issueFee + sponsorFee + burnFee + minFee + issueFee
       miner.assertBalances(miner.address, minerBalance._1 + totalWavesFee)
       sponsor.assertBalances(sponsor.address, sponsorBalance._1 - totalWavesFee, sponsorBalance._2 - totalWavesFee)
-      sponsor.assertAssetBalance(sponsor.address, sponsorAssetId2, SmallFee)
+      sponsor.assertAssetBalance(sponsor.address, sponsorAssetId2, SmallFee + sponsorAssetTotal)
     }
 
     "miner is sponsor" in {
