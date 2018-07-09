@@ -213,7 +213,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
         )
       )
     ),
-    expectedResult = Left("Compilation failed: Value 'foo' already defined in the scope in 1-1")
+    expectedResult = Left("Compilation failed: Value 'foo' already defined in the scope in -1--1")
   )
 
   treeTypeTest("pattern matching - deny shadowing in non-ref")(
@@ -240,7 +240,35 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
         )
       )
     ),
-    expectedResult = Left("Compilation failed: Value 'p' already defined in the scope in 1-1")
+    expectedResult = Left("Compilation failed: Value 'p' already defined in the scope in -1--1")
+  )
+
+  treeTypeTest("pattern matching - deny matching with single non-existing type")(
+    ctx = compilerContext,
+    expr = Expressions.MATCH(
+      AnyPos,
+      Expressions.FUNCTION_CALL(
+        AnyPos,
+        Expressions.PART.VALID(AnyPos, "idT"),
+        List(Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")))
+      ),
+      List(
+        Expressions.MATCH_CASE(
+          AnyPos,
+          Some(Expressions.PART.VALID(AnyPos, "p1")),
+          List(Expressions.PART.VALID(AnyPos, "Point0"), Expressions.PART.VALID(AnyPos, "PointB")),
+          Expressions.TRUE(AnyPos)
+        ),
+        Expressions.MATCH_CASE(
+          AnyPos,
+          None,
+          List.empty,
+          Expressions.FALSE(AnyPos)
+        )
+      )
+    ),
+    expectedResult = Left(
+      "Compilation failed: Value 'p1' declared as non-existing type, while all possible types are List(Point, PointB, Boolean, Int, PointA, ByteVector, Unit, String) in -1--1")
   )
 
   treeTypeTest("Invalid LET")(
