@@ -11,9 +11,9 @@ import scorex.crypto.signatures.Curve25519
 import scorex.serialization.Deser
 import scorex.transaction.smart.script.Script
 import scorex.transaction.validation._
-import scorex.transaction.{AssetId, ProvenTransaction, ValidationError}
+import scorex.transaction.{AssetId, ProvenTransaction, ValidationError, VersionedTransaction}
 
-trait IssueTransaction extends ProvenTransaction {
+trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
   def name: Array[Byte]
   def description: Array[Byte]
   def quantity: Long
@@ -21,7 +21,6 @@ trait IssueTransaction extends ProvenTransaction {
   def reissuable: Boolean
   def fee: Long
   def script: Option[Script]
-  def version: Byte
 
   final lazy val assetId                               = id
   override final val assetFee: (Option[AssetId], Long) = (None, fee)

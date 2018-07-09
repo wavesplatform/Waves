@@ -7,10 +7,9 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount
 import scorex.crypto.signatures.Curve25519.KeyLength
-import scorex.transaction.{AssetId, ProvenTransaction, ValidationError}
+import scorex.transaction.{AssetId, ProvenTransaction, ValidationError, VersionedTransaction}
 
-trait LeaseCancelTransaction extends ProvenTransaction {
-  def version: Byte
+trait LeaseCancelTransaction extends ProvenTransaction with VersionedTransaction {
   def chainByte: Option[Byte]
   def leaseId: ByteStr
   def fee: Long
