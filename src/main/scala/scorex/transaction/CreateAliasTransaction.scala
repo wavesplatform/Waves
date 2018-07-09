@@ -9,8 +9,7 @@ import scorex.serialization.Deser
 
 import scala.util.{Failure, Success, Try}
 
-trait CreateAliasTransaction extends ProvenTransaction {
-  def version: Byte
+trait CreateAliasTransaction extends ProvenTransaction with VersionedTransaction {
   def alias: Alias
   def fee: Long
   def timestamp: Long

@@ -16,8 +16,6 @@ import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.transaction.transfer._
 
-import scala.concurrent.duration._
-
 /*
 Scenario:
 1. Alice's and swapBC1's balances initialisation
@@ -163,9 +161,9 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     notMiner.assertBalances(BobBC1, bobBalance + transferAmount, bobEffBalance + transferAmount)
     notMiner.assertBalances(AliceBC1, aliceBalance, aliceEffBalance)
 
-    for (n <- nodes) n.rollback(height, false)
+    nodes.rollback(height, false)
 
-    sender.waitForHeight(sender.height + 20, 3.minutes)
+    nodes.waitForHeight(height + 20)
 
     val selfSignedToAlice = TransferTransactionV2
       .selfSigned(

@@ -61,8 +61,8 @@ object AsyncHttpApi extends Assertions {
     def matcherPost[A: Writes](path: String, body: A): Future[Response] =
       post(s"${n.matcherApiEndpoint}$path", (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
 
-    def getOrderStatus(asset: String, orderId: String): Future[MatcherStatusResponse] =
-      matcherGet(s"/matcher/orderbook/$asset/WAVES/$orderId", waitForStatus = true).as[MatcherStatusResponse]
+    def getOrderStatus(asset: String, orderId: String, waitForStatus: Boolean = true): Future[MatcherStatusResponse] =
+      matcherGet(s"/matcher/orderbook/$asset/WAVES/$orderId", waitForStatus = waitForStatus).as[MatcherStatusResponse]
 
     def getOrderBook(asset: String): Future[OrderBookResponse] =
       matcherGet(s"/matcher/orderbook/$asset/WAVES").as[OrderBookResponse]

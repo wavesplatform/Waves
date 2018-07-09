@@ -106,7 +106,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
                                     "Asset was issued by other address")
       }
 
-      "not enough fee to change shonsorship" in {
+      "not enough fee to change sponsorship" in {
         val lessThanMinFee = minFee / 2
         assertBadRequestAndResponse(
           sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = 2 * Token, fee = lessThanMinFee),
@@ -163,7 +163,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
         nodes.waitForHeightAriseAndTxPresent(bobLeaseSomeWavesToSponsorTx)
 
         assertBadRequestAndResponse(alice.transfer(alice.address, bob.address, 10 * Token, LargeFee, Some(sponsorAssetId), Some(sponsorAssetId)),
-                                    "leased being more than own")
+                                    "trying to spend leased money")
         val cancelBobLeasingTx = bob.cancelLease(bob.address, bobLeaseSomeWavesToSponsorTx, leasingFee).id
 
         val cancelSponsorLeasingTx = sponsor.cancelLease(sponsor.address, sponsorLeaseAllAvaliableWaves, leasingFee).id

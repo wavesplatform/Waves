@@ -14,13 +14,14 @@ import com.wavesplatform.lang._
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import monix.eval.Coeval
 
 class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
   val Plus  = FunctionHeader.Native(SUM_LONG)
   val Minus = FunctionHeader.Native(SUB_LONG)
   val Gt    = FunctionHeader.Native(GT_LONG)
 
-  val FunctionCosts: Map[FunctionHeader, Long] = Map(Plus -> 100, Minus -> 10, Gt -> 10)
+  val FunctionCosts: Map[FunctionHeader, Coeval[Long]] = Map[FunctionHeader, Long](Plus -> 100, Minus -> 10, Gt -> 10).mapValues(Coeval.now)
 
   private val ctx: CompilerContext = {
     val tx = CaseObj(transferTransactionType.typeRef, Map("amount" -> 100000000L))

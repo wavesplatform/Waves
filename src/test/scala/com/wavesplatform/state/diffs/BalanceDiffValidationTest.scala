@@ -105,7 +105,7 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Matche
           TestBlock.create(Seq(aliceTransfersMoreThanOwnsMinusLeaseOut)),
           settings
         ) { totalDiffEi =>
-          totalDiffEi should produce("leased being more than own")
+          totalDiffEi should produce("trying to spend leased money")
         }
     }
   }

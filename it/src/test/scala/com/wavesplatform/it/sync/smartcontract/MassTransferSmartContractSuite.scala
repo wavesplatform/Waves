@@ -44,7 +44,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
             let txToUsers = (massTxSize && totalAmountToUsers)
 
-            let mTx = getTransactionById(ttx.proofs[1])
+            let mTx = transactionById(ttx.proofs[1])
 
             if (txToUsers && accSig) then true
             else

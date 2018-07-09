@@ -37,10 +37,11 @@ object Common {
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
-  val multiplierFunction: NativeFunction = NativeFunction("MULTIPLY", 1, 10005, LONG, "x1" -> LONG, "x2" -> LONG) {
-    case (x1: Long) :: (x2: Long) :: Nil => Try(x1 * x2).toEither.left.map(_.toString)
-    case _                               => ??? // suppress pattern match warning
-  }
+  val multiplierFunction: NativeFunction =
+    NativeFunction("MULTIPLY", 1, 10005, LONG, "x1" -> LONG, "x2" -> LONG) {
+      case (x1: Long) :: (x2: Long) :: Nil => Try(x1 * x2).toEither.left.map(_.toString)
+      case _                               => ??? // suppress pattern match warning
+    }
 
   val pointTypeA = CaseType("PointA", List("X"  -> LONG, "YA" -> LONG))
   val pointTypeB = CaseType("PointB", List("X"  -> LONG, "YB" -> LONG))
@@ -48,7 +49,7 @@ object Common {
 
   val AorB    = UNION(pointTypeA.typeRef, pointTypeB.typeRef)
   val AorBorC = UNION(pointTypeA.typeRef, pointTypeB.typeRef, pointTypeC.typeRef)
-  val BorC    = UNION.of(pointTypeB, pointTypeC)
+  val BorC    = UNION(pointTypeB.typeRef, pointTypeC.typeRef)
 
   val pointAInstance = CaseObj(pointTypeA.typeRef, Map("X"  -> 3L, "YA" -> 40L))
   val pointBInstance = CaseObj(pointTypeB.typeRef, Map("X"  -> 3L, "YB" -> 41L))
@@ -64,11 +65,11 @@ object Common {
     override def networkByte: Byte = nByte
     override def transaction: Tx   = tx()
 
-    override def transactionById(id: Array[Byte]): Option[Tx]                                                      = ???
-    override def transactionHeightById(id: Array[Byte]): Option[Int]                                               = ???
-    override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                          = ???
-    override def resolveAlias(name: String): Either[String, Recipient.Address]                                     = ???
-    override def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = ???
+    override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+    override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
+    override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
+    override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
+    override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
   }
 
   def addressFromPublicKey(networkByte: Byte, pk: Array[Byte], addressVersion: Byte = EnvironmentFunctions.AddressVersion): Array[Byte] = {

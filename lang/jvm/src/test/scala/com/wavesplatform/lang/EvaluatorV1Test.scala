@@ -234,10 +234,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
           )
         ))
     }
-    val fooTransform = NativeFunction("transformFoo", 1, 260, fooType.typeRef, "foo" -> fooType.typeRef) {
-      case (fooObj: CaseObj) :: Nil => Right(fooObj.copy(fields = fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
-      case _                        => ???
-    }
+    val fooTransform =
+      NativeFunction("transformFoo", 1, 260, fooType.typeRef, "foo" -> fooType.typeRef) {
+        case (fooObj: CaseObj) :: Nil => Right(fooObj.copy(fields = fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
+        case _                        => ???
+      }
 
     val context = EvaluationContext(
       typeDefs = Map.empty,
@@ -323,7 +324,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("drop(ByteVector, Long) works as the native one") {
     forAll(genBytesAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(FunctionHeader.Native(DROP_BYTES), List(CONST_BYTEVECTOR(xs), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(PureContext.dropBytes.header, List(CONST_BYTEVECTOR(xs), CONST_LONG(number)))
         val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)._2
         actual shouldBe Right(xs.drop(number))
     }
@@ -341,7 +342,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("dropRightBytes(ByteVector, Long) works as the native one") {
     forAll(genBytesAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(FunctionHeader.User("dropRightBytes"), List(CONST_BYTEVECTOR(xs), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(PureContext.dropRightBytes.header, List(CONST_BYTEVECTOR(xs), CONST_LONG(number)))
         val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)._2
         actual shouldBe Right(xs.dropRight(number))
     }
@@ -350,7 +351,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("takeRightBytes(ByteVector, Long) works as the native one") {
     forAll(genBytesAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(FunctionHeader.User("takeRightBytes"), List(CONST_BYTEVECTOR(xs), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(PureContext.takeRightBytes.header, List(CONST_BYTEVECTOR(xs), CONST_LONG(number)))
         val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)._2
         actual shouldBe Right(xs.takeRight(number))
     }
@@ -382,7 +383,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("dropRight(String, Long) works as the native one") {
     forAll(genStringAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(FunctionHeader.User("dropRight"), List(CONST_STRING(xs), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(PureContext.dropRightString.header, List(CONST_STRING(xs), CONST_LONG(number)))
         val actual = ev[String](PureContext.ctx.evaluationContext, expr)._2
         actual shouldBe Right(xs.dropRight(number))
     }
@@ -391,7 +392,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("takeRight(String, Long) works as the native one") {
     forAll(genStringAndNumber) {
       case (xs, number) =>
-        val expr   = FUNCTION_CALL(FunctionHeader.User("takeRight"), List(CONST_STRING(xs), CONST_LONG(number)))
+        val expr   = FUNCTION_CALL(PureContext.takeRightString.header, List(CONST_STRING(xs), CONST_LONG(number)))
         val actual = ev[String](PureContext.ctx.evaluationContext, expr)._2
         actual shouldBe Right(xs.takeRight(number))
     }
@@ -654,7 +655,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
     )
 
-    val vars: Map[String, (TYPE, LazyVal)] = Map(
+    val vars: Map[String, (FINAL, LazyVal)] = Map(
       ("tx", (txType.typeRef, LazyVal(EitherT.pure(txObj)))),
       ("alicePubKey", (BYTEVECTOR, LazyVal(EitherT.pure(ByteVector(alicePK))))),
       ("bobPubKey", (BYTEVECTOR, LazyVal(EitherT.pure(ByteVector(bobPK)))))

@@ -43,4 +43,5 @@ class PaymentTransactionDiffTest extends PropSpec with PropertyChecks with Match
         }
     }
   }
+
 }
