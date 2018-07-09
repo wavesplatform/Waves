@@ -45,7 +45,8 @@ case class MatcherApiRoute(wallet: Wallet,
     pathPrefix("matcher") {
       matcherPublicKey ~ orderBook ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
         getAllOrderHistory ~ getTradableBalance ~ reservedBalance ~ orderStatus ~
-        historyDelete ~ cancel ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder
+        historyDelete ~ cancel ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
+        getSettings
     }
 
   @Path("/")
@@ -56,6 +57,14 @@ case class MatcherApiRoute(wallet: Wallet,
         .findPrivateKey(matcherSettings.account)
         .map(a => JsString(Base58.encode(a.publicKey)))
         .getOrElse[JsValue](JsString("")))
+  }
+
+  @Path("/settings")
+  @ApiOperation(value = "Matcher Settings", notes = "Get matcher settings", httpMethod = "GET")
+  def getSettings: Route = (path("settings") & get) {
+    val priceAssets = matcherSettings.priceAssets
+    println(priceAssets)
+    complete(StatusCodes.OK -> Json.obj("settings" -> Json.obj("price-assets" -> priceAssets)))
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}")

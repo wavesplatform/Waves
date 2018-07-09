@@ -185,10 +185,6 @@ class MatcherActor(orderHistory: ActorRef,
       }
   }
 
-  def initPredefinedPairs(): Unit = {
-    settings.predefinedPairs.diff(tradedPairs.keys.toSeq).foreach(pair => createOrderBook(pair))
-  }
-
   private def removeOrderBook(pair: AssetPair): Unit = {
     if (tradedPairs.contains(pair)) {
       tradedPairs -= pair
@@ -205,7 +201,6 @@ class MatcherActor(orderHistory: ActorRef,
         .getOrElse(createOrderBook(pair))
     case RecoveryCompleted =>
       log.info("MatcherActor - Recovery completed!")
-      initPredefinedPairs()
       createBalanceWatcher()
   }
 
