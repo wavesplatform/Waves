@@ -47,9 +47,6 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
     val sponsorWavesBalance = miner.accountBalances(sponsor.address)._2
     val minerWavesBalance   = miner.accountBalances(miner.address)._2
 
-    //25000000000000
-    //24999799900000
-    //24999699900000
     val sponsorAssetId =
       sponsor
         .issue(sponsor.address, "SponsoredAsset", "Created by Sponsorship Suite", sponsorAssetTotal, decimals = 2, reissuable = false, fee = issueFee)
@@ -58,27 +55,6 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
 
     val transferTxToAlice = sponsor.transfer(sponsor.address, alice.address, sponsorAssetTotal / 2, minFee, Some(sponsorAssetId), None).id
     nodes.waitForHeightAriseAndTxPresent(transferTxToAlice)
-
-    "cannot set up sponsorship" - {
-
-      "if sender not issuer" in {
-        assertBadRequestAndResponse(alice.sponsorAsset(alice.address, sponsorAssetId, baseFee = Token, fee = sponsorFee),
-                                    "Asset was issued by other address")
-      }
-
-      "not enough fee" in {
-        assertBadRequestAndResponse(
-          sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = Token, fee = sponsorFee / 2),
-          "Fee in WAVES for scorex.transaction.assets.SponsorFeeTransaction does not exceed minimal value of 100000000 WAVES: 50000000"
-        )
-      }
-
-      "fee is 0 or negative" in {
-        assertBadRequestAndResponse(sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = Token, fee = -sponsorFee), "insufficient fee")
-        assertBadRequestAndResponse(sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = Token, fee = 0), "insufficient fee")
-      }
-
-    }
 
     "make asset sponsored" in {
       val sponsorId = sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = Token, fee = sponsorFee).id
@@ -99,96 +75,15 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       assetInfo.sponsorBalance shouldBe Some(sponsor.accountBalances(sponsor.address)._2)
     }
 
-    "cannot change sponsorship fee" - {
-
-      "sender not issuer. cannot change sponsorship fee" in {
-        assertBadRequestAndResponse(alice.sponsorAsset(alice.address, sponsorAssetId, baseFee = 2 * Token, fee = sponsorFee),
-                                    "Asset was issued by other address")
-      }
-
-      "not enough fee to change sponsorship" in {
-        val lessThanMinFee = minFee / 2
-        assertBadRequestAndResponse(
-          sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = 2 * Token, fee = lessThanMinFee),
-          s"Fee in WAVES for scorex.transaction.assets.SponsorFeeTransaction does not exceed minimal value of 100000000 WAVES: $lessThanMinFee"
-        )
-      }
-
-      "fee is zero or negative" in {
-        assertBadRequestAndResponse(sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = Token, fee = -sponsorFee), "insufficient fee")
-        assertBadRequestAndResponse(sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = Token, fee = 0), "insufficient fee")
-      }
-    }
-
-    "cannot cancel sponsorship" - {
-      "canceller not issuer" in {
-        assertBadRequestAndResponse(alice.cancelSponsorship(alice.address, sponsorAssetId, fee = sponsorFee), "Asset was issued by other address")
-      }
-      "not enough fee for cancel" in {
-        val lessThenMinSponsorFee = sponsorFee / 2
-        assertBadRequestAndResponse(
-          sponsor.cancelSponsorship(sponsor.address, sponsorAssetId, fee = lessThenMinSponsorFee),
-          s"Fee in WAVES for scorex.transaction.assets.SponsorFeeTransaction does not exceed minimal value of 100000000 WAVES: $lessThenMinSponsorFee"
-        )
-      }
-
-      "fee is zero or negative" in {
-        assertBadRequestAndResponse(sponsor.cancelSponsorship(sponsor.address, sponsorAssetId, fee = -sponsorFee), "insufficient fee")
-        assertBadRequestAndResponse(sponsor.cancelSponsorship(sponsor.address, sponsorAssetId, fee = 0), "insufficient fee")
-      }
-
-    }
-
     "sender cannot make transfer" - {
-      "transfer tx sponsored fee is less then minimal" in {
-        assertBadRequestAndResponse(
-          sponsor
-            .transfer(sponsor.address, alice.address, 10 * Token, fee = TinyFee, assetId = Some(sponsorAssetId), feeAssetId = Some(sponsorAssetId))
-            .id,
-          s"Fee in $sponsorAssetId .* does not exceed minimal value"
-        )
-      }
-
-      "not enought balance for fee" in {
-        assertBadRequestAndResponse(bob.transfer(bob.address, alice.address, 1.waves, SmallFee, None, Some(sponsorAssetId)), "unavailable funds")
-      }
-
-      "if sponsor has not enough spendable and effective balance to pay fee" in {
-        val (sponsorBalance, sponsorEffectiveBalance) = sponsor.accountBalances(sponsor.address)
-        val sponsorLeaseAllAvaliableWaves             = sponsor.lease(sponsor.address, bob.address, sponsorEffectiveBalance - leasingFee, leasingFee).id
-        nodes.waitForHeightAriseAndTxPresent(sponsorLeaseAllAvaliableWaves)
-        assertBadRequestAndResponse(alice.transfer(alice.address, bob.address, 10 * Token, LargeFee, Some(sponsorAssetId), Some(sponsorAssetId)),
-                                    "negative effective balance")
-        val bobLeaseSomeWavesToSponsorTx = bob.lease(bob.address, sponsor.address, leasingAmount, leasingFee).id
-        nodes.waitForHeightAriseAndTxPresent(bobLeaseSomeWavesToSponsorTx)
-
-        assertBadRequestAndResponse(alice.transfer(alice.address, bob.address, 10 * Token, LargeFee, Some(sponsorAssetId), Some(sponsorAssetId)),
-                                    "trying to spend leased money")
-        val cancelBobLeasingTx = bob.cancelLease(bob.address, bobLeaseSomeWavesToSponsorTx, leasingFee).id
-
-        val cancelSponsorLeasingTx = sponsor.cancelLease(sponsor.address, sponsorLeaseAllAvaliableWaves, leasingFee).id
-        nodes.waitForHeightAriseAndTxPresent(cancelSponsorLeasingTx)
-      }
-
-      "sponsor sends all waves using sponsor fee" in {
-        val (sponsorBalance, sponsorEffectiveBalance) = sponsor.accountBalances(sponsor.address)
-        assertBadRequestAndResponse(sponsor.transfer(sponsor.address, bob.address, sponsorBalance, SmallFee, None, Some(sponsorAssetId)),
-                                    "negative waves balance")
-      }
-
-      "negative sponsored fee" in {
-        assertBadRequestAndResponse(alice.transfer(alice.address, bob.address, 10 * Token, -LargeFee, Some(sponsorAssetId), Some(sponsorAssetId)),
-                                    "insufficient fee")
-      }
-
       "invalid tx timestamp" in {
         //todo
 
       }
     }
 
-    val minerWavesBalanceAfterFirstXferTest   = minerWavesBalance + 2.waves + minFee + 4 * leasingFee + Sponsorship.FeeUnit * SmallFee / minSponsorFee
-    val sponsorWavesBalanceAfterFirstXferTest = sponsorWavesBalance - 2.waves - minFee - 2 * leasingFee - Sponsorship.FeeUnit * SmallFee / minSponsorFee
+    val minerWavesBalanceAfterFirstXferTest   = minerWavesBalance + 2.waves + minFee + Sponsorship.FeeUnit * SmallFee / minSponsorFee
+    val sponsorWavesBalanceAfterFirstXferTest = sponsorWavesBalance - 2.waves - minFee - Sponsorship.FeeUnit * SmallFee / minSponsorFee
 
     "fee should be written off in issued asset" - {
 

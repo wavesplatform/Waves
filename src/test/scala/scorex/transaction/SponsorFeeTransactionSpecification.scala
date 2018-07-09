@@ -66,7 +66,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       0
     )
 
-  property("negative fee") {
+  property("sponsorship negative fee") {
     forAll(invalidFee) { fee: Long =>
       val f = for {
         sender                                                                       <- accountGen
@@ -78,6 +78,21 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
         minFee <- smallFeeGen
         assetId = issue.assetId()
       } yield SponsorFeeTransaction.selfSigned(1, sender, assetId, Some(minFee), fee, timestamp) should produce("insufficient fee")
+    }
+  }
+
+  property("cancel sponsorship negative fee") {
+    forAll(invalidFee) { fee: Long =>
+      val f = for {
+        sender                                                                       <- accountGen
+        (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
+        issue = IssueTransactionV1
+          .selfSigned(sender, assetName, description, quantity, decimals, reissuable = reissuable, iFee, timestamp)
+          .right
+          .get
+        minFee  = None
+        assetId = issue.assetId()
+      } yield SponsorFeeTransaction.selfSigned(1, sender, assetId, minFee, fee, timestamp) should produce("insufficient fee")
     }
   }
 
