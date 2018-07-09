@@ -36,8 +36,6 @@ object BalanceDiffValidation extends ScorexLogging with Instrumented {
           Some(s"negative effective balance: $acc, old: ${leaseWavesInfo(oldPortfolio)}, new: ${leaseWavesInfo(newPortfolio)}")
         } else if (leasedMoreThanOwn && oldPortfolio.lease.out == newPortfolio.lease.out) {
           Some(s"$acc trying to spend leased money")
-        } else if (leasedMoreThanOwn) {
-          Some(s"leased being more than own: $acc, old: ${leaseWavesInfo(oldPortfolio)}, new: ${leaseWavesInfo(newPortfolio)}")
         } else None
         err.map(acc -> _)
       })
