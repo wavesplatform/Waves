@@ -2,13 +2,12 @@ package com.wavesplatform.matcher.market
 
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorRef, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence.{PersistentActor, RecoveryCompleted}
 import akka.routing.FromConfig
 import com.google.common.base.Charsets
-import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
+import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.matcher.model.OrderBook
@@ -143,7 +142,7 @@ class MatcherActor(orderHistory: ActorRef,
   }
 
   def shuttingDown: Receive = {
-    case _ => sender() ! Failure(akka.actor.IllegalActorStateException("MatcherActor is shutting down"))
+    case _ => sender() ! BadMatcherResponse(StatusCodes.ServiceUnavailable, "System is going shutdown")
   }
 
   def initPredefinedPairs(): Unit = {
