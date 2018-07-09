@@ -1,14 +1,15 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.{TransactionGen, crypto}
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import com.wavesplatform.utils.Base58
 import scorex.lagonaki.mocks.TestBlock.{create => block}
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.GenesisTransaction
+import scorex.transaction.{GenesisTransaction, Proofs}
 import scorex.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
 import scorex.transaction.transfer._
 
@@ -130,6 +131,59 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
     }
   }
 
+  property("cannot cancel sponsorship") {
+    val s = settings(0)
+    val setup = for {
+      master     <- accountGen
+      notSponsor <- accountGen
+      ts         <- timestampGen
+      genesis: GenesisTransaction = GenesisTransaction.create(master, 400000000, ts).explicitGet()
+      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
+      recipient                  <- accountGen
+      assetId = issueTx.id()
+      senderNotIssuer = SponsorFeeTransaction
+        .selfSigned(1, notSponsor, assetId, None, 1 * Constants.UnitsInWave, ts + 1)
+        .right
+        .get
+      insufficientFee = SponsorFeeTransaction
+        .selfSigned(1, notSponsor, assetId, None, 1 * Constants.UnitsInWave - 1, ts + 1)
+        .right
+        .get
+      negativeFee = {
+        val tx = SponsorFeeTransaction
+          .selfSigned(1, notSponsor, assetId, None, 1 * Constants.UnitsInWave, ts + 1)
+          .right
+          .get
+          .copy(fee = -1 * Constants.UnitsInWave)
+
+        tx.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(master, tx.bodyBytes())))).explicitGet())
+      }
+      zeroFee = SponsorFeeTransaction
+        .selfSigned(1, notSponsor, assetId, None, 1 * Constants.UnitsInWave, ts + 1)
+        .right
+        .get
+
+    } yield (genesis, issueTx, sponsorTx, senderNotIssuer, insufficientFee, negativeFee, zeroFee)
+
+    forAll(setup) {
+      case (genesis, issueTx, sponsorTx, senderNotIssuer, insufficientFee, negativeFee, zeroFee) =>
+        val setupBlocks = Seq(block(Seq(genesis, issueTx, sponsorTx)))
+        assertDiffEi(setupBlocks, block(Seq(senderNotIssuer)), s) { blockDiffEi =>
+          blockDiffEi should produce("Asset was issued by other address")
+        }
+        assertDiffEi(setupBlocks, block(Seq(insufficientFee)), s) { blockDiffEi =>
+          blockDiffEi should produce("does not exceed minimal value of 100000000 WAVES: 99999999")
+        }
+        assertDiffEi(setupBlocks, block(Seq(negativeFee)), s) { blockDiffEi =>
+          blockDiffEi should produce("")
+        }
+        assertDiffEi(setupBlocks, block(Seq(zeroFee)), s) { blockDiffEi =>
+          blockDiffEi should produce("insufficient fee")
+        }
+
+    }
+  }
+
   property("sponsor has no WAVES but receives them just in time") {
     val s = settings(0)
     val setup = for {
@@ -164,4 +218,5 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         }
     }
   }
+
 }

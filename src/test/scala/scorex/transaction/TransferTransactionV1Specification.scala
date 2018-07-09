@@ -5,9 +5,10 @@ import com.wavesplatform.state.{ByteStr, EitherExt2}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
-import scorex.account.{Address, PublicKeyAccount}
+import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.transfer._
+import com.wavesplatform.state.diffs._
 
 class TransferTransactionV1Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -69,5 +70,13 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
       .get
 
     tx.json() shouldEqual js
+  }
+
+  property("negative") {
+    for {
+      (_, sender, recipient, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
+      sender                                                              <- accountGen
+    } yield
+      TransferTransactionV1.selfSigned(None, sender, recipient, amount, timestamp, None, feeAmount, attachment) should produce("insufficient fee")
   }
 }

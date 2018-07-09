@@ -1,12 +1,15 @@
 package scorex.transaction
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.{ByteStr, EitherExt2}
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatest.prop.{PropertyChecks, TableFor2}
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
-import scorex.transaction.assets.SponsorFeeTransaction
+import scorex.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
+import com.wavesplatform.state.diffs._
+import scorex.transaction.transfer.TransferTransactionV1
 
 class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -54,6 +57,28 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       .right
       .get
     js shouldEqual tx.json()
+  }
+
+  val invalidFee =
+    Table(
+      "fee",
+      -1 * Constants.UnitsInWave,
+      0
+    )
+
+  property("negative fee") {
+    forAll(invalidFee) { fee: Long =>
+      val f = for {
+        sender                                                                       <- accountGen
+        (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
+        issue = IssueTransactionV1
+          .selfSigned(sender, assetName, description, quantity, decimals, reissuable = reissuable, iFee, timestamp)
+          .right
+          .get
+        minFee <- smallFeeGen
+        assetId = issue.assetId()
+      } yield SponsorFeeTransaction.selfSigned(1, sender, assetId, Some(minFee), fee, timestamp) should produce("insufficient fee")
+    }
   }
 
 }
