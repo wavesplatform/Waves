@@ -96,11 +96,6 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
             .selfSigned(1, sponsor.privateKey, ByteStr.decodeBase58(sponsorAssetId).get, Some(SmallFee), minFee, timestamp + 1.day.toMillis)
             .right
             .get
-        def invalidTx(timestamp: Long = System.currentTimeMillis) =
-          SponsorFeeTransaction
-            .selfSigned(1, sponsor.privateKey, ByteStr.decodeBase58(sponsorAssetId).get, Some(SmallFee), minFee, timestamp + 1.day.toMillis)
-            .right
-            .get
 
         def request(tx: SponsorFeeTransaction): SignedSponsorFeeRequest =
           SignedSponsorFeeRequest(
@@ -112,22 +107,6 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
             tx.timestamp,
             tx.proofs.base58().toList
           )
-
-        def request(tx: SponsorFeeTransaction): SignedSponsorFeeRequest =
-          SignedSponsorFeeRequest(
-            tx.version,
-            Base58.encode(tx.sender.publicKey),
-            tx.assetId.base58,
-            tx.minSponsoredAssetFee,
-            tx.fee,
-            tx.timestamp,
-            tx.proofs.base58().toList
-          )
-        implicit val w =
-          Json.writes[SignedSponsorFeeRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(SponsorFeeTransaction.typeId.toInt)))
-
-        val iTx = invalidTx(timestamp = System.currentTimeMillis + 1.day.toMillis)
-        assertBadRequestAndResponse(sponsor.broadcastRequest(request(iTx)), "Transaction .* is from far future")
         implicit val w =
           Json.writes[SignedSponsorFeeRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(SponsorFeeTransaction.typeId.toInt)))
 
