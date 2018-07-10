@@ -103,7 +103,15 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
 
       "check transactions by address" in {
         //todo
-        //Transaction by address for Transfer tx (miner - no, sponsor - no, sender - yes)
+//        val minerTx = miner.transactionsByAddress(miner.address, 100)
+//        minerTx.size shouldBe 1
+
+        val sponsorTx = sponsor.transactionsByAddress(sponsor.address, 100)
+        sponsorTx.head.size shouldBe 4
+
+//        val aliceTx = alice.transactionsByAddress(alice.address, 100)
+//        aliceTx.head.size shouldBe 3
+
         //        Transaction by address for Sponsorship
       }
 
