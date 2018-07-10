@@ -58,7 +58,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       val active: Seq[LimitOrder] = activeOrdersByAssets.flatMap {
         case (id, info) =>
           orderHistory.order(id).map { order =>
-            LimitOrder(order).partial(info.remaining)
+            LimitOrder(order).partial(info.remaining, info.remainingFee)
           }
       }(collection.breakOut)
 
@@ -99,7 +99,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   def forceCancelOrder(id: String): Unit = {
     orderHistory.order(id).map((_, orderHistory.orderInfo(id))) match {
       case Some((o, oi)) =>
-        orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, o), unmatchable = false))
+        orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, oi.remainingFee, o), unmatchable = false))
         sender() ! o
       case None =>
         sender() ! None

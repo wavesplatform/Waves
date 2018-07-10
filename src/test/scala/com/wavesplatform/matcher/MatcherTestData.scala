@@ -138,7 +138,7 @@ trait MatcherTestData {
     timestamp: Long           <- createdTimeGen
     expiration: Long          <- maxTimeGen
     matcherFee: Long          <- maxWavesAmountGen
-  } yield BuyLimitOrder(price, amount, Order.buy(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
+  } yield BuyLimitOrder(price, amount, matcherFee, Order.buy(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
 
   val sellLimitOrderGenerator: Gen[SellLimitOrder] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -148,6 +148,6 @@ trait MatcherTestData {
     timestamp: Long           <- createdTimeGen
     expiration: Long          <- maxTimeGen
     matcherFee: Long          <- maxWavesAmountGen
-  } yield SellLimitOrder(price, amount, Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
+  } yield SellLimitOrder(price, amount, matcherFee, Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
 
 }

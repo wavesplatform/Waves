@@ -59,10 +59,11 @@ object EventSerializers {
     val OrderCancelled   = "event.OrderCancelled"
   }
 
-  private def zzz(lo: LimitOrder) = (lo.price, lo.amount, lo.order)
-  private def fmt[T <: LimitOrder](f1: (Long, Long, Order) => T): Format[T] =
+  private def zzz(lo: LimitOrder) = (lo.price, lo.amount, lo.fee, lo.order)
+  private def fmt[T <: LimitOrder](f1: (Long, Long, Long, Order) => T): Format[T] =
     ((__ \ "price").format[Long] and
       (__ \ "amount").format[Long] and
+      (__ \ "fee").format[Long] and
       (__ \ "order").format[Order])(f1, zzz)
 
   implicit val limitFormat: Format[LimitOrder]    = fmt[LimitOrder](LimitOrder.limitOrder)

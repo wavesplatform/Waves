@@ -86,8 +86,8 @@ class BalanceWatcherWorkerActor(settings: Settings, matcher: ActorRef, orderHist
               .copy(balance = restPortfolio.balance - restPortfolio.lease.out, lease = LeaseBalance.empty)
               .remove(limitOrder.spentAcc.assetId, limitOrder.getSpendAmount)
               .flatMap { p =>
-                if (limitOrder.rcvAsset == AssetPair.WavesName && limitOrder.getReceiveAmount >= limitOrder.remainingFee) Some(p)
-                else p.remove(None, limitOrder.remainingFee)
+                if (limitOrder.rcvAsset == AssetPair.WavesName && limitOrder.getReceiveAmount >= limitOrder.fee) Some(p)
+                else p.remove(None, limitOrder.fee)
               }
 
             updatedPortfolio match {

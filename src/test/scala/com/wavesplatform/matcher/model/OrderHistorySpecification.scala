@@ -35,7 +35,7 @@ class OrderHistorySpecification
     val lo = LimitOrder(ord1)
     oh.orderAccepted(OrderAdded(lo))
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Accepted
-    oh.orderInfo(ord1.idStr()) shouldBe OrderInfo(ord1.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset))
+    oh.orderInfo(ord1.idStr()) shouldBe OrderInfo(ord1.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord1.matcherFee)
 
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 0L
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 7L
@@ -136,7 +136,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     val exec = OrderExecuted(LimitOrder(ord2), LimitOrder(ord1))
     oh.orderExecuted(exec)
-    oh.orderAccepted(OrderAdded(exec.submitted.partial(exec.submittedRemaining)))
+    oh.orderAccepted(OrderAdded(exec.submitted.partial(exec.submittedRemainingAmount, 0)))
 
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Filled
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.PartiallyFilled(100000000)
@@ -166,9 +166,9 @@ class OrderHistorySpecification
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.PartiallyFilled(50000000)
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.Filled
 
-    val exec2 = OrderExecuted(LimitOrder(ord3), exec1.counter.partial(exec1.counterRemaining))
+    val exec2 = OrderExecuted(LimitOrder(ord3), exec1.counter.partial(exec1.counterRemainingAmount, 0))
     oh.orderExecuted(exec2)
-    oh.orderAccepted(OrderAdded(exec2.submitted.partial(exec2.submittedRemaining)))
+    oh.orderAccepted(OrderAdded(exec2.submitted.partial(exec2.submittedRemainingAmount, 0)))
 
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Filled
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.Filled
@@ -198,7 +198,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     val exec1 = OrderExecuted(LimitOrder(ord2), LimitOrder(ord1))
     oh.orderExecuted(exec1)
-    oh.orderAccepted(OrderAdded(exec1.submitted.partial(exec1.submittedRemaining)))
+    oh.orderAccepted(OrderAdded(exec1.submitted.partial(exec1.submittedRemainingAmount, 0)))
 
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Filled
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.PartiallyFilled(100000000)
@@ -246,7 +246,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     val exec1 = OrderExecuted(LimitOrder(ord2), LimitOrder(ord1))
     oh.orderExecuted(exec1)
-    oh.orderCanceled(OrderCanceled(exec1.counter.partial(exec1.counterRemaining), unmatchable = false))
+    oh.orderCanceled(OrderCanceled(exec1.counter.partial(exec1.counterRemainingAmount, 0), unmatchable = false))
 
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Cancelled(1000000000)
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.Filled
@@ -297,7 +297,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord2)))
     oh.orderAccepted(OrderAdded(LimitOrder(ord3)))
     oh.orderExecuted(OrderExecuted(LimitOrder(ord4), LimitOrder(ord1)))
-    oh.orderAccepted(OrderAdded(LimitOrder.limitOrder(ord4.price, 1000000000, ord4)))
+    oh.orderAccepted(OrderAdded(LimitOrder.limitOrder(ord4.price, 1000000000, 0, ord4)))
     oh.orderCanceled(OrderCanceled(LimitOrder(ord3), unmatchable = false))
     oh.orderAccepted(OrderAdded(LimitOrder(ord5)))
 

@@ -147,14 +147,16 @@ class OrderBookActorSpecification
       actor ! ord2
       receiveN(2)
       actor ! GetOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord2.price, ord2.amount, ord2), BuyLimitOrder(ord1.price, ord1.amount, ord1))))
+      expectMsg(
+        GetOrdersResponse(
+          Seq(BuyLimitOrder(ord2.price, ord2.amount, ord2.matcherFee, ord2), BuyLimitOrder(ord1.price, ord1.amount, ord2.matcherFee, ord1))))
 
       val ord3 = sell(pair, 100, 10 * Order.PriceConstant)
       actor ! ord3
       expectMsg(OrderAccepted(ord3))
 
       actor ! GetOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord1.price, ord1.amount, ord1))))
+      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord1.price, ord1.amount, ord2.matcherFee, ord1))))
     }
 
     "place buy and sell order to the order book and preserve it after restart" in {
@@ -183,7 +185,7 @@ class OrderBookActorSpecification
       actor ! RestartActor
       actor ! GetOrdersRequest
 
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord2.price, 5 * Order.PriceConstant, ord2))))
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord2.price, 5 * Order.PriceConstant, ord2.matcherFee, ord2))))
     }
 
     "execute one order fully and other partially and restore after restart" in {
@@ -199,7 +201,7 @@ class OrderBookActorSpecification
       actor ! RestartActor
 
       actor ! GetBidOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord2.price, 3 * Order.PriceConstant, ord2))))
+      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord2.price, 3 * Order.PriceConstant, ord2.matcherFee, ord2))))
 
       actor ! GetAskOrdersRequest
       expectMsg(GetOrdersResponse(Seq.empty))
@@ -224,7 +226,7 @@ class OrderBookActorSpecification
       expectMsg(GetOrdersResponse(Seq.empty))
 
       actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord2.price, 1 * Order.PriceConstant, ord2))))
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord2.price, 1 * Order.PriceConstant, ord2.matcherFee, ord2))))
 
     }
 
@@ -244,7 +246,7 @@ class OrderBookActorSpecification
       expectMsg(GetOrdersResponse(Seq.empty))
 
       actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord3.price, 3 * Order.PriceConstant, ord3))))
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord3.price, 3 * Order.PriceConstant, ord3.matcherFee, ord3))))
 
     }
 
@@ -298,7 +300,7 @@ class OrderBookActorSpecification
       actor ! RestartActor
 
       actor ! GetBidOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(100 * Order.PriceConstant, 10 * Order.PriceConstant, ord1))))
+      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(100 * Order.PriceConstant, 10 * Order.PriceConstant, 0, ord1))))
 
       actor ! GetAskOrdersRequest
       expectMsg(GetOrdersResponse(Seq.empty))
@@ -316,7 +318,7 @@ class OrderBookActorSpecification
       receiveN(3)
 
       actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder((0.00041 * Order.PriceConstant).toLong, 200000000, ord1))))
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder((0.00041 * Order.PriceConstant).toLong, 200000000, 0, ord1))))
 
     }
 
@@ -332,7 +334,7 @@ class OrderBookActorSpecification
       receiveN(3)
 
       actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder((0.0006999 * Order.PriceConstant).toLong, 1500 * Constants.UnitsInWave - 115749L, ord1))))
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder((0.0006999 * Order.PriceConstant).toLong, 1500 * Constants.UnitsInWave - 115749L, 0, ord1))))
     }
 
     "partially execute order with price > 1 and zero fee remaining part " in {
@@ -347,7 +349,8 @@ class OrderBookActorSpecification
       receiveN(3)
 
       actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(1850 * Order.PriceConstant, ((0.1 - (0.0100001 - 0.01)) * Constants.UnitsInWave).toLong, ord1))))
+      expectMsg(
+        GetOrdersResponse(Seq(SellLimitOrder(1850 * Order.PriceConstant, ((0.1 - (0.0100001 - 0.01)) * Constants.UnitsInWave).toLong, 0, ord1))))
     }
 
     "buy small amount of pricey asset" in {
@@ -359,7 +362,7 @@ class OrderBookActorSpecification
       receiveN(2)
 
       actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(280, 30000000000L - Order.correctAmount(700000L, 280), s))))
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(280, 30000000000L - Order.correctAmount(700000L, 280), 0, s))))
 
       actor ! GetBidOrdersRequest
       expectMsg(GetOrdersResponse(Seq.empty))
@@ -373,7 +376,7 @@ class OrderBookActorSpecification
       val expiredOrder = buy(pair, price, amount).copy(expiration = time)
       actor ! expiredOrder
       receiveN(1)
-      getOrders(actor) shouldEqual Seq(BuyLimitOrder(price * Order.PriceConstant, amount, expiredOrder))
+      getOrders(actor) shouldEqual Seq(BuyLimitOrder(price * Order.PriceConstant, amount, 0, expiredOrder))
       actor ! OrderCleanup
       expectMsg(OrderCanceled(expiredOrder.idStr()))
       getOrders(actor).size should be(0)
@@ -384,7 +387,7 @@ class OrderBookActorSpecification
       val amount = 1
 
       val order          = buy(pair, price, amount)
-      val expectedOrders = Seq(BuyLimitOrder(price * Order.PriceConstant, amount, order))
+      val expectedOrders = Seq(BuyLimitOrder(price * Order.PriceConstant, amount, 0, order))
 
       actor ! order
       receiveN(1)
