@@ -1,5 +1,6 @@
 package com.wavesplatform.it.api
 
+import com.wavesplatform.lang.v1.traits.Recipient
 import play.api.libs.json.{Format, Json}
 
 // USCE no longer contains references to non-serializable Request/Response objects
@@ -81,7 +82,8 @@ case class TransactionInfo(`type`: Int,
                            timestamp: Long,
                            sender: Option[String],
                            height: Int,
-                           minSponsoredAssetFee: Option[Long])
+                           minSponsoredAssetFee: Option[Long],
+                           recipient: Option[String])
 object TransactionInfo {
   implicit val format: Format[TransactionInfo] = Json.format
 }

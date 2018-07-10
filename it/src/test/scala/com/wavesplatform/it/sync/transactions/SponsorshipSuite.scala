@@ -64,8 +64,9 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
     val transferTxToAlice = sponsor.transfer(sponsor.address, alice.address, sponsorAssetTotal / 2, minFee, Some(sponsorAssetId), None).id
     nodes.waitForHeightAriseAndTxPresent(transferTxToAlice)
 
+    val sponsorId = sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = Token, fee = sponsorFee).id
+
     "make asset sponsored" in {
-      val sponsorId = sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = Token, fee = sponsorFee).id
       nodes.waitForHeightAriseAndTxPresent(sponsorId)
       assert(!sponsorAssetId.isEmpty)
       assert(!sponsorId.isEmpty)
@@ -121,26 +122,26 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
         assert(!transferTxCustomFeeAlice.isEmpty)
         miner.assertAssetBalance(alice.address, sponsorAssetId, sponsorAssetTotal / 2 - SmallFee - 10 * Token)
         miner.assertAssetBalance(bob.address, sponsorAssetId, 10 * Token)
-      }
 
-      "check transaction info" in {
-        //todo
-        //        Transaction info for Sponsorship
-        //        Transaction info for Transfer ()
+        val aliceTx = alice.transactionsByAddress(alice.address, 100)
+        aliceTx.head.size shouldBe 3
+        aliceTx.head.count(tx => tx.sender.contains(alice.address) || tx.recipient.contains(alice.address)) shouldBe 3
+        aliceTx.head.map(_.id) should contain allElementsOf Seq(transferTxCustomFeeAlice, transferTxToAlice)
+
+        val bobTx = alice.transactionsByAddress(bob.address, 100)
+        bobTx.head.size shouldBe 2
+        bobTx.head.count(tx => tx.sender.contains(bob.address) || tx.recipient.contains(bob.address)) shouldBe 2
+        bobTx.head.map(_.id) should contain(transferTxCustomFeeAlice)
       }
 
       "check transactions by address" in {
-        //todo
-//        val minerTx = miner.transactionsByAddress(miner.address, 100)
-//        minerTx.size shouldBe 1
+        val minerTx = miner.transactionsByAddress(miner.address, 100)
+        minerTx.size shouldBe 1
 
         val sponsorTx = sponsor.transactionsByAddress(sponsor.address, 100)
-        sponsorTx.head.size shouldBe 4
-
-//        val aliceTx = alice.transactionsByAddress(alice.address, 100)
-//        aliceTx.head.size shouldBe 3
-
-        //        Transaction by address for Sponsorship
+//        sponsorTx.head.size shouldBe 4
+//        sponsorTx.head.count(tx => tx.sender.contains(sponsor.address) || tx.recipient.contains(sponsor.address)) shouldBe 4
+        sponsorTx.head.map(_.id) should contain allElementsOf Seq(sponsorId, transferTxToAlice, sponsorAssetId)
       }
 
       "sponsor should receive sponsored asset as fee, waves should be written off" in {
@@ -156,8 +157,8 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
     "assets balance should contain sponsor fee info and sponsor balance" in {
       val sponsorLeaseSomeWaves = sponsor.lease(sponsor.address, bob.address, leasingAmount, leasingFee).id
       nodes.waitForHeightAriseAndTxPresent(sponsorLeaseSomeWaves)
-      val (sponsorBalance, sponsorEffectiveBalance) = sponsor.accountBalances(sponsor.address)
-      val assetsBalance                             = alice.assetsBalance(alice.address).balances.filter(_.assetId == sponsorAssetId).head
+      val (_, sponsorEffectiveBalance) = sponsor.accountBalances(sponsor.address)
+      val assetsBalance                = alice.assetsBalance(alice.address).balances.filter(_.assetId == sponsorAssetId).head
       assetsBalance.minSponsoredAssetFee shouldBe Some(minSponsorFee)
       assetsBalance.sponsorBalance shouldBe Some(sponsorEffectiveBalance)
     }
@@ -242,8 +243,6 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
 
         val transferTxCustomFeeAlice = alice.transfer(alice.address, bob.address, 1.waves, TinyFee, None, Some(sponsorAssetId)).id
         nodes.waitForHeightAriseAndTxPresent(transferTxCustomFeeAlice)
-//24998498150000
-//24999498050000
         val wavesFee = Sponsorship.FeeUnit * TinyFee / TinyFee
         sponsor.assertBalances(sponsor.address, sponsoredBalance._1 - wavesFee, sponsoredBalance._2 - wavesFee)
         sponsor.assertAssetBalance(sponsor.address, sponsorAssetId, sponsorAssetBalance + TinyFee)
