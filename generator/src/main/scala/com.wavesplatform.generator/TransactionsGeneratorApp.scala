@@ -7,7 +7,6 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.generator.cli.ScoptImplicits
 import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.network.client.NetworkSender
-import com.wavesplatform.settings.inetSocketAddressReader
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
@@ -83,6 +82,12 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
           c.copy(dynWide = c.dynWide.copy(limitDestAccounts = x))
         }
       )
+
+    cmd("multisig")
+      .action { (_, c) =>
+        c.copy(mode = Mode.MULTISIG)
+      }
+      .text("Multisig cycle of funding, initializng and sending funds back")
   }
 
   val defaultConfig = ConfigFactory.load().as[GeneratorSettings]("generator")
@@ -99,6 +104,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         case Mode.NARROW   => new NarrowTransactionGenerator(finalConfig.narrow, finalConfig.privateKeyAccounts)
         case Mode.WIDE     => new WideTransactionGenerator(finalConfig.wide, finalConfig.privateKeyAccounts)
         case Mode.DYN_WIDE => new DynamicWideTransactionGenerator(finalConfig.dynWide, finalConfig.privateKeyAccounts)
+        case Mode.MULTISIG => new MultisigTransactionGenerator(finalConfig.multisig, finalConfig.privateKeyAccounts)
       }
 
       val threadPool                            = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
