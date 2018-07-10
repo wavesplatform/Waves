@@ -63,7 +63,7 @@ case class MatcherApiRoute(wallet: Wallet,
   @ApiOperation(value = "Matcher Settings", notes = "Get matcher settings", httpMethod = "GET")
   def getSettings: Route = (path("settings") & get) {
     val priceAssets = matcherSettings.priceAssets
-    complete(StatusCodes.OK -> Json.obj("settings" -> Json.obj("price-assets" -> priceAssets)))
+    complete(StatusCodes.OK -> Json.obj("priceAssets" -> priceAssets))
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}")
