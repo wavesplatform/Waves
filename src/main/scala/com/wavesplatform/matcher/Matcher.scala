@@ -25,6 +25,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
 import akka.pattern.ask
+import akka.util.Timeout
 
 class Matcher(actorSystem: ActorSystem,
               wallet: Wallet,
@@ -83,7 +84,8 @@ class Matcher(actorSystem: ActorSystem,
   @volatile var matcherServerBinding: ServerBinding = _
 
   def shutdownMatcher(): Unit = {
-    Await.result(matcher ? MatcherActor.Shutdown, 5.minute)
+    implicit val timeout: Timeout = Timeout.durationToTimeout(5.minute)
+    Await.result(matcher ? MatcherActor.Shutdown, timeout.duration)
     db.close()
     Await.result(matcherServerBinding.unbind(), 10.seconds)
   }

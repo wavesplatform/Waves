@@ -53,8 +53,12 @@ class OrderBookActor(assetPair: AssetPair,
   private var apiSender           = Option.empty[ActorRef]
   private var cancellable         = Option.empty[Cancellable]
 
-  private var shuttingDown             = false
-  private var shutDownSender: ActorRef = ActorRef.noSender
+  private var shutdownStatus: ShutdownStatus = ShutdownStatus(
+    initiated = false,
+    oldMessagesDeleted = false,
+    oldSnapshotsDeleted = false,
+    onComplete = () => ()
+  )
 
   private lazy val alreadyCanceledOrders = CacheBuilder
     .newBuilder()
@@ -85,20 +89,16 @@ class OrderBookActor(assetPair: AssetPair,
   private def snapshotsCommands: Receive = {
     case SaveSnapshot =>
       saveSnapshot(Snapshot(orderBook))
+
     case SaveSnapshotSuccess(metadata) =>
       log.info(s"Snapshot saved with metadata $metadata")
       deleteMessages(metadata.sequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest.copy(maxSequenceNr = metadata.sequenceNr - 1))
-      if (shuttingDown) {
-        shutDownSender ! ShutdownComplete
-        context.stop(self)
-      }
+
     case SaveSnapshotFailure(metadata, reason) =>
       log.error(s"Failed to save snapshot: $metadata, $reason.")
-      if (shuttingDown) {
-        shutDownSender ! ShutdownComplete
-        context.stop(self)
-      }
+      shutdownStatus.forceComplete()
+
     case DeleteOrderBookRequest(pair) =>
       updateSnapshot(OrderBook.empty)
       orderBook.asks.values
@@ -107,16 +107,38 @@ class OrderBookActor(assetPair: AssetPair,
         .foreach(x => context.system.eventStream.publish(Events.OrderCanceled(x)))
       deleteMessages(lastSequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
-      context.stop(self)
       sender() ! GetOrderBookResponse(pair, Seq(), Seq())
+      context.stop(self)
+
+    case DeleteSnapshotsSuccess(criteria) =>
+      log.info(s"$persistenceId DeleteSnapshotsSuccess with $criteria")
+      if (shutdownStatus.initiated) {
+        shutdownStatus = shutdownStatus.copy(oldSnapshotsDeleted = true)
+        shutdownStatus.tryComplete()
+      }
+
+    case DeleteSnapshotsFailure(criteria, cause) =>
+      log.error(s"$persistenceId DeleteSnapshotsFailure with $criteria, reason: $cause")
+      shutdownStatus.forceComplete()
+
     case DeleteMessagesSuccess(toSequenceNr) =>
       log.info(s"$persistenceId DeleteMessagesSuccess up to $toSequenceNr")
+      if (shutdownStatus.initiated) {
+        shutdownStatus = shutdownStatus.copy(oldMessagesDeleted = true)
+        shutdownStatus.tryComplete()
+      }
+
     case DeleteMessagesFailure(cause: Throwable, toSequenceNr: Long) =>
       log.error(s"$persistenceId DeleteMessagesFailure up to $toSequenceNr, reason: $cause")
+      shutdownStatus.forceComplete()
+
     case Shutdown =>
-      if (!shuttingDown) {
-        shuttingDown = true
-        shutDownSender = sender()
+      if (!shutdownStatus.initiated) {
+        val s = sender()
+        shutdownStatus = shutdownStatus.copy(initiated = true, onComplete = { () =>
+          s ! ShutdownComplete
+          context.stop(self)
+        })
         saveSnapshot(Snapshot(orderBook))
       }
   }
@@ -361,6 +383,12 @@ object OrderBookActor {
   val MaxDepth                          = 50
   val ValidationTimeout: FiniteDuration = 5.seconds
   val AlreadyCanceledCacheSize          = 10000L
+
+  private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit) {
+    def completed: Boolean    = initiated && oldMessagesDeleted && oldSnapshotsDeleted
+    def tryComplete(): Unit   = if (completed) onComplete()
+    def forceComplete(): Unit = if (initiated) onComplete()
+  }
 
   //protocol
   sealed trait OrderBookRequest {
