@@ -1,6 +1,5 @@
 package com.wavesplatform.it.api
 
-import com.wavesplatform.lang.v1.traits.Recipient
 import play.api.libs.json.{Format, Json}
 
 // USCE no longer contains references to non-serializable Request/Response objects

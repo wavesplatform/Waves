@@ -2,14 +2,13 @@ package scorex.transaction
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.Constants
+import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.{ByteStr, EitherExt2}
 import org.scalatest._
-import org.scalatest.prop.{PropertyChecks, TableFor2}
+import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
 import scorex.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
-import com.wavesplatform.state.diffs._
-import scorex.transaction.transfer.TransferTransactionV1
 
 class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -68,7 +67,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
 
   property("sponsorship negative fee") {
     forAll(invalidFee) { fee: Long =>
-      val f = for {
+      for {
         sender                                                                       <- accountGen
         (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
         issue = IssueTransactionV1
@@ -83,7 +82,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
 
   property("cancel sponsorship negative fee") {
     forAll(invalidFee) { fee: Long =>
-      val f = for {
+      for {
         sender                                                                       <- accountGen
         (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
         issue = IssueTransactionV1

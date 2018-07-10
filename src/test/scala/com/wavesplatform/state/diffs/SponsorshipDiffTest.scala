@@ -1,17 +1,17 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.{TransactionGen, crypto}
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
+import com.wavesplatform.utils.Base58
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import com.wavesplatform.utils.Base58
 import scorex.lagonaki.mocks.TestBlock.{create => block}
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{GenesisTransaction, Proofs}
+import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
-import scorex.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
+import scorex.transaction.lease.LeaseTransactionV1
 import scorex.transaction.transfer._
 
 class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -140,7 +140,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       bob    <- accountGen
       ts     <- timestampGen
       fee    <- smallFeeGen
-      val amount                   = ENOUGH_AMT / 2
+      amount                       = ENOUGH_AMT / 2
       genesis: GenesisTransaction  = GenesisTransaction.create(master, amount, ts).explicitGet()
       genesis2: GenesisTransaction = GenesisTransaction.create(bob, amount, ts).explicitGet()
       (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
@@ -254,7 +254,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       recipient <- accountGen
       ts        <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, 300000000, ts).explicitGet()
-      issue                       = IssueTransactionV1.selfSigned(master, Base58.decode("Asset").get, Array.emptyByteArray, 100, 2, false, 100000000, ts + 1).explicitGet()
+      issue                       = IssueTransactionV1.selfSigned(master, Base58.decode("Asset").get, Array.emptyByteArray, 100, 2, reissuable = false, 100000000, ts + 1).explicitGet()
       assetId                     = issue.id()
       sponsor                     = SponsorFeeTransaction.selfSigned(1, master, assetId, Some(100), 100000000, ts + 2).explicitGet()
       assetTransfer = TransferTransactionV1
