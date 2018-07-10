@@ -85,7 +85,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
 
     "sender cannot make transfer" - {
       "invalid tx timestamp" in {
-       implicit val w =
+
         def invalidTx(timestamp: Long = System.currentTimeMillis) =
           SponsorFeeTransaction
             .selfSigned(1, sponsor.privateKey, ByteStr.decodeBase58(sponsorAssetId).get, Some(SmallFee), minFee, timestamp + 1.day.toMillis)
@@ -102,6 +102,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
             tx.timestamp,
             tx.proofs.base58().toList
           )
+        implicit val w =
           Json.writes[SignedSponsorFeeRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(SponsorFeeTransaction.typeId.toInt)))
 
         val iTx = invalidTx(timestamp = System.currentTimeMillis + 1.day.toMillis)
