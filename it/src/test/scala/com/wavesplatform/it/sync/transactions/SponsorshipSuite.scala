@@ -4,22 +4,16 @@ import com.typesafe.config.Config
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
-
-import scala.concurrent.duration._
+import com.wavesplatform.it.util._
 import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
 import com.wavesplatform.state.{ByteStr, Sponsorship}
 import com.wavesplatform.utils.Base58
 import org.scalatest.{Assertion, CancelAfterFailure, FreeSpec, Matchers}
-import play.api.libs.json.{JsNumber, JsObject, Json}
-import com.wavesplatform.it.util._
-import scorex.api.http.assets.{SignedSponsorFeeRequest}
+import play.api.libs.json.{JsNumber, JsObject, Json, OWrites}
+import scorex.api.http.assets.SignedSponsorFeeRequest
 import scorex.transaction.assets.SponsorFeeTransaction
-import play.api.libs.json.{JsNumber, JsObject, Json}
-import com.wavesplatform.it.util._
-import io.swagger.annotations.ApiModelProperty
-import scorex.api.http.assets.{SignedSponsorFeeRequest, SignedTransferV1Request, SponsorFeeRequest}
-import scorex.transaction.assets.SponsorFeeTransaction
-import scorex.transaction.transfer.TransferTransactionV1
+
+import scala.concurrent.duration._
 
 class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with ReportingTestName with CancelAfterFailure {
 
