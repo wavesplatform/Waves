@@ -107,18 +107,6 @@ class MatcherActorSpecification
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid AssetPair"))
     }
 
-    "AssetPair with predefined pair" in {
-      def predefinedPair = AssetPair(ByteStr.decodeBase58("BASE2").toOption, ByteStr.decodeBase58("BASE1").toOption)
-
-      actor ! GetOrderBookRequest(predefinedPair, None)
-      expectMsg(GetOrderBookResponse(predefinedPair, Seq(), Seq()))
-
-      def reversePredefinedPair = AssetPair(ByteStr.decodeBase58("BASE1").toOption, ByteStr.decodeBase58("BASE2").toOption)
-
-      actor ! GetOrderBookRequest(reversePredefinedPair, None)
-      expectMsg(StatusCodeMatcherResponse(StatusCodes.Found, "Invalid AssetPair ordering, should be reversed: BASE2-BASE1"))
-    }
-
     "AssetPair with predefined price assets" in {
       def priceAsset = AssetPair(ByteStr.decodeBase58("ABC").toOption, ByteStr.decodeBase58("BASE1").toOption)
 
@@ -198,11 +186,8 @@ class MatcherActorSpecification
 
       actor ! GetMarkets
 
-      val Predefined = AssetPair(ByteStr.decodeBase58("BASE2").toOption, ByteStr.decodeBase58("BASE1").toOption)
-
       expectMsgPF() {
-        case GetMarketsResponse(publicKey,
-                                Seq(MarketData(`Predefined`, "Unknown", "Unknown", _, _, _), MarketData(_, "Unknown", "Unknown", _, _, _))) =>
+        case GetMarketsResponse(publicKey, Seq(MarketData(_, "Unknown", "Unknown", _, _, _))) =>
           publicKey shouldBe MatcherAccount.publicKey
       }
     }
