@@ -187,7 +187,16 @@ object Events {
           Map(o2.order.senderPublicKey.address -> op2)
         )
       case OrderCanceled(lo, _) =>
+        println(s"""
+             |lo.feeAcc: ${lo.feeAcc}
+             |lo.rcvAcc: ${lo.rcvAcc}
+             |lo.remainingFee: ${lo.remainingFee}
+             |lo.getReceiveAmount: ${lo.getReceiveAmount}
+             |lo.spentAsset: ${lo.spentAsset}
+             |lo.getSpendAmount: ${lo.getSpendAmount}""".stripMargin)
+
         val feeDiff = if (lo.feeAcc == lo.rcvAcc) math.max(lo.remainingFee - lo.getReceiveAmount, 0L) else lo.remainingFee
+        println(s"feeDiff: $feeDiff")
         Map(
           lo.order.senderPublicKey.address ->
             OpenPortfolio(
