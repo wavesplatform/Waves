@@ -143,7 +143,7 @@ object Diff {
             accountData: Map[Address, AccountDataInfo] = Map.empty,
             sponsorship: Map[AssetId, Sponsorship] = Map.empty): Diff =
     Diff(
-      transactions = Map((tx.id(), (height, tx, portfolios.keys.toSet))),
+      transactions = Map((tx.id(), (height, tx, portfolios.filterNot(_._2.hidden).keys.toSet))),
       portfolios = portfolios,
       issuedAssets = assetInfos,
       aliases = aliases,

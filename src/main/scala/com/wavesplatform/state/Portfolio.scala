@@ -5,7 +5,7 @@ import cats.kernel.instances.map._
 import scorex.block.Block.Fraction
 import scorex.transaction.AssetId
 
-case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[ByteStr, Long]) {
+case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[ByteStr, Long], hidden: Boolean = false) {
   lazy val effectiveBalance: Long = safeSum(balance, lease.in) - lease.out
   lazy val spendableBalance: Long = balance - lease.out
 
@@ -37,9 +37,12 @@ object Portfolio {
     override val empty: Portfolio = Portfolio.empty
 
     override def combine(older: Portfolio, newer: Portfolio): Portfolio =
-      Portfolio(balance = safeSum(older.balance, newer.balance),
-                lease = Monoid.combine(older.lease, newer.lease),
-                assets = Monoid.combine(older.assets, newer.assets))
+      Portfolio(
+        balance = safeSum(older.balance, newer.balance),
+        lease = Monoid.combine(older.lease, newer.lease),
+        assets = Monoid.combine(older.assets, newer.assets),
+        hidden = older.hidden & newer.hidden
+      )
   }
 
   implicit class PortfolioExt(self: Portfolio) {
