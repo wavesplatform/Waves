@@ -147,7 +147,7 @@ class OrderHistorySpecification
     oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe empty
 
     oh.openVolume(AssetAcc(ord2.senderPublicKey, pair.amountAsset)) shouldBe
-      math.max(0L, OrderInfo.safeSum(ord2.matcherFee * 2 / 12, -19999056L))
+      math.max(0L, OrderInfo.safeSum(LimitOrder.getPartialFee(ord2.matcherFee, ord2.amount, ord2.amount - ord1.amount), -19999056L))
     oh.openVolume(AssetAcc(ord2.senderPublicKey, pair.priceAsset)) shouldBe (BigDecimal(0.00085) * 20000000L).toLong
     oh.allOrderIdsByAddress(ord2.senderPublicKey.address) shouldBe Set(ord2.idStr())
     oh.activeOrderIdsByAddress(ord2.senderPublicKey.address) shouldBe Set(pair.priceAsset -> ord2.idStr())
@@ -203,8 +203,11 @@ class OrderHistorySpecification
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Filled
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.PartiallyFilled(100000000)
 
-    oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 109998942L + (BigInt(ord2.matcherFee) * (210000000 - 100000000) / 210000000).bigInteger
-      .longValue()
+    oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 109998942L + LimitOrder.getPartialFee(
+      ord2.matcherFee,
+      ord2.amount,
+      ord2.amount - ord1.amount
+    )
     oh.openVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 0L
     oh.allOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(ord1.idStr(), ord2.idStr())
     oh.activeOrderIdsByAddress(ord1.senderPublicKey.address) shouldBe Set(pair.amountAsset -> ord2.idStr())
@@ -246,7 +249,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     val exec1 = OrderExecuted(LimitOrder(ord2), LimitOrder(ord1))
     oh.orderExecuted(exec1)
-    oh.orderCanceled(OrderCanceled(exec1.counter.partial(exec1.counterRemainingAmount, 0), unmatchable = false))
+    oh.orderCanceled(OrderCanceled(exec1.counter.partial(exec1.counterRemainingAmount, exec1.counterRemainingFee), unmatchable = false))
 
     oh.orderStatus(ord1.idStr()) shouldBe LimitOrder.Cancelled(1000000000)
     oh.orderStatus(ord2.idStr()) shouldBe LimitOrder.Filled
