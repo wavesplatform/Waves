@@ -203,7 +203,7 @@ case class MatcherApiRoute(wallet: Wallet,
                 }
           }
         } else {
-          (StatusCodes.BadRequest -> Json.obj("message" -> "Signature should be valid"))
+          StatusCodes.BadRequest -> Json.obj("message" -> "Signature should be valid")
         }
       }
     }
