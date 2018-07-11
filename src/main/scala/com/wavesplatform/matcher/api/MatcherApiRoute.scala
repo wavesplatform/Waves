@@ -142,7 +142,7 @@ case class MatcherApiRoute(wallet: Wallet,
       if (req.isSignatureValid) {
         req.timestamp match {
           case None =>
-            StatusCodes.BadRequest -> JsString("Timestamp required")
+            StatusCodes.BadRequest -> Json.obj("message" -> "Timestamp required")
           case Some(timestamp) =>
             (orderHistory ? GetAllOrderHistory(req.senderPublicKey.address, true, timestamp))
               .mapTo[GetOrderHistoryResponse]
@@ -153,7 +153,7 @@ case class MatcherApiRoute(wallet: Wallet,
                       matcher ? CancelOrder(order.assetPair, req.senderPublicKey, id)
                     case _ => Future.successful(())
                   })
-                  .map(_ => StatusCodes.OK -> JsString("Canceled"))
+                  .map(_ => StatusCodes.OK -> Json.obj("message" -> "Canceled"))
               }
         }
       } else {
@@ -199,7 +199,7 @@ case class MatcherApiRoute(wallet: Wallet,
                     .sequence(res.history map { h =>
                       matcher ? CancelOrder(pair, req.senderPublicKey, h._1)
                     })
-                    .map(_ => StatusCodes.OK -> JsString("Canceled"))
+                    .map(_ => StatusCodes.OK -> Json.obj("message" -> "Canceled"))
                 }
           }
         } else {
