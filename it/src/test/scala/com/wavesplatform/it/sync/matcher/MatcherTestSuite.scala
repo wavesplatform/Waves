@@ -1,8 +1,7 @@
-package com.wavesplatform.it.async.matcher
+package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.matcher._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.LevelResponse
@@ -198,6 +197,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       }
 
       /// test cancel all orders
+      ///replay
 
       "buy order should execute all open orders and put remaining in order book" in {
         val matcherBalance = matcherNode.accountBalances(matcherNode.address)._1
