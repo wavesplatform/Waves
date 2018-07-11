@@ -64,8 +64,8 @@ package object predef {
        |
        | let ne = nePrim && neDataEntryAndGetElement && neOptionAndExtractHeight
        |
-       |# 3) gt, ge
-       | let gteLong = 1000 > 999 && 1000 >= 999
+       |# 3) gt, ge, lt, le
+       | let gteLong = 1000 > 999 && 1000 >= 999 && 1000 >=1000 && 1000 < 1001 && 1000 < 1001 && 1000 <= 1000
        |
        |# 4) getListSize
        | let getListSize = match tx {
