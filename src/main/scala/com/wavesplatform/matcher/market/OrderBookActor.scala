@@ -14,10 +14,10 @@ import com.wavesplatform.matcher.model._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.utils.Base58
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
-import com.wavesplatform.utils.Base58
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
 import scorex.transaction.assets.exchange._
@@ -292,7 +292,7 @@ class OrderBookActor(assetPair: AssetPair,
             allChannels.broadcastTx(tx)
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
-            val r = (
+            (
               if (event.submittedRemainingAmount < 0) None
               else
                 Some(
@@ -310,11 +310,6 @@ class OrderBookActor(assetPair: AssetPair,
                   )
                 )
             )
-            println(
-              s"handleMatchEvent: $r\n" +
-                s"o: $o\n" +
-                s"c: $c")
-            r
           case Left(ex) =>
             log.info("Can't create tx for o1: " + Json.prettyPrint(o.order.json()) + "\n, o2: " + Json.prettyPrint(c.order.json()))
             (processInvalidTransaction(event, ex), None)

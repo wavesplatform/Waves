@@ -119,11 +119,8 @@ object LimitOrder {
     }
   }
 
-  def getPartialFee(matcherFee: Long, totalAmount: Long, partialAmount: Long): Long = {
-    val r = (BigDecimal(partialAmount) * matcherFee / totalAmount).setScale(0, RoundingMode.HALF_UP).toLong
-    println(s"getPartialFee(matcherFee=$matcherFee, totalAmount=$totalAmount, partialAmount=$partialAmount) = $r")
-    r
-  }
+  def getPartialFee(matcherFee: Long, totalAmount: Long, partialAmount: Long): Long =
+    (BigDecimal(partialAmount) * matcherFee / totalAmount).setScale(0, RoundingMode.HALF_UP).toLong
 }
 
 object Events {
@@ -142,13 +139,6 @@ object Events {
     def submittedExecutedFee: Long     = LimitOrder.getPartialFee(submitted.order.matcherFee, submitted.order.amount, executedAmount)
     def submittedRemainingFee: Long    = math.max(submitted.fee - submittedExecutedFee, 0)
     def submittedExecuted: LimitOrder  = submitted.partial(amount = executedAmount, fee = submittedExecutedFee)
-
-    println(s"""OrderExecuted.cons:
-         |  counter.fee: ${counter.fee}
-         |  counterExecutedFee: $counterExecutedFee
-         |  submitted.fee: ${submitted.fee}
-         |  submittedExecutedFee: $submittedExecutedFee
-         |  executedAmount: $executedAmount""".stripMargin)
   }
 
   case class OrderAdded(order: LimitOrder) extends Event
@@ -207,29 +197,12 @@ object Events {
             Map(o2.spentAsset -> -o2.getSpendAmount),
             Map(o2.feeAsset   -> -overdraftFee(o2))
           ))
-
-        println(s"""OrderExecuted:
-                   |o1.fee: ${o1.fee}
-                   |o2.fee: ${o2.fee}
-                   |op1 = $op1
-                   |op2 = $op2""".stripMargin)
-
         Monoid.combine(
           Map(o1.order.senderPublicKey.address -> op1),
           Map(o2.order.senderPublicKey.address -> op2)
         )
       case OrderCanceled(lo, unmatchable) =>
-        println(s"""OrderCanceled:
-             |lo.feeAcc: ${lo.feeAcc}
-             |lo.rcvAcc: ${lo.rcvAcc}
-             |lo.fee: ${lo.fee}
-             |lo.getReceiveAmount: ${lo.getReceiveAmount}
-             |lo.spentAsset: ${lo.spentAsset}
-             |lo.getSpendAmount: ${lo.getSpendAmount}""".stripMargin)
-
-        //val feeAmount = LimitOrder.getPartialFee(lo.order.matcherFee, lo.order.amount, lo.amount)
         val feeDiff = if (unmatchable) 0 else if (lo.feeAcc == lo.rcvAcc) math.max(lo.fee - lo.getReceiveAmount, 0L) else lo.fee
-        println(s"feeDiff: $feeDiff")
         Map(
           lo.order.senderPublicKey.address ->
             OpenPortfolio(
