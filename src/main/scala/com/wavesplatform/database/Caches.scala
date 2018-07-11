@@ -69,9 +69,8 @@ trait Caches extends Blockchain {
   protected def hasScriptBytes(address: Address): Boolean
   protected def discardScript(address: Address): Unit = scriptCache.invalidate(address)
 
-  override def accountScript(address: Address): Option[Script] = scriptCache.get(address)
-  override def hasScript(address: Address): Boolean =
-    Option(scriptCache.getIfPresent(address)).flatten.isDefined || hasScriptBytes(address)
+  override def accountScript(address: Address): Option[Script] = loadScript(address)
+  override def hasScript(address: Address): Boolean            = hasScriptBytes(address)
 
   private var lastAddressId = loadMaxAddressId()
   protected def loadMaxAddressId(): BigInt

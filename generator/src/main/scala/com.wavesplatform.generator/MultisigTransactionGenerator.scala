@@ -47,7 +47,8 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
       tx.copy(proofs = Proofs(signatures))
     }
 
-    res
+    if (settings.firstRun) setScript +: res
+    else res
   }
 
   private def createAccount() = {
@@ -58,12 +59,13 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
 }
 
 object MultisigTransactionGenerator {
-  final case class Settings(transactions: Int)
+  final case class Settings(transactions: Int, firstRun: Boolean)
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>
       s"""
         | transactions = ${x.transactions}
+        | firstRun = ${x.firstRun}
       """.stripMargin
     }
   }
