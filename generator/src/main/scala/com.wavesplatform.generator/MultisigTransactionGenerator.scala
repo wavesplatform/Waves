@@ -20,8 +20,8 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
 
   private def generate(settings: MultisigTransactionGenerator.Settings): Seq[Transaction] = {
 
-    val bank   = accounts.last
-    val owners = Seq(accounts(1), accounts(2), accounts(3))
+    val bank   = accounts.head
+    val owners = Seq(createAccount(), accounts(1), createAccount(), accounts(2), createAccount(), accounts(3), createAccount(), createAccount())
 
     val enoughFee               = 0.005.waves
     val totalAmountOnNewAccount = 1.waves

@@ -15,7 +15,7 @@ object Gen {
   private def random = ThreadLocalRandom.current
 
   def multiSigScript(owners: Seq[PrivateKeyAccount], requiredProofsCount: Int): Script = {
-    val accountsWithIndexes = owners zipWithIndex
+    val accountsWithIndexes = owners.zipWithIndex
     val keyLets =
       accountsWithIndexes map {
         case (acc, i) =>
