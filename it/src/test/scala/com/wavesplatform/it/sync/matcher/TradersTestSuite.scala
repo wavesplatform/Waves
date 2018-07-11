@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync.matcher
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.state.ByteStr
@@ -11,7 +10,6 @@ import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.model.MatcherModel.Price
-import scorex.transaction.ValidationError.NegativeAmount
 
 import scala.util.Random
 
@@ -88,7 +86,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
           // Cleanup
           nodes.waitForHeightArise()
-          matcherCancelOrder(bobNode, matcherNode, twoAssetsPair, newestOrderId).status should be("OrderCanceled")
+          matcherCancelOrder(bobNode, matcherNode, twoAssetsPair, Some(newestOrderId)).status should be("OrderCanceled")
 
           val transferBackId = aliceNode.transfer(aliceNode.address, bobNode.address, 3050, TransactionFee, Some(bobNewAsset), None).id
           nodes.waitForHeightAriseAndTxPresent(transferBackId)
@@ -113,7 +111,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
           // Cleanup
           nodes.waitForHeightArise()
-          matcherCancelOrder(bobNode, matcherNode, twoAssetsPair, newestOrderId).status should be("OrderCanceled")
+          matcherCancelOrder(bobNode, matcherNode, twoAssetsPair, Some(newestOrderId)).status should be("OrderCanceled")
           val cancelLeaseId = bobNode.cancelLease(bobNode.address, leaseId, TransactionFee).id
           nodes.waitForHeightAriseAndTxPresent(cancelLeaseId)
         }
@@ -137,7 +135,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
           // Cleanup
           nodes.waitForHeightArise()
-          matcherCancelOrder(bobNode, matcherNode, twoAssetsPair, newestOrderId).status should be("OrderCanceled")
+          matcherCancelOrder(bobNode, matcherNode, twoAssetsPair, Some(newestOrderId)).status should be("OrderCanceled")
           val transferBackId = aliceNode.transfer(aliceNode.address, bobNode.address, transferAmount, TransactionFee, None, None).id
           nodes.waitForHeightAriseAndTxPresent(transferBackId)
         }
@@ -165,7 +163,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
           // Cleanup
           nodes.waitForHeightArise()
-          matcherCancelOrder(bobNode, matcherNode, bobWavesPair, newestOrderId).status should be("OrderCanceled")
+          matcherCancelOrder(bobNode, matcherNode, bobWavesPair, Some(newestOrderId)).status should be("OrderCanceled")
           val cancelLeaseId = bobNode.cancelLease(bobNode.address, leaseId, TransactionFee).id
           nodes.waitForHeightAriseAndTxPresent(cancelLeaseId)
         }

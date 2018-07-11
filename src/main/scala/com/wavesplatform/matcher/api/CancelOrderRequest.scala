@@ -12,8 +12,8 @@ import scorex.transaction.assets.exchange.OrderJson._
 
 case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
                               @ApiModelProperty(dataType = "java.lang.String") orderIdStr: Option[String],
-                              @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte],
-                              @ApiModelProperty() timestamp: Option[Long]) {
+                              @ApiModelProperty() timestamp: Option[Long],
+                              @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte]) {
   @ApiModelProperty(hidden = true)
   val orderId: Option[Array[Byte]] = orderIdStr.map(id => Base58.decode(id).get)
 
@@ -21,7 +21,7 @@ case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") s
   lazy val toSign: Array[Byte] = (orderId, timestamp) match {
     case (Some(orderId), _)      => senderPublicKey.publicKey ++ orderId
     case (None, Some(timestamp)) => senderPublicKey.publicKey ++ Longs.toByteArray(timestamp)
-    case (None, None)            => signature // Signature cann't sign itself
+    case (None, None)            => signature // Signature can't sign itself
   }
   @ApiModelProperty(hidden = true)
   def isSignatureValid: Boolean = crypto.verify(signature, toSign, senderPublicKey.publicKey)
@@ -38,8 +38,8 @@ object CancelOrderRequest {
   implicit val cancelOrderReads: Reads[CancelOrderRequest] = {
     val r = (JsPath \ "sender").read[PublicKeyAccount] and
       (JsPath \ "orderId").readNullable[String] and
-      (JsPath \ "signature").read[Array[Byte]] and
-      (JsPath \ "timestamp").readNullable[Long]
+      (JsPath \ "timestamp").readNullable[Long] and
+      (JsPath \ "signature").read[Array[Byte]]
     r(CancelOrderRequest.apply _)
   }
 }

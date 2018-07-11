@@ -162,7 +162,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
       "order could be canceled and resubmitted again" in {
         // Alice cancels the very first order (100 left)
-        val status1 = matcherCancelOrder(aliceNode, matcherNode, aliceWavesPair, order1.message.id)
+        val status1 = matcherCancelOrder(aliceNode, matcherNode, aliceWavesPair, Some(order1.message.id))
         status1.status should be("OrderCanceled")
 
         // Alice checks that the order book is empty
@@ -179,6 +179,25 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         val orders2 = matcherNode.getOrderBook(aliceAsset)
         orders2.asks should contain(LevelResponse(20.waves / 10 * Order.PriceConstant, 100))
       }
+
+      "cancel orders by pair" in {
+        val N = 5
+
+        val orders = 0 to N map { _ =>
+          val o = matcherNode.placeOrder(prepareOrder(aliceNode, matcherNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 100))
+          o.status should be("OrderAccepted")
+          o.message.id
+        }
+
+        val cancel = matcherCancelOrder(aliceNode, matcherNode, aliceWavesPair, None, Some(System.currentTimeMillis))
+        cancel.status should be("OrderCancelingAccepted")
+
+        orders foreach { id =>
+          matcherNode.waitOrderStatus(aliceAsset, id, "Canceled")
+        }
+      }
+
+      /// test cancel all orders
 
       "buy order should execute all open orders and put remaining in order book" in {
         val matcherBalance = matcherNode.accountBalances(matcherNode.address)._1
@@ -281,7 +300,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
         // Cleanup
         nodes.waitForHeightArise()
-        matcherCancelOrder(bobNode, matcherNode, bobWavesPair, order8.message.id).status should be("OrderCanceled")
+        matcherCancelOrder(bobNode, matcherNode, bobWavesPair, Some(order8.message.id)).status should be("OrderCanceled")
 
         val transferBobId = aliceNode.transfer(aliceNode.address, bobNode.address, transferAmount, TransactionFee, None, None).id
         nodes.waitForHeightAriseAndTxPresent(transferBobId)

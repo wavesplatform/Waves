@@ -53,10 +53,10 @@ package object matcher {
     matcherNode.getReservedBalance(node.publicKeyStr, ts, signature)
   }
 
-  def matcherCancelOrder(node: Node, matcherNode: Node, pair: AssetPair, orderId: String) = {
+  def matcherCancelOrder(node: Node, matcherNode: Node, pair: AssetPair, orderId: Option[String], timestamp: Option[Long] = None) = {
     val privateKey    = node.privateKey
     val publicKey     = node.publicKey
-    val request       = CancelOrderRequest(publicKey, Some(orderId), Array.emptyByteArray, None)
+    val request       = CancelOrderRequest(publicKey, orderId, timestamp.map(_ / 1000), Array.emptyByteArray)
     val sig           = crypto.sign(privateKey, request.toSign)
     val signedRequest = request.copy(signature = sig)
     matcherNode.cancelOrder(pair.amountAssetStr, pair.priceAssetStr, signedRequest)
