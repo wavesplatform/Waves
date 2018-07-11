@@ -89,6 +89,14 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         c.copy(mode = Mode.MULTISIG)
       }
       .text("Multisig cycle of funding, initializng and sending funds back")
+      .children(
+        opt[Int]("transactions").abbr("t").optional().text("number of transactions").action { (x, c) =>
+          c.copy(multisig = c.multisig.copy(transactions = x))
+        },
+        opt[Boolean]("first-run").abbr("first").optional().text("generate set multisig script transaction").action { (x, c) =>
+          c.copy(multisig = c.multisig.copy(firstRun = x))
+        },
+      )
   }
 
   val defaultConfig = ConfigFactory.load().as[GeneratorSettings]("generator")
