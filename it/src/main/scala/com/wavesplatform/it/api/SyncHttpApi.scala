@@ -111,6 +111,12 @@ object SyncHttpApi extends Assertions {
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Transaction =
       Await.result(async(n).payment(sourceAddress, recipient, amount, fee), RequestAwaitTime)
 
+    def transactionInfo(txId: String): TransactionInfo =
+      Await.result(async(n).transactionInfo(txId), RequestAwaitTime)
+
+    def transactionsByAddress(address: String, limit: Int): Seq[Seq[TransactionInfo]] =
+      Await.result(async(n).transactionsByAddress(address, limit), RequestAwaitTime)
+
     def scriptCompile(code: String): CompiledScript =
       Await.result(async(n).scriptCompile(code), RequestAwaitTime)
 
