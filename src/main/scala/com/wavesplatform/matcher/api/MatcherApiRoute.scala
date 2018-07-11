@@ -142,9 +142,26 @@ case class MatcherApiRoute(wallet: Wallet,
   def cancel: Route = (path("orderbook" / Segment / Segment / "cancel") & post) { (a1, a2) =>
     withAssetPair(a1, a2) { pair =>
       json[CancelOrderRequest] { req =>
-        (matcher ? CancelOrder(pair, req))
-          .mapTo[MatcherResponse]
-          .map(r => r.code -> r.json)
+        if (req.isSignatureValid) {
+          req.orderId match {
+            case Some(id) =>
+              (matcher ? CancelOrder(pair, req.senderPublicKey, Base58.encode(id)))
+                .mapTo[MatcherResponse]
+                .map(r => r.code -> r.json)
+            case None =>
+              (orderHistory ? GetOrderHistory(pair, req.senderPublicKey.address, req.timestamp.get))
+                .mapTo[GetOrderHistoryResponse]
+                .flatMap { res =>
+                  Future
+                    .sequence(res.history map { h =>
+                      matcher ? CancelOrder(pair, req.senderPublicKey, h._1)
+                    })
+                    .map(_ => StatusCodes.OK -> JsString("Canceled"))
+                }
+          }
+        } else {
+          (StatusCodes.BadRequest -> Json.obj("message" -> "Signature should be valid"))
+        }
       }
     }
   }
@@ -173,7 +190,7 @@ case class MatcherApiRoute(wallet: Wallet,
     withAssetPair(a1, a2) { pair =>
       json[CancelOrderRequest] { req =>
         if (req.isSignatureValid) {
-          (orderHistory ? DeleteOrderFromHistory(pair, req.senderPublicKey.address, Base58.encode(req.orderId), NTP.correctedTime()))
+          (orderHistory ? DeleteOrderFromHistory(pair, req))
             .mapTo[MatcherResponse]
             .map(r => r.code -> r.json)
         } else {

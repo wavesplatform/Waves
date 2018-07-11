@@ -6,7 +6,6 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state.ByteStr
-import com.wavesplatform.utils.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.duration._
@@ -57,7 +56,7 @@ package object matcher {
   def matcherCancelOrder(node: Node, matcherNode: Node, pair: AssetPair, orderId: String) = {
     val privateKey    = node.privateKey
     val publicKey     = node.publicKey
-    val request       = CancelOrderRequest(publicKey, Base58.decode(orderId).get, Array.emptyByteArray)
+    val request       = CancelOrderRequest(publicKey, Some(orderId), Array.emptyByteArray, None)
     val sig           = crypto.sign(privateKey, request.toSign)
     val signedRequest = request.copy(signature = sig)
     matcherNode.cancelOrder(pair.amountAssetStr, pair.priceAssetStr, signedRequest)

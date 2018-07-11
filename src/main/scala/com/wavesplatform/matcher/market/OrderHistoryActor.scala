@@ -18,6 +18,7 @@ import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
+import com.wavesplatform.utils.Base58
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -128,12 +129,18 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   }
 
   def deleteFromOrderHistory(req: DeleteOrderFromHistory): Unit = {
-    orderHistory.orderStatus(req.id) match {
+    def delete(id: String) = orderHistory.orderStatus(id) match {
       case Filled | LimitOrder.Cancelled(_) =>
-        orderHistory.deleteOrder(req.address, req.id)
-        sender() ! OrderDeleted(req.id)
+        orderHistory.deleteOrder(req.address, id)
+        OrderDeleted(id)
       case _ =>
-        sender() ! BadMatcherResponse(StatusCodes.BadRequest, "Order couldn't be deleted")
+        BadMatcherResponse(StatusCodes.BadRequest, "Order couldn't be deleted")
+    }
+    req.id match {
+      case Some(id) => sender() ! delete(id)
+      case None =>
+        sender() ! OrderDeletingAccepted()
+        orderHistory.fetchOrderHistoryByPair(req.assetPair, req.address).foreach(orderData => delete(orderData._1))
     }
   }
 
@@ -175,7 +182,12 @@ object OrderHistoryActor {
 
   case class GetActiveOrdersByAddressResponse(requestId: Long, address: Address, orders: Seq[LimitOrder])
 
-  case class DeleteOrderFromHistory(assetPair: AssetPair, address: String, id: String, ts: Long) extends ExpirableOrderHistoryRequest
+  case class DeleteOrderFromHistory(assetPair: AssetPair, req: com.wavesplatform.matcher.api.CancelOrderRequest)
+      extends ExpirableOrderHistoryRequest {
+    val address: String    = req.senderPublicKey.address
+    val id: Option[String] = req.orderId.map(Base58.encode)
+    val ts: Long           = req.timestamp.getOrElse(NTP.correctedTime()) // XXX TODO make ts mandatory
+  }
 
   case class ValidateOrder(order: Order, ts: Long) extends ExpirableOrderHistoryRequest
 
@@ -192,6 +204,11 @@ object OrderHistoryActor {
   case class AssetPairAwareResponse(assetPair: AssetPair)
 
   case object DbCommit
+
+  case class OrderDeletingAccepted() extends MatcherResponse {
+    val json: JsObject            = Json.obj("status" -> "Accepted")
+    val code: StatusCodes.Success = StatusCodes.Accepted
+  }
 
   case class OrderDeleted(orderId: String) extends MatcherResponse {
     val json: JsObject            = Json.obj("status" -> "OrderDeleted", "orderId" -> orderId)

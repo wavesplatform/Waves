@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher.api
 
 import com.wavesplatform.crypto
+import com.google.common.primitives.Longs
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
@@ -10,26 +11,35 @@ import com.wavesplatform.utils.Base58
 import scorex.transaction.assets.exchange.OrderJson._
 
 case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
-                              @ApiModelProperty(dataType = "java.lang.String") orderId: Array[Byte],
-                              @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte]) {
+                              @ApiModelProperty(dataType = "java.lang.String") orderIdStr: Option[String],
+                              @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte],
+                              @ApiModelProperty() timestamp: Option[Long]) {
   @ApiModelProperty(hidden = true)
-  lazy val toSign: Array[Byte] = senderPublicKey.publicKey ++ orderId
+  val orderId: Option[Array[Byte]] = orderIdStr.map(id => Base58.decode(id).get)
 
+  @ApiModelProperty(hidden = true)
+  lazy val toSign: Array[Byte] = (orderId, timestamp) match {
+    case (Some(orderId), _)      => senderPublicKey.publicKey ++ orderId
+    case (None, Some(timestamp)) => senderPublicKey.publicKey ++ Longs.toByteArray(timestamp)
+    case (None, None)            => signature // Signature cann't sign itself
+  }
   @ApiModelProperty(hidden = true)
   def isSignatureValid: Boolean = crypto.verify(signature, toSign, senderPublicKey.publicKey)
 
   def json: JsObject = Json.obj(
     "sender"    -> Base58.encode(senderPublicKey.publicKey),
-    "orderId"   -> Base58.encode(orderId),
-    "signature" -> Base58.encode(signature)
+    "orderId"   -> orderId.map(Base58.encode),
+    "signature" -> Base58.encode(signature),
+    "timestamp" -> timestamp
   )
 }
 
 object CancelOrderRequest {
   implicit val cancelOrderReads: Reads[CancelOrderRequest] = {
     val r = (JsPath \ "sender").read[PublicKeyAccount] and
-      (JsPath \ "orderId").read[Array[Byte]] and
-      (JsPath \ "signature").read[Array[Byte]]
+      (JsPath \ "orderId").readNullable[String] and
+      (JsPath \ "signature").read[Array[Byte]] and
+      (JsPath \ "timestamp").readNullable[Long]
     r(CancelOrderRequest.apply _)
   }
 }
