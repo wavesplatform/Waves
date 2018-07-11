@@ -1,48 +1,42 @@
 package com.wavesplatform.generator
 import cats.Show
 import com.wavesplatform.crypto
-import com.wavesplatform.generator.DynamicWideTransactionGenerator.Settings
-import com.wavesplatform.generator.MultisigTransactionGenerator.Settings
 import com.wavesplatform.generator.utils.Gen
 import com.wavesplatform.state._
 import scorex.account.PrivateKeyAccount
-import scorex.transaction.{Proofs, Transaction}
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.Script
-import scorex.transaction.transfer.{TransferTransactionV1, TransferTransactionV2}
-
+import scorex.transaction.transfer.TransferTransactionV2
+import scorex.transaction.{Proofs, Transaction}
+import com.wavesplatform.it.util._
 import scala.util.Random
 
-class MultisigTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKeyAccount]) extends TransactionGenerator {
+class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settings, val accounts: Seq[PrivateKeyAccount])
+    extends TransactionGenerator {
 
   override def next(): Iterator[Transaction] = {
-    Iterator.continually(generate).flatten
+    generate(settings).toIterator
   }
 
-  private def generate: Seq[Transaction] = {
+  private def generate(settings: MultisigTransactionGenerator.Settings): Seq[Transaction] = {
 
-    val newAccount = createAccount()
-
-    val bank   = accounts.head
+    val bank   = accounts.last
     val owners = Seq(accounts(1), accounts(2), accounts(3))
 
-    val enoughFee               = 5000000
-    val totalAmountOnNewAccount = 100000000000L
-    val fundNewAccount = TransferTransactionV2
-      .selfSigned(2, None, bank, newAccount.toAddress, totalAmountOnNewAccount, System.currentTimeMillis(), None, enoughFee, Array.emptyByteArray)
-      .explicitGet()
+    val enoughFee               = 0.005.waves
+    val totalAmountOnNewAccount = 1.waves
 
     val script: Script = Gen.multiSigScript(owners, 3)
 
-    val setScript = SetScriptTransaction.selfSigned(1, newAccount, Some(script), enoughFee, System.currentTimeMillis()).explicitGet()
+    val setScript = SetScriptTransaction.selfSigned(1, bank, Some(script), enoughFee, System.currentTimeMillis()).explicitGet()
 
-    val transferBackToBank: TransferTransactionV2 = {
+    val res = Range(0, settings.transactions).map { i =>
       val tx = TransferTransactionV2
         .create(2,
                 None,
-                newAccount,
                 bank,
-                totalAmountOnNewAccount - 2 * enoughFee,
+                owners(1),
+                totalAmountOnNewAccount - 2 * enoughFee - i,
                 System.currentTimeMillis(),
                 None,
                 enoughFee,
@@ -53,19 +47,24 @@ class MultisigTransactionGenerator(settings: Settings, val accounts: Seq[Private
       tx.copy(proofs = Proofs(signatures))
     }
 
-    Seq(fundNewAccount, setScript, transferBackToBank)
+    res
   }
 
-  private def createAccount() = PrivateKeyAccount.fromSeed(Random.alphanumeric.take(32).mkString).explicitGet()
+  private def createAccount() = {
+    val seedBytes = Array.fill(32)(0: Byte)
+    Random.nextBytes(seedBytes)
+    PrivateKeyAccount(seedBytes)
+  }
 }
 
 object MultisigTransactionGenerator {
-  final case class Settings()
+  final case class Settings(transactions: Int)
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>
-      import x._
-      "<empty multisig settings>"
+      s"""
+        | transactions = ${x.transactions}
+      """.stripMargin
     }
   }
 }

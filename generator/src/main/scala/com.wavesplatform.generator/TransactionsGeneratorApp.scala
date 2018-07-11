@@ -7,6 +7,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.generator.cli.ScoptImplicits
 import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.network.client.NetworkSender
+import com.wavesplatform.settings.inetSocketAddressReader
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
@@ -114,6 +115,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       sys.addShutdownHook(sender.close())
 
       val workers = finalConfig.sendTo.map { node =>
+        log.info(s"Creating worker: ${node.getHostString}:${node.getPort}")
         new Worker(finalConfig.worker, sender, node, generator)
       }
 

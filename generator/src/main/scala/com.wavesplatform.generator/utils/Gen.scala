@@ -3,6 +3,7 @@ package com.wavesplatform.generator.utils
 import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.generator.utils.Implicits._
+import com.wavesplatform.state.ByteStr
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.crypto.signatures.Curve25519.KeyLength
 import scorex.transaction.smart.script.{Script, ScriptCompiler}
@@ -18,7 +19,7 @@ object Gen {
     val keyLets =
       accountsWithIndexes map {
         case (acc, i) =>
-          s"let accountPK$i = base58'$acc'"
+          s"let accountPK$i = base58'${ByteStr(acc.publicKey).base58}'"
       } mkString "\n"
 
     val signedLets =
@@ -90,8 +91,4 @@ object Gen {
 
   def address(limitUniqNumber: Option[Int]): Iterator[Address] = limitUniqNumber.map(address(_)).getOrElse(address)
 
-}
-
-object MultiSigScriptGenerator {
-  def apply(accounts: List[String], num: Int): String = {}
 }
