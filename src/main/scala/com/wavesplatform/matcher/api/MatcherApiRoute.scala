@@ -45,7 +45,7 @@ case class MatcherApiRoute(wallet: Wallet,
     pathPrefix("matcher") {
       matcherPublicKey ~ orderBook ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
         getAllOrderHistory ~ getTradableBalance ~ reservedBalance ~ orderStatus ~
-        historyDelete ~ cancel ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
+        historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
         getSettings
     }
 
@@ -119,6 +119,49 @@ case class MatcherApiRoute(wallet: Wallet,
     }
   }
 
+  @Path("/orderbook/cancelAll")
+  @ApiOperation(
+    value = "Cancel orders",
+    notes = "Cancel all previously submitted orders if it's not already filled completely",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json"
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "body",
+        value = "Json with data",
+        required = true,
+        paramType = "body",
+        dataType = "com.wavesplatform.matcher.api.CancelOrderRequest"
+      )
+    ))
+  def cancelAll: Route = (path("orderbook" / "cancel") & post) {
+    json[CancelOrderRequest] { req =>
+      if (req.isSignatureValid) {
+        req.timestamp match {
+          case None =>
+            StatusCodes.BadRequest -> JsString("Timestamp required")
+          case Some(timestamp) =>
+            (orderHistory ? GetAllOrderHistory(req.senderPublicKey.address, true, timestamp))
+              .mapTo[GetOrderHistoryResponse]
+              .flatMap { res: GetOrderHistoryResponse =>
+                Future
+                  .sequence(res.history map {
+                    case (id, info, Some(order)) =>
+                      matcher ? CancelOrder(order.assetPair, req.senderPublicKey, id)
+                    case _ => Future.successful(())
+                  })
+                  .map(_ => StatusCodes.OK -> JsString("Canceled"))
+              }
+        }
+      } else {
+        Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Signature should be valid"))
+      }
+    }
+  }
+
   @Path("/orderbook/{amountAsset}/{priceAsset}/cancel")
   @ApiOperation(
     value = "Cancel order",
@@ -165,7 +208,6 @@ case class MatcherApiRoute(wallet: Wallet,
       }
     }
   }
-
   @Path("/orderbook/{amountAsset}/{priceAsset}/delete")
   @ApiOperation(
     value = "Delete Order from History by Id",
