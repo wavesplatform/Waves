@@ -218,7 +218,7 @@ object Events {
           Map(o1.order.senderPublicKey.address -> op1),
           Map(o2.order.senderPublicKey.address -> op2)
         )
-      case OrderCanceled(lo, _) =>
+      case OrderCanceled(lo, unmatchable) =>
         println(s"""OrderCanceled:
              |lo.feeAcc: ${lo.feeAcc}
              |lo.rcvAcc: ${lo.rcvAcc}
@@ -228,7 +228,7 @@ object Events {
              |lo.getSpendAmount: ${lo.getSpendAmount}""".stripMargin)
 
         //val feeAmount = LimitOrder.getPartialFee(lo.order.matcherFee, lo.order.amount, lo.amount)
-        val feeDiff = if (lo.feeAcc == lo.rcvAcc) math.max(lo.fee - lo.getReceiveAmount, 0L) else lo.fee
+        val feeDiff = if (unmatchable) 0 else if (lo.feeAcc == lo.rcvAcc) math.max(lo.fee - lo.getReceiveAmount, 0L) else lo.fee
         println(s"feeDiff: $feeDiff")
         Map(
           lo.order.senderPublicKey.address ->
