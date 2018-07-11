@@ -153,7 +153,7 @@ case class MatcherApiRoute(wallet: Wallet,
                       matcher ? CancelOrder(order.assetPair, req.senderPublicKey, id)
                     case _ => Future.successful(())
                   })
-                  .map(_ => StatusCodes.OK -> Json.obj("message" -> "Canceled"))
+                  .map(_ => StatusCodes.OK -> Json.obj("status" -> "Canceled"))
               }
         }
       } else {
@@ -199,7 +199,7 @@ case class MatcherApiRoute(wallet: Wallet,
                     .sequence(res.history map { h =>
                       matcher ? CancelOrder(pair, req.senderPublicKey, h._1)
                     })
-                    .map(_ => StatusCodes.OK -> Json.obj("message" -> "Canceled"))
+                    .map(_ => StatusCodes.OK -> Json.obj("status" -> "Canceled"))
                 }
           }
         } else {

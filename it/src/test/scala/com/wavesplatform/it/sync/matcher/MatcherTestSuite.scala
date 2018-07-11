@@ -189,7 +189,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         }
 
         val cancel = matcherCancelOrder(aliceNode, matcherNode, aliceWavesPair, None, Some(System.currentTimeMillis))
-        cancel.status should be("OrderCancelingAccepted")
+        cancel.status should be("Canceled")
 
         orders foreach { id =>
           matcherNode.waitOrderStatus(aliceAsset, id, "Canceled")
