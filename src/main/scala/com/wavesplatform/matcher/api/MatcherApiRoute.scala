@@ -119,6 +119,8 @@ case class MatcherApiRoute(wallet: Wallet,
     }
   }
 
+  val cancelRequestsTimestamps: scala.collection.mutable.Map[String, Seq[Long]] = scala.collection.mutable.Map().withDefaultValue(Seq())
+
   @Path("/orderbook/cancelAll")
   @ApiOperation(
     value = "Cancel orders",
@@ -144,17 +146,23 @@ case class MatcherApiRoute(wallet: Wallet,
           case None =>
             StatusCodes.BadRequest -> Json.obj("message" -> "Timestamp required")
           case Some(timestamp) =>
-            (orderHistory ? GetAllOrderHistory(req.senderPublicKey.address, true, timestamp))
-              .mapTo[GetOrderHistoryResponse]
-              .flatMap { res: GetOrderHistoryResponse =>
-                Future
-                  .sequence(res.history map {
-                    case (id, info, Some(order)) =>
-                      matcher ? CancelOrder(order.assetPair, req.senderPublicKey, id)
-                    case _ => Future.successful(())
-                  })
-                  .map(_ => StatusCodes.OK -> Json.obj("status" -> "Canceled"))
-              }
+            val address = req.senderPublicKey.address
+            if (cancelRequestsTimestamps(address).contains(timestamp)) {
+              Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Duplicate request"))
+            } else {
+              cancelRequestsTimestamps(address) ++= Seq(timestamp)
+              (orderHistory ? GetAllOrderHistory(address, true, timestamp))
+                .mapTo[GetOrderHistoryResponse]
+                .flatMap { res: GetOrderHistoryResponse =>
+                  Future
+                    .sequence(res.history map {
+                      case (id, info, Some(order)) =>
+                        matcher ? CancelOrder(order.assetPair, req.senderPublicKey, id)
+                      case _ => Future.successful(())
+                    })
+                    .map(_ => StatusCodes.OK -> Json.obj("status" -> "Canceled"))
+                }
+            }
         }
       } else {
         Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Signature should be valid"))
