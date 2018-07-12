@@ -56,6 +56,7 @@ object JsAPI {
       override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     })
 
+    //comment
     val cryptoContext = CryptoContext.build(Global)
 
     val compilerContext = Monoid.combineAll(Seq(PureContext.ctx, cryptoContext, wavesContext)).compilerContext
