@@ -40,14 +40,15 @@ object MatcherApiRoute {
 
   val expiration = 15.minutes
 
-  val cancelRequestsTimestamps: scala.collection.mutable.Map[String, Seq[Duration]] = scala.collection.mutable.Map().withDefaultValue(Seq())
+  val cancelRequestsTimestamps: scala.collection.mutable.Map[String, Duration] =
+    scala.collection.mutable.Map().withDefaultValue(NTP.correctedTime().millis)
 
-  def checkReuse(address: String, timestamp: Duration, correct: Duration) = synchronized {
-    val old = cancelRequestsTimestamps(address).filter(correct - _ <= expiration)
-    if (old.contains(timestamp)) {
+  def checkReuse(address: String, timestamp: Duration) = synchronized {
+    val old = cancelRequestsTimestamps(address)
+    if (old < timestamp) {
       true
     } else {
-      cancelRequestsTimestamps(address) = timestamp +: old
+      cancelRequestsTimestamps(address) = old
       false
     }
   }
@@ -58,7 +59,7 @@ object MatcherApiRoute {
       Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Timestamp from future"))
     } else if (delta > expiration) {
       Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Request is obsolete"))
-    } else if (checkReuse(address, timestamp, correct)) {
+    } else if (checkReuse(address, timestamp)) {
       Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Request is duplicate"))
     } else {
       proc
