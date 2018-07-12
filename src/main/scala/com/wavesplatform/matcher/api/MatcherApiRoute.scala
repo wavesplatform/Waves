@@ -37,7 +37,8 @@ case class MatcherApiRoute(wallet: Wallet,
                            assetPairBuilder: AssetPairBuilder,
                            matcher: ActorRef,
                            orderHistory: ActorRef,
-                           getOrderBook: AssetPair => Option[OrderBook],
+                           orderBook: AssetPair => Option[ActorRef],
+                           orderBookSnapshot: AssetPair => Option[OrderBook],
                            txWriter: ActorRef,
                            settings: RestAPISettings,
                            matcherSettings: MatcherSettings)
@@ -47,12 +48,12 @@ case class MatcherApiRoute(wallet: Wallet,
 
   override lazy val route: Route =
     pathPrefix("matcher") {
-      matcherPublicKey ~ orderBook ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
+      matcherPublicKey ~ getOrderBook ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
         getAllOrderHistory ~ getTradableBalance ~ reservedBalance ~ orderStatus ~
         historyDelete ~ cancel ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder
     }
 
-  private def withAssetPair(a1: String, a2: String, redirectToInverse: Boolean = false): Directive1[AssetPair] =
+  private def withAssetPair(a1: String, a2: String, redirectToInverse: Boolean = false, suffix: String = ""): Directive1[AssetPair] =
     assetPairBuilder.createAssetPair(a1, a2) match {
       case Right(p) => provide(p)
       case Left(e) if redirectToInverse =>
@@ -60,7 +61,7 @@ case class MatcherApiRoute(wallet: Wallet,
           .createAssetPair(a2, a1)
           .fold(
             _ => complete(StatusCodes.NotFound -> Json.obj("message" -> e)),
-            _ => redirect(s"/matcher/$a2/$a1", StatusCodes.MovedPermanently)
+            _ => redirect(s"/matcher/orderbook/$a2/$a1$suffix", StatusCodes.MovedPermanently)
           )
       case Left(e) => complete(StatusCodes.NotFound -> Json.obj("message" -> e))
     }
@@ -87,10 +88,10 @@ case class MatcherApiRoute(wallet: Wallet,
                            dataType = "integer",
                            paramType = "query")
     ))
-  def orderBook: Route = (path("orderbook" / Segment / Segment) & get) { (a1, a2) =>
+  def getOrderBook: Route = (path("orderbook" / Segment / Segment) & get) { (a1, a2) =>
     parameters('depth.as[Int].?) { depth =>
       withAssetPair(a1, a2, redirectToInverse = true) { pair =>
-        complete(StatusCodes.OK -> getOrderBook(pair).fold(GetOrderBookResponse.empty(pair))(handleGetOrderBook(pair, _, depth)).json)
+        complete(StatusCodes.OK -> orderBookSnapshot(pair).fold(GetOrderBookResponse.empty(pair))(handleGetOrderBook(pair, _, depth)).json)
       }
     }
   }
@@ -143,10 +144,16 @@ case class MatcherApiRoute(wallet: Wallet,
     ))
   def cancel: Route = (path("orderbook" / Segment / Segment / "cancel") & post) { (a1, a2) =>
     withAssetPair(a1, a2) { pair =>
-      json[CancelOrderRequest] { req =>
-        (matcher ? CancelOrder(pair, req))
-          .mapTo[MatcherResponse]
-          .map(r => r.code -> r.json)
+      orderBook(pair).fold[Route](complete(StatusCodes.NotFound -> Json.obj("message" -> "Invalid asset pair"))) { oba =>
+        json[CancelOrderRequest] { req =>
+          if (req.isSignatureValid()) {
+            (oba ? CancelOrder(pair, req))
+              .mapTo[MatcherResponse]
+              .map(r => r.code -> r.json)
+          } else {
+            OrderCancelRejected("Invalid signature").json
+          }
+        }
       }
     }
   }
@@ -174,7 +181,7 @@ case class MatcherApiRoute(wallet: Wallet,
   def historyDelete: Route = (path("orderbook" / Segment / Segment / "delete") & post) { (a1, a2) =>
     withAssetPair(a1, a2) { pair =>
       json[CancelOrderRequest] { req =>
-        if (req.isSignatureValid) {
+        if (req.isSignatureValid()) {
           (orderHistory ? DeleteOrderFromHistory(pair, req.senderPublicKey.address, Base58.encode(req.orderId), NTP.correctedTime()))
             .mapTo[MatcherResponse]
             .map(r => r.code -> r.json)
@@ -205,7 +212,7 @@ case class MatcherApiRoute(wallet: Wallet,
     (headerValueByName("Timestamp") & headerValueByName("Signature")) { (ts, sig) =>
       checkGetSignature(publicKey, ts, sig) match {
         case Success(address) =>
-          withAssetPair(a1, a2, redirectToInverse = true) { pair =>
+          withAssetPair(a1, a2, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
             complete(
               (orderHistory ? GetOrderHistory(pair, address, NTP.correctedTime()))
                 .mapTo[MatcherResponse]
@@ -306,7 +313,7 @@ case class MatcherApiRoute(wallet: Wallet,
       new ApiImplicitParam(name = "address", value = "Account Address", required = true, dataType = "string", paramType = "path")
     ))
   def getTradableBalance: Route = (path("orderbook" / Segment / Segment / "tradableBalance" / Segment) & get) { (a1, a2, address) =>
-    withAssetPair(a1, a2, redirectToInverse = true) { pair =>
+    withAssetPair(a1, a2, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
       complete(
         (orderHistory ? GetTradableBalance(pair, address, NTP.correctedTime()))
           .mapTo[MatcherResponse]
@@ -349,7 +356,7 @@ case class MatcherApiRoute(wallet: Wallet,
       new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path")
     ))
   def orderStatus: Route = (path("orderbook" / Segment / Segment / Segment) & get) { (a1, a2, orderId) =>
-    withAssetPair(a1, a2, redirectToInverse = true) { pair =>
+    withAssetPair(a1, a2, redirectToInverse = true, s"/$orderId") { pair =>
       complete(
         (orderHistory ? GetOrderStatus(pair, orderId, NTP.correctedTime()))
           .mapTo[MatcherResponse]

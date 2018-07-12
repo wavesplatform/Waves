@@ -1,5 +1,7 @@
 package com.wavesplatform.matcher.market
 
+import java.util.concurrent.atomic.AtomicReference
+
 import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence.{PersistentActor, RecoveryCompleted}
@@ -27,6 +29,7 @@ import scala.collection.{immutable, mutable}
 
 class MatcherActor(orderHistory: ActorRef,
                    pairBuilder: AssetPairBuilder,
+                   orderBooks: AtomicReference[Map[AssetPair, ActorRef]],
                    updateSnapshot: AssetPair => OrderBook => Unit,
                    wallet: Wallet,
                    utx: UtxPool,
@@ -40,6 +43,8 @@ class MatcherActor(orderHistory: ActorRef,
   import MatcherActor._
 
   val tradedPairs = mutable.Map.empty[AssetPair, MarketData]
+
+  private def orderBook(pair: AssetPair) = Option(orderBooks.get()).flatMap(_.get(pair))
 
   def getAssetName(asset: Option[AssetId]): String =
     asset.fold(AssetPair.WavesName) { aid =>
@@ -57,10 +62,14 @@ class MatcherActor(orderHistory: ActorRef,
     )
     tradedPairs += pair -> md
 
-    context.actorOf(
+    val orderBook = context.actorOf(
       OrderBookActor.props(pair, updateSnapshot(pair), orderHistory, blockchain, settings, wallet, utx, allChannels, functionalitySettings),
       OrderBookActor.name(pair)
     )
+
+    orderBooks.updateAndGet(_ + (pair -> orderBook))
+
+    orderBook
   }
 
   def checkBlacklistedAddress(address: Address)(f: => Unit): Unit = {
@@ -108,33 +117,20 @@ class MatcherActor(orderHistory: ActorRef,
     case order: Order =>
       checkAssetPair(order.assetPair, order) {
         checkBlacklistedAddress(order.senderPublicKey) {
-          context
-            .child(OrderBookActor.name(order.assetPair))
-            .fold(createAndForward(order))(forwardReq(order))
+          orderBook(order.assetPair).fold(createAndForward(order))(forwardReq(order))
         }
       }
 
     case ob: DeleteOrderBookRequest =>
       checkAssetPair(ob.assetPair, ob) {
-        context
-          .child(OrderBookActor.name(ob.assetPair))
+        orderBook(ob.assetPair)
           .fold(returnEmptyOrderBook(ob.assetPair))(forwardReq(ob))
         removeOrderBook(ob.assetPair)
       }
 
-    case x: CancelOrder =>
-      checkAssetPair(x.assetPair, x) {
-        context
-          .child(OrderBookActor.name(x.assetPair))
-          .fold {
-            sender() ! OrderCancelRejected(s"Order '${x.orderId}' is already cancelled or never existed in '${x.assetPair.key}' pair")
-          }(forwardReq(x))
-      }
-
     case x: ForceCancelOrder =>
       checkAssetPair(x.assetPair, x) {
-        context
-          .child(OrderBookActor.name(x.assetPair))
+        orderBook(x.assetPair)
           .fold {
             sender() ! OrderCancelRejected(s"Order '${x.orderId}' is already cancelled or never existed in '${x.assetPair.key}' pair")
           }(forwardReq(x))
@@ -156,9 +152,7 @@ class MatcherActor(orderHistory: ActorRef,
 
   override def receiveRecover: Receive = {
     case OrderBookCreated(pair) =>
-      context
-        .child(OrderBookActor.name(pair))
-        .getOrElse(createOrderBook(pair))
+      if (orderBook(pair).isEmpty) createOrderBook(pair)
     case RecoveryCompleted =>
       log.info("MatcherActor - Recovery completed!")
       initPredefinedPairs()
@@ -181,6 +175,7 @@ object MatcherActor {
 
   def props(orderHistoryActor: ActorRef,
             pairBuilder: AssetPairBuilder,
+            orderBooks: AtomicReference[Map[AssetPair, ActorRef]],
             updateSnapshot: AssetPair => OrderBook => Unit,
             wallet: Wallet,
             utx: UtxPool,
@@ -188,7 +183,17 @@ object MatcherActor {
             settings: MatcherSettings,
             blockchain: Blockchain,
             functionalitySettings: FunctionalitySettings): Props =
-    Props(new MatcherActor(orderHistoryActor, pairBuilder, updateSnapshot, wallet, utx, allChannels, settings, blockchain, functionalitySettings))
+    Props(
+      new MatcherActor(orderHistoryActor,
+                       pairBuilder,
+                       orderBooks,
+                       updateSnapshot,
+                       wallet,
+                       utx,
+                       allChannels,
+                       settings,
+                       blockchain,
+                       functionalitySettings))
 
   case class OrderBookCreated(pair: AssetPair)
 

@@ -64,7 +64,7 @@ trait OrderValidator {
     val v =
       (status != LimitOrder.NotFound) :| "Order not found" &&
         (status != LimitOrder.Filled) :| "Order is already Filled" &&
-        cancel.req.isSignatureValid :| "Signature should be valid" &&
+        cancel.req.isSignatureValid() :| "Signature should be valid" &&
         orderHistory.order(cancel.orderId).fold(false)(_.senderPublicKey == cancel.req.senderPublicKey) :| "Order not found"
 
     if (!v) {
