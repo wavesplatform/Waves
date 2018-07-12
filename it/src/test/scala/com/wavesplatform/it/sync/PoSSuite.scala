@@ -36,8 +36,6 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     for (h <- height to (height + 10)) {
 
-      println(s"Checking block at $h")
-
       val block = forgeBlock(h, signerPK)()
 
       nodes.waitForHeightArise()

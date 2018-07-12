@@ -12,6 +12,7 @@ import com.wavesplatform.lang.v1.compiler.Types.{FINAL, _}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
+import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
@@ -81,8 +82,8 @@ object CompilerV1 {
     tl.flatMap(typeName =>
       typeDefs.get(typeName) match {
         case Some(UnionType(_, unionTypes)) => unionTypes
-        case Some(realType) => List(realType.typeRef)
-        case None        => List.empty
+        case Some(realType)                 => List(realType.typeRef)
+        case None                           => List.empty
     })
 
   private def compileMatch(p: Pos, expr: Expressions.EXPR, cases: List[Expressions.MATCH_CASE]): CompileM[(Terms.EXPR, FINAL)] = {
@@ -93,6 +94,16 @@ object CompilerV1 {
         case u: UNION => u.pure[CompileM]
         case _        => raiseError[CompilerContext, CompilationError, UNION](MatchOnlyUnion(p.start, p.end))
       }
+      refTmpKey = "$match" + ctx.tmpArgsIdx
+      _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1))
+      allowShadowVarName = typedExpr._1 match {
+        case REF(k) => Some(k)
+        case _      => None
+      }
+      ifCases <- inspectFlat[CompilerContext, CompilationError, Expressions.EXPR](updatedCtx => {
+        mkIfCases(updatedCtx, cases, Expressions.REF(p, PART.VALID(AnyPos, refTmpKey)), allowShadowVarName).toCompileM
+      })
+      compiledMatch <- compileBlock(p, Expressions.LET(AnyPos, PART.VALID(AnyPos, refTmpKey), expr, Seq.empty), ifCases)
       _ <- cases
         .flatMap(_.types)
         .traverse[CompileM, String](handlePart)
@@ -106,16 +117,6 @@ object CompilerV1 {
             )
             .toCompileM
         })
-      refTmpKey = "$match" + ctx.tmpArgsIdx
-      _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1))
-      allowShadowVarName = typedExpr._1 match {
-        case REF(k) => Some(k)
-        case _      => None
-      }
-      ifCases <- inspect[CompilerContext, CompilationError, Expressions.EXPR](updatedCtx => {
-        mkIfCases(updatedCtx, cases, Expressions.REF(Pos(1, 1), PART.VALID(Pos(1, 1), refTmpKey)), allowShadowVarName)
-      })
-      compiledMatch <- compileBlock(p, Expressions.LET(Pos(1, 1), PART.VALID(Pos(1, 1), refTmpKey), expr, Seq.empty), ifCases)
     } yield compiledMatch
   }
 
@@ -210,28 +211,50 @@ object CompilerV1 {
     (IF(cond, ifTrue._1, ifFalse._1), t).asRight
   }
 
-  def mkIfCases(ctx: CompilerContext, cases: List[MATCH_CASE], refTmp: Expressions.REF, allowShadowVarName: Option[String]): Expressions.EXPR = {
-    cases.foldRight(Expressions.REF(Pos(1, 1), PART.VALID(Pos(1, 1), PureContext.errRef)): Expressions.EXPR)((mc, further) => {
+  def mkIfCases(ctx: CompilerContext,
+                cases: List[MATCH_CASE],
+                refTmp: Expressions.REF,
+                allowShadowVarName: Option[String]): Either[CompilationError, Expressions.EXPR] = {
+
+    def f(mc: MATCH_CASE, further: Expressions.EXPR): Either[CompilationError, Expressions.EXPR] = {
       val blockWithNewVar = mc.newVarName.fold(mc.expr) { nv =>
         val allowShadowing = nv match {
           case PART.VALID(_, x) => allowShadowVarName.contains(x)
           case _                => false
         }
-        Expressions.BLOCK(Pos(1, 1), Expressions.LET(Pos(1, 1), nv, refTmp, mc.types, allowShadowing), mc.expr)
+        Expressions.BLOCK(mc.position, Expressions.LET(mc.position, nv, refTmp, mc.types, allowShadowing), mc.expr)
       }
       mc.types.toList match {
-        case Nil => blockWithNewVar
+        case Nil => Right(blockWithNewVar)
         case types =>
           def isInst(matchType: String): Expressions.EXPR =
             Expressions
-              .FUNCTION_CALL(Pos(1, 1),
-                             PART.VALID(Pos(1, 1), PureContext._isInstanceOf.name),
-                             List(refTmp, Expressions.CONST_STRING(Pos(1, 1), PART.VALID(Pos(1, 1), matchType))))
-          val hType :: tTypes = flat(ctx.predefTypes, types.map(_.asInstanceOf[PART.VALID[String]].v)).map(_.name)
-          val typeIf          = tTypes.foldLeft(isInst(hType))((other, matchType) => BINARY_OP(Pos(1, 1), isInst(matchType), BinaryOperation.OR_OP, other))
-          Expressions.IF(Pos(1, 1), typeIf, blockWithNewVar, further)
+              .FUNCTION_CALL(
+                mc.position,
+                PART.VALID(mc.position, PureContext._isInstanceOf.name),
+                List(refTmp, Expressions.CONST_STRING(mc.position, PART.VALID(mc.position, matchType)))
+              )
+
+          val flatTypes = flat(ctx.predefTypes, types.map(_.asInstanceOf[PART.VALID[String]].v)).map(_.name)
+          flatTypes match {
+            case Nil => Left(NonExistingType(mc.position.start, mc.position.end, mc.types.toString(), List.empty))
+            case hType :: tTypes =>
+              val typeIf =
+                tTypes.foldLeft(isInst(hType))((other, matchType) => BINARY_OP(mc.position, isInst(matchType), BinaryOperation.OR_OP, other))
+              Right(Expressions.IF(mc.position, typeIf, blockWithNewVar, further))
+          }
       }
-    })
+    }
+
+    val default: Either[CompilationError, Expressions.EXPR] = Right(Expressions.REF(AnyPos, PART.VALID(AnyPos, PureContext.errRef)))
+    cases.foldRight(default) {
+      case (mc, furtherEi) =>
+        furtherEi match {
+          case Right(further) => f(mc, further)
+          case Left(e)        => Left(e)
+        }
+    }
+
   }
 
   private def mkGetter(p: Pos, ctx: CompilerContext, types: List[FINAL], fieldName: String, expr: EXPR): Either[CompilationError, (GETTER, FINAL)] = {

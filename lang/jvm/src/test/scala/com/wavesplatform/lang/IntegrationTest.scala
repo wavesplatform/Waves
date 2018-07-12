@@ -16,6 +16,18 @@ import org.scalatest.{Matchers, PropSpec}
 
 class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
 
+  property("proper error message") {
+    val src =
+      """
+        |match p {
+        |  case pa: PointA => let x = 3
+        |  case _ => throw
+        |}
+      """.stripMargin
+
+    eval[Boolean](src) should produce("can't parse the expression")
+  }
+
   property("patternMatching") {
     val sampleScript =
       """match p {

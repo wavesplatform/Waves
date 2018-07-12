@@ -31,10 +31,13 @@ object NativeFunction {
 
 }
 
-case class UserFunction private (name: String, signature: FunctionTypeSignature, ev: List[EXPR] => EXPR) extends BaseFunction
+case class UserFunction private (name: String, internalName: String, signature: FunctionTypeSignature, ev: List[EXPR] => EXPR) extends BaseFunction
 
 object UserFunction {
 
   def apply(name: String, resultType: TYPE, args: (String, TYPE)*)(ev: List[EXPR] => EXPR): UserFunction =
-    new UserFunction(name, FunctionTypeSignature(resultType, args.map(_._2), FunctionHeader.User(name)), ev)
+    UserFunction(name, name, resultType, args: _*)(ev)
+
+  def apply(name: String, internalName: String, resultType: TYPE, args: (String, TYPE)*)(ev: List[EXPR] => EXPR): UserFunction =
+    new UserFunction(name, internalName, FunctionTypeSignature(resultType, args.map(_._2), FunctionHeader.User(internalName)), ev)
 }

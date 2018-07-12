@@ -1,6 +1,7 @@
 package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.StatusCodes
+import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.it.Node
 import com.wavesplatform.state.DataEntry
 import org.asynchttpclient.Response
@@ -15,6 +16,7 @@ import scorex.waves.http.DebugMessage
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Try}
 
 object SyncHttpApi extends Assertions {
@@ -61,6 +63,9 @@ object SyncHttpApi extends Assertions {
     def printDebugMessage(db: DebugMessage): Response =
       Await.result(async(n).printDebugMessage(db), RequestAwaitTime)
 
+    def activationStatus: ActivationStatus =
+      Await.result(async(n).activationStatus, RequestAwaitTime)
+
     def seed(address: String): String =
       Await.result(async(n).seed(address), RequestAwaitTime)
 
@@ -102,6 +107,12 @@ object SyncHttpApi extends Assertions {
 
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Transaction =
       Await.result(async(n).payment(sourceAddress, recipient, amount, fee), RequestAwaitTime)
+
+    def transactionInfo(txId: String): TransactionInfo =
+      Await.result(async(n).transactionInfo(txId), RequestAwaitTime)
+
+    def transactionsByAddress(address: String, limit: Int): Seq[Seq[TransactionInfo]] =
+      Await.result(async(n).transactionsByAddress(address, limit), RequestAwaitTime)
 
     def scriptCompile(code: String): CompiledScript =
       Await.result(async(n).scriptCompile(code), RequestAwaitTime)
@@ -193,6 +204,8 @@ object SyncHttpApi extends Assertions {
     def height: Int =
       Await.result(async(n).height, RequestAwaitTime)
 
+    def blockAt(height: Int) = Await.result(async(n).blockAt(height), RequestAwaitTime)
+
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       Await.result(async(n).rollback(to, returnToUTX), RequestAwaitTime)
   }
@@ -217,6 +230,24 @@ object SyncHttpApi extends Assertions {
       Await.result(
         async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(scala.concurrent.ExecutionContext.Implicits.global), cond),
         ConditionAwaitTime)
+
+    def rollback(height: Int, returnToUTX: Boolean = true): Unit = {
+      Await.result(
+        Future.traverse(nodes) { node =>
+          com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).rollback(height, returnToUTX)
+        },
+        ConditionAwaitTime
+      )
+    }
+
+    def waitForHeight(height: Int): Unit = {
+      Await.result(
+        Future.traverse(nodes) { node =>
+          com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).waitForHeight(height)
+        },
+        ConditionAwaitTime
+      )
+    }
   }
 
 }
