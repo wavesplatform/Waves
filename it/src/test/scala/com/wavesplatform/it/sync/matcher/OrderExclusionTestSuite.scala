@@ -11,6 +11,7 @@ import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scala.concurrent.duration._
 import com.wavesplatform.it.util._
 import scala.util.Random
+import com.wavesplatform.it.api.SyncMatcherHttpApi._
 
 class OrderExclusionTestSuite
     extends FreeSpec
@@ -46,27 +47,27 @@ class OrderExclusionTestSuite
     "sell order could be placed and status it's correct" in {
       // Alice places sell order
       val aliceOrder = matcherNode
-        .placeOrder(prepareOrder(aliceNode, matcherNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 500, 70.seconds))
+        .placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 500, 70.seconds)
 
       aliceOrder.status shouldBe "OrderAccepted"
 
       val orderId = aliceOrder.message.id
 
       // Alice checks that the order in order book
-      matcherNode.getOrderStatus(aliceAsset, orderId).status shouldBe "Accepted"
-      getOrderBook(aliceNode, matcherNode).head.status shouldBe "Accepted"
+      matcherNode.getOrderStatus(orderId, aliceWavesPair).status shouldBe "Accepted"
+      matcherNode.orderHistory(aliceNode).head.status shouldBe "Accepted"
 
       // Alice check that order is correct
-      val orders = matcherNode.getOrderBook(aliceAsset)
+      val orders = matcherNode.getOrderBook(aliceWavesPair)
       orders.asks.head.amount shouldBe 500
       orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
       // sell order should be in the aliceNode orderbook
-      getOrderBook(aliceNode, matcherNode).head.status shouldBe "Accepted"
+      matcherNode.orderHistory(aliceNode).head.status shouldBe "Accepted"
 
       //wait for expiration of order
-      matcherNode.waitOrderStatus(aliceAsset, orderId, "Cancelled", 2.minutes)
-      getOrderBook(aliceNode, matcherNode).head.status shouldBe "Cancelled"
+      matcherNode.waitOrderStatus(aliceWavesPair, orderId, "Cancelled", 2.minutes)
+      matcherNode.orderHistory(aliceNode).head.status shouldBe "Cancelled"
     }
   }
 

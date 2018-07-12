@@ -198,53 +198,6 @@ object SyncHttpApi extends Assertions {
 
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       Await.result(async(n).rollback(to, returnToUTX), RequestAwaitTime)
-
-    def getOrderBook(asset: String): OrderBookResponse =
-      Await.result(async(n).getOrderBook(asset), RequestAwaitTime)
-
-    def getOrderbookByPublicKey(publicKey: String, timestamp: Long, signature: ByteStr): Seq[OrderbookHistory] =
-      Await.result(async(n).getOrderbookByPublicKey(publicKey, timestamp, signature), RequestAwaitTime)
-
-    def getOrderbookByPublicKeyActive(publicKey: String, timestamp: Long, signature: ByteStr): Seq[OrderbookHistory] =
-      Await.result(async(n).getOrderbookByPublicKeyActive(publicKey, timestamp, signature), RequestAwaitTime)
-
-    def matcherGet(path: String,
-                   f: RequestBuilder => RequestBuilder = identity,
-                   statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200,
-                   waitForStatus: Boolean = false): Response =
-      Await.result(async(n).matcherGet(path, f, statusCode, waitForStatus), RequestAwaitTime)
-
-    def matcherGetStatusCode(path: String, statusCode: Int): MessageMatcherResponse =
-      Await.result(async(n).matcherGetStatusCode(path, statusCode), RequestAwaitTime)
-
-    def matcherPost[A: Writes](path: String, body: A): Response =
-      Await.result(async(n).matcherPost(path, body), RequestAwaitTime)
-
-    def placeOrder(order: Order): MatcherResponse =
-      Await.result(async(n).placeOrder(order), RequestAwaitTime)
-
-    def getOrderStatus(asset: String, orderId: String, waitForStatus: Boolean = true): MatcherStatusResponse =
-      Await.result(async(n).getOrderStatus(asset, orderId, waitForStatus), RequestAwaitTime)
-
-    def waitOrderStatus(asset: String, orderId: String, expectedStatus: String, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
-      Await.result(async(n).waitOrderStatus(asset, orderId, expectedStatus), waitTime)
-
-    def waitFor[A](desc: String)(f: async => A, cond: A => Boolean, retryInterval: FiniteDuration): A =
-      Await.result(async(n).waitFor(desc)(z => Future(f(z))(scala.concurrent.ExecutionContext.Implicits.global), cond, retryInterval),
-                   RequestAwaitTime)
-
-    def getReservedBalance(publicKey: String, timestamp: Long, signature: ByteStr, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
-      Await.result(async(n).getReservedBalance(publicKey, timestamp, signature), waitTime)
-
-    def expectIncorrectOrderPlacement(order: Order, expectedStatusCode: Int, expectedStatus: String): Boolean =
-      Await.result(async(n).expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus), 1.minute)
-
-    def cancelOrder(amountAsset: String,
-                    priceAsset: String,
-                    request: CancelOrderRequest,
-                    waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
-      Await.result(async(n).cancelOrder(amountAsset, priceAsset, request), waitTime)
-
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
