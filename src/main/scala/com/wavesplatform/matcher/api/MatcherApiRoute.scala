@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.api
 import javax.ws.rs.Path
 
 import akka.actor.ActorRef
-import akka.http.scaladsl.model.{StatusCodes, Uri}
+import akka.http.scaladsl.model.{StatusCode, StatusCodes, Uri}
 import akka.http.scaladsl.server.{Directive1, Route}
 import akka.pattern.ask
 import akka.util.Timeout
@@ -30,14 +30,50 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
+object MatcherApiRoute {
+  def apply(wallet: Wallet,
+            matcher: ActorRef,
+            orderHistory: ActorRef,
+            txWriter: ActorRef,
+            settings: RestAPISettings,
+            matcherSettings: MatcherSettings) = new MatcherApiRoute(wallet, matcher, orderHistory, txWriter, settings, matcherSettings)
+
+  val expiration = 15.minutes
+
+  val cancelRequestsTimestamps: scala.collection.mutable.Map[String, Seq[Duration]] = scala.collection.mutable.Map().withDefaultValue(Seq())
+
+  def checkReuse(address: String, timestamp: Duration, correct: Duration) = synchronized {
+    val old = cancelRequestsTimestamps(address).filter(correct - _ <= expiration)
+    if (old.contains(timestamp)) {
+      true
+    } else {
+      cancelRequestsTimestamps(address) = timestamp +: old
+      false
+    }
+  }
+  def checkTimestamp(address: String, timestamp: Duration)(proc: => Future[(StatusCode, JsValue)]): Future[(StatusCode, JsValue)] = {
+    val correct = NTP.correctedTime().millis
+    val delta   = timestamp - correct
+    if (delta < -60.second) {
+      Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Timestamp from future"))
+    } else if (delta > expiration) {
+      Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Request is obsolete"))
+    } else if (checkReuse(address, timestamp, correct)) {
+      Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Request is duplicate"))
+    } else {
+      proc
+    }
+  }
+}
+
 @Path("/matcher")
 @Api(value = "/matcher/")
-case class MatcherApiRoute(wallet: Wallet,
-                           matcher: ActorRef,
-                           orderHistory: ActorRef,
-                           txWriter: ActorRef,
-                           settings: RestAPISettings,
-                           matcherSettings: MatcherSettings)
+class MatcherApiRoute(wallet: Wallet,
+                      matcher: ActorRef,
+                      orderHistory: ActorRef,
+                      txWriter: ActorRef,
+                      val settings: RestAPISettings,
+                      matcherSettings: MatcherSettings)
     extends ApiRoute {
   private implicit val timeout: Timeout = 5.seconds
 
@@ -119,8 +155,6 @@ case class MatcherApiRoute(wallet: Wallet,
     }
   }
 
-  val cancelRequestsTimestamps: scala.collection.mutable.Map[String, Seq[Long]] = scala.collection.mutable.Map().withDefaultValue(Seq())
-
   @Path("/orderbook/cancelAll")
   @ApiOperation(
     value = "Cancel orders",
@@ -147,10 +181,7 @@ case class MatcherApiRoute(wallet: Wallet,
             StatusCodes.BadRequest -> Json.obj("message" -> "Timestamp required")
           case Some(timestamp) =>
             val address = req.senderPublicKey.address
-            if (cancelRequestsTimestamps(address).contains(timestamp)) {
-              Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Duplicate request"))
-            } else {
-              cancelRequestsTimestamps(address) ++= Seq(timestamp)
+            MatcherApiRoute.checkTimestamp(address, timestamp.millis) {
               (orderHistory ? GetAllOrderHistory(address, true, timestamp))
                 .mapTo[GetOrderHistoryResponse]
                 .flatMap { res: GetOrderHistoryResponse =>
@@ -200,15 +231,19 @@ case class MatcherApiRoute(wallet: Wallet,
                 .mapTo[MatcherResponse]
                 .map(r => r.code -> r.json)
             case None =>
-              (orderHistory ? GetOrderHistory(pair, req.senderPublicKey.address, req.timestamp.get))
-                .mapTo[GetOrderHistoryResponse]
-                .flatMap { res =>
-                  Future
-                    .sequence(res.history map { h =>
-                      matcher ? CancelOrder(pair, req.senderPublicKey, h._1)
-                    })
-                    .map(_ => StatusCodes.OK -> Json.obj("status" -> "Canceled"))
-                }
+              val timestamp = req.timestamp.get
+              val address   = req.senderPublicKey.address
+              MatcherApiRoute.checkTimestamp(address, timestamp.millis) {
+                (orderHistory ? GetOrderHistory(pair, address, timestamp))
+                  .mapTo[GetOrderHistoryResponse]
+                  .flatMap { res =>
+                    Future
+                      .sequence(res.history map { h =>
+                        matcher ? CancelOrder(pair, req.senderPublicKey, h._1)
+                      })
+                      .map(_ => StatusCodes.OK -> Json.obj("status" -> "Canceled"))
+                  }
+              }
           }
         } else {
           StatusCodes.BadRequest -> Json.obj("message" -> "Signature should be valid")
