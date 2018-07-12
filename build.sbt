@@ -50,7 +50,6 @@ inThisBuild(
   ))
 
 resolvers += Resolver.bintrayRepo("ethereum", "maven")
-resolvers += Resolver.bintrayRepo("kamon-io", "snapshots") // https://github.com/kamon-io/kamon-influxdb/issues/17#issuecomment-374666541
 
 fork in run := true
 javaOptions in run ++= Seq(
