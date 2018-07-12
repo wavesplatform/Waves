@@ -82,7 +82,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
             matcherNode.waitOrderStatus(bobWavesPair, oldestOrderId, "Cancelled")
           }
           withClue(s"The newest order '$newestOrderId' is still active") {
-            matcherNode.getOrderStatus(newestOrderId, bobWavesPair).status shouldBe "Accepted"
+            matcherNode.orderStatus(newestOrderId, bobWavesPair).status shouldBe "Accepted"
           }
 
           // Cleanup
@@ -107,7 +107,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
             matcherNode.waitOrderStatus(bobWavesPair, oldestOrderId, "Cancelled")
           }
           withClue(s"The newest order '$newestOrderId' is still active") {
-            matcherNode.getOrderStatus(newestOrderId, bobWavesPair).status shouldBe "Accepted"
+            matcherNode.orderStatus(newestOrderId, bobWavesPair).status shouldBe "Accepted"
           }
 
           // Cleanup
@@ -131,7 +131,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
             matcherNode.waitOrderStatus(bobWavesPair, oldestOrderId, "Cancelled")
           }
           withClue(s"The newest order '$newestOrderId' is still active") {
-            matcherNode.getOrderStatus(newestOrderId, bobWavesPair).status shouldBe "Accepted"
+            matcherNode.orderStatus(newestOrderId, bobWavesPair).status shouldBe "Accepted"
           }
 
           // Cleanup
@@ -159,7 +159,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
             matcherNode.waitOrderStatus(bobWavesPair, oldestOrderId, "Cancelled")
           }
           withClue(s"The newest order '$newestOrderId' is still active") {
-            matcherNode.getOrderStatus(newestOrderId, bobWavesPair).status shouldBe "Accepted"
+            matcherNode.orderStatus(newestOrderId, bobWavesPair).status shouldBe "Accepted"
           }
 
           // Cleanup

@@ -49,8 +49,8 @@ object SyncMatcherHttpApi extends Assertions {
     private val RequestAwaitTime      = 15.seconds
     private val OrderRequestAwaitTime = 1.minutes
 
-    def getOrderBook(assetPair: AssetPair): OrderBookResponse =
-      Await.result(async(m).getOrderBook(assetPair), RequestAwaitTime)
+    def orderBook(assetPair: AssetPair): OrderBookResponse =
+      Await.result(async(m).orderBook(assetPair), RequestAwaitTime)
 
     def orderHistory(sender: Node): Seq[OrderbookHistory] =
       Await.result(async(m).orderHistory(sender), RequestAwaitTime)
@@ -69,8 +69,8 @@ object SyncMatcherHttpApi extends Assertions {
                    timeToLive: Duration = 30.days - 1.seconds): MatcherResponse =
       Await.result(async(m).placeOrder(sender, pair, orderType, price, amount, timeToLive), RequestAwaitTime)
 
-    def getOrderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
-      Await.result(async(m).getOrderStatus(orderId, assetPair, waitForStatus), RequestAwaitTime)
+    def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
+      Await.result(async(m).orderStatus(orderId, assetPair, waitForStatus), RequestAwaitTime)
 
     def waitOrderStatus(assetPair: AssetPair,
                         orderId: String,
@@ -78,7 +78,7 @@ object SyncMatcherHttpApi extends Assertions {
                         waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(m).waitOrderStatus(assetPair, orderId, expectedStatus), waitTime)
 
-    def getReservedBalance(sender: Node, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
+    def reservedBalance(sender: Node, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
       Await.result(async(m).reservedBalance(sender), waitTime)
 
     def expectIncorrectOrderPlacement(order: Order,

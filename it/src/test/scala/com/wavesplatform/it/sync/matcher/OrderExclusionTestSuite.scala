@@ -54,11 +54,11 @@ class OrderExclusionTestSuite
       val orderId = aliceOrder.message.id
 
       // Alice checks that the order in order book
-      matcherNode.getOrderStatus(orderId, aliceWavesPair).status shouldBe "Accepted"
+      matcherNode.orderStatus(orderId, aliceWavesPair).status shouldBe "Accepted"
       matcherNode.orderHistory(aliceNode).head.status shouldBe "Accepted"
 
       // Alice check that order is correct
-      val orders = matcherNode.getOrderBook(aliceWavesPair)
+      val orders = matcherNode.orderBook(aliceWavesPair)
       orders.asks.head.amount shouldBe 500
       orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
 

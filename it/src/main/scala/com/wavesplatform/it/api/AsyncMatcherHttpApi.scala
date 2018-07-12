@@ -46,13 +46,13 @@ object AsyncMatcherHttpApi extends Assertions {
       post(s"${matcherNode.matcherApiEndpoint}$path",
            (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
 
-    def getOrderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): Future[MatcherStatusResponse] = {
+    def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): Future[MatcherStatusResponse] = {
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
       matcherGet(s"/matcher/orderbook/${amountAsset}/${priceAsset}/$orderId", waitForStatus = waitForStatus)
         .as[MatcherStatusResponse]
     }
 
-    def getOrderBook(assetPair: AssetPair): Future[OrderBookResponse] = {
+    def orderBook(assetPair: AssetPair): Future[OrderBookResponse] = {
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
       matcherGet(s"/matcher/orderbook/${amountAsset}/${priceAsset}").as[OrderBookResponse]
     }
@@ -104,7 +104,7 @@ object AsyncMatcherHttpApi extends Assertions {
                         retryInterval: FiniteDuration = 1.second): Future[MatcherStatusResponse] = {
       waitFor[MatcherStatusResponse](
         s"order(amountAsset=${assetPair.amountAsset}, priceAsset=${assetPair.priceAsset}, orderId=$orderId) status == $expectedStatus")(
-        _.getOrderStatus(orderId, assetPair),
+        _.orderStatus(orderId, assetPair),
         _.status == expectedStatus,
         5.seconds)
     }

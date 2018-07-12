@@ -52,17 +52,17 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       order1.status shouldBe "OrderAccepted"
 
       // Alice checks that the order in order book
-      matcherNode.getOrderStatus(order1.message.id, aliceWavesPair).status shouldBe "Accepted"
+      matcherNode.orderStatus(order1.message.id, aliceWavesPair).status shouldBe "Accepted"
 
       // Alice check that order is correct
-      val orders = matcherNode.getOrderBook(aliceWavesPair)
+      val orders = matcherNode.orderBook(aliceWavesPair)
       orders.asks.head.amount shouldBe aliceSellAmount
       orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
       "frozen amount should be listed via matcherBalance REST endpoint" in {
-        matcherNode.getReservedBalance(aliceNode) shouldBe Map(aliceAsset -> aliceSellAmount)
+        matcherNode.reservedBalance(aliceNode) shouldBe Map(aliceAsset -> aliceSellAmount)
 
-        matcherNode.getReservedBalance(bobNode) shouldBe Map()
+        matcherNode.reservedBalance(bobNode) shouldBe Map()
       }
 
       "and should be listed by trader's publiс key via REST" in {
@@ -87,7 +87,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         bobNode.assertAssetBalance(bobNode.address, aliceAsset, 200)
 
         // Alice checks that part of her order still in the order book
-        val orders = matcherNode.getOrderBook(aliceWavesPair)
+        val orders = matcherNode.orderBook(aliceWavesPair)
         orders.asks.head.amount shouldBe 300
         orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
@@ -124,7 +124,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         order3.status should be("OrderAccepted")
 
         // Bob checks that the order in the order book
-        val orders = matcherNode.getOrderBook(aliceWavesPair)
+        val orders = matcherNode.orderBook(aliceWavesPair)
         orders.asks should contain(LevelResponse(19.waves / 10 * Order.PriceConstant, 150))
       }
 
@@ -163,7 +163,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         status1.status should be("OrderCanceled")
 
         // Alice checks that the order book is empty
-        val orders1 = matcherNode.getOrderBook(aliceWavesPair)
+        val orders1 = matcherNode.orderBook(aliceWavesPair)
         orders1.asks.size should be(0)
         orders1.bids.size should be(0)
 
@@ -173,7 +173,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         order4.status should be("OrderAccepted")
 
         // Alice checks that the order is in the order book
-        val orders2 = matcherNode.getOrderBook(aliceWavesPair)
+        val orders2 = matcherNode.orderBook(aliceWavesPair)
         orders2.asks should contain(LevelResponse(20.waves / 10 * Order.PriceConstant, 100))
       }
 
@@ -190,7 +190,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         matcherNode.waitOrderStatus(aliceWavesPair, order5.message.id, "PartiallyFilled")
 
         // Check that remaining part of the order is in the order book
-        val orders = matcherNode.getOrderBook(aliceWavesPair)
+        val orders = matcherNode.orderBook(aliceWavesPair)
         orders.bids should contain(LevelResponse(2.waves * Order.PriceConstant, 30))
 
         // Check balances
