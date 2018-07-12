@@ -220,6 +220,9 @@ object AsyncHttpApi extends Assertions {
 
     def transactionInfo(txId: String): Future[TransactionInfo] = get(s"/transactions/info/$txId").as[TransactionInfo]
 
+    def transactionsByAddress(address: String, limit: Int): Future[Seq[Seq[TransactionInfo]]] =
+      get(s"/transactions/address/$address/limit/$limit").as[Seq[Seq[TransactionInfo]]]
+
     def effectiveBalance(address: String): Future[Balance] = get(s"/addresses/effectiveBalance/$address").as[Balance]
 
     def transfer(sourceAddress: String,
