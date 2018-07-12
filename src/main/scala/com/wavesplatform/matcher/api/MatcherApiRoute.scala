@@ -45,7 +45,7 @@ object MatcherApiRoute {
 
   def checkReuse(address: String, timestamp: Duration) = synchronized {
     val old = cancelRequestsTimestamps(address)
-    if (old < timestamp) {
+    if (old >= timestamp) {
       true
     } else {
       cancelRequestsTimestamps(address) = old
