@@ -209,8 +209,6 @@ object SyncHttpApi extends Assertions {
       Await.result(async(n).rollback(to, returnToUTX), RequestAwaitTime)
 
     def findTransactionInfo(txId: String): Option[TransactionInfo] = Await.result(async(n).findTransactionInfo(txId), RequestAwaitTime)
-
-    def transactionsByAddress(address: String, limit: Int) = Await.result(async(n).transactionsByAddress(address, limit), RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
