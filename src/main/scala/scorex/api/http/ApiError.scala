@@ -294,9 +294,3 @@ case class TransactionNotAllowedByScript(tx: Transaction, vars: Map[String, Lazy
     )
   }
 }
-
-case object TimestampReuse extends ApiError {
-  override val id: Int         = 308
-  override val code            = StatusCodes.BadRequest
-  override val message: String = "timestamp has already been used"
-}

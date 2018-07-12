@@ -186,7 +186,7 @@ object OrderHistoryActor {
       extends ExpirableOrderHistoryRequest {
     val address: String    = req.senderPublicKey.address
     val id: Option[String] = req.orderId.map(Base58.encode)
-    val ts: Long           = req.timestamp.getOrElse(NTP.correctedTime()) // XXX TODO make ts mandatory
+    val ts: Long           = req.timestamp.getOrElse(NTP.correctedTime())
   }
 
   case class ValidateOrder(order: Order, ts: Long) extends ExpirableOrderHistoryRequest

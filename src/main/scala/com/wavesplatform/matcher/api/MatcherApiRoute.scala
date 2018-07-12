@@ -56,11 +56,11 @@ object MatcherApiRoute {
     val correct = NTP.correctedTime().millis
     val delta   = timestamp - correct
     if (delta < -60.second) {
-      Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Timestamp from future"))
+      Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Timestamp is from future"))
     } else if (delta > expiration) {
-      Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Request is obsolete"))
+      Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Timestamp is too old"))
     } else if (checkReuse(address, timestamp)) {
-      Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Request is duplicate"))
+      Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Timestamp has already been used"))
     } else {
       proc
     }
@@ -276,9 +276,7 @@ class MatcherApiRoute(wallet: Wallet,
           (orderHistory ? DeleteOrderFromHistory(pair, req))
             .mapTo[MatcherResponse]
             .map(r => r.code -> r.json)
-        } else {
-          StatusCodes.BadRequest -> Json.obj("message" -> "Incorrect signature")
-        }
+        } else InvalidSignature
       }
     }
   }

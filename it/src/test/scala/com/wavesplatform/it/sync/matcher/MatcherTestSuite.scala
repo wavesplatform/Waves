@@ -39,17 +39,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     matcherNode.assertAssetBalance(matcherNode.address, aliceAsset, 0)
     bobNode.assertAssetBalance(bobNode.address, aliceAsset, 0)
 
-    // Bob issues new asset
-    val bobAssetQuantity = 10000
-    val bobAssetName     = "BobCoin"
-    val bobAsset         = bobNode.issue(bobNode.address, bobAssetName, "Bob's asset", bobAssetQuantity, 0, false, 100000000L).id
-    nodes.waitForHeightAriseAndTxPresent(bobAsset)
-
-    aliceNode.assertAssetBalance(aliceNode.address, bobAsset, 0)
-    matcherNode.assertAssetBalance(matcherNode.address, bobAsset, 0)
-    bobNode.assertAssetBalance(bobNode.address, bobAsset, bobAssetQuantity)
-    val bobWavesPair = AssetPair(ByteStr.decodeBase58(bobAsset).toOption, None)
-
     "matcher should respond with Public key" in {
       matcherNode.matcherGet("/matcher").getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe matcherNode.publicKeyStr
     }
@@ -190,51 +179,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         orders2.asks should contain(LevelResponse(20.waves / 10 * Order.PriceConstant, 100))
       }
 
-    "batch cancel" - {
-      val N = 5
-
-      def fileOrders(pair: AssetPair): Seq[String] = 0 to N map { _ =>
-        val o = matcherNode.placeOrder(prepareOrder(aliceNode, matcherNode, pair, OrderType.BUY, 2.waves * Order.PriceConstant, 100))
-        o.status should be("OrderAccepted")
-        o.message.id
-      }
-
-      val ordersToRetain = fileOrders(bobWavesPair)
-
-      "cancel orders by pair" in {
-        val ordersToCancel = fileOrders(aliceWavesPair)
-        val ts             = Some(System.currentTimeMillis)
-
-        val cancel = matcherCancelOrder(aliceNode, matcherNode, aliceWavesPair, None, ts)
-        cancel.status should be("Cancelled")
-
-        ordersToCancel foreach { matcherNode.getOrderStatus(aliceAsset, _).status should be("Cancelled") }
-        ordersToRetain foreach { matcherNode.getOrderStatus(aliceAsset, _).status should be("Accepted") }
-
-        // signed timestamp is mandatory
-        assertBadRequestAndMessage(matcherCancelOrder(aliceNode, matcherNode, aliceWavesPair, None, None), "invalid signature")
-
-        // timestamp reuse shouldn't be allowed
-        assertBadRequestAndMessage(matcherCancelOrder(aliceNode, matcherNode, aliceWavesPair, None, ts), "timestamp has already been used")
-      }
-
-      "cancel all orders" in {
-        val ordersToCancel = fileOrders(aliceWavesPair)
-        val ts             = Some(System.currentTimeMillis)
-
-        val cancel = matcherCancelAllOrders(aliceNode, matcherNode, ts)
-        cancel.status should be("Cancelled")
-
-        ordersToCancel ++ ordersToRetain foreach { matcherNode.getOrderStatus(aliceAsset, _).status should be("Cancelled") }
-
-        // signed timestamp is mandatory
-        assertBadRequestAndMessage(matcherCancelAllOrders(aliceNode, matcherNode, None), "invalid signature")
-
-        // timestamp reuse shouldn't be allowed
-        assertBadRequestAndMessage(matcherCancelAllOrders(aliceNode, matcherNode, ts), "timestamp has already been used")
-      }
-    }
-
       "buy order should execute all open orders and put remaining in order book" in {
         val matcherBalance = matcherNode.accountBalances(matcherNode.address)._1
         val aliceBalance   = aliceNode.accountBalances(aliceNode.address)._1
@@ -272,6 +216,17 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       }
 
       "should consider UTX pool when checking the balance" in {
+        // Bob issues new asset
+        val bobAssetQuantity = 10000
+        val bobAssetName     = "BobCoin"
+        val bobAsset         = bobNode.issue(bobNode.address, bobAssetName, "Bob's asset", bobAssetQuantity, 0, false, 100000000L).id
+        nodes.waitForHeightAriseAndTxPresent(bobAsset)
+
+        aliceNode.assertAssetBalance(aliceNode.address, bobAsset, 0)
+        matcherNode.assertAssetBalance(matcherNode.address, bobAsset, 0)
+        bobNode.assertAssetBalance(bobNode.address, bobAsset, bobAssetQuantity)
+        val bobWavesPair = AssetPair(ByteStr.decodeBase58(bobAsset).toOption, None)
+
         def bobOrder = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.SELL, 1.waves * Order.PriceConstant, bobAssetQuantity)
 
         val order6 = matcherNode.placeOrder(bobOrder)
@@ -329,9 +284,56 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         nodes.waitForHeightAriseAndTxPresent(transferBobId)
 
       }
-
     }
 
+    "batch cancel" - {
+      def fileOrders(pair: AssetPair): Seq[String] = 0 to 5 map { _ =>
+        val o = matcherNode.placeOrder(prepareOrder(aliceNode, matcherNode, pair, OrderType.BUY, 1.waves * Order.PriceConstant, 100))
+        o.status should be("OrderAccepted")
+        o.message.id
+      }
+
+      val asset2 =
+        aliceNode.issue(aliceNode.address, "AliceCoin2", "AliceCoin for matcher's tests", AssetQuantity, 0, reissuable = false, 100000000L).id
+      nodes.waitForHeightAriseAndTxPresent(asset2)
+      val aliceWavesPair2 = AssetPair(ByteStr.decodeBase58(asset2).toOption, None)
+
+      "cancel orders by pair" in {
+        val ordersToCancel = fileOrders(aliceWavesPair)
+        val ordersToRetain = fileOrders(aliceWavesPair2)
+        val ts             = Some(System.currentTimeMillis)
+
+        val cancel = matcherCancelOrder(aliceNode, matcherNode, aliceWavesPair, None, ts)
+        cancel.status should be("Cancelled")
+
+        ordersToCancel foreach { matcherNode.getOrderStatus(aliceAsset, _).status should be("Cancelled") }
+        ordersToRetain foreach { matcherNode.getOrderStatus(asset2, _).status should be("Accepted") }
+
+        // signed timestamp is mandatory
+        assertBadRequestAndMessage(matcherCancelOrder(aliceNode, matcherNode, aliceWavesPair, None, None), "invalid signature")
+
+        // timestamp reuse shouldn't be allowed
+        assertBadRequestAndMessage(matcherCancelOrder(aliceNode, matcherNode, aliceWavesPair, None, ts), "Timestamp has already been used")
+      }
+
+      "cancel all orders" in {
+        val orders1 = fileOrders(aliceWavesPair)
+        val orders2 = fileOrders(aliceWavesPair2)
+        val ts      = Some(System.currentTimeMillis)
+
+        val cancel = matcherCancelAllOrders(aliceNode, matcherNode, ts)
+        cancel.status should be("Cancelled")
+
+        orders1 foreach { matcherNode.getOrderStatus(aliceAsset, _).status should be("Cancelled") }
+        orders2 foreach { matcherNode.getOrderStatus(asset2, _).status should be("Cancelled") }
+
+        // signed timestamp is mandatory
+        assertBadRequestAndMessage(matcherCancelAllOrders(aliceNode, matcherNode, None), "invalid signature")
+
+        // timestamp reuse shouldn't be allowed
+        assertBadRequestAndMessage(matcherCancelAllOrders(aliceNode, matcherNode, ts), "Timestamp has already been used")
+      }
+    }
   }
 }
 
