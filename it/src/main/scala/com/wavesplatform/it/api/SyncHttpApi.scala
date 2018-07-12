@@ -2,17 +2,14 @@ package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.it.Node
-import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.state.{ByteStr, DataEntry}
-import org.asynchttpclient.util.HttpConstants
-import org.asynchttpclient.{RequestBuilder, Response}
+import com.wavesplatform.state.DataEntry
+import org.asynchttpclient.Response
 import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
 import play.api.libs.json.{Format, JsObject, Json, Writes}
 import scorex.api.http.AddressApiRoute
 import scorex.api.http.assets.SignedIssueV1Request
-import scorex.transaction.assets.exchange.Order
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
 import scorex.waves.http.DebugMessage
 

@@ -3,7 +3,6 @@ package com.wavesplatform.it.api
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
-import com.wavesplatform.it.api.SyncHttpApi.NodeExtSync
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.{Assertion, Assertions, Matchers}

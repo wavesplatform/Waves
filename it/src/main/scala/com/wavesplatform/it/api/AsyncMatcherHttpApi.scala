@@ -4,12 +4,10 @@ import com.google.common.primitives.Longs
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
-import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
-import scala.concurrent.ExecutionContext.Implicits.global
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.utils.Base58
-import org.asynchttpclient.Dsl.{get => _get, post => _post}
+import org.asynchttpclient.Dsl.{get => _get}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.Assertions
@@ -17,6 +15,7 @@ import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json.Writes
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.util.{Failure, Success, Try}
