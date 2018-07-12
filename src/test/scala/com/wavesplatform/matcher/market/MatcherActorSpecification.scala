@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher.market
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.model.StatusCodes
@@ -60,13 +61,13 @@ class MatcherActorSpecification
     }
   })
 
-  val obc                                              = new ConcurrentHashMap[AssetPair, OrderBook]()
+  val obc                                              = new ConcurrentHashMap[AssetPair, OrderBook]
+  val ob                                               = new AtomicReference(Map.empty[AssetPair, ActorRef])
   def update(ap: AssetPair)(snapshot: OrderBook): Unit = obc.put(ap, snapshot)
 
-  var actor: ActorRef = system.actorOf(
-    Props(
-      new MatcherActor(orderHistoryRef, pairBuilder, update, wallet, mock[UtxPool], mock[ChannelGroup], settings, blockchain, functionalitySettings)
-      with RestartableActor))
+  var actor: ActorRef = system.actorOf(Props(
+    new MatcherActor(orderHistoryRef, pairBuilder, ob, update, wallet, mock[UtxPool], mock[ChannelGroup], settings, blockchain, functionalitySettings)
+    with RestartableActor))
 
   val i1 = IssueTransactionV1
     .selfSigned(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
@@ -93,8 +94,16 @@ class MatcherActorSpecification
 
     actor = system.actorOf(
       Props(
-        new MatcherActor(orderHistoryRef, pairBuilder, update, wallet, mock[UtxPool], mock[ChannelGroup], settings, blockchain, functionalitySettings)
-        with RestartableActor))
+        new MatcherActor(orderHistoryRef,
+                         pairBuilder,
+                         ob,
+                         update,
+                         wallet,
+                         mock[UtxPool],
+                         mock[ChannelGroup],
+                         settings,
+                         blockchain,
+                         functionalitySettings) with RestartableActor))
   }
 
   "MatcherActor" should {

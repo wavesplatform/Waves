@@ -2,6 +2,7 @@ package com.wavesplatform.matcher
 
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.Http
@@ -34,12 +35,24 @@ class Matcher(actorSystem: ActorSystem,
               matcherSettings: MatcherSettings)
     extends ScorexLogging {
 
-  private val pairBuilder                                                              = new AssetPairBuilder(matcherSettings, blockchain)
-  private val orderBookCache                                                           = new ConcurrentHashMap[AssetPair, OrderBook](1000, 0.9f, 10)
+  private val pairBuilder    = new AssetPairBuilder(matcherSettings, blockchain)
+  private val orderBookCache = new ConcurrentHashMap[AssetPair, OrderBook](1000, 0.9f, 10)
+  private val orderBooks     = new AtomicReference(Map.empty[AssetPair, ActorRef])
+
   private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBook): Unit = orderBookCache.put(assetPair, newSnapshot)
 
   lazy val matcherApiRoutes = Seq(
-    MatcherApiRoute(wallet, pairBuilder, matcher, orderHistory, ap => Option(orderBookCache.get(ap)), txWriter, restAPISettings, matcherSettings)
+    MatcherApiRoute(
+      wallet,
+      pairBuilder,
+      matcher,
+      orderHistory,
+      p => Option(orderBooks.get()).flatMap(_.get(p)),
+      p => Option(orderBookCache.get(p)),
+      txWriter,
+      restAPISettings,
+      matcherSettings
+    )
   )
 
   lazy val matcherApiTypes = Seq(
@@ -49,6 +62,7 @@ class Matcher(actorSystem: ActorSystem,
   lazy val matcher: ActorRef = actorSystem.actorOf(
     MatcherActor.props(orderHistory,
                        pairBuilder,
+                       orderBooks,
                        updateOrderBookCache,
                        wallet,
                        utx,
