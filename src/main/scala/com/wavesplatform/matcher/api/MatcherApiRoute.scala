@@ -48,7 +48,7 @@ object MatcherApiRoute {
     if (old >= timestamp) {
       true
     } else {
-      cancelRequestsTimestamps(address) = old
+      cancelRequestsTimestamps(address) = timestamp
       false
     }
   }
