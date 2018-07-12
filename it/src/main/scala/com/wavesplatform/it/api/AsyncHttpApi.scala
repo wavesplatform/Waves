@@ -452,6 +452,9 @@ object AsyncHttpApi extends Assertions {
         case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
       }
 
+    def cancelAllOrders(request: CancelOrderRequest): Future[MatcherStatusResponse] =
+      matcherPost(s"/matcher/orderbook/cancel", request.json).as[MatcherStatusResponse]
+
     def cancelOrder(amountAsset: String, priceAsset: String, request: CancelOrderRequest): Future[MatcherStatusResponse] =
       matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", request.json).as[MatcherStatusResponse]
 

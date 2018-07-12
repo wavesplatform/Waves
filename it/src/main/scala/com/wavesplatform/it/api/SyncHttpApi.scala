@@ -252,6 +252,9 @@ object SyncHttpApi extends Assertions {
                     waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(n).cancelOrder(amountAsset, priceAsset, request), waitTime)
 
+    def cancelAllOrders(request: CancelOrderRequest, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+      Await.result(async(n).cancelAllOrders(request), waitTime)
+
     def findTransactionInfo(txId: String): Option[TransactionInfo] = Await.result(async(n).findTransactionInfo(txId), RequestAwaitTime)
 
   }

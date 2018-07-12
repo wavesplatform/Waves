@@ -62,4 +62,13 @@ package object matcher {
     matcherNode.cancelOrder(pair.amountAssetStr, pair.priceAssetStr, signedRequest)
   }
 
+  def matcherCancelAllOrders(node: Node, matcherNode: Node, timestamp: Option[Long]) = {
+    val privateKey    = node.privateKey
+    val publicKey     = node.publicKey
+    val request       = CancelOrderRequest(publicKey, None, timestamp, Array.emptyByteArray)
+    val sig           = crypto.sign(privateKey, request.toSign)
+    val signedRequest = request.copy(signature = sig)
+    matcherNode.cancelAllOrders(signedRequest)
+  }
+
 }

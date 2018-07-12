@@ -121,7 +121,7 @@ case class MatcherApiRoute(wallet: Wallet,
 
   val cancelRequestsTimestamps: scala.collection.mutable.Map[String, Seq[Long]] = scala.collection.mutable.Map().withDefaultValue(Seq())
 
-  @Path("/orderbook/cancelAll")
+  @Path("/orderbook/cancel")
   @ApiOperation(
     value = "Cancel orders",
     notes = "Cancel all previously submitted orders if it's not already filled completely",
@@ -143,12 +143,11 @@ case class MatcherApiRoute(wallet: Wallet,
     json[CancelOrderRequest] { req =>
       if (req.isSignatureValid) {
         req.timestamp match {
-          case None =>
-            StatusCodes.BadRequest -> Json.obj("message" -> "Timestamp required")
+          case None => InvalidSignature
           case Some(timestamp) =>
             val address = req.senderPublicKey.address
             if (cancelRequestsTimestamps(address).contains(timestamp)) {
-              Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Duplicate request"))
+              TimestampReuse
             } else {
               cancelRequestsTimestamps(address) ++= Seq(timestamp)
               (orderHistory ? GetAllOrderHistory(address, true, timestamp))
@@ -165,7 +164,7 @@ case class MatcherApiRoute(wallet: Wallet,
             }
         }
       } else {
-        Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Signature should be valid"))
+        InvalidSignature
       }
     }
   }
@@ -207,12 +206,10 @@ case class MatcherApiRoute(wallet: Wallet,
                     .sequence(res.history map { h =>
                       matcher ? CancelOrder(pair, req.senderPublicKey, h._1)
                     })
-                    .map(_ => StatusCodes.OK -> Json.obj("status" -> "Canceled"))
+                    .map(_ => StatusCodes.OK -> Json.obj("status" -> "Cancelled"))
                 }
           }
-        } else {
-          StatusCodes.BadRequest -> Json.obj("message" -> "Signature should be valid")
-        }
+        } else InvalidSignature
       }
     }
   }
