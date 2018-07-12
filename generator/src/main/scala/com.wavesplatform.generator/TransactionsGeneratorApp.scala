@@ -83,6 +83,20 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
           c.copy(dynWide = c.dynWide.copy(limitDestAccounts = x))
         }
       )
+
+    cmd("multisig")
+      .action { (_, c) =>
+        c.copy(mode = Mode.MULTISIG)
+      }
+      .text("Multisig cycle of funding, initializng and sending funds back")
+      .children(
+        opt[Int]("transactions").abbr("t").optional().text("number of transactions").action { (x, c) =>
+          c.copy(multisig = c.multisig.copy(transactions = x))
+        },
+        opt[Boolean]("first-run").abbr("first").optional().text("generate set multisig script transaction").action { (x, c) =>
+          c.copy(multisig = c.multisig.copy(firstRun = x))
+        },
+      )
   }
 
   val defaultConfig = ConfigFactory.load().as[GeneratorSettings]("generator")
@@ -99,6 +113,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         case Mode.NARROW   => new NarrowTransactionGenerator(finalConfig.narrow, finalConfig.privateKeyAccounts)
         case Mode.WIDE     => new WideTransactionGenerator(finalConfig.wide, finalConfig.privateKeyAccounts)
         case Mode.DYN_WIDE => new DynamicWideTransactionGenerator(finalConfig.dynWide, finalConfig.privateKeyAccounts)
+        case Mode.MULTISIG => new MultisigTransactionGenerator(finalConfig.multisig, finalConfig.privateKeyAccounts)
       }
 
       val threadPool                            = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
@@ -108,6 +123,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       sys.addShutdownHook(sender.close())
 
       val workers = finalConfig.sendTo.map { node =>
+        log.info(s"Creating worker: ${node.getHostString}:${node.getPort}")
         new Worker(finalConfig.worker, sender, node, generator)
       }
 

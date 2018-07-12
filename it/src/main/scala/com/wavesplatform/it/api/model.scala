@@ -75,7 +75,14 @@ object Transaction {
   implicit val transactionFormat: Format[Transaction] = Json.format
 }
 
-case class TransactionInfo(`type`: Int, id: String, fee: Long, timestamp: Long, sender: Option[String], height: Int)
+case class TransactionInfo(`type`: Int,
+                           id: String,
+                           fee: Long,
+                           timestamp: Long,
+                           sender: Option[String],
+                           height: Int,
+                           minSponsoredAssetFee: Option[Long],
+                           recipient: Option[String])
 object TransactionInfo {
   implicit val format: Format[TransactionInfo] = Json.format
 }
