@@ -21,7 +21,7 @@ inTask(docker)(
       val startWaves     = sourceDirectory.value / "container" / "start-waves.sh"
 
       val withAspectJ     = Option(System.getenv("WITH_ASPECTJ")).fold(false)(_.toBoolean)
-      val aspectjAgentUrl = "http://search.maven.org/remotecontent?filepath=org/aspectj/aspectjweaver/1.8.13/aspectjweaver-1.8.13.jar"
+      val aspectjAgentUrl = "http://search.maven.org/remotecontent?filepath=org/aspectj/aspectjweaver/1.9.1/aspectjweaver-1.9.1.jar"
       val yourKitArchive  = "YourKit-JavaProfiler-2018.04-docker.zip"
 
       new Dockerfile {

@@ -68,12 +68,11 @@ object Dependencies {
   )
 
   lazy val metrics = Seq(
-    kamonModule("core", "1.1.2"),
+    kamonModule("core", "1.1.3"),
     kamonModule("system-metrics", "1.0.0"),
-    kamonModule("akka-2.4", "1.0.1"),
+    kamonModule("akka-2.4", "1.1.1"),
     kamonModule("influxdb", "1.0.1"),
-    kamonModule("autoweave", "0.6.5"),
-    "org.influxdb" % "influxdb-java" % "2.7"
+    "org.influxdb" % "influxdb-java" % "2.11"
   ).map(_.exclude("org.asynchttpclient", "async-http-client"))
 
   lazy val fp = Seq(
