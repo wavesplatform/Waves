@@ -122,7 +122,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
 
     val data0 = node.getData(firstAddress)
     assert(data0 == List.empty)
-    sender.transactionsByAddress(firstAddress, 10) should contain allElementsOf txsBefore0
+    sender.transactionsByAddress(firstAddress, 10) should contain theSameElementsAs txsBefore0
   }
 
   test("Sponsorship transaction rollback") {
@@ -153,6 +153,6 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     val assetDetailsAfter = sender.assetsDetails(sponsorAssetId)
 
     assert(assetDetailsAfter.minSponsoredAssetFee == assetDetailsBefore.minSponsoredAssetFee)
-    sender.transactionsByAddress(sender.address, 10) should contain allElementsOf txsBefore1
+    sender.transactionsByAddress(sender.address, 10) should contain theSameElementsAs txsBefore1
   }
 }
