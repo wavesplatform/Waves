@@ -29,6 +29,8 @@ import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
+import kamon.influxdb.CustomInfluxDBReporter
+import kamon.system.SystemMetrics
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler._
 import monix.execution.schedulers.SchedulerService
@@ -293,7 +295,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     //on unexpected shutdown
     sys.addShutdownHook {
-      Kamon.shutdown()
+      Await.ready(Kamon.stopAllReporters(), 20.seconds)
       Metrics.shutdown()
       shutdown(utxStorage, network)
     }
@@ -410,7 +412,13 @@ object Application extends ScorexLogging {
     }
 
     val settings = WavesSettings.fromConfig(config)
-    Kamon.start(config)
+    if (config.getBoolean("kamon.enable")) {
+      log.info("Aggregated metrics are enabled")
+      Kamon.reconfigure(config)
+      Kamon.addReporter(new CustomInfluxDBReporter())
+      SystemMetrics.startCollecting()
+    }
+
     val isMetricsStarted = Metrics.start(settings.metrics)
 
     RootActorSystem.start("wavesplatform", config) { actorSystem =>

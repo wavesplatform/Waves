@@ -1,5 +1,7 @@
 package com.wavesplatform.utx
 
+import java.time.Duration
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 
 import cats._
@@ -10,7 +12,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import com.wavesplatform.state.{Blockchain, ByteStr, Diff, Portfolio}
 import kamon.Kamon
-import kamon.metric.instrument.{Time => KamonTime}
+import kamon.metric.MeasurementUnit
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
@@ -23,7 +25,7 @@ import scorex.transaction.transfer._
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.collection.JavaConverters._
-import scala.concurrent.duration._
+import scala.concurrent.duration.DurationLong
 import scala.util.{Left, Right}
 
 class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculator, fs: FunctionalitySettings, utxSettings: UtxSettings)
@@ -53,9 +55,9 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
     scheduler.shutdown()
   }
 
-  private val utxPoolSizeStats    = Kamon.metrics.minMaxCounter("utx-pool-size", 500.millis)
-  private val processingTimeStats = Kamon.metrics.histogram("utx-transaction-processing-time", KamonTime.Milliseconds)
-  private val putRequestStats     = Kamon.metrics.counter("utx-pool-put-if-new")
+  private val utxPoolSizeStats    = Kamon.rangeSampler("utx-pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
+  private val processingTimeStats = Kamon.histogram("utx-transaction-processing-time", MeasurementUnit.time.milliseconds)
+  private val putRequestStats     = Kamon.counter("utx-pool-put-if-new")
 
   private def removeExpired(currentTs: Long): Unit = {
     def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > utxSettings.maxTransactionAge

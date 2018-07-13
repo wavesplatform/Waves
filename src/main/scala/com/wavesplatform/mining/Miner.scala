@@ -13,7 +13,7 @@ import com.wavesplatform.state.appender.{BlockAppender, MicroblockAppender}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
-import kamon.metric.instrument
+import kamon.metric.MeasurementUnit
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
@@ -79,8 +79,8 @@ class MinerImpl(allChannels: ChannelGroup,
   private val scheduledAttempts = SerialCancelable()
   private val microBlockAttempt = SerialCancelable()
 
-  private val blockBuildTimeStats      = Kamon.metrics.histogram("pack-and-forge-block-time", instrument.Time.Milliseconds)
-  private val microBlockBuildTimeStats = Kamon.metrics.histogram("forge-microblock-time", instrument.Time.Milliseconds)
+  private val blockBuildTimeStats      = Kamon.histogram("pack-and-forge-block-time", MeasurementUnit.time.milliseconds)
+  private val microBlockBuildTimeStats = Kamon.histogram("forge-microblock-time", MeasurementUnit.time.milliseconds)
 
   private val nextBlockGenerationTimes: MMap[Address, Long] = MMap.empty
 
@@ -354,8 +354,8 @@ class MinerImpl(allChannels: ChannelGroup,
 }
 
 object Miner {
-  val blockMiningStarted = Kamon.metrics.counter("block-mining-started")
-  val microMiningStarted = Kamon.metrics.counter("micro-mining-started")
+  val blockMiningStarted = Kamon.counter("block-mining-started")
+  val microMiningStarted = Kamon.counter("micro-mining-started")
 
   val MaxTransactionsPerMicroblock: Int = 500
 

@@ -11,7 +11,7 @@ object Dependencies {
 
   def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.24.Final"
 
-  def kamonModule(v: String)(module: String) = "io.kamon" %% s"kamon-$module" % v
+  def kamonModule(module: String, v: String) = "io.kamon" %% s"kamon-$module" % v
 
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "2.4.7"
 
@@ -23,9 +23,9 @@ object Dependencies {
 
   lazy val testKit = scalatest ++ Seq(
     akkaModule("testkit"),
-    "org.scalacheck"   %% "scalacheck"                  % "1.13.5",
-    "org.mockito"      % "mockito-all"                  % "1.10.19",
-    "org.scalamock"    %% "scalamock-scalatest-support" % "3.6.0",
+    "org.scalacheck" %% "scalacheck"                  % "1.13.5",
+    "org.mockito"    % "mockito-all"                  % "1.10.19",
+    "org.scalamock"  %% "scalamock-scalatest-support" % "3.6.0",
     ("org.iq80.leveldb" % "leveldb" % "0.9").exclude("com.google.guava", "guava"),
     akkaHttpModule("akka-http-testkit")
   )
@@ -63,41 +63,42 @@ object Dependencies {
   lazy val matcher = Seq(
     akkaModule("persistence"),
     akkaModule("persistence-tck") % "test",
-    "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.4.18.1" % "test",
-    "org.ethereum"        % "leveldbjni-all"             % "1.18.3"
+    "com.github.dnvriend"         %% "akka-persistence-inmemory" % "2.4.18.1" % "test",
+    "org.ethereum"                % "leveldbjni-all" % "1.18.3"
   )
 
-  lazy val metrics = {
-    Seq("core", "system-metrics").map(kamonModule("0.6.7")) ++
-      Seq("akka-2.4", "influxdb").map(kamonModule("0.6.8")) ++
-      Seq(
-        "org.influxdb" % "influxdb-java"    % "2.7",
-        "io.kamon"     %% "kamon-autoweave" % "0.6.5"
-      )
-  }.map(_.exclude("org.asynchttpclient", "async-http-client"))
+  lazy val metrics = Seq(
+    kamonModule("core", "1.1.3"),
+    kamonModule("system-metrics", "1.0.0"),
+    kamonModule("akka-2.4", "1.1.1"),
+    kamonModule("influxdb", "1.0.1"),
+    "org.influxdb" % "influxdb-java" % "2.11"
+  ).map(_.exclude("org.asynchttpclient", "async-http-client"))
 
   lazy val fp = Seq(
     "org.typelevel"       %% "cats-core"       % "1.1.0",
-    "org.typelevel"       %% "cats-mtl-core"       % "0.2.1",
+    "org.typelevel"       %% "cats-mtl-core"   % "0.2.1",
     "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
   )
-  lazy val meta        = Seq("com.chuusai" %% "shapeless" % "2.3.3")
-  lazy val monix       = Def.setting(Seq(
-    // exclusion and explicit dependency can likely be removed when monix 3 is released
-    ("io.monix" %%% "monix" % "3.0.0-RC1").exclude("org.typelevel", "cats-effect_2.12"),
-    "org.typelevel" %%% "cats-effect"  % "0.10.1"
-  ))
-  lazy val scodec      = Def.setting(Seq("org.scodec" %%% "scodec-core" % "1.10.3"))
-  lazy val fastparse   = Def.setting(Seq("com.lihaoyi" %%% "fastparse" % "1.0.0", "org.bykn" %%% "fastparse-cats-core" % "0.1.0"))
-  lazy val ficus       = Seq("com.iheart" %% "ficus" % "1.4.2")
-  lazy val scorex      = Seq("org.scorexfoundation" %% "scrypto" % "2.0.4" excludeAll(
-    ExclusionRule("org.slf4j", "slf4j-api"),
-    ExclusionRule("com.google.guava", "guava")
-  ))
-  lazy val commons_net = Seq("commons-net" % "commons-net" % "3.+")
-  lazy val scalatest   = Seq("org.scalatest" %% "scalatest" % "3.0.3")
-  lazy val scalactic   = Seq("org.scalactic" %% "scalactic" % "3.0.3")
-  lazy val cats        = Seq("org.typelevel" %% "cats-core" % "1.1.0")
+  lazy val meta = Seq("com.chuusai" %% "shapeless" % "2.3.3")
+  lazy val monix = Def.setting(
+    Seq(
+      // exclusion and explicit dependency can likely be removed when monix 3 is released
+      ("io.monix" %%% "monix" % "3.0.0-RC1").exclude("org.typelevel", "cats-effect_2.12"),
+      "org.typelevel" %%% "cats-effect" % "0.10.1"
+    ))
+  lazy val scodec    = Def.setting(Seq("org.scodec" %%% "scodec-core" % "1.10.3"))
+  lazy val fastparse = Def.setting(Seq("com.lihaoyi" %%% "fastparse" % "1.0.0", "org.bykn" %%% "fastparse-cats-core" % "0.1.0"))
+  lazy val ficus     = Seq("com.iheart" %% "ficus" % "1.4.2")
+  lazy val scorex = Seq(
+    "org.scorexfoundation" %% "scrypto" % "2.0.4" excludeAll (
+      ExclusionRule("org.slf4j", "slf4j-api"),
+      ExclusionRule("com.google.guava", "guava")
+    ))
+  lazy val commons_net = Seq("commons-net"   % "commons-net" % "3.+")
+  lazy val scalatest   = Seq("org.scalatest" %% "scalatest"  % "3.0.3")
+  lazy val scalactic   = Seq("org.scalactic" %% "scalactic"  % "3.0.3")
+  lazy val cats        = Seq("org.typelevel" %% "cats-core"  % "1.1.0")
   lazy val scalacheck = Seq(
     "org.scalacheck"      %% "scalacheck"      % "1.13.5",
     "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
