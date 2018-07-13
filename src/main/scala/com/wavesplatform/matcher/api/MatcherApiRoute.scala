@@ -14,10 +14,12 @@ import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import com.wavesplatform.matcher.model.{LevelAgg, LimitOrder, OrderBook}
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherSettings}
+import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils.Base58
 import io.swagger.annotations._
 import javax.ws.rs.Path
+import kamon.Kamon
 import play.api.libs.json._
 import scorex.account.PublicKeyAccount
 import scorex.api.http._
@@ -45,6 +47,10 @@ case class MatcherApiRoute(wallet: Wallet,
     extends ApiRoute {
 
   import MatcherApiRoute._
+
+  private val timer       = Kamon.timer("matcher.api-requests")
+  private val placeTimer  = timer.refine("action" -> "place")
+  private val cancelTimer = timer.refine("action" -> "cancel")
 
   override lazy val route: Route =
     pathPrefix("matcher") {
@@ -115,9 +121,9 @@ case class MatcherApiRoute(wallet: Wallet,
   def place: Route = path("orderbook") {
     (pathEndOrSingleSlash & post) {
       json[Order] { order =>
-        (matcher ? order)
-          .mapTo[MatcherResponse]
-          .map(r => r.code -> r.json)
+        placeTimer.measure {
+          (matcher ? order).mapTo[MatcherResponse].map(r => r.code -> r.json)
+        }
       }
     }
   }
@@ -146,7 +152,7 @@ case class MatcherApiRoute(wallet: Wallet,
     withAssetPair(a1, a2) { pair =>
       orderBook(pair).fold[Route](complete(StatusCodes.NotFound -> Json.obj("message" -> "Invalid asset pair"))) { oba =>
         json[CancelOrderRequest] { req =>
-          if (req.isSignatureValid()) {
+          if (req.isSignatureValid()) cancelTimer.measure {
             (oba ? CancelOrder(pair, req))
               .mapTo[MatcherResponse]
               .map(r => r.code -> r.json)

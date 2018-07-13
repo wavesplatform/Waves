@@ -13,9 +13,9 @@ import com.wavesplatform.utx.UtxPool
 import org.iq80.leveldb.DB
 import play.api.libs.json._
 import scorex.account.Address
-import scorex.transaction.{AssetAcc, AssetId}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.{AssetPair, Order}
+import scorex.transaction.{AssetAcc, AssetId}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 

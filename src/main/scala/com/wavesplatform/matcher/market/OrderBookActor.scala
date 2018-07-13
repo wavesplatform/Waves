@@ -10,12 +10,14 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model._
+import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.network._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.Base58
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
+import kamon.Kamon
 import play.api.libs.json._
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
@@ -41,6 +43,8 @@ class OrderBookActor(assetPair: AssetPair,
     with ScorexLogging
     with ExchangeTransactionCreator {
   override def persistenceId: String = OrderBookActor.name(assetPair)
+
+  private val timer = Kamon.timer("matcher.orderbook.match").refine("pair" -> assetPair.toString)
 
   private val snapshotCancellable = context.system.scheduler.schedule(settings.snapshotsInterval, settings.snapshotsInterval, self, SaveSnapshot)
   private val cleanupCancellable  = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
@@ -203,7 +207,7 @@ class OrderBookActor(assetPair: AssetPair,
       case Right(o) =>
         log.debug(s"Order accepted: '${o.idStr()}' in '${o.assetPair.key}', trying to match ...")
         apiSender.foreach(_ ! OrderAccepted(o))
-        matchOrder(LimitOrder(o))
+        timer.measure(matchOrder(LimitOrder(o)))
     }
 
     becomeFullCommands()

@@ -1,7 +1,9 @@
 package com.wavesplatform.matcher
 
 import com.google.common.base.Charsets.UTF_8
+import com.wavesplatform.metrics._
 import com.wavesplatform.state.{Blockchain, ByteStr}
+import kamon.Kamon
 import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.AssetPair
 import scorex.utils.ByteArray
@@ -15,6 +17,10 @@ class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain) {
   private[this] val indices             = settings.priceAssets.zipWithIndex.toMap
   private[this] val predefinedPairs     = settings.predefinedPairs.toSet
   private[this] val blacklistedAssetIds = settings.blacklistedAssets
+
+  private[this] val timer    = Kamon.timer("matcher.asset-pair-builder")
+  private[this] val create   = timer.refine("action" -> "create")
+  private[this] val validate = timer.refine("action" -> "validate")
 
   private def isCorrectlyOrdered(pair: AssetPair): Boolean =
     predefinedPairs.contains(pair) || ((indices.get(pair.priceAssetStr), indices.get(pair.amountAssetStr)) match {
@@ -32,19 +38,19 @@ class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain) {
     cond(assetId.forall(isNotBlacklisted) && !blacklistedAssetIds(AssetPair.assetIdStr(assetId)), assetId, errorMsg(AssetPair.assetIdStr(assetId)))
 
   def validateAssetPair(pair: AssetPair): Either[String, AssetPair] =
-    for {
+    validate.measure(for {
       _ <- cond(pair.amountAsset != pair.priceAsset, (), "Amount and price assets must be different")
       _ <- cond(isCorrectlyOrdered(pair), pair, "Pair should be reverse")
       _ <- validateAssetId(pair.priceAsset)
       _ <- validateAssetId(pair.amountAsset)
-    } yield pair
+    } yield pair)
 
   def createAssetPair(a1: String, a2: String): Either[String, AssetPair] =
-    for {
+    create.measure(for {
       a1 <- AssetPair.extractAssetId(a1).toEither.left.map(_ => errorMsg(a1))
       a2 <- AssetPair.extractAssetId(a2).toEither.left.map(_ => errorMsg(a2))
       p  <- validateAssetPair(AssetPair(a1, a2))
-    } yield p
+    } yield p)
 }
 
 object AssetPairBuilder {
