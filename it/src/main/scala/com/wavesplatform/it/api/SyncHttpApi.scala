@@ -207,6 +207,8 @@ object SyncHttpApi extends Assertions {
 
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       Await.result(async(n).rollback(to, returnToUTX), RequestAwaitTime)
+
+    def findTransactionInfo(txId: String): Option[TransactionInfo] = Await.result(async(n).findTransactionInfo(txId), RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
