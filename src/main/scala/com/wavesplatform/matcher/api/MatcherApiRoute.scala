@@ -1,5 +1,6 @@
 package com.wavesplatform.matcher.api
 
+import java.util.concurrent.Executors
 import javax.ws.rs.Path
 
 import akka.actor.ActorRef
@@ -26,7 +27,7 @@ import scorex.utils.NTP
 import scorex.wallet.Wallet
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
@@ -37,6 +38,8 @@ object MatcherApiRoute {
             txWriter: ActorRef,
             settings: RestAPISettings,
             matcherSettings: MatcherSettings) = new MatcherApiRoute(wallet, matcher, orderHistory, txWriter, settings, matcherSettings)
+
+  val cancelExecutor: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newCachedThreadPool())
 
   val expiration = 15.minutes
 
@@ -52,6 +55,7 @@ object MatcherApiRoute {
       false
     }
   }
+
   def checkTimestamp(address: String, timestamp: Duration)(proc: => Future[(StatusCode, JsValue)]): Future[(StatusCode, JsValue)] = {
     val correct = NTP.correctedTime().millis
     val delta   = timestamp - correct
@@ -175,6 +179,7 @@ class MatcherApiRoute(wallet: Wallet,
       )
     ))
   def cancelAll: Route = (path("orderbook" / "cancel") & post) {
+    implicit val ec = MatcherApiRoute.cancelExecutor
     json[CancelOrderRequest] { req =>
       if (req.isSignatureValid) {
         req.timestamp match {
@@ -231,6 +236,7 @@ class MatcherApiRoute(wallet: Wallet,
                 .mapTo[MatcherResponse]
                 .map(r => r.code -> r.json)
             case None =>
+              implicit val ec = MatcherApiRoute.cancelExecutor
               val timestamp = req.timestamp.get
               val address   = req.senderPublicKey.address
               MatcherApiRoute.checkTimestamp(address, timestamp.millis) {
