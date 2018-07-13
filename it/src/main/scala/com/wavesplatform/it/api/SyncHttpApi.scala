@@ -50,7 +50,7 @@ object SyncHttpApi extends Assertions {
 
     import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
 
-    private val RequestAwaitTime      = 15.seconds
+    private val RequestAwaitTime = 15.seconds
 
     def get(path: String): Response =
       Await.result(async(n).get(path), RequestAwaitTime)

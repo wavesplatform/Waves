@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.persistence._
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.{CancelOrderRequest, MatcherResponse}
+import com.wavesplatform.matcher.api.MatcherResponse
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded, OrderExecuted}
@@ -17,12 +17,12 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
-import com.wavesplatform.utils.Base58
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
 import scorex.transaction.assets.exchange._
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
+import scorex.account.PublicKeyAccount
 
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -356,9 +356,8 @@ object OrderBookActor {
 
   case class DeleteOrderBookRequest(assetPair: AssetPair) extends OrderBookRequest
 
-  case class CancelOrder(assetPair: AssetPair, req: CancelOrderRequest) extends OrderBookRequest {
-    lazy val orderId: String           = Base58.encode(req.orderId)
-    override lazy val toString: String = s"CancelOrder($assetPair, ${req.senderPublicKey}, $orderId)"
+  case class CancelOrder(assetPair: AssetPair, sender: PublicKeyAccount, orderId: String) extends OrderBookRequest {
+    override lazy val toString: String = s"CancelOrder($assetPair, $sender, $orderId)"
   }
 
   case class ForceCancelOrder(assetPair: AssetPair, orderId: String) extends OrderBookRequest
