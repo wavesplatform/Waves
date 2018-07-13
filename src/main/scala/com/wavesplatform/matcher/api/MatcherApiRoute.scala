@@ -237,8 +237,8 @@ class MatcherApiRoute(wallet: Wallet,
                 .map(r => r.code -> r.json)
             case None =>
               implicit val ec = MatcherApiRoute.cancelExecutor
-              val timestamp = req.timestamp.get
-              val address   = req.senderPublicKey.address
+              val timestamp   = req.timestamp.get
+              val address     = req.senderPublicKey.address
               MatcherApiRoute.checkTimestamp(address, timestamp.millis) {
                 (orderHistory ? GetOrderHistory(pair, address, timestamp))
                   .mapTo[GetOrderHistoryResponse]

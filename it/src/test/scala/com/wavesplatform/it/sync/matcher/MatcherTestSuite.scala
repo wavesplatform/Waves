@@ -6,6 +6,7 @@ import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.LevelResponse
+import com.wavesplatform.it.sync.matcher.MatcherMassOrdersTestSuite.orderLimit
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.it.util._
 
@@ -285,7 +286,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     }
 
     "batch cancel" - {
-      def fileOrders(pair: AssetPair): Seq[String] = 0 to 5 map { _ =>
+      def fileOrders(n: Int, pair: AssetPair): Seq[String] = 0 until n map { _ =>
         val o = matcherNode.placeOrder(matcherNode.prepareOrder(aliceNode, pair, OrderType.BUY, 1.waves * Order.PriceConstant, 100))
         o.status should be("OrderAccepted")
         o.message.id
@@ -297,7 +298,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       val aliceWavesPair2 = AssetPair(ByteStr.decodeBase58(asset2).toOption, None)
 
       "canceling an order doesn't affect other orders for the same pair" in {
-        val orders                          = fileOrders(aliceWavesPair)
+        val orders                          = fileOrders(5, aliceWavesPair)
         val (orderToCancel, ordersToRetain) = (orders.head, orders.tail)
 
         val cancel = matcherNode.cancelOrder(aliceNode, aliceWavesPair, Some(orderToCancel))
@@ -309,8 +310,8 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       }
 
       "cancel orders by pair" in {
-        val ordersToCancel = fileOrders(aliceWavesPair)
-        val ordersToRetain = fileOrders(aliceWavesPair2)
+        val ordersToCancel = fileOrders(25, aliceWavesPair)
+        val ordersToRetain = fileOrders(5, aliceWavesPair2)
         val ts             = Some(System.currentTimeMillis)
 
         val cancel = matcherNode.cancelOrder(aliceNode, aliceWavesPair, None, ts)
@@ -327,8 +328,8 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       }
 
       "cancel all orders" in {
-        val orders1 = fileOrders(aliceWavesPair)
-        val orders2 = fileOrders(aliceWavesPair2)
+        val orders1 = fileOrders(25, aliceWavesPair)
+        val orders2 = fileOrders(25, aliceWavesPair2)
         val ts      = Some(System.currentTimeMillis)
 
         val cancel = matcherNode.cancelAllOrders(aliceNode, ts)
@@ -356,6 +357,7 @@ object MatcherTestSuite {
   private val AssetQuantity    = 1000
   private val MatcherFee       = 300000
   private val TransactionFee   = 300000
+  private val orderLimit       = 20
 
   private val minerDisabled = parseString("waves.miner.enable = no")
   private val matcherConfig = parseString(s"""
@@ -366,6 +368,7 @@ object MatcherTestSuite {
        |  order-match-tx-fee = 300000
        |  blacklisted-assets = ["$ForbiddenAssetId"]
        |  balance-watching.enable = yes
+       |  rest-order-limit=$orderLimit
        |}""".stripMargin)
 
   private val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
