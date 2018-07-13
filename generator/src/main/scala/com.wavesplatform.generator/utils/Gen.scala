@@ -14,6 +14,24 @@ import scorex.crypto.signatures.Curve25519._
 object Gen {
   private def random = ThreadLocalRandom.current
 
+  def oracleScript(oracle: PrivateKeyAccount): Script = {
+    val src =
+      s"""
+        |let oracle = Address(${oracle.address})
+        |
+        |match tx {
+        |  case t: TransferTransaction =>
+        |    let enabled = extract(getBoolean(oracle,"transfers"))
+        |    enabled
+        |  case _ => false
+        |}
+      """.stripMargin
+
+    val (script, _) = ScriptCompiler(src).explicitGet()
+
+    script
+  }
+
   def multiSigScript(owners: Seq[PrivateKeyAccount], requiredProofsCount: Int): Script = {
     val accountsWithIndexes = owners.zipWithIndex
     val keyLets =
