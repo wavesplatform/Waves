@@ -7,7 +7,6 @@ import play.api.libs.json.{Format, Json}
 import scorex.account.{AddressScheme, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.assets.IssueTransactionV2
-import scorex.transaction.smart.script.Script
 import scorex.transaction.{Proofs, ValidationError}
 
 object SignedIssueV2Request {
