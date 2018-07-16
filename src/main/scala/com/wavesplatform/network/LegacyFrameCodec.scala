@@ -1,7 +1,6 @@
 package com.wavesplatform.network
 
 import java.util
-import java.util.concurrent.TimeUnit
 
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.crypto
@@ -13,17 +12,17 @@ import io.netty.handler.codec.ByteToMessageCodec
 import scorex.network.message.Message._
 import scorex.utils.ScorexLogging
 
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
-class LegacyFrameCodec(peerDatabase: PeerDatabase) extends ByteToMessageCodec[RawBytes] with ScorexLogging {
+class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: FiniteDuration) extends ByteToMessageCodec[RawBytes] with ScorexLogging {
 
   import BasicMessagesRepo.specsByCodes
   import LegacyFrameCodec._
 
-  private val cache = CacheBuilder
+  private val receivedTxsCache = CacheBuilder
     .newBuilder()
-    .expireAfterWrite(5.minutes.toMillis, TimeUnit.MILLISECONDS)
+    .expireAfterWrite(receivedTxsCacheTimeout.length, receivedTxsCacheTimeout.unit)
     .build[String, Object]()
 
   override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]): Unit =
@@ -49,8 +48,8 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase) extends ByteToMessageCodec[Ra
 
         spec != TransactionSpec || {
           val actualChecksumStr = Base64.encode(rawChecksum)
-          if (cache.getIfPresent(actualChecksumStr) == null) {
-            cache.put(actualChecksumStr, LegacyFrameCodec.dummy)
+          if (receivedTxsCache.getIfPresent(actualChecksumStr) == null) {
+            receivedTxsCache.put(actualChecksumStr, LegacyFrameCodec.dummy)
             true
           } else false
         }

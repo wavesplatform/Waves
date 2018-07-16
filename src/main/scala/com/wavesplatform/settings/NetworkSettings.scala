@@ -33,6 +33,7 @@ case class NetworkSettings(file: Option[File],
                            peersBroadcastInterval: FiniteDuration,
                            handshakeTimeout: FiniteDuration,
                            suspensionResidenceTime: FiniteDuration,
+                           receivedTxsCacheTimeout: FiniteDuration,
                            uPnPSettings: UPnPSettings,
                            trafficLogger: TrafficLogger.Settings)
 
@@ -72,6 +73,7 @@ object NetworkSettings {
     val peersBroadcastInterval       = config.as[FiniteDuration]("peers-broadcast-interval")
     val handshakeTimeout             = config.as[FiniteDuration]("handshake-timeout")
     val suspensionResidenceTime      = config.as[FiniteDuration]("suspension-residence-time")
+    val receivedTxsCacheTimeout      = config.as[FiniteDuration]("received-txs-cache-timeout")
     val uPnPSettings                 = config.as[UPnPSettings]("upnp")
     val trafficLogger                = config.as[TrafficLogger.Settings]("traffic-logger")
 
@@ -94,6 +96,7 @@ object NetworkSettings {
       peersBroadcastInterval,
       handshakeTimeout,
       suspensionResidenceTime,
+      receivedTxsCacheTimeout,
       uPnPSettings,
       trafficLogger
     )
