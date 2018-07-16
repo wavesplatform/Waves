@@ -3,7 +3,6 @@ package com.wavesplatform.db
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.{BlockchainUpdaterImpl, _}
 import com.wavesplatform.{TransactionGen, WithDB}
 import org.scalacheck.Gen
