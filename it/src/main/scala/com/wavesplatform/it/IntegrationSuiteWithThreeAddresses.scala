@@ -4,6 +4,7 @@ import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util._
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
+import scorex.account.PrivateKeyAccount
 import scorex.transaction.transfer._
 import scorex.utils.ScorexLogging
 
@@ -30,6 +31,8 @@ trait IntegrationSuiteWithThreeAddresses
   protected lazy val firstAddress: String  = Await.result(sender.createAddress, 2.minutes)
   protected lazy val secondAddress: String = Await.result(sender.createAddress, 2.minutes)
   protected lazy val thirdAddress: String  = Await.result(sender.createAddress, 2.minutes)
+
+  def pkByAddress(address: String) = PrivateKeyAccount.fromSeed(Await.result(sender.seed(address), 10.seconds)).right.get
 
   abstract protected override def beforeAll(): Unit = {
     super.beforeAll()

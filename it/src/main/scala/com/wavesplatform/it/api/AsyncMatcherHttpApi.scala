@@ -6,7 +6,6 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state.ByteStr
-import com.wavesplatform.utils.Base58
 import org.asynchttpclient.Dsl.{get => _get}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
@@ -68,14 +67,23 @@ object AsyncMatcherHttpApi extends Assertions {
       (amountAsset, priceAsset)
     }
 
-    def cancelOrder(sender: Node, assetPair: AssetPair, orderId: String) = {
+    def cancelOrder(sender: Node, assetPair: AssetPair, orderId: Option[String], timestamp: Option[Long] = None) = {
       val privateKey                = sender.privateKey
       val publicKey                 = sender.publicKey
-      val request                   = CancelOrderRequest(publicKey, Base58.decode(orderId).get, Array.emptyByteArray)
+      val request                   = CancelOrderRequest(publicKey, orderId, timestamp, Array.emptyByteArray)
       val sig                       = crypto.sign(privateKey, request.toSign)
       val signedRequest             = request.copy(signature = sig)
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
       matcherPost(s"/matcher/orderbook/${amountAsset}/${priceAsset}/cancel", signedRequest.json).as[MatcherStatusResponse]
+    }
+
+    def cancelAllOrders(sender: Node, timestamp: Option[Long]) = {
+      val privateKey    = sender.privateKey
+      val publicKey     = sender.publicKey
+      val request       = CancelOrderRequest(publicKey, None, timestamp, Array.emptyByteArray)
+      val sig           = crypto.sign(privateKey, request.toSign)
+      val signedRequest = request.copy(signature = sig)
+      matcherPost(s"/matcher/orderbook/cancel", signedRequest.json).as[MatcherStatusResponse]
     }
 
     def orderHistory(sender: Node) = {
