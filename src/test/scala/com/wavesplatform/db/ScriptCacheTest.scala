@@ -11,16 +11,29 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.GenesisTransaction
 import scorex.transaction.smart.SetScriptTransaction
 import scorex.transaction.smart.script.{Script, ScriptCompiler}
+import scorex.transaction.{BlockchainUpdater, GenesisTransaction}
 import scorex.utils.{Time, TimeImpl}
 
 class ScriptCacheTest extends FreeSpec with Matchers with WithDB with TransactionGen {
 
   val CACHE_SIZE = 1
-  val AMOUNT     = 10000000000l
+  val AMOUNT     = 10000000000L
   val FEE        = 5000000
+
+  def mkScripts(num: Int): List[Script] = {
+    (0 until num).map { ind =>
+      val (script, _) = ScriptCompiler(
+        s"""
+           |let ind = $ind
+           |true
+          """.stripMargin
+      ).explicitGet()
+
+      script
+    }.toList
+  }
 
   def blockGen(scripts: List[Script], t: Time): Gen[(Seq[PrivateKeyAccount], Seq[Block])] = {
     val ts = t.correctedTime()
@@ -60,40 +73,61 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
 
   "ScriptCache" - {
     "return correct script after overflow" in {
-      val scripts =
-        (0 to CACHE_SIZE * 10).map { ind =>
-          val (script, _) = ScriptCompiler(
-            s"""
-            |let ind = $ind
-            |true
-          """.stripMargin
-          ).explicitGet()
+      val scripts = mkScripts(CACHE_SIZE * 10)
 
-          script
-        }.toList
-
-      withLevelDB(blockGen(scripts, _)) {
-        case (accounts, db) =>
+      withBlockchain(blockGen(scripts, _)) {
+        case (accounts, bc) =>
           val allScriptCorrect = (accounts zip scripts)
             .map {
               case (account, script) =>
                 val address = account.toAddress
 
                 val scriptFromCache =
-                  db.accountScript(address)
+                  bc.accountScript(address)
                     .toRight(s"No script for acc: $account")
                     .explicitGet()
 
-                scriptFromCache == script && db.hasScript(address)
+                scriptFromCache == script && bc.hasScript(address)
             }
             .forall(identity)
 
           allScriptCorrect shouldBe true
       }
     }
+
+    "Return correct script after rollback" in {
+      val scripts @ List(script) = mkScripts(1)
+
+      withBlockchain(blockGen(scripts, _)) {
+        case (List(account), bcu) =>
+          bcu.accountScript(account.toAddress) shouldEqual Some(script)
+
+          val lastBlock = bcu.lastBlock.get
+
+          val newScriptTx = SetScriptTransaction
+            .selfSigned(1, account, None, FEE, lastBlock.timestamp + 1)
+            .explicitGet()
+
+          val blockWithEmptyScriptTx = TestBlock
+            .create(
+              time = lastBlock.timestamp + 2,
+              ref = lastBlock.uniqueId,
+              txs = Seq(newScriptTx)
+            )
+
+          bcu
+            .processBlock(blockWithEmptyScriptTx)
+            .explicitGet()
+
+          bcu.accountScript(account.toAddress) shouldEqual None
+          bcu.removeAfter(lastBlock.uniqueId)
+          bcu.accountScript(account.toAddress) shouldEqual Some(script)
+      }
+    }
+
   }
 
-  def withLevelDB(gen: Time => Gen[(Seq[PrivateKeyAccount], Seq[Block])])(f: (Seq[PrivateKeyAccount], Blockchain) => Unit): Unit = {
+  def withBlockchain(gen: Time => Gen[(Seq[PrivateKeyAccount], Seq[Block])])(f: (Seq[PrivateKeyAccount], BlockchainUpdater with NG) => Unit): Unit = {
     val time          = new TimeImpl
     val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub, CACHE_SIZE)
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, WavesSettings.fromConfig(loadConfig(ConfigFactory.load())), time)
