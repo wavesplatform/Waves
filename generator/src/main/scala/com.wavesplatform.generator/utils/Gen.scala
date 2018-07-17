@@ -17,12 +17,13 @@ object Gen {
   def oracleScript(oracle: PrivateKeyAccount): Script = {
     val src =
       s"""
-        |let oracle = Address(${oracle.address})
+        |let oracle = Address(base58'${oracle.address}')
         |
         |match tx {
         |  case t: TransferTransaction =>
         |    let enabled = extract(getBoolean(oracle,"transfers"))
         |    enabled
+        |  case _: SetScriptTransaction => true
         |  case _ => false
         |}
       """.stripMargin
