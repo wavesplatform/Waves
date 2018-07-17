@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
-import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, TransactionGen}
@@ -59,10 +58,6 @@ class AssetsApiRouteSpec
       (response \ "decimals").as[Int] shouldBe smartAssetTx.decimals
       (response \ "reissuable").as[Boolean] shouldBe smartAssetTx.reissuable
       (response \ "quantity").as[BigDecimal] shouldBe smartAssetDesc.totalVolume
-      (response \ "script").as[String] shouldBe smartAssetDesc.script.fold("")(_.bytes().base58)
-      (response \ "scriptText").as[String] shouldBe smartAssetDesc.script.fold("")(_.text)
-      (response \ "complexity").as[Long] should be >= 0L
-      (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
       (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty
     }
   }
@@ -92,10 +87,6 @@ class AssetsApiRouteSpec
       (response \ "decimals").as[Int] shouldBe sillyAssetTx.decimals
       (response \ "reissuable").as[Boolean] shouldBe sillyAssetTx.reissuable
       (response \ "quantity").as[BigDecimal] shouldBe sillyAssetDesc.totalVolume
-      (response \ "script").asOpt[String] shouldBe None
-      (response \ "scriptText").asOpt[String] shouldBe None
-      (response \ "complexity").as[Long] shouldBe 0L
-      (response \ "extraFee").as[Long] shouldBe 0
       (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty
     }
   }
