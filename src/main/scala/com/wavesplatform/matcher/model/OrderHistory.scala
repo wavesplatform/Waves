@@ -34,9 +34,9 @@ trait OrderHistory {
 
   def activeOrderIdsByAddress(address: String): Set[(Option[AssetId], String)]
 
-  def fetchOrderHistoryByPair(assetPair: AssetPair, address: String): Seq[(String, OrderInfo, Option[Order])]
+  def fetchOrderHistoryByPair(assetPair: AssetPair, address: String, internal: Boolean): Seq[(String, OrderInfo, Option[Order])]
 
-  def fetchAllActiveOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])]
+  def fetchAllActiveOrderHistory(address: String, internal: Boolean): Seq[(String, OrderInfo, Option[Order])]
 
   def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])]
 
@@ -213,22 +213,29 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     }
   }
 
-  override def fetchOrderHistoryByPair(assetPair: AssetPair, address: String): Seq[(String, OrderInfo, Option[Order])] = {
-    allOrderIdsByAddress(address).toSeq
+  override def fetchOrderHistoryByPair(assetPair: AssetPair, address: String, internal: Boolean): Seq[(String, OrderInfo, Option[Order])] = {
+    val orders = allOrderIdsByAddress(address).toSeq
       .map(id => (id, orderInfo(id), order(id)))
       .filter(_._3.exists(_.assetPair == assetPair))
-      .sorted(OrderHistoryOrdering)
-      .take(settings.maxOrdersPerRequest)
+    if (internal) orders
+    else
+      orders
+        .sorted(OrderHistoryOrdering)
+        .take(settings.maxOrdersPerRequest)
   }
 
-  override def fetchAllActiveOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])] = {
+  override def fetchAllActiveOrderHistory(address: String, internal: Boolean): Seq[(String, OrderInfo, Option[Order])] = {
     import OrderInfo.orderStatusOrdering
-    activeOrderIdsByAddress(address).toSeq
-      .map(o => (o._2, orderInfo(o._2)))
-      .sortBy(_._2.status)
-      .take(settings.maxOrdersPerRequest)
-      .map(p => (p._1, p._2, order(p._1)))
-      .sorted(OrderHistoryOrdering)
+    val orders = activeOrderIdsByAddress(address).toSeq
+    if (internal)
+      orders
+        .map { case (_, id) => (id, orderInfo(id), order(id)) } else
+      orders
+        .map(o => (o._2, orderInfo(o._2)))
+        .sortBy(_._2.status)
+        .take(settings.maxOrdersPerRequest)
+        .map(p => (p._1, p._2, order(p._1)))
+        .sorted(OrderHistoryOrdering)
   }
 
   override def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])] = {

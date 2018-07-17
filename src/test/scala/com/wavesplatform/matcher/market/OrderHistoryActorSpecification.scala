@@ -47,7 +47,7 @@ class OrderHistoryActorSpecification
   "OrderHistoryActor" should {
 
     "not process expirable messages" in {
-      val r = GetOrderHistory(pair, "address", NTP.correctedTime() - OrderHistoryActor.RequestTTL - 1)
+      val r = GetOrderHistory(pair, "address", NTP.correctedTime() - OrderHistoryActor.RequestTTL - 1, internal = false)
       actor ! r
       expectNoMsg()
     }

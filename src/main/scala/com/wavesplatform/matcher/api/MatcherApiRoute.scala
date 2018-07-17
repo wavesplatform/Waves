@@ -187,12 +187,12 @@ class MatcherApiRoute(wallet: Wallet,
           case Some(timestamp) =>
             val address = req.senderPublicKey.address
             MatcherApiRoute.checkTimestamp(address, timestamp.millis) {
-              (orderHistory ? GetAllOrderHistory(address, true, timestamp))
+              (orderHistory ? GetAllOrderHistory(address, activeOnly = true, timestamp, internal = true))
                 .mapTo[GetOrderHistoryResponse]
                 .flatMap { res: GetOrderHistoryResponse =>
                   Future
                     .sequence(res.history map {
-                      case (id, info, Some(order)) =>
+                      case (id, _, Some(order)) =>
                         matcher ? CancelOrder(order.assetPair, req.senderPublicKey, id)
                       case _ => Future.successful(())
                     })
@@ -240,7 +240,7 @@ class MatcherApiRoute(wallet: Wallet,
               val timestamp   = req.timestamp.get
               val address     = req.senderPublicKey.address
               MatcherApiRoute.checkTimestamp(address, timestamp.millis) {
-                (orderHistory ? GetOrderHistory(pair, address, timestamp))
+                (orderHistory ? GetOrderHistory(pair, address, timestamp, internal = true))
                   .mapTo[GetOrderHistoryResponse]
                   .flatMap { res =>
                     Future
@@ -316,7 +316,7 @@ class MatcherApiRoute(wallet: Wallet,
         case Success(address) =>
           withAssetPair(a1, a2) { pair =>
             complete(
-              (orderHistory ? GetOrderHistory(pair, address, NTP.correctedTime()))
+              (orderHistory ? GetOrderHistory(pair, address, NTP.correctedTime(), internal = false))
                 .mapTo[MatcherResponse]
                 .map(r => r.code -> r.json))
           }
@@ -352,7 +352,7 @@ class MatcherApiRoute(wallet: Wallet,
         checkGetSignature(publicKey, ts, sig) match {
           case Success(address) =>
             complete(
-              (orderHistory ? GetAllOrderHistory(address, activeOnly.getOrElse(false), NTP.correctedTime()))
+              (orderHistory ? GetAllOrderHistory(address, activeOnly.getOrElse(false), NTP.correctedTime(), internal = false))
                 .mapTo[MatcherResponse]
                 .map(r => r.code -> r.json))
           case Failure(ex) =>
@@ -401,7 +401,7 @@ class MatcherApiRoute(wallet: Wallet,
   def getAllOrderHistory: Route = (path("orders" / Segment) & get & withAuth) { addr =>
     implicit val timeout: Timeout = Timeout(10.seconds)
     complete(
-      (orderHistory ? GetAllOrderHistory(addr, activeOnly = true, NTP.correctedTime()))
+      (orderHistory ? GetAllOrderHistory(addr, activeOnly = true, NTP.correctedTime(), internal = false))
         .mapTo[MatcherResponse]
         .map(r => r.code -> r.json))
   }

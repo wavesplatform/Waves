@@ -87,16 +87,14 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   }
 
   def fetchOrderHistory(req: GetOrderHistory): Unit = {
-    sender() ! GetOrderHistoryResponse(orderHistory.fetchOrderHistoryByPair(req.assetPair, req.address))
+    sender() ! GetOrderHistoryResponse(orderHistory.fetchOrderHistoryByPair(req.assetPair, req.address, req.internal))
   }
 
   def fetchAllOrderHistory(req: GetAllOrderHistory): Unit = {
-    req.activeOnly match {
-      case true =>
-        sender() ! GetOrderHistoryResponse(orderHistory.fetchAllActiveOrderHistory(req.address))
-      case false =>
-        sender() ! GetOrderHistoryResponse(orderHistory.fetchAllOrderHistory(req.address))
-    }
+    if (req.activeOnly)
+      sender() ! GetOrderHistoryResponse(orderHistory.fetchAllActiveOrderHistory(req.address, req.internal))
+    else
+      sender() ! GetOrderHistoryResponse(orderHistory.fetchAllOrderHistory(req.address))
   }
 
   def forceCancelOrder(id: String): Unit = {
@@ -140,7 +138,9 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       case Some(id) => sender() ! delete(id)
       case None =>
         sender() ! OrderDeletingAccepted()
-        orderHistory.fetchOrderHistoryByPair(req.assetPair, req.address).foreach(orderData => delete(orderData._1))
+        orderHistory
+          .fetchOrderHistoryByPair(req.assetPair, req.address, internal = false)
+          .foreach(orderData => delete(orderData._1))
     }
   }
 
@@ -172,9 +172,9 @@ object OrderHistoryActor {
     def ts: Long
   }
 
-  case class GetOrderHistory(assetPair: AssetPair, address: String, ts: Long) extends ExpirableOrderHistoryRequest
+  case class GetOrderHistory(assetPair: AssetPair, address: String, ts: Long, internal: Boolean) extends ExpirableOrderHistoryRequest
 
-  case class GetAllOrderHistory(address: String, activeOnly: Boolean, ts: Long) extends ExpirableOrderHistoryRequest
+  case class GetAllOrderHistory(address: String, activeOnly: Boolean, ts: Long, internal: Boolean) extends ExpirableOrderHistoryRequest
 
   case class GetOrderStatus(assetPair: AssetPair, id: String, ts: Long) extends ExpirableOrderHistoryRequest
 
