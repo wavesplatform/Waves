@@ -4,10 +4,10 @@ import java.net.{InetSocketAddress, NetworkInterface}
 import java.nio.channels.ClosedChannelException
 import java.util.concurrent.ConcurrentHashMap
 
+import com.wavesplatform.Version
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network.MessageObserver.Messages
 import com.wavesplatform.settings._
-import com.wavesplatform.Version
 import com.wavesplatform.state.NG
 import com.wavesplatform.utx.UtxPool
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
@@ -111,7 +111,7 @@ object NetworkServer extends ScorexLogging {
           serverHandshakeHandler,
           lengthFieldPrepender,
           new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
-          new LegacyFrameCodec(peerDatabase),
+          new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout),
           channelClosedHandler,
           trafficWatcher,
           discardingHandler,
@@ -141,7 +141,7 @@ object NetworkServer extends ScorexLogging {
         clientHandshakeHandler,
         lengthFieldPrepender,
         new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
-        new LegacyFrameCodec(peerDatabase),
+        new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout),
         channelClosedHandler,
         trafficWatcher,
         discardingHandler,

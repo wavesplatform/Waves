@@ -21,8 +21,13 @@ import scala.util.{Failure, Try}
 
 object SyncHttpApi extends Assertions {
   case class ErrorMessage(error: Int, message: String)
-
   implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
+
+  case class NotFoundErrorMessage(status: String, details: String)
+
+  object NotFoundErrorMessage {
+    implicit val format: Format[NotFoundErrorMessage] = Json.format
+  }
 
   def assertBadRequest[R](f: => R): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Assertions.assert(statusCode == StatusCodes.BadRequest.intValue)
@@ -44,6 +49,13 @@ object SyncHttpApi extends Assertions {
       Assertions.assert(statusCode == StatusCodes.BadRequest.intValue && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail(s"Expecting bad request")
+  }
+
+  def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
+    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+      Assertions.assert(statusCode == StatusCodes.NotFound.intValue && parse(responseBody).as[NotFoundErrorMessage].details.contains(errorMessage))
+    case Failure(e) => Assertions.fail(e)
+    case _          => Assertions.fail(s"Expecting not found error")
   }
 
   implicit class NodeExtSync(n: Node) extends Assertions with Matchers {
@@ -207,6 +219,8 @@ object SyncHttpApi extends Assertions {
 
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       Await.result(async(n).rollback(to, returnToUTX), RequestAwaitTime)
+
+    def findTransactionInfo(txId: String): Option[TransactionInfo] = Await.result(async(n).findTransactionInfo(txId), RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
