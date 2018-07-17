@@ -139,12 +139,12 @@ class Worker(workerSettings: Settings,
       case GenOrderType.ActiveBuy =>
         val buyer = randomFrom(validAccounts).get
         val pair  = AssetPair(randomFrom(tradingAssets.dropRight(2)), None)
-        buyOrder(DefaultPrice / 100, DefaultAmount, buyer, pair)._2
+        buyOrder(DefaultPrice / Random.nextInt(2, 100), DefaultAmount, buyer, pair)._2
 
       case GenOrderType.ActiveSell =>
         val seller = randomFrom(validAccounts).get
         val pair   = AssetPair(randomFrom(tradingAssets.dropRight(2)), None)
-        sellOrder(DefaultPrice * 10, DefaultAmount, seller, pair)._2
+        sellOrder(DefaultPrice * Random.nextInt(2, 10) + Random.nextInt(1, DefaultPrice), DefaultAmount, seller, pair)._2
 
       case GenOrderType.Buy =>
         val buyer = randomFrom(validAccounts).get

@@ -170,12 +170,12 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       val endpoint = finalConfig.sendTo.head.getHostString
 
       val tradingAssets = issueAssets(endpoint, finalConfig.richAccounts.head, finalConfig.assetPairsNum)
-
+      Thread.sleep(15000)
       val transfers = Seq(
         massTransfer(endpoint, finalConfig.richAccounts.head, finalConfig.validAccounts, None +: tradingAssets.dropRight(2).map(Option(_))),
         massTransfer(endpoint, finalConfig.richAccounts.head, finalConfig.fakeAccounts, None +: tradingAssets.takeRight(2).map(Option(_)))
       )
-
+      Thread.sleep(15000)
       Await.ready(Future.sequence(transfers), 30.seconds)
 
       log.info(s"Running ${ordersDistr.size} workers")
