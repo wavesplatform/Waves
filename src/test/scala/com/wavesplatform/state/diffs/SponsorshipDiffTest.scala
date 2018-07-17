@@ -254,9 +254,11 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       recipient <- accountGen
       ts        <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, 300000000, ts).explicitGet()
-      issue                       = IssueTransactionV1.selfSigned(master, Base58.decode("Asset").get, Array.emptyByteArray, 100, 2, reissuable = false, 100000000, ts + 1).explicitGet()
-      assetId                     = issue.id()
-      sponsor                     = SponsorFeeTransaction.selfSigned(1, master, assetId, Some(100), 100000000, ts + 2).explicitGet()
+      issue = IssueTransactionV1
+        .selfSigned(master, Base58.decode("Asset").get, Array.emptyByteArray, 100, 2, reissuable = false, 100000000, ts + 1)
+        .explicitGet()
+      assetId = issue.id()
+      sponsor = SponsorFeeTransaction.selfSigned(1, master, assetId, Some(100), 100000000, ts + 2).explicitGet()
       assetTransfer = TransferTransactionV1
         .selfSigned(Some(assetId), master, recipient, issue.quantity, ts + 3, None, 100000, Array.emptyByteArray)
         .right
