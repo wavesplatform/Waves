@@ -19,9 +19,6 @@ import scorex.utils.{Time, TimeImpl}
 import scala.concurrent.duration._
 import scala.util.Random
 
-/***
-  * Tests for PoSSelector with activated FairPoS
-  */
 class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with TransactionGen {
 
   import FPPoSSelectorTest._
@@ -206,8 +203,9 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
   def withEnv(gen: Time => Gen[(Seq[PrivateKeyAccount], Seq[Block])])(f: Env => Unit): Unit = {
     val time          = new TimeImpl
     val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub)
-    val settings      = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, WavesSettings.fromConfig(loadConfig(ConfigFactory.load())), time)
+    val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
+    val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, time)
     val pos           = new PoSSelector(bcu, settings.blockchainSettings)
     try {
       val (accounts, blocks) = gen(time).sample.get

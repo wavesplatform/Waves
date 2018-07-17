@@ -7,7 +7,6 @@ import play.api.libs.json.{Format, Json}
 import scorex.account.{AddressScheme, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.assets.IssueTransactionV2
-import scorex.transaction.smart.script.Script
 import scorex.transaction.{Proofs, ValidationError}
 
 object SignedIssueV2Request {
@@ -29,7 +28,6 @@ case class SignedIssueV2Request(@ApiModelProperty(required = true)
                                 decimals: Byte,
                                 @ApiModelProperty(required = true)
                                 reissuable: Boolean,
-                                script: Option[String],
                                 @ApiModelProperty(required = true)
                                 fee: Long,
                                 @ApiModelProperty(required = true)
@@ -42,10 +40,6 @@ case class SignedIssueV2Request(@ApiModelProperty(required = true)
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      _script <- script match {
-        case None    => Right(None)
-        case Some(s) => Script.fromBase64String(s).map(Some(_))
-      }
       t <- IssueTransactionV2.create(
         version,
         AddressScheme.current.chainId,
@@ -55,7 +49,7 @@ case class SignedIssueV2Request(@ApiModelProperty(required = true)
         quantity,
         decimals,
         reissuable,
-        _script,
+        None,
         fee,
         timestamp,
         _proofs

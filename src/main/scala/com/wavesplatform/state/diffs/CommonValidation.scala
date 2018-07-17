@@ -107,7 +107,7 @@ object CommonValidation {
       case _: DataTransaction          => activationBarrier(BlockchainFeatures.DataTransaction)
       case _: SetScriptTransaction     => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: TransferTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: IssueTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case it: IssueTransactionV2      => activationBarrier(if (it.script.isEmpty) BlockchainFeatures.SmartAccounts else BlockchainFeatures.SmartAssets)
       case _: ReissueTransactionV2     => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: BurnTransactionV2        => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: LeaseTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
