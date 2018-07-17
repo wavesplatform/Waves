@@ -316,6 +316,22 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     }
   }
 
+  def stopContainer(node: DockerNode): Unit = {
+    val id = node.containerId
+    log.info(s"Stopping container with id: $id")
+    takeProfileSnapshot(node)
+    client.stopContainer(node.containerId, 10)
+    saveProfile(node)
+    saveLog(node)
+    val containerInfo = client.inspectContainer(node.containerId)
+    log.debug(s"""Container information for ${node.name}:
+                 |Exit code: ${containerInfo.state().exitCode()}
+                 |Error: ${containerInfo.state().error()}
+                 |Status: ${containerInfo.state().status()}
+                 |OOM killed: ${containerInfo.state().oomKilled()}""".stripMargin)
+
+  }
+
   override def close(): Unit = {
     if (isStopped.compareAndSet(false, true)) {
       log.info("Stopping containers")
@@ -434,6 +450,10 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
   def disconnectFromNetwork(node: DockerNode): Unit = disconnectFromNetwork(node.containerId)
 
   private def disconnectFromNetwork(containerId: String): Unit = client.disconnectFromNetwork(containerId, wavesNetwork.id())
+
+  def restartNode(node: DockerNode): Unit = restartNode(node.containerId)
+
+  private def restartNode(containerId: String): Unit = client.restartContainer(containerId, 10)
 
   def connectToNetwork(nodes: Seq[DockerNode]): Unit = {
     nodes.foreach(connectToNetwork)
