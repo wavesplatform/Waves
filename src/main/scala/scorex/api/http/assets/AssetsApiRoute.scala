@@ -3,7 +3,6 @@ package scorex.api.http.assets
 import akka.http.scaladsl.server.Route
 import com.google.common.base.Charsets
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
