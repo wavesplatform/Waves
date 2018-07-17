@@ -217,25 +217,28 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     val orders = allOrderIdsByAddress(address).toSeq
       .map(id => (id, orderInfo(id), order(id)))
       .filter(_._3.exists(_.assetPair == assetPair))
-    if (internal) orders
-    else
+    if (internal) {
+      orders
+    } else {
       orders
         .sorted(OrderHistoryOrdering)
         .take(settings.maxOrdersPerRequest)
+    }
   }
 
   override def fetchAllActiveOrderHistory(address: String, internal: Boolean): Seq[(String, OrderInfo, Option[Order])] = {
     import OrderInfo.orderStatusOrdering
     val orders = activeOrderIdsByAddress(address).toSeq
-    if (internal)
-      orders
-        .map { case (_, id) => (id, orderInfo(id), order(id)) } else
+    if (internal) {
+      orders.map { case (_, id) => (id, orderInfo(id), order(id)) }
+    } else {
       orders
         .map(o => (o._2, orderInfo(o._2)))
         .sortBy(_._2.status)
         .take(settings.maxOrdersPerRequest)
         .map(p => (p._1, p._2, order(p._1)))
         .sorted(OrderHistoryOrdering)
+    }
   }
 
   override def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])] = {
