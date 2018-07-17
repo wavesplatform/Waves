@@ -47,11 +47,12 @@ class OrderBookActor(assetPair: AssetPair,
 
   private val timer = Kamon.timer("matcher.orderbook.match").refine("pair" -> assetPair.toString)
 
-  private val snapshotCancellable = context.system.scheduler.schedule(settings.snapshotsInterval, settings.snapshotsInterval, self, SaveSnapshot)
-  private val cleanupCancellable  = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
-  private var orderBook           = OrderBook.empty
-  private var apiSender           = Option.empty[ActorRef]
-  private var cancellable         = Option.empty[Cancellable]
+  private val snapshotCancellable    = context.system.scheduler.schedule(settings.snapshotsInterval, settings.snapshotsInterval, self, SaveSnapshot)
+  private val cleanupCancellable     = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
+  private var orderBook              = OrderBook.empty
+  private var apiSender              = Option.empty[ActorRef]
+  private var cancellable            = Option.empty[Cancellable]
+  private var lastSnapshotSequenceNr = 0L
 
   private var shutdownStatus: ShutdownStatus = ShutdownStatus(
     initiated = false,
@@ -91,6 +92,7 @@ class OrderBookActor(assetPair: AssetPair,
       saveSnapshot(Snapshot(orderBook))
 
     case SaveSnapshotSuccess(metadata) =>
+      lastSnapshotSequenceNr = metadata.sequenceNr
       log.info(s"Snapshot saved with metadata $metadata")
       deleteMessages(metadata.sequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest.copy(maxSequenceNr = metadata.sequenceNr - 1))
@@ -139,7 +141,12 @@ class OrderBookActor(assetPair: AssetPair,
           s ! ShutdownComplete
           context.stop(self)
         })
-        saveSnapshot(Snapshot(orderBook))
+
+        if (lastSnapshotSequenceNr < lastSequenceNr) saveSnapshot(Snapshot(orderBook))
+        else {
+          log.debug(s"No changes in $assetPair, lastSnapshotSequenceNr = $lastSnapshotSequenceNr, lastSequenceNr = $lastSequenceNr")
+          shutdownStatus.forceComplete()
+        }
       }
   }
 
@@ -349,7 +356,8 @@ class OrderBookActor(assetPair: AssetPair,
         orderHistory ! evt
       }
     case RecoveryCompleted => log.info(assetPair.toString() + " - Recovery completed!");
-    case SnapshotOffer(_, snapshot: Snapshot) =>
+    case SnapshotOffer(metadata, snapshot: Snapshot) =>
+      lastSnapshotSequenceNr = metadata.sequenceNr
       orderBook = snapshot.orderBook
       updateSnapshot(orderBook)
       if (isMigrateToNewOrderHistoryStorage) {
