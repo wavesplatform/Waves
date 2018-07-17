@@ -28,9 +28,9 @@ import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.io.IOUtils
 import org.asynchttpclient.Dsl._
-import scorex.account.AddressScheme
-import scorex.block.Block
-import scorex.utils.ScorexLogging
+import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.block.Block
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -179,7 +179,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     def connectToOne(address: InetSocketAddress): Future[Unit] = {
       for {
         _              <- node.connect(address)
-        _              <- Future(blocking(Thread.sleep(3.seconds.toMillis)))
+        _              <- Future(blocking(Thread.sleep(1.seconds.toMillis)))
         connectedPeers <- node.connectedPeers
         _ <- {
           val connectedAddresses = connectedPeers.map(_.address.replaceAll("""^.*/([\d\.]+).+$""", "$1")).sorted
@@ -195,6 +195,10 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
     val seedAddresses = nodes.asScala
       .filterNot(_.name == node.name)
+      .filterNot { node =>
+        // Exclude disconnected
+        client.inspectContainer(node.containerId).networkSettings().networks().isEmpty
+      }
       .map(_.containerNetworkAddress)
 
     if (seedAddresses.isEmpty) Future.successful(())
@@ -316,22 +320,6 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     }
   }
 
-  def stopContainer(node: DockerNode): Unit = {
-    val id = node.containerId
-    log.info(s"Stopping container with id: $id")
-    takeProfileSnapshot(node)
-    client.stopContainer(node.containerId, 10)
-    saveProfile(node)
-    saveLog(node)
-    val containerInfo = client.inspectContainer(node.containerId)
-    log.debug(s"""Container information for ${node.name}:
-                 |Exit code: ${containerInfo.state().exitCode()}
-                 |Error: ${containerInfo.state().error()}
-                 |Status: ${containerInfo.state().status()}
-                 |OOM killed: ${containerInfo.state().oomKilled()}""".stripMargin)
-
-  }
-
   override def close(): Unit = {
     if (isStopped.compareAndSet(false, true)) {
       log.info("Stopping containers")
@@ -451,9 +439,20 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
   private def disconnectFromNetwork(containerId: String): Unit = client.disconnectFromNetwork(containerId, wavesNetwork.id())
 
-  def restartNode(node: DockerNode): Unit = restartNode(node.containerId)
+  def restartContainer(node: DockerNode): DockerNode = {
+    val id            = node.containerId
+    val containerInfo = inspectContainer(id)
+    val ports         = containerInfo.networkSettings().ports()
+    log.info(s"New ports: ${ports.toString}")
+    client.restartContainer(id, 10)
 
-  private def restartNode(containerId: String): Unit = client.restartContainer(containerId, 10)
+    node.nodeInfo = getNodeInfo(node.containerId, node.settings)
+    Await.result(
+      node.waitForStartup().flatMap(_ => connectToAll(node)),
+      3.minutes
+    )
+    node
+  }
 
   def connectToNetwork(nodes: Seq[DockerNode]): Unit = {
     nodes.foreach(connectToNetwork)
@@ -540,6 +539,8 @@ object Docker {
     override def networkAddress: InetSocketAddress = nodeInfo.hostNetworkAddress
 
     def containerNetworkAddress: InetSocketAddress = nodeInfo.containerNetworkAddress
+
+    def getConfig: Config = config
   }
 
 }

@@ -7,9 +7,9 @@ import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.ByteStr
 import org.scalacheck.{Arbitrary, Gen}
-import scorex.account.PrivateKeyAccount
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.utils.NTP
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.utils.NTP
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 trait MatcherTestData {
   private val signatureSize = 32

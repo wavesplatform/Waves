@@ -1,6 +1,6 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
+import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector, TransactionsOrdering}
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
@@ -8,12 +8,11 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
-import scorex.block.Block
-import scorex.consensus.TransactionsOrdering
-import scorex.transaction.ValidationError.{BlockAppendError, BlockFromFuture, GenericError}
-import scorex.transaction._
-import scorex.utils.{ScorexLogging, Time}
+import com.wavesplatform.block.Block
+import com.wavesplatform.transaction.ValidationError.{BlockAppendError, BlockFromFuture, GenericError}
+import com.wavesplatform.transaction._
 import cats.implicits._
+import com.wavesplatform.utils.{ScorexLogging, Time}
 
 import scala.util.{Left, Right}
 

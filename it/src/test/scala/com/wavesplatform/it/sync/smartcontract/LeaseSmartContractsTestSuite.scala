@@ -11,11 +11,11 @@ import com.wavesplatform.state._
 import com.wavesplatform.utils.dummyCompilerContext
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.JsNumber
-import scorex.account.{AddressScheme}
-import scorex.transaction.Proofs
-import scorex.transaction.lease.{LeaseCancelTransactionV2, LeaseTransactionV2}
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.account.{AddressScheme}
+import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV2, LeaseTransactionV2}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 
 class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val acc0 = pkByAddress(firstAddress)

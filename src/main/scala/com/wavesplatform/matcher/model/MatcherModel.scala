@@ -5,9 +5,9 @@ import cats.implicits._
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.state.Portfolio
 import play.api.libs.json.{JsObject, JsValue, Json}
-import scorex.account.Address
-import scorex.transaction.{AssetAcc, AssetId}
-import scorex.transaction.assets.exchange._
+import com.wavesplatform.account.Address
+import com.wavesplatform.transaction.{AssetAcc, AssetId}
+import com.wavesplatform.transaction.assets.exchange._
 
 import scala.util.Try
 

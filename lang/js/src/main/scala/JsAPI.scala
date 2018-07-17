@@ -7,37 +7,40 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient, Tx}
+import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import fastparse.core.Parsed.{Failure, Success}
 
 import scala.scalajs.js
-//import scala.scalajs.js.Dynamic.{literal => jObj}
-//import scala.scalajs.js.JSConverters._
+import scala.scalajs.js.Dynamic.{literal => jObj}
+import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.annotation.JSExportTopLevel
 
 object JsAPI {
 
-  private def toJs(ast: EXPR): js.Object = ???
-//
-//  {
-//    def r(expr: EXPR): js.Object = {
-//      expr match {
-//        case CONST_LONG(t)        => jObj.applyDynamic("apply")("type" -> "LONG", "value"       -> t)
-//        case GETTER(ref, field)   => jObj.applyDynamic("apply")("type" -> "GETTER", "ref"       -> r(ref), "field" -> field)
-//        case CONST_BYTEVECTOR(bs) => jObj.applyDynamic("apply")("type" -> "BYTEVECTOR", "value" -> bs.toArray.toJSArray)
-//        case CONST_STRING(s)      => jObj.applyDynamic("apply")("type" -> "STRING", "value"     -> s)
-//        case BLOCK(let, body) =>
-//          jObj.applyDynamic("apply")("type" -> "BLOCK", "let" -> jObj("name" -> let.name, "value" -> r(let.value)), "body" -> r(body))
-//        case IF(cond, ifTrue, ifFalse) =>
-//          jObj.applyDynamic("apply")("type" -> "IF", "condition" -> r(cond), "true" -> r(ifTrue), "false" -> r(ifFalse))
-//        case REF(key)                      => jObj.applyDynamic("apply")("type" -> "REF", "key"    -> key)
-//        case TRUE                          => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> true)
-//        case FALSE                         => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> false)
-//        case FUNCTION_CALL(function, args) => jObj.applyDynamic("apply")("type" -> "CALL", "name"  -> function.name, "args" -> args.map(r).toJSArray)
-//      }
-//    }
-//
-//    r(ast)
-//  }
+  private def toJs(ast: EXPR): js.Object = {
+    def r(expr: EXPR): js.Object = {
+      expr match {
+        case CONST_LONG(t)        => jObj.applyDynamic("apply")("type" -> "LONG", "value"       -> t)
+        case GETTER(ref, field)   => jObj.applyDynamic("apply")("type" -> "GETTER", "ref"       -> r(ref), "field" -> field)
+        case CONST_BYTEVECTOR(bs) => jObj.applyDynamic("apply")("type" -> "BYTEVECTOR", "value" -> bs.toArray.toJSArray)
+        case CONST_STRING(s)      => jObj.applyDynamic("apply")("type" -> "STRING", "value"     -> s)
+        case BLOCK(let, body) =>
+          jObj.applyDynamic("apply")("type" -> "BLOCK", "let" -> jObj("name" -> let.name, "value" -> r(let.value)), "body" -> r(body))
+        case IF(cond, ifTrue, ifFalse) =>
+          jObj.applyDynamic("apply")("type" -> "IF", "condition" -> r(cond), "true" -> r(ifTrue), "false" -> r(ifFalse))
+        case REF(key) => jObj.applyDynamic("apply")("type" -> "REF", "key"    -> key)
+        case TRUE     => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> true)
+        case FALSE    => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> false)
+        case FUNCTION_CALL(function, args) =>
+          jObj.applyDynamic("apply")("type" -> "CALL", "name" -> (function match {
+            case Native(name) => name.toString()
+            case User(name)   => name
+          }), "args" -> args.map(r).toJSArray)
+      }
+    }
+
+    r(ast)
+  }
 
   @JSExportTopLevel("compile")
   def compile(input: String): js.Dynamic = {
@@ -53,6 +56,7 @@ object JsAPI {
       override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     })
 
+    //comment
     val cryptoContext = CryptoContext.build(Global)
 
     val compilerContext = Monoid.combineAll(Seq(PureContext.ctx, cryptoContext, wavesContext)).compilerContext
@@ -71,12 +75,11 @@ object JsAPI {
       .flatMap(ast => serialize(ast._1).map(x => (x, ast)))
       .fold(
         err => {
-          ???
-//          js.Dynamic.literal("error" -> err)
+          js.Dynamic.literal("error" -> err)
         }, {
-          case (result, ast) => ???
-          // js.Dynamic.literal("result" -> result)
-//            js.Dynamic.literal("result" -> Global.toBuffer(result), "ast" -> toJs(ast._1))
+          case (result, ast) =>
+            //js.Dynamic.literal("result" -> result)
+            js.Dynamic.literal("result" -> Global.toBuffer(result), "ast" -> toJs(ast._1))
         }
       )
   }

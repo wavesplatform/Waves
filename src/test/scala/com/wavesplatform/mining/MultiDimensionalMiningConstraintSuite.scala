@@ -6,7 +6,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.transaction.Transaction
+import com.wavesplatform.transaction.Transaction
 
 class MultiDimensionalMiningConstraintSuite
     extends FreeSpec

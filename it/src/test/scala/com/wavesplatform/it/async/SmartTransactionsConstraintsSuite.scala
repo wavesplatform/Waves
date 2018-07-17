@@ -9,11 +9,11 @@ import com.wavesplatform.mining.MiningConstraints.MaxScriptRunsInBlock
 import com.wavesplatform.state.EitherExt2
 import org.scalatest._
 import play.api.libs.json.{JsNumber, Json}
-import scorex.account.PrivateKeyAccount
-import scorex.api.http.assets.SignedSetScriptRequest
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.api.http.assets.SignedSetScriptRequest
 import com.wavesplatform.utils.Base58
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global

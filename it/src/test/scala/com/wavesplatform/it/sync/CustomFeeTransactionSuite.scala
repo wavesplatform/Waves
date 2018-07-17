@@ -8,9 +8,9 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.state.{EitherExt2, Sponsorship}
 import com.wavesplatform.utils.Base58
 import org.scalatest.CancelAfterFailure
-import scorex.account.PrivateKeyAccount
-import scorex.api.http.assets.SignedIssueV1Request
-import scorex.transaction.assets.IssueTransactionV1
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.api.http.assets.SignedIssueV1Request
+import com.wavesplatform.transaction.assets.IssueTransactionV1
 
 class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 

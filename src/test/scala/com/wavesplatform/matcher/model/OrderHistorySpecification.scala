@@ -6,9 +6,9 @@ import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderE
 import com.wavesplatform.state.{ByteStr, EitherExt2}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.account.PrivateKeyAccount
-import scorex.transaction.AssetAcc
-import scorex.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.transaction.AssetAcc
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
 import scala.collection.mutable
 
@@ -302,7 +302,7 @@ class OrderHistorySpecification
     oh.fetchAllOrderHistory(ord1.senderPublicKey.address).map(_._1) shouldBe
       Seq(ord5.idStr(), ord4.idStr(), ord2.idStr(), ord3.idStr(), ord1.idStr())
 
-    oh.fetchAllActiveOrderHistory(ord1.senderPublicKey.address).map(_._1) shouldBe
+    oh.fetchAllActiveOrderHistory(ord1.senderPublicKey.address, internal = false).map(_._1) shouldBe
       Seq(ord5.idStr(), ord4.idStr(), ord2.idStr())
   }
 

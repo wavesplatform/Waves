@@ -6,13 +6,13 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.account.PrivateKeyAccount
-import scorex.block.{Block, MicroBlock, SignerData}
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.transfer._
-import scorex.transaction.{GenesisTransaction, Transaction}
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.block.{Block, MicroBlock, SignerData}
+import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 
 class BlockchainUpdaterLiquidBlockTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
 

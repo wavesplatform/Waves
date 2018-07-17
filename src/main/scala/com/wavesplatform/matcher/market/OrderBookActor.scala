@@ -17,12 +17,12 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
-import scorex.transaction.assets.exchange._
-import scorex.utils.{NTP, ScorexLogging}
-import scorex.wallet.Wallet
-import scorex.account.PublicKeyAccount
+import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
+import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.utils.{NTP, ScorexLogging}
 
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global

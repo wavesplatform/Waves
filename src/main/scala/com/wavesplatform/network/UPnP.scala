@@ -3,8 +3,8 @@ package com.wavesplatform.network
 import java.net.InetAddress
 
 import com.wavesplatform.settings.UPnPSettings
+import com.wavesplatform.utils.ScorexLogging
 import org.bitlet.weupnp.{GatewayDevice, GatewayDiscover}
-import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 import scala.util.Try

@@ -1,8 +1,8 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.state.ByteStr
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.ValidationError.GenericError
 
 class InMemoryInvalidBlockStorage extends InvalidBlockStorage {
 

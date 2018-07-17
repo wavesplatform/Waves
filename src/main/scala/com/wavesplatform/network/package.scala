@@ -5,6 +5,7 @@ import java.util.concurrent.Callable
 
 import cats.Eq
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
 import io.netty.channel.local.LocalAddress
 import io.netty.channel.socket.nio.NioSocketChannel
@@ -14,9 +15,8 @@ import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
 import monix.eval.Coeval
 import monix.execution.Scheduler
 import monix.reactive.Observable
-import scorex.block.Block
-import scorex.transaction.Transaction
-import scorex.utils.ScorexLogging
+import com.wavesplatform.block.Block
+import com.wavesplatform.transaction.Transaction
 
 import scala.concurrent.duration._
 

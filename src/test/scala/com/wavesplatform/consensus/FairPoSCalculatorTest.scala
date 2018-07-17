@@ -3,7 +3,7 @@ package com.wavesplatform.consensus
 import cats.data.NonEmptyList
 import cats.implicits._
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.PrivateKeyAccount
+import com.wavesplatform.account.PrivateKeyAccount
 
 import scala.util.Random
 

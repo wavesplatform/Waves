@@ -7,11 +7,11 @@ import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderCanceled,
 import com.wavesplatform.matcher.model.LimitOrder.{Filled, OrderStatus}
 import com.wavesplatform.matcher.model.OrderHistory.OrderHistoryOrdering
 import com.wavesplatform.state._
+import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 import play.api.libs.json.Json
-import scorex.transaction.{AssetAcc, AssetId}
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.utils.ScorexLogging
+import com.wavesplatform.transaction.{AssetAcc, AssetId}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 trait OrderHistory {
   def orderAccepted(event: OrderAdded): Unit
@@ -34,9 +34,9 @@ trait OrderHistory {
 
   def activeOrderIdsByAddress(address: String): Set[(Option[AssetId], String)]
 
-  def fetchOrderHistoryByPair(assetPair: AssetPair, address: String): Seq[(String, OrderInfo, Option[Order])]
+  def fetchOrderHistoryByPair(assetPair: AssetPair, address: String, internal: Boolean): Seq[(String, OrderInfo, Option[Order])]
 
-  def fetchAllActiveOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])]
+  def fetchAllActiveOrderHistory(address: String, internal: Boolean): Seq[(String, OrderInfo, Option[Order])]
 
   def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])]
 
@@ -170,7 +170,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     get(makeKey(OrdersInfoPrefix, id)).map(Json.parse).flatMap(_.validate[OrderInfo].asOpt).getOrElse(OrderInfo.empty)
 
   override def order(id: String): Option[Order] = {
-    import scorex.transaction.assets.exchange.OrderJson.orderFormat
+    import com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
     get(makeKey(OrdersPrefix, id)).map(b => new String(b, Charset)).map(Json.parse).flatMap(_.validate[Order].asOpt)
   }
 
@@ -213,22 +213,32 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     }
   }
 
-  override def fetchOrderHistoryByPair(assetPair: AssetPair, address: String): Seq[(String, OrderInfo, Option[Order])] = {
-    allOrderIdsByAddress(address).toSeq
+  override def fetchOrderHistoryByPair(assetPair: AssetPair, address: String, internal: Boolean): Seq[(String, OrderInfo, Option[Order])] = {
+    val orders = allOrderIdsByAddress(address).toSeq
       .map(id => (id, orderInfo(id), order(id)))
       .filter(_._3.exists(_.assetPair == assetPair))
-      .sorted(OrderHistoryOrdering)
-      .take(settings.maxOrdersPerRequest)
+    if (internal) {
+      orders
+    } else {
+      orders
+        .sorted(OrderHistoryOrdering)
+        .take(settings.maxOrdersPerRequest)
+    }
   }
 
-  override def fetchAllActiveOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])] = {
+  override def fetchAllActiveOrderHistory(address: String, internal: Boolean): Seq[(String, OrderInfo, Option[Order])] = {
     import OrderInfo.orderStatusOrdering
-    activeOrderIdsByAddress(address).toSeq
-      .map(o => (o._2, orderInfo(o._2)))
-      .sortBy(_._2.status)
-      .take(settings.maxOrdersPerRequest)
-      .map(p => (p._1, p._2, order(p._1)))
-      .sorted(OrderHistoryOrdering)
+    val orders = activeOrderIdsByAddress(address).toSeq
+    if (internal) {
+      orders.map { case (_, id) => (id, orderInfo(id), order(id)) }
+    } else {
+      orders
+        .map(o => (o._2, orderInfo(o._2)))
+        .sortBy(_._2.status)
+        .take(settings.maxOrdersPerRequest)
+        .map(p => (p._1, p._2, order(p._1)))
+        .sorted(OrderHistoryOrdering)
+    }
   }
 
   override def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])] = {

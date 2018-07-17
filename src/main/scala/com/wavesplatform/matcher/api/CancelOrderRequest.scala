@@ -6,9 +6,9 @@ import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json.{JsObject, JsPath, Json, Reads}
-import scorex.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.utils.Base58
-import scorex.transaction.assets.exchange.OrderJson._
+import com.wavesplatform.transaction.assets.exchange.OrderJson._
 
 case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
                               @ApiModelProperty(dataType = "java.lang.String") orderIdStr: Option[String],

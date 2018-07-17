@@ -10,7 +10,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{Format, JsObject, JsValue, Json}
-import scorex.api.http.{ApiKeyNotValid, PeersApiRoute}
+import com.wavesplatform.api.http.{ApiKeyNotValid, PeersApiRoute}
 
 class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with PropertyChecks with MockFactory {
 

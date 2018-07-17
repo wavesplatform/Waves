@@ -1,7 +1,7 @@
 package com.wavesplatform.db
 
+import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DBFactory
-import scorex.utils.ScorexLogging
 
 object LevelDBFactory extends ScorexLogging {
   private val nativeFactory = "org.fusesource.leveldbjni.JniDBFactory"

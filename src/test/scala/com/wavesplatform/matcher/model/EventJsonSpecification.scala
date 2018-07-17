@@ -10,7 +10,7 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json.Json
-import scorex.transaction.assets.exchange.AssetPair
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 
 import scala.collection.immutable.TreeMap
 

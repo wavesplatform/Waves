@@ -11,8 +11,8 @@ import monix.eval.{Coeval, Task}
 import monix.execution.CancelableFuture
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
-import scorex.block.Block.BlockId
-import scorex.block.MicroBlock
+import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.MicroBlock
 
 import scala.collection.mutable.{Set => MSet}
 import scala.concurrent.duration.FiniteDuration

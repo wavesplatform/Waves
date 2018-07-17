@@ -3,11 +3,11 @@ import cats.Show
 import com.wavesplatform.crypto
 import com.wavesplatform.generator.utils.Gen
 import com.wavesplatform.state._
-import scorex.account.PrivateKeyAccount
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.smart.script.Script
-import scorex.transaction.transfer.TransferTransactionV2
-import scorex.transaction.{Proofs, Transaction}
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.{Proofs, Transaction}
 import com.wavesplatform.it.util._
 import scala.util.Random
 

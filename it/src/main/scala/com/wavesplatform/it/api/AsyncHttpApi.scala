@@ -4,12 +4,21 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeoutException
 
+import com.wavesplatform.api.http.PeersApiRoute.{ConnectReq, connectFormat}
+import com.wavesplatform.api.http.alias.CreateAliasV1Request
+import com.wavesplatform.api.http.assets._
+import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
+import com.wavesplatform.api.http.{AddressApiRoute, DataRequest}
 import com.wavesplatform.features.api.ActivationStatus
-import com.wavesplatform.http.api_key
+import com.wavesplatform.http.DebugApiRoute._
+import com.wavesplatform.http.DebugMessage._
+import com.wavesplatform.http.{DebugMessage, RollbackParams, api_key}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{DataEntry, Portfolio}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
+import com.wavesplatform.transaction.transfer._
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
@@ -17,16 +26,6 @@ import org.scalactic.source.Position
 import org.scalatest.{Assertions, Matchers}
 import play.api.libs.json.Json.{stringify, toJson}
 import play.api.libs.json._
-import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
-import scorex.api.http.alias.CreateAliasV1Request
-import scorex.api.http.assets._
-import scorex.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
-import scorex.api.http.{AddressApiRoute, DataRequest}
-import scorex.transaction.transfer.MassTransferTransaction.Transfer
-import scorex.transaction.transfer._
-import scorex.waves.http.DebugApiRoute._
-import scorex.waves.http.DebugMessage._
-import scorex.waves.http.{DebugMessage, RollbackParams}
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -143,6 +142,8 @@ object AsyncHttpApi extends Assertions {
     def activationStatus: Future[ActivationStatus] = get("/activation/status").as[ActivationStatus]
 
     def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
+
+    def getAddresses: Future[Seq[String]] = get(s"/addresses").as[Seq[String]]
 
     def scriptInfo(address: String): Future[AddressApiRoute.AddressScriptInfo] =
       get(s"/addresses/scriptInfo/$address").as[AddressApiRoute.AddressScriptInfo]

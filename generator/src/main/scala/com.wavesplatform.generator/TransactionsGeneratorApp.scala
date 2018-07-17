@@ -13,8 +13,8 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
 import org.slf4j.LoggerFactory
 import scopt.OptionParser
-import scorex.account.AddressScheme
-import scorex.utils.LoggerFacade
+import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.utils.LoggerFacade
 
 import scala.concurrent._
 import scala.concurrent.duration._

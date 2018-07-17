@@ -17,13 +17,13 @@ import kamon.metric.instrument
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
-import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
-import scorex.block.Block._
-import scorex.block.{Block, MicroBlock}
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.transaction._
-import scorex.utils.{ScorexLogging, Time}
-import scorex.wallet.Wallet
+import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.block.Block._
+import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.transaction._
+import com.wavesplatform.wallet.Wallet
 
 import scala.collection.mutable.{Map => MMap}
 import scala.concurrent.Await
