@@ -40,7 +40,7 @@ object TransferTransactionDiff {
                 .collect {
                   case desc if desc.sponsorship > 0 =>
                     val feeInWaves = Sponsorship.toWaves(tx.fee, desc.sponsorship)
-                    Map(desc.issuer.toAddress -> Portfolio(-feeInWaves, LeaseBalance.empty, Map(aid -> tx.fee)))
+                    Map(desc.issuer.toAddress -> Portfolio(-feeInWaves, LeaseBalance.empty, Map(aid -> tx.fee), hidden = true))
                 }
                 .getOrElse(Map.empty)
               senderPf.combine(sponsorPf)
