@@ -260,3 +260,8 @@ lazy val generator = project
 lazy val benchmark = project
   .enablePlugins(JmhPlugin)
   .dependsOn(node % "compile->compile;test->test", langJVM % "compile->compile;test->test")
+
+lazy val dexgenerator = project
+  .enablePlugins(JmhPlugin)
+  .dependsOn(node % "compile->compile;test->test", langJVM % "compile->compile;test->test", it)
+  .settings(libraryDependencies += "com.github.scopt" %% "scopt" % "3.6.0")
