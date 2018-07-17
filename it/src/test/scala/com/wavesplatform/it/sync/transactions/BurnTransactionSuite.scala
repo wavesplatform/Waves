@@ -21,7 +21,6 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       val details1 = notMiner.assetsDetails(issuedAssetId)
       assert(!details1.reissuable)
       assert(details1.quantity == issueAmount)
-      assert(details1.extraFee == 0)
       assert(details1.minSponsoredAssetFee.isEmpty)
 
       // burn half of the coins and check balance
@@ -45,7 +44,6 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       val details3 = notMiner.assetsDetails(issuedAssetId)
       assert(!details3.reissuable)
       assert(details3.quantity == 0)
-      assert(details1.extraFee == 0)
       assert(details1.minSponsoredAssetFee.isEmpty)
 
       val assetOptRest = notMiner.assetsBalance(firstAddress).balances.find(_.assetId == issuedAssetId)
@@ -77,7 +75,6 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       val details = notMiner.assetsDetails(issuedAssetId)
       assert(!details.reissuable)
       assert(details.quantity == issuedQuantity - transferredQuantity)
-      assert(details.extraFee == 0)
       assert(details.minSponsoredAssetFee.isEmpty)
 
       assertBadRequestAndMessage(sender.transfer(secondAddress, firstAddress, transferredQuantity / 2, minFee, issuedAssetId.some).id,
@@ -142,7 +139,6 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       val details = notMiner.assetsDetails(issuedAssetId)
       assert(details.reissuable)
       assert(details.quantity == transferredQuantity)
-      assert(details.extraFee == 0)
       assert(details.minSponsoredAssetFee.isEmpty)
 
       val reissueId = sender.reissue(firstAddress, issuedAssetId, issuedQuantity, false, issueFee).id
@@ -151,7 +147,6 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       val details1 = notMiner.assetsDetails(issuedAssetId)
       assert(!details1.reissuable)
       assert(details1.quantity == transferredQuantity + issuedQuantity)
-      assert(details1.extraFee == 0)
       assert(details1.minSponsoredAssetFee.isEmpty)
 
       val burn1 = sender.burn(firstAddress, issuedAssetId, issuedQuantity, minFee, v).id
@@ -163,7 +158,6 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       val details2 = notMiner.assetsDetails(issuedAssetId)
       assert(!details2.reissuable)
       assert(details2.quantity == 0)
-      assert(details2.extraFee == 0)
       assert(details2.minSponsoredAssetFee.isEmpty)
 
       assertBadRequestAndMessage(sender.reissue(firstAddress, issuedAssetId, issuedQuantity, true, issueFee).id, "Asset is not reissuable")
