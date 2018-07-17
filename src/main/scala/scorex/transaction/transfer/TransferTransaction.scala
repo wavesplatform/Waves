@@ -12,7 +12,7 @@ import scorex.serialization.Deser
 import scorex.transaction._
 import scorex.transaction.validation._
 
-trait TransferTransaction extends ProvenTransaction {
+trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
   def assetId: Option[AssetId]
   def recipient: AddressOrAlias
   def amount: Long

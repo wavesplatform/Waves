@@ -14,7 +14,8 @@ case class GeneratorSettings(chainId: String,
                              mode: Mode.Value,
                              narrow: NarrowTransactionGenerator.Settings,
                              wide: WideTransactionGenerator.Settings,
-                             dynWide: DynamicWideTransactionGenerator.Settings) {
+                             dynWide: DynamicWideTransactionGenerator.Settings,
+                             multisig: MultisigTransactionGenerator.Settings) {
   val addressScheme: Char                        = chainId.head
   val privateKeyAccounts: Seq[PrivateKeyAccount] = accounts.map(s => PrivateKeyAccount.fromSeed(s).explicitGet())
 }
@@ -27,6 +28,7 @@ object GeneratorSettings {
       case Mode.NARROW   => show"$narrow"
       case Mode.WIDE     => show"$wide"
       case Mode.DYN_WIDE => show"$dynWide"
+      case Mode.MULTISIG => show"$multisig"
     }).toString
 
     s"""network byte: $chainId

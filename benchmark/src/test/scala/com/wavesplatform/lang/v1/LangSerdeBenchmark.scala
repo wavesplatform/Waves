@@ -5,7 +5,6 @@ import java.util.concurrent.TimeUnit
 import com.wavesplatform.lang.v1.LangSerdeBenchmark.St
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
-import scodec.bits.BitVector
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -16,10 +15,10 @@ import scodec.bits.BitVector
 class LangSerdeBenchmark {
 
   @Benchmark
-  def serialize_test(st: St, bh: Blackhole): Unit = bh.consume(Serde.codec.encode(st.expr).require)
+  def serialize_test(st: St, bh: Blackhole): Unit = bh.consume(Serde.serialize(st.expr))
 
   @Benchmark
-  def deserialize_test(st: St, bh: Blackhole): Unit = bh.consume(Serde.codec.decode(st.serilizedExpr).require.value)
+  def deserialize_test(st: St, bh: Blackhole): Unit = bh.consume(Serde.deserialize(st.serializedExpr).explicitGet())
 
 }
 
@@ -27,7 +26,7 @@ object LangSerdeBenchmark {
 
   @State(Scope.Benchmark)
   class St extends BigSum {
-    val serilizedExpr: BitVector = Serde.codec.encode(expr).require.compact
+    val serializedExpr: Array[Byte] = Serde.serialize(expr)
   }
 
 }

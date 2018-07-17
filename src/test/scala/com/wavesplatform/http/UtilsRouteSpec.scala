@@ -2,19 +2,19 @@ package com.wavesplatform.http
 
 import com.wavesplatform.crypto
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.utils.Base58
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue}
 import scorex.api.http.{TooBigArrayAllocation, UtilsApiRoute}
-import com.wavesplatform.utils.Base58
 import scorex.transaction.smart.script.Script
 import scorex.transaction.smart.script.v1.ScriptV1
 import scorex.utils.Time
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks {
   private val route = UtilsApiRoute(
@@ -26,7 +26,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   ).route
 
   val script = FUNCTION_CALL(
-    function = FunctionHeader.Native(EQ),
+    function = PureContext.eq.header,
     args = List(CONST_LONG(1), CONST_LONG(2))
   )
 
