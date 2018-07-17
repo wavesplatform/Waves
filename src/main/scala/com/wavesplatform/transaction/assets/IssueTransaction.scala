@@ -34,7 +34,6 @@ trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
       "reissuable"  -> reissuable,
       "decimals"    -> decimals,
       "description" -> new String(description, StandardCharsets.UTF_8),
-      "script"      -> script.map(_.text)
     ))
 
   final protected val bytesBase: Coeval[Array[Byte]] = Coeval.evalOnce(

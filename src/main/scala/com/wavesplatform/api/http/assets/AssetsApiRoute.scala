@@ -3,7 +3,6 @@ package com.wavesplatform.api.http.assets
 import akka.http.scaladsl.server.Route
 import com.google.common.base.Charsets
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
@@ -283,10 +282,6 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           "decimals"       -> JsNumber(tx.decimals.toInt),
           "reissuable"     -> JsBoolean(description.reissuable),
           "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
-          "script"         -> Json.toJson(description.script.map(_.bytes().base58)),
-          "scriptText"     -> Json.toJson(description.script.map(_.text)),
-          "complexity"     -> JsNumber(complexity),
-          "extraFee"       -> JsNumber(if (description.script.isEmpty) 0 else CommonValidation.ScriptExtraFee),
           "minSponsoredAssetFee" -> (description.sponsorship match {
             case 0           => JsNull
             case sponsorship => JsNumber(sponsorship)
