@@ -1,20 +1,19 @@
 package com.wavesplatform.consensus
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.block.Block
+import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.database.LevelDBWriter
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{WavesSettings, _}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, ProduceError}
+import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
+import com.wavesplatform.utils.{Time, TimeImpl}
 import com.wavesplatform.{TransactionGen, WithDB}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.account.PrivateKeyAccount
-import scorex.block.Block
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{BlockchainUpdater, GenesisTransaction}
-import scorex.utils.{Time, TimeImpl}
 
 import scala.concurrent.duration._
 import scala.util.Random

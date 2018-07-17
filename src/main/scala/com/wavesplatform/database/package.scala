@@ -7,8 +7,8 @@ import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.state._
-import scorex.transaction.smart.script.{Script, ScriptReader}
-import scorex.transaction.{Transaction, TransactionParsers}
+import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
+import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 
 package object database {
   implicit class ByteArrayDataOutputExt(val output: ByteArrayDataOutput) extends AnyVal {

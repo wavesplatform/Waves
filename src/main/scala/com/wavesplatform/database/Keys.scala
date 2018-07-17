@@ -5,10 +5,10 @@ import java.nio.ByteBuffer
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.state._
-import scorex.account.{Address, Alias}
-import scorex.block.{Block, BlockHeader}
-import scorex.transaction.Transaction
-import scorex.transaction.smart.script.{Script, ScriptReader}
+import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 
 object Keys {
   private def h(prefix: Short, height: Int): Array[Byte] =

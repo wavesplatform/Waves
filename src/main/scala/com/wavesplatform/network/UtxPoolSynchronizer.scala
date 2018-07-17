@@ -9,7 +9,7 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.{ChannelGroup, ChannelMatcher}
 import monix.execution.{CancelableFuture, Scheduler}
-import scorex.transaction.Transaction
+import com.wavesplatform.transaction.Transaction
 
 object UtxPoolSynchronizer {
   def start(utx: UtxPool,

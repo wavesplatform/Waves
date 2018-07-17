@@ -6,9 +6,9 @@ import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderE
 import com.wavesplatform.state.{ByteStr, EitherExt2}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.account.PrivateKeyAccount
-import scorex.transaction.AssetAcc
-import scorex.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.transaction.AssetAcc
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
 import scala.collection.mutable
 

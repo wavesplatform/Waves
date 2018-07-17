@@ -5,10 +5,10 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.{Blockchain, ByteStr, _}
-import scorex.block.Block
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.GenericError
+import com.wavesplatform.block.Block
+import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.ValidationError.GenericError
 
 import scala.concurrent.duration.FiniteDuration
 

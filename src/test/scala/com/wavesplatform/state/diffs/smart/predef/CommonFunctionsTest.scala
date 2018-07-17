@@ -6,9 +6,9 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Assertions, Matchers, PropSpec}
 import scodec.bits.ByteVector
-import scorex.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias}
 import org.scalacheck.Gen
-import scorex.transaction.{DataTransaction, Proofs}
+import com.wavesplatform.transaction.{DataTransaction, Proofs}
 
 class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 

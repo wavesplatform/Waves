@@ -7,11 +7,11 @@ import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderCanceled,
 import com.wavesplatform.matcher.model.LimitOrder.{Filled, OrderStatus}
 import com.wavesplatform.matcher.model.OrderHistory.OrderHistoryOrdering
 import com.wavesplatform.state._
+import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 import play.api.libs.json.Json
-import scorex.transaction.{AssetAcc, AssetId}
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.utils.ScorexLogging
+import com.wavesplatform.transaction.{AssetAcc, AssetId}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 trait OrderHistory {
   def orderAccepted(event: OrderAdded): Unit
@@ -170,7 +170,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     get(makeKey(OrdersInfoPrefix, id)).map(Json.parse).flatMap(_.validate[OrderInfo].asOpt).getOrElse(OrderInfo.empty)
 
   override def order(id: String): Option[Order] = {
-    import scorex.transaction.assets.exchange.OrderJson.orderFormat
+    import com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
     get(makeKey(OrdersPrefix, id)).map(b => new String(b, Charset)).map(Json.parse).flatMap(_.validate[Order].asOpt)
   }
 

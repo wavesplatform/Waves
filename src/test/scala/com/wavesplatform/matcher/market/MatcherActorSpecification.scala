@@ -12,19 +12,18 @@ import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResp
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.LevelAgg
-import com.wavesplatform.settings.WalletSettings
+import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, LeaseBalance, Portfolio}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.AssetId
-import scorex.transaction.assets.IssueTransactionV1
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.utils.{NTP, ScorexLogging}
-import scorex.wallet.Wallet
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.utils.{NTP, ScorexLogging}
+import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.wallet.Wallet
 
 import scala.concurrent.duration.DurationInt
 

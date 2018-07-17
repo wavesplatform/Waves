@@ -8,13 +8,12 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.state._
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json._
-import scorex.account.{PublicKeyAccount}
-import scorex.api.http.assets.SignedTransferV1Request
-import com.wavesplatform.utils.Base58
-import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.api.http.assets.SignedTransferV1Request
+import com.wavesplatform.utils.{Base58, NTP}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.it.sync._
-import scorex.transaction.transfer.MassTransferTransaction.Transfer
-import scorex.utils.NTP
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 
 import scala.util.Random
 

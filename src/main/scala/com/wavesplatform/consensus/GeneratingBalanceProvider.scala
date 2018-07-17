@@ -3,8 +3,8 @@ package com.wavesplatform.consensus
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
-import scorex.account.Address
-import scorex.block.Block
+import com.wavesplatform.account.Address
+import com.wavesplatform.block.Block
 
 object GeneratingBalanceProvider {
   private val MinimalEffectiveBalanceForGenerator1: Long = 1000000000000L

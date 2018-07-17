@@ -7,17 +7,16 @@ import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.account.{Address, PrivateKeyAccount}
-import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.ValidationError.AliasDoesNotExist
-import scorex.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
-import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.transfer._
-import scorex.transaction.{CreateAliasTransactionV1, DataTransaction, GenesisTransaction}
+import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.ValidationError.AliasDoesNotExist
+import com.wavesplatform.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{CreateAliasTransactionV1, DataTransaction, GenesisTransaction}
 import com.wavesplatform.features._
-import scorex.settings.TestFunctionalitySettings
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.history
 
 class RollbackSpec extends FreeSpec with Matchers with WithState with TransactionGen with PropertyChecks with NoShrink {
@@ -34,7 +33,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
     TransferTransactionV1.selfSigned(None, sender, recipient, amount, nextTs, None, 1, Array.empty[Byte]).explicitGet()
 
   private def randomOp(sender: PrivateKeyAccount, recipient: Address, amount: Long, op: Int) = {
-    import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
+    import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
     op match {
       case 1 =>
         val lease = LeaseTransactionV1.selfSigned(sender, amount, 100000, nextTs, recipient).explicitGet()

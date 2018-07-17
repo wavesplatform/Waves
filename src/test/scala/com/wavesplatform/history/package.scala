@@ -1,16 +1,15 @@
 package com.wavesplatform
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.settings.{BlockchainSettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state._
-import scorex.account.PrivateKeyAccount
-import scorex.block.{Block, MicroBlock}
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.crypto.signatures.Curve25519.KeyLength
-import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.Transaction
+import com.wavesplatform.transaction.Transaction
+import scorex.crypto.signatures.Curve25519._
 
 package object history {
   val MaxTransactionsPerBlockDiff = 10

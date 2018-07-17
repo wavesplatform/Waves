@@ -3,14 +3,14 @@ package com.wavesplatform.state.reader
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.state._
-import scorex.account.{Address, Alias}
-import scorex.block.{Block, BlockHeader}
-import scorex.transaction.Transaction.Type
-import scorex.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled}
-import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.smart.script.Script
-import scorex.transaction.{AssetId, Transaction, ValidationError}
+import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.transaction.Transaction.Type
+import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled}
+import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.{AssetId, Transaction, ValidationError}
 
 class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends Blockchain {
 

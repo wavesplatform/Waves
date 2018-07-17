@@ -5,9 +5,9 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, EitherExt2}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.account.{Address, PrivateKeyAccount}
-import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.transfer.TransferTransactionV1
+import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.transfer.TransferTransactionV1
 
 class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with TransactionGen {
   "scriptRunNumber" - {

@@ -1,8 +1,8 @@
 package com.wavesplatform
 
-import scorex.account.PrivateKeyAccount
+import com.wavesplatform.account.PrivateKeyAccount
 import scorex.crypto.hash.{Blake2b256, Keccak256}
-import scorex.crypto.signatures._
+import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey, Signature}
 
 package object crypto {
   val SignatureLength: Int = Curve25519.SignatureLength

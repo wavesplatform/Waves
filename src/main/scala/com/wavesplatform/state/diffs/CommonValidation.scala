@@ -5,14 +5,14 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import scorex.account.Address
-import scorex.transaction.ValidationError._
-import scorex.transaction._
-import scorex.transaction.assets._
-import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.lease._
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.transfer._
+import com.wavesplatform.account.Address
+import com.wavesplatform.transaction.ValidationError._
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.transfer._
 
 import scala.concurrent.duration._
 import scala.util.{Left, Right}

@@ -7,12 +7,12 @@ import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.WithDB
+import com.wavesplatform.utils.{NTP, ScorexLogging}
 import com.wavesplatform.utx.UtxPool
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
-import scorex.transaction.assets.exchange.AssetPair
-import scorex.utils.{NTP, ScorexLogging}
-import scorex.wallet.Wallet
+import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.wallet.Wallet
 
 class OrderHistoryActorSpecification
     extends TestKit(ActorSystem("MatcherTest"))

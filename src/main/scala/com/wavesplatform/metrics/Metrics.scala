@@ -3,12 +3,12 @@ package com.wavesplatform.metrics
 import java.net.URI
 import java.util.concurrent.TimeUnit
 
+import com.wavesplatform.utils.{ScorexLogging, TimeImpl}
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.influxdb.dto.Point
 import org.influxdb.{InfluxDB, InfluxDBFactory}
-import scorex.utils.{ScorexLogging, TimeImpl}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration

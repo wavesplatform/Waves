@@ -11,11 +11,11 @@ import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.Writes
-import scorex.account.Address
-import scorex.api.http.assets.{AssetsApiRoute, TransferV1Request, TransferV2Request}
-import scorex.transaction.Transaction
-import scorex.transaction.transfer._
-import scorex.wallet.Wallet
+import com.wavesplatform.account.Address
+import com.wavesplatform.api.http.assets.{AssetsApiRoute, TransferV1Request, TransferV2Request}
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.wallet.Wallet
 
 class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMockFactory with Eventually {
 

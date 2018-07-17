@@ -4,12 +4,12 @@ import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.generator.utils.Implicits._
 import com.wavesplatform.state.ByteStr
-import scorex.account.{Address, PrivateKeyAccount}
-import scorex.crypto.signatures.Curve25519.KeyLength
-import scorex.transaction.smart.script.{Script, ScriptCompiler}
-import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import scorex.transaction.transfer._
-import scorex.transaction.{Proofs, Transaction}
+import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{Proofs, Transaction}
+import scorex.crypto.signatures.Curve25519._
 
 object Gen {
   private def random = ThreadLocalRandom.current

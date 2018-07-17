@@ -1,15 +1,15 @@
 package com.wavesplatform.state.patch
 
+import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.GenesisTransaction
-import scorex.transaction.lease.{LeaseCancelTransactionV1, LeaseTransaction}
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransaction}
 
 class CancelAllLeasesTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 

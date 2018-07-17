@@ -1,8 +1,8 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.state.{Diff, LeaseBalance, Portfolio}
-import scorex.transaction.ValidationError
-import scorex.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 
 import scala.util.Right
 

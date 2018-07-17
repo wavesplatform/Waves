@@ -1,26 +1,30 @@
 package com.wavesplatform
 
+import java.security.SecureRandom
+
 import cats.kernel.Monoid
 import com.google.common.base.Throwables
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.db.{Storage, VersionedStorage}
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.v1.{FunctionHeader, ScriptEstimator}
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.{FunctionHeader, ScriptEstimator}
+import com.wavesplatform.transaction.smart.{BlockchainContext, WavesEnvironment}
 import monix.eval.Coeval
 import monix.execution.UncaughtExceptionReporter
 import org.joda.time.Duration
 import org.joda.time.format.PeriodFormat
-import scorex.account.AddressScheme
-import scorex.transaction.smart.{BlockchainContext, WavesEnvironment}
-import scorex.utils.ScorexLogging
 
+import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.util.Try
+import scala.concurrent.duration._
+import scala.reflect.runtime.universe
+import scala.util.{Failure, Success, Try}
 
 package object utils extends ScorexLogging {
 
@@ -113,4 +117,31 @@ package object utils extends ScorexLogging {
         PureContext.compilerContext
       ))
 
+  @tailrec
+  final def untilTimeout[T](timeout: FiniteDuration, delay: FiniteDuration = 100.milliseconds, onFailure: => Unit = {})(fn: => T): T = {
+    Try {
+      fn
+    } match {
+      case Success(x) => x
+      case _ if timeout > delay =>
+        Thread.sleep(delay.toMillis)
+        untilTimeout(timeout - delay, delay, onFailure)(fn)
+      case Failure(e) =>
+        onFailure
+        throw e
+    }
+  }
+
+  def randomBytes(howMany: Int = 32): Array[Byte] = {
+    val r = new Array[Byte](howMany)
+    new SecureRandom().nextBytes(r) //overrides r
+    r
+  }
+
+  def objectFromString[T](fullClassName: String): Try[T] = Try {
+    val runtimeMirror = universe.runtimeMirror(getClass.getClassLoader)
+    val module        = runtimeMirror.staticModule(fullClassName)
+    val obj           = runtimeMirror.reflectModule(module)
+    obj.instance.asInstanceOf[T]
+  }
 }

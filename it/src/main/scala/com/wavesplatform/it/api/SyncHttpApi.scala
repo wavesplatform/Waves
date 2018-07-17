@@ -9,10 +9,10 @@ import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
 import play.api.libs.json.{Format, JsObject, Json, Writes}
-import scorex.api.http.AddressApiRoute
-import scorex.api.http.assets.SignedIssueV1Request
-import scorex.transaction.transfer.MassTransferTransaction.Transfer
-import scorex.waves.http.DebugMessage
+import com.wavesplatform.api.http.AddressApiRoute
+import com.wavesplatform.api.http.assets.SignedIssueV1Request
+import com.wavesplatform.http.DebugMessage
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}

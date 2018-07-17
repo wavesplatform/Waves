@@ -8,7 +8,7 @@ import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl}
-import scorex.utils.{ScorexLogging, TimeImpl}
+import com.wavesplatform.utils.{ScorexLogging, TimeImpl}
 
 trait WithState extends ScorexLogging {
   private def withState[A](fs: FunctionalitySettings)(f: Blockchain => A): A = {

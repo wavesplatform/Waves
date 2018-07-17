@@ -12,10 +12,10 @@ import com.wavesplatform.state._
 import com.wavesplatform.utils.Base58
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
 import play.api.libs.json.{JsSuccess, Json, Reads}
-import scorex.account.PrivateKeyAccount
-import scorex.block.{Block, SignerData}
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.waves.http.DebugMessage
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.block.{Block, SignerData}
+import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.http.DebugMessage
 
 import scala.util.Random
 

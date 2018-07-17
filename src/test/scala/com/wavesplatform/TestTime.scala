@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import scorex.utils.Time
+import com.wavesplatform.utils.Time
 
 import scala.concurrent.duration.FiniteDuration
 

@@ -1,8 +1,8 @@
 package com.wavesplatform.matcher.api
 
 import java.util.concurrent.Executors
-import javax.ws.rs.Path
 
+import javax.ws.rs.Path
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.{StatusCode, StatusCodes, Uri}
 import akka.http.scaladsl.server.{Directive1, Route}
@@ -18,13 +18,12 @@ import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json._
-import scorex.account.PublicKeyAccount
-import scorex.api.http._
-import com.wavesplatform.utils.Base58
-import scorex.transaction.assets.exchange.OrderJson._
-import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.utils.NTP
-import scorex.wallet.Wallet
+import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.api.http._
+import com.wavesplatform.utils.{Base58, NTP}
+import com.wavesplatform.transaction.assets.exchange.OrderJson._
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.wallet.Wallet
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -147,7 +146,7 @@ class MatcherApiRoute(wallet: Wallet,
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "scorex.transaction.assets.exchange.Order"
+        dataType = "com.wavesplatform.transaction.assets.exchange.Order"
       )
     ))
   def place: Route = path("orderbook") {
