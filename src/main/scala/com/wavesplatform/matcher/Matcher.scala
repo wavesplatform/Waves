@@ -7,7 +7,9 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
+import akka.pattern.gracefulStop
 import akka.stream.ActorMaterializer
+import akka.util.Timeout
 import com.wavesplatform.db._
 import com.wavesplatform.matcher.api.MatcherApiRoute
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderHistoryActor}
@@ -24,8 +26,6 @@ import scorex.wallet.Wallet
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
-import akka.pattern.ask
-import akka.util.Timeout
 
 class Matcher(actorSystem: ActorSystem,
               wallet: Wallet,
@@ -85,7 +85,7 @@ class Matcher(actorSystem: ActorSystem,
 
   def shutdownMatcher(): Unit = {
     implicit val timeout: Timeout = Timeout.durationToTimeout(5.minute)
-    Await.result(matcher ? MatcherActor.Shutdown, timeout.duration)
+    gracefulStop(matcher, 5.minute, MatcherActor.Shutdown)
     db.close()
     Await.result(matcherServerBinding.unbind(), 10.seconds)
   }
