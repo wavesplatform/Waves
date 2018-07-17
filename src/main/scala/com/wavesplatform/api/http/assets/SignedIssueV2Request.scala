@@ -2,13 +2,12 @@ package com.wavesplatform.api.http.assets
 
 import cats.implicits._
 import com.google.common.base.Charsets
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
-import play.api.libs.json.{Format, Json}
 import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.assets.IssueTransactionV2
-import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{Proofs, ValidationError}
+import io.swagger.annotations.{ApiModel, ApiModelProperty}
+import play.api.libs.json.{Format, Json}
 
 object SignedIssueV2Request {
   implicit val signedExchangeRequestFormat: Format[SignedIssueV2Request] = Json.format

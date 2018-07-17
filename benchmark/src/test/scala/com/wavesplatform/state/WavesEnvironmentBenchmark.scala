@@ -17,6 +17,7 @@ import org.openjdk.jmh.infra.Blackhole
 import scodec.bits.{BitVector, ByteVector}
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, Alias}
 import com.wavesplatform.transaction.smart.WavesEnvironment
+import com.wavesplatform.utils.Base58
 
 import scala.io.Codec
 

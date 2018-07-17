@@ -9,6 +9,7 @@ import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.state.EitherExt2
 import org.openjdk.jmh.annotations._
 import scodec.bits.ByteVector
+import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey, Signature}
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
