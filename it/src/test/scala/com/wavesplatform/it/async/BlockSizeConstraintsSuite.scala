@@ -34,7 +34,7 @@ class BlockSizeConstraintsSuite extends FreeSpec with Matchers with TransferSend
       val blockSizeInBytesAfter = blockHeaderAfter.blocksize
       blockSizeInBytesAfter should be <= maxSizeInBytesAfterActivation
     },
-    6.minutes
+    7.minutes
   )
 
 }

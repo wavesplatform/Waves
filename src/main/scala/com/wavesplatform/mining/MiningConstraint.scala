@@ -35,7 +35,7 @@ case class OneDimensionalMiningConstraint(rest: Long, estimator: TxEstimators.Fn
 }
 
 case class MultiDimensionalMiningConstraint(constraints: NonEmptyList[MiningConstraint]) extends MiningConstraint {
-  override def isEmpty: Boolean      = constraints.forall(_.isEmpty)
+  override def isEmpty: Boolean      = constraints.exists(_.isEmpty)
   override def isOverfilled: Boolean = constraints.exists(_.isOverfilled)
   override def put(blockchain: Blockchain, x: Transaction): MultiDimensionalMiningConstraint =
     MultiDimensionalMiningConstraint(constraints.map(_.put(blockchain, x)))
