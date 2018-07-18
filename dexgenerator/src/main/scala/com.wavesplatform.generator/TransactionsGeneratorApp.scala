@@ -131,7 +131,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
               sender = richAccountPk,
               transfers = assetsTransfers,
               timestamp = System.currentTimeMillis(),
-              feeAmount = 100000 + 50000 * assetsTransfers.size,
+              feeAmount = 200000 + 50000 * assetsTransfers.size,
               attachment = Array.emptyByteArray
             )
             .right

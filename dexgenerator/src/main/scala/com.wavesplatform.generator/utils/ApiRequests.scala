@@ -3,7 +3,6 @@ package com.wavesplatform.generator.utils
 import java.io.IOException
 import java.util.concurrent.TimeoutException
 
-import akka.http.scaladsl.model.headers.ContentDispositionTypes.attachment
 import com.google.common.primitives.Longs
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.{
@@ -11,6 +10,7 @@ import com.wavesplatform.it.api.{
   Balance,
   MatcherResponse,
   MatcherStatusResponse,
+  OrderBookResponse,
   OrderbookHistory,
   ResponseFutureExt,
   Transaction,
@@ -20,7 +20,6 @@ import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state.ByteStr
-
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
@@ -30,8 +29,8 @@ import scorex.account.PrivateKeyAccount
 import scorex.api.http.assets.{SignedIssueV1Request, SignedMassTransferRequest, SignedTransferV1Request}
 import scorex.crypto.encode.Base58
 import scorex.transaction.AssetId
-import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.IssueTransactionV1
+import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import scorex.transaction.transfer.{MassTransferTransaction, TransferTransactionV1}
 import scorex.utils.ScorexLogging
@@ -54,10 +53,10 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
           new AsyncCompletionHandler[Response] {
             override def onCompleted(response: Response): Response = {
               if (response.getStatusCode == statusCode) {
-                log.info(s"[$tag] Request: ${r.getUrl}\nResponse: ${response.getResponseBody}")
+                //  log.info(s"[$tag] Request: ${r.getUrl}\nResponse: ${response.getResponseBody}")
                 response
               } else {
-                log.info(s"[$tag] Request: ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
+                //      log.info(s"[$tag] Request: ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
                 throw UnexpectedStatusCodeException(r.getUrl, response.getStatusCode, response.getResponseBody)
               }
             }
@@ -137,6 +136,10 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
     def matcherPost[A: Writes](path: String, body: A)(implicit tag: String): Future[Response] =
       post(s"$endpoint$path", (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
 
+    def matcherGet(path: String, f: RequestBuilder => RequestBuilder = identity, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200)(
+        implicit tag: String): Future[Response] =
+      retrying(f(_get(s"${endpoint}$path")).build(), statusCode = statusCode)
+
     def placeOrder(order: Order)(implicit tag: String): Future[MatcherResponse] =
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
 
@@ -168,6 +171,29 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
           .setHeader("Signature", signature)
           .build()
       }.as[Seq[OrderbookHistory]]
+
+    def parseAssetPair(assetPair: AssetPair) = {
+      val amountAsset = assetPair.amountAsset match {
+        case None => "WAVES"
+        case _    => assetPair.amountAsset.get
+      }
+      val priceAsset = assetPair.priceAsset match {
+        case None => "WAVES"
+        case _    => assetPair.priceAsset.get
+      }
+      (amountAsset, priceAsset)
+    }
+
+    def orderBook(assetPair: AssetPair)(implicit tag: String): Future[OrderBookResponse] = {
+      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
+      matcherGet(s"/matcher/orderbook/${amountAsset}/${priceAsset}").as[OrderBookResponse]
+    }
+
+    def orderStatus(orderId: String, assetPair: AssetPair)(implicit tag: String): Future[MatcherStatusResponse] = {
+      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
+      matcherGet(s"/matcher/orderbook/${amountAsset}/${priceAsset}/$orderId")
+        .as[MatcherStatusResponse]
+    }
 
     //    def getOrderbookByPublicKey(publicKey: String, timestamp: Long, signature: ByteStr): Future[Seq[OrderbookHistory]] =
     //      matcherGetWithSignature(s"/matcher/orderbook/$publicKey", timestamp, signature).as[Seq[OrderbookHistory]]

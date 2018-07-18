@@ -55,21 +55,32 @@ class Worker(workerSettings: Settings,
   private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(Random.nextInt(c.size))) else None
 
   def buyOrder(price: Long, amount: Long, buyer: PrivateKeyAccount, pair: AssetPair)(implicit tag: String): (Order, Future[MatcherResponse]) = {
+    to(matcherSettings.endpoint).orderHistory(buyer)
+    to(matcherSettings.endpoint).orderBook(pair)
     val order = Order.buy(buyer, matcherPublicKey, pair, price, amount, now, now + 1.day.toMillis, fee)
     log.info(s"[$tag] Buy ${order.idStr()}: $order")
     val response = to(matcherSettings.endpoint).placeOrder(order).andThen {
       case Failure(e) => log.error(s"[$tag] Can't place buy order ${order.idStr()}: $e")
     }
     log.info(order.idStr())
+    to(matcherSettings.endpoint).orderHistory(buyer)
+    to(matcherSettings.endpoint).orderBook(pair)
+    to(matcherSettings.endpoint).orderStatus(order.idStr.apply(), pair)
+
     (order, response)
   }
 
   def sellOrder(price: Long, amount: Long, seller: PrivateKeyAccount, pair: AssetPair)(implicit tag: String): (Order, Future[MatcherResponse]) = {
+    to(matcherSettings.endpoint).orderHistory(seller)
+    to(matcherSettings.endpoint).orderBook(pair)
     val order = Order.sell(seller, matcherPublicKey, pair, price, amount, now, now + 1.day.toMillis, fee)
     log.info(s"[$tag] Sell ${order.idStr()}: $order")
     val response = to(matcherSettings.endpoint).placeOrder(order).andThen {
       case Failure(e) => log.error(s"[$tag] Can't place sell order ${order.idStr()}: $e")
     }
+    to(matcherSettings.endpoint).orderHistory(seller)
+    to(matcherSettings.endpoint).orderBook(pair)
+    to(matcherSettings.endpoint).orderStatus(order.idStr.apply(), pair)
     (order, response)
   }
 
@@ -139,7 +150,7 @@ class Worker(workerSettings: Settings,
       case GenOrderType.ActiveBuy =>
         val buyer = randomFrom(validAccounts).get
         val pair  = AssetPair(randomFrom(tradingAssets.dropRight(2)), None)
-        buyOrder(DefaultPrice / Random.nextInt(2, 100), DefaultAmount, buyer, pair)._2
+        buyOrder(DefaultPrice / Random.nextInt(2, 10), DefaultAmount, buyer, pair)._2
 
       case GenOrderType.ActiveSell =>
         val seller = randomFrom(validAccounts).get
@@ -243,8 +254,8 @@ class Worker(workerSettings: Settings,
 
 object Worker {
 
-  private val DefaultAmount = 10000
-  private val DefaultPrice  = 10000
+  private val DefaultAmount = 100000
+  private val DefaultPrice  = 1000000
 
   case class Settings(autoReconnect: Boolean, iterations: Int, delay: FiniteDuration, reconnectDelay: FiniteDuration)
 
