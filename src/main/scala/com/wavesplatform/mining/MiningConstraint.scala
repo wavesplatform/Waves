@@ -19,14 +19,23 @@ object MiningConstraint {
 }
 
 case class OneDimensionalMiningConstraint(rest: Long, estimator: TxEstimators.Fn) extends MiningConstraint {
-  override def isEmpty: Boolean                                                            = rest <= 0
-  override def isOverfilled: Boolean                                                       = rest < 0
+  override def isEmpty: Boolean = {
+    println(s"Is $estimator empty ($rest < ${estimator.minEstimate})?")
+    rest < estimator.minEstimate
+  }
+  override def isOverfilled: Boolean = {
+    println(s"Is $estimator overfilled ($rest)?")
+    rest < 0
+  }
   override def put(blockchain: Blockchain, x: Transaction): OneDimensionalMiningConstraint = put(estimator(blockchain, x))
-  private def put(x: Long): OneDimensionalMiningConstraint                                 = copy(rest = this.rest - x)
+  private def put(x: Long): OneDimensionalMiningConstraint = {
+    println(s"$estimator estimate $x of $rest")
+    copy(rest = this.rest - x)
+  }
 }
 
 case class MultiDimensionalMiningConstraint(constraints: NonEmptyList[MiningConstraint]) extends MiningConstraint {
-  override def isEmpty: Boolean      = constraints.exists(_.isEmpty)
+  override def isEmpty: Boolean      = constraints.forall(_.isEmpty)
   override def isOverfilled: Boolean = constraints.exists(_.isOverfilled)
   override def put(blockchain: Blockchain, x: Transaction): MultiDimensionalMiningConstraint =
     MultiDimensionalMiningConstraint(constraints.map(_.put(blockchain, x)))

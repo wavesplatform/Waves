@@ -8,6 +8,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.mining.MiningConstraints.MaxScriptRunsInBlock
 import com.wavesplatform.state.EitherExt2
 import org.scalatest._
+import org.scalatest.Matchers._
 import play.api.libs.json.{JsNumber, Json}
 import scorex.account.PrivateKeyAccount
 import scorex.api.http.assets.SignedSetScriptRequest
@@ -60,23 +61,30 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
     .withDefault(1)
     .build(false)
 
-  private def miner                  = nodes.head
-  private val smartAccountPrivateKey = PrivateKeyAccount.fromSeed(NodeConfigs.Default(1).getString("account-seed")).explicitGet()
+  private def miner                   = nodes.head
+  private val smartAccountPrivateKey  = PrivateKeyAccount.fromSeed(NodeConfigs.Default(1).getString("account-seed")).explicitGet()
+  private val simpleAccountPrivateKey = PrivateKeyAccount.fromSeed(NodeConfigs.Default(2).getString("account-seed")).explicitGet()
 
   s"Block is limited by size after activation" in result(
     for {
-      _                  <- miner.signedBroadcast(Json.toJsObject(toRequest(setScriptTx(smartAccountPrivateKey))) + ("type" -> JsNumber(13)))
-      _                  <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartAccountPrivateKey.address))
-      _                  <- miner.waitForHeight(4)
+      _ <- miner.signedBroadcast(Json.toJsObject(toRequest(setScriptTx(smartAccountPrivateKey))) + ("type" -> JsNumber(13)))
+      _ <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartAccountPrivateKey.address))
+      _ <- miner.waitForHeight(4)
+//      _                  <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartAccountPrivateKey.address))
+//      _                  <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, simpleAccountPrivateKey.address))
+      _                  <- miner.waitForHeight(7)
       blockWithSetScript <- miner.blockHeadersAt(2)
       restBlocks         <- miner.blockHeadersSeq(3, 4)
+      newBlock           <- miner.blockAt(5)
     } yield {
-      (1 to (1 + MaxScriptRunsInBlock)) should contain(blockWithSetScript.transactionCount)
+      println(restBlocks(0))
+      println(newBlock)
+      blockWithSetScript.transactionCount should (be <= (MaxScriptRunsInBlock + 1) and be >= 1)
       restBlocks.foreach { x =>
-        (1 to MaxScriptRunsInBlock) should contain(x.transactionCount)
+        x.transactionCount should (be >= 1 and be <= MaxScriptRunsInBlock)
       }
     },
-    6.minutes
+    12.minutes
   )
 
   private def setScriptTx(sender: PrivateKeyAccount) =
