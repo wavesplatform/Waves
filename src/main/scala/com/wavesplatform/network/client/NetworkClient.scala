@@ -6,12 +6,12 @@ import java.net.InetSocketAddress
 import com.wavesplatform.Version
 import com.wavesplatform.network.Handshake
 import com.wavesplatform.settings._
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel._
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
-import scorex.utils.ScorexLogging
 
 import scala.concurrent.{Future, Promise}
 

@@ -11,7 +11,7 @@ import com.wavesplatform.it.util._
 
 import scala.concurrent.duration._
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.util.Random
 

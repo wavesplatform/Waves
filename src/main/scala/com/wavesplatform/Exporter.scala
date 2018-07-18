@@ -5,14 +5,13 @@ import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils._
 import org.slf4j.bridge.SLF4JBridgeHandler
-import scorex.account.AddressScheme
-import scorex.utils.{NTP, ScorexLogging}
 
 import scala.util.{Failure, Success, Try}
 

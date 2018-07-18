@@ -28,9 +28,9 @@ import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.io.IOUtils
 import org.asynchttpclient.Dsl._
-import scorex.account.AddressScheme
-import scorex.block.Block
-import scorex.utils.ScorexLogging
+import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.block.Block
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global

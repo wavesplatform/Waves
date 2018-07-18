@@ -3,7 +3,7 @@ package com.wavesplatform.network
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.network.InvalidBlockStorageImpl._
 import com.wavesplatform.state.ByteStr
-import scorex.transaction.ValidationError
+import com.wavesplatform.transaction.ValidationError
 
 import scala.concurrent.duration.FiniteDuration
 

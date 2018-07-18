@@ -5,9 +5,9 @@ import java.net.InetSocketAddress
 import com.wavesplatform.crypto
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.block.{Block, MicroBlock}
-import scorex.transaction.{Signed, Transaction}
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.transaction.{Signed, Transaction}
 
 sealed trait Message
 

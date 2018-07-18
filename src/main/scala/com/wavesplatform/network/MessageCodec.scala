@@ -2,10 +2,10 @@ package com.wavesplatform.network
 
 import java.util
 
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.MessageToMessageCodec
-import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Success}
 

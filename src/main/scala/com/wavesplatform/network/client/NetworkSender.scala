@@ -6,10 +6,10 @@ import java.nio.channels.ClosedChannelException
 import java.util.concurrent.atomic.AtomicLong
 
 import com.wavesplatform.network.RawBytes
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
-import scorex.utils.ScorexLogging
 
 import scala.concurrent.{Future, Promise}
 

@@ -9,8 +9,8 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, Data
 import com.wavesplatform.utils.Base58
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
-import scorex.api.http.SignedDataRequest
-import scorex.transaction.DataTransaction
+import com.wavesplatform.api.http.SignedDataRequest
+import com.wavesplatform.transaction.DataTransaction
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Try}

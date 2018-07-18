@@ -14,13 +14,13 @@ import kamon.metric.instrument.{Time => KamonTime}
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
-import scorex.account.Address
-import scorex.consensus.TransactionsOrdering
-import scorex.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
-import scorex.transaction._
-import scorex.transaction.assets.ReissueTransaction
-import scorex.transaction.transfer._
-import scorex.utils.{ScorexLogging, Time}
+import com.wavesplatform.account.Address
+import com.wavesplatform.consensus.TransactionsOrdering
+import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets.ReissueTransaction
+import com.wavesplatform.transaction.transfer._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._

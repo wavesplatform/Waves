@@ -12,10 +12,10 @@ import com.wavesplatform.state.diffs.BlockDiffer
 import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations.{Setup, TearDown}
 import org.scalacheck.Gen
-import scorex.account.PrivateKeyAccount
-import scorex.block.Block
-import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.{GenesisTransaction, Transaction}
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.block.Block
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 
 trait BaseState extends TransactionGenBase {
   import BaseState._

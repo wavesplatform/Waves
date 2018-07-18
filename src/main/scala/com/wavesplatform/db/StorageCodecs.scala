@@ -4,7 +4,7 @@ import com.google.common.base.Charsets
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.state.{ByteStr, EitherExt2}
-import scorex.transaction.AssetId
+import com.wavesplatform.transaction.AssetId
 
 import scala.collection.generic.CanBuildFrom
 import scala.util.Try

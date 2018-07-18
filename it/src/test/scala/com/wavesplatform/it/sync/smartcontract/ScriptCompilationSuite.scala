@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import scorex.api.http.assets.{IssueV2Request, SetScriptRequest}
+import com.wavesplatform.api.http.assets.{IssueV2Request, SetScriptRequest}
 
 class ScriptCompilationSuite extends BaseTransactionSuite {
   test("Sign broadcast via rest") {

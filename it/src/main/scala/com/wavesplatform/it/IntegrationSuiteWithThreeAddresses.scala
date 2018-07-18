@@ -4,9 +4,9 @@ import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util._
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
-import scorex.account.PrivateKeyAccount
-import scorex.transaction.transfer._
-import scorex.utils.ScorexLogging
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.transaction.transfer._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse

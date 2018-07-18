@@ -9,9 +9,9 @@ import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.utils.Base58
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json._
-import scorex.account.AddressOrAlias
-import scorex.api.http.assets.SignedTransferV1Request
-import scorex.transaction.transfer._
+import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.api.http.assets.SignedTransferV1Request
+import com.wavesplatform.transaction.transfer._
 
 import scala.concurrent.duration._
 

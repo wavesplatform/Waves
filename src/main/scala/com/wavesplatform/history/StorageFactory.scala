@@ -3,9 +3,9 @@ package com.wavesplatform.history
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{BlockchainUpdaterImpl, NG}
+import com.wavesplatform.utils.Time
 import org.iq80.leveldb.DB
-import scorex.transaction.BlockchainUpdater
-import scorex.utils.Time
+import com.wavesplatform.transaction.BlockchainUpdater
 
 object StorageFactory {
   def apply(settings: WavesSettings, db: DB, time: Time): BlockchainUpdater with NG = {

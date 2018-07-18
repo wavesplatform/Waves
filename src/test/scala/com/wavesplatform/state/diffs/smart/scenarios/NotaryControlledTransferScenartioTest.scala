@@ -14,11 +14,11 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.AddressScheme
-import scorex.transaction.assets.IssueTransactionV2
-import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.transfer._
-import scorex.transaction.{DataTransaction, GenesisTransaction}
+import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
 
 class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions: Gen[

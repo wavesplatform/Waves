@@ -15,7 +15,7 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
-import com.wavesplatform.http.NodeApiRoute
+import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute, WavesApiRoute}
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
@@ -23,7 +23,7 @@ import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
 import com.wavesplatform.state.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.utils.{SystemInformationReporter, forceStopApplication}
+import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, Time, forceStopApplication}
 import com.wavesplatform.utx.{MatcherUtxPool, UtxPool, UtxPoolImpl}
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
@@ -36,16 +36,16 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
 import org.slf4j.bridge.SLF4JBridgeHandler
-import scorex.account.AddressScheme
-import scorex.api.http._
-import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
-import scorex.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
-import scorex.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
-import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
-import scorex.transaction._
-import scorex.utils.{NTP, ScorexLogging, Time}
-import scorex.wallet.Wallet
-import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
+import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
+import com.wavesplatform.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
+import com.wavesplatform.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
+import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
+import com.wavesplatform.transaction._
+import com.wavesplatform.utils.NTP
+import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.http.DebugApiRoute
 
 import scala.concurrent.Await
 import scala.concurrent.duration._

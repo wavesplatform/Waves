@@ -2,19 +2,18 @@ package com.wavesplatform.db
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.database.LevelDBWriter
-import com.wavesplatform.settings.{WavesSettings, loadConfig}
+import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.{BlockchainUpdaterImpl, _}
 import com.wavesplatform.{TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.account.PrivateKeyAccount
-import scorex.block.Block
-import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.smart.script.{Script, ScriptCompiler}
-import scorex.transaction.{BlockchainUpdater, GenesisTransaction}
-import scorex.utils.{Time, TimeImpl}
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.utils.{Time, TimeImpl}
+import com.wavesplatform.block.Block
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
+import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 
 class ScriptCacheTest extends FreeSpec with Matchers with WithDB with TransactionGen {
 
@@ -130,7 +129,9 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
   def withBlockchain(gen: Time => Gen[(Seq[PrivateKeyAccount], Seq[Block])])(f: (Seq[PrivateKeyAccount], BlockchainUpdater with NG) => Unit): Unit = {
     val time          = new TimeImpl
     val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub, CACHE_SIZE)
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, WavesSettings.fromConfig(loadConfig(ConfigFactory.load())), time)
+    val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
+    val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, time)
     try {
       val (accounts, blocks) = gen(time).sample.get
 

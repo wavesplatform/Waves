@@ -13,11 +13,11 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
-import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
-import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.smart.BlockchainContext
-import scorex.transaction.transfer._
-import scorex.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
+import com.wavesplatform.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.smart.BlockchainContext
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
 
 class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 

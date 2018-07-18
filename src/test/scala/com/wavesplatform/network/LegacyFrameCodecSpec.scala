@@ -10,7 +10,7 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.network.message.{MessageSpec, Message => ScorexMessage}
+import com.wavesplatform.network.message.{MessageSpec, Message => ScorexMessage}
 
 import scala.concurrent.duration.DurationInt
 

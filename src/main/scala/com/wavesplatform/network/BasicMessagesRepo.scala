@@ -6,13 +6,12 @@ import java.util
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.state.ByteStr
-import scorex.account.PublicKeyAccount
-import scorex.block.{Block, MicroBlock}
-import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
-import scorex.network.message.Message._
-import scorex.network.message._
-import scorex.transaction.{Transaction, TransactionParsers}
-
+import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.network.message.Message._
+import com.wavesplatform.network.message._
+import com.wavesplatform.transaction.{Transaction, TransactionParsers}
+import scorex.crypto.signatures.Curve25519._
 import scala.util.Try
 
 object GetPeersSpec extends MessageSpec[GetPeers.type] {

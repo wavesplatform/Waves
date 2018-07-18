@@ -8,8 +8,8 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.JsObject
-import scorex.api.http.BlockDoesNotExist
-import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
+import com.wavesplatform.api.http.BlockDoesNotExist
+import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 
 class ConsensusRouteSpec
     extends RouteSpec("/consensus")

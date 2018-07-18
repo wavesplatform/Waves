@@ -2,8 +2,8 @@ package com.wavesplatform.state
 
 import cats._
 import cats.kernel.instances.map._
-import scorex.block.Block.Fraction
-import scorex.transaction.AssetId
+import com.wavesplatform.block.Block.Fraction
+import com.wavesplatform.transaction.AssetId
 
 case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[ByteStr, Long]) {
   lazy val effectiveBalance: Long = safeSum(balance, lease.in) - lease.out

@@ -6,7 +6,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.Json
 import com.wavesplatform.it.sync._
-import scorex.transaction.lease.LeaseTransaction.Status.{Active, Canceled}
+import com.wavesplatform.transaction.lease.LeaseTransaction.Status.{Active, Canceled}
 
 class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   import LeaseStatusTestSuite._

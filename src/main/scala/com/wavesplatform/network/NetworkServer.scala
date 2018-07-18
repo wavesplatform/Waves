@@ -9,6 +9,7 @@ import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network.MessageObserver.Messages
 import com.wavesplatform.settings._
 import com.wavesplatform.state.NG
+import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
@@ -20,8 +21,7 @@ import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepende
 import io.netty.util.concurrent.DefaultThreadFactory
 import monix.reactive.Observable
 import org.influxdb.dto.Point
-import scorex.transaction._
-import scorex.utils.ScorexLogging
+import com.wavesplatform.transaction._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._

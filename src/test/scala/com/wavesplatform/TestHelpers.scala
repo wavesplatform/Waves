@@ -5,7 +5,7 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.{FileVisitResult, Files, Path, SimpleFileVisitor}
 
 import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings}
-import scorex.account.Address
+import com.wavesplatform.account.Address
 
 import scala.concurrent.duration._
 

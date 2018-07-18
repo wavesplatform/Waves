@@ -2,13 +2,13 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import scorex.transaction.ValidationError.UnsupportedTransactionType
-import scorex.transaction._
-import scorex.transaction.assets._
-import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.smart.{SetScriptTransaction, Verifier}
-import scorex.transaction.transfer._
+import com.wavesplatform.transaction.ValidationError.UnsupportedTransactionType
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.{SetScriptTransaction, Verifier}
+import com.wavesplatform.transaction.transfer._
 
 object TransactionDiffer {
 

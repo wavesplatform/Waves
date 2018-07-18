@@ -6,12 +6,11 @@ import com.typesafe.config.Config
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.EitherExt2
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.utils.{Base58, LoggerFacade}
 import org.asynchttpclient.Dsl.{config => clientConfig, _}
 import org.asynchttpclient._
 import org.slf4j.LoggerFactory
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.utils.LoggerFacade
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 
 import scala.concurrent.duration.FiniteDuration
 
