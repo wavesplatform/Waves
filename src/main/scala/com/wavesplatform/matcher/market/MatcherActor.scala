@@ -42,9 +42,16 @@ class MatcherActor(orderHistory: ActorRef,
 
   import MatcherActor._
 
-  private var shutdownInitiated      = false
   private var tradedPairs            = Map.empty[AssetPair, MarketData]
   private var lastSnapshotSequenceNr = 0L
+
+  private var shutdownStatus: ShutdownStatus = ShutdownStatus(
+    initiated = false,
+    orderBooksStopped = false,
+    oldMessagesDeleted = false,
+    oldSnapshotsDeleted = false,
+    onComplete = () => ()
+  )
 
   private def orderBook(pair: AssetPair) = Option(orderBooks.get()).flatMap(_.get(pair))
 
@@ -73,9 +80,9 @@ class MatcherActor(orderHistory: ActorRef,
   )
 
   def createOrderBook(pair: AssetPair): ActorRef = {
-    tradedPairs += pair -> createMarketData(pair)
     val orderBook = createOrderBookActor(pair)
     orderBooks.updateAndGet(_ + (pair -> orderBook))
+    tradedPairs += pair -> createMarketData(pair)
     orderBook
   }
 
@@ -140,15 +147,27 @@ class MatcherActor(orderHistory: ActorRef,
       }
 
     case Shutdown =>
-      if (lastSnapshotSequenceNr < lastSequenceNr) saveSnapshot(Snapshot(tradedPairs.keySet))
-      context.actorOf(Props(classOf[GracefulShutdownActor], context.children.toVector, self))
-  }
+      val s = sender()
+      shutdownStatus = shutdownStatus.copy(
+        initiated = true,
+        onComplete = { () =>
+          s ! ShutdownComplete
+          context.stop(self)
+        }
+      )
 
-  def shuttingDown: Receive = {
-    case ShutdownComplete =>
-      log.info("OrderBooks are successfully closed, stopping MatcherActor")
-      context.stop(self)
-    case _ => sender() ! BadMatcherResponse(StatusCodes.ServiceUnavailable, "System is going shutdown")
+      context.become(snapshotsCommands orElse shutdownFallback)
+
+      if (lastSnapshotSequenceNr < lastSequenceNr) saveSnapshot(Snapshot(tradedPairs.keySet))
+      else {
+        log.debug(s"No changes, lastSnapshotSequenceNr = $lastSnapshotSequenceNr, lastSequenceNr = $lastSequenceNr")
+        shutdownStatus = shutdownStatus.copy(
+          oldMessagesDeleted = true,
+          oldSnapshotsDeleted = true
+        )
+      }
+
+      context.actorOf(Props(classOf[GracefulShutdownActor], context.children.toVector, self))
   }
 
   def initPredefinedPairs(): Unit = {
@@ -165,36 +184,74 @@ class MatcherActor(orderHistory: ActorRef,
 
   override def receiveRecover: Receive = {
     case OrderBookCreated(pair) =>
-      log.info(s"==> OrderBookCreated($pair)")
       if (orderBook(pair).isEmpty) createOrderBook(pair)
 
-    case SnapshotOffer(_, snapshot: Snapshot) =>
-      lastSnapshotSequenceNr = lastSequenceNr
-
-//      var orderBooksCache = List.empty[(AssetPair, ActorRef)]
-//      snapshot.tradedPairsSet.par.foreach { pair =>
-//        tradedPairs += pair      -> createMarketData(pair)
-//        orderBooksCache ::= pair -> createOrderBookActor(pair)
-//      }
-//      orderBooks.updateAndGet(_ ++ orderBooksCache)
+    case SnapshotOffer(metadata, snapshot: Snapshot) =>
+      lastSnapshotSequenceNr = metadata.sequenceNr
+      log.info(s"Loaded the snapshot with nr = ${metadata.sequenceNr}")
       snapshot.tradedPairsSet.par.foreach(createOrderBook)
 
     case RecoveryCompleted =>
-      log.info("MatcherActor - Recovery completed!")
+      log.info("Recovery completed!")
       initPredefinedPairs()
       createBalanceWatcher()
   }
 
   private def snapshotsCommands: Receive = {
     case SaveSnapshotSuccess(metadata) =>
-      deleteMessages(metadata.sequenceNr - 1)
+      lastSnapshotSequenceNr = metadata.sequenceNr
       log.info(s"Snapshot saved with metadata $metadata")
+      deleteMessages(metadata.sequenceNr - 1)
+      deleteSnapshots(SnapshotSelectionCriteria.Latest.copy(maxSequenceNr = metadata.sequenceNr - 1))
 
     case SaveSnapshotFailure(metadata, reason) =>
       log.error(s"Failed to save snapshot: $metadata, $reason.")
+      if (shutdownStatus.initiated) {
+        shutdownStatus = shutdownStatus.copy(
+          oldMessagesDeleted = true,
+          oldSnapshotsDeleted = true
+        )
+        shutdownStatus.tryComplete()
+      }
+
+    case DeleteMessagesSuccess(nr) =>
+      log.info(s"Old messages are deleted up to $nr")
+      if (shutdownStatus.initiated) {
+        shutdownStatus = shutdownStatus.copy(oldMessagesDeleted = true)
+        shutdownStatus.tryComplete()
+      }
+
+    case DeleteMessagesFailure(cause, nr) =>
+      log.info(s"Failed to delete messages up to $nr: $cause")
+      if (shutdownStatus.initiated) {
+        shutdownStatus = shutdownStatus.copy(oldMessagesDeleted = true)
+        shutdownStatus.tryComplete()
+      }
+
+    case DeleteSnapshotsSuccess(nr) =>
+      log.info(s"Old snapshots are deleted up to $nr")
+      if (shutdownStatus.initiated) {
+        shutdownStatus = shutdownStatus.copy(oldSnapshotsDeleted = true)
+        shutdownStatus.tryComplete()
+      }
+
+    case DeleteSnapshotsFailure(cause, nr) =>
+      log.info(s"Failed to delete old snapshots to $nr: $cause")
+      if (shutdownStatus.initiated) {
+        shutdownStatus = shutdownStatus.copy(oldSnapshotsDeleted = true)
+        shutdownStatus.tryComplete()
+      }
   }
 
-  override def receiveCommand: Receive = /*shutdownFallback orElse */ forwardToOrderBook orElse snapshotsCommands
+  private def shutdownFallback: Receive = {
+    case ShutdownComplete =>
+      shutdownStatus = shutdownStatus.copy(orderBooksStopped = true)
+      shutdownStatus.tryComplete()
+
+    case _ if shutdownStatus.initiated => sender() ! BadMatcherResponse(StatusCodes.ServiceUnavailable, "System is going shutdown")
+  }
+
+  override def receiveCommand: Receive = forwardToOrderBook orElse snapshotsCommands
 
   override def persistenceId: String = "matcher"
 
@@ -229,6 +286,21 @@ object MatcherActor {
                        settings,
                        blockchain,
                        functionalitySettings))
+
+  private case class ShutdownStatus(initiated: Boolean,
+                                    oldMessagesDeleted: Boolean,
+                                    oldSnapshotsDeleted: Boolean,
+                                    orderBooksStopped: Boolean,
+                                    onComplete: () => Unit) {
+    def completed: ShutdownStatus = copy(
+      initiated = true,
+      oldMessagesDeleted = true,
+      oldSnapshotsDeleted = true,
+      orderBooksStopped = true
+    )
+    def isCompleted: Boolean = initiated && oldMessagesDeleted && oldSnapshotsDeleted && orderBooksStopped
+    def tryComplete(): Unit  = if (isCompleted) onComplete()
+  }
 
   case object SaveSnapshot
 
