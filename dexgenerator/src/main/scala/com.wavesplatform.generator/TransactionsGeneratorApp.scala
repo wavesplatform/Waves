@@ -22,10 +22,10 @@ import scopt.OptionParser
 import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import scorex.api.http.assets.{SignedIssueV1Request, SignedMassTransferRequest}
 import scorex.transaction.AssetId
-import scorex.transaction.assets.{IssueTransactionV1}
+import scorex.transaction.assets.IssueTransactionV1
 import scorex.transaction.transfer.MassTransferTransaction
 import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import scorex.utils.LoggerFacade
+import scorex.utils.{ByteArray, LoggerFacade}
 import settings.GeneratorSettings
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -74,14 +74,14 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
   def issueAssets(endpoint: String, richAddressSeed: String, n: Int)(implicit tag: String): Seq[AssetId] = {
     val node = api.to(endpoint)
 
-    val assetsTx: Seq[IssueTransactionV1] = (1 to n).map { _ =>
+    val assetsTx: Seq[IssueTransactionV1] = (1 to n).map { i =>
       IssueTransactionV1
         .selfSigned(
           PrivateKeyAccount.fromSeed(richAddressSeed).right.get,
-          name = s"asset$n".getBytes(),
-          description = "asset description".getBytes(),
-          quantity = 99999999999L,
-          decimals = 8,
+          name = s"asset$i".getBytes(),
+          description = s"asset description - $i".getBytes(),
+          quantity = 99999999999999999L,
+          decimals = 2,
           reissuable = false,
           fee = 100000000,
           timestamp = System.currentTimeMillis()
@@ -101,12 +101,12 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       }
 
     val allIssued: Future[Seq[Transaction]] = Future.sequence(issued)
-    Await.result(allIssued, 30.seconds)
+    Await.result(allIssued, 120.seconds)
     tradingAssets
   }
 
   def parsedTransfersList(endpoint: String, assetId: Option[ByteStr], transferAmount: Long, pk: PrivateKeyAccount, accounts: Seq[PrivateKeyAccount])(
-      implicit tag: String): List[ParsedTransfer] = {
+    implicit tag: String): List[ParsedTransfer] = {
     val assetsTransfers = accounts.map { accountPk =>
       ParsedTransfer(AddressOrAlias.fromString(accountPk.address).right.get, transferAmount)
     }
@@ -114,7 +114,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
   }
 
   def massTransfer(endpoint: String, richAccountSeed: String, accounts: Seq[PrivateKeyAccount], tradingAssets: Seq[Option[AssetId]])(
-      implicit tag: String): Future[Seq[Transaction]] = {
+    implicit tag: String): Future[Seq[Transaction]] = {
     val node          = api.to(endpoint)
     val richAccountPk = PrivateKeyAccount.fromSeed(richAccountSeed).right.get
 
@@ -122,7 +122,11 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       node
         .balance(richAccountPk.address, assetId)
         .flatMap { balance =>
-          val transferAmount  = (balance / accounts.size) / 1000
+          val transferAmount =
+            if (assetId.isEmpty)
+              30000000000l
+            else
+              balance / accounts.size / 1000
           val assetsTransfers = parsedTransfersList(endpoint, assetId, transferAmount, richAccountPk, accounts)
           val tx = MassTransferTransaction
             .selfSigned(
@@ -131,7 +135,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
               sender = richAccountPk,
               transfers = assetsTransfers,
               timestamp = System.currentTimeMillis(),
-              feeAmount = 100000 + 50000 * assetsTransfers.size,
+              feeAmount = 200000 + 50000 * (assetsTransfers.size + 1),
               attachment = Array.emptyByteArray
             )
             .right
@@ -170,13 +174,15 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       val endpoint = finalConfig.sendTo.head.getHostString
 
       val tradingAssets = issueAssets(endpoint, finalConfig.richAccounts.head, finalConfig.assetPairsNum)
-      Thread.sleep(15000)
+      Thread.sleep(5000)
+
       val transfers = Seq(
         massTransfer(endpoint, finalConfig.richAccounts.head, finalConfig.validAccounts, None +: tradingAssets.dropRight(2).map(Option(_))),
         massTransfer(endpoint, finalConfig.richAccounts.head, finalConfig.fakeAccounts, None +: tradingAssets.takeRight(2).map(Option(_)))
       )
-      Thread.sleep(15000)
-      Await.ready(Future.sequence(transfers), 30.seconds)
+      Await.ready(Future.sequence(transfers), 120.seconds)
+
+      Thread.sleep(5000)
 
       log.info(s"Running ${ordersDistr.size} workers")
       val workers = ordersDistr.map(p => new Worker(finalConfig.worker, finalConfig, finalConfig.matcherConfig, tradingAssets, p._1, p._2, client))
