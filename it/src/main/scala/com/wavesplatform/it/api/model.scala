@@ -159,7 +159,7 @@ object OrderbookHistory {
 
   implicit val assetPairFormat: Format[AssetPair] = Json.format[AssetPair]
 
-  implicit val orderbookHistory: Format[OrderBookHistory] = Json.format
+  implicit val orderbookHistory: Format[OrderbookHistory] = Json.format
 }
 
 case class PairResponse(amountAsset: String, priceAsset: String)
