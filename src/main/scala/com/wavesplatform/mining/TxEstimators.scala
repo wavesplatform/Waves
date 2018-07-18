@@ -1,10 +1,10 @@
 package com.wavesplatform.mining
 
 import com.wavesplatform.state.Blockchain
-import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.assets.{BurnTransaction, ReissueTransaction, SponsorFeeTransaction}
-import scorex.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import scorex.transaction.{Authorized, Transaction}
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.assets.{BurnTransaction, ReissueTransaction, SponsorFeeTransaction}
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.{Authorized, Transaction}
 
 object TxEstimators {
   type Fn = (Blockchain, Transaction) => Long

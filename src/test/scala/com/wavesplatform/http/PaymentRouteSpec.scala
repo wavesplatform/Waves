@@ -8,10 +8,10 @@ import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, Json}
-import scorex.api.http.{ApiKeyNotValid, PaymentApiRoute}
-import scorex.transaction.Transaction
-import scorex.transaction.transfer._
-import scorex.utils.Time
+import com.wavesplatform.api.http.{ApiKeyNotValid, PaymentApiRoute}
+import com.wavesplatform.utils.Time
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.transfer._
 
 class PaymentRouteSpec
     extends RouteSpec("/payment")

@@ -13,9 +13,9 @@ import com.wavesplatform.settings.{BlockchainSettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
-import scorex.api.http.CompositeHttpService
-import scorex.utils.ScorexLogging
-import scorex.wallet.Wallet
+import com.wavesplatform.api.http.CompositeHttpService
+import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.wallet.Wallet
 
 import scala.concurrent.Await
 import scala.concurrent.duration._

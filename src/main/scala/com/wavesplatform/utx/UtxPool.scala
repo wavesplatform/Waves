@@ -2,8 +2,8 @@ package com.wavesplatform.utx
 
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.state.{ByteStr, Diff, Portfolio}
-import scorex.account.Address
-import scorex.transaction._
+import com.wavesplatform.account.Address
+import com.wavesplatform.transaction._
 
 trait UtxPool extends AutoCloseable {
   self =>

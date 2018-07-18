@@ -1,7 +1,7 @@
 package com.wavesplatform.settings
 
 import com.wavesplatform.Version
-import scorex.utils.ScorexLogging
+import com.wavesplatform.utils.ScorexLogging
 
 /**
   * System constants here.

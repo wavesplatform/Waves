@@ -6,13 +6,13 @@ import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.matcher.model.Events.OrderAdded
 import com.wavesplatform.state._
 import com.wavesplatform.utx.UtxPool
-import scorex.account.PublicKeyAccount
-import scorex.transaction.AssetAcc
-import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.exchange.Validation.booleanOperators
-import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
-import scorex.utils.NTP
-import scorex.wallet.Wallet
+import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.utils.NTP
+import com.wavesplatform.transaction.AssetAcc
+import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, Validation}
+import com.wavesplatform.wallet.Wallet
 
 trait OrderValidator {
   val orderHistory: OrderHistory

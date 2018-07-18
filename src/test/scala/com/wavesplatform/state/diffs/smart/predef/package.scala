@@ -7,9 +7,9 @@ import com.wavesplatform.state.ByteStr
 import com.wavesplatform.utils.dummyCompilerContext
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval
-import scorex.transaction.{DataTransaction, Transaction}
-import scorex.transaction.smart.BlockchainContext
-import scorex.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{DataTransaction, Transaction}
+import com.wavesplatform.transaction.smart.BlockchainContext
+import com.wavesplatform.transaction.transfer.TransferTransaction
 
 package object predef {
   val networkByte: Byte = 'u'

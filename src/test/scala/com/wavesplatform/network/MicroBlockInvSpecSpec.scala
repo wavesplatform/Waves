@@ -6,7 +6,7 @@ import org.scalacheck.Gen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.crypto.signatures.Curve25519.SignatureLength
+import scorex.crypto.signatures.Curve25519._
 
 class MicroBlockInvSpecSpec extends FreeSpec with Matchers with PropertyChecks with Eventually with TransactionGen {
 

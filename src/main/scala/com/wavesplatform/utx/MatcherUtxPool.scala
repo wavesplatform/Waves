@@ -6,9 +6,9 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.state.{ByteStr, Diff, Portfolio}
-import scorex.account.Address
-import scorex.transaction.{AssetId, Authorized, Transaction, ValidationError}
-import scorex.utils.ScorexLogging
+import com.wavesplatform.account.Address
+import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.transaction.{AssetId, Authorized, Transaction, ValidationError}
 
 import scala.collection.mutable
 

@@ -1,10 +1,10 @@
 package com.wavesplatform.network
 
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelDuplexHandler, ChannelHandlerContext}
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
-import scorex.utils.ScorexLogging
 
 @Sharable
 class DiscardingHandler(blockchainReadiness: Observable[Boolean]) extends ChannelDuplexHandler with ScorexLogging {

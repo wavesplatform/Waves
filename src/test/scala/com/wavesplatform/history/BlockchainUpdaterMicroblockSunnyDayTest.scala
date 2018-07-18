@@ -7,10 +7,10 @@ import com.wavesplatform.state.diffs._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.account.{Address, AddressOrAlias, PrivateKeyAccount}
-import scorex.crypto.signatures.Curve25519.KeyLength
-import scorex.transaction._
-import scorex.transaction.transfer._
+import com.wavesplatform.account.{Address, AddressOrAlias, PrivateKeyAccount}
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.transfer._
+import scorex.crypto.signatures.Curve25519._
 
 class BlockchainUpdaterMicroblockSunnyDayTest
     extends PropSpec

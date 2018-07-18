@@ -4,13 +4,12 @@ import java.util
 
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.crypto
-import com.wavesplatform.utils.Base64
+import com.wavesplatform.utils.{Base64, ScorexLogging}
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled._
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.ByteToMessageCodec
-import scorex.network.message.Message._
-import scorex.utils.ScorexLogging
+import com.wavesplatform.network.message.Message._
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal

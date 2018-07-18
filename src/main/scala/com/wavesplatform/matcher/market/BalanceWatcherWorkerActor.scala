@@ -7,9 +7,9 @@ import com.wavesplatform.matcher.market.OrderHistoryActor.{ForceCancelOrderFromH
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.matcher.model.LimitOrder
 import com.wavesplatform.state.LeaseBalance
-import scorex.account.Address
-import scorex.transaction.assets.exchange.AssetPair
-import scorex.utils.ScorexLogging
+import com.wavesplatform.account.Address
+import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 
 import scala.concurrent.duration.FiniteDuration
 

@@ -4,10 +4,10 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import scorex.account.Address
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.lease._
+import com.wavesplatform.account.Address
+import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.lease._
 
 import scala.util.{Left, Right}
 

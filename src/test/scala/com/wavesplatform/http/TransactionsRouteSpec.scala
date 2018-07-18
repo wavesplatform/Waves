@@ -12,9 +12,9 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
-import scorex.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation, TransactionsApiRoute}
+import com.wavesplatform.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation, TransactionsApiRoute}
 import com.wavesplatform.utils.Base58
-import scorex.wallet.Wallet
+import com.wavesplatform.wallet.Wallet
 
 class TransactionsRouteSpec
     extends RouteSpec("/transactions")

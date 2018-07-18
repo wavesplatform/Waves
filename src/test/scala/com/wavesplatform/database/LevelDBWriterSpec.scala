@@ -1,23 +1,22 @@
 package com.wavesplatform.database
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.block.Block
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.settings.{WavesSettings, loadConfig}
+import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{BlockchainUpdaterImpl, EitherExt2}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
+import com.wavesplatform.utils.{Time, TimeImpl}
 import com.wavesplatform.{RequestGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.account.{Address, PrivateKeyAccount}
-import scorex.block.Block
-import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.transfer.{TransferTransaction, TransferTransactionV1}
-import scorex.transaction.{GenesisTransaction, Transaction}
-import scorex.utils.{Time, TimeImpl}
 
 class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestGen {
   "Slice" - {

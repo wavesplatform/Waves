@@ -10,19 +10,18 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
-import com.wavesplatform.settings.{Constants, FunctionalitySettings, WalletSettings}
+import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{Blockchain, ByteStr, Diff, LeaseBalance, Portfolio}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
-import scorex.account.PrivateKeyAccount
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction._
-import scorex.transaction.assets.IssueTransactionV1
-import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import scorex.utils.{NTP, ScorexLogging}
-import scorex.wallet.Wallet
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.utils.{NTP, ScorexLogging}
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.wallet.Wallet
 
 import scala.concurrent.duration._
 

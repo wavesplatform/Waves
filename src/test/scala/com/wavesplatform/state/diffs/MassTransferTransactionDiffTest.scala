@@ -6,12 +6,12 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.{Address, PrivateKeyAccount}
-import scorex.lagonaki.mocks.TestBlock.{create => block}
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.IssueTransactionV1
-import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
+import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 
 class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -63,7 +63,7 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
       }
     }
 
-    import scorex.transaction.transfer.MassTransferTransaction.{MaxTransferCount => Max}
+    import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount => Max}
     Seq(0, 1, Max) foreach testDiff // test edge cases
     Gen.choose(2, Max - 1) map testDiff
   }

@@ -11,11 +11,11 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.patch.{CancelAllLeases, CancelInvalidLeaseIn, CancelLeaseOverflow}
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
-import scorex.account.Address
-import scorex.block.{Block, MicroBlock}
-import scorex.transaction.ValidationError.ActivationError
-import scorex.transaction.{Transaction, ValidationError}
-import scorex.utils.ScorexLogging
+import com.wavesplatform.account.Address
+import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.transaction.ValidationError.ActivationError
+import com.wavesplatform.transaction.{Transaction, ValidationError}
 
 object BlockDiffer extends ScorexLogging with Instrumented {
 

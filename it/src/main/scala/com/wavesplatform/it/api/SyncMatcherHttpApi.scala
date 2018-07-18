@@ -6,7 +6,7 @@ import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.{Assertions, Matchers}
 import play.api.libs.json.{Format, Json, Writes}
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._

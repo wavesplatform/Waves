@@ -8,19 +8,18 @@ import com.wavesplatform.mining.{MiningConstraint, MiningConstraints, MultiDimen
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
-import com.wavesplatform.utils.{UnsupportedFeature, forceStopApplication}
+import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
-import scorex.account.{Address, Alias}
-import scorex.block.Block.BlockId
-import scorex.block.{Block, BlockHeader, MicroBlock}
-import scorex.transaction.Transaction.Type
-import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
-import scorex.transaction._
-import scorex.transaction.lease._
-import scorex.transaction.smart.script.Script
-import scorex.utils.{ScorexLogging, Time}
+import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
+import com.wavesplatform.transaction.Transaction.Type
+import com.wavesplatform.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.smart.script.Script
 
 class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, time: Time)
     extends BlockchainUpdater

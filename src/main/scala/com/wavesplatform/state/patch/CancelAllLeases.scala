@@ -1,7 +1,7 @@
 package com.wavesplatform.state.patch
 
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
-import scorex.utils.ScorexLogging
+import com.wavesplatform.utils.ScorexLogging
 
 object CancelAllLeases extends ScorexLogging {
   private def invertLeaseInfo(p: Portfolio) = Portfolio(0, LeaseBalance(-p.lease.in, -p.lease.out), Map.empty)

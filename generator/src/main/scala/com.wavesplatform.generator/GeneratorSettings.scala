@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import cats.Show
 import cats.implicits.showInterpolator
 import com.wavesplatform.state.EitherExt2
-import scorex.account.PrivateKeyAccount
+import com.wavesplatform.account.PrivateKeyAccount
 
 case class GeneratorSettings(chainId: String,
                              accounts: Seq[String],

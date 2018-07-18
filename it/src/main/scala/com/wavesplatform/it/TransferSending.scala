@@ -7,12 +7,11 @@ import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.state.EitherExt2
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.utils.{Base58, ScorexLogging}
 import org.scalatest.Suite
-import scorex.account.{Address, AddressOrAlias, AddressScheme, PrivateKeyAccount}
-import scorex.api.http.assets.SignedTransferV1Request
-import scorex.transaction.transfer._
-import scorex.utils.ScorexLogging
+import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.api.http.assets.SignedTransferV1Request
+import com.wavesplatform.transaction.transfer._
 
 import scala.concurrent.Future
 import scala.util.Random

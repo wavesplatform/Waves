@@ -3,9 +3,8 @@ package com.wavesplatform.db
 import java.nio.charset.{Charset, StandardCharsets}
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.utils.forceStopApplication
+import com.wavesplatform.utils.{ScorexLogging, forceStopApplication}
 import org.iq80.leveldb.{DB, DBIterator, WriteBatch}
-import scorex.utils.ScorexLogging
 
 import scala.collection.AbstractIterator
 import scala.util.control.NonFatal

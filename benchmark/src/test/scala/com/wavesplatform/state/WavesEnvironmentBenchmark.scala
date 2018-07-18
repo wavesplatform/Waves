@@ -15,9 +15,9 @@ import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import scodec.bits.{BitVector, ByteVector}
-import scorex.account.{AddressOrAlias, AddressScheme, Alias}
-import scorex.crypto.encode.Base58
-import scorex.transaction.smart.WavesEnvironment
+import com.wavesplatform.account.{AddressOrAlias, AddressScheme, Alias}
+import com.wavesplatform.transaction.smart.WavesEnvironment
+import com.wavesplatform.utils.Base58
 
 import scala.io.Codec
 

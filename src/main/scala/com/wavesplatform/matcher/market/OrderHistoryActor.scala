@@ -12,13 +12,12 @@ import com.wavesplatform.matcher.model._
 import com.wavesplatform.utx.UtxPool
 import org.iq80.leveldb.DB
 import play.api.libs.json._
-import scorex.account.Address
-import scorex.transaction.{AssetAcc, AssetId}
-import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.utils.NTP
-import scorex.wallet.Wallet
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.account.Address
+import com.wavesplatform.transaction.{AssetAcc, AssetId}
+import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.utils.{Base58, NTP}
 
 import scala.concurrent.duration._
 import scala.language.postfixOps

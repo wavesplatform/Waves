@@ -10,7 +10,7 @@ import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.state.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.util.Random
 

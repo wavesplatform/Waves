@@ -5,10 +5,11 @@ import java.util
 import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.state._
-import scorex.account.{Address, Alias}
-import scorex.block.Block
-import scorex.transaction.smart.script.Script
-import scorex.transaction.{AssetId, Transaction}
+import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.Block
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.AssetId
 
 import scala.collection.JavaConverters._
 
