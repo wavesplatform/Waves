@@ -9,7 +9,6 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.pattern.gracefulStop
 import akka.stream.ActorMaterializer
-import akka.util.Timeout
 import com.wavesplatform.db._
 import com.wavesplatform.matcher.api.MatcherApiRoute
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderHistoryActor}
@@ -84,8 +83,8 @@ class Matcher(actorSystem: ActorSystem,
   @volatile var matcherServerBinding: ServerBinding = _
 
   def shutdownMatcher(): Unit = {
-    implicit val timeout: Timeout = Timeout.durationToTimeout(5.minute)
-    gracefulStop(matcher, 5.minute, MatcherActor.Shutdown)
+    val stopMatcherTimeout = 5.minutes
+    Await.result(gracefulStop(matcher, stopMatcherTimeout, MatcherActor.Shutdown), stopMatcherTimeout)
     db.close()
     Await.result(matcherServerBinding.unbind(), 10.seconds)
   }

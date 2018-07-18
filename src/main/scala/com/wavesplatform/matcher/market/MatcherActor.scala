@@ -138,10 +138,13 @@ class MatcherActor(orderHistory: ActorRef,
 
     case Shutdown =>
       context.become(shuttingDown)
-      context.actorOf(Props(classOf[GracefulShutdownActor], context.children.toVector, sender()))
+      context.actorOf(Props(classOf[GracefulShutdownActor], context.children.toVector, self))
   }
 
   def shuttingDown: Receive = {
+    case ShutdownComplete =>
+      log.info("OrderBooks are successfully closed, stopping MatcherActor")
+      context.stop(self)
     case _ => sender() ! BadMatcherResponse(StatusCodes.ServiceUnavailable, "System is going shutdown")
   }
 

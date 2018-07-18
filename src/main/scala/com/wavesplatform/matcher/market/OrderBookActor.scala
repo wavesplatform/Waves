@@ -99,7 +99,13 @@ class OrderBookActor(assetPair: AssetPair,
 
     case SaveSnapshotFailure(metadata, reason) =>
       log.error(s"Failed to save snapshot: $metadata, $reason.")
-      shutdownStatus.forceComplete()
+      if (shutdownStatus.initiated) {
+        shutdownStatus = shutdownStatus.copy(
+          oldSnapshotsDeleted = true,
+          oldMessagesDeleted = true
+        )
+        shutdownStatus.tryComplete()
+      }
 
     case DeleteOrderBookRequest(pair) =>
       updateSnapshot(OrderBook.empty)
@@ -121,7 +127,10 @@ class OrderBookActor(assetPair: AssetPair,
 
     case DeleteSnapshotsFailure(criteria, cause) =>
       log.error(s"$persistenceId DeleteSnapshotsFailure with $criteria, reason: $cause")
-      shutdownStatus.forceComplete()
+      if (shutdownStatus.initiated) {
+        shutdownStatus = shutdownStatus.copy(oldSnapshotsDeleted = true)
+        shutdownStatus.tryComplete()
+      }
 
     case DeleteMessagesSuccess(toSequenceNr) =>
       log.info(s"$persistenceId DeleteMessagesSuccess up to $toSequenceNr")
@@ -132,7 +141,10 @@ class OrderBookActor(assetPair: AssetPair,
 
     case DeleteMessagesFailure(cause: Throwable, toSequenceNr: Long) =>
       log.error(s"$persistenceId DeleteMessagesFailure up to $toSequenceNr, reason: $cause")
-      shutdownStatus.forceComplete()
+      if (shutdownStatus.initiated) {
+        shutdownStatus = shutdownStatus.copy(oldMessagesDeleted = true)
+        shutdownStatus.tryComplete()
+      }
 
     case Shutdown =>
       if (!shutdownStatus.initiated) {
@@ -145,7 +157,11 @@ class OrderBookActor(assetPair: AssetPair,
         if (lastSnapshotSequenceNr < lastSequenceNr) saveSnapshot(Snapshot(orderBook))
         else {
           log.debug(s"No changes in $assetPair, lastSnapshotSequenceNr = $lastSnapshotSequenceNr, lastSequenceNr = $lastSequenceNr")
-          shutdownStatus.forceComplete()
+          shutdownStatus = shutdownStatus.copy(
+            oldSnapshotsDeleted = true,
+            oldMessagesDeleted = true
+          )
+          shutdownStatus.tryComplete()
         }
       }
   }
@@ -393,9 +409,8 @@ object OrderBookActor {
   val AlreadyCanceledCacheSize          = 10000L
 
   private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit) {
-    def completed: Boolean    = initiated && oldMessagesDeleted && oldSnapshotsDeleted
-    def tryComplete(): Unit   = if (completed) onComplete()
-    def forceComplete(): Unit = if (initiated) onComplete()
+    def completed: Boolean  = initiated && oldMessagesDeleted && oldSnapshotsDeleted
+    def tryComplete(): Unit = if (completed) onComplete()
   }
 
   //protocol
