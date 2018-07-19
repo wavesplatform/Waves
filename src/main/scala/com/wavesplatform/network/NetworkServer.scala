@@ -106,7 +106,7 @@ object NetworkServer extends ScorexLogging {
         .channel(classOf[NioServerSocketChannel])
         .childHandler(new PipelineInitializer[SocketChannel](Seq(
           inboundConnectionFilter,
-          new BrokenConnectionDetector(30.seconds),
+          new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
           new HandshakeDecoder(peerDatabase),
           new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
           serverHandshakeHandler,
@@ -137,7 +137,7 @@ object NetworkServer extends ScorexLogging {
       .group(workerGroup)
       .channel(classOf[NioSocketChannel])
       .handler(new PipelineInitializer[SocketChannel](Seq(
-        new BrokenConnectionDetector(30.seconds),
+        new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
         new HandshakeDecoder(peerDatabase),
         new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
         clientHandshakeHandler,
