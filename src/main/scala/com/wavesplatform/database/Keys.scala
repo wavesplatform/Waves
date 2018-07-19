@@ -4,9 +4,9 @@ import java.nio.ByteBuffer
 
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Ints, Longs, Shorts}
-import com.wavesplatform.state._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.state._
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 
@@ -38,7 +38,7 @@ object Keys {
 
   // actual key definition
 
-  val version: Key[Int]               = intKey(0, default = 1)
+  val version: Key[Int]               = intKey(0)
   val height: Key[Int]                = intKey(1)
   def score(height: Int): Key[BigInt] = Key(h(2, height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
 
