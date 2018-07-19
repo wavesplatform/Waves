@@ -3,12 +3,12 @@ package com.wavesplatform.generator
 import cats.Show
 import com.wavesplatform.generator.OracleTransactionGenerator.Settings
 import com.wavesplatform.generator.utils.Gen
-import scorex.account.PrivateKeyAccount
-import scorex.transaction.{DataTransaction, Transaction}
-import scorex.transaction.smart.SetScriptTransaction
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.transaction.{DataTransaction, Transaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.it.util._
 import com.wavesplatform.state._
-import scorex.transaction.transfer.TransferTransactionV1
+import com.wavesplatform.transaction.transfer.TransferTransactionV1
 
 class OracleTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKeyAccount]) extends TransactionGenerator {
   override def next(): Iterator[Transaction] = generate(settings).toIterator

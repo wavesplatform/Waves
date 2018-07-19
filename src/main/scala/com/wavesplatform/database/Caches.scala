@@ -68,11 +68,11 @@ trait Caches extends Blockchain {
   private val scriptCache: LoadingCache[Address, Option[Script]] = cache(maxCacheSize, loadScript)
   protected def loadScript(address: Address): Option[Script]
   protected def hasScriptBytes(address: Address): Boolean
-  protected def discardScript(address: Address): Unit = scriptCache.invalidate(address)
+  protected def discardScript(address: Address): Unit = () //scriptCache.invalidate(address)
 
-  override def accountScript(address: Address): Option[Script] = scriptCache.get(address)
+  override def accountScript(address: Address): Option[Script] = loadScript(address)//scriptCache.get(address)
   override def hasScript(address: Address): Boolean =
-    Option(scriptCache.getIfPresent(address)).flatten.isDefined || hasScriptBytes(address)
+    /* Option(scriptCache.getIfPresent(address)).flatten.isDefined || */ hasScriptBytes(address)
 
   private var lastAddressId = loadMaxAddressId()
   protected def loadMaxAddressId(): BigInt
@@ -181,7 +181,7 @@ trait Caches extends Blockchain {
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
     for ((address, portfolio)    <- newPortfolios.result()) portfolioCache.put(address, portfolio)
     for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
-    scriptCache.putAll(diff.scripts.asJava)
+    //scriptCache.putAll(diff.scripts.asJava)
   }
 
   protected def doRollback(targetBlockId: ByteStr): Seq[Block]
