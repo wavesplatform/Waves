@@ -435,9 +435,9 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
   private def disconnectFromNetwork(containerId: String): Unit = client.disconnectFromNetwork(containerId, wavesNetwork.id())
 
-  def connectToNetwork(nodes: Seq[DockerNode]): Unit = {
+  def connectToNetwork(nodes: Seq[DockerNode], restoreConnections: Boolean = true): Unit = {
     nodes.foreach(connectToNetwork)
-    Await.result(Future.traverse(nodes)(connectToAll), 1.minute)
+    if (restoreConnections) Await.result(Future.traverse(nodes)(connectToAll), 1.minute)
   }
 
   private def connectToNetwork(node: DockerNode): Unit = {
