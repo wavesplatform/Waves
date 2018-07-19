@@ -2,6 +2,7 @@ import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys.{sourceGenerators, _}
 import sbt._
 import sbtcrossproject.CrossPlugin.autoImport.crossProject
+import sbt.internal.inc.ReflectUtilities
 import sbtassembly.MergeStrategy
 
 enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
@@ -188,6 +189,21 @@ inConfig(Debian)(
 
 commands += Command.command("packageAll") { state =>
   "clean" :: "assembly" :: "debian:packageBin" :: state
+}
+
+// https://stackoverflow.com/a/48592704/4050580
+def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList map { p =>
+  p: ProjectReference
+}
+
+lazy val travisBuild = taskKey[Unit]("Build a project and run unit tests")
+travisBuild in Global := {
+  try {
+    clean.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile))).value
+  } finally {
+    test.all(ScopeFilter(inProjects(langJVM, node), inConfigurations(Test))).value
+    compile.all(ScopeFilter(inProjects(generator, benchmark), inConfigurations(Test))).value
+  }
 }
 
 lazy val lang =
