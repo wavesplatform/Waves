@@ -41,7 +41,6 @@ class NetworkSeparationTestSuite
     val maxHeight = nodes.map(_.height).max
     log.debug(s"Max height is $maxHeight")
     nodes.waitForSameBlockHeadesAt(maxHeight + 5)
-
   }
 
   "after fork node should apply correct subchain" in {
@@ -72,7 +71,6 @@ class NetworkSeparationTestSuite
 
     assert(nodeA.blockAt(heightAfter) == block)
     assert(nodeA.blockAt(nodeA.height) != nodeB.blockAt(nodeA.height))
-
   }
 
 }

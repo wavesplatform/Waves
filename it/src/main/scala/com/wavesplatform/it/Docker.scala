@@ -195,6 +195,10 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
     val seedAddresses = nodes.asScala
       .filterNot(_.name == node.name)
+      .filterNot { node =>
+        // Exclude disconnected
+        client.inspectContainer(node.containerId).networkSettings().networks().isEmpty
+      }
       .map(_.containerNetworkAddress)
 
     if (seedAddresses.isEmpty) Future.successful(())
@@ -435,9 +439,9 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
   private def disconnectFromNetwork(containerId: String): Unit = client.disconnectFromNetwork(containerId, wavesNetwork.id())
 
-  def connectToNetwork(nodes: Seq[DockerNode], restoreConnections: Boolean = true): Unit = {
+  def connectToNetwork(nodes: Seq[DockerNode]): Unit = {
     nodes.foreach(connectToNetwork)
-    if (restoreConnections) Await.result(Future.traverse(nodes)(connectToAll), 1.minute)
+    Await.result(Future.traverse(nodes)(connectToAll), 1.minute)
   }
 
   private def connectToNetwork(node: DockerNode): Unit = {
