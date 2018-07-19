@@ -8,7 +8,6 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.mining.MiningConstraints.MaxScriptRunsInBlock
 import com.wavesplatform.state.EitherExt2
 import org.scalatest._
-import org.scalatest.Matchers._
 import play.api.libs.json.{JsNumber, Json}
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.api.http.assets.SignedSetScriptRequest
@@ -69,20 +68,20 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
     for {
       _ <- miner.signedBroadcast(Json.toJsObject(toRequest(setScriptTx(smartAccountPrivateKey))) + ("type" -> JsNumber(13)))
       _ <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartAccountPrivateKey.address))
-      _ <- miner.waitForHeight(4)
-//      _                  <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartAccountPrivateKey.address))
-//      _                  <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, simpleAccountPrivateKey.address))
-      _                  <- miner.waitForHeight(7)
+      _ <- miner.waitForHeight(5)
+      _ <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartAccountPrivateKey.address))
+      _ <- scala.concurrent.Future.sequence((0 to 3).map(_ =>
+        processRequests(generateTransfersFromAccount((500 - MaxScriptRunsInBlock), simpleAccountPrivateKey.address))))
+      _                  <- miner.waitForHeight(6)
       blockWithSetScript <- miner.blockHeadersAt(2)
       restBlocks         <- miner.blockHeadersSeq(3, 4)
-      newBlock           <- miner.blockAt(5)
+      newBlock           <- miner.blockHeadersAt(5)
     } yield {
-      println(restBlocks(0))
-      println(newBlock)
       blockWithSetScript.transactionCount should (be <= (MaxScriptRunsInBlock + 1) and be >= 1)
       restBlocks.foreach { x =>
-        x.transactionCount should (be >= 1 and be <= MaxScriptRunsInBlock)
+        x.transactionCount should be(MaxScriptRunsInBlock)
       }
+      newBlock.transactionCount should be > MaxScriptRunsInBlock
     },
     12.minutes
   )
