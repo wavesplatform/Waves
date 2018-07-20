@@ -12,7 +12,7 @@ import scala.util.Try
 
 // Remove when kamon-influxdb 1.0.2 will be shipped
 class CustomInfluxDBReporter(config: Config = Kamon.config()) extends MetricReporter {
-  private val logger   = LoggerFactory.getLogger(classOf[InfluxDBReporter])
+  private val logger   = LoggerFactory.getLogger(classOf[CustomInfluxDBReporter])
   private var settings = readSettings(config)
   private val client   = buildClient(settings)
 
@@ -31,9 +31,9 @@ class CustomInfluxDBReporter(config: Config = Kamon.config()) extends MetricRepo
       }
 
       response.close()
-
-    }.failed.map { error =>
-      logger.error("Failed to POST metrics to InfluxDB", error)
+    }.failed.foreach { error =>
+      // Check this line in the next kamon-influxdb version, it is a fix for NODE-481
+      logger.error(s"Failed to POST metrics to InfluxDB: ${error.getMessage}")
     }
   }
 
