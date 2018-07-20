@@ -196,6 +196,7 @@ def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this
   p: ProjectReference
 }
 
+addCommandAlias("checkPR", "Global / travisBuild")
 lazy val travisBuild = taskKey[Unit]("Build a project and run unit tests")
 travisBuild in Global := {
   try {
