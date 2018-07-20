@@ -1,7 +1,8 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform.it.sync.network
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.sync.{issueAmount, issueFee, minFee}
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{ReportingTestName, WaitForHeight2}
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
@@ -40,11 +41,10 @@ class NetworkSeparationTestSuite
     val maxHeight = nodes.map(_.height).max
     log.debug(s"Max height is $maxHeight")
     nodes.waitForSameBlockHeadesAt(maxHeight + 5)
-
   }
 
   "after fork node should apply correct subchain" in {
-    val issuedAssetId = nodeA.issue(nodeA.address, s"TestAsset", "description", issueAmount, 8, reissuable = true, issueFee).id
+    val issuedAssetId = nodeA.issue(nodeA.address, "TestAsset", "description", issueAmount, 8, reissuable = true, issueFee).id
 
     nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
     nodeA.assertAssetBalance(nodeA.address, issuedAssetId, issueAmount)
@@ -70,8 +70,8 @@ class NetworkSeparationTestSuite
     Thread.sleep(80.seconds.toMillis)
 
     assert(nodeA.blockAt(heightAfter) == block)
-    assert(nodeA.blockAt(nodeA.height) != nodeB.blockAt(nodeA.height))
-
+    val height = nodeA.height
+    assert(nodeA.blockAt(height) != nodeB.blockAt(height))
   }
 
 }

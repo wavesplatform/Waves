@@ -23,6 +23,7 @@ case class NetworkSettings(file: Option[File],
                            knownPeers: Seq[String],
                            peersDataResidenceTime: FiniteDuration,
                            blackListResidenceTime: FiniteDuration,
+                           breakIdleConnectionsTimeout: FiniteDuration,
                            maxInboundConnections: Int,
                            maxOutboundConnections: Int,
                            maxConnectionsPerHost: Int,
@@ -63,6 +64,7 @@ object NetworkSettings {
     val knownPeers                   = config.as[Seq[String]]("known-peers")
     val peersDataResidenceTime       = config.as[FiniteDuration]("peers-data-residence-time")
     val blackListResidenceTime       = config.as[FiniteDuration]("black-list-residence-time")
+    val breakIdleConnectionsTimeout  = config.as[FiniteDuration]("break-idle-connections-timeout")
     val maxInboundConnections        = config.as[Int]("max-inbound-connections")
     val maxOutboundConnections       = config.as[Int]("max-outbound-connections")
     val maxConnectionsFromSingleHost = config.as[Int]("max-single-host-connections")
@@ -86,6 +88,7 @@ object NetworkSettings {
       knownPeers,
       peersDataResidenceTime,
       blackListResidenceTime,
+      breakIdleConnectionsTimeout,
       maxInboundConnections,
       maxOutboundConnections,
       maxConnectionsFromSingleHost,

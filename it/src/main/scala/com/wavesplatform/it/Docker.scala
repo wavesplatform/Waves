@@ -179,7 +179,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     def connectToOne(address: InetSocketAddress): Future[Unit] = {
       for {
         _              <- node.connect(address)
-        _              <- Future(blocking(Thread.sleep(3.seconds.toMillis)))
+        _              <- Future(blocking(Thread.sleep(1.seconds.toMillis)))
         connectedPeers <- node.connectedPeers
         _ <- {
           val connectedAddresses = connectedPeers.map(_.address.replaceAll("""^.*/([\d\.]+).+$""", "$1")).sorted
@@ -195,6 +195,10 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
     val seedAddresses = nodes.asScala
       .filterNot(_.name == node.name)
+      .filterNot { node =>
+        // Exclude disconnected
+        client.inspectContainer(node.containerId).networkSettings().networks().isEmpty
+      }
       .map(_.containerNetworkAddress)
 
     if (seedAddresses.isEmpty) Future.successful(())

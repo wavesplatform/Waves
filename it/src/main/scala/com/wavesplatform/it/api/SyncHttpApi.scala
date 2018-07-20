@@ -221,6 +221,8 @@ object SyncHttpApi extends Assertions {
       Await.result(async(n).rollback(to, returnToUTX), RequestAwaitTime)
 
     def findTransactionInfo(txId: String): Option[TransactionInfo] = Await.result(async(n).findTransactionInfo(txId), RequestAwaitTime)
+
+    def connectedPeers: Seq[Peer] = (Json.parse(get("/peers/connected").getResponseBody) \ "peers").as[Seq[Peer]]
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
