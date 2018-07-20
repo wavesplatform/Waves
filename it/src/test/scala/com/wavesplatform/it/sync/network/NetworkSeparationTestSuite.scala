@@ -44,7 +44,7 @@ class NetworkSeparationTestSuite
   }
 
   "after fork node should apply correct subchain" in {
-    val issuedAssetId = nodeA.issue(nodeA.address, s"TestAsset", "description", issueAmount, 8, reissuable = true, issueFee).id
+    val issuedAssetId = nodeA.issue(nodeA.address, "TestAsset", "description", issueAmount, 8, reissuable = true, issueFee).id
 
     nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
     nodeA.assertAssetBalance(nodeA.address, issuedAssetId, issueAmount)
@@ -70,7 +70,8 @@ class NetworkSeparationTestSuite
     Thread.sleep(80.seconds.toMillis)
 
     assert(nodeA.blockAt(heightAfter) == block)
-    assert(nodeA.blockAt(nodeA.height) != nodeB.blockAt(nodeA.height))
+    val height = nodeA.height
+    assert(nodeA.blockAt(height) != nodeB.blockAt(height))
   }
 
 }
