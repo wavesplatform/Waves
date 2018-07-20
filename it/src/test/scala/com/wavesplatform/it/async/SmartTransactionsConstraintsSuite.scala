@@ -70,8 +70,8 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
       _ <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartAccountPrivateKey.address))
       _ <- miner.waitForHeight(5)
       _ <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartAccountPrivateKey.address))
-      _ <- scala.concurrent.Future.sequence((0 to 3).map(_ =>
-        processRequests(generateTransfersFromAccount((500 - MaxScriptRunsInBlock), simpleAccountPrivateKey.address))))
+      _ <- scala.concurrent.Future.sequence((0 to 9).map(_ =>
+        processRequests(generateTransfersFromAccount((50 - MaxScriptRunsInBlock / 10), simpleAccountPrivateKey.address))))
       _                  <- miner.waitForHeight(6)
       blockWithSetScript <- miner.blockHeadersAt(2)
       restBlocks         <- miner.blockHeadersSeq(3, 4)
