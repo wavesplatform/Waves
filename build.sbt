@@ -196,9 +196,9 @@ def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this
   p: ProjectReference
 }
 
-addCommandAlias("checkPR", "Global / travisBuild")
-lazy val travisBuild = taskKey[Unit]("Build a project and run unit tests")
-travisBuild in Global := {
+addCommandAlias("checkPR", """;set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings"); Global / checkPRRaw""")
+lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
+checkPRRaw in Global := {
   try {
     clean.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile))).value
   } finally {
