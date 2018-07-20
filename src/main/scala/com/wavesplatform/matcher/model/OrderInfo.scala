@@ -16,7 +16,7 @@ case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: O
     else if (canceled) LimitOrder.Cancelled(filled)
     else if (filled == 0) LimitOrder.Accepted
     else if (filled < amount - minAmount.getOrElse(0L)) LimitOrder.PartiallyFilled(filled)
-    else LimitOrder.Filled
+    else LimitOrder.Filled(filled)
   }
 
   def jsonStr: String = {

@@ -30,5 +30,8 @@ case object Validation {
 
   implicit def result2Boolean(x: Validation): Boolean = x.status
 
-  val success = Validation(status = true)
+  val success             = Validation(status = true)
+  val failure: Validation = Validation(status = false)
+
+  def failure(l: String): Validation = Validation(status = false, Set(l))
 }
