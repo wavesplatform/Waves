@@ -21,11 +21,12 @@ class BlockSizeConstraintsSuite extends FreeSpec with Matchers with TransferSend
 
   s"Block is limited by size after activation" in result(
     for {
-      _                                        <- processRequests(generateTransfersToRandomAddresses(maxTxs, nodeAddresses), includeAttachment = true)
-      _                                        <- miner.waitForHeight(3)
-      _                                        <- processRequests(generateTransfersToRandomAddresses(maxTxs, nodeAddresses), includeAttachment = true)
-      _                                        <- miner.waitForHeight(4)
-      Seq(blockHeaderBefore, blockHeaderAfter) <- miner.blockHeadersSeq(2, 3)
+      _                 <- processRequests(generateTransfersToRandomAddresses(maxTxs, nodeAddresses), includeAttachment = true)
+      _                 <- miner.waitForHeight(4)
+      _                 <- processRequests(generateTransfersToRandomAddresses(maxTxs, nodeAddresses), includeAttachment = true)
+      blockHeaderBefore <- miner.blockHeadersAt(2)
+      _                 <- miner.waitForHeight(5)
+      blockHeaderAfter  <- miner.blockHeadersAt(4)
     } yield {
       val maxSizeInBytesAfterActivation = (1.1d * 1024 * 1024).toInt // including headers
       val blockSizeInBytesBefore        = blockHeaderBefore.blocksize
@@ -34,7 +35,7 @@ class BlockSizeConstraintsSuite extends FreeSpec with Matchers with TransferSend
       val blockSizeInBytesAfter = blockHeaderAfter.blocksize
       blockSizeInBytesAfter should be <= maxSizeInBytesAfterActivation
     },
-    7.minutes
+    9.minutes
   )
 
 }
