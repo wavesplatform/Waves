@@ -123,20 +123,22 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
     val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, currentTs, b.height) _
     val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = transactions.values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
-      .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
-        case (curr @ (_, _, _, _, skip), _) if skip => curr
+      .iterator
+      .scanLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
         case ((invalid, valid, diff, currRest, _), tx) =>
           val updatedBlockchain = composite(b, diff)
           differ(updatedBlockchain, tx) match {
             case Right(newDiff) =>
               val updatedRest = currRest.put(updatedBlockchain, tx)
               if (updatedRest.isOverfilled) {
-                (invalid, valid, diff, currRest, false)
-              } else (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, updatedRest.isEmpty)
+                (invalid, valid, diff, currRest, currRest.isEmpty)
+              } else (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty)
             case Left(_) =>
-              (tx.id() +: invalid, valid, diff, currRest, false)
+              (tx.id() +: invalid, valid, diff, currRest, currRest.isEmpty)
           }
       }
+      .takeWhile(!_._5)
+      .reduce((_, s) => s)
 
     invalidTxs.foreach { itx =>
       transactions.remove(itx)
