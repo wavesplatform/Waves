@@ -47,8 +47,8 @@ class TradeBalanceAndRoundingTestSuite
     val aliceWavesBalanceBefore = matcherNode.accountBalances(aliceNode.address)._1
     val bobWavesBalanceBefore   = matcherNode.accountBalances(bobNode.address)._1
 
-    val price = 280
-    val buyOrderAmount = 700000
+    val price           = 280
+    val buyOrderAmount  = 700000
     val sellOrderAmount = 300000000
 
     // Alice wants to sell USD for Waves
@@ -70,13 +70,16 @@ class TradeBalanceAndRoundingTestSuite
 
     val bobWavesBalanceAfter = matcherNode.accountBalances(bobNode.address)._1
     val bobUsdBalance        = matcherNode.assetBalance(bobNode.address, UsdId.base58).balance
-    val adjustedTotal = receiveAmount(OrderType.BUY, price, buyOrderAmount)
+    val adjustedAmount       = receiveAmount(OrderType.BUY, price, buyOrderAmount)
+    val adjustedTotal        = receiveAmount(OrderType.SELL, price, buyOrderAmount)
 
-    (aliceWavesBalanceAfter - aliceWavesBalanceBefore) should be(adjustedTotal - (BigInt(MatcherFee) * adjustedTotal / buyOrderAmount).bigInteger.longValue())
+    (aliceWavesBalanceAfter - aliceWavesBalanceBefore) should be(
+      adjustedAmount - (BigInt(MatcherFee) * adjustedAmount / buyOrderAmount).bigInteger.longValue())
 
-    aliceUsdBalance - defaultAssetQuantity should be(-1)
-    bobWavesBalanceAfter - bobWavesBalanceBefore should be(-adjustedTotal - (BigInt(MatcherFee) * adjustedTotal / sellOrderAmount).bigInteger.longValue())
-    bobUsdBalance should be(1)
+    aliceUsdBalance - defaultAssetQuantity should be(-adjustedTotal)
+    bobWavesBalanceAfter - bobWavesBalanceBefore should be(
+      -adjustedAmount - (BigInt(MatcherFee) * adjustedAmount / sellOrderAmount).bigInteger.longValue())
+    bobUsdBalance should be(adjustedTotal)
   }
 
   def correctAmount(a: Long, price: Long): Long = {
