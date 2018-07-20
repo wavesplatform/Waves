@@ -131,6 +131,8 @@ object SyncHttpApi extends Assertions {
     def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Transaction =
       Await.result(async(n).burn(sourceAddress, assetId, quantity, fee), RequestAwaitTime)
 
+    def getAddresses: Seq[String] = Await.result(async(n).getAddresses, RequestAwaitTime)
+
     def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, version: String): Transaction =
       if (Option(version).nonEmpty) burnV2(sourceAddress, assetId, quantity, fee, version) else burn(sourceAddress, assetId, quantity, fee)
 

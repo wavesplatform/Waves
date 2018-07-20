@@ -439,6 +439,21 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
   private def disconnectFromNetwork(containerId: String): Unit = client.disconnectFromNetwork(containerId, wavesNetwork.id())
 
+  def restartContainer(node: DockerNode): DockerNode = {
+    val id            = node.containerId
+    val containerInfo = inspectContainer(id)
+    val ports         = containerInfo.networkSettings().ports()
+    log.info(s"New ports: ${ports.toString}")
+    client.restartContainer(id, 10)
+
+    node.nodeInfo = getNodeInfo(node.containerId, node.settings)
+    Await.result(
+      node.waitForStartup().flatMap(_ => connectToAll(node)),
+      3.minutes
+    )
+    node
+  }
+
   def connectToNetwork(nodes: Seq[DockerNode]): Unit = {
     nodes.foreach(connectToNetwork)
     Await.result(Future.traverse(nodes)(connectToAll), 1.minute)
@@ -524,6 +539,8 @@ object Docker {
     override def networkAddress: InetSocketAddress = nodeInfo.hostNetworkAddress
 
     def containerNetworkAddress: InetSocketAddress = nodeInfo.containerNetworkAddress
+
+    def getConfig: Config = config
   }
 
 }
