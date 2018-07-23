@@ -1,10 +1,11 @@
 package com.wavesplatform.settings
 
-import scala.concurrent.duration._
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.BalanceWatcherWorkerActor
 import org.scalatest.{FlatSpec, Matchers}
+
+import scala.concurrent.duration._
 
 class MatcherSettingsSpecification extends FlatSpec with Matchers {
   "MatcherSettings" should "read values" in {
@@ -19,7 +20,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    order-match-tx-fee: 100000
         |    snapshots-interval: 1d
         |    order-cleanup-interval: 5m
-        |    max-open-orders: 1000
         |    rest-order-limit: 100
         |    price-assets: [
         |      "WAVES",
@@ -48,7 +48,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.snapshotsDataDir should be("/waves/matcher/snapshots")
     settings.snapshotsInterval should be(1.day)
     settings.orderCleanupInterval should be(5.minute)
-    settings.maxOpenOrders should be(1000)
     settings.maxOrdersPerRequest should be(100)
     settings.priceAssets should be(Seq("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J"))
     settings.blacklistedAssets shouldBe Set("a")

@@ -16,7 +16,6 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
         |    max-chain-length = 101
         |    synchronization-timeout = 30s
         |    score-ttl = 90s
-        |    remote-score-debounce = 5s
         |
         |    invalid-blocks-storage {
         |      max-size = 40000
@@ -49,7 +48,6 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
     settings.maxChainLength should be(101)
     settings.synchronizationTimeout should be(30.seconds)
     settings.scoreTTL should be(90.seconds)
-    settings.remoteScoreDebounce should be(5.seconds)
     settings.invalidBlocksStorage shouldBe InvalidBlockStorageSettings(
       maxSize = 40000,
       timeout = 2.days
