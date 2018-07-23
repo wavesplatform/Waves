@@ -38,7 +38,7 @@ object Keys {
 
   // actual key definition
 
-  val version: Key[Int]               = intKey(0)
+  val version: Key[Int]               = intKey(0, default = 1)
   val height: Key[Int]                = intKey(1)
   def score(height: Int): Key[BigInt] = Key(h(2, height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
 

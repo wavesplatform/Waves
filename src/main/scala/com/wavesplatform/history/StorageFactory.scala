@@ -4,7 +4,7 @@ import com.wavesplatform.database.{Keys, LevelDBWriter, RW}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{BlockchainUpdaterImpl, NG}
 import com.wavesplatform.transaction.BlockchainUpdater
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import org.iq80.leveldb.DB
 
 object StorageFactory extends ScorexLogging {
@@ -21,23 +21,15 @@ object StorageFactory extends ScorexLogging {
     val version = rw.get(Keys.version)
     val height  = rw.get(Keys.height)
     if (version != StorageVersion) {
-      // Version of storage (which is 0 by default) differs from expected version
       if (height == 0) {
         // The storage is empty, set current version
         rw.put(Keys.version, StorageVersion)
       } else {
         // Here we've detected that the storage is not empty and doesn't contain version
-        // From here it is possible to fail or to put current version in storage if it's compatible
-
-        //TODO: Choose behaviour, by defautl we put the version in storage
-
-        // Uncomment those lines to stop the program
-//        log.error(
-//          s"Storage version $version is not compatible with expected version $StorageVersion! Please, rebuild node's state, use import or sync from scratch.")
-//        log.error("FOR THIS REASON THE NODE STOPPED AUTOMATICALLY")
-//        forceStopApplication(UnsupportedFeature)
-        log.info(s"Storage version set to $StorageVersion")
-        rw.put(Keys.version, StorageVersion)
+        log.error(
+          s"Storage version $version is not compatible with expected version $StorageVersion! Please, rebuild node's state, use import or sync from scratch.")
+        log.error("FOR THIS REASON THE NODE STOPPED AUTOMATICALLY")
+        forceStopApplication(UnsupportedFeature)
       }
     }
     rw.close()
