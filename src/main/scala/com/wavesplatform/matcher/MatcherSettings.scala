@@ -23,7 +23,6 @@ case class MatcherSettings(enable: Boolean,
                            snapshotsDataDir: String,
                            snapshotsInterval: FiniteDuration,
                            orderCleanupInterval: FiniteDuration,
-                           maxOpenOrders: Int,
                            priceAssets: Seq[String],
                            maxTimestampDiff: FiniteDuration,
                            blacklistedAssets: Set[String],
@@ -49,7 +48,6 @@ object MatcherSettings {
     val snapshotsDirectory   = config.as[String](s"$configPath.snapshots-directory")
     val snapshotsInterval    = config.as[FiniteDuration](s"$configPath.snapshots-interval")
     val orderCleanupInterval = config.as[FiniteDuration](s"$configPath.order-cleanup-interval")
-    val maxOpenOrders        = config.as[Int](s"$configPath.max-open-orders")
     val maxOrdersPerRequest  = config.as[Int](s"$configPath.rest-order-limit")
     val baseAssets           = config.as[List[String]](s"$configPath.price-assets")
     val maxTimestampDiff     = config.as[FiniteDuration](s"$configPath.max-timestamp-diff")
@@ -75,7 +73,6 @@ object MatcherSettings {
       snapshotsDirectory,
       snapshotsInterval,
       orderCleanupInterval,
-      maxOpenOrders,
       baseAssets,
       maxTimestampDiff,
       blacklistedAssets.toSet,
