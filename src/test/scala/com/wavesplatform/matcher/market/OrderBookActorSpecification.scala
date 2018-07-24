@@ -71,7 +71,7 @@ class OrderBookActorSpecification
 
   val orderHistoryRef = TestActorRef(new Actor {
     def receive: Receive = {
-      case ValidateOrder(o, _) => sender() ! ValidateOrderResult(Right(o))
+      case ValidateOrder(o, _) => sender() ! ValidateOrderResult(o.idStr(), Right(o))
       case _                   =>
     }
   })

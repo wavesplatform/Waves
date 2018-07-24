@@ -46,6 +46,13 @@ class OrderBookActor(assetPair: AssetPair,
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
   private val timer = Kamon.timer("matcher.orderbook.match").refine("pair" -> assetPair.toString)
+  private val validationTimeouts = Kamon
+    .counter("matcher.orderbook.error")
+    .refine(
+      "pair"  -> assetPair.toString,
+      "group" -> "validation",
+      "type"  -> "timeout"
+    )
 
   private val snapshotCancellable    = context.system.scheduler.schedule(settings.snapshotsInterval, settings.snapshotsInterval, self, SaveSnapshot)
   private val cleanupCancellable     = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
@@ -166,19 +173,36 @@ class OrderBookActor(assetPair: AssetPair,
       }
   }
 
-  private def waitingValidation: Receive = readOnlyCommands orElse {
+  private def waitingValidation(sentMessage: Either[ValidateCancelOrder, ValidateOrder]): Receive = readOnlyCommands orElse {
     case ValidationTimeoutExceeded =>
-      log.warn("Validation timeout exceeded, skip incoming request")
+      validationTimeouts.increment()
+      log.warn(s"Validation timeout exceeded for $sentMessage")
+      val orderId = sentMessage.fold(_.cancel.orderId, _.order.idStr())
+      cancelInProgressOrders.invalidate(orderId)
       becomeFullCommands()
-    case ValidateOrderResult(res) =>
-      cancellable.foreach(_.cancel())
-      handleValidateOrderResult(res)
-    case ValidateCancelResult(res) =>
-      cancellable.foreach(_.cancel())
-      handleValidateCancelResult(res.map(x => x.orderId))
+
+    case ValidateOrderResult(validatedOrderId, res) =>
+      sentMessage match {
+        case Right(sent) if validatedOrderId == sent.order.idStr() =>
+          cancellable.foreach(_.cancel())
+          handleValidateOrderResult(res)
+        case x =>
+          log.warn(s"Unexpected message: $x")
+      }
+
+    case ValidateCancelResult(validatedOrderId, res) =>
+      sentMessage match {
+        case Left(sent) if validatedOrderId == sent.cancel.orderId =>
+          cancellable.foreach(_.cancel())
+          handleValidateCancelResult(res.map(x => x.orderId))
+        case x =>
+          log.warn(s"Unexpected message: $x")
+      }
+
     case cancel: CancelOrder if Option(cancelInProgressOrders.getIfPresent(cancel.orderId)).nonEmpty =>
       log.info(s"Order($assetPair, ${cancel.orderId}) is already being canceled")
       sender() ! OrderCancelRejected("Order is already being canceled")
+
     case ev =>
       log.info("Stashed: " + ev)
       stash()
@@ -202,10 +226,11 @@ class OrderBookActor(assetPair: AssetPair,
         log.info(s"Order($assetPair, ${cancel.orderId}) is already not found")
         sender() ! OrderCancelRejected("Order not found")
       case None =>
-        orderHistory ! ValidateCancelOrder(cancel, NTP.correctedTime())
+        val msg = ValidateCancelOrder(cancel, NTP.correctedTime())
+        orderHistory ! msg
         apiSender = Some(sender())
         cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
-        context.become(waitingValidation)
+        context.become(waitingValidation(Left(msg)))
         cancelInProgressOrders.put(cancel.orderId, okCancel)
     }
   }
@@ -256,10 +281,11 @@ class OrderBookActor(assetPair: AssetPair,
   }
 
   private def onAddOrder(order: Order): Unit = {
-    orderHistory ! ValidateOrder(order, NTP.correctedTime())
+    val msg = ValidateOrder(order, NTP.correctedTime())
+    orderHistory ! msg
     apiSender = Some(sender())
     cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
-    context.become(waitingValidation)
+    context.become(waitingValidation(Right(msg)))
   }
 
   private def handleValidateOrderResult(res: Either[GenericError, Order]): Unit = {
@@ -362,7 +388,7 @@ class OrderBookActor(assetPair: AssetPair,
 
   override def receiveCommand: Receive = fullCommands
 
-  val isMigrateToNewOrderHistoryStorage = settings.isMigrateToNewOrderHistoryStorage
+  val isMigrateToNewOrderHistoryStorage: Boolean = settings.isMigrateToNewOrderHistoryStorage
 
   override def receiveRecover: Receive = {
     case evt: Event =>
