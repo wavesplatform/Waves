@@ -145,10 +145,12 @@ object CommonValidation {
       case _: LeaseCancelTransaction   => Right(1)
       case _: ExchangeTransaction      => Right(3)
       case _: CreateAliasTransaction   => Right(1)
-      case tx: DataTransaction         => Right(1 + (tx.bytes().length - 1) / 1024)
-      case _: SetScriptTransaction     => Right(1)
-      case _: SponsorFeeTransaction    => Right(1000)
-      case _                           => Left(UnsupportedTransactionType)
+      case tx: DataTransaction =>
+        val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts, height)) tx.bodyBytes() else tx.bytes()
+        Right(1 + (base.length - 1) / 1024)
+      case _: SetScriptTransaction  => Right(1)
+      case _: SponsorFeeTransaction => Right(1000)
+      case _                        => Left(UnsupportedTransactionType)
     }
 
     def restFeeAfterSponsorship(inputFee: (Option[AssetId], Long)): Either[ValidationError, (Option[AssetId], Long)] =

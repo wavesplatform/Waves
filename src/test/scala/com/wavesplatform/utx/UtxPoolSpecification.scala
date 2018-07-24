@@ -21,7 +21,7 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTran
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{FeeCalculator, GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.{NoShrink, TestHelpers, TestTime, TransactionGen, WithDB}
+import com.wavesplatform._
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
@@ -50,8 +50,6 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     val settings = origSettings.copy(
       blockchainSettings = BlockchainSettings(
         'T',
-        5,
-        5,
         FunctionalitySettings.TESTNET.copy(
           preActivatedFeatures = Map(
             BlockchainFeatures.MassTransfer.id  -> 0,

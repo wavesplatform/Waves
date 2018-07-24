@@ -63,7 +63,7 @@ object RealTransactionWrapper {
         Tx.Transfer(
           proven(t),
           feeAssetId = t.feeAssetId.map(a => ByteVector(a.arr)),
-          transferAssetId = t.assetId.map(a => ByteVector(a.arr)),
+          assetId = t.assetId.map(a => ByteVector(a.arr)),
           amount = t.amount,
           recipient = t.recipient,
           attachment = ByteVector(t.attachment)
