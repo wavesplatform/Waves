@@ -36,7 +36,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       str             <- stringEntryGen(500, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key && e.key != bin.key)
       dataTransaction <- dataTransactionGenP(oracle, List(long, bool, bin, str))
       allFieldsRequiredScript = s"""
-                                   | match tx {
+                                   | match input {
                                    | case t : DataTransaction =>
                                    |   let txId = match extract(transactionById(t.id)) {
                                    |     case d: DataTransaction => d.bodyBytes == base64'${ByteStr(dataTransaction.bodyBytes.apply()).base64}'

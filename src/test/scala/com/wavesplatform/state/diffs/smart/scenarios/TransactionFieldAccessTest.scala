@@ -29,7 +29,7 @@ class TransactionFieldAccessTest extends PropSpec with PropertyChecks with Match
   private val script =
     """
       |
-      | match tx {
+      | match input {
       | case ttx: TransferTransaction =>
       |       isDefined(ttx.assetId)==false
       |   case other =>
