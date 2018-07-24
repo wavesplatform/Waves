@@ -343,6 +343,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       miner.assertBalances(miner.address, minerBalance._1)
       val aliceSponsoredTransferWaves = alice.transfer(alice.address, bob.address, transferAmount, SmallFee, None, Some(minersSpondorAssetId)).id
       nodes.waitForHeightAriseAndTxPresent(aliceSponsoredTransferWaves)
+      nodes.waitForHeightAriseAndTxPresent(aliceSponsoredTransferWaves)
 
       miner.assertBalances(miner.address, minerBalance._1)
       miner.assertAssetBalance(miner.address, minersSpondorAssetId, sponsorAssetTotal / 2 + SmallFee)
