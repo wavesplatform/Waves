@@ -107,11 +107,11 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(1)
   }
 
-  private def eval[T](code: String, pointInstance: Option[CaseObj] = None): Either[String, T] = {
+  private def eval[T](code: String, pointInstance: Option[CaseObj] = None, pointType: FINAL = AorBorC): Either[String, T] = {
     val untyped = Parser(code).get.value
     require(untyped.size == 1)
     val lazyVal                                      = LazyVal(EitherT.pure(pointInstance.orNull))
-    val stringToTuple: Map[String, (FINAL, LazyVal)] = Map(("p", (AorBorC, lazyVal)))
+    val stringToTuple: Map[String, (FINAL, LazyVal)] = Map(("p", (pointType, lazyVal)))
     val ctx: CTX =
       Monoid.combine(PureContext.ctx, CTX(sampleTypes, stringToTuple, Seq.empty))
     val typed = CompilerV1(ctx.compilerContext, untyped.head)
@@ -230,4 +230,21 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(3)
     eval[Long](sampleScript, Some(pointCInstance)) shouldBe Right(42)
   }
+
+  property("different types, same name of field") {
+    val sampleScript =
+      """match (p.YB) {
+        | case l: Int => l
+        | case u: Unit => 1
+        | }
+      """.stripMargin
+    eval[Long](sampleScript, Some(pointCInstance), CorD) shouldBe Right(42)
+    eval[Long](sampleScript, Some(pointDInstance1), CorD) shouldBe Right(43)
+    eval[Long](sampleScript, Some(pointDInstance2), CorD) shouldBe Right(1)
+
+    eval[Long]("p.YB", Some(pointCInstance), CorD) shouldBe Right(42)
+    eval[Long]("p.YB", Some(pointDInstance1), CorD) shouldBe Right(43)
+    eval[Unit]("p.YB", Some(pointDInstance2), CorD) shouldBe Right(())
+  }
+
 }
