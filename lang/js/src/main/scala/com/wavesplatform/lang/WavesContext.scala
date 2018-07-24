@@ -6,7 +6,7 @@ object WavesContext {
   val env = new Environment {
     override def height: Int                                         = impl.Environment.height
     override def networkByte: Byte                                   = impl.Environment.networkByte
-    override def transaction: Tx                                     = impl.Environment.transaction
+    override def inputEntity: Tx                                     = impl.Environment.transaction
     override def transactionById(id: Array[Byte]): Option[Tx]        = impl.Environment.transactionById(id)
     override def transactionHeightById(id: Array[Byte]): Option[Int] = impl.Environment.transactionHeightById(id)
     override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any] =

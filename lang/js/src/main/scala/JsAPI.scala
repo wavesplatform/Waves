@@ -48,7 +48,7 @@ object JsAPI {
     val wavesContext = WavesContext.build(new Environment {
       override def height: Int                                                                                     = ???
       override def networkByte: Byte                                                                               = ???
-      override def transaction: Tx                                                                                 = ???
+      override def inputEntity: Tx                                                                                 = ???
       override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
       override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
       override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???

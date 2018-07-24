@@ -1,15 +1,16 @@
 package com.wavesplatform.transaction.smart
 
-import com.wavesplatform.lang.v1.traits.{Proven, _}
-import com.wavesplatform.state._
-import scodec.bits.ByteVector
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
+import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
+import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.state._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.transfer._
+import scodec.bits.ByteVector
 
 object RealTransactionWrapper {
 
@@ -87,7 +88,7 @@ object RealTransactionWrapper {
           assetId = ms.assetId.map(a => ByteVector(a.arr)),
           transferCount = ms.transfers.length,
           totalAmount = ms.transfers.map(_.amount).sum,
-          transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.TransferItem(r.address, r.amount)).toIndexedSeq,
+          transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(r.address, r.amount)).toIndexedSeq,
           attachment = ByteVector(ms.attachment)
         )
       case ss: SetScriptTransaction => Tx.SetScript(proven(ss), ss.script.map(_.bytes()).map(toByteVector))

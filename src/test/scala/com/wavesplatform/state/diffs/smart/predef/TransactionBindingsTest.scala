@@ -37,7 +37,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
       val result = runScript[Boolean](
         s"""
-           |match tx {
+           |match input {
            | case t : TransferTransaction  =>
            |   ${provenPart(t)}
            |   let amount = t.amount == ${t.amount}
@@ -66,7 +66,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   property("IssueTransaction binding") {
     forAll(issueGen) { t =>
       val s = s"""
-                 |match tx {
+                 |match input {
                  | case t : IssueTransaction =>
                  |   ${provenPart(t)}
                  |   let quantity = t.quantity == ${t.quantity}
@@ -95,7 +95,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     forAll(burnGen) { t =>
       val result = runScript[Boolean](
         s"""
-          |match tx {
+          |match input {
           | case t : BurnTransaction =>
           |   ${provenPart(t)}
           |   let quantity = t.quantity == ${t.quantity}
@@ -115,7 +115,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     forAll(reissueGen) { t =>
       val result = runScript[Boolean](
         s"""
-          |match tx {
+          |match input {
           | case t : ReissueTransaction =>
           |   ${provenPart(t)}
           |   let quantity = t.quantity == ${t.quantity}
@@ -136,7 +136,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     forAll(createAliasGen) { t =>
       val result = runScript[Boolean](
         s"""
-          |match tx {
+          |match input {
           | case t : CreateAliasTransaction =>
           |   ${provenPart(t)}
           |   let alias = t.alias == ${Json.toJson(t.alias.name)}
@@ -155,7 +155,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     forAll(leaseGen) { t =>
       val result = runScript[Boolean](
         s"""
-          |match tx {
+          |match input {
           | case t : LeaseTransaction =>
           |   ${provenPart(t)}
           |   let amount = t.amount == ${t.amount}
@@ -178,7 +178,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     forAll(leaseCancelGen) { t =>
       val result = runScript[Boolean](
         s"""
-          |match tx {
+          |match input {
           | case t : LeaseCancelTransaction =>
           |   ${provenPart(t)}
           |   let leaseId = t.leaseId == base58'${t.leaseId.base58}'
@@ -197,7 +197,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     forAll(Gen.oneOf(sponsorFeeGen, cancelFeeSponsorshipGen)) { t =>
       val result = runScript[Boolean](
         s"""
-          |match tx {
+          |match input {
           | case t : SponsorFeeTransaction =>
           |   ${provenPart(t)}
           |   let assetId = t.assetId == base58'${t.assetId.base58}'
@@ -218,7 +218,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     forAll(setScriptTransactionGen) { t =>
       val result = runScript[Boolean](
         s"""
-           |match tx {
+           |match input {
            | case t : SetScriptTransaction =>
            |   ${provenPart(t)}
            |   let script = if (${t.script.isDefined}) then extract(t.script) == base64'${t.script
@@ -254,7 +254,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         if (t.data.isEmpty) assertProvenPart else assertProvenPart + s" && ${t.data.indices.map(i => s"key$i && value$i").mkString(" && ")}"
 
       val s = s"""
-                 |match tx {
+                 |match input {
                  | case t : DataTransaction =>
                  |   ${provenPart(t)}
                  |   ${Range(0, t.data.length).map(pg).mkString("\n")}
@@ -292,7 +292,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           }
 
       val script = s"""
-                      |match tx {
+                      |match input {
                       | case t : MassTransferTransaction =>
                       |    let assetId = if (${t.assetId.isDefined}) then extract(t.assetId) == base58'${t.assetId
                         .getOrElse(ByteStr.empty)
@@ -361,7 +361,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         (script, lets)
       }
 
-      val s = s"""|match tx {
+      val s = s"""|match input {
                 | case t : ExchangeTransaction =>
                 |   ${provenPart(t)}
                 |   let price = t.price == ${t.price}

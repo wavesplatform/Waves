@@ -10,6 +10,7 @@ import monix.eval.Coeval
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
 import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import shapeless.Coproduct
 
 package object predef {
   val networkByte: Byte = 'u'
@@ -20,7 +21,7 @@ package object predef {
       _             <- Either.cond(expr.size == 1, (), expr.mkString("\n"))
       compileResult <- CompilerV1(dummyCompilerContext, expr.head)
       (typedExpr, tpe) = compileResult
-      r <- EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr)._2
+      r <- EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(Coproduct(tx)), Coeval(???), null), typedExpr)._2
     } yield r
   }
 
@@ -31,7 +32,7 @@ package object predef {
        |
        | let longAll = 1000 * 2 == 2000 && 1000 / 2 == 500 && 1000 % 2 == 0 && 1000 + 2 == 1002 && 1000 - 2 == 998
        | let sumString = "ha" + "-" +"ha" == "ha-ha"
-       | let sumByteVector = match tx {
+       | let sumByteVector = match input {
        |     case d: DataTransaction =>
        |      let body = d.bodyBytes
        |      body + base64'${ByteStr(tx.bodyBytes.apply()).base64}' == base64'${ByteStr(tx.bodyBytes.apply()).base64}' + base64'${ByteStr(
@@ -40,7 +41,7 @@ package object predef {
        |     case _ => false
        |   }
        |
-       | let eqUnion = match tx {
+       | let eqUnion = match input {
        |   case d: DataTransaction => true
        |   case d: TransferTransaction => d.recipient == Address(base58'${t.recipient.bytes.base58}')
        |   case _ => false
@@ -49,16 +50,16 @@ package object predef {
        | let basic = longAll && sumString && sumByteVector && eqUnion
        | 
        | # 2) ne
-       | let nePrim = 1000 != 999 && "ha" +"ha" != "ha-ha" && tx.bodyBytes != base64'hahaha'
-       | let neDataEntryAndGetElement = match tx {
+       | let nePrim = 1000 != 999 && "ha" +"ha" != "ha-ha"
+       | let neDataEntryAndGetElement = match input {
        |    case d: DataTransaction => d.data[0] != DataEntry("ha", true)
        |    case d: TransferTransaction => true
        |    case _ => false
        |  }
        |
-       | let neOptionAndExtractHeight = match tx {
+       | let neOptionAndExtractHeight = match input {
        |   case d: DataTransaction => true
-       |   case d: TransferTransaction => extract(transactionHeightById(tx.id)) != 0
+       |   case d: TransferTransaction => extract(transactionHeightById(input.id)) != 0
        |   case _ => false
        | }
        |
@@ -68,7 +69,7 @@ package object predef {
        | let gteLong = 1000 > 999 && 1000 >= 999
        |
        |# 4) getListSize
-       | let getListSize = match tx {
+       | let getListSize = match input {
        |    case d: DataTransaction => size(d.data) != 0
        |    case d: TransferTransaction => true
        |    case _ => false
@@ -80,7 +81,7 @@ package object predef {
        |# 6) fraction, sizeBytes, takeBytes, dropBytes, takeRightBytes, dropRightBytes, sizeString, takeString, dropString,
        |#    takeRightString, dropRightString, isDefined
        | let frAction = fraction(12, 3, 4) == 9
-       | let bytesOps = match tx {
+       | let bytesOps = match input {
        |     case d: DataTransaction =>
        |       size(d.bodyBytes) != 0 && take(d.bodyBytes, 1) != base58'ha' && drop(d.bodyBytes, 1) != base58'ha' && takeRight(d.bodyBytes, 1) != base58'ha' && dropRight(d.bodyBytes, 1) != base58'ha'
        |     case d: TransferTransaction => isDefined(d.feeAssetId) == false
@@ -91,14 +92,14 @@ package object predef {
        | let pure = basic && ne && gteLong && getListSize && unary && frAction && bytesOps && strOps
        |
        | # Waves context
-       | let txById = match tx {
+       | let txById = match input {
        |     case d: DataTransaction => true
        |     case d: TransferTransaction =>
        |       let g = extract(transactionById(base58'${tx.id().base58}'))
        |       g.id == base58'${tx.id().base58}'
        |     case _ => false
        | }
-       | let entries = match tx {
+       | let entries = match input {
        |   case d: DataTransaction => true || true
        |   case d: TransferTransaction =>
        |     let add = Address(base58'${t.recipient.bytes.base58}')
@@ -110,22 +111,22 @@ package object predef {
        |   case _ => false
        | }
        |
-       | let aFromPK = addressFromPublicKey(tx.senderPublicKey) == tx.sender
-       | let aFromStrOrRecip = match tx {
+       | let aFromPK = addressFromPublicKey(input.senderPublicKey) == input.sender
+       | let aFromStrOrRecip = match input {
        |   case d: DataTransaction => addressFromString("${tx.sender.address}") == Address(base58'${tx.sender.bytes.base58}')
        |   case d: TransferTransaction => addressFromRecipient(d.recipient) == Address(base58'${t.recipient.bytes.base58}')
        |   case _ => false
        | }
        |
-       | let balances = assetBalance(tx.sender, unit) > 0 && wavesBalance(tx.sender) != 0
+       | let balances = assetBalance(input.sender, unit) > 0 && wavesBalance(input.sender) != 0
        |
        | let waves = txById && entries && balances && aFromPK && aFromStrOrRecip && height > 0
        |
        | # Crypto context
        | let bks = blake2b256(base58'') != base58'' && keccak256(base58'') != base58'' && sha256(base58'') != base58''
        | let sig = sigVerify(base58'333', base58'123', base58'567') != true
-       | let str58 = fromBase58String(toBase58String(tx.id)) == tx.id
-       | let str64 = fromBase64String(toBase64String(tx.id)) == tx.id
+       | let str58 = fromBase58String(toBase58String(input.id)) == input.id
+       | let str64 = fromBase64String(toBase64String(input.id)) == input.id
        |
        | let crypto = bks && sig && str58 && str64
        |

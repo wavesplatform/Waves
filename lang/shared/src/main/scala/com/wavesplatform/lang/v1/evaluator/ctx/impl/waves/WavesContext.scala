@@ -1,13 +1,15 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import cats.data.EitherT
+import cats.implicits._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTEVECTOR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.fromOption
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext}
 import com.wavesplatform.lang.v1.traits._
+import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import monix.eval.Coeval
 import scodec.bits.ByteVector
@@ -173,7 +175,17 @@ object WavesContext {
         case _ => ???
       }
 
-    val txCoeval: Coeval[Either[String, CaseObj]]  = Coeval.evalOnce(Right(transactionObject(env.transaction)))
+    val inputEntityCoeval: Coeval[Either[String, CaseObj]] =
+      Coeval.evalOnce(
+        env.inputEntity
+          .eliminate(
+            tx => transactionObject(tx).asRight[String],
+            _.eliminate(
+              o => orderObject(o).asRight[String],
+              _ => "Expected Transaction or Order".asLeft[CaseObj]
+            )
+          ))
+
     val heightCoeval: Coeval[Either[String, Long]] = Coeval.evalOnce(Right(env.height))
 
     val txByIdF: BaseFunction = {
@@ -212,7 +224,7 @@ object WavesContext {
 
     val vars: Map[String, (FINAL, LazyVal)] = Map(
       ("height", (com.wavesplatform.lang.v1.compiler.Types.LONG, LazyVal(EitherT(heightCoeval)))),
-      ("tx", (outgoingTransactionType, LazyVal(EitherT(txCoeval))))
+      ("input", (scriptInputType, LazyVal(EitherT(inputEntityCoeval))))
     )
 
     val functions = Seq(

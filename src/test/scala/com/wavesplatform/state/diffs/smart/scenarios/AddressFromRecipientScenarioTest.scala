@@ -18,6 +18,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
+import shapeless._
 
 class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -36,10 +37,10 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
 
   def evalScript(tx: Transaction, blockchain: Blockchain): Either[com.wavesplatform.lang.ExecutionError, CaseObj] = {
     val context =
-      BlockchainContext.build(AddressScheme.current.chainId, Coeval.evalOnce(tx), Coeval.evalOnce(blockchain.height), blockchain)
+      BlockchainContext.build(AddressScheme.current.chainId, Coeval.evalOnce(Coproduct(tx)), Coeval.evalOnce(blockchain.height), blockchain)
 
     val Parsed.Success(expr, _) = Parser("""
-        | match tx {
+        | match input {
         |  case t : TransferTransaction =>  addressFromRecipient(t.recipient)
         |  case other => throw
         |  }

@@ -1,17 +1,13 @@
-package com.wavesplatform.lang.v1.traits
+package com.wavesplatform.lang.v1.traits.domain
 
 import scodec.bits.ByteVector
 
-case class Header(id: ByteVector, fee: Long, timestamp: Long, version: Long)
+sealed trait Tx
+object Tx {
 
-case class Proven(h: Header, sender: Recipient.Address, bodyBytes: ByteVector, senderPk: ByteVector, proofs: IndexedSeq[ByteVector])
-
-trait Recipient
-object Recipient {
-  case class Address(bytes: ByteVector) extends Recipient
-  case class Alias(name: String)        extends Recipient
-}
-case class TransferItem(recipient: Recipient, amount: Long)
+  case class Header(id: ByteVector, fee: Long, timestamp: Long, version: Long)
+  case class Proven(h: Header, sender: Recipient.Address, bodyBytes: ByteVector, senderPk: ByteVector, proofs: IndexedSeq[ByteVector])
+  case class TransferItem(recipient: Recipient, amount: Long)
 
 sealed trait OrdType
 object OrdType {
@@ -27,10 +23,10 @@ trait DataItem[T] {
 }
 
 object DataItem {
-  case class Lng(k: String, v: Long)       extends DataItem[Long]       { val key = k; val value = v }
-  case class Bool(k: String, v: Boolean)   extends DataItem[Boolean]    { val key = k; val value = v }
+  case class Lng(k: String, v: Long)       extends DataItem[Long] { val key = k; val value = v }
+  case class Bool(k: String, v: Boolean)   extends DataItem[Boolean] { val key = k; val value = v }
   case class Bin(k: String, v: ByteVector) extends DataItem[ByteVector] { val key = k; val value = v }
-  case class Str(k: String, v: String)     extends DataItem[String]     { val key = k; val value = v }
+  case class Str(k: String, v: String)     extends DataItem[String] { val key = k; val value = v }
 }
 
 case class Ord(id: ByteVector,
