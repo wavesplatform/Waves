@@ -42,6 +42,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |      enable: yes
         |      one-address-processing-timeout: 32s
         |    }
+        |    validation-timeout = 10m
         |  }
         |}""".stripMargin))
 
@@ -67,6 +68,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       ))
     settings.blacklistedAssets shouldBe Set("a")
     settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")
+    settings.validationTimeout shouldBe 10.minutes
     settings.blacklistedAddresses shouldBe Set("c")
     settings.balanceWatching shouldBe BalanceWatcherWorkerActor.Settings(
       enable = true,

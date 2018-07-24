@@ -28,7 +28,6 @@ import scorex.wallet.Wallet
 
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 
 class OrderBookActor(assetPair: AssetPair,
                      updateSnapshot: OrderBook => Unit,
@@ -230,7 +229,7 @@ class OrderBookActor(assetPair: AssetPair,
         val msg = ValidateCancelOrder(cancel, NTP.correctedTime())
         orderHistory ! msg
         apiSender = Some(sender())
-        cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
+        cancellable = Some(context.system.scheduler.scheduleOnce(settings.validationTimeout, self, ValidationTimeoutExceeded))
         context.become(waitingValidation(Left(msg)))
         cancelInProgressOrders.put(cancel.orderId, okCancel)
     }
@@ -285,7 +284,7 @@ class OrderBookActor(assetPair: AssetPair,
     val msg = ValidateOrder(order, NTP.correctedTime())
     orderHistory ! msg
     apiSender = Some(sender())
-    cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
+    cancellable = Some(context.system.scheduler.scheduleOnce(settings.validationTimeout, self, ValidationTimeoutExceeded))
     context.become(waitingValidation(Right(msg)))
   }
 
@@ -431,9 +430,8 @@ object OrderBookActor {
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
-  val MaxDepth                          = 50
-  val ValidationTimeout: FiniteDuration = 5.seconds
-  val AlreadyCanceledCacheSize          = 10000L
+  val MaxDepth                 = 50
+  val AlreadyCanceledCacheSize = 10000L
 
   private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit) {
     def completed: Boolean  = initiated && oldMessagesDeleted && oldSnapshotsDeleted
