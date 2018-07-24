@@ -14,6 +14,7 @@ import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.leasing._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
@@ -49,7 +50,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
 
   override lazy val route =
     pathPrefix("transactions") {
-      unconfirmed ~ addressLimit ~ info ~ sign ~ estimate ~ broadcast
+      unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ broadcast
     }
 
   private val invalidLimit = StatusCodes.BadRequest -> Json.obj("message" -> "invalid.limit")
@@ -153,8 +154,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       }
   }
 
-  @Path("/estimate")
-  @ApiOperation(value = "Estimates a transaction", notes = "Gets a fee for this transaction", httpMethod = "POST")
+  @Path("/calculateFee")
+  @ApiOperation(value = "Calculate fee", notes = "Calculates a fee for a transaction", httpMethod = "POST")
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "json",
@@ -163,13 +164,13 @@ case class TransactionsApiRoute(settings: RestAPISettings,
                            paramType = "body",
                            value = "Transaction data including type and optional timestamp in milliseconds")
     ))
-  def estimate: Route = (pathPrefix("sign") & post) {
+  def calculateFee: Route = (pathPrefix("sign") & post) {
     pathEndOrSingleSlash {
       handleExceptions(jsonExceptionHandler) {
         json[JsObject] { jsv =>
           val fakeAccount = PrivateKeyAccount.apply("fake".getBytes(StandardCharsets.UTF_8))
           signTransaction(fakeAccount, fakeAccount, jsv) { tx =>
-            tx.json()
+            CommonValidation.getMinFee(blockchain, settings, tx) // TODO: Change sender
           }
         }
       }
