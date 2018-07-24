@@ -44,15 +44,15 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |   let feeAssetId = if (${t.feeAssetId.isDefined})
            |      then extract(t.feeAssetId) == base58'${t.feeAssetId.getOrElse(ByteStr.empty).base58}'
            |      else isDefined(t.feeAssetId) == false
-           |   let transferAssetId = if (${t.assetId.isDefined})
-           |      then extract(t.transferAssetId) == base58'${t.assetId.getOrElse(ByteStr.empty).base58}'
-           |      else isDefined(t.transferAssetId) == false
+           |   let assetId = if (${t.assetId.isDefined})
+           |      then extract(t.assetId) == base58'${t.assetId.getOrElse(ByteStr.empty).base58}'
+           |      else isDefined(t.assetId) == false
            |   let recipient = match (t.recipient) {
            |       case a: Address => a.bytes == base58'${t.recipient.cast[Address].map(_.bytes.base58).getOrElse("")}'
            |       case a: Alias => a.alias == ${Json.toJson(t.recipient.cast[Alias].map(_.name).getOrElse(""))}
            |      }
            |    let attachment = t.attachment == base58'${ByteStr(t.attachment).base58}'
-           |   $assertProvenPart && amount && feeAssetId && transferAssetId && recipient && attachment
+           |   $assertProvenPart && amount && feeAssetId && assetId && recipient && attachment
            | case other => throw
            | }
            |""".stripMargin,
@@ -294,10 +294,10 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       val script = s"""
                       |match tx {
                       | case t : MassTransferTransaction =>
-                      |    let assetId = if (${t.assetId.isDefined}) then extract(t.transferAssetId) == base58'${t.assetId
+                      |    let assetId = if (${t.assetId.isDefined}) then extract(t.assetId) == base58'${t.assetId
                         .getOrElse(ByteStr.empty)
                         .base58}'
-                      |      else isDefined(t.transferAssetId) == false
+                      |      else isDefined(t.assetId) == false
                       |     let transferCount = t.transferCount == ${t.transfers.length}
                       |     let totalAmount = t.totalAmount == ${t.transfers.map(_.amount).sum}
                       |     let attachment = t.attachment == base58'${ByteStr(t.attachment).base58}'

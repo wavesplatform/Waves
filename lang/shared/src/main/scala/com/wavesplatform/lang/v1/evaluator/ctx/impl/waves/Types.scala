@@ -38,11 +38,11 @@ object Types {
   val transferTransactionType = CaseType(
     "TransferTransaction",
     List(
-      "feeAssetId"      -> optionByteVector,
-      "amount"          -> LONG,
-      "transferAssetId" -> optionByteVector,
-      "recipient"       -> addressOrAliasType,
-      "attachment"      -> BYTEVECTOR
+      "feeAssetId" -> optionByteVector,
+      "amount"     -> LONG,
+      "assetId"    -> optionByteVector,
+      "recipient"  -> addressOrAliasType,
+      "attachment" -> BYTEVECTOR
     ) ++ header ++ proven
   )
 
@@ -157,12 +157,12 @@ object Types {
   val massTransferTransactionType = CaseType(
     "MassTransferTransaction",
     List(
-      "feeAssetId"      -> optionByteVector,
-      "transferAssetId" -> optionByteVector,
-      "totalAmount"     -> LONG,
-      "transfers"       -> listTransfers,
-      "transferCount"   -> LONG,
-      "attachment"      -> BYTEVECTOR
+      "feeAssetId"    -> optionByteVector,
+      "assetId"       -> optionByteVector,
+      "totalAmount"   -> LONG,
+      "transfers"     -> listTransfers,
+      "transferCount" -> LONG,
+      "attachment"    -> BYTEVECTOR
     ) ++ header ++ proven
   )
 
