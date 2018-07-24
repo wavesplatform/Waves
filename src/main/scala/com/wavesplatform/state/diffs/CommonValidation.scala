@@ -132,6 +132,8 @@ object CommonValidation {
       case _ => Right(tx)
     }
 
+  //def getMinFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, Unit] = {}
+
   def checkFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
     def feeInUnits: Either[ValidationError, Int] = tx match {
       case _: GenesisTransaction       => Right(0)
