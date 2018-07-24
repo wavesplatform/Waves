@@ -18,7 +18,7 @@ class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matche
     val scriptText =
       s"""
          |
-         | match tx {
+         | match input {
          |  case ttx: TransferTransaction | MassTransferTransaction =>
          |     sigVerify(ttx.bodyBytes,ttx.proofs[0],ttx.senderPublicKey)
          |  case other =>

@@ -66,7 +66,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     let Bob = Address(base58'$BobBC1')
     let Alice = Address(base58'$AliceBC1')
 
-    match tx {
+    match input {
       case ttx: TransferTransaction =>
         let txToBob = (ttx.recipient == Bob) && (sha256(ttx.proofs[0]) == base58'$shaSecret') && ((20 + $beforeHeight) >= height)
         let backToAliceAfterHeight = ((height >= (21 + $beforeHeight)) && (ttx.recipient == Alice))
