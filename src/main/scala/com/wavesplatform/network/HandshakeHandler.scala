@@ -135,7 +135,7 @@ object HandshakeHandler extends ScorexLogging {
   val NodeNameAttributeKey = AttributeKey.newInstance[String]("name")
 
   def versionIsSupported(remoteVersion: (Int, Int, Int)): Boolean =
-    remoteVersion._1 == 0 && remoteVersion._2 >= 13
+    (remoteVersion._1 == 0 && remoteVersion._2 >= 13) || (remoteVersion._1 == 1 && remoteVersion._2 >= 0)
 
   def removeHandshakeHandlers(ctx: ChannelHandlerContext, thisHandler: ChannelHandler): Unit = {
     ctx.pipeline().remove(classOf[HandshakeTimeoutHandler])
