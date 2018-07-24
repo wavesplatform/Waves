@@ -30,8 +30,6 @@ class BlockSizeConstraintsSuite extends FreeSpec with Matchers with TransferSend
       _                 <- miner.waitForHeight(4)
       blockHeaderAfter  <- miner.blockHeadersAt(3)
     } yield {
-      println(blockHeaderBefore)
-      println(blockHeaderAfter)
       val maxSizeInBytesAfterActivation = (1.1d * 1024 * 1024).toInt // including headers
       val blockSizeInBytesBefore        = blockHeaderBefore.blocksize
       blockSizeInBytesBefore should be > maxSizeInBytesAfterActivation
