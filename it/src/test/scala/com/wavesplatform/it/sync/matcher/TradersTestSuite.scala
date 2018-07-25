@@ -23,7 +23,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   private def matcherNode = nodes.head
   private def aliceNode   = nodes(1)
   private def bobNode     = nodes(2)
-  948
+
   "Verifications of tricky ordering cases" - {
     // Alice issues new asset
     val aliceAsset =

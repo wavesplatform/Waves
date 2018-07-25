@@ -112,7 +112,7 @@ object MatcherResponse {
   implicit val matcherResponseFormat: Format[MatcherResponse] = Json.format
 }
 
-case class MatcherStatusResponse(status: String)
+case class MatcherStatusResponse(status: String, filledAmount: Option[Long])
 object MatcherStatusResponse {
   implicit val matcherStatusResponseFormat: Format[MatcherStatusResponse] = Json.format
 }
