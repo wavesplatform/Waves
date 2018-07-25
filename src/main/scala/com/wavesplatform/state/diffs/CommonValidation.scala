@@ -132,36 +132,36 @@ object CommonValidation {
       case _ => Right(tx)
     }
 
+  private def feeInUnits(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Long] = tx match {
+    case _: GenesisTransaction       => Right(0)
+    case _: PaymentTransaction       => Right(1)
+    case _: IssueTransaction         => Right(1000)
+    case _: ReissueTransaction       => Right(1000)
+    case _: BurnTransaction          => Right(1)
+    case _: TransferTransaction      => Right(1)
+    case tx: MassTransferTransaction => Right(1 + (tx.transfers.size + 1) / 2)
+    case _: LeaseTransaction         => Right(1)
+    case _: LeaseCancelTransaction   => Right(1)
+    case _: ExchangeTransaction      => Right(3)
+    case _: CreateAliasTransaction   => Right(1)
+    case tx: DataTransaction =>
+      val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts, height)) tx.bodyBytes() else tx.bytes()
+      Right(1 + (base.length - 1) / 1024)
+    case _: SetScriptTransaction  => Right(1)
+    case _: SponsorFeeTransaction => Right(1000)
+    case _                        => Left(UnsupportedTransactionType)
+  }
+
   def getMinFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, (Option[AssetId], Long)] = {
     type FeeInfo = (Option[(AssetId, AssetDescription)], Long)
-
-    def feeInUnits: Either[ValidationError, Long] = tx match {
-      case _: GenesisTransaction       => Right(0)
-      case _: PaymentTransaction       => Right(1)
-      case _: IssueTransaction         => Right(1000)
-      case _: ReissueTransaction       => Right(1000)
-      case _: BurnTransaction          => Right(1)
-      case _: TransferTransaction      => Right(1)
-      case tx: MassTransferTransaction => Right(1 + (tx.transfers.size + 1) / 2)
-      case _: LeaseTransaction         => Right(1)
-      case _: LeaseCancelTransaction   => Right(1)
-      case _: ExchangeTransaction      => Right(3)
-      case _: CreateAliasTransaction   => Right(1)
-      case tx: DataTransaction =>
-        val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts, height)) tx.bodyBytes() else tx.bytes()
-        Right(1 + (base.length - 1) / 1024)
-      case _: SetScriptTransaction  => Right(1)
-      case _: SponsorFeeTransaction => Right(1000)
-      case _                        => Left(UnsupportedTransactionType)
-    }
 
     def feeAfterSponsorship(txAsset: Option[AssetId]): Either[ValidationError, FeeInfo] =
       if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
         // This could be true for private blockchains
-        feeInUnits.map(x => (None, x * Sponsorship.FeeUnit))
+        feeInUnits(blockchain, height, tx).map(x => (None, x * Sponsorship.FeeUnit))
       } else
         for {
-          feeInUnits <- feeInUnits
+          feeInUnits <- feeInUnits(blockchain, height, tx)
           r <- txAsset match {
             case None => Right((None, feeInUnits * Sponsorship.FeeUnit))
             case Some(assetId) =>
@@ -207,32 +207,12 @@ object CommonValidation {
   }
 
   def checkFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
-    def feeInUnits: Either[ValidationError, Int] = tx match {
-      case _: GenesisTransaction       => Right(0)
-      case _: PaymentTransaction       => Right(1)
-      case _: IssueTransaction         => Right(1000)
-      case _: ReissueTransaction       => Right(1000)
-      case _: BurnTransaction          => Right(1)
-      case _: TransferTransaction      => Right(1)
-      case tx: MassTransferTransaction => Right(1 + (tx.transfers.size + 1) / 2)
-      case _: LeaseTransaction         => Right(1)
-      case _: LeaseCancelTransaction   => Right(1)
-      case _: ExchangeTransaction      => Right(3)
-      case _: CreateAliasTransaction   => Right(1)
-      case tx: DataTransaction =>
-        val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts, height)) tx.bodyBytes() else tx.bytes()
-        Right(1 + (base.length - 1) / 1024)
-      case _: SetScriptTransaction  => Right(1)
-      case _: SponsorFeeTransaction => Right(1000)
-      case _                        => Left(UnsupportedTransactionType)
-    }
-
     def restFeeAfterSponsorship(inputFee: (Option[AssetId], Long)): Either[ValidationError, (Option[AssetId], Long)] =
       if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) Right(inputFee)
       else {
         val (feeAssetId, feeAmount) = inputFee
         for {
-          feeInUnits <- feeInUnits
+          feeInUnits <- feeInUnits(blockchain, height, tx)
           feeAmount <- feeAssetId match {
             case None => Right(feeAmount)
             case Some(x) =>

@@ -169,9 +169,10 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       handleExceptions(jsonExceptionHandler) {
         json[JsObject] { jsv =>
           val senderPk = (jsv \ "senderPublicKey").as[String]
+          // Just for converting the request to the transaction
           val enrichedJsv = jsv ++ Json.obj(
             "fee"    -> 1234567,
-            "sender" -> senderPk // Doesn't matter
+            "sender" -> senderPk
           )
           createTransaction(senderPk, enrichedJsv) { tx =>
             CommonValidation.getMinFee(blockchain, functionalitySettings, blockchain.height, tx).map {
@@ -184,7 +185,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           }
         }
       }
-    } ~ signWithSigner
+    }
   }
 
   @Path("/sign")
