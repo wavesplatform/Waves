@@ -5,8 +5,10 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation, TransactionsApiRoute}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr}
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.utils.Base58
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -37,30 +39,67 @@ class TransactionsRouteSpec
   private val route       = TransactionsApiRoute(restAPISettings, TestFunctionalitySettings.Stub, wallet, blockchain, utx, allChannels, new TestTime).route
 
   routePath("/calculateFee") - {
-    "transfer with Waves fee" in {
-      val sender: PublicKeyAccount = accountGen.sample.get
-      val transferTx = Json.obj(
-        "type"            -> 4,
-        "version"         -> 2,
-        "amount"          -> 1000000,
-        "senderPublicKey" -> Base58.encode(sender.publicKey),
-        "recipient"       -> accountGen.sample.get.toAddress
-      )
+    "transfer with Waves fee" - {
+      "TransferTransaction" in {
+        val sender: PublicKeyAccount = accountGen.sample.get
+        val transferTx = Json.obj(
+          "type"            -> 4,
+          "version"         -> 2,
+          "amount"          -> 1000000,
+          "senderPublicKey" -> Base58.encode(sender.publicKey),
+          "recipient"       -> accountGen.sample.get.toAddress
+        )
 
-      val featuresSettings = TestFunctionalitySettings.Enabled.copy(
-        preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.FeeSponsorship.id -> 100)
-      )
-      val blockchain = mock[Blockchain]
-      (blockchain.height _).expects().returning(1).anyNumberOfTimes()
-      (blockchain.hasScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
-      (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+        val featuresSettings = TestFunctionalitySettings.Enabled.copy(
+          preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.FeeSponsorship.id -> 100)
+        )
+        val blockchain = mock[Blockchain]
+        (blockchain.height _).expects().returning(1).anyNumberOfTimes()
+        (blockchain.hasScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
+        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
 
-      val route = TransactionsApiRoute(restAPISettings, featuresSettings, wallet, blockchain, utx, allChannels, new TestTime).route
+        val route = TransactionsApiRoute(restAPISettings, featuresSettings, wallet, blockchain, utx, allChannels, new TestTime).route
 
-      Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
-        status shouldEqual StatusCodes.OK
-        (responseAs[JsObject] \ "feeAssetId").asOpt[String] shouldBe empty
-        (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 100000
+        Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          (responseAs[JsObject] \ "feeAssetId").asOpt[String] shouldBe empty
+          (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 100000
+        }
+      }
+
+      "MassTransferTransaction" in {
+        val sender: PublicKeyAccount = accountGen.sample.get
+        val transferTx = Json.obj(
+          "type"            -> 11,
+          "version"         -> 1,
+          "senderPublicKey" -> Base58.encode(sender.publicKey),
+          "transfers" -> Json.arr(
+            Json.obj(
+              "recipient" -> accountGen.sample.get.toAddress,
+              "amount"    -> 1000000
+            ),
+            Json.obj(
+              "recipient" -> accountGen.sample.get.toAddress,
+              "amount"    -> 2000000
+            )
+          )
+        )
+
+        val featuresSettings = TestFunctionalitySettings.Enabled.copy(
+          preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.FeeSponsorship.id -> 100)
+        )
+        val blockchain = mock[Blockchain]
+        (blockchain.height _).expects().returning(1).anyNumberOfTimes()
+        (blockchain.hasScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
+        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+
+        val route = TransactionsApiRoute(restAPISettings, featuresSettings, wallet, blockchain, utx, allChannels, new TestTime).route
+
+        Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          (responseAs[JsObject] \ "feeAssetId").asOpt[String] shouldBe empty
+          (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 200000
+        }
       }
     }
 
@@ -133,6 +172,49 @@ class TransactionsRouteSpec
           status shouldEqual StatusCodes.OK
           (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.base58
           (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 5
+        }
+      }
+
+      "with sponsorship, smart token and smart account" in {
+        val assetId: ByteStr         = issueGen.sample.get.assetId()
+        val sender: PublicKeyAccount = accountGen.sample.get
+        val transferTx = Json.obj(
+          "type"            -> 4,
+          "version"         -> 2,
+          "amount"          -> 1000000,
+          "feeAssetId"      -> assetId.base58,
+          "senderPublicKey" -> Base58.encode(sender.publicKey),
+          "recipient"       -> accountGen.sample.get.toAddress
+        )
+
+        val featuresSettings = TestFunctionalitySettings.Enabled.copy(
+          preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.FeeSponsorship.id -> 0)
+        )
+
+        val blockchain = mock[Blockchain]
+        (blockchain.height _).expects().returning(featuresSettings.featureCheckBlocksPeriod).once()
+        (blockchain.hasScript _).expects(sender.toAddress).returning(true).once()
+        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+        (blockchain.assetDescription _)
+          .expects(assetId)
+          .returning(Some(AssetDescription(
+            issuer = accountGen.sample.get,
+            name = "foo".getBytes,
+            description = "bar".getBytes,
+            decimals = 8,
+            reissuable = false,
+            totalVolume = Long.MaxValue,
+            script = Some(ScriptV1(TRUE, checkSize = false).explicitGet()),
+            sponsorship = 5
+          )))
+          .anyNumberOfTimes()
+
+        val route = TransactionsApiRoute(restAPISettings, featuresSettings, wallet, blockchain, utx, allChannels, new TestTime).route
+
+        Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.base58
+          (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 45
         }
       }
     }

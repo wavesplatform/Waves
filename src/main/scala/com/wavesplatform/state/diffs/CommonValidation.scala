@@ -178,26 +178,24 @@ object CommonValidation {
 
     def isSmartToken(input: FeeInfo): Boolean = input._1.map(_._1).flatMap(blockchain.assetDescription).exists(_.script.isDefined)
 
-    def feeAfterSmartTokens(inputFee: FeeInfo): Either[ValidationError, FeeInfo] =
+    def feeAfterSmartTokens(inputFee: FeeInfo): Either[ValidationError, FeeInfo] = Right {
       if (isSmartToken(inputFee)) {
         val (feeAssetInfo, feeAmount) = inputFee
-        Either.cond(feeAssetInfo.isEmpty, (), GenericError("Transactions with smart tokens require Waves as fee")).map { _ =>
-          (feeAssetInfo, feeAmount + ScriptExtraFee)
-        }
-      } else Right(inputFee)
+        (feeAssetInfo, feeAmount + ScriptExtraFee)
+      } else inputFee
+    }
 
     def hasSmartAccountScript: Boolean = tx match {
       case tx: Transaction with Authorized => blockchain.hasScript(tx.sender)
       case _                               => false
     }
 
-    def feeAfterSmartAccounts(inputFee: FeeInfo): Either[ValidationError, FeeInfo] =
+    def feeAfterSmartAccounts(inputFee: FeeInfo): Either[ValidationError, FeeInfo] = Right {
       if (hasSmartAccountScript) {
         val (feeAssetInfo, feeAmount) = inputFee
-        Either.cond(feeAssetInfo.isEmpty, (), GenericError("Transactions from scripted accounts require Waves as fee")).map { _ =>
-          (feeAssetInfo, feeAmount + ScriptExtraFee)
-        }
-      } else Right(inputFee)
+        (feeAssetInfo, feeAmount + ScriptExtraFee)
+      } else inputFee
+    }
 
     feeAfterSponsorship(tx.assetFee._1)
       .flatMap(feeAfterSmartTokens)
