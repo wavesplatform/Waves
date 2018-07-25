@@ -49,7 +49,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   test("set acc0 as 2of2 multisig") {
     val scriptText = {
       val untyped = Parser(s"""
-        match input {
+        match tx {
           case tx: Transaction => {
             let A = base58'${ByteStr(acc1.publicKey)}'
             let B = base58'${ByteStr(acc2.publicKey)}'

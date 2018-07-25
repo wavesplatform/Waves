@@ -37,7 +37,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
         let pkB = base58'${ByteStr(acc1.publicKey)}'
         let pkC = base58'${ByteStr(acc2.publicKey)}'
 
-        match input {
+        match tx {
           case ltx: LeaseTransaction => sigVerify(ltx.bodyBytes,ltx.proofs[0],pkA) && sigVerify(ltx.bodyBytes,ltx.proofs[2],pkC)
           case lctx : LeaseCancelTransaction => sigVerify(lctx.bodyBytes,lctx.proofs[1],pkA) && sigVerify(lctx.bodyBytes,lctx.proofs[2],pkB)
           case other => false
