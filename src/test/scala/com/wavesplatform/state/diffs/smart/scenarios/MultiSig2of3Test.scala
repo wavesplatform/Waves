@@ -28,7 +28,7 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
          |let B = base58'${ByteStr(pk1.publicKey)}'
          |let C = base58'${ByteStr(pk2.publicKey)}'
          |
-         |match input {
+         |match tx {
          |  case _: Order => false
          |  case tx: Transaction       => {
          |    let proofs = tx.proofs

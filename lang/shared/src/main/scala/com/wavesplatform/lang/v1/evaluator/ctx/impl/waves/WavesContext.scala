@@ -224,7 +224,7 @@ object WavesContext {
 
     val vars: Map[String, (FINAL, LazyVal)] = Map(
       ("height", (com.wavesplatform.lang.v1.compiler.Types.LONG, LazyVal(EitherT(heightCoeval)))),
-      ("input", (scriptInputType, LazyVal(EitherT(inputEntityCoeval))))
+      ("tx", (scriptInputType, LazyVal(EitherT(inputEntityCoeval))))
     )
 
     val functions = Seq(

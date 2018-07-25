@@ -40,7 +40,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
       BlockchainContext.build(AddressScheme.current.chainId, Coeval.evalOnce(Coproduct(tx)), Coeval.evalOnce(blockchain.height), blockchain)
 
     val Parsed.Success(expr, _) = Parser("""
-        | match input {
+        | match tx {
         |  case t : TransferTransaction =>  addressFromRecipient(t.recipient)
         |  case other => throw
         |  }
