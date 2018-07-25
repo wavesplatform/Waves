@@ -164,12 +164,23 @@ case class TransactionsApiRoute(settings: RestAPISettings,
                            paramType = "body",
                            value = "Transaction data including type and optional timestamp in milliseconds")
     ))
-  def calculateFee: Route = (pathPrefix("sign") & post) {
+  def calculateFee: Route = (pathPrefix("calculateFee") & post) {
     pathEndOrSingleSlash {
       handleExceptions(jsonExceptionHandler) {
         json[JsObject] { jsv =>
-          createTransaction((jsv \ "sender").as[String], jsv + ("fee" -> JsNumber(Long.MaxValue))) { tx =>
-            CommonValidation.getMinFee(blockchain, functionalitySettings, blockchain.height, tx)
+          val senderPk = (jsv \ "senderPublicKey").as[String]
+          val enrichedJsv = jsv ++ Json.obj(
+            "fee"    -> 1234567,
+            "sender" -> senderPk // Doesn't matter
+          )
+          createTransaction(senderPk, enrichedJsv) { tx =>
+            CommonValidation.getMinFee(blockchain, functionalitySettings, blockchain.height, tx).map {
+              case (assetId, assetAmount) =>
+                Json.obj(
+                  "feeAssetId" -> assetId,
+                  "feeAmount"  -> assetAmount
+                )
+            }
           }
         }
       }
@@ -251,40 +262,40 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     }
   }
 
-  private def createTransaction(senderAddress: String, jsv: JsObject)(f: Transaction => ToResponseMarshallable): ToResponseMarshallable = {
+  private def createTransaction(senderPk: String, jsv: JsObject)(f: Transaction => ToResponseMarshallable): ToResponseMarshallable = {
     val typeId = (jsv \ "type").as[Byte]
 
     (jsv \ "version").validateOpt[Byte](versionReads) match {
       case JsError(errors) => WrongJson(None, errors)
       case JsSuccess(value, _) =>
-        val version = value getOrElse (1: Byte)
+        val version = value.getOrElse(1: Byte)
         val txJson  = jsv ++ Json.obj("version" -> version)
 
         PublicKeyAccount
-          .fromBase58String(senderAddress)
-          .flatMap { senderAddress =>
+          .fromBase58String(senderPk)
+          .flatMap { senderPk =>
             TransactionParsers.by(typeId, version) match {
               case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
               case Some(x) =>
                 x match {
-                  case IssueTransactionV1       => TransactionFactory.issueAssetV1(txJson.as[IssueV1Request], senderAddress)
-                  case IssueTransactionV2       => TransactionFactory.issueAssetV2(txJson.as[IssueV2Request], senderAddress)
-                  case TransferTransactionV1    => TransactionFactory.transferAssetV1(txJson.as[TransferV1Request], senderAddress)
-                  case TransferTransactionV2    => TransactionFactory.transferAssetV2(txJson.as[TransferV2Request], senderAddress)
-                  case ReissueTransactionV1     => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], senderAddress)
-                  case ReissueTransactionV2     => TransactionFactory.reissueAssetV2(txJson.as[ReissueV2Request], senderAddress)
-                  case BurnTransactionV1        => TransactionFactory.burnAssetV1(txJson.as[BurnV1Request], senderAddress)
-                  case BurnTransactionV2        => TransactionFactory.burnAssetV2(txJson.as[BurnV2Request], senderAddress)
-                  case MassTransferTransaction  => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], senderAddress)
-                  case LeaseTransactionV1       => TransactionFactory.leaseV1(txJson.as[LeaseV1Request], senderAddress)
-                  case LeaseTransactionV2       => TransactionFactory.leaseV2(txJson.as[LeaseV2Request], senderAddress)
-                  case LeaseCancelTransactionV1 => TransactionFactory.leaseCancelV1(txJson.as[LeaseCancelV1Request], senderAddress)
-                  case LeaseCancelTransactionV2 => TransactionFactory.leaseCancelV2(txJson.as[LeaseCancelV2Request], senderAddress)
-                  case CreateAliasTransactionV1 => TransactionFactory.aliasV1(txJson.as[CreateAliasV1Request], senderAddress)
-                  case CreateAliasTransactionV2 => TransactionFactory.aliasV2(txJson.as[CreateAliasV2Request], senderAddress)
-                  case DataTransaction          => TransactionFactory.data(txJson.as[DataRequest], senderAddress)
-                  case SetScriptTransaction     => TransactionFactory.setScript(txJson.as[SetScriptRequest], senderAddress)
-                  case SponsorFeeTransaction    => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderAddress)
+                  case IssueTransactionV1       => TransactionFactory.issueAssetV1(txJson.as[IssueV1Request], senderPk)
+                  case IssueTransactionV2       => TransactionFactory.issueAssetV2(txJson.as[IssueV2Request], senderPk)
+                  case TransferTransactionV1    => TransactionFactory.transferAssetV1(txJson.as[TransferV1Request], senderPk)
+                  case TransferTransactionV2    => TransactionFactory.transferAssetV2(txJson.as[TransferV2Request], senderPk)
+                  case ReissueTransactionV1     => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], senderPk)
+                  case ReissueTransactionV2     => TransactionFactory.reissueAssetV2(txJson.as[ReissueV2Request], senderPk)
+                  case BurnTransactionV1        => TransactionFactory.burnAssetV1(txJson.as[BurnV1Request], senderPk)
+                  case BurnTransactionV2        => TransactionFactory.burnAssetV2(txJson.as[BurnV2Request], senderPk)
+                  case MassTransferTransaction  => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], senderPk)
+                  case LeaseTransactionV1       => TransactionFactory.leaseV1(txJson.as[LeaseV1Request], senderPk)
+                  case LeaseTransactionV2       => TransactionFactory.leaseV2(txJson.as[LeaseV2Request], senderPk)
+                  case LeaseCancelTransactionV1 => TransactionFactory.leaseCancelV1(txJson.as[LeaseCancelV1Request], senderPk)
+                  case LeaseCancelTransactionV2 => TransactionFactory.leaseCancelV2(txJson.as[LeaseCancelV2Request], senderPk)
+                  case CreateAliasTransactionV1 => TransactionFactory.aliasV1(txJson.as[CreateAliasV1Request], senderPk)
+                  case CreateAliasTransactionV2 => TransactionFactory.aliasV2(txJson.as[CreateAliasV2Request], senderPk)
+                  case DataTransaction          => TransactionFactory.data(txJson.as[DataRequest], senderPk)
+                  case SetScriptTransaction     => TransactionFactory.setScript(txJson.as[SetScriptRequest], senderPk)
+                  case SponsorFeeTransaction    => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderPk)
                 }
             }
           }

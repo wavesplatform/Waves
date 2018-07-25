@@ -1,10 +1,15 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
+import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation, TransactionsApiRoute}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings}
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr}
+import com.wavesplatform.utils.Base58
 import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
 import io.netty.channel.group.ChannelGroup
 import org.scalacheck.Gen._
@@ -12,9 +17,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
-import com.wavesplatform.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation, TransactionsApiRoute}
-import com.wavesplatform.utils.Base58
-import com.wavesplatform.wallet.Wallet
 
 class TransactionsRouteSpec
     extends RouteSpec("/transactions")
@@ -33,6 +35,108 @@ class TransactionsRouteSpec
   private val utx         = mock[UtxPool]
   private val allChannels = mock[ChannelGroup]
   private val route       = TransactionsApiRoute(restAPISettings, TestFunctionalitySettings.Stub, wallet, blockchain, utx, allChannels, new TestTime).route
+
+  routePath("/calculateFee") - {
+    "transfer with Waves fee" in {
+      val sender: PublicKeyAccount = accountGen.sample.get
+      val transferTx = Json.obj(
+        "type"            -> 4,
+        "version"         -> 2,
+        "amount"          -> 1000000,
+        "senderPublicKey" -> Base58.encode(sender.publicKey),
+        "recipient"       -> accountGen.sample.get.toAddress
+      )
+
+      val featuresSettings = TestFunctionalitySettings.Enabled.copy(
+        preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.FeeSponsorship.id -> 100)
+      )
+      val blockchain = mock[Blockchain]
+      (blockchain.height _).expects().returning(1).anyNumberOfTimes()
+      (blockchain.hasScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
+      (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+
+      val route = TransactionsApiRoute(restAPISettings, featuresSettings, wallet, blockchain, utx, allChannels, new TestTime).route
+
+      Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        (responseAs[JsObject] \ "feeAssetId").asOpt[String] shouldBe empty
+        (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 100000
+      }
+    }
+
+    "transfer with Asset fee" - {
+      "without sponsorship" in {
+        val assetId: ByteStr         = issueGen.sample.get.assetId()
+        val sender: PublicKeyAccount = accountGen.sample.get
+        val transferTx = Json.obj(
+          "type"            -> 4,
+          "version"         -> 2,
+          "amount"          -> 1000000,
+          "feeAssetId"      -> assetId.base58,
+          "senderPublicKey" -> Base58.encode(sender.publicKey),
+          "recipient"       -> accountGen.sample.get.toAddress
+        )
+
+        val featuresSettings = TestFunctionalitySettings.Enabled.copy(
+          preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.FeeSponsorship.id -> 100)
+        )
+        val blockchain = mock[Blockchain]
+        (blockchain.height _).expects().returning(1).anyNumberOfTimes()
+        (blockchain.hasScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
+        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+
+        val route = TransactionsApiRoute(restAPISettings, featuresSettings, wallet, blockchain, utx, allChannels, new TestTime).route
+
+        Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          (responseAs[JsObject] \ "feeAssetId").asOpt[String] shouldBe empty
+          (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 100000
+        }
+      }
+
+      "with sponsorship" in {
+        val assetId: ByteStr         = issueGen.sample.get.assetId()
+        val sender: PublicKeyAccount = accountGen.sample.get
+        val transferTx = Json.obj(
+          "type"            -> 4,
+          "version"         -> 2,
+          "amount"          -> 1000000,
+          "feeAssetId"      -> assetId.base58,
+          "senderPublicKey" -> Base58.encode(sender.publicKey),
+          "recipient"       -> accountGen.sample.get.toAddress
+        )
+
+        val featuresSettings = TestFunctionalitySettings.Enabled.copy(
+          preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.FeeSponsorship.id -> 0)
+        )
+        val blockchain = mock[Blockchain]
+        (blockchain.height _).expects().returning(featuresSettings.featureCheckBlocksPeriod).once()
+        (blockchain.hasScript _).expects(sender.toAddress).returning(false).once()
+        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
+        (blockchain.assetDescription _)
+          .expects(assetId)
+          .returning(Some(AssetDescription(
+            issuer = accountGen.sample.get,
+            name = "foo".getBytes,
+            description = "bar".getBytes,
+            decimals = 8,
+            reissuable = false,
+            totalVolume = Long.MaxValue,
+            script = None,
+            sponsorship = 5
+          )))
+          .anyNumberOfTimes()
+
+        val route = TransactionsApiRoute(restAPISettings, featuresSettings, wallet, blockchain, utx, allChannels, new TestTime).route
+
+        Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.base58
+          (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 5
+        }
+      }
+    }
+  }
 
   routePath("/address/{address}/limit/{limit}") - {
     "handles invalid address" in {

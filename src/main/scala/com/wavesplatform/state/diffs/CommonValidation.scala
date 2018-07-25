@@ -133,6 +133,8 @@ object CommonValidation {
     }
 
   def getMinFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, (Option[AssetId], Long)] = {
+    type FeeInfo = (Option[(AssetId, AssetDescription)], Long)
+
     def feeInUnits: Either[ValidationError, Long] = tx match {
       case _: GenesisTransaction       => Right(0)
       case _: PaymentTransaction       => Right(1)
@@ -153,7 +155,7 @@ object CommonValidation {
       case _                        => Left(UnsupportedTransactionType)
     }
 
-    def feeAfterSponsorship(txAsset: Option[AssetId]): Either[ValidationError, (Option[AssetDescription], Long)] =
+    def feeAfterSponsorship(txAsset: Option[AssetId]): Either[ValidationError, FeeInfo] =
       if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
         // This could be true for private blockchains
         feeInUnits.map(x => (None, x * Sponsorship.FeeUnit))
@@ -162,22 +164,22 @@ object CommonValidation {
           feeInUnits <- feeInUnits
           r <- txAsset match {
             case None => Right((None, feeInUnits * Sponsorship.FeeUnit))
-            case Some(x) =>
+            case Some(assetId) =>
               for {
-                assetInfo <- blockchain.assetDescription(x).toRight(GenericError(s"Asset $x does not exist, cannot be used to pay fees"))
+                assetInfo <- blockchain.assetDescription(assetId).toRight(GenericError(s"Asset $assetId does not exist, cannot be used to pay fees"))
                 wavesFee <- Either.cond(
                   assetInfo.sponsorship > 0,
-                  Sponsorship.toWaves(feeInUnits * Sponsorship.FeeUnit, assetInfo.sponsorship),
-                  GenericError(s"Asset $x is not sponsored, cannot be used to pay fees")
+                  feeInUnits * Sponsorship.FeeUnit,
+                  GenericError(s"Asset $assetId is not sponsored, cannot be used to pay fees")
                 )
-              } yield (Some(assetInfo), wavesFee)
+              } yield (Some((assetId, assetInfo)), wavesFee)
           }
         } yield r
 
-    def isSmartToken: Boolean = tx.assetFee._1.flatMap(blockchain.assetDescription).exists(_.script.isDefined)
+    def isSmartToken(input: FeeInfo): Boolean = input._1.map(_._1).flatMap(blockchain.assetDescription).exists(_.script.isDefined)
 
-    def feeAfterSmartTokens(inputFee: (Option[AssetDescription], Long)): Either[ValidationError, (Option[AssetDescription], Long)] =
-      if (isSmartToken) {
+    def feeAfterSmartTokens(inputFee: FeeInfo): Either[ValidationError, FeeInfo] =
+      if (isSmartToken(inputFee)) {
         val (feeAssetInfo, feeAmount) = inputFee
         Either.cond(feeAssetInfo.isEmpty, (), GenericError("Transactions with smart tokens require Waves as fee")).map { _ =>
           (feeAssetInfo, feeAmount + ScriptExtraFee)
@@ -189,7 +191,7 @@ object CommonValidation {
       case _                               => false
     }
 
-    def feeAfterSmartAccounts(inputFee: (Option[AssetDescription], Long)): Either[ValidationError, (Option[AssetDescription], Long)] =
+    def feeAfterSmartAccounts(inputFee: FeeInfo): Either[ValidationError, FeeInfo] =
       if (hasSmartAccountScript) {
         val (feeAssetInfo, feeAmount) = inputFee
         Either.cond(feeAssetInfo.isEmpty, (), GenericError("Transactions from scripted accounts require Waves as fee")).map { _ =>
@@ -201,8 +203,8 @@ object CommonValidation {
       .flatMap(feeAfterSmartTokens)
       .flatMap(feeAfterSmartAccounts)
       .map {
-        case (Some(assetInfo), amountInWaves) => (tx.assetFee._1, Sponsorship.fromWaves(amountInWaves, assetInfo.sponsorship))
-        case (None, amountInWaves)            => (None, amountInWaves)
+        case (Some((assetId, assetInfo)), amountInWaves) => (Some(assetId), Sponsorship.fromWaves(amountInWaves, assetInfo.sponsorship))
+        case (None, amountInWaves)                       => (None, amountInWaves)
       }
   }
 
