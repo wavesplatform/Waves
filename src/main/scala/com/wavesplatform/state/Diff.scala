@@ -105,6 +105,14 @@ object Sponsorship {
     }
     waves.toLong
   }
+
+  def fromWaves(wavesFee: Long, sponsorship: Long): Long = {
+    val assetFee = (BigDecimal(wavesFee) / BigDecimal(Sponsorship.FeeUnit)) * BigDecimal(sponsorship)
+    if (assetFee > Long.MaxValue) {
+      throw new java.lang.ArithmeticException("Overflow")
+    }
+    assetFee.toLong
+  }
 }
 
 case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
