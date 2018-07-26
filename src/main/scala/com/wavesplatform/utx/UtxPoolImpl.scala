@@ -63,12 +63,10 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
     def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > utxSettings.maxTransactionAge
 
     transactions.values.asScala
-      .filter(isExpired)
-      .foreach { tx =>
-        transactions.remove(tx.id())
-        pessimisticPortfolios.remove(tx.id())
-        utxPoolSizeStats.decrement()
+      .collect {
+        case tx if isExpired(tx) => tx.id()
       }
+      .foreach(remove)
   }
 
   override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = putIfNew(blockchain, tx)
@@ -99,12 +97,13 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
   }
 
   override def removeAll(txs: Traversable[Transaction]): Unit = {
-    txs.view.map(_.id()).foreach { id =>
-      Option(transactions.remove(id)).foreach(_ => utxPoolSizeStats.decrement())
-      pessimisticPortfolios.remove(id)
-    }
-
+    txs.view.map(_.id()).foreach(remove)
     removeExpired(time.correctedTime())
+  }
+
+  private def remove(txId: ByteStr): Unit = {
+    Option(transactions.remove(txId)).foreach(_ => utxPoolSizeStats.decrement())
+    pessimisticPortfolios.remove(txId)
   }
 
   override def accountPortfolio(addr: Address): Portfolio = blockchain.portfolio(addr)
@@ -139,10 +138,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
           }
       }
 
-    invalidTxs.foreach { itx =>
-      transactions.remove(itx)
-      pessimisticPortfolios.remove(itx)
-    }
+    invalidTxs.foreach(remove)
     val txs = if (sortInBlock) reversedValidTxs.sorted(TransactionsOrdering.InBlock) else reversedValidTxs.reverse
     (txs, finalConstraint)
   }
@@ -175,9 +171,10 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
           _    <- feeCalculator.enoughFee(tx, blockchain, fs)
           diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
         } yield {
-          utxPoolSizeStats.increment()
           pessimisticPortfolios.add(tx.id(), diff)
-          (Option(transactions.put(tx.id(), tx)).isEmpty, diff)
+          val isNew = Option(transactions.put(tx.id(), tx)).isEmpty
+          if (isNew) utxPoolSizeStats.increment()
+          (isNew, diff)
         }
       }
     )
