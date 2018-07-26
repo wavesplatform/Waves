@@ -13,6 +13,7 @@ import org.scalatest.Assertions
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json.Writes
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.Proofs
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -125,9 +126,10 @@ object AsyncMatcherHttpApi extends Assertions {
       val creationTime        = System.currentTimeMillis()
       val timeToLiveTimestamp = creationTime + timeToLive.toMillis
       val matcherPublicKey    = matcherNode.publicKey
-      val unsigned            = Order(sender.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, 300000, Array())
-      val signature           = crypto.sign(sender.privateKey, unsigned.toSign)
-      unsigned.copy(signature = signature)
+      val unsigned =
+        Order(sender.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, 300000, Proofs.empty)
+      val signature = crypto.sign(sender.privateKey, unsigned.toSign)
+      unsigned.copy(proofs = Proofs(Seq(ByteStr(signature))))
     }
 
     def placeOrder(order: Order): Future[MatcherResponse] =

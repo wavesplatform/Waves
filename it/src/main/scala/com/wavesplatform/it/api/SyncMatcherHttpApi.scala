@@ -7,6 +7,8 @@ import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.{Assertions, Matchers}
 import play.api.libs.json.{Format, Json, Writes}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.state.ByteStr
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -93,9 +95,9 @@ object SyncMatcherHttpApi extends Assertions {
       val creationTime        = System.currentTimeMillis()
       val timeToLiveTimestamp = creationTime + timeToLive.toMillis
       val matcherPublicKey    = m.publicKey
-      val unsigned            = Order(node.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, 300000, Array())
+      val unsigned            = Order(node.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, 300000, Proofs.empty)
       val signature           = crypto.sign(node.privateKey, unsigned.toSign)
-      unsigned.copy(signature = signature)
+      unsigned.copy(proofs = Proofs(Seq(ByteStr(signature))))
     }
   }
 

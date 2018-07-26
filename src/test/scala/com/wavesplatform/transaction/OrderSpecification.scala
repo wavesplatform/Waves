@@ -5,7 +5,6 @@ import com.wavesplatform.matcher.ValidationMatcher
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.utils.NTP
-import com.wavesplatform.transaction.Proofs
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
