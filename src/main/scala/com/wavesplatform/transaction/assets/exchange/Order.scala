@@ -63,10 +63,12 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
                  @ApiModelProperty(value = "Creation timestamp") timestamp: Long,
                  @ApiModelProperty(value = "Order time to live, max = 30 days") expiration: Long,
                  @ApiModelProperty(example = "100000") matcherFee: Long,
-                 @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte])
+                 @ApiModelProperty(dataType = "Proofs") proofs: Proofs)
     extends BytesSerializable
     with JsonSerializable
     with Signed {
+
+  def signature: Array[Byte] = proofs.proofs(0).arr
 
   import Order._
 
@@ -196,6 +198,19 @@ object Order {
   val MaxAmount: Long       = 100 * PriceConstant * PriceConstant
   private val AssetIdLength = 32
 
+  def apply(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
+            @ApiModelProperty(dataType = "java.lang.String", example = "") matcherPublicKey: PublicKeyAccount,
+            assetPair: AssetPair,
+            @ApiModelProperty(dataType = "java.lang.String", example = "buy") orderType: OrderType,
+            @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8", example = "100000000") price: Long,
+            @ApiModelProperty("Amount in AssetPair.second") amount: Long,
+            @ApiModelProperty(value = "Creation timestamp") timestamp: Long,
+            @ApiModelProperty(value = "Order time to live, max = 30 days") expiration: Long,
+            @ApiModelProperty(example = "100000") matcherFee: Long,
+            @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte]): Order = {
+    Order(senderPublicKey, matcherPublicKey, assetPair, orderType, price, amount, timestamp, expiration, matcherFee, Proofs(Seq(ByteStr(signature))))
+  }
+
   def buy(sender: PrivateKeyAccount,
           matcher: PublicKeyAccount,
           pair: AssetPair,
@@ -204,9 +219,9 @@ object Order {
           timestamp: Long,
           expiration: Long,
           matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, pair, OrderType.BUY, price, amount, timestamp, expiration, matcherFee, Array())
+    val unsigned = Order(sender, matcher, pair, OrderType.BUY, price, amount, timestamp, expiration, matcherFee, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.toSign)
-    unsigned.copy(signature = sig)
+    unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
   }
 
   def sell(sender: PrivateKeyAccount,
@@ -217,9 +232,9 @@ object Order {
            timestamp: Long,
            expiration: Long,
            matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, pair, OrderType.SELL, price, amount, timestamp, expiration, matcherFee, Array())
+    val unsigned = Order(sender, matcher, pair, OrderType.SELL, price, amount, timestamp, expiration, matcherFee, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.toSign)
-    unsigned.copy(signature = sig)
+    unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
   }
 
   def apply(sender: PrivateKeyAccount,
@@ -231,9 +246,9 @@ object Order {
             timestamp: Long,
             expiration: Long,
             matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, Array())
+    val unsigned = Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.toSign)
-    unsigned.copy(signature = sig)
+    unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
   }
 
   def parseBytes(bytes: Array[Byte]): Try[Order] = Try {
@@ -270,14 +285,14 @@ object Order {
       timestamp,
       expiration,
       matcherFee,
-      signature
+      Proofs(Seq(ByteStr(signature)))
     )
   }
 
   def sign(unsigned: Order, sender: PrivateKeyAccount): Order = {
     require(unsigned.senderPublicKey == sender)
     val sig = crypto.sign(sender, unsigned.toSign)
-    unsigned.copy(signature = sig)
+    unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
   }
 
   def splitByType(o1: Order, o2: Order): (Order, Order) = {

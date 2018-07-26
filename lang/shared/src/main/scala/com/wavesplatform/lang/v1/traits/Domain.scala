@@ -44,7 +44,7 @@ case class Ord(id: ByteVector,
                timestamp: Long,
                expiration: Long,
                matcherFee: Long,
-               signature: ByteVector)
+               proofs: IndexedSeq[ByteVector])
 trait Tx
 object Tx {
 

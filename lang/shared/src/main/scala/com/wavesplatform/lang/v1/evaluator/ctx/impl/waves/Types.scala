@@ -132,7 +132,8 @@ object Types {
       "timestamp"        -> LONG,
       "expiration"       -> LONG,
       "matcherFee"       -> LONG,
-      "signature"        -> BYTEVECTOR
+      "proofs"          -> listByteVector
+     // "signature"        -> BYTEVECTOR
     )
   )
   val exchangeTransactionType = CaseType(

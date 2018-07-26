@@ -48,7 +48,7 @@ object RealTransactionWrapper {
       timestamp = o.timestamp,
       expiration = o.expiration,
       matcherFee = o.matcherFee,
-      signature = ByteVector(o.signature)
+      proofs = o.proofs.proofs.map(a => ByteVector(a.arr)).toIndexedSeq
     )
 
   implicit def aoaToRecipient(aoa: AddressOrAlias): Recipient = aoa match {

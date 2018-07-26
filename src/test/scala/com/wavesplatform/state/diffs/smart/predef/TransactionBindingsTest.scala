@@ -331,7 +331,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |   let ${oType}Timestamp = t.${oType}Order.timestamp == ${ord.timestamp}
            |   let ${oType}Expiration = t.${oType}Order.expiration == ${ord.expiration}
            |   let ${oType}OrderMatcherFee = t.${oType}Order.matcherFee == ${ord.matcherFee}
-           |   let ${oType}Signature = t.${oType}Order.signature == base58'${ByteStr(ord.signature).base58}'
+           |   let ${oType}Signature = t.${oType}Order.proofs[0] == base58'${ByteStr(ord.signature).base58}'
            |   let ${oType}AssetPairAmount = if (${ord.assetPair.amountAsset.isDefined}) then extract(t.${oType}Order.assetPair.amountAsset) == base58'${ord.assetPair.amountAsset
                           .getOrElse(ByteStr.empty)
                           .base58}'

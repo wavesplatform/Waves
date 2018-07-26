@@ -5,6 +5,7 @@ import com.wavesplatform.matcher.ValidationMatcher
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.utils.NTP
+import com.wavesplatform.transaction.Proofs
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -96,7 +97,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
         order.copy(amount = order.amount + 1).signaturesValid() should produce("InvalidSignature")
         order.copy(expiration = order.expiration + 1).signaturesValid() should produce("InvalidSignature")
         order.copy(matcherFee = order.matcherFee + 1).signaturesValid() should produce("InvalidSignature")
-        order.copy(signature = pka.publicKey ++ pka.publicKey).signaturesValid() should produce("InvalidSignature")
+        order.copy(proofs = Proofs(Seq(ByteStr(pka.publicKey ++ pka.publicKey)))).signaturesValid() should produce("InvalidSignature")
     }
   }
 

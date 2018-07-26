@@ -1,7 +1,9 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.state.ByteStr
 import play.api.libs.json._
+
+import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.utils.Base58
 
@@ -55,8 +57,21 @@ object OrderJson {
                 timestamp: Long,
                 expiration: Long,
                 matcherFee: Long,
-                signature: Option[Array[Byte]]): Order = {
-    Order(sender, matcher, assetPair, orderType, price, amount, timestamp, expiration, matcherFee, signature.getOrElse(Array()))
+                signature: Option[Array[Byte]],
+                proofs: Option[Array[Array[Byte]]],
+  ): Order = {
+    Order(
+      sender,
+      matcher,
+      assetPair,
+      orderType,
+      price,
+      amount,
+      timestamp,
+      expiration,
+      matcherFee,
+      proofs.map(p => Proofs(p.map(ByteStr.apply))).orElse(signature.map(s => Proofs(Seq(ByteStr(s))))).getOrElse(Proofs.empty)
+    )
   }
 
   def readAssetPair(amountAsset: Option[Option[Array[Byte]]], priceAsset: Option[Option[Array[Byte]]]): AssetPair = {
@@ -82,7 +97,8 @@ object OrderJson {
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "expiration").read[Long] and
       (JsPath \ "matcherFee").read[Long] and
-      (JsPath \ "signature").readNullable[Array[Byte]]
+      (JsPath \ "signature").readNullable[Array[Byte]] and
+      (JsPath \ "proofs").readNullable[Array[Array[Byte]]]
     r(readOrder _)
   }
 

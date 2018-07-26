@@ -63,7 +63,10 @@ object Bindings {
         "timestamp"        -> ord.timestamp,
         "expiration"       -> ord.expiration,
         "matcherFee"       -> ord.matcherFee,
-        "signature"        -> ord.signature
+        "proofs"           -> {
+           val existingProofs = ord.proofs
+           (existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteVector.empty)).toIndexedSeq
+         }
       )
     )
 
