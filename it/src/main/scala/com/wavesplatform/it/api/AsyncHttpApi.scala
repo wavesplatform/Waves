@@ -493,11 +493,11 @@ object AsyncHttpApi extends Assertions {
         finalHeights <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
       } yield all(finalHeights).shouldBe(finalHeights.head)
 
-    def waitForHeightArise(): Future[Unit] =
+    def waitForHeightArise(): Future[Int] =
       for {
         height <- traverse(nodes)(_.height).map(_.max)
         _      <- traverse(nodes)(_.waitForHeight(height + 1))
-      } yield ()
+      } yield (height + 1)
 
     def waitForSameBlockHeadesAt(height: Int, retryInterval: FiniteDuration = 5.seconds): Future[Boolean] = {
 

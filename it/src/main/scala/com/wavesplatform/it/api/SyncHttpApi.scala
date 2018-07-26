@@ -219,6 +219,10 @@ object SyncHttpApi extends Assertions {
 
     def blockAt(height: Int) = Await.result(async(n).blockAt(height), RequestAwaitTime)
 
+    def blockSeq(fromHeight: Int, toHeight: Int) = Await.result(async(n).blockSeq(fromHeight, toHeight), RequestAwaitTime)
+
+    def blockHeadersSeq(fromHeight: Int, toHeight: Int) = Await.result(async(n).blockHeadersSeq(fromHeight, toHeight), RequestAwaitTime)
+
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       Await.result(async(n).rollback(to, returnToUTX), RequestAwaitTime)
 
@@ -237,7 +241,7 @@ object SyncHttpApi extends Assertions {
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
       Await.result(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
 
-    def waitForHeightArise(): Unit =
+    def waitForHeightArise(): Int =
       Await.result(async(nodes).waitForHeightArise(), TxInBlockchainAwaitTime)
 
     def waitForSameBlockHeadesAt(height: Int, retryInterval: FiniteDuration = 5.seconds): Boolean =

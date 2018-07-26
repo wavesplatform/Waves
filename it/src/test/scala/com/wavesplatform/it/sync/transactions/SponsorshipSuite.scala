@@ -32,7 +32,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
   val bob               = nodes(3)
   val Waves             = 100000000L
   val Token             = 100L
-  val sponsorAssetTotal = 100 * Token
+  val sponsorAssetTotal = 100000 * Token
   val minSponsorFee     = Token
   val TinyFee           = Token / 2
   val SmallFee          = Token + Token / 2
