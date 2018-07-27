@@ -1,9 +1,7 @@
 package com.wavesplatform.database
 
-import java.nio.ByteBuffer
-
 import com.google.common.base.Charsets.UTF_8
-import com.google.common.primitives.{Ints, Longs, Shorts}
+import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.state._
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, BlockHeader}
@@ -11,32 +9,7 @@ import scorex.transaction.Transaction
 import scorex.transaction.smart.script.{Script, ScriptReader}
 
 object Keys {
-  private def h(prefix: Short, height: Int): Array[Byte] =
-    ByteBuffer.allocate(6).putShort(prefix).putInt(height).array()
-
-  private def hBytes(prefix: Short, height: Int, bytes: Array[Byte]) =
-    ByteBuffer.allocate(6 + bytes.length).putShort(prefix).putInt(height).put(bytes).array()
-
-  private def bytes(prefix: Short, bytes: Array[Byte]) =
-    ByteBuffer.allocate(2 + bytes.length).putShort(prefix).put(bytes).array()
-
-  private def addr(prefix: Short, addressId: BigInt) = bytes(prefix, addressId.toByteArray)
-
-  private def hash(prefix: Short, hashBytes: ByteStr) = bytes(prefix, hashBytes.arr)
-
-  private def hAddr(prefix: Short, height: Int, addressId: BigInt): Array[Byte] = hBytes(prefix, height, addressId.toByteArray)
-
-  private def historyKey(prefix: Short, b: Array[Byte]) = Key(bytes(prefix, b), readIntSeq, writeIntSeq)
-
-  private def intKey(prefix: Short, default: Int = 0): Key[Int] =
-    Key(Shorts.toByteArray(prefix), Option(_).fold(default)(Ints.fromByteArray), Ints.toByteArray)
-
-  private def bytesSeqNr(prefix: Short, b: Array[Byte]): Key[Int] =
-    Key(bytes(prefix, b), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
-
-  private def unsupported[A](message: String): A => Array[Byte] = _ => throw new UnsupportedOperationException(message)
-
-  // actual key definition
+  import KeyHelpers._
 
   val version: Key[Int]               = intKey(0, default = 1)
   val height: Key[Int]                = intKey(1)

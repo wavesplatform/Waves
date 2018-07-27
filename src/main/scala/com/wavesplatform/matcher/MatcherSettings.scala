@@ -3,9 +3,7 @@ package com.wavesplatform.matcher
 import java.io.File
 
 import com.typesafe.config.Config
-import com.wavesplatform.matcher.market.BalanceWatcherWorkerActor
 import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.NameMapper
 import scorex.transaction.assets.exchange.AssetPair
 
@@ -32,8 +30,7 @@ case class MatcherSettings(enable: Boolean,
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
                            maxOrdersPerRequest: Int,
-                           blacklistedAddresses: Set[String],
-                           balanceWatching: BalanceWatcherWorkerActor.Settings)
+                           blacklistedAddresses: Set[String])
 
 object MatcherSettings {
 
@@ -66,7 +63,6 @@ object MatcherSettings {
     val blacklistedAddresses = config.as[List[String]](s"$configPath.blacklisted-addresses")
 
     val isMigrateToNewOrderHistoryStorage = !new File(dataDirectory).exists()
-    val balanceWatching                   = config.as[BalanceWatcherWorkerActor.Settings](s"$configPath.balance-watching")
 
     MatcherSettings(
       enabled,
@@ -89,7 +85,6 @@ object MatcherSettings {
       blacklistedNames,
       maxOrdersPerRequest,
       blacklistedAddresses.toSet,
-      balanceWatching
     )
   }
 }

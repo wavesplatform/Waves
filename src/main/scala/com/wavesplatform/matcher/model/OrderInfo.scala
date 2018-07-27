@@ -4,6 +4,7 @@ import cats.instances.map._
 import cats.syntax.semigroup._
 import cats.{Monoid, Semigroup}
 import play.api.libs.json.{Format, Json}
+import scorex.transaction.AssetId
 
 import scala.util.Try
 
@@ -46,7 +47,7 @@ object OrderInfo {
   }
 }
 
-case class OpenPortfolio(orders: Map[String, Long])
+case class OpenPortfolio(orders: Map[Option[AssetId], Long])
 
 object OpenPortfolio {
   import OrderInfo.longSemigroup

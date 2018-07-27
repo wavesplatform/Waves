@@ -13,8 +13,7 @@ import com.wavesplatform.matcher.model._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.network._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
@@ -44,7 +43,8 @@ class OrderBookActor(assetPair: AssetPair,
     with ExchangeTransactionCreator {
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
-  private val timer = Kamon.timer("matcher.orderbook.match").refine("pair" -> assetPair.toString)
+  private val timer       = Kamon.timer("matcher.orderbook.match").refine("pair"    -> assetPair.toString)
+  private val cancelTimer = Kamon.timer("matcher.orderbook.persist").refine("event" -> "OrderCancelled")
 
   private val snapshotCancellable = context.system.scheduler.schedule(settings.snapshotsInterval, settings.snapshotsInterval, self, SaveSnapshot)
   private val cleanupCancellable  = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
@@ -55,12 +55,12 @@ class OrderBookActor(assetPair: AssetPair,
   private lazy val alreadyCanceledOrders = CacheBuilder
     .newBuilder()
     .maximumSize(AlreadyCanceledCacheSize)
-    .build[String, java.lang.Boolean]()
+    .build[ByteStr, java.lang.Boolean]()
 
   private lazy val cancelInProgressOrders = CacheBuilder
     .newBuilder()
     .maximumSize(AlreadyCanceledCacheSize)
-    .build[String, java.lang.Boolean]()
+    .build[ByteStr, java.lang.Boolean]()
 
   val okCancel: java.lang.Boolean     = Boolean.box(true)
   val failedCancel: java.lang.Boolean = Boolean.box(false)
@@ -73,6 +73,7 @@ class OrderBookActor(assetPair: AssetPair,
     case cancel: CancelOrder =>
       onCancelOrder(cancel)
     case ForceCancelOrder(_, orderId) =>
+      log.trace(s"Force cancel order $orderId")
       onForceCancelOrder(orderId)
     case OrderCleanup =>
       onOrderCleanup(orderBook, NTP.correctedTime())
@@ -134,7 +135,7 @@ class OrderBookActor(assetPair: AssetPair,
     Option(alreadyCanceledOrders.getIfPresent(cancel.orderId)) match {
       case Some(`okCancel`) =>
         log.info(s"Order($assetPair, ${cancel.orderId}) is already canceled")
-        sender() ! OrderCanceled(cancel.orderId)
+        sender() ! OrderCanceled(cancel.orderId.base58)
       case Some(_) =>
         log.info(s"Order($assetPair, ${cancel.orderId}) is already not found")
         sender() ! OrderCancelRejected("Order not found")
@@ -147,12 +148,14 @@ class OrderBookActor(assetPair: AssetPair,
     }
   }
 
-  private def onForceCancelOrder(orderIdToCancel: String): Unit = {
+  private def onForceCancelOrder(orderIdToCancel: ByteStr): Unit = {
     OrderBook.cancelOrder(orderBook, orderIdToCancel) match {
       case Some(oc) =>
+        val st = cancelTimer.start()
         persist(oc) { _ =>
           applyEvent(oc)
-          sender() ! OrderCanceled(orderIdToCancel)
+          sender() ! OrderCanceled(orderIdToCancel.base58)
+          st.stop()
         }
       case _ => sender() ! OrderCancelRejected("Order not found")
     }
@@ -166,11 +169,11 @@ class OrderBookActor(assetPair: AssetPair,
         val validation = x.order.isValid(ts)
         validation
       })
-      .map(_.order.idStr())
+      .map(_.order.id())
       .foreach(x => handleValidateCancelResult(Right(x)))
   }
 
-  private def handleValidateCancelResult(res: Either[GenericError, String]): Unit = {
+  private def handleValidateCancelResult(res: Either[GenericError, ByteStr]): Unit = {
     res match {
       case Left(err) =>
         apiSender.foreach(_ ! OrderCancelRejected(err.err))
@@ -178,10 +181,12 @@ class OrderBookActor(assetPair: AssetPair,
         cancelInProgressOrders.invalidate(orderIdToCancel)
         OrderBook.cancelOrder(orderBook, orderIdToCancel) match {
           case Some(oc) =>
+            val st = cancelTimer.start()
             alreadyCanceledOrders.put(orderIdToCancel, okCancel)
             persist(oc) { _ =>
               handleCancelEvent(oc)
-              apiSender.foreach(_ ! OrderCanceled(orderIdToCancel))
+              apiSender.foreach(_ ! OrderCanceled(orderIdToCancel.base58))
+              st.stop()
             }
           case _ =>
             alreadyCanceledOrders.put(orderIdToCancel, failedCancel)
@@ -205,7 +210,7 @@ class OrderBookActor(assetPair: AssetPair,
         log.debug(s"Order rejected: $err.err")
         apiSender.foreach(_ ! OrderRejected(err.err))
       case Right(o) =>
-        log.debug(s"Order accepted: '${o.idStr()}' in '${o.assetPair.key}', trying to match ...")
+        log.debug(s"Order accepted: '${o.id()}' in '${o.assetPair.key}', trying to match ...")
         apiSender.foreach(_ ! OrderAccepted(o))
         timer.measure(matchOrder(LimitOrder(o)))
     }
@@ -237,7 +242,8 @@ class OrderBookActor(assetPair: AssetPair,
   }
 
   private def processEvent(e: Event): Unit = {
-    persist(e)(_ => ())
+    val st = Kamon.timer("matcher.orderbook.persist").refine("event" -> e.getClass.getSimpleName).start()
+    persist(e)(_ => st.stop())
     applyEvent(e)
     context.system.eventStream.publish(e)
   }
@@ -254,10 +260,10 @@ class OrderBookActor(assetPair: AssetPair,
       case OrderValidationError(order, _) if order == event.counter.order   => cancelCounterOrder()
       case AccountBalanceError(errs) =>
         errs.foreach(e => log.error(s"Balance error: ${e._2}"))
-        if (errs.contains(event.counter.order.senderPublicKey.toAddress)) {
+        if (errs.contains(event.counter.order.senderPublicKey)) {
           cancelCounterOrder()
         }
-        if (errs.contains(event.submitted.order.senderPublicKey.toAddress)) {
+        if (errs.contains(event.submitted.order.senderPublicKey)) {
           None
         } else {
           Some(event.submitted)
@@ -352,11 +358,11 @@ object OrderBookActor {
   case class DeleteOrderBookRequest(assetPair: AssetPair) extends OrderBookRequest
 
   case class CancelOrder(assetPair: AssetPair, req: CancelOrderRequest) extends OrderBookRequest {
-    lazy val orderId: String           = Base58.encode(req.orderId)
+    lazy val orderId: ByteStr          = req.orderId
     override lazy val toString: String = s"CancelOrder($assetPair, ${req.senderPublicKey}, $orderId)"
   }
 
-  case class ForceCancelOrder(assetPair: AssetPair, orderId: String) extends OrderBookRequest
+  case class ForceCancelOrder(assetPair: AssetPair, orderId: ByteStr) extends OrderBookRequest
 
   case object OrderCleanup
 
@@ -378,14 +384,6 @@ object OrderBookActor {
   case class OrderCancelRejected(message: String) extends MatcherResponse {
     val json = Json.obj("status" -> "OrderCancelRejected", "message" -> message)
     val code = StatusCodes.BadRequest
-  }
-
-  case class GetOrderStatusResponse(status: LimitOrder.OrderStatus) extends MatcherResponse {
-    val json = status.json
-    val code = status match {
-      case LimitOrder.NotFound => StatusCodes.NotFound
-      case _                   => StatusCodes.OK
-    }
   }
 
   case class GetOrderBookResponse(pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends MatcherResponse {

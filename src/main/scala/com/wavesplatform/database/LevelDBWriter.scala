@@ -438,8 +438,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
               case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
               case tx: ExchangeTransaction =>
-                ordersToInvalidate += rollbackOrderFill(rw, ByteStr(tx.buyOrder.id()), currentHeight)
-                ordersToInvalidate += rollbackOrderFill(rw, ByteStr(tx.sellOrder.id()), currentHeight)
+                ordersToInvalidate += rollbackOrderFill(rw, tx.buyOrder.id(), currentHeight)
+                ordersToInvalidate += rollbackOrderFill(rw, tx.sellOrder.id(), currentHeight)
             }
 
             rw.delete(ktxId)

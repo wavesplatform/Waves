@@ -51,7 +51,8 @@ class Matcher(actorSystem: ActorSystem,
       p => Option(orderBookCache.get(p)),
       txWriter,
       restAPISettings,
-      matcherSettings
+      matcherSettings,
+      db
     )
   )
 

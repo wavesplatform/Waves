@@ -3,11 +3,11 @@ package com.wavesplatform.matcher.model
 import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.state.Portfolio
+import com.wavesplatform.state.{ByteStr, Portfolio}
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.account.Address
-import scorex.transaction.{AssetAcc, AssetId}
 import scorex.transaction.assets.exchange._
+import scorex.transaction.{AssetAcc, AssetId}
 
 import scala.util.Try
 
@@ -36,9 +36,9 @@ sealed trait LimitOrder {
   def rcvAcc: AssetAcc   = AssetAcc(order.senderPublicKey, order.getReceiveAssetId)
   def feeAcc: AssetAcc   = AssetAcc(order.senderPublicKey, None)
 
-  def spentAsset: String = order.getSpendAssetId.map(_.base58).getOrElse(AssetPair.WavesName)
-  def rcvAsset: String   = order.getReceiveAssetId.map(_.base58).getOrElse(AssetPair.WavesName)
-  def feeAsset: String   = AssetPair.WavesName
+  def spentAsset: Option[ByteStr] = order.getSpendAssetId
+  def rcvAsset: Option[ByteStr]   = order.getReceiveAssetId
+  def feeAsset: Option[ByteStr]   = None
 }
 
 case class BuyLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
@@ -130,22 +130,22 @@ object Events {
     case class Changes(updatedPortfolio: Portfolio, changedAssets: Set[Option[AssetId]])
   }
 
-  def createOrderInfo(event: Event): Map[String, (Order, OrderInfo)] = {
+  def createOrderInfo(event: Event): Map[ByteStr, (Order, OrderInfo)] = {
     event match {
       case OrderAdded(lo) =>
-        Map((lo.order.idStr(), (lo.order, OrderInfo(lo.order.amount, 0L, false))))
+        Map(lo.order.id() -> (lo.order -> OrderInfo(lo.order.amount, 0L, false)))
       case oe: OrderExecuted =>
         val (o1, o2) = (oe.submittedExecuted, oe.counterExecuted)
         Map(
-          (o1.order.idStr(), (o1.order, OrderInfo(o1.order.amount, o1.amount, false))),
-          (o2.order.idStr(), (o2.order, OrderInfo(o2.order.amount, o2.amount, false)))
+          o1.order.id() -> (o1.order -> OrderInfo(o1.order.amount, o1.amount, false)),
+          o2.order.id() -> (o2.order -> OrderInfo(o2.order.amount, o2.amount, false))
         )
       case OrderCanceled(lo) =>
-        Map((lo.order.idStr(), (lo.order, OrderInfo(lo.order.amount, 0, true))))
+        Map(lo.order.id() -> (lo.order -> OrderInfo(lo.order.amount, 0, true)))
     }
   }
 
-  def createOpenPortfolio(event: Event): Map[String, OpenPortfolio] = {
+  def createOpenPortfolio(event: Event): Map[Address, OpenPortfolio] = {
     def overdraftFee(lo: LimitOrder): Long = {
       if (lo.feeAcc == lo.rcvAcc) math.max(lo.feeAmount - lo.getReceiveAmount, 0L) else lo.feeAmount
     }
@@ -153,7 +153,7 @@ object Events {
     event match {
       case OrderAdded(lo) =>
         Map(
-          lo.order.senderPublicKey.address -> OpenPortfolio(
+          lo.order.senderPublicKey.toAddress -> OpenPortfolio(
             Monoid.combine(
               Map(lo.spentAsset -> lo.getSpendAmount),
               Map(lo.feeAsset   -> overdraftFee(lo))
@@ -171,13 +171,13 @@ object Events {
             Map(o2.feeAsset   -> -overdraftFee(o2))
           ))
         Monoid.combine(
-          Map(o1.order.senderPublicKey.address -> op1),
-          Map(o2.order.senderPublicKey.address -> op2)
+          Map(o1.order.senderPublicKey.toAddress -> op1),
+          Map(o2.order.senderPublicKey.toAddress -> op2)
         )
       case OrderCanceled(lo) =>
         val feeDiff = if (lo.feeAcc == lo.rcvAcc) math.max(lo.remainingFee - lo.getReceiveAmount, 0L) else lo.remainingFee
         Map(
-          lo.order.senderPublicKey.address ->
+          lo.order.senderPublicKey.toAddress ->
             OpenPortfolio(
               Monoid.combine(
                 Map(lo.spentAsset -> -lo.getSpendAmount),
