@@ -74,7 +74,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
     }
   }
 
-  private val blockReceivingLag        = Kamon.metrics.histogram("block-receiving-lag")
-  private val blockProcessingTimeStats = Kamon.metrics.histogram("single-block-processing-time")
+  private val blockReceivingLag        = Kamon.histogram("block-receiving-lag")
+  private val blockProcessingTimeStats = Kamon.histogram("single-block-processing-time")
 
 }

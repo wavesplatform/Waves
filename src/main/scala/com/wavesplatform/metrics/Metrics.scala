@@ -45,7 +45,7 @@ object Metrics extends ScorexLogging {
       if (settings.enable) {
         import config.{influxDb => dbSettings}
 
-        log.info(s"Metrics are enabled and will be sent to ${dbSettings.uri}/${dbSettings.db}")
+        log.info(s"Precise metrics are enabled and will be sent to ${dbSettings.uri}/${dbSettings.db}")
         try {
           val x = if (dbSettings.username.nonEmpty && dbSettings.password.nonEmpty) {
             InfluxDBFactory.connect(

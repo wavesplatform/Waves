@@ -1,27 +1,29 @@
 package com.wavesplatform.matcher.market
 
+import java.util.concurrent.ConcurrentHashMap
+
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
+import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.Events.Event
-import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
+import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, OrderBook, SellLimitOrder}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{Blockchain, ByteStr, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
-import org.scalamock.scalatest.PathMockFactory
-import org.scalatest._
-import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.utils.{NTP, ScorexLogging}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.utils.{NTP, ScorexLogging}
+import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
+import io.netty.channel.group.ChannelGroup
+import org.scalamock.scalatest.PathMockFactory
+import org.scalatest._
 
 import scala.concurrent.duration._
 
@@ -73,10 +75,20 @@ class OrderBookActorSpecification
     }
   })
 
+  val obc                                              = new ConcurrentHashMap[AssetPair, OrderBook]()
+  def update(ap: AssetPair)(snapshot: OrderBook): Unit = obc.put(ap, snapshot)
+
   var actor: ActorRef = system.actorOf(
     Props(
-      new OrderBookActor(pair, orderHistoryRef, blockchain, wallet, stub[UtxPool], stub[ChannelGroup], settings, FunctionalitySettings.TESTNET)
-      with RestartableActor))
+      new OrderBookActor(pair,
+                         update(pair),
+                         orderHistoryRef,
+                         blockchain,
+                         wallet,
+                         stub[UtxPool],
+                         stub[ChannelGroup],
+                         settings,
+                         FunctionalitySettings.TESTNET) with RestartableActor))
 
   private def getOrders(actor: ActorRef) = {
     actor ! GetOrdersRequest
@@ -84,6 +96,7 @@ class OrderBookActorSpecification
   }
 
   override protected def beforeEach() = {
+    obc.clear()
     val tp = TestProbe()
     tp.send(StorageExtension(system).journalStorage, InMemoryJournalStorage.ClearJournal)
     tp.expectMsg(akka.actor.Status.Success(""))
@@ -98,7 +111,9 @@ class OrderBookActorSpecification
     (utx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty)))
     val allChannels = stub[ChannelGroup]
     actor = system.actorOf(
-      Props(new OrderBookActor(pair, orderHistoryRef, blockchain, wallet, utx, allChannels, settings, functionalitySettings) with RestartableActor))
+      Props(
+        new OrderBookActor(pair, update(pair), orderHistoryRef, blockchain, wallet, utx, allChannels, settings, functionalitySettings)
+        with RestartableActor))
 
     eventsProbe = TestProbe()
     system.eventStream.subscribe(eventsProbe.ref, classOf[Event])
@@ -276,7 +291,7 @@ class OrderBookActorSpecification
       val ord3 = sell(pair, 100, 10 * Order.PriceConstant)
 
       val pool = stub[UtxPool]
-      (pool.putIfNew _).when(*).onCall { (tx: Transaction) =>
+      (pool.putIfNew _).when(*).onCall { tx: Transaction =>
         tx match {
           case om: ExchangeTransaction if om.buyOrder == ord2 => Left(ValidationError.GenericError("test"))
           case _: Transaction                                 => Right((true, Diff.empty))
@@ -284,8 +299,8 @@ class OrderBookActorSpecification
       }
       val allChannels = stub[ChannelGroup]
       actor = system.actorOf(
-        Props(
-          new OrderBookActor(pair, orderHistoryRef, blockchain, wallet, pool, allChannels, settings, functionalitySettings) with RestartableActor))
+        Props(new OrderBookActor(pair, update(pair), orderHistoryRef, blockchain, wallet, pool, allChannels, settings, functionalitySettings)
+        with RestartableActor))
 
       actor ! ord1
       expectMsg(OrderAccepted(ord1))

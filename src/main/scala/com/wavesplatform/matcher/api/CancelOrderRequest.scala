@@ -8,6 +8,7 @@ import play.api.libs.json.Reads._
 import play.api.libs.json.{JsObject, JsPath, Json, Reads}
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.utils.Base58
+import monix.eval.Coeval
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 
 case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
@@ -24,7 +25,7 @@ case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") s
     case (None, None)            => signature // Signature can't sign itself
   }
   @ApiModelProperty(hidden = true)
-  def isSignatureValid: Boolean = crypto.verify(signature, toSign, senderPublicKey.publicKey)
+  val isSignatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
 
   def json: JsObject = Json.obj(
     "sender"    -> Base58.encode(senderPublicKey.publicKey),
