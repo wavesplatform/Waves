@@ -4,6 +4,7 @@ import java.io.File
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.google.common.base.Charsets.UTF_8
+import com.google.common.primitives.Shorts
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.database.DBExt
 import com.wavesplatform.db.{OrderIdsCodec, OrderToTxIdsCodec, PortfolioCodec, openDB}
@@ -15,6 +16,8 @@ import org.iq80.leveldb.DB
 import scorex.account.{Address, AddressScheme, PublicKeyAccount}
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.utils.ScorexLogging
+import java.util.HashMap
+import scala.collection.JavaConverters._
 
 object MigrationTool extends ScorexLogging {
   private def loadOrderInfo(db: DB, om: ObjectMapper): Map[ByteStr, OrderInfo] = {
@@ -28,52 +31,39 @@ object MigrationTool extends ScorexLogging {
         val SK.OrdersInfo(id) = e.getKey
         val t                 = om.readTree(e.getValue)
         val oi                = OrderInfo(t.get("amount").asLong, t.get("filled").asLong, t.get("canceled").asBoolean)
-        result += id -> oi
+        if (!oi.canceled && oi.amount != oi.filled) {
+          result += id -> oi
+        }
       }
     } finally iterator.close()
     log.info("Loaded all order infos")
     result.result()
   }
 
-  private def parseOrderJson(om: ObjectMapper, bytes: Array[Byte]): Option[Order] = {
-    val t         = om.readTree(bytes)
-    val timestamp = t.get("timestamp").asLong()
-    if (System.currentTimeMillis() - timestamp > 30 * 24 * 60 * 60 * 1000L) None
-    else {
-      val p = t.get("assetPair")
-
-      Some(
-        Order(
-          PublicKeyAccount.fromBase58String(t.get("senderPublicKey").asText()).explicitGet(),
-          PublicKeyAccount.fromBase58String(t.get("matcherPublicKey").asText()).explicitGet(),
-          AssetPair
-            .createAssetPair(
-              p.get("amountAsset").asText("WAVES"),
-              p.get("priceAsset").asText("WAVES")
-            )
-            .get,
-          OrderType(t.get("orderType").asText()),
-          t.get("price").asLong(),
-          t.get("amount").asLong(),
-          timestamp,
-          t.get("expiration").asLong(),
-          t.get("matcherFee").asLong(),
-          Base58.decode(t.get("signature").asText()).get
-        ))
-    }
+  private def parseOrderJson(om: ObjectMapper, bytes: Array[Byte]): Order = {
+    val t = om.readTree(bytes)
+    val p = t.get("assetPair")
+    Order(
+      PublicKeyAccount.fromBase58String(t.get("senderPublicKey").asText()).explicitGet(),
+      PublicKeyAccount.fromBase58String(t.get("matcherPublicKey").asText()).explicitGet(),
+      AssetPair
+        .createAssetPair(
+          p.get("amountAsset").asText("WAVES"),
+          p.get("priceAsset").asText("WAVES")
+        )
+        .get,
+      OrderType(t.get("orderType").asText()),
+      t.get("price").asLong(),
+      t.get("amount").asLong(),
+      t.get("timestamp").asLong(),
+      t.get("expiration").asLong(),
+      t.get("matcherFee").asLong(),
+      Base58.decode(t.get("signature").asText()).get
+    )
   }
 
-  def main(args: Array[String]): Unit = {
-    val userConfig = args.headOption.fold(ConfigFactory.empty())(f => ConfigFactory.parseFile(new File(f)))
-    val settings   = WavesSettings.fromConfig(loadConfig(userConfig))
-    val db         = openDB(settings.matcherSettings.dataDir)
-
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
-    }
-
-    val orderInfos        = Seq.newBuilder[(ByteStr, OrderInfo)]
-    val addressOrders     = Seq.newBuilder[(Address, Seq[String])]
+  private def performMigration(db: DB): Unit = {
+    val addressOrders     = Seq.newBuilder[(Address, Seq[ByteStr])]
     val orderTransactions = Seq.newBuilder[(ByteStr, Set[String])]
     val orders            = Map.newBuilder[ByteStr, Order]
     val transactions      = Seq.newBuilder[(ByteStr, Array[Byte])]
@@ -89,15 +79,22 @@ object MigrationTool extends ScorexLogging {
       while (iterator.hasNext) {
         val entry = iterator.next()
         entry.getKey match {
-          case SK.OrdersInfo(id) =>
-            orderInfos += id -> OrderInfo.empty
+          case SK.OrdersInfo(_) => // order info has already been processed
           case SK.AddressToOrders(address) =>
-            addressOrders += address -> OrderIdsCodec.decode(entry.getValue).explicitGet().value
+            addressOrders += address -> OrderIdsCodec
+              .decode(entry.getValue)
+              .explicitGet()
+              .value
+              .map(ByteStr.decodeBase58(_).get)
+              .filter(orderInfo.keySet)
+              .toSeq
           case SK.OrdersToTxIds(orderId) =>
-            orderTransactions += orderId -> OrderToTxIdsCodec.decode(entry.getValue).explicitGet().value
+            if (orderInfo.contains(orderId)) {
+              orderTransactions += orderId -> OrderToTxIdsCodec.decode(entry.getValue).explicitGet().value
+            }
           case SK.Orders(orderId) =>
-            for (o <- parseOrderJson(om, entry.getValue)) {
-              orders += orderId -> o
+            if (orderInfo.contains(orderId)) {
+              orders += orderId -> parseOrderJson(om, entry.getValue)
             }
           case SK.Transactions(txId) =>
             transactions += txId -> entry.getValue
@@ -109,18 +106,19 @@ object MigrationTool extends ScorexLogging {
       }
     } finally iterator.close()
 
-    val allOrders        = orders.result()
-    val allTransactions  = transactions.result()
-    val allAddressOrders = addressOrders.result()
-    val allOpenVolume    = portfolios.result()
+    val allOrders            = orders.result()
+    val allTransactions      = transactions.result()
+    val allAddressOrders     = addressOrders.result()
+    val allOpenVolume        = portfolios.result()
+    val allOrderTransactions = orderTransactions.result()
     log.info(s"""Done reading data:
-        |
-        |order infos:        ${orderInfos.result().length}
-        |address orders:     ${allAddressOrders.length}
-        |order transactions: ${orderTransactions.result().length}
-        |orders:             ${allOrders.size}
-        |transactions:       ${allTransactions.length}
-        |portfolios:         ${allOpenVolume.length}
+                |
+        |order infos:        ${orderInfo.size}
+                |address orders:     ${allAddressOrders.length}
+                |order transactions: ${allOrderTransactions.length}
+                |orders:             ${allOrders.size}
+                |transactions:       ${allTransactions.length}
+                |portfolios:         ${allOpenVolume.length}
       """.stripMargin)
 
     db.readWrite { rw =>
@@ -134,7 +132,7 @@ object MigrationTool extends ScorexLogging {
       }
       log.info("Saving orders for address")
       for ((address, orderIds) <- allAddressOrders) {
-        val activeOrderIds = orderIds.flatMap(ByteStr.decodeBase58(_).toOption).filter(orderInfo.keySet)
+        val activeOrderIds = orderIds.filter(orderInfo.keySet)
         rw.put(MatcherKeys.addressOrdersSeqNr(address), activeOrderIds.size)
         for ((id, offset) <- activeOrderIds.zipWithIndex) {
           rw.put(MatcherKeys.addressOrders(address, offset + 1), OrderAssets(id, allOrders(id).getSpendAssetId))
@@ -150,13 +148,86 @@ object MigrationTool extends ScorexLogging {
           rw.put(MatcherKeys.openVolumeAsset(address, offset + 1), assetId)
         }
       }
+      log.info("Saving order transactions")
+      for ((orderId, txIds) <- allOrderTransactions) {
+        val txCount = txIds.size
+        rw.put(MatcherKeys.orderTxIdsSeqNr(orderId), txCount)
+        for ((id, offset) <- txIds.flatMap(ByteStr.decodeBase58(_).toOption).zipWithIndex) {
+          rw.put(MatcherKeys.orderTxId(orderId, offset + 1), id)
+        }
+      }
+      log.info("Saving transactions")
+      for ((id, txBytes) <- allTransactions) {
+        rw.put(MatcherKeys.exchangeTransaction(id).keyBytes, txBytes)
+      }
+
       log.info("Writing changes")
     }
 
-    db.close()
-
     log.info("Migration complete")
   }
+
+  private def collectStats(db: DB): Unit = {
+    log.info("Collecting stats")
+    val iterator = db.iterator()
+    iterator.seekToFirst()
+
+    val result = new HashMap[Short, Stats]
+
+    def add(prefix: Short, e: java.util.Map.Entry[Array[Byte], Array[Byte]]): Unit = {
+      result.compute(
+        prefix,
+        (_, maybePrev) =>
+          maybePrev match {
+            case null => Stats(1, e.getKey.length, e.getValue.length)
+            case prev => Stats(prev.entryCount + 1, prev.totalKeySize + e.getKey.length, prev.totalValueSize + e.getValue.length)
+        }
+      )
+    }
+
+    try {
+      while (iterator.hasNext) {
+        val e = iterator.next()
+        e.getKey match {
+          case SK.Orders(_)                => add(100.toShort, e)
+          case SK.OrdersInfo(_)            => add(101.toShort, e)
+          case SK.AddressToOrders(_)       => add(102.toShort, e)
+          case SK.AddressToActiveOrders(_) => add(103.toShort, e)
+          case SK.AddressPortfolio(_)      => add(104.toShort, e)
+          case SK.Transactions(_)          => add(104.toShort, e)
+          case SK.OrdersToTxIds(_)         => add(106.toShort, e)
+          case bytes =>
+            val prefix = Shorts.fromByteArray(bytes.take(2))
+            add(prefix, e)
+        }
+      }
+    } finally iterator.close()
+
+    for ((k, s) <- result.asScala) {
+      println(s"$k, ${s.entryCount}, ${s.totalKeySize}, ${s.totalValueSize}")
+    }
+  }
+
+  def main(args: Array[String]): Unit = {
+    val userConfig = args.headOption.fold(ConfigFactory.empty())(f => ConfigFactory.parseFile(new File(f)))
+    val settings   = WavesSettings.fromConfig(loadConfig(userConfig))
+    val db         = openDB(settings.matcherSettings.dataDir)
+
+    AddressScheme.current = new AddressScheme {
+      override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
+    }
+
+    if (args.length < 2) {
+      log.info("Performing migration")
+      performMigration(db)
+    } else if (args(1) == "stats") {
+      collectStats(db)
+    }
+
+    db.close()
+  }
+
+  case class Stats(entryCount: Long, totalKeySize: Long, totalValueSize: Long)
 
   class SK[A](suffix: String, extractor: Array[Byte] => Option[A]) {
     val keyBytes = ("matcher:" + suffix + ":").getBytes(UTF_8)

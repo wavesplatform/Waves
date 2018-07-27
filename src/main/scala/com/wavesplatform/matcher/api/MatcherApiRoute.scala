@@ -222,10 +222,10 @@ case class MatcherApiRoute(wallet: Wallet,
       checkGetSignature(publicKey, ts, sig) match {
         case Success(address) =>
           withAssetPair(p, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
-            DBUtils.ordersByAddress(db, address, Set(pair.priceAsset, pair.amountAsset), activeOnly = true)
-
-            // todo: load order history directly from leveldb
-            complete(StatusCodes.NotImplemented)
+            complete(StatusCodes.OK -> DBUtils.ordersByAddress(db, address, Set(pair.priceAsset, pair.amountAsset), false).map {
+              case (order, orderInfo) =>
+                orderJson(order, orderInfo)
+            })
           }
         case Failure(ex) =>
           complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
@@ -302,9 +302,11 @@ case class MatcherApiRoute(wallet: Wallet,
     Array(
       new ApiImplicitParam(name = "address", value = "Address", dataType = "string", paramType = "path")
     ))
-  def getAllOrderHistory: Route = (path("orders" / AddressPM) & get & withAuth) { _ =>
-    // todo: load order history directly from leveldb
-    complete(StatusCodes.NotImplemented)
+  def getAllOrderHistory: Route = (path("orders" / AddressPM) & get & withAuth) { address =>
+    complete(StatusCodes.OK -> DBUtils.ordersByAddress(db, address, Set.empty, true).map {
+      case (order, orderInfo) =>
+        orderJson(order, orderInfo)
+    })
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/tradableBalance/{address}")
