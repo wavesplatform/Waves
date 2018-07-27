@@ -191,6 +191,9 @@ object SyncHttpApi extends Assertions {
     def signedBroadcast(tx: JsObject): Transaction =
       Await.result(async(n).signedBroadcast(tx), RequestAwaitTime)
 
+    def calculateFee(tx: JsObject): FeeInfo =
+      Await.result(async(n).calculateFee(tx), RequestAwaitTime)
+
     def signedIssue(tx: SignedIssueV1Request): Transaction =
       Await.result(async(n).signedIssue(tx), RequestAwaitTime)
 
