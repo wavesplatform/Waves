@@ -48,6 +48,8 @@ class OrderBookActor(assetPair: AssetPair,
   private var apiSender           = Option.empty[ActorRef]
   private var cancellable         = Option.empty[Cancellable]
 
+  private var lastPrice: Option[Price] = None
+
   private lazy val alreadyCanceledOrders = CacheBuilder
     .newBuilder()
     .maximumSize(AlreadyCanceledCacheSize)
@@ -125,6 +127,8 @@ class OrderBookActor(assetPair: AssetPair,
       sender() ! GetOrdersResponse(orderBook.bids.values.flatten.toSeq)
     case GetOrderBookRequest(pair, depth) =>
       handleGetOrderBook(pair, depth)
+    case GetMarketStatusRequest(pair) =>
+      handleGetMarketStatus(pair)
   }
 
   private def onCancelOrder(cancel: CancelOrder): Unit = {
@@ -195,7 +199,13 @@ class OrderBookActor(assetPair: AssetPair,
     if (pair == assetPair) {
       val d = Math.min(depth.getOrElse(MaxDepth), MaxDepth)
       sender() ! GetOrderBookResponse(pair, orderBook.bids.take(d).map(aggregateLevel).toSeq, orderBook.asks.take(d).map(aggregateLevel).toSeq)
-    } else sender() ! GetOrderBookResponse(pair, Seq(), Seq())
+    } else sender() ! GetOrderBookResponse.empty(pair)
+  }
+
+  private def handleGetMarketStatus(pair: AssetPair): Unit = {
+    if (pair == assetPair) {
+      sender() ! MarketStatus(pair, orderBook.bids.headOption.map(_._1), orderBook.asks.headOption.map(_._1), lastPrice)
+    } else sender() ! MarketStatus(pair, None, None, None)
   }
 
   private def onAddOrder(order: Order): Unit = {
@@ -283,6 +293,7 @@ class OrderBookActor(assetPair: AssetPair,
           _  <- utx.putIfNew(tx)
         } yield tx) match {
           case Right(tx) if tx.isInstanceOf[ExchangeTransaction] =>
+            lastPrice = Some(c.price)
             allChannels.broadcastTx(tx)
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
@@ -354,6 +365,8 @@ object OrderBookActor {
 
   case class GetOrderBookRequest(assetPair: AssetPair, depth: Option[Int]) extends OrderBookRequest
 
+  case class GetMarketStatusRequest(assetPair: AssetPair) extends OrderBookRequest
+
   case class DeleteOrderBookRequest(assetPair: AssetPair) extends OrderBookRequest
 
   case class CancelOrder(assetPair: AssetPair, sender: PublicKeyAccount, orderId: String) extends OrderBookRequest {
@@ -400,6 +413,8 @@ object OrderBookActor {
   object GetOrderBookResponse {
     def empty(pair: AssetPair): GetOrderBookResponse = GetOrderBookResponse(pair, Seq(), Seq())
   }
+
+  case class MarketStatus(pair: AssetPair, bid: Option[Price], ask: Option[Price], last: Option[Price])
 
   // Direct requests
   case object GetOrdersRequest
