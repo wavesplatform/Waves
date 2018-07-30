@@ -1,27 +1,20 @@
 package com.wavesplatform.matcher.model
 
 import cats.implicits._
+import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.matcher.model.Events.OrderAdded
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
-import com.wavesplatform.utx.UtxPool
-import com.wavesplatform.account.PublicKeyAccount
-import com.wavesplatform.utils.NTP
 import com.wavesplatform.transaction.AssetAcc
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, Validation}
+import com.wavesplatform.utils.NTP
+import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import kamon.Kamon
-import scorex.account.PublicKeyAccount
-import scorex.transaction.AssetAcc
-import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets.exchange.Validation.booleanOperators
-import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
-import scorex.utils.NTP
-import scorex.wallet.Wallet
 
 trait OrderValidator {
   val orderHistory: OrderHistory

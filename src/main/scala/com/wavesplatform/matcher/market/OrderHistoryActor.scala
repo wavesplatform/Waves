@@ -13,7 +13,7 @@ import com.wavesplatform.matcher.model._
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.{AssetAcc, AssetId}
-import com.wavesplatform.utils.NTP
+import com.wavesplatform.utils.{Base58, NTP}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import org.iq80.leveldb.DB

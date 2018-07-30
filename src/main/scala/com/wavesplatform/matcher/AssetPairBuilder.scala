@@ -3,9 +3,9 @@ package com.wavesplatform.matcher
 import com.google.common.base.Charsets.UTF_8
 import com.wavesplatform.metrics._
 import com.wavesplatform.state.{Blockchain, ByteStr}
+import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 import kamon.Kamon
-import scorex.transaction.AssetId
-import scorex.transaction.assets.exchange.AssetPair
 import scorex.utils.ByteArray
 
 class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain) {
@@ -15,20 +15,18 @@ class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain) {
   import Ordered._
 
   private[this] val indices             = settings.priceAssets.zipWithIndex.toMap
-  private[this] val predefinedPairs     = settings.predefinedPairs.toSet
   private[this] val blacklistedAssetIds = settings.blacklistedAssets
 
   private[this] val timer    = Kamon.timer("matcher.asset-pair-builder")
   private[this] val create   = timer.refine("action" -> "create")
   private[this] val validate = timer.refine("action" -> "validate")
 
-  private def isCorrectlyOrdered(pair: AssetPair): Boolean =
-    predefinedPairs.contains(pair) || ((indices.get(pair.priceAssetStr), indices.get(pair.amountAssetStr)) match {
-      case (None, None)         => pair.priceAsset < pair.amountAsset
-      case (Some(_), None)      => true
-      case (None, Some(_))      => false
-      case (Some(pi), Some(ai)) => pi < ai
-    })
+  private def isCorrectlyOrdered(pair: AssetPair): Boolean = (indices.get(pair.priceAssetStr), indices.get(pair.amountAssetStr)) match {
+    case (None, None)         => pair.priceAsset < pair.amountAsset
+    case (Some(_), None)      => true
+    case (None, Some(_))      => false
+    case (Some(pi), Some(ai)) => pi < ai
+  }
 
   private def isNotBlacklisted(assetId: ByteStr): Boolean = blockchain.assetDescription(assetId).exists { d =>
     settings.blacklistedNames.forall(_.findFirstIn(new String(d.name, UTF_8)).isEmpty)

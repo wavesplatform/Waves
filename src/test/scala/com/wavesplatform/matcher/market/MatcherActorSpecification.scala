@@ -126,42 +126,6 @@ class MatcherActorSpecification
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Amount and price assets must be different"))
     }
 
-    "AssetPair with predefined price assets" in {
-      def priceAsset = AssetPair(ByteStr.decodeBase58("ABC").toOption, ByteStr.decodeBase58("BASE1").toOption)
-
-      actor ! GetOrderBookRequest(priceAsset, None)
-      expectMsg(GetOrderBookResponse(priceAsset, Seq(), Seq()))
-
-      def wrongPriceAsset = AssetPair(ByteStr.decodeBase58("BASE2").toOption, ByteStr.decodeBase58("CDE").toOption)
-
-      actor ! GetOrderBookRequest(wrongPriceAsset, None)
-      expectMsg(StatusCodeMatcherResponse(StatusCodes.Found, "Invalid AssetPair ordering, should be reversed: CDE-BASE2"))
-    }
-
-    "AssetPair with predefined price assets with priorities" in {
-      def predefinedPair = AssetPair(ByteStr.decodeBase58("BASE").toOption, ByteStr.decodeBase58("BASE2").toOption)
-
-      actor ! GetOrderBookRequest(predefinedPair, None)
-      expectMsg(GetOrderBookResponse(predefinedPair, Seq(), Seq()))
-
-      def reversePredefinedPair = AssetPair(ByteStr.decodeBase58("BASE2").toOption, ByteStr.decodeBase58("BASE").toOption)
-
-      actor ! GetOrderBookRequest(reversePredefinedPair, None)
-      expectMsg(StatusCodeMatcherResponse(StatusCodes.Found, "Invalid AssetPair ordering, should be reversed: BASE-BASE2"))
-    }
-
-    "AssetPair with unknown assets" in {
-      def unknownAssets = AssetPair(ByteStr.decodeBase58("Some2").toOption, ByteStr.decodeBase58("Some1").toOption)
-
-      actor ! GetOrderBookRequest(unknownAssets, None)
-      expectMsg(GetOrderBookResponse(unknownAssets, Seq(), Seq()))
-
-      def wrongUnknownAssets = AssetPair(ByteStr.decodeBase58("Some1").toOption, ByteStr.decodeBase58("Some2").toOption)
-
-      actor ! GetOrderBookRequest(wrongUnknownAssets, None)
-      expectMsg(StatusCodeMatcherResponse(StatusCodes.Found, "Invalid AssetPair ordering, should be reversed: Some2-Some1"))
-    }
-
     "accept orders with AssetPair with same assets" in {
       def sameAssetsOrder(): Order =
         Order.apply(

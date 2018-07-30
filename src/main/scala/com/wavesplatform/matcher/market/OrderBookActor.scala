@@ -4,9 +4,8 @@ import akka.actor.{ActorRef, Cancellable, Props, Stash}
 import akka.http.scaladsl.model.StatusCodes
 import akka.persistence._
 import com.google.common.cache.CacheBuilder
-import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.MatcherResponse
+import com.wavesplatform.matcher.api.{CancelOrderRequest, MatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded, OrderExecuted}
@@ -154,7 +153,7 @@ class OrderBookActor(assetPair: AssetPair,
           applyEvent(oc)
           sender() ! OrderCanceled(orderIdToCancel)
         }
-      case _ => sender() ! OrderCancelRejected("Order not found")
+      case _ => sender() ! OrderCancelRejected(s"Order '$orderIdToCancel' not found")
     }
   }
 
@@ -185,7 +184,7 @@ class OrderBookActor(assetPair: AssetPair,
             }
           case _ =>
             alreadyCanceledOrders.put(orderIdToCancel, failedCancel)
-            apiSender.foreach(_ ! OrderCancelRejected("Order not found"))
+            apiSender.foreach(_ ! OrderCancelRejected(s"Order '$orderIdToCancel' not found"))
         }
     }
 
@@ -351,8 +350,8 @@ object OrderBookActor {
 
   case class DeleteOrderBookRequest(assetPair: AssetPair) extends OrderBookRequest
 
-  case class CancelOrder(assetPair: AssetPair, sender: PublicKeyAccount, orderId: String) extends OrderBookRequest {
-    override lazy val toString: String = s"CancelOrder($assetPair, $sender, $orderId)"
+  case class CancelOrder(assetPair: AssetPair, req: CancelOrderRequest, orderId: String) extends OrderBookRequest {
+    override lazy val toString: String = s"CancelOrder($assetPair, ${req.senderPublicKey}, $orderId)"
   }
 
   case class ForceCancelOrder(assetPair: AssetPair, orderId: String) extends OrderBookRequest
