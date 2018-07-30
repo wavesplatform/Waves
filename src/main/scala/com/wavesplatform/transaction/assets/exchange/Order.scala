@@ -66,6 +66,8 @@ trait Order extends BytesSerializable with JsonSerializable with Signed {
   @ApiModelProperty(example = "100000") def matcherFee: Long
   @ApiModelProperty(dataType = "Proofs") def proofs: Proofs
 
+  def version: Byte
+
   def signature: Array[Byte] = proofs.proofs(0).arr
 
   import Order._
@@ -146,6 +148,7 @@ trait Order extends BytesSerializable with JsonSerializable with Signed {
   override val json: Coeval[JsObject] = Coeval.evalOnce({
     val sig = Base58.encode(signature)
     Json.obj(
+      "version"          -> version,
       "id"               -> Base58.encode(id()),
       "sender"           -> senderPublicKey.address,
       "senderPublicKey"  -> Base58.encode(senderPublicKey.publicKey),

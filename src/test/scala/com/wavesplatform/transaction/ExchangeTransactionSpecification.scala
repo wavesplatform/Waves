@@ -119,6 +119,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
 
   property("JSON format validation") {
     val js = Json.parse("""{
+         "version": 1,
          "type":7,
          "id":"FaDrdKax2KBZY6Mh7K3tWmanEdzZx6MhYUmpjV3LBJRp",
          "sender":"3N22UCTvst8N1i1XDvGHzyqdgmZgwDKbp44",
@@ -128,6 +129,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
          "signature":"5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa",
          "proofs":["5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa"],
          "order1":{
+            "version": 1,
             "id":"EdUTcUZNK3NYKuPrsPCkZGzVUwpjx6qVjd4TgBwna7po",
             "sender":"3MthkhReCHXeaPZcWXcT3fa6ey1XWptLtwj",
             "senderPublicKey":"BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ",
@@ -143,6 +145,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
             "proofs":["2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs"]
          },
          "order2":{
+            "version": 1,
             "id":"DS9HPBGRMJcquTb3sAGAJzi73jjMnFFSWWHfzzKK32Q7",
             "sender":"3MswjKzUBKCD6i1w4vCosQSbC8XzzdBx1mG",
             "senderPublicKey":"7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV",

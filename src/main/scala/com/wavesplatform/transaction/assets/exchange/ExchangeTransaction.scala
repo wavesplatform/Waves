@@ -32,6 +32,7 @@ trait ExchangeTransaction extends FastHashId with ProvenTransaction {
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
+      "version"        -> version,
       "order1"         -> buyOrder.json(),
       "order2"         -> sellOrder.json(),
       "price"          -> price,

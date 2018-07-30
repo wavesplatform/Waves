@@ -99,7 +99,7 @@ class LeaseTransactionSpecification extends PropSpec with PropertyChecks with Ma
 
   property("forbid assetId in LeaseTransactionV2") {
     val leaseV2Gen      = leaseGen.filter(_.version == 2)
-    val assetIdBytesGen = assetIdGen.filter(_.nonEmpty).map(_.get.arr)
+    val assetIdBytesGen = bytes32gen
     forAll(leaseV2Gen, assetIdBytesGen) { (tx, assetId) =>
       val bytes = tx.bytes()
       // hack in an assetId

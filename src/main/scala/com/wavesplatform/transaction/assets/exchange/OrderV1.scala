@@ -26,6 +26,8 @@ case class OrderV1(@ApiModelProperty(dataType = "java.lang.String") senderPublic
                    @ApiModelProperty(dataType = "Proofs") proofs: Proofs)
     extends Order {
 
+  override def version: Byte = 1
+
   override def signature: Array[Byte] = proofs.proofs(0).arr
 
   val signatureValid = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
