@@ -5,7 +5,6 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state.ByteStr
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.transaction.ValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction._
@@ -39,16 +38,6 @@ case class ExchangeTransactionV1(buyOrder: Order,
       Longs.toByteArray(timestamp))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature.arr)
-
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
-      "order1"         -> buyOrder.json(),
-      "order2"         -> sellOrder.json(),
-      "price"          -> price,
-      "amount"         -> amount,
-      "buyMatcherFee"  -> buyMatcherFee,
-      "sellMatcherFee" -> sellMatcherFee
-    ))
 
   override val signedDescendants: Coeval[Seq[Order]] = Coeval.evalOnce(Seq(buyOrder, sellOrder))
 }
