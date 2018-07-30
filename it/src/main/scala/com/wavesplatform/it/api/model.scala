@@ -83,6 +83,11 @@ object TransactionInfo {
   implicit val format: Format[TransactionInfo] = Json.format
 }
 
+case class FeeInfo(feeAssetId: Option[String], feeAmount: Long)
+object FeeInfo {
+  implicit val format: Format[FeeInfo] = Json.format
+}
+
 case class Block(signature: String,
                  height: Int,
                  timestamp: Long,

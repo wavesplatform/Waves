@@ -266,6 +266,9 @@ object AsyncHttpApi extends Assertions {
     def signedBroadcast(jsobj: JsObject): Future[Transaction] =
       post("/transactions/broadcast", stringify(jsobj)).as[Transaction]
 
+    def calculateFee(jsobj: JsObject): Future[FeeInfo] =
+      postJsObjectWithApiKey("/transactions/calculateFee", jsobj).as[FeeInfo]
+
     def signAndBroadcast(jsobj: JsObject): Future[Transaction] = sign(jsobj).flatMap(signedBroadcast)
 
     def signedIssue(issue: SignedIssueV1Request): Future[Transaction] =
