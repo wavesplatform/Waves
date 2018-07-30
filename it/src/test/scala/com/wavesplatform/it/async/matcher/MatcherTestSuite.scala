@@ -365,7 +365,7 @@ class MatcherTestSuite
     }
 
     // Could not work sometimes because of NODE-546
-    "order with assets" ignore {
+    "order with assets" ignore /* until balance watcher functionality is re-implemented */ {
       "moved assets, insufficient assets" in {
         val oldestOrderId = bobPlacesAssetOrder(8000)
         val newestOrderId = bobPlacesAssetOrder(1000)
@@ -433,7 +433,7 @@ class MatcherTestSuite
       }
     }
 
-    "order with waves" - {
+    "order with waves" ignore /* until balance watcher functionality is re-implemented */ {
       "leased waves, insufficient fee" in {
         // Amount of waves in order is smaller than fee
         val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
