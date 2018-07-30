@@ -43,7 +43,7 @@ case class MatcherApiRoute(wallet: Wallet,
                            orderBook: AssetPair => Option[ActorRef],
                            orderBookSnapshot: AssetPair => Option[OrderBook],
                            txWriter: ActorRef,
-                           val settings: RestAPISettings,
+                           settings: RestAPISettings,
                            matcherSettings: MatcherSettings)
     extends ApiRoute
     with ScorexLogging {
@@ -159,7 +159,7 @@ case class MatcherApiRoute(wallet: Wallet,
   def cancelAll: Route = (path("orderbook" / "cancel") & post) {
     implicit val ec = MatcherApiRoute.cancelExecutor
     json[CancelOrderRequest] { req =>
-      if (req.isSignatureValid()) { // todo cancel timer?
+      if (req.isSignatureValid()) {
         req.timestamp match {
           case None => InvalidSignature
           case Some(timestamp) =>
@@ -209,11 +209,11 @@ case class MatcherApiRoute(wallet: Wallet,
     withAssetPair(a1, a2) { pair =>
       orderBook(pair).fold[Route](complete(StatusCodes.NotFound -> Json.obj("message" -> "Invalid asset pair"))) { oba =>
         json[CancelOrderRequest] { req =>
-          // todo cancelTimer
-          if (req.isSignatureValid()) cancelTimer.measure {
+          if (req.isSignatureValid())
             req.orderId match {
               case Some(id) =>
-                (oba ? CancelOrder(pair, req, Base58.encode(id)))
+                cancelTimer
+                  .measure(oba ? CancelOrder(pair, req, Base58.encode(id)))
                   .mapTo[MatcherResponse]
                   .map(r => r.code -> r.json)
 
@@ -227,13 +227,14 @@ case class MatcherApiRoute(wallet: Wallet,
                     .flatMap { res =>
                       Future
                         .sequence(res.history map { h =>
-                          oba ? CancelOrder(pair, req, h._1)
+                          cancelTimer.measure {
+                            oba ? CancelOrder(pair, req, h._1)
+                          }
                         })
                         .map(_ => StatusCodes.OK -> Json.obj("status" -> "Cancelled"))
                     }
                 }
-            }
-          } else InvalidSignature
+            } else InvalidSignature
         }
       }
     }

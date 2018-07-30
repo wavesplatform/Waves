@@ -109,15 +109,6 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       }
     }
 
-    "tx is declined if sponsor has not enough effective balance to pay fee" in {
-      val (_, sponsorEffectiveBalance)  = sponsor.accountBalances(sponsor.address)
-      val sponsorLeaseAllAvaliableWaves = sponsor.lease(sponsor.address, bob.address, sponsorEffectiveBalance - leasingFee, leasingFee).id
-      nodes.waitForHeightAriseAndTxPresent(sponsorLeaseAllAvaliableWaves)
-      assertBadRequest(alice.transfer(alice.address, bob.address, 10 * Token, LargeFee, Some(sponsorAssetId), Some(sponsorAssetId)))
-      val cancelLeasingTx = sponsor.cancelLease(sponsor.address, sponsorLeaseAllAvaliableWaves, leasingFee).id
-      nodes.waitForHeightAriseAndTxPresent(cancelLeasingTx)
-    }
-
     val minerWavesBalanceAfterFirstXferTest   = minerWavesBalance + 2.waves + minFee + Sponsorship.FeeUnit * SmallFee / minSponsorFee
     val sponsorWavesBalanceAfterFirstXferTest = sponsorWavesBalance - 2.waves - minFee - Sponsorship.FeeUnit * SmallFee / minSponsorFee
 
@@ -229,6 +220,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       }
 
     }
+
     "set sponsopship again" - {
 
       "set sponsorship and check new asset details, min sponsored fee changed" in {
@@ -306,6 +298,15 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
         miner.assertBalances(miner.address, minerBalance._2 + wavesFee)
       }
 
+    }
+
+    "tx is declined if sponsor has not enough effective balance to pay fee" in {
+      val (_, sponsorEffectiveBalance)  = sponsor.accountBalances(sponsor.address)
+      val sponsorLeaseAllAvaliableWaves = sponsor.lease(sponsor.address, bob.address, sponsorEffectiveBalance - leasingFee, leasingFee).id
+      nodes.waitForHeightAriseAndTxPresent(sponsorLeaseAllAvaliableWaves)
+      assertBadRequest(alice.transfer(alice.address, bob.address, 10 * Token, LargeFee, Some(sponsorAssetId), Some(sponsorAssetId)))
+      val cancelLeasingTx = sponsor.cancelLease(sponsor.address, sponsorLeaseAllAvaliableWaves, leasingFee).id
+      nodes.waitForHeightAriseAndTxPresent(cancelLeasingTx)
     }
 
     "issue asset make sponsor and burn and reissue" in {

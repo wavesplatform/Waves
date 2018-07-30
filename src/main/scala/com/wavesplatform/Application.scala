@@ -299,6 +299,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     //on unexpected shutdown
     sys.addShutdownHook {
+      SystemMetrics.stopCollecting()
       Await.ready(Kamon.stopAllReporters(), 20.seconds)
       Metrics.shutdown()
       shutdown(utxStorage, network)

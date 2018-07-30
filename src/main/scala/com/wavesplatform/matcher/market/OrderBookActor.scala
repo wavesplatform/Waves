@@ -247,7 +247,6 @@ class OrderBookActor(assetPair: AssetPair,
       Some(event.submitted)
     }
 
-    log.debug(s"Failed to execute order: $err")
     err match {
       case OrderValidationError(order, _) if order == event.submitted.order => None
       case OrderValidationError(order, _) if order == event.counter.order   => cancelCounterOrder()
@@ -284,7 +283,11 @@ class OrderBookActor(assetPair: AssetPair,
               Some(o.partial(event.submittedRemaining))
             else None
           case Left(ex) =>
-            log.info("Can't create tx for o1: " + Json.prettyPrint(o.order.json()) + "\n, o2: " + Json.prettyPrint(c.order.json()))
+            log.warn(
+              s"Can't create tx for o1: ${Json.prettyPrint(o.order.json())}\n, " +
+                s"o2: ${Json.prettyPrint(c.order.json())}\n, " +
+                s"reason: $ex"
+            )
             processInvalidTransaction(event, ex)
         }
       case _ => None
