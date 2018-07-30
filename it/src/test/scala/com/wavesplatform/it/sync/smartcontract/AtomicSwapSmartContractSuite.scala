@@ -1,20 +1,22 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.typesafe.config.Config
+import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.crypto
+import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
-import com.wavesplatform.utils.dummyCompilerContext
-import org.scalatest.CancelAfterFailure
-import play.api.libs.json.JsNumber
-import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.utils.dummyCompilerContext
+import org.scalatest.CancelAfterFailure
+import play.api.libs.json.JsNumber
 
 /*
 Scenario:
@@ -26,6 +28,20 @@ Scenario:
  */
 
 class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfterFailure {
+
+  /*
+  One node because:
+  1. There is an expected behavior of rollback and a possible issue with this. When the node are going rollback,
+     there is a chance, it has a downloaded (but don't applied) extension. After the rollback, it applies an extension.
+     This breaks the test.
+  2. We have RollbackSuite
+   */
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(0))
+      .withDefault(1)
+      .buildNonConflicting()
+
   private val BobBC1: String   = sender.createAddress()
   private val AliceBC1: String = sender.createAddress()
   private val swapBC1: String  = sender.createAddress()
@@ -126,7 +142,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("step5: Bob makes transfer; after revert Alice takes funds back") {
-    val height = sender.height
+    val height = nodes.height.max
 
     val (bobBalance, bobEffBalance)     = notMiner.accountBalances(BobBC1)
     val (aliceBalance, aliceEffBalance) = notMiner.accountBalances(AliceBC1)
@@ -151,9 +167,9 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val proof    = ByteStr(secretText.getBytes())
     val sigAlice = ByteStr(crypto.sign(AlicesPK, unsigned.bodyBytes()))
     val signed   = unsigned.copy(proofs = Proofs(Seq(proof, sigAlice)))
-    val versionedTransferId =
-      sender.signedBroadcast(signed.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt))).id
 
+    nodes.waitForHeightArise()
+    val versionedTransferId = sender.signedBroadcast(signed.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt))).id
     nodes.waitForHeightAriseAndTxPresent(versionedTransferId)
 
     notMiner.assertBalances(swapBC1, swapBalance - transferAmount - (minFee + smartFee), swapEffBalance - transferAmount - (minFee + smartFee))
