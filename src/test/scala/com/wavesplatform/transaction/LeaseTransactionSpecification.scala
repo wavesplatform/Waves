@@ -42,6 +42,7 @@ class LeaseTransactionSpecification extends PropSpec with PropertyChecks with Ma
                        "fee": 1000000,
                        "timestamp": 1526646300260,
                        "signature": "iy3TmfbFds7pc9cDDqfjEJhfhVyNtm3GcxoVz8L3kJFvgRPUmiqqKLMeJGYyN12AhaQ6HvE7aF1tFgaAoCCgNJJ",
+                       "proofs": ["iy3TmfbFds7pc9cDDqfjEJhfhVyNtm3GcxoVz8L3kJFvgRPUmiqqKLMeJGYyN12AhaQ6HvE7aF1tFgaAoCCgNJJ"],
                        "version": 1,
                        "amount": 10000000,
                        "recipient": "3NCBMxgdghg4tUhEEffSXy11L6hUi6fcBpd"

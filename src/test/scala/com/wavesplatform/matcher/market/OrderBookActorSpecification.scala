@@ -251,7 +251,7 @@ class OrderBookActorSpecification
       val ord1 = sell(pair, 100, 10 * Order.PriceConstant)
 
       (1 to 100).foreach({ i =>
-        actor ! ord1.copy()
+        actor ! ord1 //.copy()
       })
 
       within(10.seconds) {
@@ -356,7 +356,7 @@ class OrderBookActorSpecification
       val price  = 34118
       val amount = 1
 
-      val expiredOrder = buy(pair, price, amount).copy(expiration = time)
+      val expiredOrder = buy(pair, price, amount).updateExpiration(time)
       actor ! expiredOrder
       receiveN(1)
       getOrders(actor) shouldEqual Seq(BuyLimitOrder(price * Order.PriceConstant, amount, expiredOrder))

@@ -38,7 +38,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
   property("Order timestamp validation") {
     forAll(orderGen) { order =>
       val time = NTP.correctedTime()
-      order.copy(timestamp = -1).isValid(time) shouldBe not(valid)
+      order.updateTimestamp(-1).isValid(time) shouldBe not(valid)
     }
   }
 
@@ -80,23 +80,21 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
     forAll(orderGen, accountGen) {
       case (order, pka) =>
         order.signaturesValid() shouldBe an[Right[_, _]]
-        order.copy(senderPublicKey = pka).signaturesValid() should produce("InvalidSignature")
-        order.copy(matcherPublicKey = pka).signaturesValid() should produce("InvalidSignature")
+        order.updateSender(pka).signaturesValid() should produce("InvalidSignature")
+        order.updateMatcher(pka).signaturesValid() should produce("InvalidSignature")
         val assetPair = order.assetPair
         order
-          .copy(
-            assetPair = assetPair.copy(amountAsset = assetPair.amountAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_))))
+          .updatePair(assetPair.copy(amountAsset = assetPair.amountAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_))))
           .signaturesValid() should produce("InvalidSignature")
         order
-          .copy(
-            assetPair = assetPair.copy(priceAsset = assetPair.priceAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_))))
+          .updatePair(assetPair.copy(priceAsset = assetPair.priceAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_))))
           .signaturesValid() should produce("InvalidSignature")
-        order.copy(orderType = OrderType.reverse(order.orderType)).signaturesValid() should produce("InvalidSignature")
-        order.copy(price = order.price + 1).signaturesValid() should produce("InvalidSignature")
-        order.copy(amount = order.amount + 1).signaturesValid() should produce("InvalidSignature")
-        order.copy(expiration = order.expiration + 1).signaturesValid() should produce("InvalidSignature")
-        order.copy(matcherFee = order.matcherFee + 1).signaturesValid() should produce("InvalidSignature")
-        order.copy(proofs = Proofs(Seq(ByteStr(pka.publicKey ++ pka.publicKey)))).signaturesValid() should produce("InvalidSignature")
+        order.updateType(OrderType.reverse(order.orderType)).signaturesValid() should produce("InvalidSignature")
+        order.updatePrice(order.price + 1).signaturesValid() should produce("InvalidSignature")
+        order.updateAmount(order.amount + 1).signaturesValid() should produce("InvalidSignature")
+        order.updateExpiration(order.expiration + 1).signaturesValid() should produce("InvalidSignature")
+        order.updateFee(order.matcherFee + 1).signaturesValid() should produce("InvalidSignature")
+        order.updateProofs(Proofs(Seq(ByteStr(pka.publicKey ++ pka.publicKey)))).signaturesValid() should produce("InvalidSignature")
     }
   }
 

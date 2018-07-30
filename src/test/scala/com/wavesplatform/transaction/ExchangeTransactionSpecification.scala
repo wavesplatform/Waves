@@ -67,17 +67,17 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         create(sellMatcherFee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
         create(buyMatcherFee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
         create(fee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
-        create(buyOrder = buy.copy(matcherPublicKey = sender2)) shouldBe an[Left[_, _]]
-        create(sellOrder = buy.copy(matcherPublicKey = sender2)) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.updateMatcher(sender2)) shouldBe an[Left[_, _]]
+        create(sellOrder = buy.updateMatcher(sender2)) shouldBe an[Left[_, _]]
         create(
-          buyOrder = buy.copy(assetPair = buy.assetPair.copy(amountAsset = None)),
-          sellOrder = sell.copy(assetPair = sell.assetPair.copy(priceAsset = Some(ByteStr(Array(1: Byte)))))
+          buyOrder = buy.updatePair(buy.assetPair.copy(amountAsset = None)),
+          sellOrder = sell.updatePair(sell.assetPair.copy(priceAsset = Some(ByteStr(Array(1: Byte)))))
         ) shouldBe an[Left[_, _]]
-        create(buyOrder = buy.copy(expiration = 1L)) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.updateExpiration(1L)) shouldBe an[Left[_, _]]
         create(price = buy.price + 1) shouldBe an[Left[_, _]]
         create(price = sell.price - 1) shouldBe an[Left[_, _]]
-        create(sellOrder = sell.copy(amount = -1)) shouldBe an[Left[_, _]]
-        create(buyOrder = buy.copy(amount = -1)) shouldBe an[Left[_, _]]
+        create(sellOrder = sell.updateAmount(-1)) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.updateAmount(-1)) shouldBe an[Left[_, _]]
 
     }
   }
@@ -118,8 +118,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
   }
 
   property("JSON format validation") {
-    val js = Json.parse(
-      """{
+    val js = Json.parse("""{
          "type":7,
          "id":"FaDrdKax2KBZY6Mh7K3tWmanEdzZx6MhYUmpjV3LBJRp",
          "sender":"3N22UCTvst8N1i1XDvGHzyqdgmZgwDKbp44",
@@ -127,14 +126,43 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
          "fee":1,
          "timestamp":1526992336241,
          "signature":"5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa",
-         "order1":{"id":"EdUTcUZNK3NYKuPrsPCkZGzVUwpjx6qVjd4TgBwna7po","sender":"3MthkhReCHXeaPZcWXcT3fa6ey1XWptLtwj","senderPublicKey":"BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ","matcherPublicKey":"Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP","assetPair":{"amountAsset":null,"priceAsset":"9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy"},"orderType":"buy","price":6000000000,"amount":2,"timestamp":1526992336241,"expiration":1529584336241,"matcherFee":1,"signature":"2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs"},
-         "order2":{"id":"DS9HPBGRMJcquTb3sAGAJzi73jjMnFFSWWHfzzKK32Q7","sender":"3MswjKzUBKCD6i1w4vCosQSbC8XzzdBx1mG","senderPublicKey":"7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV","matcherPublicKey":"Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP","assetPair":{"amountAsset":null,"priceAsset":"9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy"},"orderType":"sell","price":5000000000,"amount":3,"timestamp":1526992336241,"expiration":1529584336241,"matcherFee":2,"signature":"2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq"},
+         "proofs":["5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa"],
+         "order1":{
+            "id":"EdUTcUZNK3NYKuPrsPCkZGzVUwpjx6qVjd4TgBwna7po",
+            "sender":"3MthkhReCHXeaPZcWXcT3fa6ey1XWptLtwj",
+            "senderPublicKey":"BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ",
+            "matcherPublicKey":"Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP",
+            "assetPair":{"amountAsset":null,"priceAsset":"9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy"},
+            "orderType":"buy",
+            "price":6000000000,
+            "amount":2,
+            "timestamp":1526992336241,
+            "expiration":1529584336241,
+            "matcherFee":1,
+            "signature":"2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs",
+            "proofs":["2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs"]
+         },
+         "order2":{
+            "id":"DS9HPBGRMJcquTb3sAGAJzi73jjMnFFSWWHfzzKK32Q7",
+            "sender":"3MswjKzUBKCD6i1w4vCosQSbC8XzzdBx1mG",
+            "senderPublicKey":"7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV",
+            "matcherPublicKey":"Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP",
+            "assetPair":{"amountAsset":null,"priceAsset":"9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy"},
+            "orderType":"sell",
+            "price":5000000000,
+            "amount":3,
+            "timestamp":1526992336241,
+            "expiration":1529584336241,
+            "matcherFee":2,
+            "signature":"2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq",
+            "proofs":["2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq"]
+         },
          "price":5000000000,
          "amount":2,
          "buyMatcherFee":1,
          "sellMatcherFee":1
-         }
-      """.stripMargin)
+      }
+      """)
 
     val buy = Order(
       PublicKeyAccount.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(),

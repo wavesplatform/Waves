@@ -97,7 +97,7 @@ object SyncMatcherHttpApi extends Assertions {
       val matcherPublicKey    = m.publicKey
       val unsigned            = Order(node.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, 300000, Proofs.empty)
       val signature           = crypto.sign(node.privateKey, unsigned.toSign)
-      unsigned.copy(proofs = Proofs(Seq(ByteStr(signature))))
+      unsigned.updateProofs(Proofs(Seq(ByteStr(signature))))
     }
   }
 

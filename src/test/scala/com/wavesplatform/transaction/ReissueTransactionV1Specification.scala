@@ -33,6 +33,7 @@ class ReissueTransactionV1Specification extends PropSpec with PropertyChecks wit
                     "fee": 100000000,
                     "timestamp": 1526287561757,
                     "signature": "3LnRMrjkk7RoV35PTwcdB4yW2rqUqXaKAh8DnPk5tNWABvhVQ9oqdTk3zM8b9AbGtry7WEcQZtevfK92DCFaa6hA",
+                    "proofs": ["3LnRMrjkk7RoV35PTwcdB4yW2rqUqXaKAh8DnPk5tNWABvhVQ9oqdTk3zM8b9AbGtry7WEcQZtevfK92DCFaa6hA"],
                     "version": 1,
                     "chainId": null,
                     "assetId": "9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz",
