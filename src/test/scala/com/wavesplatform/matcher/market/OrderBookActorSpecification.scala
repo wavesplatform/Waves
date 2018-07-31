@@ -6,6 +6,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.wavesplatform.matcher.MatcherTestData
+import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
@@ -71,7 +72,7 @@ class OrderBookActorSpecification
 
   val orderHistoryRef = TestActorRef(new Actor {
     def receive: Receive = {
-      case ValidateOrder(o, _) => sender() ! ValidateOrderResult(Right(o))
+      case ValidateOrder(o, _) => sender() ! ValidateOrderResult(o.idStr(), Right(o))
       case _                   =>
     }
   })
@@ -120,7 +121,7 @@ class OrderBookActorSpecification
     system.eventStream.subscribe(eventsProbe.ref, classOf[Event])
   }
 
-  "OrderBookActror" should {
+  "OrderBookActor" should {
 
     "place buy orders" in {
       val ord1 = buy(pair, 34118, 1583290045643L)
@@ -394,6 +395,60 @@ class OrderBookActorSpecification
       actor ! OrderCleanup
       getOrders(actor) shouldEqual expectedOrders
     }
+
+    "responses with a error after timeout" in {
+      val actor: ActorRef = createOrderBookActor(TestProbe().ref, 50.millis)
+
+      val order = buy(pair, 1, 1)
+      actor ! order
+      Thread.sleep(60)
+      expectMsg(OperationTimedOut)
+    }
+
+    "ignores an unexpected validation message" when {
+      "receives ValidateOrderResult of another order" in {
+        val historyActor = TestProbe()
+        val actor        = createOrderBookActor(historyActor.ref)
+
+        val order = buy(pair, 1, 1)
+        actor ! order
+
+        val unexpectedOrder = buy(pair, 1, 2)
+        actor.tell(ValidateOrderResult(unexpectedOrder.idStr(), Right(unexpectedOrder)), historyActor.ref)
+        expectNoMsg()
+      }
+
+      "receives ValidateCancelResult of another order" in {
+        val historyActor = TestProbe()
+        val actor        = createOrderBookActor(historyActor.ref)
+
+        val order = buy(pair, 1, 1)
+        actor ! CancelOrder(pair, CancelOrderRequest(order.senderPublicKey, order.id(), order.signature))
+
+        val unexpectedOrder = buy(pair, 1, 2)
+        actor.tell(
+          CancelOrder(pair, CancelOrderRequest(unexpectedOrder.senderPublicKey, unexpectedOrder.id(), unexpectedOrder.signature)),
+          historyActor.ref
+        )
+        expectNoMsg()
+      }
+    }
   }
+
+  private def createOrderBookActor(historyActor: ActorRef, validationTimeout: FiniteDuration = 10.minutes): ActorRef = system.actorOf(
+    Props(
+      new OrderBookActor(
+        pair,
+        _ => (),
+        historyActor,
+        stub[Blockchain],
+        stub[Wallet],
+        stub[UtxPool],
+        stub[ChannelGroup],
+        settings.copy(validationTimeout = validationTimeout),
+        FunctionalitySettings.TESTNET
+      ) with RestartableActor
+    )
+  )
 
 }

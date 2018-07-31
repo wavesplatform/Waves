@@ -38,9 +38,9 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
     case req: GetAllOrderHistory =>
       fetchAllOrderHistory(req)
     case ValidateOrder(o, ts) =>
-      sender() ! ValidateOrderResult(validateNewOrder(o))
+      sender() ! ValidateOrderResult(o.idStr(), validateNewOrder(o))
     case ValidateCancelOrder(co, _) =>
-      sender() ! ValidateCancelResult(validateCancelOrder(co))
+      sender() ! ValidateCancelResult(co.orderId, validateCancelOrder(co))
     case req: DeleteOrderFromHistory =>
       deleteFromOrderHistory(req)
     case GetOrderStatus(_, id, _) =>
@@ -89,13 +89,9 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
     sender() ! GetOrderHistoryResponse(orderHistory.fetchOrderHistoryByPair(req.assetPair, req.address))
   }
 
-  def fetchAllOrderHistory(req: GetAllOrderHistory): Unit = {
-    req.activeOnly match {
-      case true =>
-        sender() ! GetOrderHistoryResponse(orderHistory.fetchAllActiveOrderHistory(req.address))
-      case false =>
-        sender() ! GetOrderHistoryResponse(orderHistory.fetchAllOrderHistory(req.address))
-    }
+  def fetchAllOrderHistory(req: GetAllOrderHistory): Unit = sender() ! {
+    if (req.activeOnly) GetOrderHistoryResponse(orderHistory.fetchAllActiveOrderHistory(req.address))
+    else GetOrderHistoryResponse(orderHistory.fetchAllOrderHistory(req.address))
   }
 
   def forceCancelOrder(id: String): Unit = {
@@ -179,11 +175,11 @@ object OrderHistoryActor {
 
   case class ValidateOrder(order: Order, ts: Long) extends ExpirableOrderHistoryRequest
 
-  case class ValidateOrderResult(result: Either[GenericError, Order])
+  case class ValidateOrderResult(validatedOrderId: String, result: Either[GenericError, Order])
 
   case class ValidateCancelOrder(cancel: CancelOrder, ts: Long) extends ExpirableOrderHistoryRequest
 
-  case class ValidateCancelResult(result: Either[GenericError, CancelOrder])
+  case class ValidateCancelResult(validatedOrderId: String, result: Either[GenericError, CancelOrder])
 
   case class RecoverFromOrderBook(ob: OrderBook) extends OrderHistoryRequest
 

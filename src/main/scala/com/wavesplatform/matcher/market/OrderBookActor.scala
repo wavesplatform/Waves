@@ -28,7 +28,6 @@ import scorex.wallet.Wallet
 
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 
 class OrderBookActor(assetPair: AssetPair,
                      updateSnapshot: OrderBook => Unit,
@@ -46,6 +45,13 @@ class OrderBookActor(assetPair: AssetPair,
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
   private val timer = Kamon.timer("matcher.orderbook.match").refine("pair" -> assetPair.toString)
+  private val validationTimeouts = Kamon
+    .counter("matcher.orderbook.error")
+    .refine(
+      "pair"  -> assetPair.toString,
+      "group" -> "validation",
+      "type"  -> "timeout"
+    )
 
   private val snapshotCancellable    = context.system.scheduler.schedule(settings.snapshotsInterval, settings.snapshotsInterval, self, SaveSnapshot)
   private val cleanupCancellable     = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
@@ -166,19 +172,37 @@ class OrderBookActor(assetPair: AssetPair,
       }
   }
 
-  private def waitingValidation: Receive = readOnlyCommands orElse {
+  private def waitingValidation(sentMessage: Either[ValidateCancelOrder, ValidateOrder]): Receive = readOnlyCommands orElse {
     case ValidationTimeoutExceeded =>
-      log.warn("Validation timeout exceeded, skip incoming request")
+      validationTimeouts.increment()
+      log.warn(s"Validation timeout exceeded for $sentMessage")
+      val orderId = sentMessage.fold(_.cancel.orderId, _.order.idStr())
+      cancelInProgressOrders.invalidate(orderId)
+      apiSender.foreach(_ ! OperationTimedOut)
       becomeFullCommands()
-    case ValidateOrderResult(res) =>
-      cancellable.foreach(_.cancel())
-      handleValidateOrderResult(res)
-    case ValidateCancelResult(res) =>
-      cancellable.foreach(_.cancel())
-      handleValidateCancelResult(res.map(x => x.orderId))
+
+    case ValidateOrderResult(validatedOrderId, res) =>
+      sentMessage match {
+        case Right(sent) if validatedOrderId == sent.order.idStr() =>
+          cancellable.foreach(_.cancel())
+          handleValidateOrderResult(res)
+        case x =>
+          log.warn(s"Unexpected message: $x")
+      }
+
+    case ValidateCancelResult(validatedOrderId, res) =>
+      sentMessage match {
+        case Left(sent) if validatedOrderId == sent.cancel.orderId =>
+          cancellable.foreach(_.cancel())
+          handleValidateCancelResult(res.map(x => x.orderId))
+        case x =>
+          log.warn(s"Unexpected message: $x")
+      }
+
     case cancel: CancelOrder if Option(cancelInProgressOrders.getIfPresent(cancel.orderId)).nonEmpty =>
       log.info(s"Order($assetPair, ${cancel.orderId}) is already being canceled")
       sender() ! OrderCancelRejected("Order is already being canceled")
+
     case ev =>
       log.info("Stashed: " + ev)
       stash()
@@ -202,10 +226,11 @@ class OrderBookActor(assetPair: AssetPair,
         log.info(s"Order($assetPair, ${cancel.orderId}) is already not found")
         sender() ! OrderCancelRejected("Order not found")
       case None =>
-        orderHistory ! ValidateCancelOrder(cancel, NTP.correctedTime())
+        val msg = ValidateCancelOrder(cancel, NTP.correctedTime())
+        orderHistory ! msg
         apiSender = Some(sender())
-        cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
-        context.become(waitingValidation)
+        cancellable = Some(context.system.scheduler.scheduleOnce(settings.validationTimeout, self, ValidationTimeoutExceeded))
+        context.become(waitingValidation(Left(msg)))
         cancelInProgressOrders.put(cancel.orderId, okCancel)
     }
   }
@@ -256,10 +281,11 @@ class OrderBookActor(assetPair: AssetPair,
   }
 
   private def onAddOrder(order: Order): Unit = {
-    orderHistory ! ValidateOrder(order, NTP.correctedTime())
+    val msg = ValidateOrder(order, NTP.correctedTime())
+    orderHistory ! msg
     apiSender = Some(sender())
-    cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
-    context.become(waitingValidation)
+    cancellable = Some(context.system.scheduler.scheduleOnce(settings.validationTimeout, self, ValidationTimeoutExceeded))
+    context.become(waitingValidation(Right(msg)))
   }
 
   private def handleValidateOrderResult(res: Either[GenericError, Order]): Unit = {
@@ -362,7 +388,7 @@ class OrderBookActor(assetPair: AssetPair,
 
   override def receiveCommand: Receive = fullCommands
 
-  val isMigrateToNewOrderHistoryStorage = settings.isMigrateToNewOrderHistoryStorage
+  val isMigrateToNewOrderHistoryStorage: Boolean = settings.isMigrateToNewOrderHistoryStorage
 
   override def receiveRecover: Receive = {
     case evt: Event =>
@@ -404,9 +430,8 @@ object OrderBookActor {
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
-  val MaxDepth                          = 50
-  val ValidationTimeout: FiniteDuration = 5.seconds
-  val AlreadyCanceledCacheSize          = 10000L
+  val MaxDepth                 = 50
+  val AlreadyCanceledCacheSize = 10000L
 
   private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit) {
     def completed: Boolean  = initiated && oldMessagesDeleted && oldSnapshotsDeleted
@@ -428,6 +453,11 @@ object OrderBookActor {
   case class ForceCancelOrder(assetPair: AssetPair, orderId: String) extends OrderBookRequest
 
   case object OrderCleanup
+
+  case object OperationTimedOut extends MatcherResponse {
+    val json = Json.obj("status" -> "OperationTimedOut", "message" -> "Operation is timed out, please try later")
+    val code = StatusCodes.RequestTimeout
+  }
 
   case class OrderAccepted(order: Order) extends MatcherResponse {
     val json = Json.obj("status" -> "OrderAccepted", "message" -> order.json())
