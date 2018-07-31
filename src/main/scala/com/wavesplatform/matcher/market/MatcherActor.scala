@@ -2,11 +2,11 @@ package com.wavesplatform.matcher.market
 
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence.{PersistentActor, RecoveryCompleted}
 import com.google.common.base.Charsets
-import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
+import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.OrderBook
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherSettings}
@@ -133,6 +133,17 @@ class MatcherActor(orderHistory: ActorRef,
             sender() ! OrderCancelRejected(s"Order '${x.orderId}' is already cancelled or never existed in '${x.assetPair.key}' pair")
           }(forwardReq(x))
       }
+
+    case Shutdown =>
+      context.become(shuttingDown)
+      context.actorOf(Props(classOf[GracefulShutdownActor], context.children.toVector, self))
+  }
+
+  def shuttingDown: Receive = {
+    case ShutdownComplete =>
+      log.info("OrderBooks are successfully closed, stopping MatcherActor")
+      context.stop(self)
+    case _ => sender() ! BadMatcherResponse(StatusCodes.ServiceUnavailable, "System is going shutdown")
   }
 
   def initPredefinedPairs(): Unit = {
@@ -190,6 +201,10 @@ object MatcherActor {
 
   case object GetMarkets
 
+  case object Shutdown
+
+  case object ShutdownComplete
+
   case class GetMarketsResponse(publicKey: Array[Byte], markets: Seq[MarketData]) extends MatcherResponse {
     def getMarketsJs: JsValue =
       JsArray(
@@ -227,5 +242,20 @@ object MatcherActor {
     else if (buffer1.isEmpty) -1
     else if (buffer2.isEmpty) 1
     else ByteArray.compare(buffer1.get, buffer2.get)
+  }
+
+  class GracefulShutdownActor(children: Vector[ActorRef], receiver: ActorRef) extends Actor {
+    children.foreach(_ ! Shutdown)
+
+    override def receive: Receive = state(children.size)
+
+    private def state(expectedResponses: Int): Receive = {
+      case ShutdownComplete =>
+        if (expectedResponses > 1) context.become(state(expectedResponses - 1))
+        else {
+          receiver ! ShutdownComplete
+          context.stop(self)
+        }
+    }
   }
 }

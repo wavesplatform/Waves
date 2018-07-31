@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
+import akka.pattern.gracefulStop
 import akka.stream.ActorMaterializer
 import com.wavesplatform.db._
 import com.wavesplatform.matcher.api.MatcherApiRoute
@@ -83,6 +84,8 @@ class Matcher(actorSystem: ActorSystem,
   @volatile var matcherServerBinding: ServerBinding = _
 
   def shutdownMatcher(): Unit = {
+    val stopMatcherTimeout = 5.minutes
+    Await.result(gracefulStop(matcher, stopMatcherTimeout, MatcherActor.Shutdown), stopMatcherTimeout)
     db.close()
     Await.result(matcherServerBinding.unbind(), 10.seconds)
   }
