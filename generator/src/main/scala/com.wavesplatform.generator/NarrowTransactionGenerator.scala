@@ -5,7 +5,7 @@ import java.util.concurrent.ThreadLocalRandom
 import cats.Show
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
 import com.wavesplatform.state.DataEntry.{MaxValueSize, Type}
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, EitherExt2, IntegerDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, EitherExt2, IntegerDataEntry, StringDataEntry}
 import org.slf4j.LoggerFactory
 import com.wavesplatform.account.{Alias, PrivateKeyAccount}
 import com.wavesplatform.utils.LoggerFacade
@@ -195,6 +195,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
               etype match {
                 case t if t == Type.Integer.id => IntegerDataEntry(key, r.nextLong)
                 case t if t == Type.Boolean.id => BooleanDataEntry(key, r.nextBoolean)
+                case t if t == Type.String.id  => StringDataEntry(key, r.nextLong.toString)
                 case t if t == Type.Binary.id =>
                   val size = r.nextInt(MaxValueSize + 1)
                   val b    = new Array[Byte](size)
