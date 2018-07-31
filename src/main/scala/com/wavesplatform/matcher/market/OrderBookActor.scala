@@ -398,7 +398,6 @@ class OrderBookActor(assetPair: AssetPair,
 
   override def receiveRecover: Receive = {
     case evt: Event =>
-      log.debug("Event: {}", evt)
       applyEvent(evt)
       if (isMigrateToNewOrderHistoryStorage) {
         orderHistory ! evt
