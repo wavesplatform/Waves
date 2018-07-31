@@ -32,7 +32,7 @@ object MigrationTool extends ScorexLogging {
         val e                 = iterator.next()
         val SK.OrdersInfo(id) = e.getKey
         val t                 = om.readTree(e.getValue)
-        val oi                = OrderInfo(t.get("amount").asLong, t.get("filled").asLong, t.get("canceled").asBoolean)
+        val oi                = OrderInfo(t.get("amount").asLong, t.get("filled").asLong, t.get("canceled").asBoolean, None)
         if (!oi.canceled && oi.amount != oi.filled) {
           result += id -> oi
         }

@@ -3,6 +3,7 @@ package com.wavesplatform.matcher
 import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.crypto
+import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.ByteStr
@@ -91,16 +92,30 @@ trait MatcherTestData {
           amount: Long,
           sender: Option[PrivateKeyAccount] = None,
           matcherFee: Option[Long] = None,
-          ts: Option[Long] = None): Order =
-    valueFromGen(buyGenerator(pair, (price * Order.PriceConstant).toLong, amount, sender, matcherFee, ts))._1
+          ts: Option[Long] = None): Order = rawBuy(pair, (price * Order.PriceConstant).toLong, amount, sender, matcherFee, ts)
+
+  def rawBuy(pair: AssetPair,
+             price: Price,
+             amount: Long,
+             sender: Option[PrivateKeyAccount] = None,
+             matcherFee: Option[Long] = None,
+             ts: Option[Long] = None): Order =
+    valueFromGen(buyGenerator(pair, price, amount, sender, matcherFee, ts))._1
 
   def sell(pair: AssetPair,
            price: BigDecimal,
            amount: Long,
            sender: Option[PrivateKeyAccount] = None,
            matcherFee: Option[Long] = None,
-           ts: Option[Long] = None): Order =
-    valueFromGen(sellGenerator(pair, (price * Order.PriceConstant).toLong, amount, sender, matcherFee, ts))._1
+           ts: Option[Long] = None): Order = rawSell(pair, (price * Order.PriceConstant).toLong, amount, sender, matcherFee, ts)
+
+  def rawSell(pair: AssetPair,
+              price: Long,
+              amount: Long,
+              sender: Option[PrivateKeyAccount] = None,
+              matcherFee: Option[Long] = None,
+              ts: Option[Long] = None): Order =
+    valueFromGen(sellGenerator(pair, price, amount, sender, matcherFee, ts))._1
 
   val orderTypeGenerator: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
 

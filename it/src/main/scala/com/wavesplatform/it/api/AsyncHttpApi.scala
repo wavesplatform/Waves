@@ -10,8 +10,7 @@ import com.wavesplatform.http.api_key
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
-import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.state.{ByteStr, DataEntry, Portfolio}
+import com.wavesplatform.state.{DataEntry, Portfolio}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
@@ -25,7 +24,6 @@ import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
 import scorex.api.http.{AddressApiRoute, ApiErrorResponse, DataRequest}
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
-import scorex.transaction.assets.exchange.Order
 import scorex.transaction.transfer._
 import scorex.waves.http.DebugApiRoute._
 import scorex.waves.http.DebugMessage._
@@ -36,7 +34,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 object AsyncHttpApi extends Assertions {
 
@@ -69,41 +67,6 @@ object AsyncHttpApi extends Assertions {
   }
 
   implicit class NodeAsyncHttpApi(n: Node) extends Assertions with Matchers {
-
-    def matcherGet(path: String,
-                   f: RequestBuilder => RequestBuilder = identity,
-                   statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200,
-                   waitForStatus: Boolean = false): Future[Response] =
-      retrying(f(_get(s"${n.matcherApiEndpoint}$path")).build(), statusCode = statusCode, waitForStatus = waitForStatus)
-
-    def matcherGetWithSignature(path: String, ts: Long, signature: ByteStr, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
-      retrying {
-        _get(s"${n.matcherApiEndpoint}$path")
-          .setHeader("Timestamp", ts)
-          .setHeader("Signature", signature)
-          .build()
-      }
-
-    def matcherGetStatusCode(path: String, statusCode: Int): Future[MessageMatcherResponse] =
-      matcherGet(path, statusCode = statusCode).as[MessageMatcherResponse]
-
-    def matcherPost[A: Writes](path: String, body: A): Future[Response] =
-      post(s"${n.matcherApiEndpoint}$path", (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
-
-    def getOrderStatus(asset: String, orderId: String): Future[MatcherStatusResponse] =
-      matcherGet(s"/matcher/orderbook/$asset/WAVES/$orderId", waitForStatus = true).as[MatcherStatusResponse]
-
-    def getOrderBook(asset: String): Future[OrderBookResponse] =
-      matcherGet(s"/matcher/orderbook/$asset/WAVES").as[OrderBookResponse]
-
-    def getOrderbookByPublicKey(publicKey: String, timestamp: Long, signature: ByteStr): Future[Seq[OrderbookHistory]] =
-      matcherGetWithSignature(s"/matcher/orderbook/$publicKey", timestamp, signature).as[Seq[OrderbookHistory]]
-
-    def getOrderbookByPublicKeyActive(publicKey: String, timestamp: Long, signature: ByteStr): Future[Seq[OrderbookHistory]] =
-      matcherGetWithSignature(s"/matcher/orderbook/$publicKey?activeOnly=true", timestamp, signature).as[Seq[OrderbookHistory]]
-
-    def getReservedBalance(publicKey: String, timestamp: Long, signature: ByteStr): Future[Map[String, Long]] =
-      matcherGetWithSignature(s"/matcher/balance/reserved/$publicKey", timestamp, signature).as[Map[String, Long]]
 
     def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
       retrying(f(_get(s"${n.nodeApiEndpoint}$path")).build())
@@ -457,23 +420,6 @@ object AsyncHttpApi extends Assertions {
                    fee: Long,
                    reissuable: Boolean): Future[Transaction] =
       postJson("/assets/issue", IssueV1Request(address, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
-
-    def placeOrder(order: Order): Future[MatcherResponse] =
-      matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
-
-    def expectIncorrectOrderPlacement(order: Order, expectedStatusCode: Int, expectedStatus: String): Future[Boolean] =
-      matcherPost("/matcher/orderbook", order.json()) transform {
-        case Failure(UnexpectedStatusCodeException(_, `expectedStatusCode`, responseBody)) =>
-          Try(parse(responseBody).as[MatcherStatusResponse]) match {
-            case Success(mr) if mr.status == expectedStatus => Success(true)
-            case Failure(f)                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
-          }
-        case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
-        case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
-      }
-
-    def cancelOrder(amountAsset: String, priceAsset: String, request: CancelOrderRequest): Future[MatcherStatusResponse] =
-      matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", request.json).as[MatcherStatusResponse]
 
     def retrying(r: Request,
                  interval: FiniteDuration = 1.second,

@@ -27,9 +27,9 @@ trait ExchangeTransactionCreator extends ScorexLogging {
       .privateKeyAccount(submitted.order.matcherPublicKey)
       .flatMap(matcherPrivateKey => {
         val price             = counter.price
-        val amount            = math.min(submitted.amount, counter.amount)
+        val amount            = math.min(submitted.executionAmount(counter), counter.amountOfAmountAsset)
         val (buy, sell)       = Order.splitByType(submitted.order, counter.order)
-        val (buyFee, sellFee) = calculateMatcherFee(buy, sell, amount: Long)
+        val (buyFee, sellFee) = calculateMatcherFee(buy, sell, amount)
         ExchangeTransaction.create(matcherPrivateKey, buy, sell, price, amount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
       })
   }

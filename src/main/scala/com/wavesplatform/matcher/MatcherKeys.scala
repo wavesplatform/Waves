@@ -22,9 +22,20 @@ object MatcherKeys {
     bytes(2, orderId.arr),
     Option(_).fold[OrderInfo](OrderInfo.empty) { b =>
       val bb = ByteBuffer.wrap(b)
-      OrderInfo(bb.getLong, bb.getLong, bb.get == 1)
+      b.length match {
+        case 17 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, None)
+        case 25 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, Some(bb.getLong))
+      }
+
     },
-    oi => ByteBuffer.allocate(17).putLong(oi.amount).putLong(oi.filled).put(if (oi.canceled) 1.toByte else 0.toByte).array()
+    oi =>
+      ByteBuffer
+        .allocate(25)
+        .putLong(oi.amount)
+        .putLong(oi.filled)
+        .put(if (oi.canceled) 1.toByte else 0.toByte)
+        .putLong(oi.minAmount.getOrElse(0L))
+        .array()
   )
 
   def addressOrdersSeqNr(address: Address): Key[Int] = bytesSeqNr(3, address.bytes.arr)

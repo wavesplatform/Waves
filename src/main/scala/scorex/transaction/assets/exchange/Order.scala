@@ -14,6 +14,7 @@ import scorex.transaction.ValidationError.{GenericError, InvalidSignature}
 import scorex.transaction._
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 
+import scala.math.BigDecimal.RoundingMode
 import scala.util.Try
 
 sealed trait OrderType {
@@ -71,8 +72,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
 
   import Order._
 
-  val sender         = senderPublicKey
-  val signatureValid = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
+  val sender: PublicKeyAccount        = senderPublicKey
+  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(price, amount) &&
@@ -122,7 +123,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   @ApiModelProperty(hidden = true)
   def getSpendAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] =
     Try {
-      if (orderType == OrderType.SELL) matchAmount
+      if (orderType == OrderType.SELL) correctAmount(matchAmount, matchPrice)
       else {
         val spend = BigInt(matchAmount) * matchPrice / PriceConstant
         if (getSpendAssetId.isEmpty && !(spend + matcherFee).isValidLong) {
@@ -134,7 +135,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   @ApiModelProperty(hidden = true)
   def getReceiveAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] =
     Try {
-      if (orderType == OrderType.BUY) matchAmount
+      if (orderType == OrderType.BUY) correctAmount(matchAmount, matchPrice)
       else {
         (BigInt(matchAmount) * matchPrice / PriceConstant).bigInteger.longValueExact()
       }
@@ -193,6 +194,14 @@ object Order {
   val PriceConstant         = 100000000L
   val MaxAmount: Long       = 100 * PriceConstant * PriceConstant
   private val AssetIdLength = 32
+
+  def correctAmount(a: Long, price: Long): Long = {
+    val min = (BigDecimal(Order.PriceConstant) / price).setScale(0, RoundingMode.HALF_UP)
+    if (min > 0)
+      ((BigDecimal(a) / min).toBigInt() * min.toBigInt()).bigInteger.longValueExact()
+    else
+      a
+  }
 
   def buy(sender: PrivateKeyAccount,
           matcher: PublicKeyAccount,

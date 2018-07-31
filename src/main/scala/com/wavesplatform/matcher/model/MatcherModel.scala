@@ -9,6 +9,7 @@ import scorex.account.Address
 import scorex.transaction.assets.exchange._
 import scorex.transaction.{AssetAcc, AssetId}
 
+import scala.math.BigDecimal.RoundingMode
 import scala.util.Try
 
 object MatcherModel {
@@ -27,10 +28,9 @@ sealed trait LimitOrder {
 
   def getSpendAmount: Long
   def getReceiveAmount: Long
-  def feeAmount: Long       = Try((BigInt(amount) * order.matcherFee / order.amount).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
+  def feeAmount: Long       = longExact(BigInt(amount) * order.matcherFee / order.amount, Long.MaxValue)
   def remainingAmount: Long = order.amount - amount
-  val remainingFee: Long = order.matcherFee - Try((BigInt(remainingAmount) * order.matcherFee / order.amount).bigInteger.longValueExact())
-    .getOrElse(0L)
+  val remainingFee: Long    = order.matcherFee - longExact(BigInt(remainingAmount) * order.matcherFee / order.amount, 0L)
 
   def spentAcc: AssetAcc = AssetAcc(order.senderPublicKey, order.getSpendAssetId)
   def rcvAcc: AssetAcc   = AssetAcc(order.senderPublicKey, order.getReceiveAssetId)
@@ -39,17 +39,31 @@ sealed trait LimitOrder {
   def spentAsset: Option[ByteStr] = order.getSpendAssetId
   def rcvAsset: Option[ByteStr]   = order.getReceiveAssetId
   def feeAsset: Option[ByteStr]   = None
+
+  def minAmountOfAmountAsset: Long         = minimalAmountOfAmountAssetByPrice(price)
+  def amountOfPriceAsset: Long             = longExact(BigInt(amount) * price / Order.PriceConstant, Long.MaxValue)
+  def amountOfAmountAsset: Long            = correctedAmountOfAmountAsset(minAmountOfAmountAsset, amount)
+  def executionAmount(o: LimitOrder): Long = correctedAmountOfAmountAsset(minimalAmountOfAmountAssetByPrice(o.price), amount)
+
+  def isValid: Boolean =
+    amount > 0 && amount >= minAmountOfAmountAsset && amount < Order.MaxAmount && getSpendAmount > 0 && getReceiveAmount > 0
+
+  protected def longExact(v: BigInt, default: Long): Long              = Try(v.bigInteger.longValueExact()).getOrElse(default)
+  protected def minimalAmountOfAmountAssetByPrice(p: Long): Long       = (BigDecimal(Order.PriceConstant) / p).setScale(0, RoundingMode.HALF_UP).toLong
+  protected def correctedAmountOfAmountAsset(min: Long, a: Long): Long = if (min > 0) longExact((BigInt(a) / min) * min, Long.MaxValue) else a
+
 }
 
 case class BuyLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
-  def partial(amount: Price): LimitOrder = copy(amount = amount)
-  def getReceiveAmount: Long             = amount
-  def getSpendAmount: Long               = Try((BigInt(amount) * price / Order.PriceConstant).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
+  def partial(amount: Long): LimitOrder = copy(amount = amount)
+  def getReceiveAmount: Long            = amountOfAmountAsset
+  def getSpendAmount: Long              = amountOfPriceAsset
 }
+
 case class SellLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
-  def partial(amount: Price): LimitOrder = copy(amount = amount)
-  def getSpendAmount: Long               = amount
-  def getReceiveAmount: Long             = Try((BigInt(amount) * price / Order.PriceConstant).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
+  def partial(amount: Long): LimitOrder = copy(amount = amount)
+  def getReceiveAmount: Long            = amountOfPriceAsset
+  def getSpendAmount: Long              = amountOfAmountAsset
 }
 
 object LimitOrder {
@@ -80,13 +94,13 @@ object LimitOrder {
   }
   case object Filled extends OrderStatus {
     val name             = "Filled"
-    def json             = Json.obj("status" -> name)
+    def json: JsObject   = Json.obj("status" -> name)
     val isFinal: Boolean = true
     val ordering         = 3
   }
   case class Cancelled(filled: Long) extends OrderStatus {
     val name             = "Cancelled"
-    def json             = Json.obj("status" -> name, "filledAmount" -> filled)
+    def json: JsObject   = Json.obj("status" -> name, "filledAmount" -> filled)
     val isFinal: Boolean = true
     val ordering         = 3
   }
@@ -100,31 +114,30 @@ object LimitOrder {
     case OrderType.BUY  => BuyLimitOrder(price, amount, o).copy()
     case OrderType.SELL => SellLimitOrder(price, amount, o)
   }
-
-  def validateAmount(lo: LimitOrder): Validation = lo.order.isValidAmount(lo.price, lo.amount)
 }
 
 object Events {
-  sealed trait Event
-  case class OrderExecuted(submitted: LimitOrder, counter: LimitOrder) extends Event {
-    def counterRemaining: Long              = math.max(counter.amount - submitted.amount, 0)
-    def counterRemainingOrder: LimitOrder   = counter.partial(counterRemaining)
-    def submittedRemaining: Long            = math.max(submitted.amount - counter.amount, 0)
-    def submittedRemainingOrder: LimitOrder = submitted.partial(submittedRemaining)
-    def executedAmount: Long                = math.min(submitted.amount, counter.amount)
-    def submittedExecuted                   = submitted.partial(amount = executedAmount)
-    def counterExecuted                     = counter.partial(amount = executedAmount)
-    def isCounterFilled: Boolean            = counterRemaining == 0L
 
+  sealed trait Event
+
+  case class OrderExecuted(submitted: LimitOrder, counter: LimitOrder) extends Event {
+    def executedAmount: Long          = math.min(submitted.executionAmount(counter), counter.amountOfAmountAsset)
+    def counterRemaining: Long        = math.max(counter.amount - executedAmount, 0)
+    def submittedRemaining: Long      = math.max(submitted.amount - executedAmount, 0)
+    def submittedExecuted: LimitOrder = submitted.partial(amount = executedAmount)
+    def counterExecuted: LimitOrder   = counter.partial(amount = executedAmount)
   }
-  case class OrderAdded(order: LimitOrder)         extends Event
-  case class OrderCanceled(limitOrder: LimitOrder) extends Event
+
+  case class OrderAdded(order: LimitOrder) extends Event
+
+  case class OrderCanceled(limitOrder: LimitOrder, unmatchable: Boolean) extends Event
 
   case class ExchangeTransactionCreated(tx: ExchangeTransaction)
 
   case class BalanceChanged(changes: Map[Address, BalanceChanged.Changes]) {
     def isEmpty: Boolean = changes.isEmpty
   }
+
   object BalanceChanged {
     val empty: BalanceChanged = BalanceChanged(Map.empty)
     case class Changes(updatedPortfolio: Portfolio, changedAssets: Set[Option[AssetId]])
@@ -133,15 +146,15 @@ object Events {
   def createOrderInfo(event: Event): Map[ByteStr, (Order, OrderInfo)] = {
     event match {
       case OrderAdded(lo) =>
-        Map(lo.order.id() -> (lo.order -> OrderInfo(lo.order.amount, 0L, false)))
+        Map((lo.order.id(), (lo.order, OrderInfo(lo.order.amount, 0L, canceled = false, Some(lo.minAmountOfAmountAsset)))))
       case oe: OrderExecuted =>
         val (o1, o2) = (oe.submittedExecuted, oe.counterExecuted)
         Map(
-          o1.order.id() -> (o1.order -> OrderInfo(o1.order.amount, o1.amount, false)),
-          o2.order.id() -> (o2.order -> OrderInfo(o2.order.amount, o2.amount, false))
+          (o1.order.id(), (o1.order, OrderInfo(o1.order.amount, o1.amount, canceled = false, Some(o1.minAmountOfAmountAsset)))),
+          (o2.order.id(), (o2.order, OrderInfo(o2.order.amount, o2.amount, canceled = false, Some(o2.minAmountOfAmountAsset))))
         )
-      case OrderCanceled(lo) =>
-        Map(lo.order.id() -> (lo.order -> OrderInfo(lo.order.amount, 0, true)))
+      case OrderCanceled(lo, unmatchable) =>
+        Map((lo.order.id(), (lo.order, OrderInfo(lo.order.amount, 0L, canceled = !unmatchable, Some(lo.minAmountOfAmountAsset)))))
     }
   }
 
@@ -174,7 +187,7 @@ object Events {
           Map(o1.order.senderPublicKey.toAddress -> op1),
           Map(o2.order.senderPublicKey.toAddress -> op2)
         )
-      case OrderCanceled(lo) =>
+      case OrderCanceled(lo, _) =>
         val feeDiff = if (lo.feeAcc == lo.rcvAcc) math.max(lo.remainingFee - lo.getReceiveAmount, 0L) else lo.remainingFee
         Map(
           lo.order.senderPublicKey.toAddress ->

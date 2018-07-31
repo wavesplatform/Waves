@@ -4,7 +4,7 @@ import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.database.{DBExt, RW}
 import com.wavesplatform.matcher.api.DBUtils
-import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.matcher.model.Events._
 import com.wavesplatform.matcher.model.LimitOrder.{Filled, OrderStatus}
 import com.wavesplatform.matcher.{MatcherKeys, MatcherSettings, OrderAssets}
 import com.wavesplatform.metrics.TimerExt

@@ -21,7 +21,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
     arr
   }
 
-  val balance           = 50000000L * 100000000L
+  val balance: Long     = 50000000L * 100000000L
   val blockDelaySeconds = 60
   val defaultBaseTarget = 100L
 
@@ -39,11 +39,12 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
       next :: acc
     }).reverse.tail
 
-    val avgBT            = chain.map(_.baseTarget).sum / chain.length
-    val avgDelay         = chain.tail.map(_.delay).sum / (chain.length - 1)
-    val minersPerfomance = calcPerfomance(chain, miners)
+    val avgBT    = chain.map(_.baseTarget).sum / chain.length
+    val avgDelay = chain.tail.map(_.delay).sum / (chain.length - 1)
 
-    assert(minersPerfomance.forall(p => p._2 < 1.1 && p._2 > 0.9))
+    val minersPerformance = calcPerfomance(chain, miners)
+
+    assert(minersPerformance.forall(p => p._2 < 1.1 && p._2 > 0.9))
     assert(avgDelay < 80000 && avgDelay > 40000)
     assert(avgBT < 200 && avgBT > 20)
   }

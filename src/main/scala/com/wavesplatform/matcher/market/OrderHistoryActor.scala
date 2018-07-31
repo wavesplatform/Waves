@@ -7,7 +7,6 @@ import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ExpirableOrderHistoryRequest, _}
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.matcher.model.LimitOrder.Filled
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state.ByteStr
@@ -71,7 +70,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   def forceCancelOrder(id: ByteStr): Unit = {
     orderHistory.order(id).map((_, orderHistory.orderInfo(id))) match {
       case Some((o, oi)) =>
-        orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, o)))
+        orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, o), unmatchable = false))
         sender() ! o
       case None =>
         sender() ! None
@@ -98,7 +97,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
 
   def deleteFromOrderHistory(req: DeleteOrderFromHistory): Unit = {
     orderHistory.orderInfo(req.id).status match {
-      case Filled | LimitOrder.Cancelled(_) =>
+      case LimitOrder.Filled | LimitOrder.Cancelled(_) =>
         orderHistory.deleteOrder(req.address, req.id)
         sender() ! OrderDeleted(req.id)
       case _ =>

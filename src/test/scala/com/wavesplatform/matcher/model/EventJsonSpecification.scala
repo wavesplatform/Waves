@@ -4,8 +4,8 @@ import com.wavesplatform.NoShrink
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
 import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
+import com.wavesplatform.matcher.model.EventSerializers._
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
-import com.wavesplatform.matcher.model.MatcherSerializer._
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -67,6 +67,68 @@ class EventJsonSpecification extends PropSpec with PropertyChecks with Matchers 
       val r   = js.as[OrderBookCreated]
       obc shouldBe r
     }
+  }
+
+  property("Backward compatibility Reads for OrderCancelled") {
+    val rawJson =
+      """{
+        |  "o": {
+        |    "amount": 1,
+        |    "price": 112300000,
+        |    "order": {
+        |       "id" : "12C6pHxbbiYXaRtpmDnVoyiwb78DFztqwPmorogYzdT5",
+        |       "sender" : "3Hi5pLwXXo3WeGEg2HgeDcy4MjQRTgz7WRx",
+        |       "senderPublicKey" : "Gk2vtWGKPRqSQTqc72ZJhQ1y2T25AioAGNvKSUXJpXWD",
+        |       "matcherPublicKey" : "FkV3y43B4SAXkSL31SXFZU5xm5bonRtRVNU1sQzwpVhm",
+        |       "assetPair" : {
+        |         "amountAsset" : "ASZc9p4DLkoPb1qKAkLzdZJB7S7hkBf95mwnYdBW5pCc",
+        |         "priceAsset" : null
+        |       },
+        |       "orderType" : "buy",
+        |       "price" : 112300000,
+        |       "amount" : 8,
+        |       "timestamp" : 1530800388321,
+        |       "expiration" : 1533392387321,
+        |       "matcherFee" : 300000,
+        |       "signature" : "uckvU4TsyP9DQUjZABcnLm3i2w6LvaJBTcEw23mZDC8u18roGQazxV69qMd82kvm2SjZsxoZQqUMBHcJLwYBbWq"
+        |     }
+        |  }
+        |}""".stripMargin
+
+    val actual = EventSerializers.orderCancelledFormat.reads(Json.parse(rawJson))
+    actual.isSuccess shouldBe true
+    actual.get.unmatchable shouldBe false
+  }
+
+  property("Reads for OrderCancelled with unmatchable") {
+    val rawJson =
+      """{
+        |  "o": {
+        |    "amount": 1,
+        |    "price": 112300000,
+        |    "order": {
+        |       "id" : "12C6pHxbbiYXaRtpmDnVoyiwb78DFztqwPmorogYzdT5",
+        |       "sender" : "3Hi5pLwXXo3WeGEg2HgeDcy4MjQRTgz7WRx",
+        |       "senderPublicKey" : "Gk2vtWGKPRqSQTqc72ZJhQ1y2T25AioAGNvKSUXJpXWD",
+        |       "matcherPublicKey" : "FkV3y43B4SAXkSL31SXFZU5xm5bonRtRVNU1sQzwpVhm",
+        |       "assetPair" : {
+        |         "amountAsset" : "ASZc9p4DLkoPb1qKAkLzdZJB7S7hkBf95mwnYdBW5pCc",
+        |         "priceAsset" : null
+        |       },
+        |       "orderType" : "buy",
+        |       "price" : 112300000,
+        |       "amount" : 8,
+        |       "timestamp" : 1530800388321,
+        |       "expiration" : 1533392387321,
+        |       "matcherFee" : 300000,
+        |       "signature" : "uckvU4TsyP9DQUjZABcnLm3i2w6LvaJBTcEw23mZDC8u18roGQazxV69qMd82kvm2SjZsxoZQqUMBHcJLwYBbWq"
+        |     }
+        |  },
+        |  "unmatchable": true
+        |}""".stripMargin
+
+    val actual = EventSerializers.orderCancelledFormat.reads(Json.parse(rawJson)).get
+    actual.unmatchable shouldBe true
   }
 
 }

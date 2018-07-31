@@ -41,7 +41,7 @@ object OrderBook {
       .orElse(ob.asks.find { case (_, v) => v.exists(_.order.id() == orderId) })
       .fold(Option.empty[OrderCanceled]) {
         case (_, v) =>
-          Some(OrderCanceled(v.find(_.order.id() == orderId).get))
+          Some(OrderCanceled(v.find(_.order.id() == orderId).get, unmatchable = false))
       }
   }
 
@@ -93,6 +93,6 @@ object OrderBook {
       ob.copy(asks = ob.asks + (o.price -> (orders :+ o)))
     case e @ OrderExecuted(_, c: BuyLimitOrder)  => updateExecutedBuy(ob, c, e.counterRemaining)
     case e @ OrderExecuted(_, c: SellLimitOrder) => updateExecutedSell(ob, c, e.counterRemaining)
-    case OrderCanceled(limitOrder)               => updateCancelOrder(ob, limitOrder)
+    case OrderCanceled(limitOrder, _)            => updateCancelOrder(ob, limitOrder)
   }
 }

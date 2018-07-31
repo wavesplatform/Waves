@@ -119,7 +119,7 @@ class OrderBookActor(assetPair: AssetPair,
       orderBook.asks.values
         .++(orderBook.bids.values)
         .flatten
-        .foreach(x => context.system.eventStream.publish(Events.OrderCanceled(x)))
+        .foreach(x => context.system.eventStream.publish(Events.OrderCanceled(x, unmatchable = false)))
       deleteMessages(lastSequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
       sender() ! GetOrderBookResponse(pair, Seq(), Seq())
@@ -319,12 +319,18 @@ class OrderBookActor(assetPair: AssetPair,
 
   @tailrec
   private def matchOrder(limitOrder: LimitOrder): Unit = {
-    val remOrder = handleMatchEvent(OrderBook.matchOrder(orderBook, limitOrder))
-    if (remOrder.isDefined) {
-      if (LimitOrder.validateAmount(remOrder.get)) {
-        matchOrder(remOrder.get)
+    val (submittedRemains, counterRemains) = handleMatchEvent(OrderBook.matchOrder(orderBook, limitOrder))
+    if (counterRemains.isDefined) {
+      if (!counterRemains.get.isValid) {
+        val canceled = Events.OrderCanceled(counterRemains.get, unmatchable = true)
+        processEvent(canceled)
+      }
+    }
+    if (submittedRemains.isDefined) {
+      if (submittedRemains.get.isValid) {
+        matchOrder(submittedRemains.get)
       } else {
-        val canceled = Events.OrderCanceled(remOrder.get)
+        val canceled = Events.OrderCanceled(submittedRemains.get, unmatchable = true)
         processEvent(canceled)
       }
     }
@@ -339,7 +345,7 @@ class OrderBookActor(assetPair: AssetPair,
 
   private def processInvalidTransaction(event: OrderExecuted, err: ValidationError): Option[LimitOrder] = {
     def cancelCounterOrder(): Option[LimitOrder] = {
-      processEvent(Events.OrderCanceled(event.counter))
+      processEvent(Events.OrderCanceled(event.counter, unmatchable = false))
       Some(event.submitted)
     }
 
@@ -361,11 +367,11 @@ class OrderBookActor(assetPair: AssetPair,
     }
   }
 
-  private def handleMatchEvent(e: Event): Option[LimitOrder] = {
+  private def handleMatchEvent(e: Event): (Option[LimitOrder], Option[LimitOrder]) = {
     e match {
       case e: OrderAdded =>
         processEvent(e)
-        None
+        (None, None)
 
       case event @ OrderExecuted(o, c) =>
         (for {
@@ -376,14 +382,14 @@ class OrderBookActor(assetPair: AssetPair,
             allChannels.broadcastTx(tx)
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
-            if (event.submittedRemaining > 0)
-              Some(o.partial(event.submittedRemaining))
-            else None
+            (if (event.submittedRemaining >= 0) Some(o.partial(event.submittedRemaining)) else None,
+             if (event.counterRemaining >= 0) Some(c.partial(event.counterRemaining)) else None)
           case Left(ex) =>
             log.info(s"Can't create tx: $ex\no1: ${Json.prettyPrint(o.order.json())}\no2: ${Json.prettyPrint(c.order.json())}")
-            processInvalidTransaction(event, ex)
+            (processInvalidTransaction(event, ex), None)
         }
-      case _ => None
+
+      case _ => (None, None)
     }
   }
 
@@ -465,28 +471,28 @@ object OrderBookActor {
   }
 
   case class OrderAccepted(order: Order) extends MatcherResponse {
-    val json = Json.obj("status" -> "OrderAccepted", "message" -> order.json())
-    val code = StatusCodes.OK
+    val json: JsObject            = Json.obj("status" -> "OrderAccepted", "message" -> order.json())
+    val code: StatusCodes.Success = StatusCodes.OK
   }
 
   case class OrderRejected(message: String) extends MatcherResponse {
-    val json = Json.obj("status" -> "OrderRejected", "message" -> message)
-    val code = StatusCodes.BadRequest
+    val json: JsObject                = Json.obj("status" -> "OrderRejected", "message" -> message)
+    val code: StatusCodes.ClientError = StatusCodes.BadRequest
   }
 
   case class OrderCanceled(orderId: String) extends MatcherResponse {
-    val json = Json.obj("status" -> "OrderCanceled", "orderId" -> orderId)
-    val code = StatusCodes.OK
+    val json: JsObject            = Json.obj("status" -> "OrderCanceled", "orderId" -> orderId)
+    val code: StatusCodes.Success = StatusCodes.OK
   }
 
   case class OrderCancelRejected(message: String) extends MatcherResponse {
-    val json = Json.obj("status" -> "OrderCancelRejected", "message" -> message)
-    val code = StatusCodes.BadRequest
+    val json: JsObject                = Json.obj("status" -> "OrderCancelRejected", "message" -> message)
+    val code: StatusCodes.ClientError = StatusCodes.BadRequest
   }
 
   case class GetOrderBookResponse(pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends MatcherResponse {
-    val json: JsValue = Json.toJson(OrderBookResult(NTP.correctedTime(), pair, bids, asks))
-    val code          = StatusCodes.OK
+    val json: JsValue             = Json.toJson(OrderBookResult(NTP.correctedTime(), pair, bids, asks))
+    val code: StatusCodes.Success = StatusCodes.OK
   }
 
   object GetOrderBookResponse {

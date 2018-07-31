@@ -16,8 +16,8 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 
 import scala.collection.immutable.TreeMap
 
-class MatcherSerializer extends SerializerWithStringManifest {
-  import MatcherSerializer._
+class EventSerializers extends SerializerWithStringManifest {
+  import EventSerializers._
   override def identifier: Int = id
   override def manifest(o: AnyRef): String = o match {
     case _: OrderBookActor.Snapshot       => Manifest.Snapshot
@@ -51,10 +51,10 @@ class MatcherSerializer extends SerializerWithStringManifest {
   }
 }
 
-object MatcherSerializer {
-  private[MatcherSerializer] val id = 4001
+object EventSerializers {
+  private[EventSerializers] val id = 4001
 
-  private[MatcherSerializer] object Manifest {
+  private[EventSerializers] object Manifest {
     val Snapshot         = "snapshot"
     val OrderBookCreated = "orderBookCreated"
     val MatcherSnapshot  = "matcherSnapshot"
@@ -96,6 +96,7 @@ object MatcherSerializer {
   }
 
   implicit val orderBookFormat: Format[OrderBook] = Json.format
+
   val orderAddedFormat = Format(
     (__ \ "o").read[LimitOrder].map(OrderAdded),
     Writes[OrderAdded](oa => Json.obj("o" -> oa.order))
@@ -105,8 +106,14 @@ object MatcherSerializer {
     (__ \ "o2").format[LimitOrder])(OrderExecuted.apply, unlift(OrderExecuted.unapply))
 
   val orderCancelledFormat = Format(
-    (__ \ "o").read[LimitOrder].map(OrderCanceled),
-    Writes[OrderCanceled](oc => Json.obj("o" -> oc.limitOrder))
+    Reads[OrderCanceled] {
+      case js: JsObject =>
+        val o = (js \ "o").as[LimitOrder]
+        val u = (js \ "unmatchable").asOpt[Boolean]
+        JsSuccess(OrderCanceled(o, unmatchable = u.getOrElse(false)))
+      case _ => JsError("failed to deserialize OrderCanceled")
+    },
+    Writes[OrderCanceled](oc => Json.obj("o" -> oc.limitOrder, "unmatchable" -> oc.unmatchable))
   )
 
   private def mkOrderBookCreated(a1: String, a2: String) = OrderBookCreated(AssetPair.createAssetPair(a1, a2).get)
