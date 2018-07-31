@@ -255,17 +255,17 @@ case class MatcherApiRoute(wallet: Wallet,
     ))
   def getPublicKeyOrderHistory: Route = (path("orderbook" / PublicKeyPM) & get) { publicKey =>
     parameters('activeOnly.as[Boolean].?) { activeOnly =>
-//      (headerValueByName("Timestamp") & headerValueByName("Signature")) { (ts, sig) =>
-//        checkGetSignature(publicKey, ts, sig) match {
-//          case Success(address) =>
-      complete(StatusCodes.OK -> DBUtils.ordersByAddress(db, publicKey, Set.empty, activeOnly.getOrElse(false)).map {
-        case (order, orderInfo) =>
-          orderJson(order, orderInfo)
-      })
-//          case Failure(ex) =>
-//            complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
-//        }
-//      }
+      (headerValueByName("Timestamp") & headerValueByName("Signature")) { (ts, sig) =>
+        checkGetSignature(publicKey, ts, sig) match {
+          case Success(_) =>
+            complete(StatusCodes.OK -> DBUtils.ordersByAddress(db, publicKey, Set.empty, activeOnly.getOrElse(true)).map {
+              case (order, orderInfo) =>
+                orderJson(order, orderInfo)
+            })
+          case Failure(ex) =>
+            complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
+        }
+      }
     }
   }
 
