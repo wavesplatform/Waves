@@ -1,13 +1,15 @@
 package com.wavesplatform.matcher
 
 import java.io.File
+import java.util.HashMap
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.Shorts
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.database.DBExt
-import com.wavesplatform.db.{OrderIdsCodec, OrderToTxIdsCodec, PortfolioCodec, openDB}
+import com.wavesplatform.db.{AssetIdOrderIdSetCodec, OrderIdsCodec, OrderToTxIdsCodec, PortfolioCodec, openDB}
+import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.model.OrderInfo
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.{ByteStr, EitherExt2}
@@ -16,7 +18,7 @@ import org.iq80.leveldb.DB
 import scorex.account.{Address, AddressScheme, PublicKeyAccount}
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.utils.ScorexLogging
-import java.util.HashMap
+
 import scala.collection.JavaConverters._
 
 object MigrationTool extends ScorexLogging {
@@ -208,7 +210,49 @@ object MigrationTool extends ScorexLogging {
     }
   }
 
+  private def migrateActiveOrders(db: DB): Unit = {
+    log.info("Migrating active orders")
+    val prefix        = "matcher:a-addr-orders:".getBytes(UTF_8)
+    val iterator      = db.iterator()
+    val addressOrders = Seq.newBuilder[(Address, Set[OrderAssets])]
+    try {
+      iterator.seek(prefix)
+      while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) {
+        val e                              = iterator.next()
+        val SK.AddressToActiveOrders(addr) = e.getKey
+        val orderIds = AssetIdOrderIdSetCodec.decode(e.getValue).explicitGet().value.map {
+          case (assetId, orderIdStr) => OrderAssets(ByteStr.decodeBase58(orderIdStr).get, assetId)
+        }
+
+        addressOrders += addr -> orderIds
+      }
+    } finally iterator.close()
+
+    val r = addressOrders.result()
+
+    log.info(s"Collected active orders for ${r.size} addresses")
+
+    db.readWrite { rw =>
+      for ((addr, migratedOrders) <- r) {
+        val currentOrderCount = rw.get(MatcherKeys.addressOrdersSeqNr(addr))
+        val currentOrderAssets = (1 to currentOrderCount).map { i =>
+          rw.get(MatcherKeys.addressOrders(addr, i))
+        }.toSet
+
+        val ordersToAdd = migratedOrders.diff(currentOrderAssets)
+        if (ordersToAdd.nonEmpty) {
+          rw.put(MatcherKeys.addressOrdersSeqNr(addr), currentOrderCount + ordersToAdd.size)
+          for ((oa, offset) <- ordersToAdd.zipWithIndex) {
+            rw.put(MatcherKeys.addressOrders(addr, currentOrderCount + offset + 1), oa)
+          }
+        }
+      }
+    }
+  }
+
   def main(args: Array[String]): Unit = {
+    log.info(s"OK, engine start")
+
     val userConfig = args.headOption.fold(ConfigFactory.empty())(f => ConfigFactory.parseFile(new File(f)))
     val settings   = WavesSettings.fromConfig(loadConfig(userConfig))
     val db         = openDB(settings.matcherSettings.dataDir)
@@ -222,6 +266,11 @@ object MigrationTool extends ScorexLogging {
       performMigration(db)
     } else if (args(1) == "stats") {
       collectStats(db)
+    } else if (args(1) == "active-orders") {
+      migrateActiveOrders(db)
+    } else if (args(1) == "ao") {
+      val o = DBUtils.ordersByAddress(db, Address.fromString(args(2)).explicitGet(), Set.empty, false)
+      println(o.mkString("\n"))
     }
 
     db.close()

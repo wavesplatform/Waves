@@ -222,7 +222,7 @@ case class MatcherApiRoute(wallet: Wallet,
       checkGetSignature(publicKey, ts, sig) match {
         case Success(address) =>
           withAssetPair(p, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
-            complete(StatusCodes.OK -> DBUtils.ordersByAddress(db, address, Set(pair.priceAsset, pair.amountAsset), false).map {
+            complete(StatusCodes.OK -> DBUtils.ordersByAddressAndPair(db, address, pair, false).map {
               case (order, orderInfo) =>
                 orderJson(order, orderInfo)
             })
@@ -255,17 +255,17 @@ case class MatcherApiRoute(wallet: Wallet,
     ))
   def getPublicKeyOrderHistory: Route = (path("orderbook" / PublicKeyPM) & get) { publicKey =>
     parameters('activeOnly.as[Boolean].?) { activeOnly =>
-      (headerValueByName("Timestamp") & headerValueByName("Signature")) { (ts, sig) =>
-        checkGetSignature(publicKey, ts, sig) match {
-          case Success(address) =>
-            complete(StatusCodes.OK -> DBUtils.ordersByAddress(db, address, Set.empty, activeOnly.getOrElse(false)).map {
-              case (order, orderInfo) =>
-                orderJson(order, orderInfo)
-            })
-          case Failure(ex) =>
-            complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
-        }
-      }
+//      (headerValueByName("Timestamp") & headerValueByName("Signature")) { (ts, sig) =>
+//        checkGetSignature(publicKey, ts, sig) match {
+//          case Success(address) =>
+      complete(StatusCodes.OK -> DBUtils.ordersByAddress(db, publicKey, Set.empty, activeOnly.getOrElse(false)).map {
+        case (order, orderInfo) =>
+          orderJson(order, orderInfo)
+      })
+//          case Failure(ex) =>
+//            complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
+//        }
+//      }
     }
   }
 

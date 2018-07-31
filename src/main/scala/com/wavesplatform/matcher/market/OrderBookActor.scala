@@ -118,7 +118,7 @@ class OrderBookActor(assetPair: AssetPair,
       log.info(s"Order($assetPair, ${cancel.orderId}) is already being canceled")
       sender() ! OrderCancelRejected("Order is already being canceled")
     case ev =>
-      log.info("Stashed: " + ev)
+      log.trace("Stashed: " + ev)
       stash()
   }
 
@@ -291,7 +291,7 @@ class OrderBookActor(assetPair: AssetPair,
               Some(o.partial(event.submittedRemaining))
             else None
           case Left(ex) =>
-            log.info("Can't create tx for o1: " + Json.prettyPrint(o.order.json()) + "\n, o2: " + Json.prettyPrint(c.order.json()))
+            log.info(s"Can't create tx: $ex\no1: ${Json.prettyPrint(o.order.json())}\no2: ${Json.prettyPrint(c.order.json())}")
             processInvalidTransaction(event, ex)
         }
       case _ => None
