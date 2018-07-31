@@ -137,7 +137,7 @@ object MigrationTool extends ScorexLogging {
         val activeOrderIds = orderIds.filter(orderInfo.keySet)
         rw.put(MatcherKeys.addressOrdersSeqNr(address), activeOrderIds.size)
         for ((id, offset) <- activeOrderIds.zipWithIndex) {
-          rw.put(MatcherKeys.addressOrders(address, offset + 1), OrderAssets(id, allOrders(id).getSpendAssetId))
+          rw.put(MatcherKeys.addressOrders(address, offset + 1), Some(OrderAssets(id, allOrders(id).getSpendAssetId)))
         }
       }
       log.info("Saving open volume")
@@ -235,7 +235,7 @@ object MigrationTool extends ScorexLogging {
     db.readWrite { rw =>
       for ((addr, migratedOrders) <- r) {
         val currentOrderCount = rw.get(MatcherKeys.addressOrdersSeqNr(addr))
-        val currentOrderAssets = (1 to currentOrderCount).map { i =>
+        val currentOrderAssets = (1 to currentOrderCount).flatMap { i =>
           rw.get(MatcherKeys.addressOrders(addr, i))
         }.toSet
 
@@ -243,7 +243,7 @@ object MigrationTool extends ScorexLogging {
         if (ordersToAdd.nonEmpty) {
           rw.put(MatcherKeys.addressOrdersSeqNr(addr), currentOrderCount + ordersToAdd.size)
           for ((oa, offset) <- ordersToAdd.zipWithIndex) {
-            rw.put(MatcherKeys.addressOrders(addr, currentOrderCount + offset + 1), oa)
+            rw.put(MatcherKeys.addressOrders(addr, currentOrderCount + offset + 1), Some(oa))
           }
         }
       }

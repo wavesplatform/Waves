@@ -81,7 +81,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
       rw.put(k, nextSeqNr)
 
       val spendAssetId = if (o.orderType == OrderType.BUY) o.assetPair.priceAsset else o.assetPair.amountAsset
-      rw.put(MatcherKeys.addressOrders(o.senderPublicKey, nextSeqNr), OrderAssets(orderId, spendAssetId))
+      rw.put(MatcherKeys.addressOrders(o.senderPublicKey, nextSeqNr), Some(OrderAssets(orderId, spendAssetId)))
     }
   }
 

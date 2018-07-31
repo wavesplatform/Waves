@@ -27,8 +27,9 @@ object MatcherKeys {
     oi => ByteBuffer.allocate(17).putLong(oi.amount).putLong(oi.filled).put(if (oi.canceled) 1.toByte else 0.toByte).array()
   )
 
-  def addressOrdersSeqNr(address: Address): Key[Int]                = bytesSeqNr(3, address.bytes.arr)
-  def addressOrders(address: Address, seqNr: Int): Key[OrderAssets] = Key(hBytes(4, seqNr, address.bytes.arr), OrderAssets.read, OrderAssets.write)
+  def addressOrdersSeqNr(address: Address): Key[Int] = bytesSeqNr(3, address.bytes.arr)
+  def addressOrders(address: Address, seqNr: Int): Key[Option[OrderAssets]] =
+    Key.opt(hBytes(4, seqNr, address.bytes.arr), OrderAssets.read, OrderAssets.write)
 
   def openVolume(address: Address, assetId: Option[AssetId]): Key[Option[Long]] =
     Key.opt(bytes(5, address.bytes.arr ++ assetIdToBytes(assetId)), Longs.fromByteArray, Longs.toByteArray)
