@@ -2,11 +2,11 @@ package com.wavesplatform.it.api
 
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.{Assertions, Matchers}
 import play.api.libs.json.{Format, Json, Writes}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._

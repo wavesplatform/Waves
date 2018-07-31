@@ -27,8 +27,6 @@ import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 
-import scala.concurrent.duration.DurationInt
-
 class MatcherActorSpecification
     extends TestKit(ActorSystem.apply("MatcherTest2"))
     with WordSpecLike
@@ -44,7 +42,6 @@ class MatcherActorSpecification
 
   val settings = matcherSettings.copy(
     account = MatcherAccount.address,
-    balanceWatching = BalanceWatcherWorkerActor.Settings(enable = false, oneAddressProcessingTimeout = 1.second)
   )
 
   val pairBuilder = new AssetPairBuilder(settings, blockchain)
@@ -84,7 +81,7 @@ class MatcherActorSpecification
     .returns(Some(AssetDescription(PublicKeyAccount(Array(0: Byte)), "Unknown".getBytes, "".getBytes, 8, false, i1.quantity, None, 0)))
   (blockchain.portfolio _).when(*).returns(Portfolio(Long.MaxValue, LeaseBalance.empty, Map(ByteStr("123".getBytes) -> Long.MaxValue)))
 
-  override protected def beforeEach() = {
+  override protected def beforeEach(): Unit = {
     val tp = TestProbe()
     tp.send(StorageExtension(system).journalStorage, InMemoryJournalStorage.ClearJournal)
     tp.expectMsg(akka.actor.Status.Success(""))

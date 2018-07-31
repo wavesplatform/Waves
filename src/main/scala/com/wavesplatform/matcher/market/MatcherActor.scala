@@ -5,12 +5,10 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence.{PersistentActor, RecoveryCompleted}
-import akka.routing.FromConfig
 import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.matcher.model.OrderBook
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherSettings}
 import com.wavesplatform.settings.FunctionalitySettings
@@ -150,19 +148,12 @@ class MatcherActor(orderHistory: ActorRef,
     case OrderBookCreated(pair) =>
       if (orderBook(pair).isEmpty) createOrderBook(pair)
     case RecoveryCompleted =>
-      log.info("MatcherActor - Recovery completed!")
-      createBalanceWatcher()
+      log.info("Recovery completed!")
   }
 
   override def receiveCommand: Receive = forwardToOrderBook
 
   override def persistenceId: String = "matcher"
-
-  private def createBalanceWatcher(): Unit = if (settings.balanceWatching.enable) {
-    val balanceWatcherMaster =
-      context.actorOf(FromConfig.props(BalanceWatcherWorkerActor.props(settings.balanceWatching, self, orderHistory)), "balance-watcher-router")
-    context.system.eventStream.subscribe(balanceWatcherMaster, classOf[BalanceChanged])
-  }
 }
 
 object MatcherActor {

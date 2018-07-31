@@ -1,18 +1,19 @@
 package com.wavesplatform.transaction.assets.exchange
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.crypto
-import com.wavesplatform.state.ByteStr
-import io.swagger.annotations.ApiModelProperty
-import monix.eval.{Coeval, Task}
-import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.crypto
 import com.wavesplatform.serialization.{BytesSerializable, Deser, JsonSerializable}
+import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.ValidationError.{GenericError, InvalidSignature}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.utils.Base58
+import io.swagger.annotations.ApiModelProperty
+import monix.eval.{Coeval, Task}
+import play.api.libs.json.{JsObject, Json}
+import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
+
 import scala.util.Try
 
 sealed trait OrderType {
@@ -36,7 +37,7 @@ object OrderType {
   def apply(value: Int): OrderType = value match {
     case 0 => OrderType.BUY
     case 1 => OrderType.SELL
-    case _ => throw new RuntimeException("Unexpected OrderType")
+    case _ => throw new RuntimeException(s"Unexpected OrderType: $value")
   }
 
   def apply(value: String): OrderType = value match {
@@ -101,10 +102,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
       Longs.toByteArray(matcherFee)
 
   @ApiModelProperty(hidden = true)
-  val id: Coeval[Array[Byte]] = Coeval.evalOnce(crypto.fastHash(toSign))
-
-  @ApiModelProperty(hidden = true)
-  val idStr: Coeval[String] = Coeval.evalOnce(Base58.encode(id()))
+  val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(crypto.fastHash(toSign)))
 
   @ApiModelProperty(hidden = true)
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign ++ signature)
@@ -145,7 +143,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   @ApiModelProperty(hidden = true)
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     Json.obj(
-      "id"               -> Base58.encode(id()),
+      "id"               -> id().base58,
       "sender"           -> senderPublicKey.address,
       "senderPublicKey"  -> Base58.encode(senderPublicKey.publicKey),
       "matcherPublicKey" -> Base58.encode(matcherPublicKey.publicKey),
@@ -180,7 +178,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     }
   }
 
-  override def hashCode(): Int = idStr.hashCode()
+  override def hashCode(): Int = id().hashCode()
 
   @ApiModelProperty(hidden = true)
   def getSignedDescendants: Coeval[Seq[Signed]] = signedDescendants

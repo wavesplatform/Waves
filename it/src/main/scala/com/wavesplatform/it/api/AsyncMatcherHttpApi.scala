@@ -13,6 +13,7 @@ import org.scalatest.Assertions
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json.Writes
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.utils.Base58
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -70,11 +71,11 @@ object AsyncMatcherHttpApi extends Assertions {
     def cancelOrder(sender: Node, assetPair: AssetPair, orderId: Option[String], timestamp: Option[Long] = None) = {
       val privateKey                = sender.privateKey
       val publicKey                 = sender.publicKey
-      val request                   = CancelOrderRequest(publicKey, orderId, timestamp, Array.emptyByteArray)
+      val request                   = CancelOrderRequest(publicKey, orderId.map(x => ByteStr(Base58.decode(x).get)), timestamp, Array.emptyByteArray)
       val sig                       = crypto.sign(privateKey, request.toSign)
       val signedRequest             = request.copy(signature = sig)
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
-      matcherPost(s"/matcher/orderbook/${amountAsset}/${priceAsset}/cancel", signedRequest.json).as[MatcherStatusResponse]
+      matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", signedRequest.json).as[MatcherStatusResponse]
     }
 
     def cancelAllOrders(sender: Node, timestamp: Option[Long]) = {

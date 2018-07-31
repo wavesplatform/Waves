@@ -1,290 +1,126 @@
 package com.wavesplatform.matcher.model
 
 import cats.implicits._
-import com.wavesplatform.db.{AssetIdOrderIdSetCodec, Codec, OrderIdsCodec, PortfolioCodec, SubStorage}
-import com.wavesplatform.matcher.MatcherSettings
+import cats.kernel.Monoid
+import com.wavesplatform.account.Address
+import com.wavesplatform.database.{DBExt, RW}
+import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.{Filled, OrderStatus}
-import com.wavesplatform.matcher.model.OrderHistory.OrderHistoryOrdering
+import com.wavesplatform.matcher.{MatcherKeys, MatcherSettings, OrderAssets}
+import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
+import kamon.Kamon
 import org.iq80.leveldb.DB
-import play.api.libs.json.Json
-import com.wavesplatform.transaction.{AssetAcc, AssetId}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
-trait OrderHistory {
-  def orderAccepted(event: OrderAdded): Unit
+class OrderHistory(db: DB, settings: MatcherSettings) {
+  import com.wavesplatform.matcher.MatcherKeys._
 
-  def orderExecuted(event: OrderExecuted): Unit
+  private val timer               = Kamon.timer("matcher.order-history.impl")
+  private val saveOpenVolumeTimer = timer.refine("action" -> "save-open-volume")
+  private val saveOrderInfoTimer  = timer.refine("action" -> "save-order-info")
+  private val openVolumeTimer     = timer.refine("action" -> "open-volume")
 
-  def orderCanceled(event: OrderCanceled)
+  private def saveOrderInfo(rw: RW, event: Event): Map[ByteStr, (Order, OrderInfo)] =
+    saveOrderInfoTimer.measure(db.readWrite { rw =>
+      val updatedInfo = Events.createOrderInfo(event).map {
+        case (orderId, (o, oi)) => (orderId, (o, DBUtils.orderInfo(rw, orderId).combine(oi)))
+      }
 
-  def orderStatus(id: String): OrderStatus
+      for ((orderId, (_, oi)) <- updatedInfo) {
+        rw.put(MatcherKeys.orderInfo(orderId), oi)
+      }
 
-  def orderInfo(id: String): OrderInfo
+      updatedInfo
+    })
 
-  def openVolume(assetAcc: AssetAcc): Long
+  def openVolume(address: Address, assetId: Option[AssetId]): Long =
+    openVolumeTimer.measure(db.get(MatcherKeys.openVolume(address, assetId)).getOrElse(0L))
 
-  def openVolumes(address: String): Option[Map[String, Long]]
+  private def saveOpenVolume(rw: RW, event: Map[Address, OpenPortfolio]): Unit = saveOpenVolumeTimer.measure {
+    for ((address, op) <- event) {
+      val newAssets = Set.newBuilder[Option[AssetId]]
+      for ((assetId, amount) <- op.orders if amount != 0) {
+        val k = MatcherKeys.openVolume(address, assetId)
+        val newValue = safeSum(amount, rw.get(k) match {
+          case None =>
+            newAssets += assetId
+            0L
+          case Some(v) => v
+        })
 
-  def allOrderIdsByAddress(address: String): Set[String]
+        rw.put(k, Some(newValue))
+      }
 
-  def finalOrderIdsByAddress(address: String): Set[String]
-
-  def activeOrderIdsByAddress(address: String): Set[(Option[AssetId], String)]
-
-  def fetchOrderHistoryByPair(assetPair: AssetPair, address: String, internal: Boolean): Seq[(String, OrderInfo, Option[Order])]
-
-  def fetchAllActiveOrderHistory(address: String, internal: Boolean): Seq[(String, OrderInfo, Option[Order])]
-
-  def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])]
-
-  def deleteOrder(address: String, orderId: String): Boolean
-
-  def order(id: String): Option[Order]
-
-  def openPortfolio(address: String): OpenPortfolio
-}
-
-object OrderHistory {
-
-  import OrderInfo.orderStatusOrdering
-
-  object OrderHistoryOrdering extends Ordering[(String, OrderInfo, Option[Order])] {
-    def orderBy(oh: (String, OrderInfo, Option[Order])): (OrderStatus, Long) = (oh._2.status, -oh._3.map(_.timestamp).getOrElse(0L))
-
-    override def compare(first: (String, OrderInfo, Option[Order]), second: (String, OrderInfo, Option[Order])): Int = {
-      implicitly[Ordering[(OrderStatus, Long)]].compare(orderBy(first), orderBy(second))
+      val r = newAssets.result()
+      if (r.nonEmpty) {
+        val k         = openVolumeSeqNr(address)
+        val prevSeqNr = rw.get(k)
+        for ((assetId, offset) <- r.zipWithIndex) {
+          rw.put(openVolumeAsset(address, prevSeqNr + offset + 1), assetId)
+        }
+        rw.put(k, prevSeqNr + r.size)
+      }
     }
   }
 
-}
+  private def saveOrder(rw: RW, order: Order): Unit = rw.put(MatcherKeys.order(order.id()), Some(order))
 
-case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorage(db: DB, "matcher") with OrderHistory with ScorexLogging {
-
-  private val OrdersPrefix                = "orders".getBytes(Charset)
-  private val OrdersInfoPrefix            = "infos".getBytes(Charset)
-  private val AddressToOrdersPrefix       = "addr-orders".getBytes(Charset)
-  private val AddressToActiveOrdersPrefix = "a-addr-orders".getBytes(Charset)
-  private val AddressPortfolioPrefix      = "portfolios".getBytes(Charset)
-
-  def addToFinal(address: String, orderId: String): Unit = {
-    get(OrderIdsCodec)(makeKey(AddressToOrdersPrefix, address)) match {
-      case Some(prev) =>
-        val r = if (prev.length >= settings.maxOrdersPerRequest) {
-          val (p1, p2) = prev.span(!orderStatus(_).isFinal)
-          if (p2.isEmpty) p1 else p1 ++ p2.tail
-        } else prev
-        put(makeKey(AddressToOrdersPrefix, address), OrderIdsCodec.encode(r :+ orderId), None)
-      case _ =>
-        put(makeKey(AddressToOrdersPrefix, address), OrderIdsCodec.encode(Array(orderId)), None)
-    }
-  }
-
-  private def saveOrderInfo(event: Event): Map[String, (Order, OrderInfo)] = {
-    val updatedInfo = Events.createOrderInfo(event).map {
-      case (orderId, (o, oi)) => (orderId, (o, orderInfo(orderId).combine(oi)))
-    }
-
-    updatedInfo.foreach {
-      case (orderId, (_, oi)) =>
-        put(makeKey(OrdersInfoPrefix, orderId), oi.jsonStr.getBytes(Charset), None)
-        log.debug(s"Changed OrderInfo for: $orderId -> $oi")
-    }
-
-    updatedInfo
-  }
-
-  def openPortfolio(address: String): OpenPortfolio = {
-    get(PortfolioCodec)(makeKey(AddressPortfolioPrefix, address)).map(OpenPortfolio.apply).getOrElse(OpenPortfolio.empty)
-  }
-
-  def saveOpenPortfolio(event: Event): Unit = {
-    Events.createOpenPortfolio(event).foreach {
-      case (address, op) =>
-        val key               = makeKey(AddressPortfolioPrefix, address)
-        val prev              = get(PortfolioCodec)(key).map(OpenPortfolio.apply).getOrElse(OpenPortfolio.empty)
-        val updatedPortfolios = prev.combine(op)
-        put(key, PortfolioCodec.encode(updatedPortfolios.orders), None)
-        log.debug(s"Changed OpenPortfolio for: $address -> " + updatedPortfolios.toString)
-    }
-  }
-
-  def saveOrder(order: Order): Unit = {
-    val key = makeKey(OrdersPrefix, order.idStr())
-    if (get(key).isEmpty)
-      put(key, order.jsonStr.getBytes(Charset), None)
-  }
-
-  def deleteFromOrders(orderId: String): Unit = {
-    delete(makeKey(OrdersPrefix, orderId), None)
-  }
-
-  override def orderAccepted(event: OrderAdded): Unit = {
+  def orderAccepted(event: OrderAdded): Unit = db.readWrite { rw =>
     val lo = event.order
-    saveOrder(lo.order)
-    val updatedInfo = saveOrderInfo(event)
-    saveOpenPortfolio(event)
+    saveOrder(rw, lo.order)
+    val updatedInfo = saveOrderInfo(rw, event)
+    saveOpenVolume(rw, Events.createOpenPortfolio(event))
 
-    updatedInfo.foreach {
-      case (orderId, (o, oi)) =>
-        if (!oi.status.isFinal) {
-          val assetId = if (o.orderType == OrderType.BUY) o.assetPair.priceAsset else o.assetPair.amountAsset
-          addToActive(o.senderPublicKey.address, assetId, orderId)
-        } else {
-          addToFinal(o.senderPublicKey.address, orderId)
-        }
+    // for OrderAdded events, updatedInfo contains just one element
+    for ((orderId, (o, _)) <- updatedInfo) {
+      val k         = MatcherKeys.addressOrdersSeqNr(o.senderPublicKey)
+      val nextSeqNr = rw.get(k) + 1
+      rw.put(k, nextSeqNr)
+
+      val spendAssetId = if (o.orderType == OrderType.BUY) o.assetPair.priceAsset else o.assetPair.amountAsset
+      rw.put(MatcherKeys.addressOrders(o.senderPublicKey, nextSeqNr), OrderAssets(orderId, spendAssetId))
     }
   }
 
-  override def orderExecuted(event: OrderExecuted): Unit = {
-    saveOrder(event.submitted.order)
-    val updatedInfo = saveOrderInfo(event)
-    saveOpenPortfolio(OrderAdded(event.submittedExecuted))
-    saveOpenPortfolio(event)
-
-    updatedInfo.foreach {
-      case (orderId, (o, oi)) =>
-        if (oi.status.isFinal) {
-          deleteFromActive(o.senderPublicKey.address, orderId)
-          addToFinal(o.senderPublicKey.address, orderId)
-        }
-    }
+  def orderExecuted(event: OrderExecuted): Unit = db.readWrite { rw =>
+    saveOrder(rw, event.submitted.order)
+    saveOrderInfo(rw, event)
+    val v = Monoid.combine(Events.createOpenPortfolio(OrderAdded(event.submittedExecuted)), Events.createOpenPortfolio(event))
+    saveOpenVolume(rw, v)
   }
 
-  override def orderCanceled(event: OrderCanceled): Unit = {
-    val updatedInfo = saveOrderInfo(event)
-    saveOpenPortfolio(event)
-
-    updatedInfo.foreach {
-      case (orderId, (o, oi)) =>
-        if (oi.status.isFinal) {
-          deleteFromActive(o.senderPublicKey.address, orderId)
-          addToFinal(o.senderPublicKey.address, orderId)
-        }
-    }
+  def orderCanceled(event: OrderCanceled): Unit = db.readWrite { rw =>
+    saveOrderInfo(rw, event)
+    saveOpenVolume(rw, Events.createOpenPortfolio(event))
   }
 
-  override def orderInfo(id: String): OrderInfo =
-    get(makeKey(OrdersInfoPrefix, id)).map(Json.parse).flatMap(_.validate[OrderInfo].asOpt).getOrElse(OrderInfo.empty)
+  def orderInfo(id: ByteStr): OrderInfo = DBUtils.orderInfo(db, id)
 
-  override def order(id: String): Option[Order] = {
-    import com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
-    get(makeKey(OrdersPrefix, id)).map(b => new String(b, Charset)).map(Json.parse).flatMap(_.validate[Order].asOpt)
-  }
+  def order(id: ByteStr): Option[Order] = db.get(MatcherKeys.order(id))
 
-  override def orderStatus(id: String): OrderStatus = {
-    orderInfo(id).status
-  }
-
-  override def openVolume(assetAcc: AssetAcc): Long = {
-    val asset = assetAcc.assetId.map(_.base58).getOrElse(AssetPair.WavesName)
-    openPortfolio(assetAcc.account.address).orders.getOrElse(asset, 0L)
-  }
-
-  override def openVolumes(address: String): Option[Map[String, Long]] = {
-    get(PortfolioCodec)(makeKey(AddressPortfolioPrefix, address))
-  }
-
-  override def allOrderIdsByAddress(address: String): Set[String] = {
-    get(AssetIdOrderIdSetCodec)(makeKey(AddressToActiveOrdersPrefix, address)).getOrElse(Set.empty).map(_._2) ++
-      get(OrderIdsCodec)(makeKey(AddressToOrdersPrefix, address)).map(_.toSet).getOrElse(Set.empty)
-  }
-
-  override def finalOrderIdsByAddress(address: String): Set[String] = {
-    get(OrderIdsCodec)(makeKey(AddressToOrdersPrefix, address)).map(_.toSet).getOrElse(Set.empty)
-  }
-
-  override def activeOrderIdsByAddress(address: String): Set[(Option[AssetId], String)] = {
-    get(AssetIdOrderIdSetCodec)(makeKey(AddressToActiveOrdersPrefix, address)).getOrElse(Set.empty)
-  }
-
-  override def deleteOrder(address: String, orderId: String): Boolean = {
-    orderStatus(orderId) match {
+  def deleteOrder(address: Address, orderId: ByteStr): Boolean = db.readWrite { rw =>
+    DBUtils.orderInfo(rw, orderId).status match {
       case Filled | LimitOrder.Cancelled(_) =>
-        deleteFromOrders(orderId)
-        deleteFromOrdersInfo(orderId)
-        deleteFromAddress(address, orderId)
-        deleteFromActive(address, orderId)
+        rw.delete(MatcherKeys.order(orderId))
+        rw.delete(MatcherKeys.orderInfo(orderId))
         true
       case _ =>
         false
     }
   }
+}
 
-  override def fetchOrderHistoryByPair(assetPair: AssetPair, address: String, internal: Boolean): Seq[(String, OrderInfo, Option[Order])] = {
-    val orders = allOrderIdsByAddress(address).toSeq
-      .map(id => (id, orderInfo(id), order(id)))
-      .filter(_._3.exists(_.assetPair == assetPair))
-    if (internal) {
-      orders
-    } else {
-      orders
-        .sorted(OrderHistoryOrdering)
-        .take(settings.maxOrdersPerRequest)
-    }
-  }
+object OrderHistory {
+  import OrderInfo.orderStatusOrdering
 
-  override def fetchAllActiveOrderHistory(address: String, internal: Boolean): Seq[(String, OrderInfo, Option[Order])] = {
-    import OrderInfo.orderStatusOrdering
-    val orders = activeOrderIdsByAddress(address).toSeq
-    if (internal) {
-      orders.map { case (_, id) => (id, orderInfo(id), order(id)) }
-    } else {
-      orders
-        .map(o => (o._2, orderInfo(o._2)))
-        .sortBy(_._2.status)
-        .take(settings.maxOrdersPerRequest)
-        .map(p => (p._1, p._2, order(p._1)))
-        .sorted(OrderHistoryOrdering)
-    }
-  }
+  object OrderHistoryOrdering extends Ordering[(ByteStr, OrderInfo, Option[Order])] {
+    def orderBy(oh: (ByteStr, OrderInfo, Option[Order])): (OrderStatus, Long) = (oh._2.status, -oh._3.map(_.timestamp).getOrElse(0L))
 
-  override def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])] = {
-    import OrderInfo.orderStatusOrdering
-    allOrderIdsByAddress(address).toSeq
-      .map(id => (id, orderInfo(id)))
-      .sortBy(_._2.status)
-      .take(settings.maxOrdersPerRequest)
-      .map(p => (p._1, p._2, order(p._1)))
-      .sorted(OrderHistoryOrdering)
-  }
-
-  private def deleteFromOrdersInfo(orderId: String): Unit = delete(makeKey(OrdersInfoPrefix, orderId), None)
-
-  private def deleteFromAddress(address: String, orderId: String): Unit = {
-    deleteOrderFromAddress(AddressToOrdersPrefix, address, orderId)
-  }
-
-  private def addToActive(address: String, assetId: Option[AssetId], orderId: String): Unit = {
-    val key  = makeKey(AddressToActiveOrdersPrefix, address)
-    val orig = get(AssetIdOrderIdSetCodec)(key).getOrElse(Set.empty)
-    put(key, AssetIdOrderIdSetCodec.encode(orig + (assetId -> orderId)), None)
-  }
-
-  private def deleteFromActive(address: String, orderId: String): Unit = {
-    update(AssetIdOrderIdSetCodec)(makeKey(AddressToActiveOrdersPrefix, address)) { orig =>
-      orig.filterNot { case (_, currOrderId) => currOrderId == orderId }
-    }
-  }
-
-  private def deleteOrderFromAddress(keyPrefix: Array[Byte], address: String, orderId: String): Unit = {
-    update(OrderIdsCodec)(makeKey(keyPrefix, address)) { orig =>
-      if (orig.contains(orderId)) orig.filterNot(_ == orderId)
-      else orig
-    }
-  }
-
-  private def update[Content](codec: Codec[Content])(key: Array[Byte])(f: Content => Content): Unit = {
-    get(codec)(key).foreach { orig =>
-      put(key, codec.encode(f(orig)), None)
-    }
-  }
-
-  private def get[Content](codec: Codec[Content])(key: Array[Byte]): Option[Content] = {
-    get(key).map { x =>
-      codec.decode(x).explicitGet().value
+    override def compare(first: (ByteStr, OrderInfo, Option[Order]), second: (ByteStr, OrderInfo, Option[Order])): Int = {
+      implicitly[Ordering[(OrderStatus, Long)]].compare(orderBy(first), orderBy(second))
     }
   }
 }

@@ -90,12 +90,12 @@ class OrderBookActorSpecification
                          settings,
                          FunctionalitySettings.TESTNET) with RestartableActor))
 
-  private def getOrders(actor: ActorRef) = {
+  private def getOrders(actor: ActorRef): Seq[LimitOrder] = {
     actor ! GetOrdersRequest
     receiveN(1).head.asInstanceOf[GetOrdersResponse].orders
   }
 
-  override protected def beforeEach() = {
+  override protected def beforeEach(): Unit = {
     obc.clear()
     val tp = TestProbe()
     tp.send(StorageExtension(system).journalStorage, InMemoryJournalStorage.ClearJournal)
@@ -376,7 +376,7 @@ class OrderBookActorSpecification
       receiveN(1)
       getOrders(actor) shouldEqual Seq(BuyLimitOrder(price * Order.PriceConstant, amount, expiredOrder))
       actor ! OrderCleanup
-      expectMsg(OrderCanceled(expiredOrder.idStr()))
+      expectMsg(OrderCanceled(expiredOrder.id()))
       getOrders(actor).size should be(0)
     }
 
