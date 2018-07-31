@@ -10,6 +10,7 @@ import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction._
 import scorex.crypto.signatures.Curve25519._
 import scala.util.Try
+import cats.data.State
 
 /**
   * Order to matcher service for asset exchange
@@ -115,40 +116,43 @@ object OrderV1 {
   }
 
   def parseBytes(bytes: Array[Byte]): Try[Order] = Try {
-    var from   = 0
-    val sender = PublicKeyAccount(bytes.slice(from, from + KeyLength))
-    from += KeyLength
-    val matcher = PublicKeyAccount(bytes.slice(from, from + KeyLength))
-    from += KeyLength
-    val (amountAssetId, s0) = Deser.parseByteArrayOption(bytes, from, AssetIdLength)
-    from = s0
-    val (priceAssetId, s1) = Deser.parseByteArrayOption(bytes, from, AssetIdLength)
-    from = s1
-    val orderType = bytes(from)
-    from += 1
-    val price = Longs.fromByteArray(bytes.slice(from, from + 8))
-    from += 8
-    val amount = Longs.fromByteArray(bytes.slice(from, from + 8))
-    from += 8
-    val timestamp = Longs.fromByteArray(bytes.slice(from, from + 8))
-    from += 8
-    val expiration = Longs.fromByteArray(bytes.slice(from, from + 8))
-    from += 8
-    val matcherFee = Longs.fromByteArray(bytes.slice(from, from + 8))
-    from += 8
-    val signature = bytes.slice(from, from + SignatureLength)
-    from += SignatureLength
-    OrderV1(
-      sender,
-      matcher,
-      AssetPair(amountAssetId.map(ByteStr(_)), priceAssetId.map(ByteStr(_))),
-      OrderType(orderType),
-      price,
-      amount,
-      timestamp,
-      expiration,
-      matcherFee,
-      signature
-    )
+    val readByte: State[Int, Byte] = State { from =>
+      (from + 1, bytes(from))
+    }
+    def read[T](f: Array[Byte] => T, size: Int): State[Int, T] = State { from =>
+      val end = from + size
+      (end, f(bytes.slice(from, end)))
+    }
+    def parse[T](f: (Array[Byte], Int, Int) => (T, Int), size: Int): State[Int, T] = State { from =>
+      val (res, off) = f(bytes, from, size)
+      (off, res)
+    }
+    val makeOrder = for {
+      sender        <- read(PublicKeyAccount.apply, KeyLength)
+      matcher       <- read(PublicKeyAccount.apply, KeyLength)
+      amountAssetId <- parse(Deser.parseByteArrayOption, AssetIdLength)
+      priceAssetId  <- parse(Deser.parseByteArrayOption, AssetIdLength)
+      orderType     <- readByte
+      price         <- read(Longs.fromByteArray _, 8)
+      amount        <- read(Longs.fromByteArray _, 8)
+      timestamp     <- read(Longs.fromByteArray _, 8)
+      expiration    <- read(Longs.fromByteArray _, 8)
+      matcherFee    <- read(Longs.fromByteArray _, 8)
+      signature     <- read(identity, SignatureLength)
+    } yield {
+      OrderV1(
+        sender,
+        matcher,
+        AssetPair(amountAssetId.map(ByteStr(_)), priceAssetId.map(ByteStr(_))),
+        OrderType(orderType),
+        price,
+        amount,
+        timestamp,
+        expiration,
+        matcherFee,
+        signature
+      )
+    }
+    makeOrder.run(0).value._2
   }
 }
