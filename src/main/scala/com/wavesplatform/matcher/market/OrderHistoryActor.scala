@@ -44,7 +44,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
     case ValidateOrder(o, _) =>
       sender() ! ValidateOrderResult(validateNewOrder(o))
     case ValidateCancelOrder(co, _) =>
-      sender() ! ValidateCancelResult(validateCancelOrder(co))
+      sender() ! ValidateCancelResult(co.orderId, validateCancelOrder(co))
     case req: DeleteOrderFromHistory =>
       deleteFromOrderHistory(req)
     case GetTradableBalance(assetPair, addr, _) =>
@@ -138,11 +138,11 @@ object OrderHistoryActor {
 
   case class ValidateOrder(order: Order, ts: Long) extends ExpirableOrderHistoryRequest
 
-  case class ValidateOrderResult(result: Either[GenericError, Order])
+  case class ValidateOrderResult(validatedOrderId: String, result: Either[GenericError, Order])
 
   case class ValidateCancelOrder(cancel: CancelOrder, ts: Long) extends ExpirableOrderHistoryRequest
 
-  case class ValidateCancelResult(result: Either[GenericError, CancelOrder])
+  case class ValidateCancelResult(validatedOrderId: String, result: Either[GenericError, CancelOrder])
 
   case class RecoverFromOrderBook(ob: OrderBook) extends OrderHistoryRequest
 

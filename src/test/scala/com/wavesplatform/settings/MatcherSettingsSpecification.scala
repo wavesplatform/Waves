@@ -38,6 +38,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    blacklisted-assets: ["a"]
         |    blacklisted-names: ["b"]
         |    blacklisted-addresses: ["c"]
+        |    validation-timeout = 10m
         |  }
         |}""".stripMargin))
 
@@ -63,6 +64,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       ))
     settings.blacklistedAssets shouldBe Set("a")
     settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")
+    settings.validationTimeout shouldBe 10.minutes
     settings.blacklistedAddresses shouldBe Set("c")
   }
 }
