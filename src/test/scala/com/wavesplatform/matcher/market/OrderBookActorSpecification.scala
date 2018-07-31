@@ -422,11 +422,13 @@ class OrderBookActorSpecification
         val actor        = createOrderBookActor(historyActor.ref)
 
         val order = buy(pair, 1, 1)
-        actor ! CancelOrder(pair, CancelOrderRequest(order.senderPublicKey, order.id(), order.signature))
+        actor ! CancelOrder(pair, CancelOrderRequest(order.senderPublicKey, Some(order.idStr()), None, order.signature), order.idStr())
 
         val unexpectedOrder = buy(pair, 1, 2)
         actor.tell(
-          CancelOrder(pair, CancelOrderRequest(unexpectedOrder.senderPublicKey, unexpectedOrder.id(), unexpectedOrder.signature)),
+          CancelOrder(pair,
+                      CancelOrderRequest(unexpectedOrder.senderPublicKey, Some(order.idStr()), None, unexpectedOrder.signature),
+                      unexpectedOrder.idStr()),
           historyActor.ref
         )
         expectNoMsg()
