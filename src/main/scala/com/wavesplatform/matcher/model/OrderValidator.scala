@@ -12,7 +12,7 @@ import scorex.account.PublicKeyAccount
 import scorex.transaction.AssetAcc
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.Validation.booleanOperators
-import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
+import scorex.transaction.assets.exchange.{Order, Validation}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 
@@ -30,12 +30,12 @@ trait OrderValidator {
   private def isBalanceWithOpenOrdersEnough(order: Order): Validation = {
     val lo = LimitOrder(order)
 
-    val b: Map[String, Long] = (Map(lo.spentAcc -> 0L) ++ Map(lo.feeAcc -> 0L))
+    val b: Map[Option[ByteStr], Long] = (Map(lo.spentAcc -> 0L) ++ Map(lo.feeAcc -> 0L))
       .map { case (a, _) => a -> spendableBalance(a) }
-      .map { case (a, v) => a.assetId.map(_.base58).getOrElse(AssetPair.WavesName) -> v }
+      .map { case (a, v) => a.assetId -> v }
 
-    val newOrder = Events.createOpenPortfolio(OrderAdded(lo)).getOrElse(order.senderPublicKey.address, OpenPortfolio.empty)
-    val open     = orderHistory.openPortfolio(order.senderPublicKey.address).orders.filter { case (k, _) => b.contains(k) }
+    val newOrder = Events.createOpenPortfolio(OrderAdded(lo)).getOrElse(order.senderPublicKey, OpenPortfolio.empty)
+    val open     = b.keySet.map(id => id -> orderHistory.openVolume(order.senderPublicKey, id)).toMap
     val needs    = OpenPortfolio(open).combine(newOrder)
 
     val res: Boolean = b.combine(needs.orders.mapValues(-_)).forall(_._2 >= 0)
@@ -44,7 +44,7 @@ trait OrderValidator {
   }
 
   def getTradableBalance(acc: AssetAcc): Long = timer.refine("action" -> "tradableBalance").measure {
-    math.max(0l, spendableBalance(acc) - orderHistory.openVolume(acc))
+    math.max(0l, spendableBalance(acc) - orderHistory.openVolume(acc.account, acc.assetId))
   }
 
   def validateNewOrder(order: Order): Either[GenericError, Order] =
@@ -57,7 +57,7 @@ trait OrderValidator {
             order.signaturesValid().isRight :| "signature should be valid" &&
             order.isValid(NTP.correctedTime()) &&
             (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
-            (orderHistory.orderStatus(order.idStr()) == LimitOrder.NotFound) :| "Order is already accepted" &&
+            (orderHistory.orderInfo(order.id()).status == LimitOrder.NotFound) :| "Order is already accepted" &&
             isBalanceWithOpenOrdersEnough(order)
         if (!v) {
           Left(GenericError(v.messages()))
@@ -70,7 +70,7 @@ trait OrderValidator {
     timer
       .refine("action" -> "cancel", "pair" -> cancel.assetPair.toString)
       .measure {
-        val status = orderHistory.orderStatus(cancel.orderId)
+        val status = orderHistory.orderInfo(cancel.orderId).status
         val v =
           (status != LimitOrder.NotFound) :| "Order not found" &&
             (status != LimitOrder.Filled) :| "Order is already Filled" &&

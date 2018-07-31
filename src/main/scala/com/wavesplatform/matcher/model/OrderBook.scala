@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
+import com.wavesplatform.state.ByteStr
 
 import scala.collection.immutable.TreeMap
 
@@ -34,17 +35,17 @@ object OrderBook {
       }
   }
 
-  def cancelOrder(ob: OrderBook, orderId: String): Option[OrderCanceled] = {
+  def cancelOrder(ob: OrderBook, orderId: ByteStr): Option[OrderCanceled] = {
     ob.bids
-      .find { case (_, v) => v.exists(_.order.idStr() == orderId) }
-      .orElse(ob.asks.find { case (_, v) => v.exists(_.order.idStr() == orderId) })
+      .find { case (_, v) => v.exists(_.order.id() == orderId) }
+      .orElse(ob.asks.find { case (_, v) => v.exists(_.order.id() == orderId) })
       .fold(Option.empty[OrderCanceled]) {
         case (_, v) =>
-          Some(OrderCanceled(v.find(_.order.idStr() == orderId).get))
+          Some(OrderCanceled(v.find(_.order.id() == orderId).get))
       }
   }
 
-  private def updateCancelOrder(ob: OrderBook, limitOrder: LimitOrder): (OrderBook) = {
+  private def updateCancelOrder(ob: OrderBook, limitOrder: LimitOrder): OrderBook = {
     (limitOrder match {
       case oo @ BuyLimitOrder(p, _, _) =>
         ob.bids.get(p).map { lvl =>

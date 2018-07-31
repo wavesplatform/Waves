@@ -377,7 +377,7 @@ class OrderBookActorSpecification
       receiveN(1)
       getOrders(actor) shouldEqual Seq(BuyLimitOrder(price * Order.PriceConstant, amount, expiredOrder))
       actor ! OrderCleanup
-      expectMsg(OrderCanceled(expiredOrder.idStr()))
+      expectMsg(OrderCanceled(expiredOrder.id().base58))
       getOrders(actor).size should be(0)
     }
 

@@ -42,7 +42,7 @@ class OrderValidatorSpecification
   val matcherPubKey: PublicKeyAccount = w.findPrivateKey(s.account).explicitGet()
 
   private var ov = new OrderValidator {
-    override val orderHistory: OrderHistory = OrderHistoryImpl(db, matcherSettings)
+    override val orderHistory: OrderHistory = new OrderHistory(db, matcherSettings)
     override val utxPool: UtxPool           = stub[UtxPool]
     override val settings: MatcherSettings  = s
     override val wallet: Wallet             = w
@@ -51,7 +51,7 @@ class OrderValidatorSpecification
   override def beforeEach(): Unit = {
     super.beforeEach()
     ov = new OrderValidator {
-      override val orderHistory: OrderHistory = OrderHistoryImpl(db, matcherSettings)
+      override val orderHistory: OrderHistory = new OrderHistory(db, matcherSettings)
       override val utxPool: UtxPool           = stub[UtxPool]
       override val settings: MatcherSettings  = s
       override val wallet: Wallet             = w

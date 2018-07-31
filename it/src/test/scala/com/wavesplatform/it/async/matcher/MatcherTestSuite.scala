@@ -365,7 +365,7 @@ class MatcherTestSuite
     }
 
     // Could not work sometimes because of NODE-546
-    "order with assets" - {
+    "order with assets" ignore /* until balance watcher functionality is re-implemented */ {
       "moved assets, insufficient assets" in {
         val oldestOrderId = bobPlacesAssetOrder(8000)
         val newestOrderId = bobPlacesAssetOrder(1000)
@@ -433,7 +433,7 @@ class MatcherTestSuite
       }
     }
 
-    "order with waves" - {
+    "order with waves" ignore /* until balance watcher functionality is re-implemented */ {
       "leased waves, insufficient fee" in {
         // Amount of waves in order is smaller than fee
         val bobBalance = Await.result(matcherNode.balance(bobNode.address), 1.minute).balance
@@ -534,7 +534,7 @@ class MatcherTestSuite
   private def matcherCancelOrder(node: Node, pair: AssetPair, orderId: String): String = {
     val privateKey    = node.privateKey
     val publicKey     = node.publicKey
-    val request       = CancelOrderRequest(publicKey, Base58.decode(orderId).get, Array.emptyByteArray)
+    val request       = CancelOrderRequest(publicKey, ByteStr(Base58.decode(orderId).get), Array.emptyByteArray)
     val sig           = crypto.sign(privateKey, request.toSign)
     val signedRequest = request.copy(signature = sig)
     val futureResult  = matcherNode.cancelOrder(pair.amountAssetStr, pair.priceAssetStr, signedRequest)

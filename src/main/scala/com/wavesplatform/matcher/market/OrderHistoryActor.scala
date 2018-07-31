@@ -4,18 +4,21 @@ import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse}
-import com.wavesplatform.matcher.market.OrderBookActor.{CancelOrder, GetOrderStatusResponse}
+import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ExpirableOrderHistoryRequest, _}
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.Filled
 import com.wavesplatform.matcher.model._
+import com.wavesplatform.metrics.TimerExt
+import com.wavesplatform.state.ByteStr
 import com.wavesplatform.utx.UtxPool
+import kamon.Kamon
 import org.iq80.leveldb.DB
 import play.api.libs.json._
 import scorex.account.Address
+import scorex.transaction.AssetAcc
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.transaction.{AssetAcc, AssetId}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 
@@ -24,7 +27,12 @@ import scala.language.postfixOps
 
 class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxPool, val wallet: Wallet) extends Actor with OrderValidator {
 
-  val orderHistory = OrderHistoryImpl(db, settings)
+  val orderHistory = new OrderHistory(db, settings)
+
+  private val timer          = Kamon.timer("matcher.order-history")
+  private val addedTimer     = timer.refine("event" -> "added")
+  private val executedTimer  = timer.refine("event" -> "executed")
+  private val cancelledTimer = timer.refine("event" -> "cancelled")
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[OrderAdded])
@@ -33,39 +41,14 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   }
 
   def processExpirableRequest(r: Any): Unit = r match {
-    case req: GetOrderHistory =>
-      fetchOrderHistory(req)
-    case req: GetAllOrderHistory =>
-      fetchAllOrderHistory(req)
-    case ValidateOrder(o, ts) =>
+    case ValidateOrder(o, _) =>
       sender() ! ValidateOrderResult(validateNewOrder(o))
     case ValidateCancelOrder(co, _) =>
       sender() ! ValidateCancelResult(validateCancelOrder(co))
     case req: DeleteOrderFromHistory =>
       deleteFromOrderHistory(req)
-    case GetOrderStatus(_, id, _) =>
-      sender() ! GetOrderStatusResponse(orderHistory.orderStatus(id))
     case GetTradableBalance(assetPair, addr, _) =>
       sender() ! getPairTradableBalance(assetPair, addr)
-    case GetActiveOrdersByAddress(requestId, addr, assets, _) =>
-      // Because all orders spend waves for fee
-      val wasAssetChanged: Option[AssetId] => Boolean = if (assets.contains(None)) { _ =>
-        true
-      } else assets.contains
-
-      val allActiveOrders      = orderHistory.activeOrderIdsByAddress(addr.stringRepr)
-      val activeOrdersByAssets = allActiveOrders.collect { case (assetId, id) if wasAssetChanged(assetId) => id -> orderHistory.orderInfo(id) }
-
-      val active: Seq[LimitOrder] = activeOrdersByAssets.flatMap {
-        case (id, info) =>
-          orderHistory.order(id).map { order =>
-            LimitOrder(order).partial(info.remaining)
-          }
-      }(collection.breakOut)
-
-      sender().forward(GetActiveOrdersByAddressResponse(requestId, addr, active))
-    case GetOpenPortfolio(addr, _) =>
-      sender() ! GetOpenPortfolioResponse(OpenPortfolio(orderHistory.openPortfolio(addr).orders.filter(_._2 > 0)))
   }
 
   override def receive: Receive = {
@@ -74,31 +57,18 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
         processExpirableRequest(req)
       }
     case ev: OrderAdded =>
-      orderHistory.orderAccepted(ev)
+      addedTimer.measure(orderHistory.orderAccepted(ev))
     case ev: OrderExecuted =>
-      orderHistory.orderExecuted(ev)
+      executedTimer.measure(orderHistory.orderExecuted(ev))
     case ev: OrderCanceled =>
-      orderHistory.orderCanceled(ev)
+      cancelledTimer.measure(orderHistory.orderCanceled(ev))
     case RecoverFromOrderBook(ob) =>
       recoverFromOrderBook(ob)
     case ForceCancelOrderFromHistory(id) =>
       forceCancelOrder(id)
   }
 
-  def fetchOrderHistory(req: GetOrderHistory): Unit = {
-    sender() ! GetOrderHistoryResponse(orderHistory.fetchOrderHistoryByPair(req.assetPair, req.address))
-  }
-
-  def fetchAllOrderHistory(req: GetAllOrderHistory): Unit = {
-    req.activeOnly match {
-      case true =>
-        sender() ! GetOrderHistoryResponse(orderHistory.fetchAllActiveOrderHistory(req.address))
-      case false =>
-        sender() ! GetOrderHistoryResponse(orderHistory.fetchAllOrderHistory(req.address))
-    }
-  }
-
-  def forceCancelOrder(id: String): Unit = {
+  def forceCancelOrder(id: ByteStr): Unit = {
     orderHistory.order(id).map((_, orderHistory.orderInfo(id))) match {
       case Some((o, oi)) =>
         orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, o)))
@@ -108,9 +78,8 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
     }
   }
 
-  def getPairTradableBalance(assetPair: AssetPair, address: String): GetTradableBalanceResponse = {
+  def getPairTradableBalance(assetPair: AssetPair, acc: Address): GetTradableBalanceResponse = {
     val bal = (for {
-      acc       <- Address.fromString(address)
       amountAcc <- Right(AssetAcc(acc, assetPair.amountAsset))
       priceAcc  <- Right(AssetAcc(acc, assetPair.priceAsset))
       amountBal <- Right(getTradableBalance(amountAcc))
@@ -128,7 +97,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   }
 
   def deleteFromOrderHistory(req: DeleteOrderFromHistory): Unit = {
-    orderHistory.orderStatus(req.id) match {
+    orderHistory.orderInfo(req.id).status match {
       case Filled | LimitOrder.Cancelled(_) =>
         orderHistory.deleteOrder(req.address, req.id)
         sender() ! OrderDeleted(req.id)
@@ -165,17 +134,7 @@ object OrderHistoryActor {
     def ts: Long
   }
 
-  case class GetOrderHistory(assetPair: AssetPair, address: String, ts: Long) extends ExpirableOrderHistoryRequest
-
-  case class GetAllOrderHistory(address: String, activeOnly: Boolean, ts: Long) extends ExpirableOrderHistoryRequest
-
-  case class GetOrderStatus(assetPair: AssetPair, id: String, ts: Long) extends ExpirableOrderHistoryRequest
-
-  case class GetActiveOrdersByAddress(requestId: Long, address: Address, assets: Set[Option[AssetId]], ts: Long) extends ExpirableOrderHistoryRequest
-
-  case class GetActiveOrdersByAddressResponse(requestId: Long, address: Address, orders: Seq[LimitOrder])
-
-  case class DeleteOrderFromHistory(assetPair: AssetPair, address: String, id: String, ts: Long) extends ExpirableOrderHistoryRequest
+  case class DeleteOrderFromHistory(assetPair: AssetPair, address: Address, id: ByteStr, ts: Long) extends ExpirableOrderHistoryRequest
 
   case class ValidateOrder(order: Order, ts: Long) extends ExpirableOrderHistoryRequest
 
@@ -187,45 +146,17 @@ object OrderHistoryActor {
 
   case class RecoverFromOrderBook(ob: OrderBook) extends OrderHistoryRequest
 
-  case class ForceCancelOrderFromHistory(orderId: String) extends OrderHistoryRequest
+  case class ForceCancelOrderFromHistory(orderId: ByteStr) extends OrderHistoryRequest
 
-  case class AssetPairAwareResponse(assetPair: AssetPair)
-
-  case object DbCommit
-
-  case class OrderDeleted(orderId: String) extends MatcherResponse {
+  case class OrderDeleted(orderId: ByteStr) extends MatcherResponse {
     val json: JsObject            = Json.obj("status" -> "OrderDeleted", "orderId" -> orderId)
     val code: StatusCodes.Success = StatusCodes.OK
   }
 
-  case class GetOrderHistoryResponse(history: Seq[(String, OrderInfo, Option[Order])]) extends MatcherResponse {
-    val json = JsArray(
-      history.map(h =>
-        Json.obj(
-          "id"        -> h._1,
-          "type"      -> h._3.map(_.orderType.toString),
-          "amount"    -> h._2.amount,
-          "price"     -> h._3.map(_.price),
-          "timestamp" -> h._3.map(_.timestamp),
-          "filled"    -> h._2.filled,
-          "status"    -> h._2.status.name,
-          "assetPair" -> h._3.map(_.assetPair.json)
-      )))
-    val code: StatusCode = StatusCodes.OK
-  }
-
-  case class GetTradableBalance(assetPair: AssetPair, address: String, ts: Long) extends ExpirableOrderHistoryRequest
+  case class GetTradableBalance(assetPair: AssetPair, address: Address, ts: Long) extends ExpirableOrderHistoryRequest
 
   case class GetTradableBalanceResponse(balances: Map[String, Long]) extends MatcherResponse {
     val json: JsObject   = JsObject(balances.map { case (k, v) => (k, JsNumber(v)) })
     val code: StatusCode = StatusCodes.OK
-  }
-
-  case class GetOpenPortfolio(address: String, ts: Long) extends ExpirableOrderHistoryRequest
-
-  case class GetOpenPortfolioResponse(portfolio: OpenPortfolio) extends MatcherResponse {
-    override def json: JsValue = JsObject(portfolio.orders.map(o => (o._1, JsNumber(o._2))).toSeq)
-
-    override def code: StatusCode = StatusCodes.OK
   }
 }
