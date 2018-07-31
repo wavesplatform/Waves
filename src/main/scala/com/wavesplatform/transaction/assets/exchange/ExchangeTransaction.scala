@@ -1,11 +1,11 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.state.ByteStr
+//import com.wavesplatform.state.ByteStr
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.transaction.ValidationError.{GenericError, OrderValidationError}
+//import com.wavesplatform.transaction.ValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction._
 import scala.util.Try
 
@@ -46,7 +46,7 @@ object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] wit
 
   override val typeId: Byte = 7
 
-  def create(matcher: PrivateKeyAccount,
+  /*  def create(matcher: PrivateKeyAccount,
              buyOrder: Order,
              sellOrder: Order,
              price: Long,
@@ -111,6 +111,12 @@ object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] wit
       Right(ExchangeTransactionV1(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature))
     }
   }
+   */
 
-  override def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] = ExchangeTransactionV1.parseTail(version, bytes)
+  override def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+    if (version == 1) {
+      ExchangeTransactionV1.parseTail(version, bytes)
+    } else {
+      ExchangeTransactionV2.parseTail(version, bytes)
+    }
 }

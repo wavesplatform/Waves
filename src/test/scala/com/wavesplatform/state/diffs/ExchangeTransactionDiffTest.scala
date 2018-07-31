@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import cats._
+import cats.{Order => _, _}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
@@ -14,7 +14,7 @@ import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.transaction.ValidationError.AccountBalanceError
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.{GenesisTransaction, ValidationError}
@@ -108,10 +108,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
   def createExTx(buy: Order, sell: Order, price: Long, matcher: PrivateKeyAccount, ts: Long): Either[ValidationError, ExchangeTransaction] = {
     val mf     = buy.matcherFee
     val amount = math.min(buy.amount, sell.amount)
-    ExchangeTransaction.create(
+    ExchangeTransactionV1.create(
       matcher = matcher,
-      buyOrder = buy,
-      sellOrder = sell,
+      buyOrder = buy.asInstanceOf[OrderV1],
+      sellOrder = sell.asInstanceOf[OrderV1],
       price = price,
       amount = amount,
       buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,

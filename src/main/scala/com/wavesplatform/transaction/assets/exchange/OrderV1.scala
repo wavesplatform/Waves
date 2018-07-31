@@ -39,15 +39,15 @@ case class OrderV1(@ApiModelProperty(dataType = "java.lang.String") senderPublic
   override def updateProofs(p: Proofs): Order = copy(proofs = p)
 
   // For tests
-  override def updateExpiration(nexpiration: Long): Order  = copy(expiration = nexpiration)
-  override def updateTimestamp(ntimestamp: Long): Order    = copy(timestamp = ntimestamp)
-  override def updateFee(fee: Long): Order                 = copy(matcherFee = fee)
-  override def updateAmount(namount: Long): Order          = copy(amount = namount)
-  override def updatePrice(nprice: Long): Order            = copy(price = nprice)
-  override def updateMatcher(pk: PrivateKeyAccount): Order = copy(matcherPublicKey = pk)
-  override def updateSender(pk: PrivateKeyAccount): Order  = copy(senderPublicKey = pk)
-  override def updatePair(pair: AssetPair): Order          = copy(assetPair = pair)
-  override def updateType(t: OrderType): Order             = copy(orderType = t)
+  override def updateExpiration(nexpiration: Long): OrderV1  = copy(expiration = nexpiration)
+  override def updateTimestamp(ntimestamp: Long): OrderV1    = copy(timestamp = ntimestamp)
+  override def updateFee(fee: Long): OrderV1                 = copy(matcherFee = fee)
+  override def updateAmount(namount: Long): OrderV1          = copy(amount = namount)
+  override def updatePrice(nprice: Long): OrderV1            = copy(price = nprice)
+  override def updateMatcher(pk: PrivateKeyAccount): OrderV1 = copy(matcherPublicKey = pk)
+  override def updateSender(pk: PrivateKeyAccount): OrderV1  = copy(senderPublicKey = pk)
+  override def updatePair(pair: AssetPair): OrderV1          = copy(assetPair = pair)
+  override def updateType(t: OrderType): OrderV1             = copy(orderType = t)
 }
 
 object OrderV1 {
@@ -62,7 +62,7 @@ object OrderV1 {
             @ApiModelProperty(value = "Creation timestamp") timestamp: Long,
             @ApiModelProperty(value = "Order time to live, max = 30 days") expiration: Long,
             @ApiModelProperty(example = "100000") matcherFee: Long,
-            @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte]): Order = {
+            @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte]): OrderV1 = {
     OrderV1(senderPublicKey,
             matcherPublicKey,
             assetPair,
@@ -82,7 +82,7 @@ object OrderV1 {
           amount: Long,
           timestamp: Long,
           expiration: Long,
-          matcherFee: Long): Order = {
+          matcherFee: Long): OrderV1 = {
     val unsigned = OrderV1(sender, matcher, pair, OrderType.BUY, price, amount, timestamp, expiration, matcherFee, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.toSign)
     unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
@@ -95,7 +95,7 @@ object OrderV1 {
            amount: Long,
            timestamp: Long,
            expiration: Long,
-           matcherFee: Long): Order = {
+           matcherFee: Long): OrderV1 = {
     val unsigned = OrderV1(sender, matcher, pair, OrderType.SELL, price, amount, timestamp, expiration, matcherFee, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.toSign)
     unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
@@ -109,13 +109,13 @@ object OrderV1 {
             amount: Long,
             timestamp: Long,
             expiration: Long,
-            matcherFee: Long): Order = {
+            matcherFee: Long): OrderV1 = {
     val unsigned = OrderV1(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.toSign)
     unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
   }
 
-  def parseBytes(bytes: Array[Byte]): Try[Order] = Try {
+  def parseBytes(bytes: Array[Byte]): Try[OrderV1] = Try {
     val readByte: State[Int, Byte] = State { from =>
       (from + 1, bytes(from))
     }

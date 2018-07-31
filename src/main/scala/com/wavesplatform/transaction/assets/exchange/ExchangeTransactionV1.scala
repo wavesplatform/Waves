@@ -48,8 +48,8 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
   override val typeId: Byte = ExchangeTransaction.typeId
 
   def create(matcher: PrivateKeyAccount,
-             buyOrder: Order,
-             sellOrder: Order,
+             buyOrder: OrderV1,
+             sellOrder: OrderV1,
              price: Long,
              amount: Long,
              buyMatcherFee: Long,
@@ -61,8 +61,8 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
     }
   }
 
-  def create(buyOrder: Order,
-             sellOrder: Order,
+  def create(buyOrder: OrderV1,
+             sellOrder: OrderV1,
              price: Long,
              amount: Long,
              buyMatcherFee: Long,

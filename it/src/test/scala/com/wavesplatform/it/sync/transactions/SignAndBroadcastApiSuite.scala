@@ -11,7 +11,7 @@ import play.api.libs.json._
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.assets.SignedTransferV1Request
 import com.wavesplatform.utils.{Base58, NTP}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 
@@ -314,11 +314,11 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
     val buyAmount           = 2
     val sellAmount          = 3
     val assetPair           = AssetPair.createAssetPair("WAVES", issueTx).get
-    val buy                 = Order.buy(buyer, matcher, assetPair, buyPrice, buyAmount, time, expirationTimestamp, mf)
-    val sell                = Order.sell(seller, matcher, assetPair, sellPrice, sellAmount, time, expirationTimestamp, mf)
+    val buy                 = OrderV1.buy(buyer, matcher, assetPair, buyPrice, buyAmount, time, expirationTimestamp, mf)
+    val sell                = OrderV1.sell(seller, matcher, assetPair, sellPrice, sellAmount, time, expirationTimestamp, mf)
 
     val amount = math.min(buy.amount, sell.amount)
-    val tx = ExchangeTransaction
+    val tx = ExchangeTransactionV1
       .create(
         matcher = matcher,
         buyOrder = buy,

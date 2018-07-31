@@ -33,19 +33,19 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         val mf1                 = 1
         val mf2                 = 2
 
-        val buy  = Order.buy(sender1, matcher, pair, buyPrice, buyAmount, time, expirationTimestamp, mf1)
-        val sell = Order.sell(sender2, matcher, pair, sellPrice, sellAmount, time, expirationTimestamp, mf2)
+        val buy  = OrderV1.buy(sender1, matcher, pair, buyPrice, buyAmount, time, expirationTimestamp, mf1)
+        val sell = OrderV1.sell(sender2, matcher, pair, sellPrice, sellAmount, time, expirationTimestamp, mf2)
 
         def create(matcher: PrivateKeyAccount = sender1,
-                   buyOrder: Order = buy,
-                   sellOrder: Order = sell,
+                   buyOrder: OrderV1 = buy,
+                   sellOrder: OrderV1 = sell,
                    price: Long = sellPrice,
                    amount: Long = buyAmount,
                    buyMatcherFee: Long = mf1,
                    sellMatcherFee: Long = 1,
                    fee: Long = 1,
                    timestamp: Long = expirationTimestamp - Order.MaxLiveTime) = {
-          ExchangeTransaction.create(
+          ExchangeTransactionV1.create(
             matcher = sender1,
             buyOrder = buyOrder,
             sellOrder = sellOrder,
@@ -82,10 +82,10 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
     }
   }
 
-  def createExTx(buy: Order, sell: Order, price: Long, matcher: PrivateKeyAccount): Either[ValidationError, ExchangeTransaction] = {
+  def createExTx(buy: OrderV1, sell: OrderV1, price: Long, matcher: PrivateKeyAccount): Either[ValidationError, ExchangeTransaction] = {
     val mf     = 300000L
     val amount = math.min(buy.amount, sell.amount)
-    ExchangeTransaction.create(
+    ExchangeTransactionV1.create(
       matcher = matcher,
       buyOrder = buy,
       sellOrder = sell,
@@ -107,12 +107,12 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         val sellPrice           = (0.50 * Order.PriceConstant).toLong
         val mf                  = 300000L
 
-        val sell = Order.sell(sender2, matcher, pair, sellPrice, 2, time, expirationTimestamp, mf)
-        val buy  = Order.buy(sender1, matcher, pair, buyPrice, 1, time, expirationTimestamp, mf)
+        val sell = OrderV1.sell(sender2, matcher, pair, sellPrice, 2, time, expirationTimestamp, mf)
+        val buy  = OrderV1.buy(sender1, matcher, pair, buyPrice, 1, time, expirationTimestamp, mf)
 
         createExTx(buy, sell, sellPrice, matcher) shouldBe an[Right[_, _]]
 
-        val sell1 = Order.sell(sender1, matcher, pair, buyPrice, 1, time, time - 1, mf)
+        val sell1 = OrderV1.sell(sender1, matcher, pair, buyPrice, 1, time, time - 1, mf)
         createExTx(buy, sell1, buyPrice, matcher) shouldBe Left(OrderValidationError(sell1, "expiration should be > currentTime"))
     }
   }
@@ -167,7 +167,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       }
       """)
 
-    val buy = Order(
+    val buy = OrderV1(
       PublicKeyAccount.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(),
       PublicKeyAccount.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
@@ -180,7 +180,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       Base58.decode("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get
     )
 
-    val sell = Order(
+    val sell = OrderV1(
       PublicKeyAccount.fromBase58String("7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV").explicitGet(),
       PublicKeyAccount.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
@@ -193,7 +193,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       Base58.decode("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
     )
 
-    val tx = ExchangeTransaction
+    val tx = ExchangeTransactionV1
       .create(
         buy,
         sell,

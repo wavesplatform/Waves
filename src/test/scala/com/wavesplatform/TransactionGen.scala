@@ -553,7 +553,17 @@ trait TransactionGenBase extends ScriptGen {
       val buyFee     = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
       val sellFee    = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
       val trans =
-        ExchangeTransaction.create(matcher, o1, o2, price, matchedAmount, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100).explicitGet()
+        ExchangeTransactionV1
+          .create(matcher,
+                  o1.asInstanceOf[OrderV1],
+                  o2.asInstanceOf[OrderV1],
+                  price,
+                  matchedAmount,
+                  buyFee,
+                  sellFee,
+                  (buyFee + sellFee) / 2,
+                  expiration - 100)
+          .explicitGet()
 
       trans
     }
