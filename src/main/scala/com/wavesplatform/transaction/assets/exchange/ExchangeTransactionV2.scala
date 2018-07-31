@@ -8,11 +8,10 @@ import monix.eval.Coeval
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.transaction.ValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction._
-import scorex.crypto.signatures.Curve25519._
 import scala.util.{Failure, Success, Try}
 import cats.data.State
 
-case class ExchangeTransactionV1(buyOrder: Order,
+case class ExchangeTransactionV2(buyOrder: Order,
                                  sellOrder: Order,
                                  price: Long,
                                  amount: Long,
@@ -20,11 +19,10 @@ case class ExchangeTransactionV1(buyOrder: Order,
                                  sellMatcherFee: Long,
                                  fee: Long,
                                  timestamp: Long,
-                                 signature: ByteStr)
-    extends ExchangeTransaction
-    with SignedTransaction {
+                                 proofs: Proofs)
+    extends ExchangeTransaction {
 
-  override def version: Byte                     = 1
+  override def version: Byte                     = 2
   override val builder: ExchangeTransaction.type = ExchangeTransaction
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
@@ -33,19 +31,19 @@ case class ExchangeTransactionV1(buyOrder: Order,
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Array(builder.typeId) ++
-      Ints.toByteArray(buyOrder.bytes().length) ++ Ints.toByteArray(sellOrder.bytes().length) ++
+      (Ints.toByteArray(buyOrder.bytes().length) :+ buyOrder.version) ++
+      (Ints.toByteArray(sellOrder.bytes().length) :+ sellOrder.version) ++
       buyOrder.bytes() ++ sellOrder.bytes() ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
       Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
       Longs.toByteArray(timestamp))
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature.arr)
-
-  override val signedDescendants: Coeval[Seq[Order]] = Coeval.evalOnce(Seq(buyOrder, sellOrder))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ proofs.bytes())
 }
 
-object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1] with TransactionParser.HardcodedVersion1 {
+object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2] with TransactionParser.MultipleVersions {
 
-  override val typeId: Byte = ExchangeTransaction.typeId
+  override val typeId: Byte                 = ExchangeTransaction.typeId
+  override val supportedVersions: Set[Byte] = Set(2)
 
   def create(matcher: PrivateKeyAccount,
              buyOrder: Order,
@@ -56,8 +54,8 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
              sellMatcherFee: Long,
              fee: Long,
              timestamp: Long): Either[ValidationError, TransactionT] = {
-    create(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).right.map { unverified =>
-      unverified.copy(signature = ByteStr(crypto.sign(matcher.privateKey, unverified.bodyBytes())))
+    create(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).right.map { unverified =>
+      unverified.copy(proofs = Proofs(Seq(ByteStr(crypto.sign(matcher.privateKey, unverified.bodyBytes())))))
     }
   }
 
@@ -69,7 +67,7 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
              sellMatcherFee: Long,
              fee: Long,
              timestamp: Long,
-             signature: ByteStr): Either[ValidationError, TransactionT] = {
+             proofs: Proofs): Either[ValidationError, TransactionT] = {
     lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
 
     if (fee <= 0) {
@@ -103,31 +101,39 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
     } else if (!priceIsValid) {
       Left(GenericError("priceIsValid"))
     } else {
-      Right(ExchangeTransactionV1(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature))
+      Right(ExchangeTransactionV2(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs))
     }
   }
 
   override def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] = {
+    val readByte: State[Int, Byte] = State { from =>
+      (from + 1, bytes(from))
+    }
     def read[T](f: Array[Byte] => T, size: Int): State[Int, T] = State { from =>
       val end = from + size
       (end, f(bytes.slice(from, end)))
+    }
+    def readEnd[T](f: Array[Byte] => T): State[Int, T] = State { from =>
+      (from, f(bytes.drop(from)))
     }
 
     Try {
       val makeTransaction = for {
         o1Size         <- read(Ints.fromByteArray _, 4)
+        o1Ver          <- readByte
         o2Size         <- read(Ints.fromByteArray _, 4)
-        o1             <- read(OrderV1.parseBytes _, o1Size).map(_.get)
-        o2             <- read(OrderV1.parseBytes _, o2Size).map(_.get)
+        o2Ver          <- readByte
+        o1             <- read(if (o1Ver == 1) { OrderV1.parseBytes _ } else { OrderV2.parseBytes _ }, o1Size).map(_.get)
+        o2             <- read(if (o1Ver == 1) { OrderV1.parseBytes _ } else { OrderV2.parseBytes _ }, o2Size).map(_.get)
         price          <- read(Longs.fromByteArray _, 8)
         amount         <- read(Longs.fromByteArray _, 8)
         buyMatcherFee  <- read(Longs.fromByteArray _, 8)
         sellMatcherFee <- read(Longs.fromByteArray _, 8)
         fee            <- read(Longs.fromByteArray _, 8)
         timestamp      <- read(Longs.fromByteArray _, 8)
-        signature      <- read(ByteStr.apply, SignatureLength)
+        proofs         <- readEnd(Proofs.fromBytes)
       } yield {
-        create(o1, o2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
+        create(o1, o2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs.right.get)
           .fold(left => Failure(new Exception(left.toString)), right => Success(right))
       }
       makeTransaction.run(0).value._2
