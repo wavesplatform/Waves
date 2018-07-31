@@ -72,7 +72,7 @@ class OrderBookActorSpecification
 
   val orderHistoryRef = TestActorRef(new Actor {
     def receive: Receive = {
-      case ValidateOrder(o, _) => sender() ! ValidateOrderResult(o.idStr(), Right(o))
+      case ValidateOrder(o, _) => sender() ! ValidateOrderResult(o.id(), Right(o))
       case _                   =>
     }
   })
@@ -414,7 +414,7 @@ class OrderBookActorSpecification
         actor ! order
 
         val unexpectedOrder = buy(pair, 1, 2)
-        actor.tell(ValidateOrderResult(unexpectedOrder.idStr(), Right(unexpectedOrder)), historyActor.ref)
+        actor.tell(ValidateOrderResult(unexpectedOrder.id(), Right(unexpectedOrder)), historyActor.ref)
         expectNoMsg()
       }
 

@@ -177,14 +177,14 @@ class OrderBookActor(assetPair: AssetPair,
     case ValidationTimeoutExceeded =>
       validationTimeouts.increment()
       log.warn(s"Validation timeout exceeded for $sentMessage")
-      val orderId = sentMessage.fold(_.cancel.orderId, _.order.idStr())
+      val orderId = sentMessage.fold(_.cancel.orderId, _.order.id())
       cancelInProgressOrders.invalidate(orderId)
       apiSender.foreach(_ ! OperationTimedOut)
       becomeFullCommands()
 
     case ValidateOrderResult(validatedOrderId, res) =>
       sentMessage match {
-        case Right(sent) if validatedOrderId == sent.order.idStr() =>
+        case Right(sent) if validatedOrderId == sent.order.id() =>
           cancellable.foreach(_.cancel())
           handleValidateOrderResult(res)
         case x =>
@@ -462,7 +462,7 @@ object OrderBookActor {
 
   case object OperationTimedOut extends MatcherResponse {
     val json = Json.obj("status" -> "OperationTimedOut", "message" -> "Operation is timed out, please try later")
-    val code = StatusCodes.RequestTimeout
+    val code = StatusCodes.InternalServerError
   }
 
   case class OrderAccepted(order: Order) extends MatcherResponse {

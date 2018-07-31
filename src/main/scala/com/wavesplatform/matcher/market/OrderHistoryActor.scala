@@ -42,7 +42,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
 
   def processExpirableRequest(r: Any): Unit = r match {
     case ValidateOrder(o, _) =>
-      sender() ! ValidateOrderResult(validateNewOrder(o))
+      sender() ! ValidateOrderResult(o.id(), validateNewOrder(o))
     case ValidateCancelOrder(co, _) =>
       sender() ! ValidateCancelResult(co.orderId, validateCancelOrder(co))
     case req: DeleteOrderFromHistory =>
@@ -138,11 +138,11 @@ object OrderHistoryActor {
 
   case class ValidateOrder(order: Order, ts: Long) extends ExpirableOrderHistoryRequest
 
-  case class ValidateOrderResult(validatedOrderId: String, result: Either[GenericError, Order])
+  case class ValidateOrderResult(validatedOrderId: ByteStr, result: Either[GenericError, Order])
 
   case class ValidateCancelOrder(cancel: CancelOrder, ts: Long) extends ExpirableOrderHistoryRequest
 
-  case class ValidateCancelResult(validatedOrderId: String, result: Either[GenericError, CancelOrder])
+  case class ValidateCancelResult(validatedOrderId: ByteStr, result: Either[GenericError, CancelOrder])
 
   case class RecoverFromOrderBook(ob: OrderBook) extends OrderHistoryRequest
 

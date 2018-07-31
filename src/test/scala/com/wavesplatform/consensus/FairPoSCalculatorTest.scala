@@ -39,21 +39,8 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
       next :: acc
     }).reverse.tail
 
-    val maxBT = chain.maxBy(_.baseTarget).baseTarget
-    val avgBT = chain.map(_.baseTarget).sum / chain.length
-    val minBT = chain.minBy(_.baseTarget).baseTarget
-
-    val maxDelay = chain.tail.maxBy(_.delay).delay
-    val avgDelay = chain.tail.map(_.delay).sum / (chain.length - 1)
-    val minDelay = chain.tail.minBy(_.delay).delay
-
-    println(
-      s"""
-        |BT: $minBT $avgBT $maxBT
-        |Delay: $minDelay $avgDelay $maxDelay
-      """.stripMargin
-    )
-
+    val avgBT            = chain.map(_.baseTarget).sum / chain.length
+    val avgDelay         = chain.tail.map(_.delay).sum / (chain.length - 1)
     val minersPerfomance = calcPerfomance(chain, miners)
 
     assert(minersPerfomance.forall(p => p._2 < 1.1 && p._2 > 0.9))

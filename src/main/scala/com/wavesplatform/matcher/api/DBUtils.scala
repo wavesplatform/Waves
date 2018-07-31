@@ -15,16 +15,15 @@ object DBUtils extends ScorexLogging {
 
   def ordersByAddressAndPair(db: DB, address: Address, pair: AssetPair, activeOnly: Boolean): Seq[(Order, OrderInfo)] = db.readOnly { ro =>
     val changedAssets = Set(pair.priceAsset, pair.amountAsset)
-      (for {
-        idx <- db.get(MatcherKeys.addressOrdersSeqNr(address)) to 1 by -1
-        orderSpendAsset = ro.get(MatcherKeys.addressOrders(address, idx))
-        if changedAssets.isEmpty || changedAssets(orderSpendAsset.spendAsset)
-        order <- ro.get(MatcherKeys.order(orderSpendAsset.orderId))
-        orderInfo = ro.get(MatcherKeys.orderInfo(orderSpendAsset.orderId))
-        if !(activeOnly && orderInfo.status.isFinal) && order.assetPair == pair
-      } yield (order, orderInfo)).sortBy { case (order, info) => (info.status, -order.timestamp) }
+    (for {
+      idx <- db.get(MatcherKeys.addressOrdersSeqNr(address)) to 1 by -1
+      orderSpendAsset = ro.get(MatcherKeys.addressOrders(address, idx))
+      if changedAssets.isEmpty || changedAssets(orderSpendAsset.spendAsset)
+      order <- ro.get(MatcherKeys.order(orderSpendAsset.orderId))
+      orderInfo = ro.get(MatcherKeys.orderInfo(orderSpendAsset.orderId))
+      if !(activeOnly && orderInfo.status.isFinal) && order.assetPair == pair
+    } yield (order, orderInfo)).sortBy { case (order, info) => (info.status, -order.timestamp) }
   }
-
 
   def ordersByAddress(db: DB, address: Address, changedAssets: Set[Option[AssetId]], activeOnly: Boolean): Seq[(Order, OrderInfo)] = db.readOnly {
     ro =>

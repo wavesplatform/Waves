@@ -4,9 +4,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import akka.persistence._
-import akka.routing.FromConfig
-import akka.persistence.{PersistentActor, RecoveryCompleted}
+import akka.persistence.{PersistentActor, RecoveryCompleted, _}
 import com.google.common.base.Charsets
 import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
