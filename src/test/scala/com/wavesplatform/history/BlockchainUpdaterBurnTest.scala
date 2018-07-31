@@ -8,9 +8,9 @@ import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.{BurnTransactionV1, IssueTransactionV1, ReissueTransactionV1}
-import scorex.transaction.transfer.TransferTransactionV1
+import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.assets.{BurnTransactionV1, IssueTransactionV1, ReissueTransactionV1}
+import com.wavesplatform.transaction.transfer.TransferTransactionV1
 
 class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
 

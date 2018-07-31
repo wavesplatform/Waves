@@ -1,92 +1,103 @@
 package com.wavesplatform.lang.v1.compiler
 
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang._
+import com.wavesplatform.lang.v1.evaluator.ctx.DefinedType
 
 object TypeInferrer {
 
-  case class MatchResult(tpe: TYPE, name: TYPEPARAM)
-  // (ACTUAL, EXPECTED)
-  def apply(seq: Seq[(TYPE, TYPEPLACEHOLDER)]): Either[String, Map[TYPEPARAM, TYPE]] = {
-    val matching = seq.map(x => matchTypes(x._1, x._2))
+  case class MatchResult(tpe: FINAL, name: TYPEPARAM)
+  def apply(seq: Seq[(FINAL, TYPE)], knownTypes: Map[String, DefinedType] = Map.empty): Either[String, Map[TYPEPARAM, FINAL]] = {
+    val matching = seq.map(x => matchTypes(x._1, x._2, knownTypes))
     matching.find(_.isLeft) match {
       case Some(left) => left.asInstanceOf[Left[String, Nothing]]
       case None =>
-        import cats.instances.option._
-        import cats.instances.vector._
-        import cats.syntax.all._
-        val matchResults = matching.flatMap(_.explicitGet()).groupBy(_.name)
-
-        // a function like Option[T], T => Option[Option[T]]
-        // can lead to different interpretations of `T`.
-        // `Nothing`, `TypeRef('XXX')` should find common type of `TypeRef('XXX')`
-        val resolved = matchResults.mapValues { matchResults =>
-          if (matchResults.size == 1) Right(matchResults.head.tpe)
-          else {
-            val maybeCommonType = matchResults.tail.map(_.tpe).toVector.foldLeftM(matchResults.head.tpe)(findCommonType)
-            maybeCommonType match {
-              case None             => Left(s"Can't match inferred types of ${matchResults.head.name} over ${matchResults.map(_.tpe)}")
-              case Some(commonType) => Right(commonType)
+        val matchResults: Map[TYPEPARAM, Seq[MatchResult]] = matching.flatMap(_.explicitGet()).groupBy(_.name)
+        val resolved = matchResults.mapValues {
+          case h :: Nil => Right(h.tpe)
+          case matchResults @ (h :: t) =>
+            val commonType = t.map(_.tpe).toVector.foldLeft(h.tpe)(findCommonType)
+            commonType match {
+              case NOTHING   => Right(NOTHING)
+              case p: SINGLE => Right(p)
+              case u @ UNION(plainTypes) =>
+                val commonTypeExists = plainTypes.exists { p =>
+                  matchResults.map(_.tpe).forall(e => e >= p)
+                }
+                Either.cond(commonTypeExists, u, s"Can't match inferred types of ${h.name} over ${matchResults.map(_.tpe)}")
             }
-          }
         }
-
         resolved.find(_._2.isLeft) match {
           case Some((_, left)) => left.asInstanceOf[Left[String, Nothing]]
-          case None            => Right(resolved.mapValues(_.explicitGet()))
+          case None =>
+            Right(resolved.mapValues { t =>
+              t.explicitGet() match {
+                case UNION(x :: Nil) => x
+                case x               => x
+              }
+            })
         }
     }
   }
 
-  def matchTypes(actual: TYPE, expected: TYPEPLACEHOLDER): Either[String, Option[MatchResult]] = {
-    lazy val err = s"Non-matching types: expected: $expected, actual: $actual"
+  def matchTypes(argType: FINAL, placeholder: TYPE, knownTypes: Map[String, DefinedType]): Either[String, Option[MatchResult]] = {
+    lazy val err = s"Non-matching types: expected: $placeholder, actual: $argType"
 
-    (expected, actual) match {
-      case (realType: TYPE, _) =>
-        Either.cond(matchType(realType, actual).isDefined, None, err)
+    (placeholder, argType) match {
+      case (_, NOTHING) => Right(None)
       case (tp @ TYPEPARAM(char), _) =>
-        Right(Some(MatchResult(actual, tp)))
-      case (tp @ OPTIONTYPEPARAM(innerTypeParam), OPTION(t)) => matchTypes(t, innerTypeParam)
-      case (tp @ LISTTYPEPARAM(innerTypeParam), LIST(t))     => matchTypes(t, innerTypeParam)
-      case _                                                 => Left(err)
+        Right(Some(MatchResult(argType, tp)))
+      case (tp @ PARAMETERIZEDLIST(innerTypeParam), LIST(t)) => matchTypes(t, innerTypeParam, knownTypes)
+      case (tp @ PARAMETERIZEDLIST(_), _)                    => Left(err)
+      case (tp @ PARAMETERIZEDUNION(l), _) =>
+        val conctretes = UNION.create(
+          l.filter(_.isInstanceOf[REAL])
+            .map(_.asInstanceOf[REAL]))
+        val parameterized = l
+          .filter(_.isInstanceOf[PARAMETERIZED])
+          .map(_.asInstanceOf[PARAMETERIZED])
+        if (conctretes >= UNION.create(argType.l)) Right(None)
+        else
+          parameterized match {
+            case singlePlaceholder :: Nil =>
+              val nonMatchedArgTypes = argType match {
+                case NOTHING         => ???
+                case UNION(argTypes) => UNION(argTypes.filterNot(conctretes.l.contains))
+                case s: SINGLE       => s
+              }
+              matchTypes(nonMatchedArgTypes, singlePlaceholder, knownTypes)
+            case many => Left(s"Can't resolve correct type for parameterized $placeholder, actual: $argType")
+          }
+
+      case (LIST(tp), LIST(t)) => matchTypes(t, tp, knownTypes)
+      case (placeholder: FINAL, _) =>
+        Either.cond(placeholder >= UNION.create(argType.l), None, err)
     }
   }
 
-  def inferResultType(resultType: TYPEPLACEHOLDER, resolved: Map[TYPEPARAM, TYPE]): Either[String, TYPE] = {
-    resultType match {
-      case plainType: TYPE => Right(plainType)
-      case tp @ TYPEPARAM(_) =>
-        resolved.get(tp) match {
-          case None    => Left(s"Unknown function return type $tp")
-          case Some(r) => Right(r)
-        }
-      case OPTIONTYPEPARAM(t) => inferResultType(t, resolved).map(OPTION)
-      case LISTTYPEPARAM(t)   => inferResultType(t, resolved).map(LIST)
-    }
-  }
-
-  def findCommonType(list: Seq[TYPE]): Option[TYPE] = list match {
-    case one :: Nil => Some(one)
+  // match, e.g. many ifs
+  def findCommonType(list: Seq[FINAL]): FINAL = list match {
+    case one :: Nil => one
     case head :: tail =>
-      for {
-        t <- findCommonType(tail)
-        r <- findCommonType(head, t)
-      } yield r
+      val t = findCommonType(tail)
+      findCommonType(head, t)
   }
-  def findCommonType(t1: TYPE, t2: TYPE): Option[TYPE]      = findCommonType(t1, t2, biDirectional = true)
-  def matchType(required: TYPE, actual: TYPE): Option[TYPE] = findCommonType(required, actual, biDirectional = false)
 
-  private def findCommonType(required: TYPE, actual: TYPE, biDirectional: Boolean): Option[TYPE] =
-    if (actual == NOTHING) Some(required)
-    else if (required == NOTHING && biDirectional) Some(actual)
-    else if (required == actual) Some(required)
-    else
-      (required, actual) match {
-        case (OPTION(it1), OPTION(it2)) => findCommonType(it1, it2, biDirectional).map(OPTION)
-        case (r: UNION, a: UNION) =>
-          if (biDirectional && (r equivalent a)) Some(r)
-          else if (!biDirectional && (r >= a)) Some(r)
-          else None
-        case _ => None
+  // if-then-else
+  def findCommonType(t1: FINAL, t2: FINAL): FINAL = (t1, t2) match {
+    case (t1, NOTHING)        => t1
+    case (NOTHING, t2)        => t2
+    case (t1, t2) if t1 == t2 => t1
+
+    case (r @ LIST(it1), a @ LIST(it2)) =>
+      findCommonType(it1, it2) match {
+        case NOTHING   => NOTHING
+        case UNION(_)  => UNION(List(r, a))
+        case p: SINGLE => LIST(p)
       }
+    case (p1: SINGLE, p2: SINGLE) => if (p1 == p2) p1 else UNION.create(List(p1, p2))
+    case (r: UNION, a: UNION)     => UNION.create((r.l.toSet ++ a.l.toSet).toSeq)
+    case (u: UNION, t: SINGLE)    => if (u.l.contains(t)) u else UNION.create(u.l :+ t)
+    case (t: SINGLE, u: UNION)    => if (u.l.contains(t)) u else UNION.create(u.l :+ t)
+  }
 }

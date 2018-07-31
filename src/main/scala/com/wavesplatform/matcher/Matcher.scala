@@ -9,18 +9,18 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.pattern.gracefulStop
 import akka.stream.ActorMaterializer
+import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.db._
 import com.wavesplatform.matcher.api.MatcherApiRoute
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderHistoryActor}
 import com.wavesplatform.matcher.model.OrderBook
 import com.wavesplatform.settings.{BlockchainSettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
-import scorex.api.http.CompositeHttpService
-import scorex.transaction.assets.exchange.AssetPair
-import scorex.utils.ScorexLogging
-import scorex.wallet.Wallet
 
 import scala.concurrent.Await
 import scala.concurrent.duration._

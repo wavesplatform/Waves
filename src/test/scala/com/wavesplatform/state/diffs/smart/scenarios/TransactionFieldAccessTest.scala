@@ -5,16 +5,16 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{assertDiffAndState, assertDiffEi, produce}
-import com.wavesplatform.utils.dummyTypeCheckerContext
+import com.wavesplatform.utils.dummyCompilerContext
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.GenesisTransaction
-import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.transfer._
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.transfer._
 
 class TransactionFieldAccessTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -22,7 +22,7 @@ class TransactionFieldAccessTest extends PropSpec with PropertyChecks with Match
       code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransactionV1)] = {
     val untyped = Parser(code).get.value
     assert(untyped.size == 1)
-    val typed = CompilerV1(dummyTypeCheckerContext, untyped.head).explicitGet()._1
+    val typed = CompilerV1(dummyCompilerContext, untyped.head).explicitGet()._1
     preconditionsTransferAndLease(typed)
   }
 
@@ -31,7 +31,7 @@ class TransactionFieldAccessTest extends PropSpec with PropertyChecks with Match
       |
       | match tx {
       | case ttx: TransferTransaction =>
-      |       isDefined(ttx.transferAssetId)==false
+      |       isDefined(ttx.assetId)==false
       |   case other =>
       |       false
       | }

@@ -3,16 +3,16 @@ package com.wavesplatform.state.diffs
 import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.BlockGen
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.block.Block
 import com.wavesplatform.db.WithState
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, Diff, EitherExt2}
+import com.wavesplatform.transaction.{GenesisTransaction, ValidationError}
 import org.scalatest.{FreeSpecLike, Matchers}
-import scorex.account.PrivateKeyAccount
-import scorex.block.Block
-import scorex.crypto.signatures.Curve25519.KeyLength
-import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.{GenesisTransaction, ValidationError}
+import scorex.crypto.signatures.Curve25519._
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with WithState {
 

@@ -15,16 +15,15 @@ import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.network._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
+import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.utils.{NTP, ScorexLogging}
 import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import play.api.libs.json._
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
-import scorex.transaction.assets.exchange._
-import scorex.utils.{NTP, ScorexLogging}
-import scorex.wallet.Wallet
 
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -242,7 +241,7 @@ class OrderBookActor(assetPair: AssetPair,
           applyEvent(oc)
           sender() ! OrderCanceled(orderIdToCancel)
         }
-      case _ => sender() ! OrderCancelRejected("Order not found")
+      case _ => sender() ! OrderCancelRejected(s"Order '$orderIdToCancel' not found")
     }
   }
 
@@ -273,7 +272,7 @@ class OrderBookActor(assetPair: AssetPair,
             }
           case _ =>
             alreadyCanceledOrders.put(orderIdToCancel, failedCancel)
-            apiSender.foreach(_ ! OrderCancelRejected("Order not found"))
+            apiSender.foreach(_ ! OrderCancelRejected(s"Order '$orderIdToCancel' not found"))
         }
     }
 
@@ -337,7 +336,6 @@ class OrderBookActor(assetPair: AssetPair,
       Some(event.submitted)
     }
 
-    log.debug(s"Failed to execute order: $err")
     err match {
       case OrderValidationError(order, _) if order == event.submitted.order => None
       case OrderValidationError(order, _) if order == event.counter.order   => cancelCounterOrder()
@@ -374,7 +372,11 @@ class OrderBookActor(assetPair: AssetPair,
               Some(o.partial(event.submittedRemaining))
             else None
           case Left(ex) =>
-            log.info("Can't create tx for o1: " + Json.prettyPrint(o.order.json()) + "\n, o2: " + Json.prettyPrint(c.order.json()))
+            log.warn(
+              s"Can't create tx for o1: ${Json.prettyPrint(o.order.json())}\n, " +
+                s"o2: ${Json.prettyPrint(c.order.json())}\n, " +
+                s"reason: $ex"
+            )
             processInvalidTransaction(event, ex)
         }
       case _ => None
@@ -445,8 +447,7 @@ object OrderBookActor {
 
   case class DeleteOrderBookRequest(assetPair: AssetPair) extends OrderBookRequest
 
-  case class CancelOrder(assetPair: AssetPair, req: CancelOrderRequest) extends OrderBookRequest {
-    lazy val orderId: String           = Base58.encode(req.orderId)
+  case class CancelOrder(assetPair: AssetPair, req: CancelOrderRequest, orderId: String) extends OrderBookRequest {
     override lazy val toString: String = s"CancelOrder($assetPair, ${req.senderPublicKey}, $orderId)"
   }
 

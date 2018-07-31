@@ -12,11 +12,11 @@ import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.GenesisTransaction
-import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.transfer._
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.transfer._
 
 class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
@@ -54,7 +54,7 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
     val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)"
     val untypedScript = Parser(textScript).get.value
     assert(untypedScript.size == 1)
-    val typedScript = CompilerV1(dummyTypeCheckerContext, untypedScript.head).explicitGet()._1
+    val typedScript = CompilerV1(dummyCompilerContext, untypedScript.head).explicitGet()._1
 
     forAll(differentTransfers(typedScript)) {
       case (gen, setScript, transfers, scriptTransfers) =>

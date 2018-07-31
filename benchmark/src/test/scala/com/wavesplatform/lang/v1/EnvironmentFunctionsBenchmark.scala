@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1
 
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
-import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
 import com.wavesplatform.lang.v1.traits._
@@ -64,10 +64,6 @@ class EnvironmentFunctionsBenchmark {
   @Benchmark
   def addressFromPublicKey_test(): ByteVector = randomAddress
 
-  @Benchmark
-  def addressFromString_full_test(): Either[String, Option[ByteVector]] =
-    environmentFunctions.addressFromString(Global.base58Encode(randomAddress.toArray).explicitGet())
-
 }
 
 object EnvironmentFunctionsBenchmark {
@@ -78,14 +74,14 @@ object EnvironmentFunctionsBenchmark {
   val SeedBytesLength   = 128
 
   private val defaultEnvironment: Environment = new Environment {
-    override def height: Int                                                                                       = 1
-    override def networkByte: Byte                                                                                 = NetworkByte
-    override def transaction: Tx                                                                                   = ???
-    override def transactionById(id: Array[Byte]): Option[Tx]                                                      = ???
-    override def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any]                     = ???
-    override def resolveAlias(alias: String): Either[String, Recipient.Address]                                    = ???
-    override def transactionHeightById(id: Array[Byte]): Option[Int]                                               = ???
-    override def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = ???
+    override def height: Int                                                                                     = 1
+    override def networkByte: Byte                                                                               = NetworkByte
+    override def transaction: Tx                                                                                 = ???
+    override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+    override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
+    override def resolveAlias(alias: String): Either[String, Recipient.Address]                                  = ???
+    override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
+    override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
   }
 
   val environmentFunctions = new EnvironmentFunctions(defaultEnvironment)
@@ -96,7 +92,7 @@ object EnvironmentFunctionsBenchmark {
     bytes
   }
 
-  def randomAddress: ByteVector = environmentFunctions.addressFromPublicKey(ByteVector(randomBytes(Curve25519.KeyLength)))
+  def randomAddress: ByteVector = ByteVector(Common.addressFromPublicKey(NetworkByte, randomBytes(Curve25519.KeyLength)))
 
   def hashTest[T](f: Array[Byte] => T): T           = f(randomBytes(DataBytesLength))
   def hashTest[T](len: Int, f: Array[Byte] => T): T = f(randomBytes(len))

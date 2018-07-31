@@ -24,7 +24,7 @@ class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFro
     val (balance1, eff1)    = nodeWithZeroBalance.accountBalances(newMinerAddress)
     val nodeMinerInfoBefore = nodeWithZeroBalance.debugMinerInfo()
     all(nodeMinerInfoBefore) shouldNot matchPattern { case State(`newMinerAddress`, _, ts) if ts > 0 => }
-    val txId = miner.transfer(miner.address, newMinerAddress, transferAmount, fee).id
+    val txId = miner.transfer(miner.address, newMinerAddress, transferAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
     val heightAfterTransfer = miner.height
@@ -40,8 +40,7 @@ class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFro
 
 object MinerStateTestSuite {
   import com.wavesplatform.it.NodeConfigs._
-  val microblockActivationHeight = 0
-  private val minerConfig        = ConfigFactory.parseString(s"""
+  private val minerConfig = ConfigFactory.parseString(s"""
     |waves {
     |  synchronization.synchronization-timeout = 10s
     |  blockchain.custom.functionality {

@@ -1,7 +1,7 @@
 package com.wavesplatform.metrics
 
+import com.wavesplatform.utils.ScorexLogging
 import kamon.metric.Histogram
-import scorex.utils.ScorexLogging
 
 trait Instrumented {
   self: ScorexLogging =>

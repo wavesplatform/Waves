@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
+import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.matcher.fixtures.RestartableActor
@@ -13,19 +14,17 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, OrderBook, SellLimitOrder}
-import com.wavesplatform.settings.{Constants, FunctionalitySettings, WalletSettings}
+import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{Blockchain, ByteStr, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.utils.{NTP, ScorexLogging}
 import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
-import scorex.account.PrivateKeyAccount
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction._
-import scorex.transaction.assets.IssueTransactionV1
-import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import scorex.utils.{NTP, ScorexLogging}
-import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
 

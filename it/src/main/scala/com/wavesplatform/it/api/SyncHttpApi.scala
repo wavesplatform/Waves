@@ -1,6 +1,7 @@
 package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.StatusCodes
+import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.it.Node
 import com.wavesplatform.state.DataEntry
 import org.asynchttpclient.Response
@@ -8,18 +9,25 @@ import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
 import play.api.libs.json.{Format, JsObject, Json, Writes}
-import scorex.api.http.AddressApiRoute
-import scorex.api.http.assets.SignedIssueV1Request
-import scorex.transaction.transfer.MassTransferTransaction.Transfer
+import com.wavesplatform.api.http.AddressApiRoute
+import com.wavesplatform.api.http.assets.SignedIssueV1Request
+import com.wavesplatform.http.DebugMessage
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Try}
 
 object SyncHttpApi extends Assertions {
   case class ErrorMessage(error: Int, message: String)
-
   implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
+
+  case class NotFoundErrorMessage(status: String, details: String)
+
+  object NotFoundErrorMessage {
+    implicit val format: Format[NotFoundErrorMessage] = Json.format
+  }
 
   def assertBadRequest[R](f: => R): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Assertions.assert(statusCode == StatusCodes.BadRequest.intValue)
@@ -40,7 +48,14 @@ object SyncHttpApi extends Assertions {
     case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
       Assertions.assert(statusCode == StatusCodes.BadRequest.intValue && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
-    case _          => Assertions.fail(s"Expecting bad request")
+    case e          => Assertions.fail(s"Expecting bad request, got: $e")
+  }
+
+  def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
+    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+      Assertions.assert(statusCode == StatusCodes.NotFound.intValue && parse(responseBody).as[NotFoundErrorMessage].details.contains(errorMessage))
+    case Failure(e) => Assertions.fail(e)
+    case e          => Assertions.fail(s"Expecting not found error, got: $e")
   }
 
   implicit class NodeExtSync(n: Node) extends Assertions with Matchers {
@@ -55,6 +70,12 @@ object SyncHttpApi extends Assertions {
     def utx = Await.result(async(n).utx, RequestAwaitTime)
 
     def utxSize = Await.result(async(n).utxSize, RequestAwaitTime)
+
+    def printDebugMessage(db: DebugMessage): Response =
+      Await.result(async(n).printDebugMessage(db), RequestAwaitTime)
+
+    def activationStatus: ActivationStatus =
+      Await.result(async(n).activationStatus, RequestAwaitTime)
 
     def seed(address: String): String =
       Await.result(async(n).seed(address), RequestAwaitTime)
@@ -95,11 +116,22 @@ object SyncHttpApi extends Assertions {
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Transaction =
       Await.result(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee), RequestAwaitTime)
 
+    def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Transaction =
+      Await.result(async(n).payment(sourceAddress, recipient, amount, fee), RequestAwaitTime)
+
+    def transactionInfo(txId: String): TransactionInfo =
+      Await.result(async(n).transactionInfo(txId), RequestAwaitTime)
+
+    def transactionsByAddress(address: String, limit: Int): Seq[Seq[TransactionInfo]] =
+      Await.result(async(n).transactionsByAddress(address, limit), RequestAwaitTime)
+
     def scriptCompile(code: String): CompiledScript =
       Await.result(async(n).scriptCompile(code), RequestAwaitTime)
 
     def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Transaction =
       Await.result(async(n).burn(sourceAddress, assetId, quantity, fee), RequestAwaitTime)
+
+    def getAddresses: Seq[String] = Await.result(async(n).getAddresses, RequestAwaitTime)
 
     def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, version: String): Transaction =
       if (Option(version).nonEmpty) burnV2(sourceAddress, assetId, quantity, fee, version) else burn(sourceAddress, assetId, quantity, fee)
@@ -185,8 +217,19 @@ object SyncHttpApi extends Assertions {
     def height: Int =
       Await.result(async(n).height, RequestAwaitTime)
 
+    def blockAt(height: Int): Block = Await.result(async(n).blockAt(height), RequestAwaitTime)
+
+    def blockHeadersSeq(from: Int, to: Int): Seq[BlockHeaders] = Await.result(async(n).blockHeadersSeq(from, to), RequestAwaitTime)
+
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       Await.result(async(n).rollback(to, returnToUTX), RequestAwaitTime)
+
+    def findTransactionInfo(txId: String): Option[TransactionInfo] = Await.result(async(n).findTransactionInfo(txId), RequestAwaitTime)
+
+    def connectedPeers: Seq[Peer] = (Json.parse(get("/peers/connected").getResponseBody) \ "peers").as[Seq[Peer]]
+
+    def calculateFee(tx: JsObject): FeeInfo =
+      Await.result(async(n).calculateFee(tx), RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
@@ -195,6 +238,9 @@ object SyncHttpApi extends Assertions {
 
     private val TxInBlockchainAwaitTime = 8 * nodes.head.blockDelay
     private val ConditionAwaitTime      = 5.minutes
+
+    def height(implicit pos: Position): Seq[Int] =
+      Await.result(async(nodes).height, TxInBlockchainAwaitTime)
 
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
       Await.result(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
@@ -209,6 +255,24 @@ object SyncHttpApi extends Assertions {
       Await.result(
         async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(scala.concurrent.ExecutionContext.Implicits.global), cond),
         ConditionAwaitTime)
+
+    def rollback(height: Int, returnToUTX: Boolean = true): Unit = {
+      Await.result(
+        Future.traverse(nodes) { node =>
+          com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).rollback(height, returnToUTX)
+        },
+        ConditionAwaitTime
+      )
+    }
+
+    def waitForHeight(height: Int): Unit = {
+      Await.result(
+        Future.traverse(nodes) { node =>
+          com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).waitForHeight(height)
+        },
+        ConditionAwaitTime
+      )
+    }
   }
 
 }

@@ -18,14 +18,14 @@ object UnaryOperation {
   case object NEGATIVE_OP extends UnaryOperation {
     override val parser: P[Any] = P("-" ~ !CharIn('0' to '9'))
     override def expr(start: Int, end: Int, op: EXPR): EXPR = {
-      FUNCTION_CALL(start, end, PART.VALID(start, end, "-"), List(op))
+      FUNCTION_CALL(Pos(start, end), PART.VALID(Pos(start, end), "-"), List(op))
     }
   }
 
   case object NOT_OP extends UnaryOperation {
     override val parser: P[Any] = P("!")
     override def expr(start: Int, end: Int, op: EXPR): EXPR = {
-      FUNCTION_CALL(start, end, PART.VALID(start, end, "!"), List(op))
+      FUNCTION_CALL(Pos(start, end), PART.VALID(Pos(start, end), "!"), List(op))
     }
   }
 

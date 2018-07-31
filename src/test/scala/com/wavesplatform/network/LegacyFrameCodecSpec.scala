@@ -1,5 +1,7 @@
 package com.wavesplatform.network
 
+import java.net.InetSocketAddress
+
 import com.wavesplatform.{TransactionGen, crypto}
 import io.netty.buffer.Unpooled.wrappedBuffer
 import io.netty.buffer.{ByteBuf, Unpooled}
@@ -8,16 +10,17 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.network.message.{Message => ScorexMessage}
-import scorex.transaction.Transaction
+import com.wavesplatform.network.message.{MessageSpec, Message => ScorexMessage}
+
+import scala.concurrent.duration.DurationInt
 
 class LegacyFrameCodecSpec extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen {
 
   "should handle one message" in forAll(issueGen) { origTx =>
-    val codec = new LegacyFrameCodec(PeerDatabase.NoOp)
+    val codec = new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes)
 
     val buff = Unpooled.buffer
-    write(buff, origTx)
+    write(buff, origTx, TransactionSpec)
 
     val ch = new EmbeddedChannel(codec)
     ch.writeInbound(buff)
@@ -29,10 +32,10 @@ class LegacyFrameCodecSpec extends FreeSpec with Matchers with MockFactory with 
   }
 
   "should handle multiple messages" in forAll(Gen.nonEmptyListOf(issueGen)) { origTxs =>
-    val codec = new LegacyFrameCodec(PeerDatabase.NoOp)
+    val codec = new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes)
 
     val buff = Unpooled.buffer
-    origTxs.foreach(write(buff, _))
+    origTxs.foreach(write(buff, _, TransactionSpec))
 
     val ch = new EmbeddedChannel(codec)
     ch.writeInbound(buff)
@@ -48,15 +51,47 @@ class LegacyFrameCodecSpec extends FreeSpec with Matchers with MockFactory with 
     decodedTxs shouldEqual origTxs
   }
 
-  private def write(buff: ByteBuf, tx: Transaction): Unit = {
-    val txBytes  = tx.bytes()
-    val checkSum = wrappedBuffer(crypto.fastHash(txBytes), 0, ScorexMessage.ChecksumLength)
+  "should reject an already received transaction" in {
+    val tx    = issueGen.sample.getOrElse(throw new RuntimeException("Can't generate a sample transaction"))
+    val codec = new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes)
+    val ch    = new EmbeddedChannel(codec)
+
+    val buff1 = Unpooled.buffer
+    write(buff1, tx, TransactionSpec)
+    ch.writeInbound(buff1)
+
+    val buff2 = Unpooled.buffer
+    write(buff2, tx, TransactionSpec)
+    ch.writeInbound(buff2)
+
+    ch.inboundMessages().size() shouldEqual 1
+  }
+
+  "should not reject an already received GetPeers" in {
+    val msg   = KnownPeers(Seq(InetSocketAddress.createUnresolved("127.0.0.1", 80)))
+    val codec = new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes)
+    val ch    = new EmbeddedChannel(codec)
+
+    val buff1 = Unpooled.buffer
+    write(buff1, msg, PeersSpec)
+    ch.writeInbound(buff1)
+
+    val buff2 = Unpooled.buffer
+    write(buff2, msg, PeersSpec)
+    ch.writeInbound(buff2)
+
+    ch.inboundMessages().size() shouldEqual 2
+  }
+
+  private def write[T <: AnyRef](buff: ByteBuf, msg: T, spec: MessageSpec[T]): Unit = {
+    val bytes    = spec.serializeData(msg)
+    val checkSum = wrappedBuffer(crypto.fastHash(bytes), 0, ScorexMessage.ChecksumLength)
 
     buff.writeInt(LegacyFrameCodec.Magic)
-    buff.writeByte(TransactionSpec.messageCode)
-    buff.writeInt(txBytes.length)
+    buff.writeByte(spec.messageCode)
+    buff.writeInt(bytes.length)
     buff.writeBytes(checkSum)
-    buff.writeBytes(txBytes)
+    buff.writeBytes(bytes)
   }
 
 }

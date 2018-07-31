@@ -13,8 +13,8 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.Config
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
+import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.ReadOptions
-import scorex.utils.ScorexLogging
 
 import scala.concurrent.Future
 import scala.util._

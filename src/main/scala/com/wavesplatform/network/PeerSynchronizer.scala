@@ -2,9 +2,9 @@ package com.wavesplatform.network
 
 import java.net.InetSocketAddress
 
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
-import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
 

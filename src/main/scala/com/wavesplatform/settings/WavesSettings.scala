@@ -38,7 +38,7 @@ object WavesSettings {
     val checkpointsSettings     = CheckpointsSettings.fromConfig(config)
     val feesSettings            = FeesSettings.fromConfig(config)
     val matcherSettings         = MatcherSettings.fromConfig(config)
-    val minerSettings           = config.as[MinerSettings]("waves.miner")
+    val minerSettings           = MinerSettings.fromConfig(config)
     val restAPISettings         = RestAPISettings.fromConfig(config)
     val synchronizationSettings = SynchronizationSettings.fromConfig(config)
     val utxSettings             = config.as[UtxSettings]("waves.utx")

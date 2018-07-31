@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.testing
 
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types._
 import org.scalacheck._
 import scodec.bits.ByteVector
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -50,12 +50,12 @@ trait TypedScriptGen {
 
   def BYTESTRgen: Gen[EXPR] = Gen.identifier.map(x => CONST_BYTEVECTOR(ByteVector(x.getBytes)))
 
-  def REFgen(tpe: TYPE): Gen[EXPR] = Gen.identifier.map(REF(_))
+  def REFgen(tpe: TYPE): Gen[EXPR] = Gen.identifier.map(REF)
 
   def FUNCTION_CALLgen(resultType: TYPE): Gen[EXPR] =
     Gen.const(
       FUNCTION_CALL(
-        function = FunctionHeader(SUM_LONG),
+        function = FunctionHeader.Native(SUM_LONG),
         args = List(CONST_LONG(1), CONST_LONG(1))
       )
     )

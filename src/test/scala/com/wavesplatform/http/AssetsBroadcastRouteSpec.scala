@@ -14,13 +14,13 @@ import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
-import scorex.api.http._
-import scorex.api.http.assets._
+import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.assets._
 import com.wavesplatform.utils.Base58
-import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.transfer._
-import scorex.transaction.{Proofs, Transaction, ValidationError}
-import scorex.wallet.Wallet
+import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{Proofs, Transaction, ValidationError}
+import com.wavesplatform.wallet.Wallet
 import shapeless.Coproduct
 
 class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {

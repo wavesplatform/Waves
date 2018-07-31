@@ -6,10 +6,10 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.account.PrivateKeyAccount
-import scorex.block.{Block, MicroBlock}
-import scorex.transaction._
-import scorex.transaction.transfer._
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.transfer._
 
 class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
     extends PropSpec

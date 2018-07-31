@@ -12,7 +12,7 @@ package object lang {
 
   implicit class EitherExt3[A, B](ei: Either[A, B]) {
     def explicitGet(): B = ei match {
-      case Left(value)  => throw new Exception(value.toString)
+      case Left(value)  => throw new Exception(s"$value")
       case Right(value) => value
     }
   }

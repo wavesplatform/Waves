@@ -17,7 +17,8 @@ trait TaskMFunctions {
       ref.write(s).map(_.asRight)
     }))
 
-  def inspect[S, E, A](f: S => A): TaskM[S, E, A] = get[S, E].map(f)
+  def inspect[S, E, A](f: S => A): TaskM[S, E, A]                  = get[S, E].map(f)
+  def inspectFlat[S, E, A](f: S => TaskM[S, E, A]): TaskM[S, E, A] = get[S, E].flatMap(f)
 
   def modify[S, E](f: S => S): TaskM[S, E, Unit] = get[S, E].flatMap(f andThen set)
 }

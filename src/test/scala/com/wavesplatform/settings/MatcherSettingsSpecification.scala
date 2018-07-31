@@ -1,17 +1,15 @@
 package com.wavesplatform.settings
 
-import scala.concurrent.duration._
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.BalanceWatcherWorkerActor
 import org.scalatest.{FlatSpec, Matchers}
-import scorex.transaction.assets.exchange.AssetPair
+
+import scala.concurrent.duration._
 
 class MatcherSettingsSpecification extends FlatSpec with Matchers {
   "MatcherSettings" should "read values" in {
-    val config = loadConfig(
-      ConfigFactory.parseString(
-        """waves {
+    val config = loadConfig(ConfigFactory.parseString("""waves {
         |  directory: "/waves"
         |  matcher {
         |    enable: yes
@@ -22,17 +20,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    order-match-tx-fee: 100000
         |    snapshots-interval: 1d
         |    order-cleanup-interval: 5m
-        |    max-open-orders: 1000
         |    rest-order-limit: 100
         |    price-assets: [
         |      "WAVES",
         |      "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS",
         |      "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J"
-        |    ]
-        |    predefined-pairs: [
-        |      {amountAsset = "WAVES", priceAsset = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"},
-        |      {amountAsset = "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J", priceAsset = "WAVES"},
-        |      {amountAsset = "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J", priceAsset = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"},
         |    ]
         |    max-timestamp-diff = 30d
         |    blacklisted-assets: ["a"]
@@ -57,15 +49,8 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.snapshotsDataDir should be("/waves/matcher/snapshots")
     settings.snapshotsInterval should be(1.day)
     settings.orderCleanupInterval should be(5.minute)
-    settings.maxOpenOrders should be(1000)
     settings.maxOrdersPerRequest should be(100)
     settings.priceAssets should be(Seq("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J"))
-    settings.predefinedPairs should be(
-      Seq(
-        AssetPair.createAssetPair("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get,
-        AssetPair.createAssetPair("DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J", "WAVES").get,
-        AssetPair.createAssetPair("DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get
-      ))
     settings.blacklistedAssets shouldBe Set("a")
     settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")
     settings.validationTimeout shouldBe 10.minutes

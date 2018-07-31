@@ -6,14 +6,14 @@ import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.StateSyntheticBenchmark._
-import com.wavesplatform.utils.dummyTypeCheckerContext
+import com.wavesplatform.utils.dummyCompilerContext
 import org.openjdk.jmh.annotations._
 import org.scalacheck.Gen
-import scorex.account.PrivateKeyAccount
-import scorex.transaction.Transaction
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.transfer._
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.transfer._
 
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -75,7 +75,7 @@ object StateSyntheticBenchmark {
       val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)"
       val untypedScript = Parser(textScript).get.value
       assert(untypedScript.size == 1)
-      val typedScript = CompilerV1(dummyTypeCheckerContext, untypedScript.head).explicitGet()._1
+      val typedScript = CompilerV1(dummyCompilerContext, untypedScript.head).explicitGet()._1
 
       val setScriptBlock = nextBlock(
         Seq(

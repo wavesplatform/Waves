@@ -15,9 +15,9 @@ object Environment extends scalajs.js.Object {
   def transactionById(id: Array[Byte]): Option[Tx]        = platform.native
   def transactionHeightById(id: Array[Byte]): Option[Int] = platform.native
 
-  def data(addressBytes: Array[Byte], key: String, dataType: DataType): Option[Any] = platform.native
+  def data(addressBytes: Recipient, key: String, dataType: DataType): Option[Any] = platform.native
 
   def resolveAddress(name: String): Either[String, Recipient.Address] = platform.native
 
-  def accountBalanceOf(addressOrAlias: Array[Byte], assetId: Option[Array[Byte]]): Either[String, Long] = platform.native
+  def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = platform.native
 }

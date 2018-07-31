@@ -1,33 +1,32 @@
 package com.wavesplatform.utx
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.block.Block
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.{ByteStr, EitherExt2, _}
-import com.wavesplatform.{NoShrink, TestHelpers, TestTime, TransactionGen, WithDB}
+import com.wavesplatform.transaction.ValidationError.SenderIsBlacklisted
+import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{FeeCalculator, GenesisTransaction, Transaction}
+import com.wavesplatform.utils.Time
+import com.wavesplatform._
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
-import scorex.block.Block
-import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.ValidationError.SenderIsBlacklisted
-import scorex.transaction.assets.IssueTransactionV1
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.smart.script.Script
-import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import scorex.transaction.transfer._
-import scorex.transaction.{FeeCalculator, GenesisTransaction, Transaction}
-import scorex.utils.Time
 
 import scala.concurrent.duration._
 
@@ -51,8 +50,6 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     val settings = origSettings.copy(
       blockchainSettings = BlockchainSettings(
         'T',
-        5,
-        5,
         FunctionalitySettings.TESTNET.copy(
           preActivatedFeatures = Map(
             BlockchainFeatures.MassTransfer.id  -> 0,

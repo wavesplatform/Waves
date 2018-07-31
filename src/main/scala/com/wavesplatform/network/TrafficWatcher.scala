@@ -1,10 +1,10 @@
 package com.wavesplatform.network
 
+import com.wavesplatform.network.message.{Message => ScorexMessage}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelDuplexHandler, ChannelHandlerContext, ChannelPromise}
 import kamon.Kamon
 import kamon.metric.{Histogram, MeasurementUnit}
-import scorex.network.message.{Message => ScorexMessage}
 
 @Sharable
 class TrafficWatcher extends ChannelDuplexHandler {

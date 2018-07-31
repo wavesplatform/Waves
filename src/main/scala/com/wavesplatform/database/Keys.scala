@@ -4,11 +4,11 @@ import java.nio.ByteBuffer
 
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Ints, Longs, Shorts}
+import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.state._
-import scorex.account.{Address, Alias}
-import scorex.block.{Block, BlockHeader}
-import scorex.transaction.Transaction
-import scorex.transaction.smart.script.{Script, ScriptReader}
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 
 object Keys {
   private def h(prefix: Short, height: Int): Array[Byte] =
@@ -77,9 +77,7 @@ object Keys {
   def transactionHeight(txId: ByteStr): Key[Option[Int]] =
     Key.opt(hash(18, txId), readTransactionHeight, unsupported("Can't write transaction height only"))
 
-  // 19: address transaction history (was never used, actually)
-  def addressTransactionIdsAtHeight(height: Int, addressId: BigInt): Key[Seq[(Int, ByteStr)]] =
-    Key(hAddr(20, height, addressId), readTransactionIds, writeTransactionIds)
+  // 19, 20 was never used
 
   def changedAddresses(height: Int): Key[Seq[BigInt]] = Key(h(21, height), readBigIntSeq, writeBigIntSeq)
 

@@ -7,9 +7,7 @@ import com.wavesplatform.matcher.market.BalanceWatcherWorkerActor
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.NameMapper
-import scorex.transaction.assets.exchange.AssetPair
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
 
@@ -25,9 +23,7 @@ case class MatcherSettings(enable: Boolean,
                            snapshotsDataDir: String,
                            snapshotsInterval: FiniteDuration,
                            orderCleanupInterval: FiniteDuration,
-                           maxOpenOrders: Int,
                            priceAssets: Seq[String],
-                           predefinedPairs: Seq[AssetPair],
                            maxTimestampDiff: FiniteDuration,
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
@@ -53,13 +49,9 @@ object MatcherSettings {
     val snapshotsDirectory   = config.as[String](s"$configPath.snapshots-directory")
     val snapshotsInterval    = config.as[FiniteDuration](s"$configPath.snapshots-interval")
     val orderCleanupInterval = config.as[FiniteDuration](s"$configPath.order-cleanup-interval")
-    val maxOpenOrders        = config.as[Int](s"$configPath.max-open-orders")
     val maxOrdersPerRequest  = config.as[Int](s"$configPath.rest-order-limit")
     val baseAssets           = config.as[List[String]](s"$configPath.price-assets")
-    val basePairs: Seq[AssetPair] = config.getConfigList(s"$configPath.predefined-pairs").asScala.map { p: Config =>
-      AssetPair.createAssetPair(p.as[String]("amountAsset"), p.as[String]("priceAsset")).get
-    }
-    val maxTimestampDiff = config.as[FiniteDuration](s"$configPath.max-timestamp-diff")
+    val maxTimestampDiff     = config.as[FiniteDuration](s"$configPath.max-timestamp-diff")
 
     val blacklistedAssets = config.as[List[String]](s"$configPath.blacklisted-assets")
     val validationTimeout = config.as[FiniteDuration](s"$configPath.validation-timeout")
@@ -83,9 +75,7 @@ object MatcherSettings {
       snapshotsDirectory,
       snapshotsInterval,
       orderCleanupInterval,
-      maxOpenOrders,
       baseAssets,
-      basePairs,
       maxTimestampDiff,
       blacklistedAssets.toSet,
       blacklistedNames,

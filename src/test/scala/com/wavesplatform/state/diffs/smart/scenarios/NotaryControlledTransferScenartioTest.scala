@@ -14,12 +14,11 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scodec.bits.ByteVector
-import scorex.account.AddressScheme
-import scorex.transaction.assets.IssueTransactionV2
-import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.transfer._
-import scorex.transaction.{DataTransaction, GenesisTransaction}
+import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
 
 class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions: Gen[
@@ -41,16 +40,18 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
                     |
                     | match tx {
                     |   case ttx: TransferTransaction =>
-                    |      let king = extract(addressFromString("${king.address}"))
-                    |      let company = extract(addressFromString("${company.address}"))
-                    |      let notary1 = addressFromPublicKey(extract(getByteArray(king,"notary1PK")))
+                    |      let king = Address(base58'${king.address}')
+                    |      let company = Address(base58'${company.address}')
+                    |      let notary1 = addressFromPublicKey(extract(getBinary(king, "notary1PK")))
                     |      let txIdBase58String = toBase58String(ttx.id)
-                    |      let notary1Agreement = getBoolean(notary1,txIdBase58String)
-                    |      let isNotary1Agreed = if(isDefined(notary1Agreement)) then extract(notary1Agreement) else false
+                    |      let isNotary1Agreed = match getBoolean(notary1,txIdBase58String) {
+                    |        case b : Boolean => b
+                    |        case _ : Unit => false
+                    |      }
                     |      let recipientAddress = addressFromRecipient(ttx.recipient)
                     |      let recipientAgreement = getBoolean(recipientAddress,txIdBase58String)
                     |      let isRecipientAgreed = if(isDefined(recipientAgreement)) then extract(recipientAgreement) else false
-                    |      let senderAddress = addressFromPublicKey(ttx.senderPk)
+                    |      let senderAddress = addressFromPublicKey(ttx.senderPublicKey)
                     |      senderAddress.bytes == company.bytes || (isNotary1Agreed && isRecipientAgreed)
                     |   case other => throw
                     | }
@@ -62,7 +63,7 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
         r.head
       }
 
-      typedScript = ScriptV1(CompilerV1(dummyTypeCheckerContext, untypedScript).explicitGet()._1).explicitGet()
+      typedScript = ScriptV1(CompilerV1(dummyCompilerContext, untypedScript).explicitGet()._1).explicitGet()
 
       issueTransaction = IssueTransactionV2
         .selfSigned(
@@ -113,8 +114,8 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
   private def eval[T](code: String) = {
     val untyped = Parser(code).get.value
     assert(untyped.size == 1)
-    val typed = CompilerV1(dummyTypeCheckerContext, untyped.head).map(_._1)
-    typed.flatMap(EvaluatorV1[T](dummyContext, _)._2)
+    val typed = CompilerV1(dummyCompilerContext, untyped.head).map(_._1)
+    typed.flatMap(EvaluatorV1[T](dummyEvaluationContext, _)._2)
   }
 
   property("Script toBase58String") {
@@ -127,12 +128,10 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
     eval[Boolean](s"""toBase64String(base64'$s') == \"$s\"""").explicitGet() shouldBe true
   }
 
-  property("addressFromString() fails when address is too long") {
+  property("addressFromString() returns None when address is too long") {
     import Global.MaxAddressLength
     val longAddress = "A" * (MaxAddressLength + 1)
-    val r           = eval[ByteVector](s"""addressFromString("$longAddress")""")
-    r.isLeft shouldBe true
-    r.left.get shouldBe s"base58Decode input exceeds $MaxAddressLength"
+    eval[Any](s"""addressFromString("$longAddress")""") shouldBe Right(())
   }
 
   property("Scenario") {

@@ -61,10 +61,6 @@ case class AssetInfo(assetId: String,
                      decimals: Int,
                      reissuable: Boolean,
                      quantity: Long,
-                     script: Option[String],
-                     scriptText: Option[String],
-                     complexity: Int,
-                     extraFee: Long,
                      minSponsoredAssetFee: Option[Long])
 object AssetInfo {
   implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
@@ -75,7 +71,14 @@ object Transaction {
   implicit val transactionFormat: Format[Transaction] = Json.format
 }
 
-case class TransactionInfo(`type`: Int, id: String, fee: Long, timestamp: Long, sender: Option[String], height: Int)
+case class TransactionInfo(`type`: Int,
+                           id: String,
+                           fee: Long,
+                           timestamp: Long,
+                           sender: Option[String],
+                           height: Int,
+                           minSponsoredAssetFee: Option[Long],
+                           recipient: Option[String])
 object TransactionInfo {
   implicit val format: Format[TransactionInfo] = Json.format
 }
@@ -155,6 +158,11 @@ object BlacklistedPeer {
 case class State(address: String, miningBalance: Long, timestamp: Long)
 object State {
   implicit val StateFormat: Format[State] = Json.format
+}
+
+case class FeeInfo(feeAssetId: Option[String], feeAmount: Long)
+object FeeInfo {
+  implicit val format: Format[FeeInfo] = Json.format
 }
 
 // Obsolete payment request

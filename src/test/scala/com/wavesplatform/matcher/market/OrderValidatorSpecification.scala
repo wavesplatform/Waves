@@ -9,11 +9,11 @@ import com.wavesplatform.utx.UtxPool
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.transaction.ValidationError
-import scorex.transaction.assets.IssueTransactionV1
-import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.wallet.Wallet
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.wallet.Wallet
 
 class OrderValidatorSpecification
     extends WordSpec

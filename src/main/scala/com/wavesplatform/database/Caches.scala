@@ -5,10 +5,11 @@ import java.util
 import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.state._
-import scorex.account.{Address, Alias}
-import scorex.block.Block
-import scorex.transaction.smart.script.Script
-import scorex.transaction.{AssetId, Transaction}
+import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.Block
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.AssetId
 
 import scala.collection.JavaConverters._
 
@@ -97,6 +98,7 @@ trait Caches extends Blockchain {
                          leaseBalances: Map[BigInt, LeaseBalance],
                          leaseStates: Map[ByteStr, Boolean],
                          transactions: Map[ByteStr, (Transaction, Set[BigInt])],
+                         addressTransactions: Map[BigInt, List[(Int, ByteStr)]],
                          reissuedAssets: Map[ByteStr, AssetInfo],
                          filledQuantity: Map[ByteStr, VolumeAndFee],
                          scripts: Map[BigInt, Option[Script]],
@@ -166,6 +168,7 @@ trait Caches extends Blockchain {
       leaseBalances.result(),
       diff.leaseState,
       newTransactions.result(),
+      diff.accountTransactionIds.map({ case (addr, txs) => addressId(addr) -> txs }),
       diff.issuedAssets,
       newFills,
       diff.scripts.map { case (address, s)        => addressId(address) -> s },

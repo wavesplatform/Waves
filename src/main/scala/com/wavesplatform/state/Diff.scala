@@ -5,9 +5,9 @@ import cats.kernel.Monoid
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
-import scorex.account.{Address, Alias, PublicKeyAccount}
-import scorex.transaction.smart.script.Script
-import scorex.transaction.{AssetId, Transaction}
+import com.wavesplatform.account.{Address, Alias, PublicKeyAccount}
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.{AssetId, Transaction}
 
 case class LeaseBalance(in: Long, out: Long)
 
@@ -105,6 +105,14 @@ object Sponsorship {
     }
     waves.toLong
   }
+
+  def fromWaves(wavesFee: Long, sponsorship: Long): Long = {
+    val assetFee = (BigDecimal(wavesFee) / BigDecimal(Sponsorship.FeeUnit)) * BigDecimal(sponsorship)
+    if (assetFee > Long.MaxValue) {
+      throw new java.lang.ArithmeticException("Overflow")
+    }
+    assetFee.toLong
+  }
 }
 
 case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
@@ -117,20 +125,21 @@ case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 accountData: Map[Address, AccountDataInfo],
                 sponsorship: Map[AssetId, Sponsorship]) {
 
-  lazy val accountTransactionIds: Map[Address, List[ByteStr]] = {
-    val map: List[(Address, Set[(Int, Long, ByteStr)])] = transactions.toList
-      .flatMap { case (id, (h, tx, accs)) => accs.map(acc => acc -> Set((h, tx.timestamp, id))) }
-    val groupedByAcc = map.foldLeft(Map.empty[Address, Set[(Int, Long, ByteStr)]]) {
+  lazy val accountTransactionIds: Map[Address, List[(Int, ByteStr)]] = {
+    val map: List[(Address, Set[(Int, Byte, Long, ByteStr)])] = transactions.toList
+      .flatMap { case (id, (h, tx, accs)) => accs.map(acc => acc -> Set((h, tx.builder.typeId, tx.timestamp, id))) }
+    val groupedByAcc = map.foldLeft(Map.empty[Address, Set[(Int, Byte, Long, ByteStr)]]) {
       case (m, (acc, set)) =>
         m.combine(Map(acc -> set))
     }
     groupedByAcc
-      .mapValues(l => l.toList.sortBy { case ((h, t, _)) => (-h, -t) }) // fresh head ([h=2, h=1, h=0])
-      .mapValues(_.map(_._3))
+      .mapValues(l => l.toList.sortBy { case (h, _, t, _) => (-h, -t) }) // fresh head ([h=2, h=1, h=0])
+      .mapValues(_.map({ case (_, typ, _, id) => (typ.toInt, id) }))
   }
 }
 
 object Diff {
+
   def apply(height: Int,
             tx: Transaction,
             portfolios: Map[Address, Portfolio] = Map.empty,

@@ -3,22 +3,21 @@ package com.wavesplatform.state.diffs
 import cats._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
-import com.wavesplatform.settings.Constants
+import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Inside, Matchers, PropSpec}
-import scorex.account.PrivateKeyAccount
-import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.ValidationError.AccountBalanceError
-import scorex.transaction.assets.{IssueTransaction, IssueTransactionV1}
-import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.{GenesisTransaction, ValidationError}
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.ValidationError.AccountBalanceError
+import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.{GenesisTransaction, ValidationError}
 
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
 

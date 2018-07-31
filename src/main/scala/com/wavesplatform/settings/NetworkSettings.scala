@@ -23,6 +23,7 @@ case class NetworkSettings(file: Option[File],
                            knownPeers: Seq[String],
                            peersDataResidenceTime: FiniteDuration,
                            blackListResidenceTime: FiniteDuration,
+                           breakIdleConnectionsTimeout: FiniteDuration,
                            maxInboundConnections: Int,
                            maxOutboundConnections: Int,
                            maxConnectionsPerHost: Int,
@@ -33,6 +34,7 @@ case class NetworkSettings(file: Option[File],
                            peersBroadcastInterval: FiniteDuration,
                            handshakeTimeout: FiniteDuration,
                            suspensionResidenceTime: FiniteDuration,
+                           receivedTxsCacheTimeout: FiniteDuration,
                            uPnPSettings: UPnPSettings,
                            trafficLogger: TrafficLogger.Settings)
 
@@ -62,6 +64,7 @@ object NetworkSettings {
     val knownPeers                   = config.as[Seq[String]]("known-peers")
     val peersDataResidenceTime       = config.as[FiniteDuration]("peers-data-residence-time")
     val blackListResidenceTime       = config.as[FiniteDuration]("black-list-residence-time")
+    val breakIdleConnectionsTimeout  = config.as[FiniteDuration]("break-idle-connections-timeout")
     val maxInboundConnections        = config.as[Int]("max-inbound-connections")
     val maxOutboundConnections       = config.as[Int]("max-outbound-connections")
     val maxConnectionsFromSingleHost = config.as[Int]("max-single-host-connections")
@@ -72,6 +75,7 @@ object NetworkSettings {
     val peersBroadcastInterval       = config.as[FiniteDuration]("peers-broadcast-interval")
     val handshakeTimeout             = config.as[FiniteDuration]("handshake-timeout")
     val suspensionResidenceTime      = config.as[FiniteDuration]("suspension-residence-time")
+    val receivedTxsCacheTimeout      = config.as[FiniteDuration]("received-txs-cache-timeout")
     val uPnPSettings                 = config.as[UPnPSettings]("upnp")
     val trafficLogger                = config.as[TrafficLogger.Settings]("traffic-logger")
 
@@ -84,6 +88,7 @@ object NetworkSettings {
       knownPeers,
       peersDataResidenceTime,
       blackListResidenceTime,
+      breakIdleConnectionsTimeout,
       maxInboundConnections,
       maxOutboundConnections,
       maxConnectionsFromSingleHost,
@@ -94,6 +99,7 @@ object NetworkSettings {
       peersBroadcastInterval,
       handshakeTimeout,
       suspensionResidenceTime,
+      receivedTxsCacheTimeout,
       uPnPSettings,
       trafficLogger
     )

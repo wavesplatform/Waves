@@ -4,7 +4,7 @@ import scodec.bits.ByteVector
 
 case class Header(id: ByteVector, fee: Long, timestamp: Long, version: Long)
 
-case class Proven(h: Header, bodyBytes: ByteVector, senderPk: ByteVector, proofs: IndexedSeq[ByteVector])
+case class Proven(h: Header, sender: Recipient.Address, bodyBytes: ByteVector, senderPk: ByteVector, proofs: IndexedSeq[ByteVector])
 
 trait Recipient
 object Recipient {
@@ -21,15 +21,21 @@ object OrdType {
 
 case class APair(amountAsset: Option[ByteVector], priceAsset: Option[ByteVector])
 
-trait DataItem
-object DataItem {
-  case class Lng(k: String, v: Long)       extends DataItem
-  case class Bool(k: String, v: Boolean)   extends DataItem
-  case class Bin(k: String, v: ByteVector) extends DataItem
-  case class Str(k: String, v: String)     extends DataItem
+trait DataItem[T] {
+  val key: String
+  val value: T
 }
 
-case class Ord(senderPublicKey: ByteVector,
+object DataItem {
+  case class Lng(k: String, v: Long)       extends DataItem[Long]       { val key = k; val value = v }
+  case class Bool(k: String, v: Boolean)   extends DataItem[Boolean]    { val key = k; val value = v }
+  case class Bin(k: String, v: ByteVector) extends DataItem[ByteVector] { val key = k; val value = v }
+  case class Str(k: String, v: String)     extends DataItem[String]     { val key = k; val value = v }
+}
+
+case class Ord(id: ByteVector,
+               sender: Recipient.Address,
+               senderPublicKey: ByteVector,
                matcherPublicKey: ByteVector,
                assetPair: APair,
                orderType: OrdType,
@@ -46,7 +52,7 @@ object Tx {
   case class Payment(p: Proven, amount: Long, recipient: Recipient)      extends Tx
   case class Transfer(p: Proven,
                       feeAssetId: Option[ByteVector],
-                      transferAssetId: Option[ByteVector],
+                      assetId: Option[ByteVector],
                       amount: Long,
                       recipient: Recipient,
                       attachment: ByteVector)
@@ -74,5 +80,5 @@ object Tx {
       extends Tx
   case class Sponsorship(p: Proven, assetId: ByteVector, minSponsoredAssetFee: Option[Long])                                          extends Tx
   case class Exchange(p: Proven, price: Long, amount: Long, buyMatcherFee: Long, sellMatcherFee: Long, buyOrder: Ord, sellOrder: Ord) extends Tx
-  case class Data(p: Proven, data: IndexedSeq[DataItem])                                                                              extends Tx
+  case class Data(p: Proven, data: IndexedSeq[DataItem[_]])                                                                           extends Tx
 }

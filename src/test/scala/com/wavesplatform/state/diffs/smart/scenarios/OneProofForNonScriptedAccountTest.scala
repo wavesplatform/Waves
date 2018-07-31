@@ -8,10 +8,10 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.transfer._
-import scorex.transaction.{GenesisTransaction, Proofs}
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{GenesisTransaction, Proofs}
 
 class OneProofForNonScriptedAccountTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 

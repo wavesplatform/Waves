@@ -13,7 +13,7 @@ import org.scalatest.{Matchers, PropSpec}
 
 class EvaluattorV1CaseObjField extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  def context(p: CaseObj): EvaluationContext = Monoid.combine(PureContext.instance, sampleUnionContext(p))
+  def context(p: CaseObj): EvaluationContext = Monoid.combine(PureContext.evalContext, sampleUnionContext(p))
 
   property("case custom type field access") {
     ev[Long](
@@ -33,6 +33,5 @@ class EvaluattorV1CaseObjField extends PropSpec with PropertyChecks with Matcher
     testAccess(pointBInstance, "X") shouldBe Right(5)
     testAccess(pointAInstance, "YA") shouldBe Right(42)
     testAccess(pointBInstance, "YB") shouldBe Right(43)
-    testAccess(pointAInstance, "YB") should produce("field 'YB' not found")
   }
 }

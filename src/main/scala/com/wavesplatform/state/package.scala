@@ -1,13 +1,13 @@
 package com.wavesplatform
 
-import scorex.account.{Address, AddressOrAlias, Alias}
-import scorex.block.Block
-import scorex.transaction.ValidationError.{AliasDoesNotExist, GenericError}
-import scorex.transaction._
-import scorex.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
+import com.wavesplatform.block.Block
+import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, GenericError}
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
 
 import scala.reflect.ClassTag
-import scala.util.{Left, Right, Try}
+import scala.util.Try
 
 package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
@@ -52,11 +52,11 @@ package object state {
     }
 
     def genesis: Block = blockchain.blockAt(1).get
-
-    def resolveAlias(a: AddressOrAlias): Either[ValidationError, Address] = a match {
-      case addr: Address => Right(addr)
-      case alias: Alias  => blockchain.resolveAlias(alias)
-    }
+    def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
+      aoa match {
+        case a: Address => Right(a)
+        case a: Alias   => blockchain.resolveAlias(a)
+      }
 
     def canCreateAlias(alias: Alias): Boolean = blockchain.resolveAlias(alias) match {
       case Left(AliasDoesNotExist(_)) => true

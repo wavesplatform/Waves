@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1
 
 import cats.data.EitherT
-import cats.syntax.semigroup._
+import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
@@ -14,26 +14,25 @@ import com.wavesplatform.lang._
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import monix.eval.Coeval
 
 class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
-  val Plus  = FunctionHeader(SUM_LONG)
-  val Minus = FunctionHeader(SUB_LONG)
-  val Gt    = FunctionHeader(GT_LONG)
+  val Plus  = FunctionHeader.Native(SUM_LONG)
+  val Minus = FunctionHeader.Native(SUB_LONG)
+  val Gt    = FunctionHeader.Native(GT_LONG)
 
-  val FunctionCosts: Map[FunctionHeader, Long] = Map(Plus -> 100, Minus -> 10, Gt -> 10)
+  val FunctionCosts: Map[FunctionHeader, Coeval[Long]] = Map[FunctionHeader, Long](Plus -> 100, Minus -> 10, Gt -> 10).mapValues(Coeval.now)
 
   private val ctx: CompilerContext = {
-    // make up a `tx` object
     val tx = CaseObj(transferTransactionType.typeRef, Map("amount" -> 100000000L))
-    val txCtx = EvaluationContext(
-      letDefs = Map("tx" -> LazyVal(EitherT.pure(tx))),
-      functions = Map.empty
-    )
-    CompilerContext.fromEvaluationContext(
-      PureContext.instance |+| txCtx,
-      Map(transferTransactionType.name -> transferTransactionType),
-      Map("tx"                         -> transferTransactionType.typeRef)
-    )
+    Monoid
+      .combine(PureContext.ctx,
+               CTX(
+                 Seq(transferTransactionType),
+                 Map(("tx", (transferTransactionType.typeRef, LazyVal(EitherT.pure(tx))))),
+                 Seq.empty
+               ))
+      .compilerContext
   }
 
   private def compile(code: String): EXPR = {

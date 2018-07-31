@@ -9,8 +9,8 @@ import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.matcher.model.LimitOrder
 import com.wavesplatform.state.{ByteStr, EitherExt2, LeaseBalance, Portfolio}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
-import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 

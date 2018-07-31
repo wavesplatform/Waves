@@ -7,6 +7,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.model.StatusCodes
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.matcher.api.StatusCodeMatcherResponse
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse, MarketData}
@@ -14,19 +15,17 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.OrderBook
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherTestData}
-import com.wavesplatform.settings.WalletSettings
+import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, LeaseBalance, Portfolio}
+import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.utils.{NTP, ScorexLogging}
 import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.AssetId
-import scorex.transaction.assets.IssueTransactionV1
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.utils.{NTP, ScorexLogging}
-import scorex.wallet.Wallet
 
 import scala.concurrent.duration.DurationInt
 
@@ -158,11 +157,8 @@ class MatcherActorSpecification
 
       actor ! GetMarkets
 
-      val Predefined = AssetPair(ByteStr.decodeBase58("BASE2").toOption, ByteStr.decodeBase58("BASE1").toOption)
-
       expectMsgPF() {
-        case GetMarketsResponse(publicKey,
-                                Seq(MarketData(`Predefined`, "Unknown", "Unknown", _, _, _), MarketData(_, "Unknown", "Unknown", _, _, _))) =>
+        case GetMarketsResponse(publicKey, Seq(MarketData(_, "Unknown", "Unknown", _, _, _))) =>
           publicKey shouldBe MatcherAccount.publicKey
       }
     }

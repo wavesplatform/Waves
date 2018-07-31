@@ -4,10 +4,10 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
-import scorex.account.PublicKeyAccount
-import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.assets._
-import scorex.transaction.{AssetId, ProvenTransaction, ValidationError}
+import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.{AssetId, ProvenTransaction, ValidationError}
 
 import scala.util.{Left, Right}
 

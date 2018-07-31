@@ -6,19 +6,19 @@ import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
-import com.wavesplatform.utils.dummyTypeCheckerContext
+import com.wavesplatform.utils.dummyCompilerContext
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import fastparse.core.Parsed
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.AddressScheme
-import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets._
-import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.transfer._
+import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.transfer._
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
@@ -219,7 +219,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   private def createScript(code: String) = {
     val Parsed.Success(expr, _) = Parser(code).get
     assert(expr.size == 1)
-    ScriptV1(CompilerV1(dummyTypeCheckerContext, expr.head).explicitGet()._1).explicitGet()
+    ScriptV1(CompilerV1(dummyCompilerContext, expr.head).explicitGet()._1).explicitGet()
   }
 
   def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransactionV2, TransferTransactionV1, ReissueTransactionV1)] =

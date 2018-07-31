@@ -9,7 +9,7 @@ import com.wavesplatform.matcher.model.Events._
 import com.wavesplatform.state._
 import org.iq80.leveldb.DB
 import play.api.libs.json.JsArray
-import scorex.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 
 class MatcherTransactionWriter(db: DB, val settings: MatcherSettings) extends SubStorage(db, "matcher") with Actor {
 

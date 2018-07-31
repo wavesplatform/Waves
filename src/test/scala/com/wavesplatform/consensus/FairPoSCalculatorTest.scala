@@ -3,7 +3,7 @@ package com.wavesplatform.consensus
 import cats.data.NonEmptyList
 import cats.implicits._
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.PrivateKeyAccount
+import com.wavesplatform.account.PrivateKeyAccount
 
 import scala.util.Random
 
@@ -25,7 +25,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
   val blockDelaySeconds = 60
   val defaultBaseTarget = 100L
 
-  property("Correct consensus parameters of blocks generated with FairPoS") {
+  property("Correct consensus parameters distribution of blocks generated with FairPoS") {
 
     val miners = mkMiners
     val first  = Block(0, defaultBaseTarget, PrivateKeyAccount(generationSignature), System.currentTimeMillis(), 0)

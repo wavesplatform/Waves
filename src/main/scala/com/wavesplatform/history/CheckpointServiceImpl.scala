@@ -5,8 +5,8 @@ import com.wavesplatform.db.{CheckpointCodec, PropertiesStorage, SubStorage}
 import com.wavesplatform.network.Checkpoint
 import com.wavesplatform.settings.CheckpointsSettings
 import org.iq80.leveldb.DB
-import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.{CheckpointService, ValidationError}
+import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.{CheckpointService, ValidationError}
 
 class CheckpointServiceImpl(db: DB, settings: CheckpointsSettings)
     extends SubStorage(db, "checkpoints")

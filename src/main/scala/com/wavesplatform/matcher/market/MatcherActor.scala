@@ -7,6 +7,7 @@ import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence._
 import akka.routing.FromConfig
 import com.google.common.base.Charsets
+import com.wavesplatform.account.Address
 import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.BalanceChanged
@@ -14,16 +15,15 @@ import com.wavesplatform.matcher.model.OrderBook
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherSettings}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{AssetDescription, Blockchain}
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.utils.{Base58, NTP, ScorexLogging}
 import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
-import scorex.account.Address
-import scorex.transaction.AssetId
-import scorex.transaction.assets.exchange.Validation.booleanOperators
-import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils._
-import scorex.wallet.Wallet
 
 import scala.collection.immutable
 
@@ -170,10 +170,6 @@ class MatcherActor(orderHistory: ActorRef,
       context.actorOf(Props(classOf[GracefulShutdownActor], context.children.toVector, self))
   }
 
-  def initPredefinedPairs(): Unit = {
-    settings.predefinedPairs.filterNot(tradedPairs.contains).foreach(createOrderBook)
-  }
-
   private def removeOrderBook(pair: AssetPair): Unit = {
     if (tradedPairs.contains(pair)) {
       tradedPairs -= pair
@@ -192,8 +188,7 @@ class MatcherActor(orderHistory: ActorRef,
       snapshot.tradedPairsSet.par.foreach(createOrderBook)
 
     case RecoveryCompleted =>
-      log.info("Recovery completed!")
-      initPredefinedPairs()
+      log.info("MatcherActor - Recovery completed!")
       createBalanceWatcher()
   }
 

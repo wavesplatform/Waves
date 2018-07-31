@@ -5,9 +5,9 @@ import java.net.InetSocketAddress
 import com.wavesplatform.crypto
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.block.{Block, MicroBlock}
-import scorex.transaction.{Signed, Transaction}
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.transaction.{Signed, Transaction}
 
 sealed trait Message
 
@@ -31,6 +31,7 @@ case class RawBytes(code: Byte, data: Array[Byte]) extends Message
 
 object RawBytes {
   def from(tx: Transaction): RawBytes = RawBytes(TransactionSpec.messageCode, tx.bytes())
+  def from(b: Block): RawBytes        = RawBytes(BlockSpec.messageCode, b.bytes())
 }
 
 case class BlockForged(block: Block) extends Message

@@ -2,8 +2,8 @@ package com.wavesplatform
 
 import cats.syntax.semigroup._
 import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.settings.Constants
@@ -12,19 +12,19 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{BeforeAndAfterAll, Suite}
-import scorex.account.PublicKeyAccount._
-import scorex.account._
-import scorex.transaction._
-import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import scorex.transaction.assets._
-import scorex.transaction.assets.exchange._
-import scorex.transaction.lease._
-import scorex.transaction.smart.script.Script
-import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.transfer._
-import scorex.utils.TimeImpl
+import com.wavesplatform.account.PublicKeyAccount._
+import com.wavesplatform.account._
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer._
 import MassTransferTransaction.MaxTransferCount
+import com.wavesplatform.utils.TimeImpl
 
 import scala.util.Random
 
@@ -110,15 +110,14 @@ trait TransactionGenBase extends ScriptGen {
   }
 
   val proofsGen: Gen[Proofs] = for {
-    proofsAmount <- Gen.chooseNum(0, 7)
+    proofsAmount <- Gen.choose(1, 8)
     proofs       <- Gen.listOfN(proofsAmount, genBoundedBytes(0, 50))
   } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
 
   val scriptGen = BOOLgen(100).map {
     case (expr, _) =>
       val typed =
-        CompilerV1(CompilerContext.fromEvaluationContext(PureContext.instance |+| CryptoContext.build(Global), Map.empty, PureContext.predefVars),
-                   expr).explicitGet()
+        CompilerV1(PureContext.compilerContext |+| CryptoContext.compilerContext(Global), expr).explicitGet()
       ScriptV1(typed._1).explicitGet()
   }
 
@@ -600,7 +599,7 @@ trait TransactionGenBase extends ScriptGen {
     for {
       key   <- keyGen
       value <- Gen.choose[Long](Long.MinValue, Long.MaxValue)
-    } yield LongDataEntry(key, value)
+    } yield IntegerDataEntry(key, value)
 
   def booleanEntryGen(keyGen: Gen[String] = dataKeyGen) =
     for {
