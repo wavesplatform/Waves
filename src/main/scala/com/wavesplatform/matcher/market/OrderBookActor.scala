@@ -6,6 +6,7 @@ import akka.persistence._
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{CancelOrderRequest, MatcherResponse}
+import com.wavesplatform.matcher.market.MatcherActor.{Shutdown, ShutdownComplete}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded, OrderExecuted}
@@ -26,7 +27,6 @@ import play.api.libs.json._
 
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 
 class OrderBookActor(assetPair: AssetPair,
                      updateSnapshot: OrderBook => Unit,
@@ -44,12 +44,27 @@ class OrderBookActor(assetPair: AssetPair,
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
   private val timer = Kamon.timer("matcher.orderbook.match").refine("pair" -> assetPair.toString)
+  private val validationTimeouts = Kamon
+    .counter("matcher.orderbook.error")
+    .refine(
+      "pair"  -> assetPair.toString,
+      "group" -> "validation",
+      "type"  -> "timeout"
+    )
 
-  private val snapshotCancellable = context.system.scheduler.schedule(settings.snapshotsInterval, settings.snapshotsInterval, self, SaveSnapshot)
-  private val cleanupCancellable  = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
-  private var orderBook           = OrderBook.empty
-  private var apiSender           = Option.empty[ActorRef]
-  private var cancellable         = Option.empty[Cancellable]
+  private val snapshotCancellable    = context.system.scheduler.schedule(settings.snapshotsInterval, settings.snapshotsInterval, self, SaveSnapshot)
+  private val cleanupCancellable     = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
+  private var orderBook              = OrderBook.empty
+  private var apiSender              = Option.empty[ActorRef]
+  private var cancellable            = Option.empty[Cancellable]
+  private var lastSnapshotSequenceNr = 0L
+
+  private var shutdownStatus: ShutdownStatus = ShutdownStatus(
+    initiated = false,
+    oldMessagesDeleted = false,
+    oldSnapshotsDeleted = false,
+    onComplete = () => ()
+  )
 
   private lazy val alreadyCanceledOrders = CacheBuilder
     .newBuilder()
@@ -79,13 +94,24 @@ class OrderBookActor(assetPair: AssetPair,
 
   private def snapshotsCommands: Receive = {
     case SaveSnapshot =>
-      deleteSnapshots(SnapshotSelectionCriteria.Latest)
       saveSnapshot(Snapshot(orderBook))
+
     case SaveSnapshotSuccess(metadata) =>
+      lastSnapshotSequenceNr = metadata.sequenceNr
       log.info(s"Snapshot saved with metadata $metadata")
       deleteMessages(metadata.sequenceNr)
+      deleteSnapshots(SnapshotSelectionCriteria.Latest.copy(maxSequenceNr = metadata.sequenceNr - 1))
+
     case SaveSnapshotFailure(metadata, reason) =>
       log.error(s"Failed to save snapshot: $metadata, $reason.")
+      if (shutdownStatus.initiated) {
+        shutdownStatus = shutdownStatus.copy(
+          oldSnapshotsDeleted = true,
+          oldMessagesDeleted = true
+        )
+        shutdownStatus.tryComplete()
+      }
+
     case DeleteOrderBookRequest(pair) =>
       updateSnapshot(OrderBook.empty)
       orderBook.asks.values
@@ -94,27 +120,88 @@ class OrderBookActor(assetPair: AssetPair,
         .foreach(x => context.system.eventStream.publish(Events.OrderCanceled(x)))
       deleteMessages(lastSequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
-      context.stop(self)
       sender() ! GetOrderBookResponse(pair, Seq(), Seq())
+      context.stop(self)
+
+    case DeleteSnapshotsSuccess(criteria) =>
+      log.info(s"$persistenceId DeleteSnapshotsSuccess with $criteria")
+      if (shutdownStatus.initiated) {
+        shutdownStatus = shutdownStatus.copy(oldSnapshotsDeleted = true)
+        shutdownStatus.tryComplete()
+      }
+
+    case DeleteSnapshotsFailure(criteria, cause) =>
+      log.error(s"$persistenceId DeleteSnapshotsFailure with $criteria, reason: $cause")
+      if (shutdownStatus.initiated) {
+        shutdownStatus = shutdownStatus.copy(oldSnapshotsDeleted = true)
+        shutdownStatus.tryComplete()
+      }
+
     case DeleteMessagesSuccess(toSequenceNr) =>
       log.info(s"$persistenceId DeleteMessagesSuccess up to $toSequenceNr")
+      if (shutdownStatus.initiated) {
+        shutdownStatus = shutdownStatus.copy(oldMessagesDeleted = true)
+        shutdownStatus.tryComplete()
+      }
+
     case DeleteMessagesFailure(cause: Throwable, toSequenceNr: Long) =>
       log.error(s"$persistenceId DeleteMessagesFailure up to $toSequenceNr, reason: $cause")
+      if (shutdownStatus.initiated) {
+        shutdownStatus = shutdownStatus.copy(oldMessagesDeleted = true)
+        shutdownStatus.tryComplete()
+      }
+
+    case Shutdown =>
+      if (!shutdownStatus.initiated) {
+        val s = sender()
+        shutdownStatus = shutdownStatus.copy(initiated = true, onComplete = { () =>
+          s ! ShutdownComplete
+          context.stop(self)
+        })
+
+        if (lastSnapshotSequenceNr < lastSequenceNr) saveSnapshot(Snapshot(orderBook))
+        else {
+          log.debug(s"No changes in $assetPair, lastSnapshotSequenceNr = $lastSnapshotSequenceNr, lastSequenceNr = $lastSequenceNr")
+          shutdownStatus = shutdownStatus.copy(
+            oldSnapshotsDeleted = true,
+            oldMessagesDeleted = true
+          )
+          shutdownStatus.tryComplete()
+        }
+      }
   }
 
-  private def waitingValidation: Receive = readOnlyCommands orElse {
+  private def waitingValidation(sentMessage: Either[ValidateCancelOrder, ValidateOrder]): Receive = readOnlyCommands orElse {
     case ValidationTimeoutExceeded =>
-      log.warn("Validation timeout exceeded, skip incoming request")
+      validationTimeouts.increment()
+      log.warn(s"Validation timeout exceeded for $sentMessage")
+      val orderId = sentMessage.fold(_.cancel.orderId, _.order.idStr())
+      cancelInProgressOrders.invalidate(orderId)
+      apiSender.foreach(_ ! OperationTimedOut)
       becomeFullCommands()
-    case ValidateOrderResult(res) =>
-      cancellable.foreach(_.cancel())
-      handleValidateOrderResult(res)
-    case ValidateCancelResult(res) =>
-      cancellable.foreach(_.cancel())
-      handleValidateCancelResult(res.map(x => x.orderId))
+
+    case ValidateOrderResult(validatedOrderId, res) =>
+      sentMessage match {
+        case Right(sent) if validatedOrderId == sent.order.idStr() =>
+          cancellable.foreach(_.cancel())
+          handleValidateOrderResult(res)
+        case x =>
+          log.warn(s"Unexpected message: $x")
+      }
+
+    case ValidateCancelResult(validatedOrderId, res) =>
+      sentMessage match {
+        case Left(sent) if validatedOrderId == sent.cancel.orderId =>
+          cancellable.foreach(_.cancel())
+          handleValidateCancelResult(res.map(x => x.orderId))
+        case x =>
+          log.warn(s"Unexpected message: $x")
+      }
+
     case cancel: CancelOrder if Option(cancelInProgressOrders.getIfPresent(cancel.orderId)).nonEmpty =>
       log.info(s"Order($assetPair, ${cancel.orderId}) is already being canceled")
       sender() ! OrderCancelRejected("Order is already being canceled")
+
     case ev =>
       log.info("Stashed: " + ev)
       stash()
@@ -138,10 +225,11 @@ class OrderBookActor(assetPair: AssetPair,
         log.info(s"Order($assetPair, ${cancel.orderId}) is already not found")
         sender() ! OrderCancelRejected("Order not found")
       case None =>
-        orderHistory ! ValidateCancelOrder(cancel, NTP.correctedTime())
+        val msg = ValidateCancelOrder(cancel, NTP.correctedTime())
+        orderHistory ! msg
         apiSender = Some(sender())
-        cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
-        context.become(waitingValidation)
+        cancellable = Some(context.system.scheduler.scheduleOnce(settings.validationTimeout, self, ValidationTimeoutExceeded))
+        context.become(waitingValidation(Left(msg)))
         cancelInProgressOrders.put(cancel.orderId, okCancel)
     }
   }
@@ -192,10 +280,11 @@ class OrderBookActor(assetPair: AssetPair,
   }
 
   private def onAddOrder(order: Order): Unit = {
-    orderHistory ! ValidateOrder(order, NTP.correctedTime())
+    val msg = ValidateOrder(order, NTP.correctedTime())
+    orderHistory ! msg
     apiSender = Some(sender())
-    cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
-    context.become(waitingValidation)
+    cancellable = Some(context.system.scheduler.scheduleOnce(settings.validationTimeout, self, ValidationTimeoutExceeded))
+    context.become(waitingValidation(Right(msg)))
   }
 
   private def handleValidateOrderResult(res: Either[GenericError, Order]): Unit = {
@@ -301,7 +390,7 @@ class OrderBookActor(assetPair: AssetPair,
 
   override def receiveCommand: Receive = fullCommands
 
-  val isMigrateToNewOrderHistoryStorage = settings.isMigrateToNewOrderHistoryStorage
+  val isMigrateToNewOrderHistoryStorage: Boolean = settings.isMigrateToNewOrderHistoryStorage
 
   override def receiveRecover: Receive = {
     case evt: Event =>
@@ -311,7 +400,8 @@ class OrderBookActor(assetPair: AssetPair,
         orderHistory ! evt
       }
     case RecoveryCompleted => log.info(assetPair.toString() + " - Recovery completed!");
-    case SnapshotOffer(_, snapshot: Snapshot) =>
+    case SnapshotOffer(metadata, snapshot: Snapshot) =>
+      lastSnapshotSequenceNr = metadata.sequenceNr
       orderBook = snapshot.orderBook
       updateSnapshot(orderBook)
       if (isMigrateToNewOrderHistoryStorage) {
@@ -342,9 +432,13 @@ object OrderBookActor {
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
-  val MaxDepth                          = 50
-  val ValidationTimeout: FiniteDuration = 5.seconds
-  val AlreadyCanceledCacheSize          = 10000L
+  val MaxDepth                 = 50
+  val AlreadyCanceledCacheSize = 10000L
+
+  private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit) {
+    def completed: Boolean  = initiated && oldMessagesDeleted && oldSnapshotsDeleted
+    def tryComplete(): Unit = if (completed) onComplete()
+  }
 
   //protocol
   sealed trait OrderBookRequest {
@@ -360,6 +454,11 @@ object OrderBookActor {
   case class ForceCancelOrder(assetPair: AssetPair, orderId: String) extends OrderBookRequest
 
   case object OrderCleanup
+
+  case object OperationTimedOut extends MatcherResponse {
+    val json = Json.obj("status" -> "OperationTimedOut", "message" -> "Operation is timed out, please try later")
+    val code = StatusCodes.RequestTimeout
+  }
 
   case class OrderAccepted(order: Order) extends MatcherResponse {
     val json = Json.obj("status" -> "OrderAccepted", "message" -> order.json())

@@ -25,6 +25,7 @@ class MatcherSerializer extends SerializerWithStringManifest {
     case _: OrderAdded                    => Manifest.OrderAdded
     case _: OrderExecuted                 => Manifest.OrderExecuted
     case _: OrderCanceled                 => Manifest.OrderCancelled
+    case _: MatcherActor.Snapshot         => Manifest.MatcherSnapshot
   }
 
   override def toBinary(o: AnyRef): Array[Byte] =
@@ -32,6 +33,7 @@ class MatcherSerializer extends SerializerWithStringManifest {
       .stringify(o match {
         case s: OrderBookActor.Snapshot         => snapshotFormat.writes(s)
         case obc: MatcherActor.OrderBookCreated => orderBookCreatedFormat.writes(obc)
+        case x: MatcherActor.Snapshot           => matcherSnapshot.writes(x)
         case oa: OrderAdded                     => orderAddedFormat.writes(oa)
         case oe: OrderExecuted                  => orderExecutedFormat.writes(oe)
         case oc: OrderCanceled                  => orderCancelledFormat.writes(oc)
@@ -41,6 +43,7 @@ class MatcherSerializer extends SerializerWithStringManifest {
   override def fromBinary(bytes: Array[Byte], manifest: String): AnyRef = manifest match {
     case Manifest.Snapshot         => snapshotFormat.reads(Json.parse(bytes)).get
     case Manifest.OrderBookCreated => orderBookCreatedFormat.reads(Json.parse(bytes)).get
+    case Manifest.MatcherSnapshot  => matcherSnapshot.reads(Json.parse(bytes)).get
     case Manifest.OrderAdded       => orderAddedFormat.reads(Json.parse(bytes)).get
     case Manifest.OrderExecuted    => orderExecutedFormat.reads(Json.parse(bytes)).get
     case Manifest.OrderCancelled   => orderCancelledFormat.reads(Json.parse(bytes)).get
@@ -54,6 +57,7 @@ object MatcherSerializer {
   private[MatcherSerializer] object Manifest {
     val Snapshot         = "snapshot"
     val OrderBookCreated = "orderBookCreated"
+    val MatcherSnapshot  = "matcherSnapshot"
     val OrderAdded       = "event.OrderAdded"
     val OrderExecuted    = "event.OrderExecuted"
     val OrderCancelled   = "event.OrderCancelled"
@@ -110,6 +114,11 @@ object MatcherSerializer {
 
   implicit val orderBookCreatedFormat: Format[OrderBookCreated] = ((__ \ "a1").format[String] and
     (__ \ "a2").format[String])(mkOrderBookCreated, orderBookToPair)
+
+  implicit val assetPair: Format[AssetPair] = ((__ \ "a1").format[String] and
+    (__ \ "a2").format[String])((a, b) => AssetPair.createAssetPair(a, b).get, x => (x.amountAssetStr, x.priceAssetStr))
+
+  implicit val matcherSnapshot: Format[MatcherActor.Snapshot] = Json.format[MatcherActor.Snapshot]
 
   implicit val tuple2Format = new Format[(Long, Long)] {
     def writes(o: (Long, Long)): JsValue = Json.arr(o._1, o._2)

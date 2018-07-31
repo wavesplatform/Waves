@@ -27,6 +27,7 @@ case class MatcherSettings(enable: Boolean,
                            maxTimestampDiff: FiniteDuration,
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
+                           validationTimeout: FiniteDuration,
                            maxOrdersPerRequest: Int,
                            blacklistedAddresses: Set[String],
                            balanceWatching: BalanceWatcherWorkerActor.Settings)
@@ -53,6 +54,7 @@ object MatcherSettings {
     val maxTimestampDiff     = config.as[FiniteDuration](s"$configPath.max-timestamp-diff")
 
     val blacklistedAssets = config.as[List[String]](s"$configPath.blacklisted-assets")
+    val validationTimeout = config.as[FiniteDuration](s"$configPath.validation-timeout")
     val blacklistedNames  = config.as[List[String]](s"$configPath.blacklisted-names").map(_.r)
 
     val blacklistedAddresses = config.as[List[String]](s"$configPath.blacklisted-addresses")
@@ -77,6 +79,7 @@ object MatcherSettings {
       maxTimestampDiff,
       blacklistedAssets.toSet,
       blacklistedNames,
+      validationTimeout,
       maxOrdersPerRequest,
       blacklistedAddresses.toSet,
       balanceWatching
