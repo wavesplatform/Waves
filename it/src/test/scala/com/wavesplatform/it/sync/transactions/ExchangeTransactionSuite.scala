@@ -13,7 +13,7 @@ import play.api.libs.json.{JsNumber, JsObject, Json, Writes}
 
 class ExchangeTransactionSuite extends BaseTransactionSuite {
 
-  test("exchange tx with not asset not exists") {
+  test("cannot exchange non-issued assets") {
 
     val assetName        = "myasset"
     val assetDescription = "my asset description"
@@ -83,8 +83,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite {
         tx.signature.base58
       )
 
-    sender.broadcastRequest(request(tx))
-    nodes.waitForHeightAriseAndTxPresent(tx.id().base58)
+    assertBadRequestAndMessage(sender.postJson("/transactions/broadcast", request(tx)), "Assets should be issued before they can be traded")
   }
 
 }

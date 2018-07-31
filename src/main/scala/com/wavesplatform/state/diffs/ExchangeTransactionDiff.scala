@@ -15,14 +15,14 @@ object ExchangeTransactionDiff {
     val matcher = tx.buyOrder.matcherPublicKey.toAddress
     val buyer   = tx.buyOrder.senderPublicKey.toAddress
     val seller  = tx.sellOrder.senderPublicKey.toAddress
-    val assets = Seq(tx.buyOrder.assetPair.amountAsset,
-                     tx.buyOrder.assetPair.priceAsset,
-                     tx.sellOrder.assetPair.amountAsset,
-                     tx.sellOrder.assetPair.priceAsset).flatten
+    val assetIds = Set(tx.buyOrder.assetPair.amountAsset,
+                       tx.buyOrder.assetPair.priceAsset,
+                       tx.sellOrder.assetPair.amountAsset,
+                       tx.sellOrder.assetPair.priceAsset).flatten
+    val assets = assetIds.map(blockchain.assetDescription)
     for {
-      _ <- Either.cond(!assets.exists(blockchain.assetDescription(_).flatMap(_.script).isDefined),
-                       (),
-                       GenericError(s"Smart assets can't participate in ExchangeTransactions"))
+      _ <- Either.cond(assets.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
+      _ <- Either.cond(!assets.exists(_.flatMap(_.script).isDefined), (), GenericError(s"Smart assets can't participate in ExchangeTransactions"))
       _ <- Either.cond(!blockchain.hasScript(buyer),
                        (),
                        GenericError(s"Buyer $buyer can't participate in ExchangeTransaction because it has assigned Script"))
