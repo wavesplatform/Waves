@@ -9,6 +9,7 @@ import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
+import org.iq80.leveldb.{DB, ReadOptions}
 
 package object database {
   implicit class ByteArrayDataOutputExt(val output: ByteArrayDataOutput) extends AnyVal {
@@ -218,5 +219,21 @@ package object database {
     ndo.writeBigInt(ai.volume)
     ndo.writeScriptOption(ai.script)
     ndo.toByteArray
+  }
+
+  implicit class DBExt(val db: DB) extends AnyVal {
+    def readOnly[A](f: ReadOnlyDB => A): A = {
+      val snapshot = db.getSnapshot
+      try f(new ReadOnlyDB(db, new ReadOptions().snapshot(snapshot)))
+      finally snapshot.close()
+    }
+
+    def readWrite[A](f: RW => A): A = {
+      val rw = new RW(db)
+      try f(rw)
+      finally rw.close()
+    }
+
+    def get[A](key: Key[A]): A = key.parse(db.get(key.keyBytes))
   }
 }
