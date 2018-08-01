@@ -435,6 +435,11 @@ class OrderBookActor(assetPair: AssetPair,
       log.debug(s"Recovering OrderBook from snapshot: $snapshot for $persistenceId")
   }
 
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
+    log.warn(s"Restarting actor because of $message", reason)
+    super.preRestart(reason, message)
+  }
+
   override def postStop(): Unit = {
     log.info(context.self.toString() + " - postStop method")
     snapshotCancellable.cancel()

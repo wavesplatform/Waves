@@ -37,7 +37,10 @@ class OrderHistorySpecification
   }
 
   private def activeOrderIds(address: Address, assetIds: Set[Option[AssetId]]): Seq[ByteStr] =
-    DBUtils.ordersByAddress(db, address, assetIds, activeOnly = true, Int.MaxValue).map(_._1.id())
+    DBUtils.ordersByAddress(db, address, assetIds, activeOnly = true, matcherSettings.maxOrdersPerRequest).map(_._1.id())
+
+  private def allOrderIds(address: Address, assetIds: Set[Option[AssetId]]): Seq[ByteStr] =
+    DBUtils.ordersByAddress(db, address, assetIds, activeOnly = false, matcherSettings.maxOrdersPerRequest).map(_._1.id())
 
   property("New buy order added") {
     val ord1 = buy(pair, 0.0007, 10000)
@@ -296,12 +299,11 @@ class OrderHistorySpecification
     oh.orderCanceled(OrderCanceled(LimitOrder(ord3), unmatchable = false))
     oh.orderAccepted(OrderAdded(LimitOrder(ord5)))
 
-    // todo:
-//    oh.fetchAllOrderHistory(ord1.senderPublicKey.address).map(_._1) shouldBe
-//      Seq(ord5.idStr(), ord4.idStr(), ord2.idStr(), ord3.idStr(), ord1.idStr())
-//
-//    oh.fetchAllActiveOrderHistory(ord1.senderPublicKey.address).map(_._1) shouldBe
-//      Seq(ord5.idStr(), ord4.idStr(), ord2.idStr())
+    allOrderIds(ord1.senderPublicKey, Set.empty) shouldBe
+      Seq(ord5.id(), ord4.id(), ord2.id(), ord3.id(), ord1.id())
+
+    activeOrderIds(ord1.senderPublicKey, Set.empty) shouldBe
+      Seq(ord5.id(), ord4.id(), ord2.id())
   }
 
   property("History with more than max limit") {
@@ -314,11 +316,13 @@ class OrderHistorySpecification
       oh.orderAccepted(OrderAdded(LimitOrder(o)))
     }
 
-    // todo:
-//    oh.orderCanceled(OrderCanceled(LimitOrder(orders.last), unmatchable = false))
-//    val newOrder = buy(pair, 0.001, 100000000, Some(pk), Some(300000L), Some(1L))
-//    oh.orderAccepted(OrderAdded(LimitOrder(newOrder)))
-//    oh.fetchAllOrderHistory(pk.address).map(_._1) shouldBe orders.reverse.tail.map(_.idStr()) :+ newOrder.idStr()
+    oh.orderCanceled(OrderCanceled(LimitOrder(orders.last), unmatchable = false))
+
+    val newOrder = buy(pair, 0.001, 100000000, Some(pk), Some(300000L), Some(1L))
+
+    oh.orderAccepted(OrderAdded(LimitOrder(newOrder)))
+
+    allOrderIds(pk, Set.empty) shouldBe orders.reverse.tail.map(_.id()) :+ newOrder.id()
   }
 
   property("History with more than max limit and canceled order") {
@@ -332,8 +336,7 @@ class OrderHistorySpecification
     }
 
     oh.orderCanceled(OrderCanceled(LimitOrder(orders.last), unmatchable = false))
-    // todo:
-//    oh.fetchAllOrderHistory(pk.address).map(_._1) shouldBe orders.reverse.tail.map(_.idStr())
+    allOrderIds(pk, Set.empty) shouldBe orders.reverse.tail.map(_.id())
   }
 
   property("Open Portfolio for two assets") {
@@ -349,12 +352,11 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     oh.orderAccepted(OrderAdded(LimitOrder(ord2)))
 
-    // todo:
-//    oh.openPortfolio(pk.address) shouldBe
-//      OpenPortfolio(
-//        Map("WAVES"     -> (2 * matcherFee - LimitOrder(ord1).getReceiveAmount - LimitOrder(ord2).getReceiveAmount),
-//            ass1.base58 -> Order.correctAmount(ord1.amount, ord1.price),
-//            ass2.base58 -> Order.correctAmount(ord2.amount, ord2.price)
-//        ))
+    DBUtils.reservedBalance(db, pk) shouldBe
+      Map(
+        None -> (2 * matcherFee - LimitOrder(ord1).getReceiveAmount - LimitOrder(ord2).getReceiveAmount),
+        ass1 -> Order.correctAmount(ord1.amount, ord1.price),
+        ass2 -> Order.correctAmount(ord2.amount, ord2.price)
+      )
   }
 }

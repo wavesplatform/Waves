@@ -347,7 +347,6 @@ case class MatcherApiRoute(wallet: Wallet,
         case Success(pk) =>
           complete(StatusCodes.OK -> Json.toJson(DBUtils.reservedBalance(db, pk).map {
             case (k, v) =>
-              println(s"ROUTE: $k")
               AssetPair.assetIdStr(k) -> v
           }))
         case Failure(ex) =>

@@ -8,9 +8,8 @@ import org.iq80.leveldb.DB
 import scorex.account.Address
 import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.utils.ScorexLogging
 
-object DBUtils extends ScorexLogging {
+object DBUtils {
   import OrderInfo.orderStatusOrdering
 
   def ordersByAddressAndPair(db: DB, address: Address, pair: AssetPair, activeOnly: Boolean): Seq[(Order, OrderInfo)] = db.readOnly { ro =>
@@ -34,15 +33,13 @@ object DBUtils extends ScorexLogging {
         order <- ro.get(MatcherKeys.order(orderSpendAsset.orderId))
         orderInfo = ro.get(MatcherKeys.orderInfo(orderSpendAsset.orderId))
         if !(activeOnly && orderInfo.status.isFinal)
-      } yield (order, orderInfo)).sortBy { case (order, info) => (info.status, -order.timestamp) }
+      } yield (order, orderInfo)).sortBy { case (order, info) => (info.status, -order.timestamp) }.take(maxOrders)
     }
 
   def reservedBalance(db: DB, address: Address): Map[Option[AssetId], Long] = db.readOnly { ro =>
-    log.trace(s"Loading reserved balance for $address")
     (for {
       idx <- 1 to ro.get(MatcherKeys.openVolumeSeqNr(address))
       assetId = ro.get(MatcherKeys.openVolumeAsset(address, idx))
-      _       = println(s"ASSET ID: $assetId")
       volume <- ro.get(MatcherKeys.openVolume(address, assetId))
       if volume != 0
     } yield assetId -> volume).toMap
