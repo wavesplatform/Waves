@@ -2,15 +2,17 @@ package com.wavesplatform.matcher.market
 
 import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import akka.pattern.ask
 import akka.persistence.{PersistentActor, RecoveryCompleted}
 import akka.routing.FromConfig
+import akka.util.Timeout
 import com.google.common.base.Charsets
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
@@ -23,6 +25,8 @@ import scorex.utils._
 import com.wavesplatform.wallet.Wallet
 
 import scala.collection.{immutable, mutable}
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.reflectiveCalls
 
 class MatcherActor(orderHistory: ActorRef,
@@ -37,6 +41,8 @@ class MatcherActor(orderHistory: ActorRef,
 
   import MatcherActor._
 
+  private implicit val timeout: Timeout = 5.seconds
+
   val tradedPairs = mutable.Map.empty[AssetPair, MarketData]
 
   def getAssetName(asset: Option[AssetId]): String =
@@ -45,14 +51,16 @@ class MatcherActor(orderHistory: ActorRef,
       blockchain.assetDescription(aid).fold("Unknown")(d => new String(d.name, Charsets.UTF_8))
     }
 
+  def getAssetDescription(asset: Option[AssetId]): Option[AssetDescription] = asset.flatMap(blockchain.assetDescription)
+
   def createOrderBook(pair: AssetPair): ActorRef = {
     val md = MarketData(
       pair,
       getAssetName(pair.amountAsset),
       getAssetName(pair.priceAsset),
       NTP.correctedTime(),
-      pair.amountAsset.flatMap(blockchain.assetDescription).map(t => AssetInfo(t.decimals)),
-      pair.priceAsset.flatMap(blockchain.assetDescription).map(t => AssetInfo(t.decimals))
+      getAssetDescription(pair.amountAsset).map(t => AssetInfo(t.decimals)),
+      getAssetDescription(pair.priceAsset).map(t => AssetInfo(t.decimals))
     )
     tradedPairs += pair -> md
 
@@ -141,6 +149,29 @@ class MatcherActor(orderHistory: ActorRef,
   def forwardToOrderBook: Receive = {
     case GetMarkets =>
       sender() ! GetMarketsResponse(getMatcherPublicKey, tradedPairs.values.toSeq)
+
+    case req: GetMarket =>
+      val snd = sender()
+      checkAssetPair(req) {
+        context
+          .child(OrderBookActor.name(req.assetPair))
+          .fold {
+            snd ! StatusCodeMatcherResponse(StatusCodes.NotFound, "Market not found")
+          } { orderbook =>
+            (orderbook ? GetMarketStatusRequest(req.assetPair))
+              .mapTo[MarketStatus]
+              .map { status =>
+                val amountDecimals = getAssetDescription(req.assetPair.amountAsset).fold(8)(_.decimals)
+                val priceDecimals  = getAssetDescription(req.assetPair.priceAsset).fold(8)(_.decimals)
+                snd ! GetMarketResponse(req.assetPair,
+                                        getAssetName(req.assetPair.amountAsset),
+                                        getAssetName(req.assetPair.priceAsset),
+                                        amountDecimals,
+                                        priceDecimals,
+                                        status)
+              }
+          }
+      }
 
     case order: Order =>
       checkAssetPair(order) {
@@ -262,6 +293,29 @@ object MatcherActor {
                         created: Long,
                         amountAssetInfo: Option[AssetInfo],
                         priceAssetinfo: Option[AssetInfo])
+
+  case class GetMarket(assetPair: AssetPair)
+
+  case class GetMarketResponse(assetPair: AssetPair,
+                               amountAssetName: String,
+                               priceAssetName: String,
+                               amountDecimals: Int,
+                               priceDecimals: Int,
+                               status: MarketStatus)
+      extends MatcherResponse {
+    def json: JsValue = Json.obj(
+      "amountAssetId"  -> assetPair.amountAssetStr,
+      "amountAsset"    -> amountAssetName,
+      "amountDecimals" -> amountDecimals,
+      "priceAssetId"   -> assetPair.priceAssetStr,
+      "priceAsset"     -> priceAssetName,
+      "priceDecimals"  -> (8 - amountDecimals + priceDecimals),
+      "lastPrice"      -> status.last,
+      "bid"            -> status.bid,
+      "ask"            -> status.ask
+    )
+    val code = StatusCodes.OK
+  }
 
   def compare(buffer1: Option[Array[Byte]], buffer2: Option[Array[Byte]]): Int = {
     if (buffer1.isEmpty && buffer2.isEmpty) 0
