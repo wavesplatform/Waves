@@ -6,13 +6,13 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.asynchttpclient.Dsl.{get => _get}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.Assertions
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json.Writes
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -46,13 +46,16 @@ object AsyncMatcherHttpApi extends Assertions {
 
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): Future[MatcherStatusResponse] = {
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
-      matcherGet(s"/matcher/orderbook/${amountAsset}/${priceAsset}/$orderId", waitForStatus = waitForStatus)
+      matcherGet(s"/matcher/orderbook/$amountAsset/$priceAsset/$orderId", waitForStatus = waitForStatus)
         .as[MatcherStatusResponse]
     }
 
+    def transactionsByOrder(orderId: String): Future[Seq[Transaction]] =
+      matcherGet(s"/matcher/transactions/$orderId").as[Seq[Transaction]]
+
     def orderBook(assetPair: AssetPair): Future[OrderBookResponse] = {
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
-      matcherGet(s"/matcher/orderbook/${amountAsset}/${priceAsset}").as[OrderBookResponse]
+      matcherGet(s"/matcher/orderbook/$amountAsset/$priceAsset").as[OrderBookResponse]
     }
 
     def parseAssetPair(assetPair: AssetPair) = {
@@ -70,11 +73,11 @@ object AsyncMatcherHttpApi extends Assertions {
     def cancelOrder(sender: Node, assetPair: AssetPair, orderId: Option[String], timestamp: Option[Long] = None) = {
       val privateKey                = sender.privateKey
       val publicKey                 = sender.publicKey
-      val request                   = CancelOrderRequest(publicKey, orderId, timestamp, Array.emptyByteArray)
+      val request                   = CancelOrderRequest(publicKey, orderId.map(ByteStr.decodeBase58(_).get), timestamp, Array.emptyByteArray)
       val sig                       = crypto.sign(privateKey, request.toSign)
       val signedRequest             = request.copy(signature = sig)
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
-      matcherPost(s"/matcher/orderbook/${amountAsset}/${priceAsset}/cancel", signedRequest.json).as[MatcherStatusResponse]
+      matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", signedRequest.json).as[MatcherStatusResponse]
     }
 
     def cancelAllOrders(sender: Node, timestamp: Option[Long]) = {
@@ -103,6 +106,11 @@ object AsyncMatcherHttpApi extends Assertions {
       val signature  = ByteStr(crypto.sign(privateKey, publicKey ++ Longs.toByteArray(ts)))
 
       matcherGetWithSignature(s"/matcher/balance/reserved/${sender.publicKeyStr}", ts, signature).as[Map[String, Long]]
+    }
+
+    def tradableBalance(sender: Node, assetPair: AssetPair) = {
+      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
+      matcherGet(s"/matcher/orderbook/$amountAsset/$priceAsset/tradableBalance/${sender.address}").as[Map[String, Long]]
     }
 
     def waitOrderStatus(assetPair: AssetPair,

@@ -1,19 +1,17 @@
 package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it.ReportingTestName
+import com.wavesplatform.it.api.LevelResponse
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.ReportingTestName
-import com.wavesplatform.it.api.LevelResponse
-import com.wavesplatform.it.sync.matcher.MatcherMassOrdersTestSuite.orderLimit
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.it.util._
+import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.duration._
-import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-
 import scala.util.Random
 
 class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with NodesFromDocker with ReportingTestName {

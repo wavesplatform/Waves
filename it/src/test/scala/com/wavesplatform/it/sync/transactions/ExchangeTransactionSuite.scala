@@ -2,10 +2,9 @@ package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.api.http.assets.SignedExchangeRequest
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
-import com.wavesplatform.it.util._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.utils.{Base58, NTP}
@@ -17,7 +16,6 @@ class ExchangeTransactionSuite extends BaseTransactionSuite {
 
     val assetName        = "myasset"
     val assetDescription = "my asset description"
-
 
     val IssueTx: IssueTransactionV1 = IssueTransactionV1
       .selfSigned(

@@ -3,9 +3,7 @@ package com.wavesplatform.matcher
 import java.io.File
 
 import com.typesafe.config.Config
-import com.wavesplatform.matcher.market.BalanceWatcherWorkerActor
 import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.NameMapper
 
 import scala.concurrent.duration.FiniteDuration
@@ -27,9 +25,9 @@ case class MatcherSettings(enable: Boolean,
                            maxTimestampDiff: FiniteDuration,
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
+                           validationTimeout: FiniteDuration,
                            maxOrdersPerRequest: Int,
-                           blacklistedAddresses: Set[String],
-                           balanceWatching: BalanceWatcherWorkerActor.Settings)
+                           blacklistedAddresses: Set[String])
 
 object MatcherSettings {
 
@@ -53,12 +51,12 @@ object MatcherSettings {
     val maxTimestampDiff     = config.as[FiniteDuration](s"$configPath.max-timestamp-diff")
 
     val blacklistedAssets = config.as[List[String]](s"$configPath.blacklisted-assets")
+    val validationTimeout = config.as[FiniteDuration](s"$configPath.validation-timeout")
     val blacklistedNames  = config.as[List[String]](s"$configPath.blacklisted-names").map(_.r)
 
     val blacklistedAddresses = config.as[List[String]](s"$configPath.blacklisted-addresses")
 
     val isMigrateToNewOrderHistoryStorage = !new File(dataDirectory).exists()
-    val balanceWatching                   = config.as[BalanceWatcherWorkerActor.Settings](s"$configPath.balance-watching")
 
     MatcherSettings(
       enabled,
@@ -77,9 +75,9 @@ object MatcherSettings {
       maxTimestampDiff,
       blacklistedAssets.toSet,
       blacklistedNames,
+      validationTimeout,
       maxOrdersPerRequest,
       blacklistedAddresses.toSet,
-      balanceWatching
     )
   }
 }

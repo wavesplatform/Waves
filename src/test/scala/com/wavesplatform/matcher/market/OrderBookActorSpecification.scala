@@ -1,27 +1,29 @@
 package com.wavesplatform.matcher.market
 
+import java.util.concurrent.ConcurrentHashMap
+
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
+import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.Events.Event
-import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
+import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, OrderBook, SellLimitOrder}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{Blockchain, ByteStr, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
-import org.scalamock.scalatest.PathMockFactory
-import org.scalatest._
-import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.utils.{NTP, ScorexLogging}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.utils.{NTP, ScorexLogging}
+import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
+import io.netty.channel.group.ChannelGroup
+import org.scalamock.scalatest.PathMockFactory
+import org.scalatest._
 
 import scala.concurrent.duration._
 
@@ -68,15 +70,25 @@ class OrderBookActorSpecification
 
   val orderHistoryRef = TestActorRef(new Actor {
     def receive: Receive = {
-      case ValidateOrder(o, _) => sender() ! ValidateOrderResult(Right(o))
+      case ValidateOrder(o, _) => sender() ! ValidateOrderResult(o.id(), Right(o))
       case _                   =>
     }
   })
 
+  val obc                                              = new ConcurrentHashMap[AssetPair, OrderBook]()
+  def update(ap: AssetPair)(snapshot: OrderBook): Unit = obc.put(ap, snapshot)
+
   var actor: ActorRef = system.actorOf(
     Props(
-      new OrderBookActor(pair, orderHistoryRef, blockchain, wallet, stub[UtxPool], stub[ChannelGroup], settings, FunctionalitySettings.TESTNET)
-      with RestartableActor))
+      new OrderBookActor(pair,
+                         update(pair),
+                         orderHistoryRef,
+                         blockchain,
+                         wallet,
+                         stub[UtxPool],
+                         stub[ChannelGroup],
+                         settings,
+                         FunctionalitySettings.TESTNET) with RestartableActor))
 
   private def getOrders(actor: ActorRef) = {
     actor ! GetOrdersRequest
@@ -84,6 +96,7 @@ class OrderBookActorSpecification
   }
 
   override protected def beforeEach() = {
+    obc.clear()
     val tp = TestProbe()
     tp.send(StorageExtension(system).journalStorage, InMemoryJournalStorage.ClearJournal)
     tp.expectMsg(akka.actor.Status.Success(""))
@@ -98,13 +111,15 @@ class OrderBookActorSpecification
     (utx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty)))
     val allChannels = stub[ChannelGroup]
     actor = system.actorOf(
-      Props(new OrderBookActor(pair, orderHistoryRef, blockchain, wallet, utx, allChannels, settings, functionalitySettings) with RestartableActor))
+      Props(
+        new OrderBookActor(pair, update(pair), orderHistoryRef, blockchain, wallet, utx, allChannels, settings, functionalitySettings)
+        with RestartableActor))
 
     eventsProbe = TestProbe()
     system.eventStream.subscribe(eventsProbe.ref, classOf[Event])
   }
 
-  "OrderBookActror" should {
+  "OrderBookActor" should {
 
     "place buy orders" in {
       val ord1 = buy(pair, 34118, 1583290045643L)
@@ -146,14 +161,16 @@ class OrderBookActorSpecification
       actor ! ord2
       receiveN(2)
       actor ! GetOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord2.price, ord2.amount, ord2), BuyLimitOrder(ord1.price, ord1.amount, ord1))))
+      expectMsg(
+        GetOrdersResponse(
+          Seq(BuyLimitOrder(ord2.price, ord2.amount, ord2.matcherFee, ord2), BuyLimitOrder(ord1.price, ord1.amount, ord1.matcherFee, ord1))))
 
       val ord3 = sell(pair, 100, 10 * Order.PriceConstant)
       actor ! ord3
       expectMsg(OrderAccepted(ord3))
 
       actor ! GetOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord1.price, ord1.amount, ord1))))
+      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord1.price, ord1.amount, ord1.matcherFee, ord1))))
     }
 
     "place buy and sell order to the order book and preserve it after restart" in {
@@ -182,7 +199,15 @@ class OrderBookActorSpecification
       actor ! RestartActor
       actor ! GetOrdersRequest
 
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord2.price, 5 * Order.PriceConstant, ord2))))
+      expectMsg(
+        GetOrdersResponse(
+          Seq(
+            SellLimitOrder(
+              ord2.price,
+              ord2.amount - ord1.amount,
+              ord2.matcherFee - LimitOrder.getPartialFee(ord2.matcherFee, ord2.amount, ord1.amount),
+              ord2
+            ))))
     }
 
     "execute one order fully and other partially and restore after restart" in {
@@ -198,11 +223,19 @@ class OrderBookActorSpecification
       actor ! RestartActor
 
       actor ! GetBidOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord2.price, 3 * Order.PriceConstant, ord2))))
+      val restAmount = ord1.amount + ord2.amount - ord3.amount
+      expectMsg(
+        GetOrdersResponse(
+          Seq(
+            BuyLimitOrder(
+              ord2.price,
+              restAmount,
+              ord2.matcherFee - LimitOrder.getPartialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
+              ord2
+            ))))
 
       actor ! GetAskOrdersRequest
       expectMsg(GetOrdersResponse(Seq.empty))
-
     }
 
     "match multiple best orders at once and restore after restart" in {
@@ -223,7 +256,16 @@ class OrderBookActorSpecification
       expectMsg(GetOrdersResponse(Seq.empty))
 
       actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord2.price, 1 * Order.PriceConstant, ord2))))
+      val restAmount = ord1.amount + ord2.amount + ord3.amount - ord4.amount
+      expectMsg(
+        GetOrdersResponse(
+          Seq(
+            SellLimitOrder(
+              ord2.price,
+              restAmount,
+              ord2.matcherFee - LimitOrder.getPartialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
+              ord2
+            ))))
 
     }
 
@@ -243,8 +285,14 @@ class OrderBookActorSpecification
       expectMsg(GetOrdersResponse(Seq.empty))
 
       actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord3.price, 3 * Order.PriceConstant, ord3))))
-
+      val restAmount = ord1.amount + ord2.amount + ord3.amount - ord4.amount
+      expectMsg(
+        GetOrdersResponse(
+          Seq(
+            SellLimitOrder(ord3.price,
+                           restAmount,
+                           ord3.matcherFee - LimitOrder.getPartialFee(ord3.matcherFee, ord3.amount, ord3.amount - restAmount),
+                           ord3))))
     }
 
     "place orders and restart without waiting for response" in {
@@ -264,40 +312,48 @@ class OrderBookActorSpecification
         actor ! GetOrdersRequest
         expectMsgType[GetOrdersResponse].orders.map(_.order.id()) should have size 100
       }
-
     }
 
     "order matched with invalid order should keep matching with others, invalid is removed" in {
       val blockchain            = stub[Blockchain]
       val functionalitySettings = TestFunctionalitySettings.Stub
-      val ord1                  = buy(pair, 100, 20 * Order.PriceConstant)
-      val ord2                  = buy(pair, 5000, 1000 * Order.PriceConstant)
-      // should be invalid
-      val ord3 = sell(pair, 100, 10 * Order.PriceConstant)
+
+      val ord1       = buy(pair, 100, 20 * Order.PriceConstant)
+      val invalidOrd = buy(pair, 5000, 1000 * Order.PriceConstant)
+      val ord2       = sell(pair, 100, 10 * Order.PriceConstant)
 
       val pool = stub[UtxPool]
-      (pool.putIfNew _).when(*).onCall { (tx: Transaction) =>
+      (pool.putIfNew _).when(*).onCall { tx: Transaction =>
         tx match {
-          case om: ExchangeTransaction if om.buyOrder == ord2 => Left(ValidationError.GenericError("test"))
-          case _: Transaction                                 => Right((true, Diff.empty))
+          case om: ExchangeTransaction if om.buyOrder == invalidOrd => Left(ValidationError.GenericError("test"))
+          case _: Transaction                                       => Right((true, Diff.empty))
         }
       }
       val allChannels = stub[ChannelGroup]
       actor = system.actorOf(
-        Props(
-          new OrderBookActor(pair, orderHistoryRef, blockchain, wallet, pool, allChannels, settings, functionalitySettings) with RestartableActor))
+        Props(new OrderBookActor(pair, update(pair), orderHistoryRef, blockchain, wallet, pool, allChannels, settings, functionalitySettings)
+        with RestartableActor))
 
       actor ! ord1
       expectMsg(OrderAccepted(ord1))
+      actor ! invalidOrd
+      expectMsg(OrderAccepted(invalidOrd))
       actor ! ord2
       expectMsg(OrderAccepted(ord2))
-      actor ! ord3
-      expectMsg(OrderAccepted(ord3))
 
       actor ! RestartActor
 
       actor ! GetBidOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(100 * Order.PriceConstant, 10 * Order.PriceConstant, ord1))))
+      val restAmount = ord1.amount - ord2.amount
+      expectMsg(
+        GetOrdersResponse(
+          Seq(
+            BuyLimitOrder(
+              ord1.price,
+              restAmount,
+              ord1.matcherFee - LimitOrder.getPartialFee(ord1.matcherFee, ord1.amount, restAmount),
+              ord1
+            ))))
 
       actor ! GetAskOrdersRequest
       expectMsg(GetOrdersResponse(Seq.empty))
@@ -315,12 +371,11 @@ class OrderBookActorSpecification
       receiveN(3)
 
       actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder((0.00041 * Order.PriceConstant).toLong, 200000000, ord1))))
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord1.price, ord1.amount, ord1.matcherFee, ord1))))
 
     }
 
     "partially execute order with zero fee remaining part" in {
-
       val ord1 = sell(pair, 0.0006999, 1500 * Constants.UnitsInWave)
       val ord2 = sell(pair, 0.00067634, 3075248828L)
       val ord3 = buy(pair, 0.00073697, 3075363900L)
@@ -331,9 +386,9 @@ class OrderBookActorSpecification
       receiveN(3)
 
       actor ! GetAskOrdersRequest
+      val restAmount = 1500 * Constants.UnitsInWave - 115749L
       expectMsg(
-        GetOrdersResponse(
-          Seq(SellLimitOrder((0.0006999 * Order.PriceConstant).toLong, 1500 * Constants.UnitsInWave - (3075363900L - 3075248828L), ord1))))
+        GetOrdersResponse(Seq(SellLimitOrder(ord1.price, restAmount, LimitOrder.getPartialFee(ord1.matcherFee, ord1.amount, restAmount), ord1))))
     }
 
     "partially execute order with price > 1 and zero fee remaining part " in {
@@ -348,7 +403,25 @@ class OrderBookActorSpecification
       receiveN(3)
 
       actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(1850 * Order.PriceConstant, ((0.1 - (0.0100001 - 0.01)) * Constants.UnitsInWave).toLong, ord1))))
+      val restAmount = ord1.amount + ord2.amount - ord3.amount
+      expectMsg(
+        GetOrdersResponse(Seq(SellLimitOrder(ord1.price, restAmount, LimitOrder.getPartialFee(ord1.matcherFee, ord1.amount, restAmount), ord1))))
+    }
+
+    "buy small amount of pricey asset" in {
+      val p = AssetPair(Some(ByteStr("WAVES".getBytes)), Some(ByteStr("USD".getBytes)))
+      val b = rawBuy(p, 280, 700000L)
+      val s = rawSell(p, 280, 30000000000L)
+      actor ! s
+      actor ! b
+      receiveN(2)
+
+      actor ! GetAskOrdersRequest
+      val restAmount = 30000000000L - Order.correctAmount(700000L, 280)
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(s.price, restAmount, LimitOrder.getPartialFee(s.matcherFee, s.amount, restAmount), s))))
+
+      actor ! GetBidOrdersRequest
+      expectMsg(GetOrdersResponse(Seq.empty))
     }
 
     "cancel expired orders after OrderCleanup command" in {
@@ -359,9 +432,9 @@ class OrderBookActorSpecification
       val expiredOrder = buy(pair, price, amount).copy(expiration = time)
       actor ! expiredOrder
       receiveN(1)
-      getOrders(actor) shouldEqual Seq(BuyLimitOrder(price * Order.PriceConstant, amount, expiredOrder))
+      getOrders(actor) shouldEqual Seq(BuyLimitOrder(price * Order.PriceConstant, amount, expiredOrder.matcherFee, expiredOrder))
       actor ! OrderCleanup
-      expectMsg(OrderCanceled(expiredOrder.idStr()))
+      expectMsg(OrderCanceled(expiredOrder.id().base58))
       getOrders(actor).size should be(0)
     }
 
@@ -370,7 +443,7 @@ class OrderBookActorSpecification
       val amount = 1
 
       val order          = buy(pair, price, amount)
-      val expectedOrders = Seq(BuyLimitOrder(price * Order.PriceConstant, amount, order))
+      val expectedOrders = Seq(BuyLimitOrder(price * Order.PriceConstant, amount, order.matcherFee, order))
 
       actor ! order
       receiveN(1)
@@ -378,6 +451,60 @@ class OrderBookActorSpecification
       actor ! OrderCleanup
       getOrders(actor) shouldEqual expectedOrders
     }
+
+    "responses with a error after timeout" in {
+      val actor: ActorRef = createOrderBookActor(TestProbe().ref, 50.millis)
+
+      val order = buy(pair, 1, 1)
+      actor ! order
+      Thread.sleep(60)
+      expectMsg(OperationTimedOut)
+    }
+
+    "ignores an unexpected validation message" when {
+      "receives ValidateOrderResult of another order" in {
+        val historyActor = TestProbe()
+        val actor        = createOrderBookActor(historyActor.ref)
+
+        val order = buy(pair, 1, 1)
+        actor ! order
+
+        val unexpectedOrder = buy(pair, 1, 2)
+        actor.tell(ValidateOrderResult(unexpectedOrder.id(), Right(unexpectedOrder)), historyActor.ref)
+        expectNoMsg()
+      }
+
+      "receives ValidateCancelResult of another order" in {
+        val historyActor = TestProbe()
+        val actor        = createOrderBookActor(historyActor.ref)
+
+        val order = buy(pair, 1, 1)
+        actor ! CancelOrder(pair, order.senderPublicKey, order.id())
+
+        val unexpectedOrder = buy(pair, 1, 2)
+        actor.tell(
+          CancelOrder(pair, unexpectedOrder.senderPublicKey, unexpectedOrder.id()),
+          historyActor.ref
+        )
+        expectNoMsg()
+      }
+    }
   }
+
+  private def createOrderBookActor(historyActor: ActorRef, validationTimeout: FiniteDuration = 10.minutes): ActorRef = system.actorOf(
+    Props(
+      new OrderBookActor(
+        pair,
+        _ => (),
+        historyActor,
+        stub[Blockchain],
+        stub[Wallet],
+        stub[UtxPool],
+        stub[ChannelGroup],
+        settings.copy(validationTimeout = validationTimeout),
+        FunctionalitySettings.TESTNET
+      ) with RestartableActor
+    )
+  )
 
 }

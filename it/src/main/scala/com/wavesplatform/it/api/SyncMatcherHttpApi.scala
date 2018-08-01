@@ -2,11 +2,11 @@ package com.wavesplatform.it.api
 
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.{Assertions, Matchers}
 import play.api.libs.json.{Format, Json, Writes}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -46,6 +46,9 @@ object SyncMatcherHttpApi extends Assertions {
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
       Await.result(async(m).orderStatus(orderId, assetPair, waitForStatus), RequestAwaitTime)
 
+    def transactionsByOrder(orderId: String) =
+      Await.result(async(m).transactionsByOrder(orderId), RequestAwaitTime)
+
     def waitOrderStatus(assetPair: AssetPair,
                         orderId: String,
                         expectedStatus: String,
@@ -54,6 +57,9 @@ object SyncMatcherHttpApi extends Assertions {
 
     def reservedBalance(sender: Node, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
       Await.result(async(m).reservedBalance(sender), waitTime)
+
+    def tradableBalance(sender: Node, assetPair: AssetPair, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
+      Await.result(async(m).tradableBalance(sender, assetPair), waitTime)
 
     def expectIncorrectOrderPlacement(order: Order,
                                       expectedStatusCode: Int,
