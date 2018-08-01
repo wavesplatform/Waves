@@ -23,18 +23,19 @@ object MatcherKeys {
     Option(_).fold[OrderInfo](OrderInfo.empty) { b =>
       val bb = ByteBuffer.wrap(b)
       b.length match {
-        case 17 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, None)
-        case 25 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, Some(bb.getLong))
+        case 17 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, None, 0)
+        case 33 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, Some(bb.getLong), bb.getLong)
       }
 
     },
     oi =>
       ByteBuffer
-        .allocate(25)
+        .allocate(33)
         .putLong(oi.amount)
         .putLong(oi.filled)
         .put(if (oi.canceled) 1.toByte else 0.toByte)
         .putLong(oi.minAmount.getOrElse(0L))
+        .putLong(oi.remainingFee)
         .array()
   )
 
@@ -46,7 +47,7 @@ object MatcherKeys {
     Key.opt(bytes(5, address.bytes.arr ++ assetIdToBytes(assetId)), Longs.fromByteArray, Longs.toByteArray)
   def openVolumeSeqNr(address: Address): Key[Int] = bytesSeqNr(6, address.bytes.arr)
   def openVolumeAsset(address: Address, seqNr: Int): Key[Option[AssetId]] =
-    Key(hBytes(7, seqNr, address.bytes.arr), Option(_).map(ByteStr(_)), assetIdToBytes)
+    Key(hBytes(7, seqNr, address.bytes.arr), Option(_).collect { case b if b.nonEmpty => ByteStr(b) }, assetIdToBytes)
 
   def orderTxIdsSeqNr(orderId: ByteStr): Key[Int]           = bytesSeqNr(8, orderId.arr)
   def orderTxId(orderId: ByteStr, seqNr: Int): Key[ByteStr] = Key(hBytes(9, seqNr, orderId.arr), ByteStr(_), _.arr)

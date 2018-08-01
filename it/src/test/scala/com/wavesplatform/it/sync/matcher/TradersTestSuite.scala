@@ -23,7 +23,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   private def matcherNode = nodes.head
   private def aliceNode   = nodes(1)
   private def bobNode     = nodes(2)
-  948
+
   "Verifications of tricky ordering cases" - {
     // Alice issues new asset
     val aliceAsset =
@@ -68,7 +68,8 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       matcherNode.matcherGet("/matcher").getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe matcherNode.publicKeyStr
     }
 
-    "owner moves assets/waves to another account and order become an invalid" - {
+    "owner moves assets/waves to another account and order become an invalid" ignore {
+      // todo: reactivate after balance watcher is reimplemented
       // Could not work sometimes because of NODE-546
       "order with assets" - {
         "moved assets, insufficient assets" in {

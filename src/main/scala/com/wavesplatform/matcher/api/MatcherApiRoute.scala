@@ -258,10 +258,13 @@ case class MatcherApiRoute(wallet: Wallet,
       (headerValueByName("Timestamp") & headerValueByName("Signature")) { (ts, sig) =>
         checkGetSignature(publicKey, ts, sig) match {
           case Success(_) =>
-            complete(StatusCodes.OK -> DBUtils.ordersByAddress(db, publicKey, Set.empty, activeOnly.getOrElse(true)).map {
-              case (order, orderInfo) =>
-                orderJson(order, orderInfo)
-            })
+            complete(
+              StatusCodes.OK -> DBUtils
+                .ordersByAddress(db, publicKey, Set.empty, activeOnly.getOrElse(false), matcherSettings.maxOrdersPerRequest)
+                .map {
+                  case (order, orderInfo) =>
+                    orderJson(order, orderInfo)
+                })
           case Failure(ex) =>
             complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
         }
@@ -303,7 +306,7 @@ case class MatcherApiRoute(wallet: Wallet,
       new ApiImplicitParam(name = "address", value = "Address", dataType = "string", paramType = "path")
     ))
   def getAllOrderHistory: Route = (path("orders" / AddressPM) & get & withAuth) { address =>
-    complete(StatusCodes.OK -> DBUtils.ordersByAddress(db, address, Set.empty, true).map {
+    complete(StatusCodes.OK -> DBUtils.ordersByAddress(db, address, Set.empty, true, matcherSettings.maxOrdersPerRequest).map {
       case (order, orderInfo) =>
         orderJson(order, orderInfo)
     })
@@ -342,7 +345,11 @@ case class MatcherApiRoute(wallet: Wallet,
     (headerValueByName("Timestamp") & headerValueByName("Signature")) { (ts, sig) =>
       checkGetSignature(publicKey, ts, sig) match {
         case Success(pk) =>
-          complete(StatusCodes.OK -> Json.toJson(DBUtils.reservedBalance(db, pk).map { case (k, v) => AssetPair.assetIdStr(k) -> v }))
+          complete(StatusCodes.OK -> Json.toJson(DBUtils.reservedBalance(db, pk).map {
+            case (k, v) =>
+              println(s"ROUTE: $k")
+              AssetPair.assetIdStr(k) -> v
+          }))
         case Failure(ex) =>
           complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
       }

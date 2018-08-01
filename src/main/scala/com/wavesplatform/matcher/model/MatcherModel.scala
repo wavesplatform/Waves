@@ -23,14 +23,14 @@ case class LevelAgg(price: Long, amount: Long)
 sealed trait LimitOrder {
   def price: Price
   def amount: Long
+  def fee: Long
   def order: Order
-  def partial(amount: Long): LimitOrder
+  def partial(amount: Long, fee: Long): LimitOrder
 
   def getSpendAmount: Long
   def getReceiveAmount: Long
-  def feeAmount: Long       = longExact(BigInt(amount) * order.matcherFee / order.amount, Long.MaxValue)
-  def remainingAmount: Long = order.amount - amount
-  val remainingFee: Long    = order.matcherFee - longExact(BigInt(remainingAmount) * order.matcherFee / order.amount, 0L)
+
+//  def feeAmount: Long = longExact(BigInt(amount) * order.matcherFee / order.amount, Long.MaxValue)
 
   def spentAcc: AssetAcc = AssetAcc(order.senderPublicKey, order.getSpendAssetId)
   def rcvAcc: AssetAcc   = AssetAcc(order.senderPublicKey, order.getReceiveAssetId)
@@ -54,16 +54,16 @@ sealed trait LimitOrder {
 
 }
 
-case class BuyLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
-  def partial(amount: Long): LimitOrder = copy(amount = amount)
-  def getReceiveAmount: Long            = amountOfAmountAsset
-  def getSpendAmount: Long              = amountOfPriceAsset
+case class BuyLimitOrder(price: Price, amount: Long, fee: Long, order: Order) extends LimitOrder {
+  def partial(amount: Long, fee: Long): LimitOrder = copy(amount = amount, fee = fee)
+  def getReceiveAmount: Long                       = amountOfAmountAsset
+  def getSpendAmount: Long                         = amountOfPriceAsset
 }
 
-case class SellLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
-  def partial(amount: Long): LimitOrder = copy(amount = amount)
-  def getReceiveAmount: Long            = amountOfPriceAsset
-  def getSpendAmount: Long              = amountOfAmountAsset
+case class SellLimitOrder(price: Price, amount: Long, fee: Long, order: Order) extends LimitOrder {
+  def partial(amount: Long, fee: Long): LimitOrder = copy(amount = amount, fee = fee)
+  def getReceiveAmount: Long                       = amountOfPriceAsset
+  def getSpendAmount: Long                         = amountOfAmountAsset
 }
 
 object LimitOrder {
@@ -105,15 +105,23 @@ object LimitOrder {
     val ordering         = 3
   }
 
-  def apply(o: Order): LimitOrder = o.orderType match {
-    case OrderType.BUY  => BuyLimitOrder(o.price, o.amount, o).copy()
-    case OrderType.SELL => SellLimitOrder(o.price, o.amount, o)
+  def apply(o: Order): LimitOrder = {
+    val partialFee = getPartialFee(o.matcherFee, o.amount, o.amount)
+    o.orderType match {
+      case OrderType.BUY  => BuyLimitOrder(o.price, o.amount, partialFee, o)
+      case OrderType.SELL => SellLimitOrder(o.price, o.amount, partialFee, o)
+    }
   }
 
-  def limitOrder(price: Long, amount: Long, o: Order): LimitOrder = o.orderType match {
-    case OrderType.BUY  => BuyLimitOrder(price, amount, o).copy()
-    case OrderType.SELL => SellLimitOrder(price, amount, o)
+  def limitOrder(price: Long, remainingAmount: Long, remainingFee: Long, o: Order): LimitOrder = {
+    o.orderType match {
+      case OrderType.BUY  => BuyLimitOrder(price, remainingAmount, remainingFee, o)
+      case OrderType.SELL => SellLimitOrder(price, remainingAmount, remainingFee, o)
+    }
   }
+
+  def getPartialFee(matcherFee: Long, totalAmount: Long, partialAmount: Long): Long =
+    (BigDecimal(partialAmount) * matcherFee / totalAmount).setScale(0, RoundingMode.HALF_UP).toLong
 }
 
 object Events {
@@ -121,11 +129,17 @@ object Events {
   sealed trait Event
 
   case class OrderExecuted(submitted: LimitOrder, counter: LimitOrder) extends Event {
-    def executedAmount: Long          = math.min(submitted.executionAmount(counter), counter.amountOfAmountAsset)
-    def counterRemaining: Long        = math.max(counter.amount - executedAmount, 0)
-    def submittedRemaining: Long      = math.max(submitted.amount - executedAmount, 0)
-    def submittedExecuted: LimitOrder = submitted.partial(amount = executedAmount)
-    def counterExecuted: LimitOrder   = counter.partial(amount = executedAmount)
+    def executedAmount: Long = math.min(submitted.executionAmount(counter), counter.amountOfAmountAsset)
+
+    def counterRemainingAmount: Long = math.max(counter.amount - executedAmount, 0)
+    def counterExecutedFee: Long     = LimitOrder.getPartialFee(counter.order.matcherFee, counter.order.amount, executedAmount)
+    def counterRemainingFee: Long    = math.max(counter.fee - counterExecutedFee, 0)
+    def counterExecuted: LimitOrder  = counter.partial(amount = executedAmount, fee = counterExecutedFee)
+
+    def submittedRemainingAmount: Long = math.max(submitted.amount - executedAmount, 0)
+    def submittedExecutedFee: Long     = LimitOrder.getPartialFee(submitted.order.matcherFee, submitted.order.amount, executedAmount)
+    def submittedRemainingFee: Long    = math.max(submitted.fee - submittedExecutedFee, 0)
+    def submittedExecuted: LimitOrder  = submitted.partial(amount = executedAmount, fee = submittedExecutedFee)
   }
 
   case class OrderAdded(order: LimitOrder) extends Event
@@ -146,21 +160,22 @@ object Events {
   def createOrderInfo(event: Event): Map[ByteStr, (Order, OrderInfo)] = {
     event match {
       case OrderAdded(lo) =>
-        Map((lo.order.id(), (lo.order, OrderInfo(lo.order.amount, 0L, canceled = false, Some(lo.minAmountOfAmountAsset)))))
+        Map((lo.order.id(), (lo.order, OrderInfo(lo.order.amount, 0L, canceled = false, Some(lo.minAmountOfAmountAsset), lo.fee))))
       case oe: OrderExecuted =>
         val (o1, o2) = (oe.submittedExecuted, oe.counterExecuted)
         Map(
-          (o1.order.id(), (o1.order, OrderInfo(o1.order.amount, o1.amount, canceled = false, Some(o1.minAmountOfAmountAsset)))),
-          (o2.order.id(), (o2.order, OrderInfo(o2.order.amount, o2.amount, canceled = false, Some(o2.minAmountOfAmountAsset))))
+          (o1.order.id(), (o1.order, OrderInfo(o1.order.amount, o1.amount, canceled = false, Some(o1.minAmountOfAmountAsset), o1.fee))),
+          (o2.order.id(), (o2.order, OrderInfo(o2.order.amount, o2.amount, canceled = false, Some(o2.minAmountOfAmountAsset), o2.fee)))
         )
       case OrderCanceled(lo, unmatchable) =>
-        Map((lo.order.id(), (lo.order, OrderInfo(lo.order.amount, 0L, canceled = !unmatchable, Some(lo.minAmountOfAmountAsset)))))
+        Map((lo.order.id(), (lo.order, OrderInfo(lo.order.amount, 0L, canceled = !unmatchable, Some(lo.minAmountOfAmountAsset), lo.fee))))
     }
   }
 
   def createOpenPortfolio(event: Event): Map[Address, OpenPortfolio] = {
     def overdraftFee(lo: LimitOrder): Long = {
-      if (lo.feeAcc == lo.rcvAcc) math.max(lo.feeAmount - lo.getReceiveAmount, 0L) else lo.feeAmount
+      val feeAmount = LimitOrder.getPartialFee(lo.order.matcherFee, lo.order.amount, lo.amount)
+      if (lo.feeAcc == lo.rcvAcc) math.max(feeAmount - lo.getReceiveAmount, 0L) else feeAmount
     }
 
     event match {
@@ -187,8 +202,8 @@ object Events {
           Map(o1.order.senderPublicKey.toAddress -> op1),
           Map(o2.order.senderPublicKey.toAddress -> op2)
         )
-      case OrderCanceled(lo, _) =>
-        val feeDiff = if (lo.feeAcc == lo.rcvAcc) math.max(lo.remainingFee - lo.getReceiveAmount, 0L) else lo.remainingFee
+      case OrderCanceled(lo, unmatchable) =>
+        val feeDiff = if (unmatchable) 0 else if (lo.feeAcc == lo.rcvAcc) math.max(lo.fee - lo.getReceiveAmount, 0L) else lo.fee
         Map(
           lo.order.senderPublicKey.toAddress ->
             OpenPortfolio(

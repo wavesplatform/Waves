@@ -2,17 +2,17 @@ package com.wavesplatform.matcher.market
 
 import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model.StatusCodes
-import com.wavesplatform.database.RW
-import com.wavesplatform.matcher.{MatcherKeys, MatcherSettings}
+import com.wavesplatform.database.{DBExt, RW}
 import com.wavesplatform.matcher.api.MatcherResponse
 import com.wavesplatform.matcher.model.Events._
+import com.wavesplatform.matcher.{MatcherKeys, MatcherSettings}
 import com.wavesplatform.state._
 import org.iq80.leveldb.DB
 import play.api.libs.json.JsArray
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import com.wavesplatform.database.DBExt
+import scorex.utils.ScorexLogging
 
-class MatcherTransactionWriter(db: DB) extends Actor {
+class MatcherTransactionWriter(db: DB) extends Actor with ScorexLogging {
 
   import MatcherTransactionWriter._
 
@@ -28,6 +28,7 @@ class MatcherTransactionWriter(db: DB) extends Actor {
   }
 
   def fetchTransactionsByOrder(orderId: ByteStr): Unit = {
+    log.trace(s"Loading transactions for order $orderId")
     val txs: Seq[ExchangeTransaction] = db.readOnly { ro =>
       for {
         seqNr <- 1 to ro.get(MatcherKeys.orderTxIdsSeqNr(orderId))
@@ -40,6 +41,8 @@ class MatcherTransactionWriter(db: DB) extends Actor {
   }
 
   private def saveExchangeTx(tx: ExchangeTransaction): Unit = db.readWrite { rw =>
+    log.trace(s"Appending ${tx.id()} to orders [${tx.buyOrder.id()}, ${tx.sellOrder.id()}]")
+    rw.put(MatcherKeys.exchangeTransaction(tx.id()), Some(tx))
     appendTxId(rw, tx.buyOrder.id(), tx.id())
     appendTxId(rw, tx.sellOrder.id(), tx.id())
   }

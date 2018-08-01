@@ -26,7 +26,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
   private def saveOrderInfo(rw: RW, event: Event): Map[ByteStr, (Order, OrderInfo)] =
     saveOrderInfoTimer.measure(db.readWrite { rw =>
       val updatedInfo = Events.createOrderInfo(event).map {
-        case (orderId, (o, oi)) => (orderId, (o, DBUtils.orderInfo(rw, orderId).combine(oi)))
+        case (orderId, (o, oi)) => (orderId, (o, OrderInfo.combine(DBUtils.orderInfo(rw, orderId), oi)))
       }
 
       for ((orderId, (_, oi)) <- updatedInfo) {

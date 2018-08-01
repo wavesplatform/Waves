@@ -382,8 +382,24 @@ class OrderBookActor(assetPair: AssetPair,
             allChannels.broadcastTx(tx)
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
-            (if (event.submittedRemaining >= 0) Some(o.partial(event.submittedRemaining)) else None,
-             if (event.counterRemaining >= 0) Some(c.partial(event.counterRemaining)) else None)
+            (
+              if (event.submittedRemainingAmount < 0) None
+              else
+                Some(
+                  o.partial(
+                    event.submittedRemainingAmount,
+                    event.submittedRemainingFee
+                  )
+                ),
+              if (event.counterRemainingAmount < 0) None
+              else
+                Some(
+                  c.partial(
+                    event.counterRemainingAmount,
+                    event.counterRemainingFee
+                  )
+                )
+            )
           case Left(ex) =>
             log.info(s"Can't create tx: $ex\no1: ${Json.prettyPrint(o.order.json())}\no2: ${Json.prettyPrint(c.order.json())}")
             (processInvalidTransaction(event, ex), None)

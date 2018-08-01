@@ -37,7 +37,7 @@ class OrderHistorySpecification
   }
 
   private def activeOrderIds(address: Address, assetIds: Set[Option[AssetId]]): Seq[ByteStr] =
-    DBUtils.ordersByAddress(db, address, assetIds, activeOnly = true).map(_._1.id())
+    DBUtils.ordersByAddress(db, address, assetIds, activeOnly = true, Int.MaxValue).map(_._1.id())
 
   property("New buy order added") {
     val ord1 = buy(pair, 0.0007, 10000)
@@ -45,7 +45,7 @@ class OrderHistorySpecification
     val lo = LimitOrder(ord1)
     oh.orderAccepted(OrderAdded(lo))
     oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Accepted
-    oh.orderInfo(ord1.id()) shouldBe OrderInfo(ord1.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset))
+    oh.orderInfo(ord1.id()) shouldBe OrderInfo(ord1.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord1.matcherFee)
 
     oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe 0L
     oh.openVolume(ord1.senderPublicKey, pair.priceAsset) shouldBe 7L
@@ -140,7 +140,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     val exec = OrderExecuted(LimitOrder(ord2), LimitOrder(ord1))
     oh.orderExecuted(exec)
-    oh.orderAccepted(OrderAdded(exec.submitted.partial(exec.submittedRemaining)))
+    oh.orderAccepted(OrderAdded(exec.submitted.partial(exec.submittedRemainingAmount, 0)))
 
     oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Filled
     oh.orderInfo(ord2.id()).status shouldBe LimitOrder.PartiallyFilled(100000000)
@@ -150,7 +150,7 @@ class OrderHistorySpecification
     activeOrderIds(ord1.senderPublicKey, Set(None)) shouldBe empty
 
     oh.openVolume(ord2.senderPublicKey, pair.amountAsset) shouldBe
-      math.max(0L, OrderInfo.safeSum(ord2.matcherFee * 2 / 12, -19999056L))
+      math.max(0L, OrderInfo.safeSum(LimitOrder.getPartialFee(ord2.matcherFee, ord2.amount, ord2.amount - ord1.amount), -19999056L))
     oh.openVolume(ord2.senderPublicKey, pair.priceAsset) shouldBe (BigDecimal(0.00085) * 20000000L).toLong
     activeOrderIds(ord2.senderPublicKey, Set(pair.priceAsset)) shouldBe Seq(ord2.id())
   }
@@ -168,9 +168,9 @@ class OrderHistorySpecification
     oh.orderInfo(ord1.id()).status shouldBe LimitOrder.PartiallyFilled(50000000)
     oh.orderInfo(ord2.id()).status shouldBe LimitOrder.Filled
 
-    val exec2 = OrderExecuted(LimitOrder(ord3), exec1.counter.partial(exec1.counterRemaining))
+    val exec2 = OrderExecuted(LimitOrder(ord3), exec1.counter.partial(exec1.counterRemainingAmount, 0))
     oh.orderExecuted(exec2)
-    oh.orderAccepted(OrderAdded(exec2.submitted.partial(exec2.submittedRemaining)))
+    oh.orderAccepted(OrderAdded(exec2.submitted.partial(exec2.submittedRemainingAmount, 0)))
 
     oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Filled
     oh.orderInfo(ord2.id()).status shouldBe LimitOrder.Filled
@@ -197,13 +197,16 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     val exec1 = OrderExecuted(LimitOrder(ord2), LimitOrder(ord1))
     oh.orderExecuted(exec1)
-    oh.orderAccepted(OrderAdded(exec1.submitted.partial(exec1.submittedRemaining)))
+    oh.orderAccepted(OrderAdded(exec1.submitted.partial(exec1.submittedRemainingAmount, 0)))
 
     oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Filled
     oh.orderInfo(ord2.id()).status shouldBe LimitOrder.PartiallyFilled(100000000)
 
-    oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe 109998942L + (BigInt(ord2.matcherFee) * (210000000 - 100000000) / 210000000).bigInteger
-      .longValue()
+    oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe 109998942L + LimitOrder.getPartialFee(
+      ord2.matcherFee,
+      ord2.amount,
+      ord2.amount - ord1.amount
+    )
     oh.openVolume(ord1.senderPublicKey, pair.priceAsset) shouldBe 0L
     activeOrderIds(ord1.senderPublicKey, Set(pair.amountAsset)) shouldBe Seq(ord2.id())
   }
@@ -242,7 +245,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     val exec1 = OrderExecuted(LimitOrder(ord2), LimitOrder(ord1))
     oh.orderExecuted(exec1)
-    oh.orderCanceled(OrderCanceled(exec1.counter.partial(exec1.counterRemaining), unmatchable = false))
+    oh.orderCanceled(OrderCanceled(exec1.counter.partial(exec1.counterRemainingAmount, exec1.counterRemainingFee), unmatchable = false))
 
     oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Cancelled(1000000000)
     oh.orderInfo(ord2.id()).status shouldBe LimitOrder.Filled
@@ -289,7 +292,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord2)))
     oh.orderAccepted(OrderAdded(LimitOrder(ord3)))
     oh.orderExecuted(OrderExecuted(LimitOrder(ord4), LimitOrder(ord1)))
-    oh.orderAccepted(OrderAdded(LimitOrder.limitOrder(ord4.price, 1000000000, ord4)))
+    oh.orderAccepted(OrderAdded(LimitOrder.limitOrder(ord4.price, 1000000000, 0, ord4)))
     oh.orderCanceled(OrderCanceled(LimitOrder(ord3), unmatchable = false))
     oh.orderAccepted(OrderAdded(LimitOrder(ord5)))
 
@@ -335,10 +338,10 @@ class OrderHistorySpecification
 
   property("Open Portfolio for two assets") {
     val pk         = PrivateKeyAccount("private".getBytes("utf-8"))
-    val ass1       = ByteStr("ASS1".getBytes)
-    val ass2       = ByteStr("ASS2".getBytes)
-    val pair1      = AssetPair(Some(ass1), None)
-    val pair2      = AssetPair(Some(ass2), None)
+    val ass1       = mkAssetId("ASS1")
+    val ass2       = mkAssetId("ASS2")
+    val pair1      = AssetPair(ass1, None)
+    val pair2      = AssetPair(ass2, None)
     val matcherFee = 300000L
     val ord1       = sell(pair1, 0.0008, 10000, Some(pk), Some(matcherFee))
     val ord2       = sell(pair2, 0.0009, 10001, Some(pk), Some(matcherFee))
@@ -352,6 +355,6 @@ class OrderHistorySpecification
 //        Map("WAVES"     -> (2 * matcherFee - LimitOrder(ord1).getReceiveAmount - LimitOrder(ord2).getReceiveAmount),
 //            ass1.base58 -> Order.correctAmount(ord1.amount, ord1.price),
 //            ass2.base58 -> Order.correctAmount(ord2.amount, ord2.price)
-        ))
+//        ))
   }
 }

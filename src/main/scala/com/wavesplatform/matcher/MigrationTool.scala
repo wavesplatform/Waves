@@ -32,7 +32,7 @@ object MigrationTool extends ScorexLogging {
         val e                 = iterator.next()
         val SK.OrdersInfo(id) = e.getKey
         val t                 = om.readTree(e.getValue)
-        val oi                = OrderInfo(t.get("amount").asLong, t.get("filled").asLong, t.get("canceled").asBoolean, None)
+        val oi                = OrderInfo(t.get("amount").asLong, t.get("filled").asLong, t.get("canceled").asBoolean, None, 0)
         if (!oi.canceled && oi.amount != oi.filled) {
           result += id -> oi
         }
@@ -269,7 +269,7 @@ object MigrationTool extends ScorexLogging {
     } else if (args(1) == "active-orders") {
       migrateActiveOrders(db)
     } else if (args(1) == "ao") {
-      val o = DBUtils.ordersByAddress(db, Address.fromString(args(2)).explicitGet(), Set.empty, false)
+      val o = DBUtils.ordersByAddress(db, Address.fromString(args(2)).explicitGet(), Set.empty, false, Int.MaxValue)
       println(o.mkString("\n"))
     }
 

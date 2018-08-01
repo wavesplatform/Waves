@@ -8,7 +8,7 @@ import scorex.transaction.AssetId
 
 import scala.util.Try
 
-case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: Option[Long]) {
+case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: Option[Long], remainingFee: Long) {
   def remaining: Long = if (canceled) 0L else amount - filled
 
   def status: LimitOrder.OrderStatus = {
@@ -28,18 +28,17 @@ object OrderInfo {
   def safeSum(x: Long, y: Long): Long         = Try(Math.addExact(x, y)).getOrElse(Long.MaxValue)
   implicit val longSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
 
-  val empty = OrderInfo(0L, 0L, false, None)
-  implicit val orderInfoMonoid: Monoid[OrderInfo] = new Monoid[OrderInfo] {
-    override def empty: OrderInfo = OrderInfo.empty
+  val empty = OrderInfo(0L, 0L, false, None, 0L)
 
-    override def combine(older: OrderInfo, newer: OrderInfo): OrderInfo =
-      OrderInfo(
-        math.max(older.amount, newer.amount),
-        older.filled.combine(newer.filled),
-        newer.canceled,
-        newer.minAmount
-      )
-  }
+  // TODO refactor this
+  def combine(older: OrderInfo, newer: OrderInfo): OrderInfo =
+    OrderInfo(
+      math.max(older.amount, newer.amount),
+      older.filled.combine(newer.filled),
+      newer.canceled,
+      newer.minAmount,
+      newer.remainingFee
+    )
 
   implicit val orderInfoFormat: Format[OrderInfo] = Json.format[OrderInfo]
 
