@@ -352,6 +352,6 @@ class OrderHistorySpecification
 //        Map("WAVES"     -> (2 * matcherFee - LimitOrder(ord1).getReceiveAmount - LimitOrder(ord2).getReceiveAmount),
 //            ass1.base58 -> Order.correctAmount(ord1.amount, ord1.price),
 //            ass2.base58 -> Order.correctAmount(ord2.amount, ord2.price)
-        ))
+//        ))
   }
 }

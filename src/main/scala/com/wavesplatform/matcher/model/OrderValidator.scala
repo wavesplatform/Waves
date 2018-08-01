@@ -50,19 +50,18 @@ trait OrderValidator {
   def validateNewOrder(order: Order): Either[GenericError, Order] =
     timer
       .refine("action" -> "place", "pair" -> order.assetPair.toString)
-      .measure {val v =
-      (order.matcherPublicKey == matcherPubKey) :| "Incorrect matcher public key" &&
-        (order.expiration > NTP.correctedTime() + MinExpiration) :| "Order expiration should be > 1 min" &&
-        order.signaturesValid().isRight :| "signature should be valid" &&
-        order.isValid(NTP.correctedTime()) &&
-        (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
-        (orderHistory.orderInfo(order.id()).status == LimitOrder.NotFound) :| "Order is already accepted" &&
-        isBalanceWithOpenOrdersEnough(order)
-    Either
-      .cond(v,
-      order,GenericError(v.messages())
-    )
-  }
+      .measure {
+        val v =
+          (order.matcherPublicKey == matcherPubKey) :| "Incorrect matcher public key" &&
+            (order.expiration > NTP.correctedTime() + MinExpiration) :| "Order expiration should be > 1 min" &&
+            order.signaturesValid().isRight :| "signature should be valid" &&
+            order.isValid(NTP.correctedTime()) &&
+            (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
+            (orderHistory.orderInfo(order.id()).status == LimitOrder.NotFound) :| "Order is already accepted" &&
+            isBalanceWithOpenOrdersEnough(order)
+        Either
+          .cond(v, order, GenericError(v.messages()))
+      }
 
   def validateCancelOrder(cancel: CancelOrder): Either[GenericError, CancelOrder] = {
     timer
@@ -85,7 +84,6 @@ trait OrderValidator {
             GenericError(v.messages())
           )
       }
-
 
   }
 
