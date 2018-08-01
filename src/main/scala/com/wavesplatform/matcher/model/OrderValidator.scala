@@ -59,30 +59,33 @@ trait OrderValidator {
             (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
             (orderHistory.orderInfo(order.id()).status == LimitOrder.NotFound) :| "Order is already accepted" &&
             isBalanceWithOpenOrdersEnough(order)
-        if (!v) {
-          Left(GenericError(v.messages()))
-        } else {
-          Right(order)
-        }
+        Either
+          .cond(v, order, GenericError(v.messages()))
       }
 
-  def validateCancelOrder(cancel: CancelOrder): Either[GenericError, CancelOrder] =
+  def validateCancelOrder(cancel: CancelOrder): Either[GenericError, CancelOrder] = {
     timer
       .refine("action" -> "cancel", "pair" -> cancel.assetPair.toString)
       .measure {
         val status = orderHistory.orderInfo(cancel.orderId).status
-        val v =
-          (status != LimitOrder.NotFound) :| "Order not found" &&
-            (status != LimitOrder.Filled) :| "Order is already Filled" &&
-            cancel.req.isSignatureValid() :| "Signature should be valid" &&
-            orderHistory.order(cancel.orderId).fold(false)(_.senderPublicKey == cancel.req.senderPublicKey) :| "Order not found"
-
-        if (!v) {
-          Left(GenericError(v.messages()))
-        } else {
-          Right(cancel)
+        val v = status match {
+          case LimitOrder.NotFound  => Validation.failure("Order not found")
+          case LimitOrder.Filled(_) => Validation.failure("Order is already Filled")
+          case _ =>
+            orderHistory
+              .order(cancel.orderId)
+              .fold(false)(_.senderPublicKey == cancel.req.senderPublicKey) :| "Order not found"
         }
+
+        Either
+          .cond(
+            v,
+            cancel,
+            GenericError(v.messages())
+          )
       }
+
+  }
 
   private def spendableBalance(a: AssetAcc): Long = {
     val portfolio = utxPool.portfolio(a.account)

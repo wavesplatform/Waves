@@ -97,7 +97,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
 
   def deleteFromOrderHistory(req: DeleteOrderFromHistory): Unit = {
     orderHistory.orderInfo(req.id).status match {
-      case LimitOrder.Filled | LimitOrder.Cancelled(_) =>
+      case LimitOrder.Filled(_) | LimitOrder.Cancelled(_) =>
         orderHistory.deleteOrder(req.address, req.id)
         sender() ! OrderDeleted(req.id)
       case _ =>

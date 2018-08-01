@@ -103,7 +103,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
 
   def deleteOrder(address: Address, orderId: ByteStr): Boolean = db.readWrite { rw =>
     DBUtils.orderInfo(rw, orderId).status match {
-      case Filled | LimitOrder.Cancelled(_) =>
+      case Filled(_) | LimitOrder.Cancelled(_) =>
         rw.delete(MatcherKeys.order(orderId))
         rw.delete(MatcherKeys.orderInfo(orderId))
         true
