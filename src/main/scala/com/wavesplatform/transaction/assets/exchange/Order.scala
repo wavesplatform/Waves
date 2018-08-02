@@ -1,16 +1,18 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.crypto
-import com.wavesplatform.state.ByteStr
-import io.swagger.annotations.ApiModelProperty
-import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.crypto
 import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}
+import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
+import com.wavesplatform.utils.Base58
+import io.swagger.annotations.ApiModelProperty
+import monix.eval.Coeval
+import play.api.libs.json.{JsObject, Json}
+import scorex.crypto.signatures.Curve25519.SignatureLength
+
 import scala.util.Try
 
 sealed trait OrderType {
@@ -210,10 +212,8 @@ object Order {
             @ApiModelProperty(value = "Order time to live, max = 30 days") expiration: Long,
             @ApiModelProperty(example = "100000") matcherFee: Long,
             @ApiModelProperty(dataType = "Proofs") proofs: Proofs,
-            @ApiModelProperty(dataType = "java.lang.Byte") version: Byte = 1): Order = {
-    if (version == 1) {
-      OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, price, amount, timestamp, expiration, matcherFee, proofs)
-    } else {
+            @ApiModelProperty(dataType = "java.lang.Byte") version: Byte = 1): Order = {if (version == 1) {
+    if (proofs.proofs.size == 1 && proofs.proofs(0).arr.size == SignatureLength) {OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, price, amount, timestamp, expiration, matcherFee, proofs)} else {
       OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, price, amount, timestamp, expiration, matcherFee, proofs)
     }
   }
