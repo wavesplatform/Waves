@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.google.common.primitives.Longs
 import com.wavesplatform.crypto
 import com.wavesplatform.state.ByteStr
 import io.swagger.annotations.ApiModelProperty
@@ -94,12 +93,7 @@ trait Order extends BytesSerializable with JsonSerializable with Signed {
     (getReceiveAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
   }
 
-  def toSign: Array[Byte] =
-    senderPublicKey.publicKey ++ matcherPublicKey.publicKey ++
-      assetPair.bytes ++ orderType.bytes ++
-      Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
-      Longs.toByteArray(timestamp) ++ Longs.toByteArray(expiration) ++
-      Longs.toByteArray(matcherFee)
+  def toSign: Array[Byte]
 
   @ApiModelProperty(hidden = true)
   val id: Coeval[Array[Byte]] = Coeval.evalOnce(crypto.fastHash(toSign))
@@ -284,8 +278,6 @@ object Order {
     val sig      = crypto.sign(sender, unsigned.toSign)
     unsigned.updateProofs(Proofs(Seq(ByteStr(sig))))
   }
-
-  def parseBytes(bytes: Array[Byte]): Try[Order] = OrderV1.parseBytes(bytes)
 
   def sign(unsigned: Order, sender: PrivateKeyAccount): Order = {
     require(unsigned.senderPublicKey == sender)

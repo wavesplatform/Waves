@@ -24,6 +24,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
   property("ExchangeTransactionV2 transaction serialization roundtrip") {
     forAll(exchangeTransactionGen.filter(_.version == 2)) { om =>
       val recovered = ExchangeTransaction.parse(om.bytes()).get
+      println(om.bytes() mkString (" "))
+      println(recovered.bytes() mkString (" "))
       om.id() shouldBe recovered.id()
       om.buyOrder.id() shouldBe recovered.buyOrder.id()
       recovered.bytes() shouldEqual om.bytes()

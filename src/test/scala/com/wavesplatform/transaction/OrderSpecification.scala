@@ -7,13 +7,28 @@ import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.utils.NTP
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange._
 
 class OrderSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with ValidationMatcher {
 
   property("Order transaction serialization roundtrip") {
-    forAll(orderGen) { order =>
-      val recovered = Order.parseBytes(order.bytes()).get
+    forAll(orderV1Gen) { order =>
+      val recovered = OrderV1.parseBytes(order.bytes()).get
+      recovered.bytes() shouldEqual order.bytes()
+      recovered.id() shouldBe order.id()
+      recovered.senderPublicKey.publicKey shouldBe order.senderPublicKey.publicKey
+      recovered.matcherPublicKey shouldBe order.matcherPublicKey
+      recovered.assetPair shouldBe order.assetPair
+      recovered.orderType shouldBe order.orderType
+      recovered.price shouldBe order.price
+      recovered.amount shouldBe order.amount
+      recovered.timestamp shouldBe order.timestamp
+      recovered.expiration shouldBe order.expiration
+      recovered.matcherFee shouldBe order.matcherFee
+      recovered.signature shouldBe order.signature
+    }
+    forAll(orderV2Gen) { order =>
+      val recovered = OrderV2.parseBytes(order.bytes()).get
       recovered.bytes() shouldEqual order.bytes()
       recovered.id() shouldBe order.id()
       recovered.senderPublicKey.publicKey shouldBe order.senderPublicKey.publicKey

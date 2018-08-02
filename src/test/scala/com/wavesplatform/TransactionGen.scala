@@ -516,9 +516,15 @@ trait TransactionGenBase extends ScriptGen {
     matcherFee <- matcherFeeAmountGen
   } yield (sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee)
 
-  val orderGen: Gen[Order] = for {
+  val orderV1Gen: Gen[Order] = for {
     (sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee) <- orderParamGen
   } yield Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, 1: Byte)
+
+  val orderV2Gen: Gen[Order] = for {
+    (sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee) <- orderParamGen
+  } yield Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, 2: Byte)
+
+  val orderGen: Gen[Order] = Gen.oneOf(orderV1Gen, orderV2Gen)
 
   val arbitraryOrderGen: Gen[Order] = for {
     (sender, matcher, pair, orderType, _, _, _, _, _) <- orderParamGen

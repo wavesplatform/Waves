@@ -31,6 +31,13 @@ case class OrderV2(@ApiModelProperty(dataType = "java.lang.String") senderPublic
 
   override def signature: Array[Byte] = proofs.proofs(0).arr
 
+  def toSign: Array[Byte] =
+    (version +: senderPublicKey.publicKey) ++ matcherPublicKey.publicKey ++
+      assetPair.bytes ++ orderType.bytes ++
+      Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
+      Longs.toByteArray(timestamp) ++ Longs.toByteArray(expiration) ++
+      Longs.toByteArray(matcherFee)
+
   val signatureValid = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
 
   @ApiModelProperty(hidden = true)
