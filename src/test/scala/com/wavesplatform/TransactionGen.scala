@@ -533,7 +533,10 @@ trait TransactionGenBase extends ScriptGen {
     sender1: PrivateKeyAccount <- accountGen
     sender2: PrivateKeyAccount <- accountGen
     assetPair                  <- assetPairGen
-    r                          <- exchangeGeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset)
+    r <- Gen.oneOf(
+      exchangeGeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset),
+      exchangeV2GeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset)
+    )
   } yield r
 
   def exchangeGeneratorP(buyer: PrivateKeyAccount,
@@ -567,6 +570,45 @@ trait TransactionGenBase extends ScriptGen {
 
       trans
     }
+
+  def exchangeV2GeneratorP(buyer: PrivateKeyAccount,
+                           seller: PrivateKeyAccount,
+                           amountAssetId: Option[ByteStr],
+                           priceAssetId: Option[ByteStr],
+                           fixedMatcherFee: Option[Long] = None) = {
+    for {
+      (_, matcher, _, _, price, amount1, timestamp, expiration, genMatcherFee) <- orderParamGen
+      amount2: Long                                                            <- matcherAmountGen
+      matcherFee = fixedMatcherFee.getOrElse(genMatcherFee)
+      matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2) / 2000, Math.min(amount1, amount2) / 1000)
+      assetPair = AssetPair(amountAssetId, priceAssetId)
+      o1 <- Gen.oneOf(
+        OrderV1.buy(buyer, matcher, assetPair, price, amount1, timestamp, expiration, matcherFee),
+        OrderV2.buy(buyer, matcher, assetPair, price, amount1, timestamp, expiration, matcherFee)
+      )
+      o2 <- Gen.oneOf(
+        OrderV1.sell(seller, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee),
+        OrderV2.sell(seller, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee)
+      )
+    } yield {
+      val buyFee  = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
+      val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
+
+      ExchangeTransactionV2
+        .create(
+          matcher,
+          o1,
+          o2,
+          price,
+          matchedAmount,
+          buyFee,
+          sellFee,
+          (buyFee + sellFee) / 2,
+          expiration - 100
+        )
+        .explicitGet()
+    }
+  }
 
   val randomTransactionGen: Gen[ProvenTransaction] = (for {
     tr <- transferV1Gen

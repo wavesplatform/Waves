@@ -12,9 +12,19 @@ import play.api.libs.json.Json
 
 class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
-  property("ExchangeTransaction transaction serialization roundtrip") {
-    forAll(exchangeTransactionGen) { om =>
-      val recovered = ExchangeTransaction.parseBytes(om.bytes()).get
+  property("ExchangeTransactionV1 transaction serialization roundtrip") {
+    forAll(exchangeTransactionGen.filter(_.version == 1)) { om =>
+      val recovered = om.builder.parseBytes(om.bytes()).get
+      om.id() shouldBe recovered.id()
+      om.buyOrder.id() shouldBe recovered.buyOrder.id()
+      recovered.bytes() shouldEqual om.bytes()
+    }
+  }
+
+  property("ExchangeTransactionV2 transaction serialization roundtrip") {
+    forAll(exchangeTransactionGen.filter(_.version == 2)) { om =>
+      println(om.bytes() mkString " ")
+      val recovered = om.builder.parseBytes(om.bytes()).get
       om.id() shouldBe recovered.id()
       om.buyOrder.id() shouldBe recovered.buyOrder.id()
       recovered.bytes() shouldEqual om.bytes()
