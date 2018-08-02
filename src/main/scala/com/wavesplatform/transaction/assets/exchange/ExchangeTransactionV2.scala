@@ -124,7 +124,7 @@ object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2]
         o2Size         <- read(Ints.fromByteArray _, 4)
         o2Ver          <- readByte
         o1             <- read(if (o1Ver == 1) { OrderV1.parseBytes _ } else { OrderV2.parseBytes _ }, o1Size).map(_.get)
-        o2             <- read(if (o1Ver == 1) { OrderV1.parseBytes _ } else { OrderV2.parseBytes _ }, o2Size).map(_.get)
+        o2             <- read(if (o2Ver == 1) { OrderV1.parseBytes _ } else { OrderV2.parseBytes _ }, o2Size).map(_.get)
         price          <- read(Longs.fromByteArray _, 8)
         amount         <- read(Longs.fromByteArray _, 8)
         buyMatcherFee  <- read(Longs.fromByteArray _, 8)
