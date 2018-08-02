@@ -18,7 +18,6 @@ class ExchangeTransactionSuite extends BaseTransactionSuite {
     val assetName        = "myasset"
     val assetDescription = "my asset description"
 
-
     val IssueTx: IssueTransactionV1 = IssueTransactionV1
       .selfSigned(
         sender = sender.privateKey,
