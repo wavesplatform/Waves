@@ -1,12 +1,13 @@
 package com.wavesplatform.matcher
 
 import java.io.File
-import java.util.HashMap
+import java.util.{HashMap => JHashMap}
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.Shorts
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.crypto.DigestSize
 import com.wavesplatform.database.DBExt
 import com.wavesplatform.db.{AssetIdOrderIdSetCodec, OrderIdsCodec, OrderToTxIdsCodec, PortfolioCodec, openDB}
 import com.wavesplatform.matcher.api.DBUtils
@@ -24,20 +25,17 @@ import scala.collection.JavaConverters._
 object MigrationTool extends ScorexLogging {
   private def loadOrderInfo(db: DB, om: ObjectMapper): Map[ByteStr, OrderInfo] = {
     log.info("Loading order info")
-    val result   = Map.newBuilder[ByteStr, OrderInfo]
-    val iterator = db.iterator()
-    try {
-      iterator.seek(SK.OrdersInfo.keyBytes)
-      while (iterator.hasNext && iterator.peekNext().getKey.startsWith(SK.OrdersInfo.keyBytes)) {
-        val e                 = iterator.next()
-        val SK.OrdersInfo(id) = e.getKey
-        val t                 = om.readTree(e.getValue)
-        val oi                = OrderInfo(t.get("amount").asLong, t.get("filled").asLong, t.get("canceled").asBoolean, None, 0)
-        if (!oi.canceled && oi.amount != oi.filled) {
-          result += id -> oi
-        }
+    val result = Map.newBuilder[ByteStr, OrderInfo]
+
+    db.iterateOver(SK.OrdersInfo.keyBytes) { e =>
+      val SK.OrdersInfo(id) = e.getKey
+      val t                 = om.readTree(e.getValue)
+      val oi                = OrderInfo(t.get("amount").asLong, t.get("filled").asLong, t.get("canceled").asBoolean, None, 0)
+      if (!oi.canceled && oi.amount != oi.filled) {
+        result += id -> oi
       }
-    } finally iterator.close()
+    }
+
     log.info("Loaded all order infos")
     result.result()
   }
@@ -174,7 +172,7 @@ object MigrationTool extends ScorexLogging {
     val iterator = db.iterator()
     iterator.seekToFirst()
 
-    val result = new HashMap[Short, Stats]
+    val result = new JHashMap[Short, Stats]
 
     def add(prefix: Short, e: java.util.Map.Entry[Array[Byte], Array[Byte]]): Unit = {
       result.compute(
@@ -250,6 +248,79 @@ object MigrationTool extends ScorexLogging {
     }
   }
 
+  private def recalculateReservedBalance(db: DB): Unit = {
+    log.info("Recalculating reserved balances")
+    val calculatedReservedBalances = new JHashMap[Address, Map[Option[AssetId], Long]]()
+    val key                        = MatcherKeys.orderInfo(ByteStr(Array.emptyByteArray))
+
+    var discrepancyCounter = 0
+
+    db.iterateOver(key.keyBytes) { e =>
+      val orderId = new Array[Byte](DigestSize)
+      Array.copy(e.getKey, 2, orderId, 0, DigestSize)
+      val orderInfo = key.parse(e.getValue)
+      if (!orderInfo.status.isFinal) {
+        db.get(MatcherKeys.order(ByteStr(orderId))) match {
+          case None => log.info(s"Missing order ${ByteStr(orderId)}")
+          case Some(order) =>
+            calculatedReservedBalances.compute(
+              order.sender, { (_, prevBalances) =>
+                val id = order.getSpendAssetId
+                Option(prevBalances).fold(Map(id -> orderInfo.remaining)) { prevBalances =>
+                  prevBalances.updated(id, prevBalances.getOrElse(id, 0L) + orderInfo.remaining)
+                }
+              }
+            )
+        }
+      }
+    }
+
+    log.info("Collecting all addresses")
+
+    val addresses = Seq.newBuilder[Address]
+    db.iterateOver(Shorts.toByteArray(5)) { e =>
+      val addressBytes = new Array[Byte](Address.AddressLength)
+      Array.copy(e.getKey, 2, addressBytes, 0, Address.AddressLength)
+      addresses += Address.fromBytes(addressBytes).explicitGet()
+    }
+
+    log.info("Loading stored reserved balances")
+
+    val allReservedBalances = addresses.result().map(a => a -> DBUtils.reservedBalance(db, a)).toMap
+
+    if (allReservedBalances.size != calculatedReservedBalances.size()) {
+      log.info(s"Calculated: ${calculatedReservedBalances.size()}, stored: ${allReservedBalances.size}")
+    }
+
+    val corrections = Seq.newBuilder[((Address, Option[AssetId]), Long)]
+
+    for (address <- allReservedBalances.keySet ++ calculatedReservedBalances.keySet().asScala) {
+      val calculated = calculatedReservedBalances.getOrDefault(address, Map.empty)
+      val stored     = allReservedBalances.getOrElse(address, Map.empty)
+      if (calculated != stored) {
+        for (assetId <- calculated.keySet ++ stored.keySet) {
+          val calculatedBalance = calculated.getOrElse(assetId, 0L)
+          val storedBalance     = stored.getOrElse(assetId, 0L)
+
+          if (calculatedBalance != storedBalance) {
+            discrepancyCounter += 1
+            corrections += (address, assetId) -> calculatedBalance
+          }
+        }
+      }
+    }
+
+    log.info(s"Found $discrepancyCounter discrepancies")
+
+    db.readWrite { rw =>
+      for (((address, assetId), value) <- corrections.result()) {
+        rw.put(MatcherKeys.openVolume(address, assetId), Some(value))
+      }
+    }
+
+    log.info("Completed")
+  }
+
   def main(args: Array[String]): Unit = {
     log.info(s"OK, engine start")
 
@@ -271,8 +342,13 @@ object MigrationTool extends ScorexLogging {
     } else if (args(1) == "ao") {
       val o = DBUtils.ordersByAddress(db, Address.fromString(args(2)).explicitGet(), Set.empty, false, Int.MaxValue)
       println(o.mkString("\n"))
+    } else if (args(1) == "cb") {
+      recalculateReservedBalance(db)
+    } else if (args(1) == "rb") {
+      for ((assetId, balance) <- DBUtils.reservedBalance(db, Address.fromString(args(2)).explicitGet())) {
+        log.info(s"${AssetPair.assetIdStr(assetId)}: $balance")
+      }
     }
-
     db.close()
   }
 

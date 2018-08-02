@@ -10,6 +10,7 @@ import com.wavesplatform.state._
 import org.iq80.leveldb.{DB, ReadOptions}
 import scorex.transaction.smart.script.{Script, ScriptReader}
 import scorex.transaction.{Transaction, TransactionParsers}
+import java.util.{Map => JMap}
 
 package object database {
   implicit class ByteArrayDataOutputExt(val output: ByteArrayDataOutput) extends AnyVal {
@@ -235,5 +236,13 @@ package object database {
     }
 
     def get[A](key: Key[A]): A = key.parse(db.get(key.keyBytes))
+
+    def iterateOver(prefix: Array[Byte])(f: JMap.Entry[Array[Byte], Array[Byte]] => Unit): Unit = {
+      val iterator = db.iterator()
+      try {
+        iterator.seek(prefix)
+        while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) f(iterator.next())
+      } finally iterator.close()
+    }
   }
 }
