@@ -6,6 +6,7 @@ import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.utils.Base58
+import scorex.crypto.signatures.Curve25519.SignatureLength
 
 import scala.util.{Failure, Success}
 
@@ -59,7 +60,8 @@ object OrderJson {
                 matcherFee: Long,
                 signature: Option[Array[Byte]],
                 proofs: Option[Array[Array[Byte]]],
-  ): Order = {
+                version: Option[Byte]): Order = {
+    val eproofs = proofs.map(p => Proofs(p.map(ByteStr.apply))).orElse(signature.map(s => Proofs(Seq(ByteStr(s))))).getOrElse(Proofs.empty)
     Order(
       sender,
       matcher,
@@ -70,7 +72,8 @@ object OrderJson {
       timestamp,
       expiration,
       matcherFee,
-      proofs.map(p => Proofs(p.map(ByteStr.apply))).orElse(signature.map(s => Proofs(Seq(ByteStr(s))))).getOrElse(Proofs.empty)
+      eproofs,
+      version.getOrElse(if (eproofs.proofs.size == 1 && eproofs.proofs(0).arr.size == SignatureLength) { 1 } else { 2 })
     )
   }
 
@@ -98,7 +101,8 @@ object OrderJson {
       (JsPath \ "expiration").read[Long] and
       (JsPath \ "matcherFee").read[Long] and
       (JsPath \ "signature").readNullable[Array[Byte]] and
-      (JsPath \ "proofs").readNullable[Array[Array[Byte]]]
+      (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
+      (JsPath \ "version").readNullable[Byte]
     r(readOrder _)
   }
 

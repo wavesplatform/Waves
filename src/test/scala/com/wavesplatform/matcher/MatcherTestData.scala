@@ -112,7 +112,7 @@ trait MatcherTestData {
     timestamp: Long           <- createdTimeGen
     expiration: Long          <- maxTimeGen
     matcherFee: Long          <- maxWavesAmountGen
-  } yield (Order(sender, MatcherAccount, pair, orderType, price, amount, timestamp, expiration, matcherFee), sender)
+  } yield (Order(sender, MatcherAccount, pair, orderType, price, amount, timestamp, expiration, matcherFee, 1: Byte), sender)
 
   val buyLimitOrderGenerator: Gen[BuyLimitOrder] = for {
     sender: PrivateKeyAccount <- accountGen

@@ -12,7 +12,6 @@ import com.wavesplatform.serialization.{BytesSerializable, /*Deser,*/ JsonSerial
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
-import scorex.crypto.signatures.Curve25519.SignatureLength
 import scala.util.Try
 
 sealed trait OrderType {
@@ -213,8 +212,9 @@ object Order {
             @ApiModelProperty(value = "Creation timestamp") timestamp: Long,
             @ApiModelProperty(value = "Order time to live, max = 30 days") expiration: Long,
             @ApiModelProperty(example = "100000") matcherFee: Long,
-            @ApiModelProperty(dataType = "Proofs") proofs: Proofs): Order = {
-    if (proofs.proofs.size == 1 && proofs.proofs(0).arr.size == SignatureLength) {
+            @ApiModelProperty(dataType = "Proofs") proofs: Proofs,
+            @ApiModelProperty(dataType = "java.lang.Byte") version: Byte = 1): Order = {
+    if (version == 1) {
       OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, price, amount, timestamp, expiration, matcherFee, proofs)
     } else {
       OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, price, amount, timestamp, expiration, matcherFee, proofs)
@@ -249,8 +249,9 @@ object Order {
           amount: Long,
           timestamp: Long,
           expiration: Long,
-          matcherFee: Long): Order = {
-    val unsigned = OrderV1(sender, matcher, pair, OrderType.BUY, price, amount, timestamp, expiration, matcherFee, Proofs.empty)
+          matcherFee: Long,
+          version: Byte = 1): Order = {
+    val unsigned = Order(sender, matcher, pair, OrderType.BUY, price, amount, timestamp, expiration, matcherFee, Proofs.empty, version)
     val sig      = crypto.sign(sender, unsigned.toSign)
     unsigned.updateProofs(Proofs(Seq(ByteStr(sig))))
   }
@@ -262,8 +263,9 @@ object Order {
            amount: Long,
            timestamp: Long,
            expiration: Long,
-           matcherFee: Long): Order = {
-    val unsigned = OrderV1(sender, matcher, pair, OrderType.SELL, price, amount, timestamp, expiration, matcherFee, Proofs.empty)
+           matcherFee: Long,
+           version: Byte = 1): Order = {
+    val unsigned = Order(sender, matcher, pair, OrderType.SELL, price, amount, timestamp, expiration, matcherFee, Proofs.empty, version)
     val sig      = crypto.sign(sender, unsigned.toSign)
     unsigned.updateProofs(Proofs(Seq(ByteStr(sig))))
   }
@@ -276,8 +278,9 @@ object Order {
             amount: Long,
             timestamp: Long,
             expiration: Long,
-            matcherFee: Long): Order = {
-    val unsigned = OrderV1(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, Proofs.empty)
+            matcherFee: Long,
+            version: Byte): Order = {
+    val unsigned = Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, Proofs.empty, version)
     val sig      = crypto.sign(sender, unsigned.toSign)
     unsigned.updateProofs(Proofs(Seq(ByteStr(sig))))
   }

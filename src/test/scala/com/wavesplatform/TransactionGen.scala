@@ -518,7 +518,7 @@ trait TransactionGenBase extends ScriptGen {
 
   val orderGen: Gen[Order] = for {
     (sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee) <- orderParamGen
-  } yield Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee)
+  } yield Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, 1: Byte)
 
   val arbitraryOrderGen: Gen[Order] = for {
     (sender, matcher, pair, orderType, _, _, _, _, _) <- orderParamGen
@@ -527,7 +527,7 @@ trait TransactionGenBase extends ScriptGen {
     timestamp                                         <- Arbitrary.arbitrary[Long]
     expiration                                        <- Arbitrary.arbitrary[Long]
     matcherFee                                        <- Arbitrary.arbitrary[Long]
-  } yield Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee)
+  } yield Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, 1: Byte)
 
   val exchangeTransactionGen: Gen[ExchangeTransaction] = for {
     sender1: PrivateKeyAccount <- accountGen
@@ -551,8 +551,8 @@ trait TransactionGenBase extends ScriptGen {
       assetPair = AssetPair(amountAssetId, priceAssetId)
     } yield {
       val matcherFee = fixedMatcherFee.getOrElse(genMatcherFee)
-      val o1         = Order.buy(buyer, matcher, assetPair, price, amount1, timestamp, expiration, matcherFee)
-      val o2         = Order.sell(seller, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee)
+      val o1         = Order.buy(buyer, matcher, assetPair, price, amount1, timestamp, expiration, matcherFee, 1: Byte)
+      val o2         = Order.sell(seller, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee, 1: Byte)
       val buyFee     = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
       val sellFee    = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
       val trans =
