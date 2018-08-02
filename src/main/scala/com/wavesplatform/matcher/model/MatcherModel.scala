@@ -30,8 +30,6 @@ sealed trait LimitOrder {
   def getSpendAmount: Long
   def getReceiveAmount: Long
 
-//  def feeAmount: Long = longExact(BigInt(amount) * order.matcherFee / order.amount, Long.MaxValue)
-
   def spentAcc: AssetAcc = AssetAcc(order.senderPublicKey, order.getSpendAssetId)
   def rcvAcc: AssetAcc   = AssetAcc(order.senderPublicKey, order.getReceiveAssetId)
   def feeAcc: AssetAcc   = AssetAcc(order.senderPublicKey, None)
@@ -49,7 +47,7 @@ sealed trait LimitOrder {
     amount > 0 && amount >= minAmountOfAmountAsset && amount < Order.MaxAmount && getSpendAmount > 0 && getReceiveAmount > 0
 
   protected def longExact(v: BigInt, default: Long): Long              = Try(v.bigInteger.longValueExact()).getOrElse(default)
-  protected def minimalAmountOfAmountAssetByPrice(p: Long): Long       = (BigDecimal(Order.PriceConstant) / p).setScale(0, RoundingMode.HALF_UP).toLong
+  protected def minimalAmountOfAmountAssetByPrice(p: Long): Long       = (BigDecimal(Order.PriceConstant) / p).setScale(0, RoundingMode.CEILING).toLong
   protected def correctedAmountOfAmountAsset(min: Long, a: Long): Long = if (min > 0) longExact((BigInt(a) / min) * min, Long.MaxValue) else a
 
 }
@@ -121,7 +119,7 @@ object LimitOrder {
   }
 
   def getPartialFee(matcherFee: Long, totalAmount: Long, partialAmount: Long): Long =
-    (BigDecimal(partialAmount) * matcherFee / totalAmount).setScale(0, RoundingMode.HALF_UP).toLong
+    (BigDecimal(partialAmount) * matcherFee / totalAmount).setScale(0, RoundingMode.HALF_UP).toLongExact
 }
 
 object Events {
