@@ -23,14 +23,14 @@ case class ExchangeTransactionV2(buyOrder: Order,
     extends ExchangeTransaction {
 
   override def version: Byte                     = 2
-  override val builder: ExchangeTransaction.type = ExchangeTransaction
+  override val builder                           = ExchangeTransactionV2
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
   @ApiModelProperty(hidden = true)
   override val sender: PublicKeyAccount = buyOrder.matcherPublicKey
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    Array(builder.typeId) ++
+    Array(0: Byte, builder.typeId, version) ++
       (Ints.toByteArray(buyOrder.bytes().length) :+ buyOrder.version) ++
       (Ints.toByteArray(sellOrder.bytes().length) :+ sellOrder.version) ++
       buyOrder.bytes() ++ sellOrder.bytes() ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++

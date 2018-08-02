@@ -35,7 +35,7 @@ class MatcherTransactionWriter(db: DB, val settings: MatcherSettings) extends Su
       .map(_.explicitGet().value)
       .getOrElse(Set())
       .flatMap(id => get(makeKey(TransactionsPrefix, id)))
-      .flatMap(b => ExchangeTransaction.parseBytes(b).toOption)
+      .flatMap(b => ExchangeTransaction.parse(b).toOption)
 
     sender() ! GetTransactionsResponse(txs.toSeq)
   }

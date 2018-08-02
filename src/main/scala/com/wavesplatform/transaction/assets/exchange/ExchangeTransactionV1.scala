@@ -25,7 +25,7 @@ case class ExchangeTransactionV1(buyOrder: Order,
     with SignedTransaction {
 
   override def version: Byte                     = 1
-  override val builder: ExchangeTransaction.type = ExchangeTransaction
+  override val builder                           = ExchangeTransactionV1
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
   @ApiModelProperty(hidden = true)

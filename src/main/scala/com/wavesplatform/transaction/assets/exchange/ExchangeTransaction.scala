@@ -4,7 +4,9 @@ package com.wavesplatform.transaction.assets.exchange
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import com.wavesplatform.account.{/*PrivateKeyAccount,*/ PublicKeyAccount}
+import com.wavesplatform.account.PublicKeyAccount
+
+import scala.util.Failure
 //import com.wavesplatform.transaction.ValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction._
 import scala.util.Try
@@ -20,7 +22,7 @@ trait ExchangeTransaction extends FastHashId with ProvenTransaction {
   def timestamp: Long
   def version: Byte
 
-  override val builder: ExchangeTransaction.type = ExchangeTransaction
+//  override val builder: ExchangeTransaction.type = ExchangeTransaction
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
   @ApiModelProperty(hidden = true)
@@ -42,9 +44,9 @@ trait ExchangeTransaction extends FastHashId with ProvenTransaction {
     ))
 }
 
-object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] with TransactionParser.HardcodedVersion1 {
+object ExchangeTransaction {
 
-  override val typeId: Byte = 7
+  val typeId: Byte = 7
 
   /*  def create(matcher: PrivateKeyAccount,
              buyOrder: Order,
@@ -113,10 +115,10 @@ object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] wit
   }
    */
 
-  override def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
-    if (version == 1) {
-      ExchangeTransactionV1.parseTail(version, bytes)
-    } else {
-      ExchangeTransactionV2.parseTail(version, bytes)
-    }
+  def parse(bytes: Array[Byte]): Try[ExchangeTransaction] =
+    bytes.headOption
+      .fold(Failure(new Exception("Empty array")): Try[ExchangeTransaction]) { b =>
+        if (b == 0) ExchangeTransactionV2.parseBytes(bytes) //.map(_.asInstanceOf[ExchangeTransaction])
+        else ExchangeTransactionV1.parseBytes(bytes) //.map(_.asInstanceOf[ExchangeTransaction])
+      }
 }
