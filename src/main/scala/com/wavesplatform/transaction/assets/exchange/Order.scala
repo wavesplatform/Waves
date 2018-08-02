@@ -12,7 +12,7 @@ import com.wavesplatform.serialization.{BytesSerializable, /*Deser,*/ JsonSerial
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
-//import scorex.crypto.signatures.Curve25519._
+import scorex.crypto.signatures.Curve25519.SignatureLength
 import scala.util.Try
 
 sealed trait OrderType {
@@ -214,7 +214,11 @@ object Order {
             @ApiModelProperty(value = "Order time to live, max = 30 days") expiration: Long,
             @ApiModelProperty(example = "100000") matcherFee: Long,
             @ApiModelProperty(dataType = "Proofs") proofs: Proofs): Order = {
-    OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, price, amount, timestamp, expiration, matcherFee, proofs)
+    if (proofs.proofs.size == 1 && proofs.proofs(0).arr.size == SignatureLength) {
+      OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, price, amount, timestamp, expiration, matcherFee, proofs)
+    } else {
+      OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, price, amount, timestamp, expiration, matcherFee, proofs)
+    }
   }
   def apply(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
             @ApiModelProperty(dataType = "java.lang.String", example = "") matcherPublicKey: PublicKeyAccount,
