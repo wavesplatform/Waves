@@ -56,6 +56,11 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherGet(s"/matcher/orderbook/${amountAsset}/${priceAsset}").as[OrderBookResponse]
     }
 
+    def marketInfo(assetPair: AssetPair): Future[MarketResponse] = {
+      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
+      matcherGet(s"/matcher/market/$amountAsset/$priceAsset").as[MarketResponse]
+    }
+
     def parseAssetPair(assetPair: AssetPair) = {
       val amountAsset = assetPair.amountAsset match {
         case None => "WAVES"

@@ -95,39 +95,37 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
   test("/transactions/sign should produce issue/reissue/burn/transfer transactions that are good for /transactions/broadcast") {
     for (v <- supportedVersions) {
       val isProof = Option(v).nonEmpty
-      val issueId = signAndBroadcast(
+      val issueId = signBroadcastAndCalcFee(
         Json.obj("type"        -> 3,
                  "name"        -> "Gigacoin",
                  "quantity"    -> 100.waves,
                  "description" -> "Gigacoin",
                  "sender"      -> firstAddress,
                  "decimals"    -> 8,
-                 "reissuable"  -> true,
-                 "fee"         -> 1.waves),
+                 "reissuable"  -> true),
         usesProofs = isProof,
         version = v
       )
 
-      signAndBroadcast(
-        Json.obj("type" -> 5, "quantity" -> 200.waves, "assetId" -> issueId, "sender" -> firstAddress, "reissuable" -> false, "fee" -> 1.waves),
+      signBroadcastAndCalcFee(
+        Json.obj("type" -> 5, "quantity" -> 200.waves, "assetId" -> issueId, "sender" -> firstAddress, "reissuable" -> false),
         usesProofs = isProof,
         version = v
       )
 
-      signAndBroadcast(Json.obj("type" -> 6, "quantity" -> 0, "assetId" -> issueId, "sender" -> firstAddress, "fee" -> 1.waves),
-                       usesProofs = isProof,
-                       version = v)
+      signBroadcastAndCalcFee(Json.obj("type" -> 6, "quantity" -> 0, "assetId" -> issueId, "sender" -> firstAddress),
+                              usesProofs = isProof,
+                              version = v)
 
-      signAndBroadcast(Json.obj("type" -> 6, "quantity" -> 100.waves, "assetId" -> issueId, "sender" -> firstAddress, "fee" -> 1.waves),
-                       usesProofs = isProof,
-                       version = v)
+      signBroadcastAndCalcFee(Json.obj("type" -> 6, "quantity" -> 100.waves, "assetId" -> issueId, "sender" -> firstAddress),
+                              usesProofs = isProof,
+                              version = v)
 
-      signAndBroadcast(
+      signBroadcastAndCalcFee(
         Json.obj(
           "type"       -> 4,
           "sender"     -> firstAddress,
           "recipient"  -> secondAddress,
-          "fee"        -> 100000,
           "assetId"    -> issueId,
           "amount"     -> 1.waves,
           "attachment" -> Base58.encode("asset transfer".getBytes)
@@ -140,11 +138,10 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
 
   test("/transactions/sign should produce transfer transaction that is good for /transactions/broadcast") {
     for (v <- supportedVersions) {
-      signAndBroadcast(
+      signBroadcastAndCalcFee(
         Json.obj("type"       -> 4,
                  "sender"     -> firstAddress,
                  "recipient"  -> secondAddress,
-                 "fee"        -> 100000,
                  "amount"     -> 1.waves,
                  "attachment" -> Base58.encode("falafel".getBytes)),
         usesProofs = Option(v).nonEmpty,
@@ -154,13 +151,12 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
   }
 
   test("/transactions/sign should produce mass transfer transaction that is good for /transactions/broadcast") {
-    signAndBroadcast(
+    signBroadcastAndCalcFee(
       Json.obj(
         "type"       -> 11,
         "version"    -> 1,
         "sender"     -> firstAddress,
         "transfers"  -> Json.toJson(Seq(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))),
-        "fee"        -> 200000,
         "attachment" -> Base58.encode("masspay".getBytes)
       ),
       usesProofs = true
@@ -171,11 +167,11 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
     for (v <- supportedVersions) {
       val isProof = Option(v).nonEmpty
       val leaseId =
-        signAndBroadcast(Json.obj("type" -> 8, "sender" -> firstAddress, "amount" -> 1.waves, "recipient" -> secondAddress, "fee" -> 100000),
-                         usesProofs = isProof,
-                         version = v)
+        signBroadcastAndCalcFee(Json.obj("type" -> 8, "sender" -> firstAddress, "amount" -> 1.waves, "recipient" -> secondAddress),
+                                usesProofs = isProof,
+                                version = v)
 
-      signAndBroadcast(Json.obj("type" -> 9, "sender" -> firstAddress, "txId" -> leaseId, "fee" -> 100000), usesProofs = isProof, version = v)
+      signBroadcastAndCalcFee(Json.obj("type" -> 9, "sender" -> firstAddress, "txId" -> leaseId), usesProofs = isProof, version = v)
     }
   }
 
@@ -183,14 +179,12 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
     for (v <- supportedVersions) {
       val isProof = Option(v).nonEmpty
       val rnd     = Random.alphanumeric.take(9).mkString.toLowerCase
-      signAndBroadcast(Json.obj("type" -> 10, "sender" -> firstAddress, "alias" -> s"myalias${rnd}", "fee" -> 100000),
-                       usesProofs = isProof,
-                       version = v)
+      signBroadcastAndCalcFee(Json.obj("type" -> 10, "sender" -> firstAddress, "alias" -> s"myalias${rnd}"), usesProofs = isProof, version = v)
     }
   }
 
   test("/transactions/sign should produce data transaction that is good for /transactions/broadcast") {
-    signAndBroadcast(
+    signBroadcastAndCalcFee(
       Json.obj(
         "type"    -> 12,
         "version" -> 1,
@@ -200,21 +194,19 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
           BooleanDataEntry("bool", true),
           BinaryDataEntry("blob", ByteStr(Array.tabulate(445)(_.toByte))),
           StringDataEntry("str", "AAA-AAA")
-        ),
-        "fee" -> 100000
+        )
       ),
       usesProofs = true
     )
   }
 
   test("/transactions/sign should produce script transaction that is good for /transactions/broadcast") {
-    signAndBroadcast(
+    signBroadcastAndCalcFee(
       Json.obj(
         "type"    -> 13,
         "version" -> 1,
         "sender"  -> firstAddress,
-        "script"  -> None,
-        "fee"     -> 100000
+        "script"  -> None
       ),
       usesProofs = true
     )
@@ -224,7 +216,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
     for (v <- supportedVersions) {
       val isProof = Option(v).nonEmpty
 
-      val assetId = signAndBroadcast(
+      val assetId = signBroadcastAndCalcFee(
         Json.obj(
           "type"        -> 3,
           "name"        -> "Sponsored Coin",
@@ -232,33 +224,30 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
           "description" -> "Sponsored Coin",
           "sender"      -> firstAddress,
           "decimals"    -> 2,
-          "reissuable"  -> false,
-          "fee"         -> 1.waves
+          "reissuable"  -> false
         ),
         usesProofs = isProof,
         version = v
       )
 
-      signAndBroadcast(
+      signBroadcastAndCalcFee(
         Json.obj(
           "type"                 -> 14,
           "version"              -> 1,
           "sender"               -> firstAddress,
           "assetId"              -> assetId,
-          "minSponsoredAssetFee" -> 100,
-          "fee"                  -> 1.waves
+          "minSponsoredAssetFee" -> 100
         ),
         usesProofs = true
       )
 
-      signAndBroadcast(
+      signBroadcastAndCalcFee(
         Json.obj(
           "type"                 -> 14,
           "version"              -> 1,
           "sender"               -> firstAddress,
           "assetId"              -> assetId,
-          "minSponsoredAssetFee" -> JsNull,
-          "fee"                  -> 1.waves
+          "minSponsoredAssetFee" -> JsNull
         ),
         usesProofs = true
       )
@@ -289,7 +278,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
   }
 
   test("/transactions/broadcast should produce ExchangeTransaction with custom asset") {
-    val issueTx = signAndBroadcast(
+    val issueTx = signBroadcastAndCalcFee(
       Json.obj(
         "type"        -> 3,
         "name"        -> "ExchangeCoin",
@@ -297,8 +286,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
         "description" -> "ExchangeCoin Description",
         "sender"      -> firstAddress,
         "decimals"    -> 2,
-        "reissuable"  -> true,
-        "fee"         -> issueFee
+        "reissuable"  -> true
       ),
       usesProofs = false
     )
@@ -338,9 +326,11 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
 
   }
 
-  private def signAndBroadcast(json: JsObject, usesProofs: Boolean, version: String = null): String = {
-    val js = if (Option(version).isDefined) json ++ Json.obj("version" -> version.toInt) else json
-    val rs = sender.postJsonWithApiKey("/transactions/sign", js)
+  private def signBroadcastAndCalcFee(json: JsObject, usesProofs: Boolean, version: String = null): String = {
+    val jsWithPK  = json ++ Json.obj("senderPublicKey" -> sender.publicKey.toString)
+    val jsWithFee = jsWithPK ++ Json.obj("fee" -> sender.calculateFee(jsWithPK).feeAmount)
+    val js        = if (Option(version).isDefined) jsWithFee ++ Json.obj("version" -> version.toInt) else jsWithFee
+    val rs        = sender.postJsonWithApiKey("/transactions/sign", js)
     assert(rs.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
     val body = Json.parse(rs.getResponseBody)
     val signed: Boolean = if (usesProofs) {

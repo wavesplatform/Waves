@@ -145,6 +145,19 @@ object OrderBookResponse {
   implicit val orderBookResponseFormat: Format[OrderBookResponse] = Json.format
 }
 
+case class MarketResponse(amountAssetId: String,
+                          amountAsset: String,
+                          amountDecimals: Int,
+                          priceAssetId: String,
+                          priceAsset: String,
+                          priceDecimals: Int,
+                          lastPrice: Option[Long],
+                          bid: Option[Long],
+                          ask: Option[Long])
+object MarketResponse {
+  implicit val marketResponseFormat: Format[MarketResponse] = Json.format
+}
+
 case class DebugInfo(stateHeight: Long, stateHash: Long)
 object DebugInfo {
   implicit val debugInfoFormat: Format[DebugInfo] = Json.format
@@ -158,6 +171,11 @@ object BlacklistedPeer {
 case class State(address: String, miningBalance: Long, timestamp: Long)
 object State {
   implicit val StateFormat: Format[State] = Json.format
+}
+
+case class FeeInfo(feeAssetId: Option[String], feeAmount: Long)
+object FeeInfo {
+  implicit val format: Format[FeeInfo] = Json.format
 }
 
 // Obsolete payment request
