@@ -118,8 +118,10 @@ object LimitOrder {
     }
   }
 
-  def getPartialFee(matcherFee: Long, totalAmount: Long, partialAmount: Long): Long =
-    (BigDecimal(partialAmount) * matcherFee / totalAmount).setScale(0, RoundingMode.HALF_UP).toLongExact
+  def getPartialFee(matcherFee: Long, totalAmount: Long, partialAmount: Long): Long = {
+    // Should not round! It could lead to forks. See ExchangeTransactionDiff
+    (BigInt(matcherFee) * partialAmount / totalAmount).toLong
+  }
 }
 
 object Events {

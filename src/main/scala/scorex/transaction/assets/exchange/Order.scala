@@ -123,7 +123,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   @ApiModelProperty(hidden = true)
   def getSpendAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] =
     Try {
-      if (orderType == OrderType.SELL) correctAmount(matchAmount, matchPrice)
+      // We should not correct amount here, because it could lead to fork. See ExchangeTransactionDiff
+      if (orderType == OrderType.SELL) matchAmount
       else {
         val spend = BigInt(matchAmount) * matchPrice / PriceConstant
         if (getSpendAssetId.isEmpty && !(spend + matcherFee).isValidLong) {
@@ -135,7 +136,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   @ApiModelProperty(hidden = true)
   def getReceiveAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] =
     Try {
-      if (orderType == OrderType.BUY) correctAmount(matchAmount, matchPrice)
+      if (orderType == OrderType.BUY) matchAmount
       else {
         (BigInt(matchAmount) * matchPrice / PriceConstant).bigInteger.longValueExact()
       }
