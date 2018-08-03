@@ -424,7 +424,11 @@ class OrderBookActor(assetPair: AssetPair,
       if (isMigrateToNewOrderHistoryStorage) {
         orderHistory ! evt
       }
-    case RecoveryCompleted => log.info(assetPair.toString() + " - Recovery completed!");
+
+    case RecoveryCompleted =>
+      log.info(assetPair.toString() + " - Recovery completed!")
+      updateSnapshot(orderBook)
+
     case SnapshotOffer(metadata, snapshot: Snapshot) =>
       lastSnapshotSequenceNr = metadata.sequenceNr
       orderBook = snapshot.orderBook
