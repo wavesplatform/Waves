@@ -145,17 +145,9 @@ object OrderBookResponse {
   implicit val orderBookResponseFormat: Format[OrderBookResponse] = Json.format
 }
 
-case class MarketResponse(amountAssetId: String,
-                          amountAsset: String,
-                          amountDecimals: Int,
-                          priceAssetId: String,
-                          priceAsset: String,
-                          priceDecimals: Int,
-                          lastPrice: Option[Long],
-                          bid: Option[Long],
-                          ask: Option[Long])
-object MarketResponse {
-  implicit val marketResponseFormat: Format[MarketResponse] = Json.format
+case class MarketStatusResponse(lastPrice: Option[Long], lastSide: Option[String], bestBid: Option[Long], bestAsk: Option[Long])
+object MarketStatusResponse {
+  implicit val marketResponseFormat: Format[MarketStatusResponse] = Json.format
 }
 
 case class DebugInfo(stateHeight: Long, stateHash: Long)
