@@ -109,6 +109,7 @@ class MatcherMassOrdersTestSuite
 
       matcherNode.waitOrderStatus(aliceSecondWavesPair, aliceActiveOrderId, "Accepted")
       matcherNode.waitOrderStatus(aliceSecondWavesPair, alicePartialOrderId, "PartiallyFilled")
+
       matcherNode.fullOrderHistory(bobNode).map(_.id) should contain(bobsOrderIds)
       matcherNode.orderHistoryByPair(bobNode, aliceWavesPair).map(_.id) should contain(bobsOrderIds)
     }
