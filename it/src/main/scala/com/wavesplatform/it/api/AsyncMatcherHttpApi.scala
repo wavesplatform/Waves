@@ -80,9 +80,16 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", signedRequest.json).as[MatcherStatusResponse]
     }
 
-    def orderHistory(sender: Node) = {
+    def fullOrdersHistory(sender: Node) = {
       val ts = System.currentTimeMillis()
       matcherGetWithSignature(s"/matcher/orderbook/${sender.publicKeyStr}", ts, signature(sender, ts)).as[Seq[OrderbookHistory]]
+    }
+
+    def orderHistoryByPair(sender: Node, assetPair: AssetPair) = {
+      val ts                        = System.currentTimeMillis()
+      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
+      matcherGetWithSignature(s"/matcher/orderbook/${amountAsset}/${priceAsset}/publicKey/${sender.publicKeyStr}", ts, signature(sender, ts))
+        .as[Seq[OrderbookHistory]]
     }
 
     def activeOrderHistory(sender: Node) = {
