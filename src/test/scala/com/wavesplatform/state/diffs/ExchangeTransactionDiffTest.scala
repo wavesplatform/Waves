@@ -86,14 +86,19 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       gen1: GenesisTransaction = GenesisTransaction.create(buyer, 1 * Constants.UnitsInWave, ts).explicitGet()
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).explicitGet()
       issue1: IssueTransactionV1 <- issueGen(buyer)
-      exchange                   <- exchangeGeneratorP(buyer, seller, None, Some(issue1.id()), fixedMatcherFee = Some(300000))
-    } yield (gen1, gen2, issue1, exchange)
+      exchange <- Gen.oneOf(
+        exchangeV1GeneratorP(buyer, seller, None, Some(issue1.id()), fixedMatcherFee = Some(300000)),
+        exchangeV2GeneratorP(buyer, seller, None, Some(issue1.id()), fixedMatcherFee = Some(300000))
+      )
+    } yield {
+      (gen1, gen2, issue1, exchange)
+    }
 
     forAll(preconditions) {
       case ((gen1, gen2, issue1, exchange)) =>
         whenever(exchange.amount > 300000) {
           assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(exchange))) {
-            case (blockDiff, state) =>
+            case (blockDiff, _) =>
               val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
               totalPortfolioDiff.balance shouldBe 0
               totalPortfolioDiff.effectiveBalance shouldBe 0

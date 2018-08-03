@@ -540,7 +540,7 @@ trait TransactionGenBase extends ScriptGen {
     sender2: PrivateKeyAccount <- accountGen
     assetPair                  <- assetPairGen
     r <- Gen.oneOf(
-      exchangeGeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset),
+      exchangeV1GeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset),
       exchangeV2GeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset)
     )
   } yield r
@@ -549,7 +549,18 @@ trait TransactionGenBase extends ScriptGen {
                          seller: PrivateKeyAccount,
                          amountAssetId: Option[ByteStr],
                          priceAssetId: Option[ByteStr],
-                         fixedMatcherFee: Option[Long] = None): Gen[ExchangeTransaction] =
+                         fixedMatcherFee: Option[Long] = None): Gen[ExchangeTransaction] = {
+    Gen.oneOf(
+      exchangeV1GeneratorP(buyer, seller, amountAssetId, priceAssetId),
+      exchangeV2GeneratorP(buyer, seller, amountAssetId, priceAssetId)
+    )
+  }
+
+  def exchangeV1GeneratorP(buyer: PrivateKeyAccount,
+                           seller: PrivateKeyAccount,
+                           amountAssetId: Option[ByteStr],
+                           priceAssetId: Option[ByteStr],
+                           fixedMatcherFee: Option[Long] = None): Gen[ExchangeTransaction] =
     for {
       (_, matcher, _, _, price, amount1, timestamp, expiration, genMatcherFee) <- orderParamGen
       amount2: Long                                                            <- matcherAmountGen
