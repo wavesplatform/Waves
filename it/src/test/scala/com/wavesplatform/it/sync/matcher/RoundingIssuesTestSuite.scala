@@ -40,6 +40,9 @@ class RoundingIssuesTestSuite
   nodes.waitForHeightArise()
 
   "should correctly fill an order with small amount" in {
+    val aliceBalanceBefore = matcherNode.accountBalances(aliceNode.address)._1
+    val bobBalanceBefore   = matcherNode.accountBalances(bobNode.address)._1
+
     val order1   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, 238, 3100000000L)
     val order1Id = matcherNode.placeOrder(order1).message.id
 
@@ -51,8 +54,20 @@ class RoundingIssuesTestSuite
 
     matcherNode.cancelOrder(aliceNode, wavesUsdPair, order1Id)
     val tx = matcherNode.transactionsByOrder(order1Id).head
+
     matcherNode.waitForTransaction(tx.id)
-    nodes.waitForHeightArise()
+    val rawExchangeTx = matcherNode.rawTransactionInfo(tx.id)
+
+    (rawExchangeTx \ "price").as[Long] shouldBe 238L
+    (rawExchangeTx \ "amount").as[Long] shouldBe 420169L
+    (rawExchangeTx \ "buyMatcherFee").as[Long] shouldBe 40L
+    (rawExchangeTx \ "sellMatcherFee").as[Long] shouldBe 296219L
+
+    val aliceBalanceAfter = matcherNode.accountBalances(aliceNode.address)._1
+    val bobBalanceAfter   = matcherNode.accountBalances(bobNode.address)._1
+
+    (aliceBalanceAfter - aliceBalanceBefore) shouldBe (-40L + 420169L)
+    (bobBalanceAfter - bobBalanceBefore) shouldBe (-296219L - 420169L)
   }
 
 }
