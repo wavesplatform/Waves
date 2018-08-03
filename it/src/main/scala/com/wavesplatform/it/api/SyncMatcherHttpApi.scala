@@ -49,7 +49,7 @@ object SyncMatcherHttpApi extends Assertions {
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
       Await.result(async(m).orderStatus(orderId, assetPair, waitForStatus), RequestAwaitTime)
 
-    def transactionsByOrder(orderId: String) =
+    def transactionsByOrder(orderId: String): Seq[Transaction] =
       Await.result(async(m).transactionsByOrder(orderId), RequestAwaitTime)
 
     def waitOrderStatus(assetPair: AssetPair,

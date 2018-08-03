@@ -7,7 +7,7 @@ import org.asynchttpclient.Response
 import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
-import play.api.libs.json.{Format, JsObject, Json, Writes}
+import play.api.libs.json._
 import scorex.api.http.AddressApiRoute
 import scorex.api.http.assets.SignedIssueV1Request
 import scorex.transaction.transfer.MassTransferTransaction.Transfer
@@ -167,6 +167,9 @@ object SyncHttpApi extends Assertions {
 
     def createAddress(): String =
       Await.result(async(n).createAddress, RequestAwaitTime)
+
+    def rawTransactionInfo(txId: String): JsValue =
+      Await.result(async(n).rawTransactionInfo(txId), RequestAwaitTime)
 
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): TransactionInfo =
       Await.result(async(n).waitForTransaction(txId), RequestAwaitTime)
