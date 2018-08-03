@@ -12,7 +12,7 @@ import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.{AssetDescription, Blockchain}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
@@ -51,16 +51,14 @@ class MatcherActor(orderHistory: ActorRef,
       blockchain.assetDescription(aid).fold("Unknown")(d => new String(d.name, Charsets.UTF_8))
     }
 
-  def getAssetDescription(asset: Option[AssetId]): Option[AssetDescription] = asset.flatMap(blockchain.assetDescription)
-
   def createOrderBook(pair: AssetPair): ActorRef = {
     val md = MarketData(
       pair,
       getAssetName(pair.amountAsset),
       getAssetName(pair.priceAsset),
       NTP.correctedTime(),
-      getAssetDescription(pair.amountAsset).map(t => AssetInfo(t.decimals)),
-      getAssetDescription(pair.priceAsset).map(t => AssetInfo(t.decimals))
+      pair.amountAsset.flatMap(blockchain.assetDescription).map(t => AssetInfo(t.decimals)),
+      pair.priceAsset.flatMap(blockchain.assetDescription).map(t => AssetInfo(t.decimals))
     )
     tradedPairs += pair -> md
 
@@ -150,7 +148,7 @@ class MatcherActor(orderHistory: ActorRef,
     case GetMarkets =>
       sender() ! GetMarketsResponse(getMatcherPublicKey, tradedPairs.values.toSeq)
 
-    case req: GetMarket =>
+    case req: GetMarketStatusRequest =>
       val snd = sender()
       checkAssetPair(req) {
         context
@@ -158,18 +156,9 @@ class MatcherActor(orderHistory: ActorRef,
           .fold {
             snd ! StatusCodeMatcherResponse(StatusCodes.NotFound, "Market not found")
           } { orderbook =>
-            (orderbook ? GetMarketStatusRequest(req.assetPair))
-              .mapTo[MarketStatus]
-              .map { status =>
-                val amountDecimals = getAssetDescription(req.assetPair.amountAsset).fold(8)(_.decimals)
-                val priceDecimals  = getAssetDescription(req.assetPair.priceAsset).fold(8)(_.decimals)
-                snd ! GetMarketResponse(req.assetPair,
-                                        getAssetName(req.assetPair.amountAsset),
-                                        getAssetName(req.assetPair.priceAsset),
-                                        amountDecimals,
-                                        priceDecimals,
-                                        status)
-              }
+            (orderbook ? req)
+              .mapTo[GetMarketStatusResponse]
+              .map(snd ! _)
           }
       }
 
@@ -293,29 +282,6 @@ object MatcherActor {
                         created: Long,
                         amountAssetInfo: Option[AssetInfo],
                         priceAssetinfo: Option[AssetInfo])
-
-  case class GetMarket(assetPair: AssetPair)
-
-  case class GetMarketResponse(assetPair: AssetPair,
-                               amountAssetName: String,
-                               priceAssetName: String,
-                               amountDecimals: Int,
-                               priceDecimals: Int,
-                               status: MarketStatus)
-      extends MatcherResponse {
-    def json: JsValue = Json.obj(
-      "amountAssetId"  -> assetPair.amountAssetStr,
-      "amountAsset"    -> amountAssetName,
-      "amountDecimals" -> amountDecimals,
-      "priceAssetId"   -> assetPair.priceAssetStr,
-      "priceAsset"     -> priceAssetName,
-      "priceDecimals"  -> (8 - amountDecimals + priceDecimals),
-      "lastPrice"      -> status.last,
-      "bid"            -> status.bid,
-      "ask"            -> status.ask
-    )
-    val code = StatusCodes.OK
-  }
 
   def compare(buffer1: Option[Array[Byte]], buffer2: Option[Array[Byte]]): Int = {
     if (buffer1.isEmpty && buffer2.isEmpty) 0

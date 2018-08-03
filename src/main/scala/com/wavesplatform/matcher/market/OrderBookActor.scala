@@ -48,7 +48,7 @@ class OrderBookActor(assetPair: AssetPair,
   private var apiSender           = Option.empty[ActorRef]
   private var cancellable         = Option.empty[Cancellable]
 
-  private var lastPrice: Option[Price] = None
+  private var lastTrade: Option[Order] = None
 
   private lazy val alreadyCanceledOrders = CacheBuilder
     .newBuilder()
@@ -204,8 +204,8 @@ class OrderBookActor(assetPair: AssetPair,
 
   private def handleGetMarketStatus(pair: AssetPair): Unit = {
     if (pair == assetPair) {
-      sender() ! MarketStatus(pair, orderBook.bids.headOption.map(_._1), orderBook.asks.headOption.map(_._1), lastPrice)
-    } else sender() ! MarketStatus(pair, None, None, None)
+      sender() ! GetMarketStatusResponse(pair, orderBook.bids.headOption.map(_._1), orderBook.asks.headOption.map(_._1), lastTrade)
+    } else sender() ! GetMarketStatusResponse(pair, None, None, None)
   }
 
   private def onAddOrder(order: Order): Unit = {
@@ -293,7 +293,7 @@ class OrderBookActor(assetPair: AssetPair,
           _  <- utx.putIfNew(tx)
         } yield tx) match {
           case Right(tx: ExchangeTransaction) =>
-            lastPrice = Some(c.price)
+            lastTrade = Some(c.order)
             allChannels.broadcastTx(tx)
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx))
@@ -414,7 +414,15 @@ object OrderBookActor {
     def empty(pair: AssetPair): GetOrderBookResponse = GetOrderBookResponse(pair, Seq(), Seq())
   }
 
-  case class MarketStatus(pair: AssetPair, bid: Option[Price], ask: Option[Price], last: Option[Price])
+  case class GetMarketStatusResponse(pair: AssetPair, bid: Option[Price], ask: Option[Price], last: Option[Order]) extends MatcherResponse {
+    def json: JsValue = Json.obj(
+      "lastPrice" -> last.map(_.price),
+      "lastSide"  -> last.map(_.orderType.toString),
+      "bestBid"   -> bid,
+      "bestAsk"   -> ask
+    )
+    val code = StatusCodes.OK
+  }
 
   // Direct requests
   case object GetOrdersRequest

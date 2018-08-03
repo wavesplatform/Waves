@@ -11,7 +11,7 @@ import akka.util.Timeout
 import com.google.common.primitives.Longs
 import com.wavesplatform.crypto
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.market.MatcherActor.{GetMarket, GetMarkets, GetMarketsResponse}
+import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse}
 import com.wavesplatform.matcher.market.MatcherTransactionWriter.GetTransactionsByOrder
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
@@ -83,7 +83,7 @@ class MatcherApiRoute(wallet: Wallet,
 
   override lazy val route: Route =
     pathPrefix("matcher") {
-      matcherPublicKey ~ orderBook ~ marketInfo ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
+      matcherPublicKey ~ orderBook ~ marketStatus ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
         getAllOrderHistory ~ getTradableBalance ~ reservedBalance ~ orderStatus ~
         historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
         getSettings
@@ -140,9 +140,9 @@ class MatcherApiRoute(wallet: Wallet,
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     ))
-  def marketInfo: Route = (path("market" / Segment / Segment) & get) { (a1, a2) =>
+  def marketStatus: Route = (path("orderbook" / Segment / Segment / "status") & get) { (a1, a2) =>
     withAssetPair(a1, a2) { pair =>
-      onComplete((matcher ? GetMarket(pair)).mapTo[MatcherResponse]) { t =>
+      onComplete((matcher ? GetMarketStatusRequest(pair)).mapTo[MatcherResponse]) { t =>
         complete(t.fold(ex => StatusCodes.InternalServerError -> s"An error occurred: ${ex.getMessage}", resp => resp.code -> resp.json))
       }
     }
