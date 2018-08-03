@@ -2,24 +2,29 @@ package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.api.http.assets.{SignedExchangeRequest, SignedExchangeRequestV2}
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.utils.{Base58, NTP}
-import play.api.libs.json.{JsNumber, JsObject, Json, Writes}
+import play.api.libs.json._
 
 class ExchangeTransactionSuite extends BaseTransactionSuite {
+
+  implicit val w1 = Json.writes[SignedExchangeRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(ExchangeTransaction.typeId.toInt)))
+  implicit val w2 =
+    Json.writes[SignedExchangeRequestV2].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(ExchangeTransaction.typeId.toInt)))
 
   test("cannot exchange non-issued assets") {
 
     for ((o1ver, o2ver, tver) <- Seq(
-           (1: Byte, 1: Byte, 1: Byte), //(1: Byte, 1: Byte, 2: Byte),
-           //(1: Byte, 2: Byte, 2: Byte),
-           //(2: Byte, 1: Byte, 2: Byte),
-           //(2: Byte, 2: Byte, 2: Byte)
+           (1: Byte, 1: Byte, 1: Byte),
+           (1: Byte, 1: Byte, 2: Byte),
+           (1: Byte, 2: Byte, 2: Byte),
+           (2: Byte, 1: Byte, 2: Byte),
+           (2: Byte, 2: Byte, 2: Byte)
          )) {
       val assetName        = "myasset"
       val assetDescription = "my asset description"
@@ -70,11 +75,6 @@ class ExchangeTransactionSuite extends BaseTransactionSuite {
           .right
           .get
 
-        implicit val o = Writes[Order](_.json())
-
-        implicit val w =
-          Json.writes[SignedExchangeRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(ExchangeTransaction.typeId.toInt)))
-
         def request(tx: ExchangeTransaction): SignedExchangeRequestV2 =
           SignedExchangeRequestV2(
             Base58.encode(tx.sender.publicKey),
@@ -106,11 +106,6 @@ class ExchangeTransactionSuite extends BaseTransactionSuite {
           )
           .right
           .get
-
-        implicit val o = Writes[Order](_.json())
-
-        implicit val w =
-          Json.writes[SignedExchangeRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(ExchangeTransaction.typeId.toInt)))
 
         def request(tx: ExchangeTransaction): SignedExchangeRequest =
           SignedExchangeRequest(
