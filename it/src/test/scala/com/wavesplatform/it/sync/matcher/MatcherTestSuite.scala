@@ -72,7 +72,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       }
 
       "and should be listed by trader's publiс key via REST" in {
-        matcherNode.orderHistory(aliceNode).map(_.id) should contain(order1.message.id)
+        matcherNode.fullOrderHistory(aliceNode).map(_.id) should contain(order1.message.id)
       }
 
       "and should match with buy order" in {
