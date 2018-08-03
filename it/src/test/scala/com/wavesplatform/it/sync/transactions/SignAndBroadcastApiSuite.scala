@@ -291,39 +291,64 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
       usesProofs = false
     )
 
-    val buyer               = pkByAddress(firstAddress)
-    val seller              = pkByAddress(secondAddress)
-    val matcher             = pkByAddress(thirdAddress)
-    val time                = NTP.correctedTime()
-    val expirationTimestamp = time + Order.MaxLiveTime
-    val buyPrice            = 1 * Order.PriceConstant
-    val sellPrice           = (0.50 * Order.PriceConstant).toLong
-    val mf                  = 300000L
-    val buyAmount           = 2
-    val sellAmount          = 3
-    val assetPair           = AssetPair.createAssetPair("WAVES", issueTx).get
-    val buy                 = OrderV1.buy(buyer, matcher, assetPair, buyPrice, buyAmount, time, expirationTimestamp, mf)
-    val sell                = OrderV1.sell(seller, matcher, assetPair, sellPrice, sellAmount, time, expirationTimestamp, mf)
+    for ((o1ver, o2ver, tver) <- Seq(
+           (1: Byte, 1: Byte, 1: Byte),
+           (1: Byte, 1: Byte, 2: Byte),
+           (1: Byte, 2: Byte, 2: Byte),
+           (2: Byte, 1: Byte, 2: Byte),
+           (2: Byte, 2: Byte, 2: Byte)
+         )) {
+      val buyer               = pkByAddress(firstAddress)
+      val seller              = pkByAddress(secondAddress)
+      val matcher             = pkByAddress(thirdAddress)
+      val time                = NTP.correctedTime()
+      val expirationTimestamp = time + Order.MaxLiveTime
+      val buyPrice            = 1 * Order.PriceConstant
+      val sellPrice           = (0.50 * Order.PriceConstant).toLong
+      val mf                  = 300000L
+      val buyAmount           = 2
+      val sellAmount          = 3
+      val assetPair           = AssetPair.createAssetPair("WAVES", issueTx).get
+      val buy                 = Order.buy(buyer, matcher, assetPair, buyPrice, buyAmount, time, expirationTimestamp, mf, o1ver)
+      val sell                = Order.sell(seller, matcher, assetPair, sellPrice, sellAmount, time, expirationTimestamp, mf, o2ver)
 
-    val amount = math.min(buy.amount, sell.amount)
-    val tx = ExchangeTransactionV1
-      .create(
-        matcher = matcher,
-        buyOrder = buy,
-        sellOrder = sell,
-        price = sellPrice,
-        amount = amount,
-        buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
-        sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
-        fee = mf,
-        timestamp = NTP.correctedTime()
-      )
-      .explicitGet()
-      .json()
+      val amount = math.min(buy.amount, sell.amount)
+      val tx =
+        if (tver == 1) {
+          ExchangeTransactionV1
+            .create(
+              matcher = matcher,
+              buyOrder = buy.asInstanceOf[OrderV1],
+              sellOrder = sell.asInstanceOf[OrderV1],
+              price = sellPrice,
+              amount = amount,
+              buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
+              sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
+              fee = mf,
+              timestamp = NTP.correctedTime()
+            )
+            .explicitGet()
+            .json()
+        } else {
+          ExchangeTransactionV2
+            .create(
+              matcher = matcher,
+              buyOrder = buy,
+              sellOrder = sell,
+              price = sellPrice,
+              amount = amount,
+              buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
+              sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
+              fee = mf,
+              timestamp = NTP.correctedTime()
+            )
+            .explicitGet()
+            .json()
+        }
 
-    val txId = sender.signedBroadcast(tx).id
-    nodes.waitForHeightAriseAndTxPresent(txId)
-
+      val txId = sender.signedBroadcast(tx).id
+      nodes.waitForHeightAriseAndTxPresent(txId)
+    }
   }
 
   private def signBroadcastAndCalcFee(json: JsObject, usesProofs: Boolean, version: String = null): String = {
