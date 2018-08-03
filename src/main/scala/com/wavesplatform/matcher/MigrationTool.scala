@@ -17,6 +17,7 @@ import com.wavesplatform.state.{ByteStr, EitherExt2}
 import com.wavesplatform.utils.Base58
 import org.iq80.leveldb.DB
 import scorex.account.{Address, AddressScheme, PublicKeyAccount}
+import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.utils.ScorexLogging
 
