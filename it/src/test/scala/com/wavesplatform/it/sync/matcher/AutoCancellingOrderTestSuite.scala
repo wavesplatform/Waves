@@ -43,28 +43,23 @@ class AutoCancellingOrderTestSuite
   nodes.waitForHeightArise()
 
   "Alice and Bob trade WAVES-USD" - {
-    nodes.waitForHeightArise()
-    val aliceWavesBalanceBefore = matcherNode.accountBalances(aliceNode.address)._1
-    val bobWavesBalanceBefore   = matcherNode.accountBalances(bobNode.address)._1
-
     "place usd-waves order" in {
       // Alice wants to sell USD for Waves
-
-      val bobSellOrder1 = matcherNode.placeOrder(bobNode, wavesUsdPair, OrderType.SELL, 800, 100.waves).message.id
-      val bobSellOrder2 = matcherNode.placeOrder(bobNode, wavesUsdPair, OrderType.SELL, 700, 100.waves).message.id
+      matcherNode.placeOrder(bobNode, wavesUsdPair, OrderType.SELL, 800, 100.waves).message.id
+      matcherNode.placeOrder(bobNode, wavesUsdPair, OrderType.SELL, 700, 100.waves).message.id
       val bobSellOrder3 = matcherNode.placeOrder(bobNode, wavesUsdPair, OrderType.SELL, 600, 100.waves).message.id
+
       matcherNode.fullOrderHistory(aliceNode)
       matcherNode.fullOrderHistory(bobNode)
 
       matcherNode.waitOrderStatus(wavesUsdPair, bobSellOrder3, "Accepted", 1.minute)
 
-      val aliceOrder   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, 800, 0.00125.waves)
-      val aliceOrderId = matcherNode.placeOrder(aliceOrder).message.id
+      val aliceOrder = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, 800, 0.00125.waves)
+      matcherNode.placeOrder(aliceOrder).message.id
 
       Thread.sleep(2000)
       matcherNode.fullOrderHistory(aliceNode)
-      matcherNode.fullOrderHistory(bobNode)
-
+      matcherNode.fullOrderHistory(bobNode).forall(_.status == "Accepted") shouldBe true
     }
 
   }

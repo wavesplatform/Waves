@@ -57,14 +57,6 @@ class TradeBalanceAndRoundingTestSuite
     val adjustedAmount = receiveAmount(OrderType.BUY, price, buyOrderAmount)
     val adjustedTotal  = receiveAmount(OrderType.SELL, price, buyOrderAmount)
 
-    //79999900000000
-    //79999900123949
-
-    log.info("==================")
-    log.info(s"${correctedSellAmount}")
-    log.info(s"${adjustedAmount}")
-    log.info(s"${adjustedTotal}")
-
     "place usd-waves order" in {
       // Alice wants to sell USD for Waves
 
@@ -73,9 +65,6 @@ class TradeBalanceAndRoundingTestSuite
       matcherNode.waitOrderStatus(wavesUsdPair, bobOrder1Id, "Accepted", 1.minute)
       matcherNode.reservedBalance(bobNode)("WAVES") shouldBe correctAmount(sellOrderAmount, price) + matcherFee
       matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES") shouldBe bobWavesBalanceBefore - (correctedSellAmount + matcherFee)
-
-      log.info("==================")
-      log.info(s"${correctAmount(sellOrderAmount, price)}")
 
       val aliceOrder   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, price, buyOrderAmount)
       val aliceOrderId = matcherNode.placeOrder(aliceOrder).message.id
@@ -96,8 +85,6 @@ class TradeBalanceAndRoundingTestSuite
 
       val bobWavesBalanceAfter = matcherNode.accountBalances(bobNode.address)._1
       val bobUsdBalance        = matcherNode.assetBalance(bobNode.address, UsdId.base58).balance
-      log.info("==================")
-      log.info(s"${correctAmount(sellOrderAmount, price)}")
 
       (aliceWavesBalanceAfter - aliceWavesBalanceBefore) should be(
         adjustedAmount - (BigInt(matcherFee) * adjustedAmount / buyOrderAmount).bigInteger.longValue())
@@ -107,9 +94,6 @@ class TradeBalanceAndRoundingTestSuite
         -adjustedAmount - (BigInt(matcherFee) * adjustedAmount / sellOrderAmount).bigInteger.longValue())
       bobUsdBalance should be(adjustedTotal)
     }
-    //99999900000000
-    //99999899579792
-    //420169
 
     "check filled amount and tradable balance" in {
       val bobsOrderId  = matcherNode.fullOrderHistory(bobNode).head.id
@@ -135,28 +119,20 @@ class TradeBalanceAndRoundingTestSuite
   }
 
   "Alice and Bob trade WAVES-USD check CELLING" - {
-
     val price2           = 289
     val buyOrderAmount2  = 0.07.waves
     val sellOrderAmount2 = 3.waves
 
     val correctedSellAmount2 = correctAmount(sellOrderAmount2, price2)
 
-    val adjustedAmount2 = receiveAmount(OrderType.BUY, price2, buyOrderAmount2)
-    val adjustedTotal2  = receiveAmount(OrderType.SELL, price2, buyOrderAmount2)
-
     "place usd-waves order" in {
       nodes.waitForHeightArise()
       // Alice wants to sell USD for Waves
-      val aliceWavesBalanceBefore = matcherNode.accountBalances(aliceNode.address)._1
-      val bobWavesBalanceBefore   = matcherNode.accountBalances(bobNode.address)._1
+      val bobWavesBalanceBefore = matcherNode.accountBalances(bobNode.address)._1
       matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES")
       val bobOrder1   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, price2, sellOrderAmount2)
       val bobOrder1Id = matcherNode.placeOrder(bobOrder1).message.id
       matcherNode.waitOrderStatus(wavesUsdPair, bobOrder1Id, "Accepted", 1.minute)
-
-      log.info("==================")
-      log.info(s"${correctAmount(sellOrderAmount2, price2)}")
 
       matcherNode.reservedBalance(bobNode)("WAVES") shouldBe correctedSellAmount2 + matcherFee
       matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES") shouldBe bobWavesBalanceBefore - (correctedSellAmount2 + matcherFee)
@@ -208,15 +184,6 @@ class TradeBalanceAndRoundingTestSuite
 
       val aliceWCTBalanceAfter = aliceNode.assetBalance(aliceNode.address, WctId.base58).balance
       val bobWCTBalanceAfter   = bobNode.assetBalance(bobNode.address, WctId.base58).balance
-
-      log.info(s"alice usd diff ${aliceUsdBalanceAfter - aliceUsdBalance}")
-      log.info(s"bob usd diff ${bobUsdBalanceAfter - bobUsdBalance}")
-
-      log.info(s"alice wct diff ${aliceWCTBalanceAfter - aliceWctBalance}")
-      log.info(s"bob wct diff ${bobWCTBalanceAfter - bobWctBalance}")
-
-      log.info(s"alice waves diff ${aliceWavesBalanceBefore - aliceWavesBalanceAfter}")
-      log.info(s"bob waves diff ${bobWavesBalanceBefore - bobWavesBalanceAfter}")
 
       matcherNode.reservedBalance(bobNode)(s"$WctId") should be(
         correctAmount(wctUsdSellAmount, wctUsdPrice) - correctAmount(wctUsdBuyAmount, wctUsdPrice))
