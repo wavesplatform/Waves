@@ -20,9 +20,10 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  private def matcherNode = nodes.head
-  private def aliceNode   = nodes(1)
-  private def bobNode     = nodes(2)
+  private def matcherNode  = nodes.head
+  private def aliceNode    = nodes(1)
+  private def bobNode      = nodes(2)
+  private def orderVersion = (Random.nextInt(2) + 1).toByte
 
   "Verifications of tricky ordering cases" - {
     // Alice issues new asset
@@ -213,7 +214,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   }
 
   def bobPlacesWaveOrder(assetPair: AssetPair, price: Price, amount: Long): String = {
-    val bobOrder = matcherNode.prepareOrder(bobNode, assetPair, OrderType.BUY, price, amount, 2: Byte)
+    val bobOrder = matcherNode.prepareOrder(bobNode, assetPair, OrderType.BUY, price, amount, orderVersion)
     val order    = matcherNode.placeOrder(bobOrder).message.id
     matcherNode.waitOrderStatus(assetPair, order, "Accepted")
     order
@@ -222,9 +223,9 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   def bobPlacesAssetOrder(bobCoinAmount: Int, twoAssetsPair: AssetPair, assetId: String): String = {
     val decodedAsset = ByteStr.decodeBase58(assetId).get
     val bobOrder = if (twoAssetsPair.amountAsset.contains(decodedAsset)) {
-      matcherNode.prepareOrder(bobNode, twoAssetsPair, OrderType.SELL, 1 * Order.PriceConstant, bobCoinAmount, 2: Byte)
+      matcherNode.prepareOrder(bobNode, twoAssetsPair, OrderType.SELL, 1 * Order.PriceConstant, bobCoinAmount, orderVersion)
     } else {
-      matcherNode.prepareOrder(bobNode, twoAssetsPair, OrderType.BUY, bobCoinAmount * Order.PriceConstant, 1, 2: Byte)
+      matcherNode.prepareOrder(bobNode, twoAssetsPair, OrderType.BUY, bobCoinAmount * Order.PriceConstant, 1, orderVersion)
     }
     val order = matcherNode.placeOrder(bobOrder)
     matcherNode.waitOrderStatus(twoAssetsPair, order.message.id, "Accepted")
