@@ -13,4 +13,5 @@ case class Ord(id: ByteVector,
                timestamp: Long,
                expiration: Long,
                matcherFee: Long,
-               signature: ByteVector)
+               bodyBytes: ByteVector,
+               proofs: IndexedSeq[ByteVector])

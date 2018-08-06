@@ -50,7 +50,7 @@ package object predef {
        | let basic = longAll && sumString && sumByteVector && eqUnion
        | 
        | # 2) ne
-       | let nePrim = 1000 != 999 && "ha" +"ha" != "ha-ha"
+       | let nePrim = 1000 != 999 && "ha" +"ha" != "ha-ha" && tx.bodyBytes != base64'hahaha'
        | let neDataEntryAndGetElement = match tx {
        |    case d: DataTransaction => d.data[0] != DataEntry("ha", true)
        |    case d: TransferTransaction => true
