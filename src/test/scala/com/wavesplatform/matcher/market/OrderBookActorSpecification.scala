@@ -388,9 +388,10 @@ class OrderBookActorSpecification
       receiveN(3)
 
       actor ! GetAskOrdersRequest
-      val restAmount = ord1.amount - 115749L // 115749L is corrected amount, rest from the matching of ord2 and ord3
+      val leftovers  = ord3.amount - ord2.amount //Order.correctAmount(ord2.amount, ord2.price)
+      val restAmount = Order.correctAmount(ord1.amount, ord1.price) - leftovers
       // See OrderExecuted.submittedRemainingFee
-      val restFee = ord1.matcherFee - LimitOrder.getPartialFee(ord1.matcherFee, ord1.amount, 115749L)
+      val restFee = ord1.matcherFee - LimitOrder.getPartialFee(ord1.matcherFee, ord1.amount, leftovers)
       expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord1.price, restAmount, restFee, ord1))))
     }
 
