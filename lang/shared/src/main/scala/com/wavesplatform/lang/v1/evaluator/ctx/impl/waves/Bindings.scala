@@ -16,15 +16,15 @@ object Bindings {
     "version"   -> tx.version,
   )
 
+  private def proofsPart(existingProofs: IndexedSeq[ByteVector]) =
+    "proofs" -> (existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteVector.empty)).toIndexedSeq
+
   private def provenTxPart(tx: Proven): Map[String, Any] =
     Map(
       "sender"          -> senderObject(tx.sender),
       "senderPublicKey" -> tx.senderPk,
       "bodyBytes"       -> tx.bodyBytes,
-      "proofs" -> {
-        val existingProofs = tx.proofs
-        (existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteVector.empty)).toIndexedSeq
-      }
+      proofsPart(tx.proofs)
     ) ++ headerPart(tx.h)
 
   private def mapRecipient(r: Recipient) =
@@ -63,7 +63,8 @@ object Bindings {
         "timestamp"        -> ord.timestamp,
         "expiration"       -> ord.expiration,
         "matcherFee"       -> ord.matcherFee,
-        "signature"        -> ord.signature
+        "bodyBytes"        -> ord.bodyBytes,
+        proofsPart(ord.proofs)
       )
     )
 

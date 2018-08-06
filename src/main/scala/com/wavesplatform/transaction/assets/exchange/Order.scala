@@ -110,6 +110,9 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign ++ signature)
 
   @ApiModelProperty(hidden = true)
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign)
+
+  @ApiModelProperty(hidden = true)
   def getReceiveAssetId: Option[AssetId] = orderType match {
     case OrderType.BUY  => assetPair.amountAsset
     case OrderType.SELL => assetPair.priceAsset
