@@ -24,7 +24,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
     long            <- longEntryGen(dataAsciiKeyGen)
     bool            <- booleanEntryGen(dataAsciiKeyGen).filter(_.key != long.key)
     bin             <- binaryEntryGen(MaxBase58Bytes, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key)
-    str             <- stringEntryGen(500, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key && e.key != bin.key)
+    str             <- stringEntryGen(100, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key && e.key != bin.key)
     dataTransaction <- dataTransactionGenP(recipient, List(long, bool, bin, str))
     transfer        <- transferGeneratorP(ts, master, recipient.toAddress, 100000000L)
 
