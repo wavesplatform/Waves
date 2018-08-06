@@ -6,8 +6,11 @@ import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
 import com.wavesplatform.lang.v1.traits._
+import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 import com.wavesplatform.state.EitherExt2
 import org.openjdk.jmh.annotations._
+import shapeless.:+:
+import shapeless.CNil
 import scodec.bits.ByteVector
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey, Signature}
 
@@ -76,7 +79,7 @@ object EnvironmentFunctionsBenchmark {
   private val defaultEnvironment: Environment = new Environment {
     override def height: Int                                                                                     = 1
     override def networkByte: Byte                                                                               = NetworkByte
-    override def transaction: Tx                                                                                 = ???
+    override def inputEntity: Tx :+: Ord :+: CNil                                                                = ???
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
     override def resolveAlias(alias: String): Either[String, Recipient.Address]                                  = ???

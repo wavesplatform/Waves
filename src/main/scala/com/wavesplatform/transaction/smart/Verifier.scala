@@ -8,6 +8,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptRunner}
 import com.wavesplatform.transaction.transfer._
+import shapeless.Coproduct
 
 object Verifier {
 
@@ -39,7 +40,7 @@ object Verifier {
                                height: Int,
                                transaction: T,
                                isTokenScript: Boolean): Either[ValidationError, T] = {
-    ScriptRunner[Boolean, T](height, transaction, blockchain, script) match {
+    ScriptRunner[Boolean](height, Coproduct(transaction), blockchain, script) match {
       case (ctx, Left(execError)) => Left(ScriptExecutionError(script.text, execError, ctx.letDefs, isTokenScript))
       case (ctx, Right(false)) =>
         Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, isTokenScript))
