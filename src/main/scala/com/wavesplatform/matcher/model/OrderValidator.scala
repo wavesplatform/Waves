@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher.model
 
 import cats.implicits._
+import cats.kernel.Monoid
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.matcher.model.Events.OrderAdded
@@ -30,17 +31,28 @@ trait OrderValidator {
   private def isBalanceWithOpenOrdersEnough(order: Order): Validation = {
     val lo = LimitOrder(order)
 
-    val b: Map[Option[ByteStr], Long] = (Map(lo.spentAcc -> 0L) ++ Map(lo.feeAcc -> 0L))
-      .map { case (a, _) => a -> spendableBalance(a) }
-      .map { case (a, v) => a.assetId -> v }
+    val b: Map[Option[ByteStr], Long] = Seq(lo.spentAcc, lo.feeAcc).map(a => a.assetId -> spendableBalance(a)).toMap
 
-    val newOrder = Events.createOpenPortfolio(OrderAdded(lo)).getOrElse(order.senderPublicKey, OpenPortfolio.empty)
-    val open     = b.keySet.map(id => id -> orderHistory.openVolume(order.senderPublicKey, id)).toMap
-    val needs    = OpenPortfolio(open).combine(newOrder)
+    val fakeOrderInfo = Events.createOrderInfo(OrderAdded(lo))(lo.order.id())._2
+    val openPortfolioForNewOrder =
+      Events.orderInfoDiff(lo.order, OrderInfo.empty, fakeOrderInfo).getOrElse(order.senderPublicKey, OpenPortfolio.empty)
 
-    val res: Boolean = b.combine(needs.orders.mapValues(-_)).forall(_._2 >= 0)
+    // TODO fee
+    val open  = b.keySet.map(id => id -> orderHistory.openVolume(order.senderPublicKey, id)).toMap
+    val needs = OpenPortfolio(open).combine(openPortfolioForNewOrder)
 
-    res :| s"Not enough tradable balance: ${b.combine(open.mapValues(-_))}, needs: $newOrder"
+    val rest = Monoid.combineAll(
+      Seq(
+        b,
+        needs.orders.mapValues(-_),
+        Map(
+          lo.feeAsset -> (if (lo.rcvAsset == lo.feeAsset) lo.getReceiveAmount else 0L)
+        )
+      )
+    )
+    val res: Boolean = rest.forall(_._2 >= 0)
+
+    res :| s"Not enough tradable balance: ${b.combine(open.mapValues(-_))}, needs: $openPortfolioForNewOrder"
   }
 
   def getTradableBalance(acc: AssetAcc): Long = timer.refine("action" -> "tradableBalance").measure {

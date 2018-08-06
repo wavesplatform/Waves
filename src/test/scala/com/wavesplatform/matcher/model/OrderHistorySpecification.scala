@@ -71,12 +71,11 @@ class OrderHistorySpecification
 
   property("New buy WAVES order added") {
     val pair = AssetPair(None, mkAssetId("BTC"))
-    val ord1 = buy(pair, 0.0008, 10000)
+    val ord1 = buy(pair, 0.0008, 10000, matcherFee = Some(1000))
 
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Accepted
-    oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe
-      math.max(ord1.matcherFee - ord1.getReceiveAmount(ord1.price, ord1.amount).explicitGet(), 0L)
+    oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe 0L
     oh.openVolume(ord1.senderPublicKey, pair.priceAsset) shouldBe 8L
 
     activeOrderIds(ord1.senderPublicKey, Set(pair.priceAsset)) shouldBe Seq(ord1.id())
@@ -97,8 +96,8 @@ class OrderHistorySpecification
   property("New buy and sell WAVES order added") {
     val pk   = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair = AssetPair(None, mkAssetId("BTC"))
-    val ord1 = buy(pair, 0.0008, 100000000, Some(pk))
-    val ord2 = sell(pair, 0.0009, 210000000, Some(pk))
+    val ord1 = buy(pair, 0.0008, 100000000, Some(pk), matcherFee = Some(1000L))
+    val ord2 = sell(pair, 0.0009, 210000000, Some(pk), matcherFee = Some(1000L))
 
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     oh.orderAccepted(OrderAdded(LimitOrder(ord2)))
@@ -117,8 +116,8 @@ class OrderHistorySpecification
 
   property("Buy WAVES order filled") {
     val pair = AssetPair(None, mkAssetId("BTC"))
-    val ord1 = buy(pair, 0.0008, 10000)
-    val ord2 = sell(pair, 0.0007, 10000)
+    val ord1 = buy(pair, 0.0008, 10000, matcherFee = Some(1000L))
+    val ord2 = sell(pair, 0.0007, 10000, matcherFee = Some(1000L))
 
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     oh.orderExecuted(OrderExecuted(LimitOrder(ord2), LimitOrder(ord1)))
@@ -136,26 +135,46 @@ class OrderHistorySpecification
   }
 
   property("Sell WAVES order - filled, buy order - partial") {
-    val pair = AssetPair(None, mkAssetId("BTC"))
-    val ord1 = sell(pair, 0.0008, 100000000)
-    val ord2 = buy(pair, 0.00085, 120000000)
+    val pair      = AssetPair(None, mkAssetId("BTC"))
+    val counter   = sell(pair, 0.0008, 100000000, matcherFee = Some(2000L))
+    val submitted = buy(pair, 0.00085, 120000000, matcherFee = Some(1000L))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
-    val exec = OrderExecuted(LimitOrder(ord2), LimitOrder(ord1))
+    println(s"""counter before added:
+         |${pair.amountAsset}: ${oh.openVolume(counter.senderPublicKey, pair.amountAsset)}
+         |${pair.priceAsset}:  ${oh.openVolume(counter.senderPublicKey, pair.priceAsset)}
+       """.stripMargin)
+
+    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
+
+    println(s"""counter after added:
+               |${pair.amountAsset}: ${oh.openVolume(counter.senderPublicKey, pair.amountAsset)}
+               |${pair.priceAsset}:  ${oh.openVolume(counter.senderPublicKey, pair.priceAsset)}
+       """.stripMargin)
+
+    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
     oh.orderExecuted(exec)
-    oh.orderAccepted(OrderAdded(exec.submitted.partial(exec.submittedRemainingAmount, 0)))
 
-    oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Filled(100000000)
-    oh.orderInfo(ord2.id()).status shouldBe LimitOrder.PartiallyFilled(100000000)
+    println(s"""counter after executed:
+               |${pair.amountAsset}: ${oh.openVolume(counter.senderPublicKey, pair.amountAsset)}
+               |${pair.priceAsset}:  ${oh.openVolume(counter.senderPublicKey, pair.priceAsset)}
+       """.stripMargin)
 
-    oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe 0L
-    oh.openVolume(ord1.senderPublicKey, pair.priceAsset) shouldBe 0L
-    activeOrderIds(ord1.senderPublicKey, Set(None)) shouldBe empty
+    // ???
+    val addedEvent = OrderAdded(exec.submitted.partial(exec.submittedRemainingAmount, exec.submittedRemainingFee))
+    println(s"addedEvent: $addedEvent")
+    oh.orderAccepted(addedEvent)
 
-    oh.openVolume(ord2.senderPublicKey, pair.amountAsset) shouldBe
-      math.max(0L, OrderInfo.safeSum(LimitOrder.getPartialFee(ord2.matcherFee, ord2.amount, ord2.amount - ord1.amount), -19999584L))
-    oh.openVolume(ord2.senderPublicKey, pair.priceAsset) shouldBe (BigDecimal(0.00085) * 20000000L).toLong
-    activeOrderIds(ord2.senderPublicKey, Set(pair.priceAsset)) shouldBe Seq(ord2.id())
+    oh.orderInfo(counter.id()).status shouldBe LimitOrder.Filled(100000000)
+    oh.orderInfo(submitted.id()).status shouldBe LimitOrder.PartiallyFilled(100000000)
+
+    oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0L
+    oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
+    activeOrderIds(counter.senderPublicKey, Set(None)) shouldBe empty
+
+    oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe
+      math.max(0L, OrderInfo.safeSum(LimitOrder.getPartialFee(submitted.matcherFee, submitted.amount, submitted.amount - counter.amount), -19999584L))
+    oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe (BigDecimal(0.00085) * 20000000L).toLong
+    activeOrderIds(submitted.senderPublicKey, Set(pair.priceAsset)) shouldBe Seq(submitted.id())
   }
 
   property("Buy WAVES order - filled with 2 steps, sell order - partial") {

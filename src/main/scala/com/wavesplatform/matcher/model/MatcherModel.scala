@@ -105,6 +105,7 @@ object LimitOrder {
 
   def apply(o: Order): LimitOrder = {
     val partialFee = getPartialFee(o.matcherFee, o.amount, o.amount)
+    println(s"MatcherModel: LimitOrder.apply(${o.sender}): partialFee: $partialFee")
     o.orderType match {
       case OrderType.BUY  => BuyLimitOrder(o.price, o.amount, partialFee, o)
       case OrderType.SELL => SellLimitOrder(o.price, o.amount, partialFee, o)
@@ -172,45 +173,20 @@ object Events {
     }
   }
 
-  def createOpenPortfolio(event: Event): Map[Address, OpenPortfolio] = {
-    def overdraftFee(lo: LimitOrder): Long = {
-      val feeAmount = LimitOrder.getPartialFee(lo.order.matcherFee, lo.order.amount, lo.amount)
-      if (lo.feeAcc == lo.rcvAcc) math.max(feeAmount - lo.getReceiveAmount, 0L) else feeAmount
-    }
-
-    event match {
-      case OrderAdded(lo) =>
+  def orderInfoDiff(order: Order, prev: OrderInfo, updated: OrderInfo): Map[Address, OpenPortfolio] = Map(
+    order.sender.toAddress -> OpenPortfolio(
+      Monoid.combine(
         Map(
-          lo.order.senderPublicKey.toAddress -> OpenPortfolio(
-            Monoid.combine(
-              Map(lo.spentAsset -> lo.getSpendAmount),
-              Map(lo.feeAsset   -> overdraftFee(lo))
-            )))
-      case oe: OrderExecuted =>
-        val (o1, o2) = (oe.submittedExecuted, oe.counterExecuted)
-        val op1 = OpenPortfolio(
-          Monoid.combine(
-            Map(o1.spentAsset -> -o1.getSpendAmount),
-            Map(o1.feeAsset   -> -overdraftFee(o1))
-          ))
-        val op2 = OpenPortfolio(
-          Monoid.combine(
-            Map(o2.spentAsset -> -o2.getSpendAmount),
-            Map(o2.feeAsset   -> -overdraftFee(o2))
-          ))
-        Monoid.combine(
-          Map(o1.order.senderPublicKey.toAddress -> op1),
-          Map(o2.order.senderPublicKey.toAddress -> op2)
-        )
-      case OrderCanceled(lo, unmatchable) =>
-        val feeDiff = if (unmatchable) 0 else if (lo.feeAcc == lo.rcvAcc) math.max(lo.fee - lo.getReceiveAmount, 0L) else lo.fee
-        Map(
-          lo.order.senderPublicKey.toAddress ->
-            OpenPortfolio(
-              Monoid.combine(
-                Map(lo.spentAsset -> -lo.getSpendAmount),
-                Map(lo.feeAsset   -> -feeDiff)
-              )))
-    }
-  }
+          order.getSpendAssetId -> (
+            LimitOrder.limitOrder(order.price, updated.remaining, updated.remainingFee, order).getSpendAmount -
+              LimitOrder.limitOrder(order.price, prev.remaining, prev.remainingFee, order).getSpendAmount
+          )
+        ), {
+          val lo = LimitOrder(order)
+          println(s"orderInfoDiff: ${order.sender}: updated.remainingFee=${updated.remainingFee}, prev.remainingFee=${prev.remainingFee}")
+          Map(lo.feeAsset -> (if (lo.feeAsset == lo.rcvAsset) 0L else updated.remainingFee - prev.remainingFee))
+        }
+      )
+    )
+  )
 }

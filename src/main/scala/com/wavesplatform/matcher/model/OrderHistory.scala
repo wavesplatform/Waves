@@ -51,6 +51,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
           case Some(v) => v
         })
 
+        println(s"saveOpenVolume: $address: $assetId -> $newValue")
         rw.put(k, Some(newValue))
       }
 
@@ -71,8 +72,12 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
   def orderAccepted(event: OrderAdded): Unit = db.readWrite { rw =>
     val lo = event.order
     saveOrder(rw, lo.order)
+    val prev        = orderInfo(lo.order.id())
     val updatedInfo = saveOrderInfo(rw, event)
-    saveOpenVolume(rw, Events.createOpenPortfolio(event))
+
+    val diff = orderInfoDiff(lo.order, prev, updatedInfo(lo.order.id())._2) // TODO: OrderInfo.empty
+    println(s"orderAccepted: diff: $diff")
+    saveOpenVolume(rw, diff)
 
     // for OrderAdded events, updatedInfo contains just one element
     for ((orderId, (o, _)) <- updatedInfo) {
@@ -86,15 +91,46 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
   }
 
   def orderExecuted(event: OrderExecuted): Unit = db.readWrite { rw =>
+    val prevCounter   = orderInfo(event.counter.order.id())
+    val prevSubmitted = OrderInfo(event.submitted.order.amount, 0L, canceled = false, None, event.submitted.order.matcherFee)
+
     saveOrder(rw, event.submitted.order)
-    saveOrderInfo(rw, event)
-    val v = Monoid.combine(Events.createOpenPortfolio(OrderAdded(event.submittedExecuted)), Events.createOpenPortfolio(event))
-    saveOpenVolume(rw, v)
+
+    val updatedInfo = saveOrderInfo(rw, event)
+
+    val updatedCounter = updatedInfo(event.counter.order.id())._2 // ?
+    println(s"orderExecuted: updatedCounter: $updatedCounter")
+
+    val updatedSubmitted = updatedInfo(event.submitted.order.id())._2
+
+    val all = Monoid.combineAll(
+      Seq(
+        if (updatedSubmitted.status.isFinal) Map.empty[Address, OpenPortfolio]
+        else
+          orderInfoDiff(
+            event.submitted.order,
+            prevSubmitted,
+            updatedSubmitted
+          ),
+        orderInfoDiff(event.counter.order, prevCounter, updatedCounter)
+      )
+    )
+
+    println(s"""orderExecuted:
+         |counter sender: ${event.counter.order.sender}
+         |submitted sender: ${event.submitted.order.sender}
+         |prevSubmitted: $prevSubmitted
+         |updatedSubmitted: $updatedSubmitted
+         |diff: $all
+       """.stripMargin)
+
+    saveOpenVolume(rw, all)
   }
 
   def orderCanceled(event: OrderCanceled): Unit = db.readWrite { rw =>
-    saveOrderInfo(rw, event)
-    saveOpenVolume(rw, Events.createOpenPortfolio(event))
+    val prevInfo    = orderInfo(event.limitOrder.order.id())
+    val updatedInfo = saveOrderInfo(rw, event)
+    saveOpenVolume(rw, orderInfoDiff(event.limitOrder.order, prevInfo, updatedInfo(event.limitOrder.order.id())._2))
   }
 
   def orderInfo(id: ByteStr): OrderInfo = DBUtils.orderInfo(db, id)
