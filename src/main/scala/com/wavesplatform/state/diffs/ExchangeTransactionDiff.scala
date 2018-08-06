@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import cats.implicits._
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.{GenericError, OrderValidationError}
@@ -19,16 +20,25 @@ object ExchangeTransactionDiff {
                        tx.buyOrder.assetPair.priceAsset,
                        tx.sellOrder.assetPair.amountAsset,
                        tx.sellOrder.assetPair.priceAsset).flatten
-    val assets = assetIds.map(blockchain.assetDescription)
+    val assets             = assetIds.map(blockchain.assetDescription)
+    val smartAssetsEnabled = blockchain.activatedFeatures.contains(BlockchainFeatures.SmartAssets.id)
     for {
       _ <- Either.cond(assets.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
-      _ <- Either.cond(!assets.exists(_.flatMap(_.script).isDefined), (), GenericError(s"Smart assets can't participate in ExchangeTransactions"))
-      _ <- Either.cond(!blockchain.hasScript(buyer),
-                       (),
-                       GenericError(s"Buyer $buyer can't participate in ExchangeTransaction because it has assigned Script"))
-      _ <- Either.cond(!blockchain.hasScript(seller),
-                       (),
-                       GenericError(s"Seller $seller can't participate in ExchangeTransaction because it has assigned Script"))
+      _ <- Either.cond(
+        smartAssetsEnabled || !assets.exists(_.flatMap(_.script).isDefined),
+        (),
+        GenericError(s"Smart assets can't participate in ExchangeTransactions (SmartAssetsFeature is disabled)")
+      )
+      _ <- Either.cond(
+        smartAssetsEnabled || !blockchain.hasScript(buyer),
+        (),
+        GenericError(s"Buyer $buyer can't participate in ExchangeTransaction because it has assigned Script (SmartAssetsFeature is disabled)")
+      )
+      _ <- Either.cond(
+        smartAssetsEnabled || !blockchain.hasScript(seller),
+        (),
+        GenericError(s"Seller $seller can't participate in ExchangeTransaction because it has assigned Script (SmartAssetsFeature is disabled)")
+      )
       t                     <- enoughVolume(tx, blockchain)
       buyPriceAssetChange   <- t.buyOrder.getSpendAmount(t.price, t.amount).liftValidationError(tx).map(-_)
       buyAmountAssetChange  <- t.buyOrder.getReceiveAmount(t.price, t.amount).liftValidationError(tx)

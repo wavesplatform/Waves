@@ -96,7 +96,7 @@ object Verifier {
     for {
       _ <- matcherScriptOpt match {
         case Some(script) => verifyTx(blockchain, script, height, et, false)
-        case None         => et.signaturesValid()
+        case None         => verifyAsEllipticCurveSignature(et)
       }
       _ <- sellerTxVerification
       _ <- buyerTxVerification
