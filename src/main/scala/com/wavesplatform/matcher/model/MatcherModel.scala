@@ -38,20 +38,18 @@ sealed trait LimitOrder {
   def feeAsset: Option[ByteStr]   = None
 
   def minAmountOfAmountAsset: Long         = minimalAmountOfAmountAssetByPrice(price)
-  def amountOfPriceAsset: Long             = (BigDecimal(amount) * price / Order.PriceConstant).setScale(0, RoundingMode.HALF_UP).toLong
+  def amountOfPriceAsset: Long             = (BigDecimal(amount) * price / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
   def amountOfAmountAsset: Long            = correctedAmountOfAmountAsset(price, amount)
   def executionAmount(o: LimitOrder): Long = correctedAmountOfAmountAsset(o.price, amount)
 
   def isValid: Boolean =
-    amount > 0 && /*amount >= minAmountOfAmountAsset &&*/ amount < Order.MaxAmount && getSpendAmount > 0 && getReceiveAmount > 0
+    amount > 0 && amount >= minAmountOfAmountAsset && amount < Order.MaxAmount && getSpendAmount > 0 && getReceiveAmount > 0
 
   protected def minimalAmountOfAmountAssetByPrice(p: Long): Long = (BigDecimal(Order.PriceConstant) / p).setScale(0, RoundingMode.CEILING).toLong
   protected def correctedAmountOfAmountAsset(p: Long, a: Long): Long = {
     val settledTotal = (BigDecimal(p) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
     (BigDecimal(settledTotal) / p * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
   }
-//    if (min > 0) ((BigDecimal(a) / min) * min).setScale(0, RoundingMode.HALF_UP).toLong else a
-
 }
 
 case class BuyLimitOrder(price: Price, amount: Long, fee: Long, order: Order) extends LimitOrder {

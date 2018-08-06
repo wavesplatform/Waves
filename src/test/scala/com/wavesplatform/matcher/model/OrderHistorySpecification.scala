@@ -153,7 +153,7 @@ class OrderHistorySpecification
     activeOrderIds(ord1.senderPublicKey, Set(None)) shouldBe empty
 
     oh.openVolume(ord2.senderPublicKey, pair.amountAsset) shouldBe
-      math.max(0L, OrderInfo.safeSum(LimitOrder.getPartialFee(ord2.matcherFee, ord2.amount, ord2.amount - ord1.amount), -20000000L /*19999584L*/ ))
+      math.max(0L, OrderInfo.safeSum(LimitOrder.getPartialFee(ord2.matcherFee, ord2.amount, ord2.amount - ord1.amount), -20000000L))
     oh.openVolume(ord2.senderPublicKey, pair.priceAsset) shouldBe (BigDecimal(0.00085) * 20000000L).toLong
     activeOrderIds(ord2.senderPublicKey, Set(pair.priceAsset)) shouldBe Seq(ord2.id())
   }
@@ -205,7 +205,7 @@ class OrderHistorySpecification
     oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Filled(100000000)
     oh.orderInfo(ord2.id()).status shouldBe LimitOrder.PartiallyFilled(100000000)
 
-    oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe 110000000L /*109998942L*/ + LimitOrder.getPartialFee(
+    oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe 110000000L + LimitOrder.getPartialFee(
       ord2.matcherFee,
       ord2.amount,
       ord2.amount - ord1.amount
