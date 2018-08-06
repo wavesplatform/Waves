@@ -251,7 +251,7 @@ class OrderBookActorSpecification
       val ord1 = sell(pair, 100, 10 * Order.PriceConstant)
 
       (1 to 100).foreach({ i =>
-        actor ! ord1 //.copy()
+        actor ! ord1
       })
 
       within(10.seconds) {
