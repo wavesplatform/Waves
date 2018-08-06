@@ -5,7 +5,6 @@ import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.matcher.market.MatcherActor.MarketData
 import com.wavesplatform.state.ByteStr
 import org.asynchttpclient.Dsl.{get => _get}
 import org.asynchttpclient.util.HttpConstants
@@ -16,7 +15,7 @@ import play.api.libs.json.Writes
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.util.{Failure, Success, Try}
 

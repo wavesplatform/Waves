@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.ReportingTestName
-import com.wavesplatform.it.api.LevelResponse
+import com.wavesplatform.it.api.{AssetDecimalsInfo, LevelResponse}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
@@ -57,10 +57,12 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       val openMarkets = matcherNode.tradingMarkets()
       openMarkets.markets.size shouldBe 1
       val markets = openMarkets.markets.head
+
       markets.amountAssetName shouldBe amountAssetName
+      markets.amountAssetInfo shouldBe Some(AssetDecimalsInfo(aliceCoinDecimals))
+
       markets.priceAssetName shouldBe "WAVES"
-      markets.priceAssetInfo.decimals shouldBe 8
-      markets.amountAssetInfo.decimals shouldBe aliceCoinDecimals
+      markets.priceAssetInfo shouldBe Some(AssetDecimalsInfo(8))
     }
 
     "sell order could be placed correctly" - {

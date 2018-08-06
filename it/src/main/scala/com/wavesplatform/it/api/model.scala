@@ -125,8 +125,8 @@ object AssetDecimalsInfo {
 case class MarketData(amountAssetName: String,
                       priceAssetName: String,
                       created: Long,
-                      amountAssetInfo: AssetDecimalsInfo,
-                      priceAssetInfo: AssetDecimalsInfo)
+                      amountAssetInfo: Option[AssetDecimalsInfo],
+                      priceAssetInfo: Option[AssetDecimalsInfo])
 object MarketData {
   implicit val marketData: Format[MarketData] = Json.format
 }
