@@ -12,7 +12,7 @@ import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.ValidationError.AccountBalanceError
-import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
@@ -28,7 +28,12 @@ import org.scalatest.{Inside, Matchers, PropSpec}
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
 
   val fs = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.SmartAccountsTrades.id -> 0))
+    preActivatedFeatures = Map(
+      BlockchainFeatures.SmartAccounts.id       -> 0,
+      BlockchainFeatures.SmartAssets.id         -> 0,
+      BlockchainFeatures.SmartAccountsTrades.id -> 0
+    )
+  )
 
   property("preserves waves invariant, stores match info, rewards matcher") {
 
@@ -225,7 +230,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
           TestBlock.create(Seq(tr1, tr2)),
           TestBlock.create(Seq(asset1, asset2, setMatcherScript))
         )
-        assertDiffEi(preconBlocks, TestBlock.create(Seq(exchangeTx))) { diff =>
+        assertDiffEi(preconBlocks, TestBlock.create(Seq(exchangeTx)), fs) { diff =>
           diff.isRight shouldBe true
         }
     }
@@ -302,7 +307,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       tr1     = createWavesTransfer(master, fstIssuer.toAddress, Long.MaxValue / 3, enoughFee, ts + 1).explicitGet()
       tr2     = createWavesTransfer(master, sndIssuer.toAddress, Long.MaxValue / 3, enoughFee, ts + 2).explicitGet()
       asset1 = IssueTransactionV2
-        .selfSigned(2: Byte, chainId, fstIssuer, "Asset#1".getBytes, "".getBytes, 1000000, 8, false, priceAssetScriptCompiled, enoughFee, ts + 3)
+        .selfSigned(2: Byte, chainId, fstIssuer, "Asset#1".getBytes, "".getBytes, 1000000, 8, false, amountAssetScriptCompiled, enoughFee, ts + 3)
         .explicitGet()
       asset2 = IssueTransactionV2
         .selfSigned(2: Byte, chainId, sndIssuer, "Asset#2".getBytes, "".getBytes, 1000000, 8, false, priceAssetScriptCompiled, enoughFee, ts + 4)

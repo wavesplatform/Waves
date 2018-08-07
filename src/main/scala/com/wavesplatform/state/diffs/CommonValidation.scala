@@ -100,7 +100,7 @@ object CommonValidation {
       case _: IssueTransactionV1       => Right(tx)
       case _: ReissueTransactionV1     => Right(tx)
       case _: ExchangeTransactionV1    => Right(tx)
-      case _: ExchangeTransactionV2    => activationBarrier(BlockchainFeatures.SmartAssets)
+      case _: ExchangeTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccountsTrades)
       case _: LeaseTransactionV1       => Right(tx)
       case _: LeaseCancelTransactionV1 => Right(tx)
       case _: CreateAliasTransactionV1 => Right(tx)

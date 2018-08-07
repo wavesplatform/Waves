@@ -21,21 +21,21 @@ object ExchangeTransactionDiff {
                        tx.sellOrder.assetPair.amountAsset,
                        tx.sellOrder.assetPair.priceAsset).flatten
     val assets             = assetIds.map(blockchain.assetDescription)
-    val smartAssetsEnabled = blockchain.activatedFeatures.contains(BlockchainFeatures.SmartAssets.id)
+    val smartTradesEnabled = blockchain.activatedFeatures.contains(BlockchainFeatures.SmartAccountsTrades.id)
     for {
       _ <- Either.cond(assets.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
       _ <- Either.cond(
-        smartAssetsEnabled || !assets.exists(_.flatMap(_.script).isDefined),
+        smartTradesEnabled || !assets.exists(_.flatMap(_.script).isDefined),
         (),
         GenericError(s"Smart assets can't participate in ExchangeTransactions (SmartAssetsFeature is disabled)")
       )
       _ <- Either.cond(
-        smartAssetsEnabled || !blockchain.hasScript(buyer),
+        smartTradesEnabled || !blockchain.hasScript(buyer),
         (),
         GenericError(s"Buyer $buyer can't participate in ExchangeTransaction because it has assigned Script (SmartAssetsFeature is disabled)")
       )
       _ <- Either.cond(
-        smartAssetsEnabled || !blockchain.hasScript(seller),
+        smartTradesEnabled || !blockchain.hasScript(seller),
         (),
         GenericError(s"Seller $seller can't participate in ExchangeTransaction because it has assigned Script (SmartAssetsFeature is disabled)")
       )
