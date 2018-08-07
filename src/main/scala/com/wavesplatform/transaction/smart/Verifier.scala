@@ -67,27 +67,27 @@ object Verifier {
                      height: Int): Either[ValidationError, Transaction] = {
     val AssetPair(amountAsset, priceAsset) = et.sellOrder.assetPair
 
-    val amountAssetVerification =
+    lazy val amountAssetVerification =
       amountAsset
         .flatMap(blockchain.assetDescription)
         .flatMap(_.script)
         .map(verifyOrder(blockchain, _, height, et.sellOrder))
         .getOrElse(Right(()))
 
-    val priceAssetVerification =
+    lazy val priceAssetVerification =
       priceAsset
         .flatMap(blockchain.assetDescription)
         .flatMap(_.script)
         .map(verifyOrder(blockchain, _, height, et.buyOrder))
         .getOrElse(Right(()))
 
-    val sellerTxVerification =
+    lazy val sellerTxVerification =
       blockchain
         .accountScript(et.sellOrder.sender.toAddress)
         .map(verifyTx(blockchain, _, height, et, false))
         .getOrElse(Right(()))
 
-    val buyerTxVerification =
+    lazy val buyerTxVerification =
       blockchain
         .accountScript(et.buyOrder.sender.toAddress)
         .map(verifyTx(blockchain, _, height, et, false))
