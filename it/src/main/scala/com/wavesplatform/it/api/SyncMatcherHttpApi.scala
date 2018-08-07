@@ -26,8 +26,11 @@ object SyncMatcherHttpApi extends Assertions {
     def orderBook(assetPair: AssetPair): OrderBookResponse =
       Await.result(async(m).orderBook(assetPair), RequestAwaitTime)
 
-    def orderHistory(sender: Node): Seq[OrderbookHistory] =
-      Await.result(async(m).orderHistory(sender), RequestAwaitTime)
+    def fullOrderHistory(sender: Node): Seq[OrderbookHistory] =
+      Await.result(async(m).fullOrdersHistory(sender), RequestAwaitTime)
+
+    def orderHistoryByPair(sender: Node, assetPair: AssetPair): Seq[OrderbookHistory] =
+      Await.result(async(m).orderHistoryByPair(sender, assetPair), RequestAwaitTime)
 
     def activeOrderHistory(sender: Node): Seq[OrderbookHistory] =
       Await.result(async(m).activeOrderHistory(sender), RequestAwaitTime)
@@ -46,7 +49,7 @@ object SyncMatcherHttpApi extends Assertions {
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
       Await.result(async(m).orderStatus(orderId, assetPair, waitForStatus), RequestAwaitTime)
 
-    def transactionsByOrder(orderId: String) =
+    def transactionsByOrder(orderId: String): Seq[Transaction] =
       Await.result(async(m).transactionsByOrder(orderId), RequestAwaitTime)
 
     def waitOrderStatus(assetPair: AssetPair,

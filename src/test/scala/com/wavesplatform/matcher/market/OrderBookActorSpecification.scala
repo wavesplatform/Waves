@@ -386,9 +386,10 @@ class OrderBookActorSpecification
       receiveN(3)
 
       actor ! GetAskOrdersRequest
-      val restAmount = 1500 * Constants.UnitsInWave - 115749L
-      expectMsg(
-        GetOrdersResponse(Seq(SellLimitOrder(ord1.price, restAmount, LimitOrder.getPartialFee(ord1.matcherFee, ord1.amount, restAmount), ord1))))
+      val restAmount = ord1.amount - 115749L // 115749L is corrected amount, rest from the matching of ord2 and ord3
+      // See OrderExecuted.submittedRemainingFee
+      val restFee = ord1.matcherFee - LimitOrder.getPartialFee(ord1.matcherFee, ord1.amount, 115749L)
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord1.price, restAmount, restFee, ord1))))
     }
 
     "partially execute order with price > 1 and zero fee remaining part " in {
@@ -403,9 +404,9 @@ class OrderBookActorSpecification
       receiveN(3)
 
       actor ! GetAskOrdersRequest
-      val restAmount = ord1.amount + ord2.amount - ord3.amount
-      expectMsg(
-        GetOrdersResponse(Seq(SellLimitOrder(ord1.price, restAmount, LimitOrder.getPartialFee(ord1.matcherFee, ord1.amount, restAmount), ord1))))
+      val restAmount = ord1.amount - (ord3.amount - ord2.amount)
+      val restFee    = ord1.matcherFee - LimitOrder.getPartialFee(ord1.matcherFee, ord1.amount, ord3.amount - ord2.amount)
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord1.price, restAmount, restFee, ord1))))
     }
 
     "buy small amount of pricey asset" in {
@@ -417,8 +418,10 @@ class OrderBookActorSpecification
       receiveN(2)
 
       actor ! GetAskOrdersRequest
-      val restAmount = 30000000000L - Order.correctAmount(700000L, 280)
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(s.price, restAmount, LimitOrder.getPartialFee(s.matcherFee, s.amount, restAmount), s))))
+      val restSAmount = Order.correctAmount(700000L, 280)
+      val restAmount  = 30000000000L - restSAmount
+      val restFee     = s.matcherFee - LimitOrder.getPartialFee(s.matcherFee, s.amount, restSAmount)
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(s.price, restAmount, restFee, s))))
 
       actor ! GetBidOrdersRequest
       expectMsg(GetOrdersResponse(Seq.empty))
