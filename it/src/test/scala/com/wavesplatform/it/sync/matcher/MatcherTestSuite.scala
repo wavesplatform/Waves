@@ -53,7 +53,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       matcherNode.matcherGet("/matcher").getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe matcherNode.publicKeyStr
     }
 
-    "get open trading markets" in {
+    "get opened trading markets" in {
       val openMarkets = matcherNode.tradingMarkets()
       openMarkets.markets.size shouldBe 1
       val markets = openMarkets.markets.head
