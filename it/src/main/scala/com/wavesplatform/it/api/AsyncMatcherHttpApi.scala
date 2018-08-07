@@ -50,8 +50,8 @@ object AsyncMatcherHttpApi extends Assertions {
         .as[MatcherStatusResponse]
     }
 
-    def transactionsByOrder(orderId: String): Future[Seq[Transaction]] =
-      matcherGet(s"/matcher/transactions/$orderId").as[Seq[Transaction]]
+    def transactionsByOrder(orderId: String): Future[Seq[ExchangeTransaction]] =
+      matcherGet(s"/matcher/transactions/$orderId").as[Seq[ExchangeTransaction]]
 
     def orderBook(assetPair: AssetPair): Future[OrderBookResponse] = {
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
