@@ -1,32 +1,29 @@
 package com.wavesplatform.state.diffs
 
 import cats.{Order => _, _}
+import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.directives.DirectiveParser
+import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.{NoShrink, TransactionGen, utils}
-import org.scalacheck.Gen
-import org.scalatest.prop.PropertyChecks
-import org.scalatest.{Inside, Matchers, PropSpec}
-import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
-import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.DirectiveParser
-import com.wavesplatform.lang.v1.{CTX, ScriptEstimator}
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1, Types}
-import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, LONG}
-import com.wavesplatform.lang.v1.evaluator.ctx.NativeFunction
 import com.wavesplatform.transaction.ValidationError.AccountBalanceError
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, ValidationError}
 import com.wavesplatform.utils.functionCosts
-import cats.implicits._
+import com.wavesplatform.{NoShrink, TransactionGen}
+import org.scalacheck.Gen
+import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Inside, Matchers, PropSpec}
 
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
 
