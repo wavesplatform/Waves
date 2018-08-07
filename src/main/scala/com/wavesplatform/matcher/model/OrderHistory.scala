@@ -23,14 +23,49 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
   private val saveOrderInfoTimer  = timer.refine("action" -> "save-order-info")
   private val openVolumeTimer     = timer.refine("action" -> "open-volume")
 
-  private def saveOrderInfo(rw: RW, event: Event): Map[ByteStr, (Order, OrderInfo)] =
-    saveOrderInfoTimer.measure(db.readWrite { rw =>
-      val updatedInfo = Events.createOrderInfo(event).map {
-        case (orderId, (o, oi)) => (orderId, (o, OrderInfo.combine(DBUtils.orderInfo(rw, orderId), oi)))
+  private def combine(order: Order, event: Event, curr: OrderInfo, diff: OrderInfoDiff): OrderInfo = {
+    val r =
+      if (diff.isNew) {
+        OrderInfo(
+          amount = order.amount,
+          filled = diff.executedAmount.getOrElse(0L),
+          canceled = diff.nowCanceled.getOrElse(false),
+          minAmount = diff.newMinAmount,
+          remainingFee = order.matcherFee - diff.totalExecutedFee.getOrElse(order.matcherFee)
+        )
+      } else {
+        OrderInfo(
+          amount = order.amount,
+          filled = curr.filled + diff.executedAmount.getOrElse(0L),
+          canceled = diff.nowCanceled.getOrElse(curr.canceled),
+          minAmount = diff.newMinAmount.orElse(curr.minAmount),
+          remainingFee = order.matcherFee - diff.totalExecutedFee.getOrElse(curr.remainingFee)
+        )
       }
 
-      for ((orderId, (_, oi)) <- updatedInfo) {
-        rw.put(MatcherKeys.orderInfo(orderId), oi)
+    println(s"""
+               |combine (order.id = ${order.id()}, sender = ${order.sender}):
+               |  curr:     $curr
+               |  diff:     $diff
+               |  combined: $r
+             """.stripMargin)
+    r
+  }
+
+  private def saveOrderInfo(rw: RW, event: Event): Seq[Order] =
+    saveOrderInfoTimer.measure(db.readWrite { rw =>
+      val diff = Events.collectChanges(event)
+
+      println(s"""
+           |saveOrderInfo: ${diff.size} changes
+           |""".stripMargin)
+      val updatedInfo = diff.map {
+        case (o, d) =>
+          val orderId  = o.id()
+          val curr     = DBUtils.orderInfo(rw, orderId)
+          val combined = combine(o, event, curr, d)
+          rw.put(MatcherKeys.orderInfo(orderId), combined)
+          o
       }
 
       updatedInfo
@@ -39,19 +74,36 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
   def openVolume(address: Address, assetId: Option[AssetId]): Long =
     openVolumeTimer.measure(db.get(MatcherKeys.openVolume(address, assetId)).getOrElse(0L))
 
-  private def saveOpenVolume(rw: RW, event: Map[Address, OpenPortfolio]): Unit = saveOpenVolumeTimer.measure {
-    for ((address, op) <- event) {
+  private def toString(openPortfolio: OpenPortfolio): String =
+    openPortfolio.orders
+      .map { case (assetId, v) => s"  $assetId -> $v" }
+      .mkString("\n")
+
+  private def toString(eventDiff: Map[Address, OpenPortfolio]): String =
+    eventDiff
+      .map { case (addr, portfolio) => s"$addr:\n${toString(portfolio)}" }
+      .mkString("\n")
+
+  private def saveOpenVolume(rw: RW, opDiff: Map[Address, OpenPortfolio]): Unit = saveOpenVolumeTimer.measure {
+    println(s"""|
+                |saveOpenVolume: 
+                |opDiff:
+                |${toString(opDiff)}
+                |""".stripMargin)
+
+    for ((address, op) <- opDiff) {
       val newAssets = Set.newBuilder[Option[AssetId]]
       for ((assetId, amount) <- op.orders if amount != 0) {
         val k = MatcherKeys.openVolume(address, assetId)
-        val newValue = safeSum(amount, rw.get(k) match {
+        val orig = rw.get(k) match {
           case None =>
             newAssets += assetId
             0L
           case Some(v) => v
-        })
+        }
+        val newValue = safeSum(orig, amount)
 
-        println(s"saveOpenVolume: $address: $assetId -> $newValue")
+        println(s"saveOpenVolume: update: $address: $assetId: $orig -> $newValue ($orig + $amount)")
         rw.put(k, Some(newValue))
       }
 
@@ -72,65 +124,72 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
   def orderAccepted(event: OrderAdded): Unit = db.readWrite { rw =>
     val lo = event.order
     saveOrder(rw, lo.order)
-    val prev        = orderInfo(lo.order.id())
-    val updatedInfo = saveOrderInfo(rw, event)
-
-    val diff = orderInfoDiff(lo.order, prev, updatedInfo(lo.order.id())._2) // TODO: OrderInfo.empty
-    println(s"orderAccepted: diff: $diff")
-    saveOpenVolume(rw, diff)
+    val newOrders = saveOrderInfo(rw, event)
+    val opDiff    = Events.createOpenPortfolio(event)
+    println(s"""|
+                |orderAccepted:
+                |opDiff:
+                |${toString(opDiff)}
+                |""".stripMargin)
+    saveOpenVolume(rw, opDiff)
 
     // for OrderAdded events, updatedInfo contains just one element
-    for ((orderId, (o, _)) <- updatedInfo) {
+    for (o <- newOrders) {
       val k         = MatcherKeys.addressOrdersSeqNr(o.senderPublicKey)
       val nextSeqNr = rw.get(k) + 1
       rw.put(k, nextSeqNr)
 
       val spendAssetId = if (o.orderType == OrderType.BUY) o.assetPair.priceAsset else o.assetPair.amountAsset
-      rw.put(MatcherKeys.addressOrders(o.senderPublicKey, nextSeqNr), Some(OrderAssets(orderId, spendAssetId)))
+      rw.put(MatcherKeys.addressOrders(o.senderPublicKey, nextSeqNr), Some(OrderAssets(o.id(), spendAssetId)))
     }
   }
 
   def orderExecuted(event: OrderExecuted): Unit = db.readWrite { rw =>
-    val prevCounter   = orderInfo(event.counter.order.id())
-    val prevSubmitted = OrderInfo(event.submitted.order.amount, 0L, canceled = false, None, event.submitted.order.matcherFee)
-
     saveOrder(rw, event.submitted.order)
+    saveOrderInfo(rw, event)
 
-    val updatedInfo = saveOrderInfo(rw, event)
+    val submittedAddedOpDiff = Events.createOpenPortfolio(OrderAdded(event.submitted)) // ?
+    val eventDiff            = Events.createOpenPortfolio(event)                       // ?
+    //val diff            = createOpenPortfolio(event)
+    val opDiff          = Monoid.combine(submittedAddedOpDiff, eventDiff)
+    val submittedStatus = orderInfo(event.submitted.order.id()).status
+    println(s"""|
+                |orderExecuted:
+                |
+                |submittedAddedOpDiff:
+                |${toString(submittedAddedOpDiff)}
+                |
+                |eventDiff:
+                |${toString(eventDiff)}
+                |
+                |opDiff:
+                |${toString(opDiff)}
+                |
+                |event.counter (id=${event.counter.order.id()}): ${event.counter}
+                |event.counterRemainingAmount: ${event.counterRemainingAmount}
+                |event.counterRemainingFee: ${event.counterRemainingFee}
+                |
+                |event.submitted (id=${event.submitted.order.id()}): ${event.submitted}
+                |event.submittedRemainingAmount: ${event.submittedRemainingAmount}
+                |event.submittedRemainingFee: ${event.submittedRemainingFee}
+                |
+                |submittedStatus: $submittedStatus
+                |""".stripMargin)
 
-    val updatedCounter = updatedInfo(event.counter.order.id())._2 // ?
-    println(s"orderExecuted: updatedCounter: $updatedCounter")
+    saveOpenVolume(rw, opDiff)
 
-    val updatedSubmitted = updatedInfo(event.submitted.order.id())._2
-
-    val all = Monoid.combineAll(
-      Seq(
-        if (updatedSubmitted.status.isFinal) Map.empty[Address, OpenPortfolio]
-        else
-          orderInfoDiff(
-            event.submitted.order,
-            prevSubmitted,
-            updatedSubmitted
-          ),
-        orderInfoDiff(event.counter.order, prevCounter, updatedCounter)
-      )
-    )
-
-    println(s"""orderExecuted:
-         |counter sender: ${event.counter.order.sender}
-         |submitted sender: ${event.submitted.order.sender}
-         |prevSubmitted: $prevSubmitted
-         |updatedSubmitted: $updatedSubmitted
-         |diff: $all
-       """.stripMargin)
-
-    saveOpenVolume(rw, all)
+    if (!submittedStatus.isFinal) {
+      import event.submitted.{order => submittedOrder}
+      val k         = MatcherKeys.addressOrdersSeqNr(submittedOrder.senderPublicKey)
+      val nextSeqNr = rw.get(k) + 1
+      rw.put(k, nextSeqNr)
+      rw.put(MatcherKeys.addressOrders(submittedOrder.senderPublicKey, nextSeqNr), Some(OrderAssets(submittedOrder.id(), event.submitted.spentAsset)))
+    }
   }
 
   def orderCanceled(event: OrderCanceled): Unit = db.readWrite { rw =>
-    val prevInfo    = orderInfo(event.limitOrder.order.id())
-    val updatedInfo = saveOrderInfo(rw, event)
-    saveOpenVolume(rw, orderInfoDiff(event.limitOrder.order, prevInfo, updatedInfo(event.limitOrder.order.id())._2))
+    saveOrderInfo(rw, event)
+    saveOpenVolume(rw, Events.createOpenPortfolio(event))
   }
 
   def orderInfo(id: ByteStr): OrderInfo = DBUtils.orderInfo(db, id)

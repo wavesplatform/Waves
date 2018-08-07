@@ -33,7 +33,7 @@ trait OrderValidator {
 
     val b: Map[Option[ByteStr], Long] = Seq(lo.spentAcc, lo.feeAcc).map(a => a.assetId -> spendableBalance(a)).toMap
 
-    val fakeOrderInfo = Events.createOrderInfo(OrderAdded(lo))(lo.order.id())._2
+    val fakeOrderInfo: OrderInfo = ??? //Events.collectChanges(OrderAdded(lo))(lo.order.id())._2
     val openPortfolioForNewOrder =
       Events.orderInfoDiff(lo.order, OrderInfo.empty, fakeOrderInfo).getOrElse(order.senderPublicKey, OpenPortfolio.empty)
 

@@ -8,6 +8,12 @@ import scorex.transaction.AssetId
 
 import scala.util.Try
 
+case class OrderInfoDiff(isNew: Boolean = false,
+                         executedAmount: Option[Long] = None,
+                         nowCanceled: Option[Boolean] = None,
+                         newMinAmount: Option[Long] = None,
+                         totalExecutedFee: Option[Long] = None)
+
 case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: Option[Long], remainingFee: Long) {
   def remaining: Long = if (canceled) 0L else amount - filled
 
@@ -29,16 +35,6 @@ object OrderInfo {
   implicit val longSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
 
   val empty = OrderInfo(0L, 0L, false, None, 0L)
-
-  // TODO refactor this
-  def combine(older: OrderInfo, newer: OrderInfo): OrderInfo =
-    OrderInfo(
-      math.max(older.amount, newer.amount),
-      older.filled.combine(newer.filled),
-      newer.canceled,
-      newer.minAmount,
-      newer.remainingFee
-    )
 
   implicit val orderInfoFormat: Format[OrderInfo] = Json.format[OrderInfo]
 

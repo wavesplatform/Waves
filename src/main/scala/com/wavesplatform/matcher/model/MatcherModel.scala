@@ -22,8 +22,8 @@ case class LevelAgg(price: Long, amount: Long)
 
 sealed trait LimitOrder {
   def price: Price
-  def amount: Long
-  def fee: Long
+  def amount: Long // remaining
+  def fee: Long    // remaining
   def order: Order
   def partial(amount: Long, fee: Long): LimitOrder
 
@@ -135,12 +135,14 @@ object Events {
     def counterRemainingAmount: Long = math.max(counter.amount - executedAmount, 0)
     def counterExecutedFee: Long     = LimitOrder.getPartialFee(counter.order.matcherFee, counter.order.amount, executedAmount)
     def counterRemainingFee: Long    = math.max(counter.fee - counterExecutedFee, 0)
-    def counterExecuted: LimitOrder  = counter.partial(amount = executedAmount, fee = counterExecutedFee)
+    def counterExecuted: LimitOrder  = counter.partial(amount = executedAmount, fee = counterExecutedFee) // TODO executed?!!!
+    def counterRemaining: LimitOrder = counter.partial(amount = counterRemainingAmount, fee = counterRemainingFee)
 
     def submittedRemainingAmount: Long = math.max(submitted.amount - executedAmount, 0)
     def submittedExecutedFee: Long     = LimitOrder.getPartialFee(submitted.order.matcherFee, submitted.order.amount, executedAmount)
     def submittedRemainingFee: Long    = math.max(submitted.fee - submittedExecutedFee, 0)
     def submittedExecuted: LimitOrder  = submitted.partial(amount = executedAmount, fee = submittedExecutedFee)
+    def submittedRemaining: LimitOrder = submitted.partial(amount = submittedRemainingAmount, fee = submittedRemainingFee)
   }
 
   case class OrderAdded(order: LimitOrder) extends Event
@@ -158,18 +160,114 @@ object Events {
     case class Changes(updatedPortfolio: Portfolio, changedAssets: Set[Option[AssetId]])
   }
 
-  def createOrderInfo(event: Event): Map[ByteStr, (Order, OrderInfo)] = {
+  def collectChanges(event: Event): Seq[(Order, OrderInfoDiff)] = {
     event match {
       case OrderAdded(lo) =>
-        Map((lo.order.id(), (lo.order, OrderInfo(lo.order.amount, 0L, canceled = false, Some(lo.minAmountOfAmountAsset), lo.fee))))
+        Seq(
+          (lo.order,
+           OrderInfoDiff(isNew = true, executedAmount = Some(0L), totalExecutedFee = Some(0L), newMinAmount = Some(lo.minAmountOfAmountAsset))))
       case oe: OrderExecuted =>
         val (o1, o2) = (oe.submittedExecuted, oe.counterExecuted)
-        Map(
-          (o1.order.id(), (o1.order, OrderInfo(o1.order.amount, o1.amount, canceled = false, Some(o1.minAmountOfAmountAsset), o1.fee))),
-          (o2.order.id(), (o2.order, OrderInfo(o2.order.amount, o2.amount, canceled = false, Some(o2.minAmountOfAmountAsset), o2.fee)))
+        // o1,o2.amount == executed
+
+        println(s"""
+                   |collectChanges (from Event):
+                   |submitted (id=${oe.submitted.order.id()}) executionAmount(counter): ${oe.submitted.executionAmount(oe.counter)}
+                   |submitted.amount: ${o1.amount}/${o1.order.amount}
+                   |submitted.amountOfAmountAsset: ${o1.amountOfAmountAsset}
+                   |submitted.amountOfPriceAsset: ${o1.amountOfPriceAsset}
+                   |submitted fee: ${o1.fee}/${o1.order.matcherFee}
+                   |counter (id=${oe.counter.order.id()}) amountOfAmountAsset: ${oe.counter.amountOfAmountAsset}
+                   |counter.amount: ${o2.amount}/${o2.order.amount}
+                   |counter.amountOfAmountAsset: ${o2.amountOfAmountAsset}
+                   |counter.amountOfPriceAsset: ${o2.amountOfPriceAsset}
+                   |counter fee: ${o2.fee}/${o2.order.matcherFee}
+                   |""".stripMargin)
+        Seq(
+          // Some(o1.minAmountOfAmountAsset)
+          (o1.order,
+           OrderInfoDiff(
+             isNew = true,
+             executedAmount = Some(o1.amountOfAmountAsset),
+             totalExecutedFee = Some(o1.fee),
+             newMinAmount = Some(o1.minAmountOfAmountAsset)
+           )),
+          (o2.order,
+           OrderInfoDiff(
+             executedAmount = Some(o2.amountOfAmountAsset),
+             totalExecutedFee = Some(o2.fee),
+             newMinAmount = Some(o2.minAmountOfAmountAsset)
+           ))
         )
       case OrderCanceled(lo, unmatchable) =>
-        Map((lo.order.id(), (lo.order, OrderInfo(lo.order.amount, 0L, canceled = !unmatchable, Some(lo.minAmountOfAmountAsset), lo.fee))))
+        Seq((lo.order, OrderInfoDiff(nowCanceled = Some(!unmatchable)))) // !unmatchable?
+    }
+  }
+
+  def createOpenPortfolio(event: Event): Map[Address, OpenPortfolio] = {
+    def overdraftFee(lo: LimitOrder): Long = {
+      val feeAmount = LimitOrder.getPartialFee(lo.order.matcherFee, lo.order.amount, lo.amount)
+      if (lo.feeAcc == lo.rcvAcc) math.max(feeAmount - lo.getReceiveAmount, 0L) else feeAmount
+    }
+
+    event match {
+      case OrderAdded(lo) =>
+        println(s"""|
+              |createOpenPortfolio.OrderAdded:
+              |lo.order.id:              ${lo.order.id()}
+              |lo.order.senderPublicKey: ${lo.order.senderPublicKey}
+              |lo.getSpendAmount: ${lo.getSpendAmount}/${lo.amount}
+              |lo.fee:            ${lo.fee}
+              |overdraftFee(lo):  ${overdraftFee(lo)}
+              |""".stripMargin)
+        Map(
+          lo.order.senderPublicKey.toAddress -> OpenPortfolio(
+            Monoid.combine(
+              Map(lo.spentAsset -> lo.getSpendAmount),
+              Map(lo.feeAsset   -> overdraftFee(lo))
+            )))
+      case oe: OrderExecuted =>
+        val (o1, o2) = (oe.submittedExecuted, oe.counterExecuted)
+        println(s"""|
+                    |createOpenPortfolio.OrderExecuted:
+                    |o1 (submitted):
+                    |o1.order.id:              ${o1.order.id()}
+                    |o1.order.senderPublicKey: ${o1.order.senderPublicKey}
+                    |o1.getSpendAmount: ${o1.getSpendAmount}/${o1.amount}
+                    |o1.fee:            ${o1.fee}
+                    |overdraftFee(o1):  ${overdraftFee(o1)}
+                    |
+                    |o2 (counter):
+                    |o2.order.id:              ${o2.order.id()}
+                    |o2.order.senderPublicKey: ${o2.order.senderPublicKey}
+                    |o2.getSpendAmount: ${o2.getSpendAmount}/${o2.amount}
+                    |o2.fee:            ${o2.fee}
+                    |overdraftFee(o2):  ${overdraftFee(o2)}
+                    |""".stripMargin)
+
+        val op1 = OpenPortfolio(
+          Monoid.combine(
+            Map(o1.spentAsset -> -o1.getSpendAmount),
+            Map(o1.feeAsset   -> -overdraftFee(o1))
+          ))
+        val op2 = OpenPortfolio(
+          Monoid.combine(
+            Map(o2.spentAsset -> -o2.getSpendAmount),
+            Map(o2.feeAsset   -> -overdraftFee(o2))
+          ))
+        Monoid.combine(
+          Map(o1.order.senderPublicKey.toAddress -> op1),
+          Map(o2.order.senderPublicKey.toAddress -> op2)
+        )
+      case OrderCanceled(lo, unmatchable) =>
+        val feeDiff = if (!unmatchable && lo.feeAcc == lo.rcvAcc) math.max(lo.fee - lo.getReceiveAmount, 0L) else lo.fee
+        Map(
+          lo.order.senderPublicKey.toAddress ->
+            OpenPortfolio(
+              Monoid.combine(
+                Map(lo.spentAsset -> -lo.getSpendAmount),
+                Map(lo.feeAsset   -> -feeDiff)
+              )))
     }
   }
 
