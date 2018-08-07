@@ -49,7 +49,7 @@ class TradeBalanceAndRoundingTestSuite
     val bobWavesBalanceBefore   = matcherNode.accountBalances(bobNode.address)._1
 
     val price           = 238
-    val buyOrderAmount  = 425532l
+    val buyOrderAmount  = 425532L
     val sellOrderAmount = 3100000000L
 
     val correctedSellAmount = correctAmount(sellOrderAmount, price)
