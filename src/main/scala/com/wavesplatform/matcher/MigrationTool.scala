@@ -233,7 +233,8 @@ object MigrationTool extends ScorexLogging {
     db.readWrite { rw =>
       for ((addr, migratedOrders) <- r) {
         val currentOrderCount = rw.get(MatcherKeys.addressOrdersSeqNr(addr))
-        val currentOrderAssets = (1 to currentOrderCount).flatMap { i => rw.get(MatcherKeys.addressOrders(addr, i))
+        val currentOrderAssets = (1 to currentOrderCount).flatMap { i =>
+          rw.get(MatcherKeys.addressOrders(addr, i))
         }.toSet
 
         val ordersToAdd = migratedOrders.diff(currentOrderAssets)
@@ -264,10 +265,16 @@ object MigrationTool extends ScorexLogging {
           case Some(order) =>
             calculatedReservedBalances.compute(
               order.sender, { (_, prevBalances) =>
-                val id = order.getSpendAssetId
-                Option(prevBalances).fold(Map(id -> orderInfo.remaining)) { prevBalances =>
-                  prevBalances.updated(id, prevBalances.getOrElse(id, 0L) + orderInfo.remaining)
+                val spendId        = order.getSpendAssetId
+                val spendRemaining = order.getSpendAmount(order.price, orderInfo.remaining).explicitGet()
+
+                val r = Option(prevBalances).fold(Map(spendId -> spendRemaining)) { prevBalances =>
+                  prevBalances.updated(spendId, prevBalances.getOrElse(spendId, 0L) + spendRemaining)
                 }
+
+                // Fee correction
+                val receivedId = order.getReceiveAssetId
+                if (receivedId.isEmpty) r else r.updated(receivedId, r.getOrElse(receivedId, 0L) + orderInfo.remainingFee)
               }
             )
         }
@@ -292,6 +299,7 @@ object MigrationTool extends ScorexLogging {
     }
 
     val corrections = Seq.newBuilder[((Address, Option[AssetId]), Long)]
+    var assetsToAdd = Map.empty[Address, Set[Option[AssetId]]]
 
     for (address <- allReservedBalances.keySet ++ calculatedReservedBalances.keySet().asScala) {
       val calculated = calculatedReservedBalances.getOrDefault(address, Map.empty)
@@ -302,6 +310,7 @@ object MigrationTool extends ScorexLogging {
           val storedBalance     = stored.getOrElse(assetId, 0L)
 
           if (calculatedBalance != storedBalance) {
+            if (!stored.contains(assetId)) assetsToAdd += address -> (assetsToAdd.getOrElse(address, Set.empty) + assetId)
             discrepancyCounter += 1
             corrections += (address, assetId) -> calculatedBalance
           }
@@ -312,6 +321,16 @@ object MigrationTool extends ScorexLogging {
     log.info(s"Found $discrepancyCounter discrepancies")
 
     db.readWrite { rw =>
+      for ((address, newAssetIds) <- assetsToAdd) {
+        val k         = MatcherKeys.openVolumeSeqNr(address)
+        val currSeqNr = rw.get(k)
+
+        rw.put(k, currSeqNr + newAssetIds.size)
+        for ((assetId, i) <- newAssetIds.zipWithIndex) {
+          rw.put(MatcherKeys.openVolumeAsset(address, currSeqNr + 1 + i), assetId)
+        }
+      }
+
       for (((address, assetId), value) <- corrections.result()) {
         rw.put(MatcherKeys.openVolume(address, assetId), Some(value))
       }

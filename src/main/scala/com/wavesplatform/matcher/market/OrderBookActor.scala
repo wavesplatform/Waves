@@ -17,7 +17,7 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
+import com.wavesplatform.transaction.ValidationError.{AccountBalanceError, GenericError, NegativeAmount, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.{NTP, ScorexLogging}
 import com.wavesplatform.utx.UtxPool
@@ -364,7 +364,11 @@ class OrderBookActor(assetPair: AssetPair,
         } else {
           Some(event.submitted)
         }
-      case _ => cancelCounterOrder()
+      case _: NegativeAmount =>
+        processEvent(Events.OrderCanceled(event.submitted, unmatchable = true))
+        None
+      case _ =>
+        cancelCounterOrder()
     }
   }
 
@@ -425,7 +429,11 @@ class OrderBookActor(assetPair: AssetPair,
       if (isMigrateToNewOrderHistoryStorage) {
         orderHistory ! evt
       }
-    case RecoveryCompleted => log.info(assetPair.toString() + " - Recovery completed!");
+
+    case RecoveryCompleted =>
+      log.info(assetPair.toString() + " - Recovery completed!")
+      updateSnapshot(orderBook)
+
     case SnapshotOffer(metadata, snapshot: Snapshot) =>
       lastSnapshotSequenceNr = metadata.sequenceNr
       orderBook = snapshot.orderBook

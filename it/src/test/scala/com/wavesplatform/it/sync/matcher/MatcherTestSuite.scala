@@ -67,7 +67,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       }
 
       "and should be listed by trader's publiс key via REST" in {
-        matcherNode.orderHistory(aliceNode).map(_.id) should contain(order1.message.id)
+        matcherNode.fullOrderHistory(aliceNode).map(_.id) should contain(order1.message.id)
       }
 
       "and should match with buy order" in {
@@ -81,6 +81,9 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
         matcherNode.waitOrderStatus(aliceWavesPair, order1.message.id, "PartiallyFilled")
         matcherNode.waitOrderStatus(aliceWavesPair, order2.message.id, "Filled")
+
+        //matcherNode.orderHistoryByPair(bobNode, aliceWavesPair) should contain(order2.message.id)
+        //matcherNode.fullOrderHistory(bobNode) should contain(order2.message.id)
 
         nodes.waitForHeightArise()
 
