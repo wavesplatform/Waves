@@ -331,6 +331,22 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
                  |OOM killed: ${containerInfo.state().oomKilled()}""".stripMargin)
   }
 
+  def killAndStartContainer(node: DockerNode): DockerNode = {
+    val id = node.containerId
+    log.info(s"Killing container with id: $id")
+    takeProfileSnapshot(node)
+    client.killContainer(id, DockerClient.Signal.SIGINT)
+    saveProfile(node)
+    saveLog(node)
+    client.startContainer(id)
+    node.nodeInfo = getNodeInfo(node.containerId, node.settings)
+    Await.result(
+      node.waitForStartup().flatMap(_ => connectToAll(node)),
+      3.minutes
+    )
+    node
+  }
+
   def restartContainer(node: DockerNode): DockerNode = {
     val id            = node.containerId
     val containerInfo = inspectContainer(id)

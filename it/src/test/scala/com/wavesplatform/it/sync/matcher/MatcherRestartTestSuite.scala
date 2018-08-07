@@ -57,32 +57,35 @@ class MatcherRestartTestSuite
       matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
 
       // reboot matcher's node
-      docker.restartContainer(dockerNodes().head)
+      docker.killAndStartContainer(dockerNodes().head)
       Thread.sleep(30.seconds.toMillis)
-      // connect back matcher's node
-      //docker.connectToNetwork(Seq(dockerNodes().head))
+
       val height = nodes.map(_.height).max
 
       matcherNode.waitForHeight(height + 1)
       matcherNode.orderStatus(firstOrder, aliceWavesPair).status shouldBe "Accepted"
       matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
 
+      val orders1 = matcherNode.orderBook(aliceWavesPair)
+      orders1.asks.head.amount shouldBe 500
+      orders1.asks.head.price shouldBe 2.waves * Order.PriceConstant
+
       val aliceSecondOrder = matcherNode
         .placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 500, 5.minutes)
       aliceSecondOrder.status shouldBe "OrderAccepted"
 
-      val orders1 = matcherNode.orderBook(aliceWavesPair)
-      orders1.asks.head.amount shouldBe 1000
-      orders1.asks.head.price shouldBe 2.waves * Order.PriceConstant
+      val orders2 = matcherNode.orderBook(aliceWavesPair)
+      orders2.asks.head.amount shouldBe 1000
+      orders2.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
       val cancel = matcherNode.cancelOrder(aliceNode, aliceWavesPair, firstOrder)
       cancel.status should be("OrderCanceled")
 
-      val orders2 = matcherNode.orderBook(aliceWavesPair)
-      orders2.asks.head.amount shouldBe 500
+      val orders3 = matcherNode.orderBook(aliceWavesPair)
+      orders3.asks.head.amount shouldBe 500
 
       matcherNode.orderStatus(firstOrder, aliceWavesPair).status should be("Cancelled")
-      matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted" t
+      matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
     }
   }
 }
