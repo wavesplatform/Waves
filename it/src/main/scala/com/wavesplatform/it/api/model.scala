@@ -1,6 +1,7 @@
 package com.wavesplatform.it.api
 
 import play.api.libs.json.{Format, Json}
+import scorex.transaction.assets.exchange.OrderType
 
 // USCE no longer contains references to non-serializable Request/Response objects
 // to work around https://github.com/scalatest/scalatest/issues/556
@@ -73,6 +74,45 @@ object AssetInfo {
 case class Transaction(`type`: Int, id: String, fee: Long, timestamp: Long, sender: Option[String])
 object Transaction {
   implicit val transactionFormat: Format[Transaction] = Json.format
+}
+
+case class OrderInfo(id: String,
+                     sender: String,
+                     senderPublicKey: String,
+                     matcherPublicKey: String,
+                     assetPair: AssetPairResponse,
+                     orderType: String,
+                     price: Long,
+                     amount: Long,
+                     timestamp: Long,
+                     expiration: Long,
+                     matcherFee: Long,
+                     signature: String)
+object OrderInfo {
+  implicit val transactionFormat: Format[OrderInfo] = Json.format
+}
+
+case class AssetPairResponse(amountAsset: Option[String], priceAsset: Option[String])
+object AssetPairResponse {
+  implicit val pairResponseFormat: Format[AssetPairResponse] = Json.format
+}
+
+case class ExchangeTransaction(`type`: Int,
+                               id: String,
+                               sender: String,
+                               senderPublicKey: String,
+                               fee: Long,
+                               timestamp: Long,
+                               signature: String,
+                               order1: OrderInfo,
+                               order2: OrderInfo,
+                               price: Long,
+                               amount: Long,
+                               buyMatcherFee: Long,
+                               sellMatcherFee: Long,
+                               height: Option[Int])
+object ExchangeTransaction {
+  implicit val transactionFormat: Format[ExchangeTransaction] = Json.format
 }
 
 case class TransactionInfo(`type`: Int, id: String, fee: Long, timestamp: Long, sender: Option[String], height: Int)
