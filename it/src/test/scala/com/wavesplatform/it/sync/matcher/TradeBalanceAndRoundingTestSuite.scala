@@ -20,7 +20,7 @@ import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.duration._
 import scala.math.BigDecimal.RoundingMode
-import scala.util.{Random, Try}
+import scala.util.Random
 
 class TradeBalanceAndRoundingTestSuite
     extends FreeSpec
@@ -126,7 +126,10 @@ class TradeBalanceAndRoundingTestSuite
       matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES") shouldBe expectedBobTradableBalance
       matcherNode.tradableBalance(aliceNode, wavesUsdPair)("WAVES") shouldBe aliceNode.accountBalances(aliceNode.address)._1
 
-      matcherNode.cancelOrder(bobNode, wavesUsdPair, matcherNode.fullOrderHistory(bobNode).head.id)
+      val orderId = matcherNode.fullOrderHistory(bobNode).head.id
+      matcherNode.fullOrderHistory(bobNode).size should be(1)
+      matcherNode.cancelOrder(bobNode, wavesUsdPair, orderId)
+      matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Cancelled", 1.minute)
       matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES") shouldBe bobNode.accountBalances(bobNode.address)._1
     }
   }
@@ -227,7 +230,7 @@ class TradeBalanceAndRoundingTestSuite
     val wctWavesSellAmount = 2
     val wctWavesPrice      = 11234560000000L
 
-    "bob lease all waves exect half matcher fee" in {
+    "bob lease all waves exact half matcher fee" in {
       val leasingAmount = bobNode.accountBalances(bobNode.address)._1 - leasingFee - matcherFee / 2
       val leaseTxId =
         bobNode.lease(bobNode.address, matcherNode.address, leasingAmount, leasingFee).id
@@ -246,12 +249,10 @@ class TradeBalanceAndRoundingTestSuite
   }
 
   def correctAmount(a: Long, price: Long): Long = {
-    val min = (BigDecimal(Order.PriceConstant) / price).setScale(0, RoundingMode.CEILING)
-    if (min > 0)
-      Try(((BigDecimal(a) / min).toBigInt() * min.toBigInt()).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
-    else
-      a
+    val settledTotal = (BigDecimal(price) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
+    (BigDecimal(settledTotal) / price * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
   }
+
   def receiveAmount(ot: OrderType, matchPrice: Long, matchAmount: Long): Long =
     if (ot == BUY) correctAmount(matchAmount, matchPrice)
     else {
