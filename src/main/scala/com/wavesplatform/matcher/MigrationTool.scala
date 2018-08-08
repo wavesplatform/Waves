@@ -11,7 +11,7 @@ import com.wavesplatform.crypto.DigestSize
 import com.wavesplatform.database.DBExt
 import com.wavesplatform.db.{AssetIdOrderIdSetCodec, OrderIdsCodec, OrderToTxIdsCodec, PortfolioCodec, openDB}
 import com.wavesplatform.matcher.api.DBUtils
-import com.wavesplatform.matcher.model.OrderInfo
+import com.wavesplatform.matcher.model.{LimitOrder, OrderInfo}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.{ByteStr, EitherExt2}
 import com.wavesplatform.utils.Base58
@@ -209,6 +209,23 @@ object MigrationTool extends ScorexLogging {
     }
   }
 
+  private def deleteLegacyEntries(db: DB): Unit = {
+    val iterator     = db.iterator()
+    val prefix       = "matcher:".getBytes(UTF_8)
+    val keysToDelete = Seq.newBuilder[Array[Byte]]
+    iterator.seekToFirst()
+    try {
+      while (iterator.hasNext) {
+        val e = iterator.next()
+        if (e.getKey.startsWith(prefix)) keysToDelete += e.getKey
+      }
+    } finally iterator.close()
+
+    db.readWrite { rw =>
+      for (k <- keysToDelete.result()) rw.delete(k)
+    }
+  }
+
   private def migrateActiveOrders(db: DB): Unit = {
     log.info("Migrating active orders")
     val prefix        = "matcher:a-addr-orders:".getBytes(UTF_8)
@@ -252,30 +269,38 @@ object MigrationTool extends ScorexLogging {
   private def recalculateReservedBalance(db: DB): Unit = {
     log.info("Recalculating reserved balances")
     val calculatedReservedBalances = new JHashMap[Address, Map[Option[AssetId], Long]]()
+    val ordersToDelete             = Seq.newBuilder[ByteStr]
+    val orderInfoToUpdate          = Seq.newBuilder[(ByteStr, OrderInfo)]
     val key                        = MatcherKeys.orderInfo(ByteStr(Array.emptyByteArray))
 
     var discrepancyCounter = 0
 
     db.iterateOver(key.keyBytes) { e =>
-      val orderId = new Array[Byte](DigestSize)
-      Array.copy(e.getKey, 2, orderId, 0, DigestSize)
+      val orderId = ByteStr(new Array[Byte](DigestSize))
+      Array.copy(e.getKey, 2, orderId.arr, 0, DigestSize)
       val orderInfo = key.parse(e.getValue)
       if (!orderInfo.status.isFinal) {
-        db.get(MatcherKeys.order(ByteStr(orderId))) match {
-          case None => log.info(s"Missing order ${ByteStr(orderId)}")
+        db.get(MatcherKeys.order(orderId)) match {
+          case None =>
+            log.info(s"Missing order $orderId")
+            ordersToDelete += orderId
           case Some(order) =>
             calculatedReservedBalances.compute(
               order.sender, { (_, prevBalances) =>
                 val spendId        = order.getSpendAssetId
                 val spendRemaining = order.getSpendAmount(order.price, orderInfo.remaining).explicitGet()
+                val remainingFee   = order.matcherFee - LimitOrder.getPartialFee(order.matcherFee, order.amount, orderInfo.filled)
+
+                if (remainingFee != orderInfo.remainingFee) {
+                  orderInfoToUpdate += orderId -> orderInfo.copy(remainingFee = remainingFee)
+                }
 
                 val r = Option(prevBalances).fold(Map(spendId -> spendRemaining)) { prevBalances =>
                   prevBalances.updated(spendId, prevBalances.getOrElse(spendId, 0L) + spendRemaining)
                 }
 
                 // Fee correction
-                val receivedId = order.getReceiveAssetId
-                if (receivedId.isEmpty) r else r.updated(receivedId, r.getOrElse(receivedId, 0L) + orderInfo.remainingFee)
+                if (order.getReceiveAssetId.isEmpty) r else r.updated(None, r.getOrElse(None, 0L) + remainingFee)
               }
             )
         }
@@ -320,7 +345,7 @@ object MigrationTool extends ScorexLogging {
       }
     }
 
-    log.info(s"Found $discrepancyCounter discrepancies")
+    log.info(s"Found $discrepancyCounter discrepancies; writing reserved balances")
 
     db.readWrite { rw =>
       for ((address, newAssetIds) <- assetsToAdd) {
@@ -335,6 +360,17 @@ object MigrationTool extends ScorexLogging {
 
       for (((address, assetId), value) <- corrections.result()) {
         rw.put(MatcherKeys.openVolume(address, assetId), Some(value))
+      }
+    }
+
+    val allUpdatedOrderInfo = orderInfoToUpdate.result()
+    if (allUpdatedOrderInfo.nonEmpty) {
+      log.info(s"Writing ${allUpdatedOrderInfo.size} updated order info values")
+
+      db.readWrite { rw =>
+        for ((id, oi) <- allUpdatedOrderInfo) {
+          rw.put(MatcherKeys.orderInfo(id), oi)
+        }
       }
     }
 
@@ -368,6 +404,9 @@ object MigrationTool extends ScorexLogging {
       for ((assetId, balance) <- DBUtils.reservedBalance(db, Address.fromString(args(2)).explicitGet())) {
         log.info(s"${AssetPair.assetIdStr(assetId)}: $balance")
       }
+    } else if (args(1) == "ddd") {
+      log.warn("DELETING LEGACY ENTRIES")
+      deleteLegacyEntries(db)
     }
     db.close()
   }
