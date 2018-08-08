@@ -54,9 +54,9 @@ object Verifier {
 
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): Either[ValidationError, Order] = {
     ScriptRunner[Boolean](height, Coproduct[TxOrd](order), blockchain, script) match {
-      case (ctx, Left(execError)) => Left(ScriptExecutionError(script.text, execError, ctx.letDefs, true))
+      case (ctx, Left(execError)) => Left(ScriptExecutionError(script.text, execError, ctx.letDefs, false))
       case (ctx, Right(false)) =>
-        Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, true))
+        Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, false))
       case (_, Right(true)) => Right(order)
     }
   }
@@ -65,47 +65,33 @@ object Verifier {
                      blockchain: Blockchain,
                      matcherScriptOpt: Option[Script],
                      height: Int): Either[ValidationError, Transaction] = {
-    val AssetPair(amountAsset, priceAsset) = et.sellOrder.assetPair
 
-    lazy val amountAssetVerification =
-      amountAsset
-        .flatMap(blockchain.assetDescription)
-        .flatMap(_.script)
-        .map(verifyOrder(blockchain, _, height, et.sellOrder))
-        .getOrElse(Right(()))
-
-    lazy val priceAssetVerification =
-      priceAsset
-        .flatMap(blockchain.assetDescription)
-        .flatMap(_.script)
-        .map(verifyOrder(blockchain, _, height, et.buyOrder))
-        .getOrElse(Right(()))
-
-    lazy val sellerTxVerification =
-      blockchain
-        .accountScript(et.sellOrder.sender.toAddress)
-        .map(verifyTx(blockchain, _, height, et, false))
-        .getOrElse(Right(()))
-
-    lazy val buyerTxVerification =
-      blockchain
-        .accountScript(et.buyOrder.sender.toAddress)
-        .map(verifyTx(blockchain, _, height, et, false))
-        .getOrElse(Right(()))
-
-    for {
-      _ <- matcherScriptOpt match {
+    lazy val matcherTxVerification =
+      matcherScriptOpt match {
         case Some(script) => verifyTx(blockchain, script, height, et, false)
         case None         => verifyAsEllipticCurveSignature(et)
       }
-      _ <- sellerTxVerification
-      _ <- buyerTxVerification
-      _ <- amountAssetVerification
-      _ <- priceAssetVerification
+
+    lazy val sellerOrderVerification =
+      blockchain
+        .accountScript(et.sellOrder.sender.toAddress)
+        .map(verifyOrder(blockchain, _, height, et.sellOrder))
+        .getOrElse(Right(()))
+
+    lazy val buyerOrderVerification =
+      blockchain
+        .accountScript(et.buyOrder.sender.toAddress)
+        .map(verifyOrder(blockchain, _, height, et.buyOrder))
+        .getOrElse(Right(()))
+
+    for {
+      _ <- matcherTxVerification
+      _ <- sellerOrderVerification
+      _ <- buyerOrderVerification
     } yield et
   }
 
-  def verifyAsEllipticCurveSignature[T <: ProvenTransaction](pt: T): Either[ValidationError, T] =
+  def verifyAsEllipticCurveSignature(pt: ProvenTransaction): Either[ValidationError, ProvenTransaction] =
     pt.proofs.proofs match {
       case p :: Nil =>
         Either.cond(crypto.verify(p.arr, pt.bodyBytes(), pt.sender.publicKey),

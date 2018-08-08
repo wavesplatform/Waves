@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, ValidationError}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, ValidationError}
 import com.wavesplatform.utils.functionCosts
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -199,6 +199,86 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     }
   }
 
+  val fsV2 = TestFunctionalitySettings.Enabled
+    .copy(
+      preActivatedFeatures = Map(
+        BlockchainFeatures.SmartAccounts.id       -> 0,
+        BlockchainFeatures.SmartAccountsTrades.id -> 0,
+        BlockchainFeatures.SmartAssets.id         -> 0,
+        BlockchainFeatures.FairPoS.id             -> 0
+      ))
+
+  property("ExchangeTransactions valid if all scripts succeeds") {
+    val allValidP = smartTradePreconditions(
+      scriptGen("Order", true),
+      scriptGen("Order", true),
+      scriptGen("ExchangeTransaction", true)
+    )
+
+    forAll(allValidP) {
+      case (genesis, transfers, issueAndScripts, exchangeTx) =>
+        val preconBlocks = Seq(
+          TestBlock.create(Seq(genesis)),
+          TestBlock.create(transfers),
+          TestBlock.create(issueAndScripts)
+        )
+        assertDiffEi(preconBlocks, TestBlock.create(Seq(exchangeTx)), fsV2) { diff =>
+          diff.isRight shouldBe true
+        }
+    }
+  }
+
+  property("ExchangeTransactions invalid if buyer scripts fails") {
+    val failedOrderScript = smartTradePreconditions(
+      scriptGen("Order", false),
+      scriptGen("Order", true),
+      scriptGen("ExchangeTransaction", true)
+    )
+
+    forAll(failedOrderScript) {
+      case (genesis, transfers, issueAndScripts, exchangeTx) =>
+        val preconBlocks = Seq(TestBlock.create(Seq(genesis)), TestBlock.create(transfers), TestBlock.create(issueAndScripts))
+        assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), fsV2)("TransactionNotAllowedByScript")
+    }
+  }
+
+  property("ExchangeTransactions invalid if seller scripts fails") {
+    val failedOrderScript = smartTradePreconditions(
+      scriptGen("Order", true),
+      scriptGen("Order", false),
+      scriptGen("ExchangeTransaction", true)
+    )
+
+    forAll(failedOrderScript) {
+      case (genesis, transfers, issueAndScripts, exchangeTx) =>
+        val preconBlocks = Seq(TestBlock.create(Seq(genesis)), TestBlock.create(transfers), TestBlock.create(issueAndScripts))
+        assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), fsV2)("TransactionNotAllowedByScript")
+    }
+  }
+
+  property("ExchangeTransactions invalid if matcher script fails") {
+    val failedMatcherScript = smartTradePreconditions(
+      scriptGen("Order", true),
+      scriptGen("Order", true),
+      scriptGen("ExchangeTransaction", false)
+    )
+
+    forAll(failedMatcherScript) {
+      case (genesis, transfers, issueAndScripts, exchangeTx) =>
+        val preconBlocks = Seq(TestBlock.create(Seq(genesis)), TestBlock.create(transfers), TestBlock.create(issueAndScripts))
+        assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), fsV2)("TransactionNotAllowedByScript")
+    }
+  }
+
+  def scriptGen(caseType: String, v: Boolean): String = {
+    s"""
+       |match tx {
+       | case o: $caseType => $v
+       | case _ => ${!v}
+       |}
+      """.stripMargin
+  }
+
   def compile(scriptText: String, ctx: CompilerContext): Either[String, (Script, Long)] = {
     val compiler = new CompilerV1(ctx)
 
@@ -216,120 +296,56 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     } yield (script, complexity)
   }
 
-  property("ExchangeTransactions valid if all scripts succeeds") {
-    val allValidP = smartTradePreconditions(
-      scriptGen("Order", true),
-      scriptGen("Order", true),
-      scriptGen("ExchangeTransaction", true)
-    )
-
-    forAll(allValidP) {
-      case (genesis, List(tr1, tr2), List(asset1, asset2), setMatcherScript, exchangeTx) =>
-        val preconBlocks = Seq(
-          TestBlock.create(Seq(genesis)),
-          TestBlock.create(Seq(tr1, tr2)),
-          TestBlock.create(Seq(asset1, asset2, setMatcherScript))
-        )
-        assertDiffEi(preconBlocks, TestBlock.create(Seq(exchangeTx)), fs) { diff =>
-          diff.isRight shouldBe true
-        }
-    }
-  }
-
-  property("ExchangeTransactions invalid if one of order scripts fails") {
-    val fs = TestFunctionalitySettings.Enabled
-
-    val failedOrderScript = smartTradePreconditions(
-      scriptGen("Order", false),
-      scriptGen("Order", true),
-      scriptGen("ExchangeTransaction", true)
-    )
-
-    forAll(failedOrderScript) {
-      case (genesis, List(tr1, tr2), List(asset1, asset2), setMatcherScript, exchangeTx) =>
-        val preconBlocks = Seq(
-          TestBlock.create(Seq(genesis)),
-          TestBlock.create(Seq(tr1, tr2)),
-          TestBlock.create(Seq(asset1, asset2, setMatcherScript))
-        )
-        assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), fs)("TransactionNotAllowedByScript")
-    }
-  }
-
-  property("ExchangeTransactions invalid if matcher script fails") {
-    val fs = TestFunctionalitySettings.Enabled
-
-    val failedMatcherScript = smartTradePreconditions(
-      scriptGen("Order", true),
-      scriptGen("Order", true),
-      scriptGen("ExchangeTransaction", false)
-    )
-
-    forAll(failedMatcherScript) {
-      case (genesis, List(tr1, tr2), List(asset1, asset2), setMatcherScript, exchangeTx) =>
-        val preconBlocks = Seq(
-          TestBlock.create(Seq(genesis)),
-          TestBlock.create(Seq(tr1, tr2)),
-          TestBlock.create(Seq(asset1, asset2, setMatcherScript))
-        )
-        assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), fs)("TransactionNotAllowedByScript")
-    }
-  }
-
-  def scriptGen(caseType: String, v: Boolean): String = {
-    s"""
-       |match tx {
-       | case _: $caseType => $v
-       | case _ => ${!v}
-       |}
-      """.stripMargin
-  }
-
-  def smartTradePreconditions(
-      priceAssetScript: String,
-      amountAssetScript: String,
-      txScript: String): Gen[(GenesisTransaction, List[TransferTransaction], List[IssueTransaction], SetScriptTransaction, ExchangeTransaction)] = {
+  def smartTradePreconditions(buyerScriptSrc: String,
+                              sellerScriptSrc: String,
+                              txScript: String): Gen[(GenesisTransaction, List[TransferTransaction], List[Transaction], ExchangeTransaction)] = {
     val enoughFee = 500000
 
     val txScriptCompiled = ScriptCompiler(txScript).explicitGet()._1
 
-    val amountAssetScriptCompiled = Some(ScriptCompiler(amountAssetScript).explicitGet()._1)
-    val priceAssetScriptCompiled  = Some(ScriptCompiler(priceAssetScript).explicitGet()._1)
+    val sellerScript = Some(ScriptCompiler(sellerScriptSrc).explicitGet()._1)
+    val buyerScript  = Some(ScriptCompiler(buyerScriptSrc).explicitGet()._1)
 
     val chainId = AddressScheme.current.chainId
 
     for {
-      master    <- accountGen
-      fstIssuer <- accountGen
-      sndIssuer <- accountGen
-      ts        <- timestampGen
+      master <- accountGen
+      buyer  <- accountGen
+      seller <- accountGen
+      ts     <- timestampGen
       genesis = GenesisTransaction.create(master, Long.MaxValue, ts).explicitGet()
-      tr1     = createWavesTransfer(master, fstIssuer.toAddress, Long.MaxValue / 3, enoughFee, ts + 1).explicitGet()
-      tr2     = createWavesTransfer(master, sndIssuer.toAddress, Long.MaxValue / 3, enoughFee, ts + 2).explicitGet()
+      tr1     = createWavesTransfer(master, buyer.toAddress, Long.MaxValue / 3, enoughFee, ts + 1).explicitGet()
+      tr2     = createWavesTransfer(master, seller.toAddress, Long.MaxValue / 3, enoughFee, ts + 2).explicitGet()
       asset1 = IssueTransactionV2
-        .selfSigned(2: Byte, chainId, fstIssuer, "Asset#1".getBytes, "".getBytes, 1000000, 8, false, amountAssetScriptCompiled, enoughFee, ts + 3)
+        .selfSigned(2: Byte, chainId, buyer, "Asset#1".getBytes, "".getBytes, 1000000, 8, false, None, enoughFee, ts + 3)
         .explicitGet()
       asset2 = IssueTransactionV2
-        .selfSigned(2: Byte, chainId, sndIssuer, "Asset#2".getBytes, "".getBytes, 1000000, 8, false, priceAssetScriptCompiled, enoughFee, ts + 4)
+        .selfSigned(2: Byte, chainId, seller, "Asset#2".getBytes, "".getBytes, 1000000, 8, false, None, enoughFee, ts + 4)
         .explicitGet()
       setMatcherScript = SetScriptTransaction
         .selfSigned(1: Byte, master, Some(txScriptCompiled), enoughFee, ts + 5)
         .explicitGet()
+      setSellerScript = SetScriptTransaction
+        .selfSigned(1: Byte, seller, sellerScript, enoughFee, ts + 6)
+        .explicitGet()
+      setBuyerScript = SetScriptTransaction
+        .selfSigned(1: Byte, buyer, buyerScript, enoughFee, ts + 7)
+        .explicitGet()
       assetPair = AssetPair(Some(asset1.id()), Some(asset2.id()))
       o1 <- Gen.oneOf(
-        OrderV1.buy(fstIssuer, master, assetPair, 100000000, 100000000, ts + 6, ts + 10000, enoughFee),
-        OrderV2.buy(fstIssuer, master, assetPair, 100000000, 100000000, ts + 6, ts + 10000, enoughFee)
+        OrderV1.buy(buyer, master, assetPair, 100000000, 100000000, ts + 8, ts + 10000, enoughFee),
+        OrderV2.buy(buyer, master, assetPair, 100000000, 100000000, ts + 8, ts + 10000, enoughFee)
       )
       o2 <- Gen.oneOf(
-        OrderV1.sell(fstIssuer, master, assetPair, 100000000, 100000000, ts + 7, ts + 10000, enoughFee),
-        OrderV2.sell(fstIssuer, master, assetPair, 100000000, 100000000, ts + 7, ts + 10000, enoughFee)
+        OrderV1.sell(seller, master, assetPair, 100000000, 100000000, ts + 9, ts + 10000, enoughFee),
+        OrderV2.sell(seller, master, assetPair, 100000000, 100000000, ts + 9, ts + 10000, enoughFee)
       )
       exchangeTx = {
         ExchangeTransactionV2
-          .create(master, o1, o2, 100000000, 100000000, enoughFee, enoughFee, enoughFee, ts + 8)
+          .create(master, o1, o2, 100000000, 100000000, enoughFee, enoughFee, enoughFee, ts + 10)
           .explicitGet()
       }
-    } yield (genesis, List(tr1, tr2), List(asset1, asset2), setMatcherScript, exchangeTx)
+    } yield (genesis, List(tr1, tr2), List(asset1, asset2, setMatcherScript, setSellerScript, setBuyerScript), exchangeTx)
   }
 
 }

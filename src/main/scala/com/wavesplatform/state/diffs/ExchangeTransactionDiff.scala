@@ -25,19 +25,19 @@ object ExchangeTransactionDiff {
     for {
       _ <- Either.cond(assets.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
       _ <- Either.cond(
-        smartTradesEnabled || !assets.exists(_.flatMap(_.script).isDefined),
+        !assets.exists(_.flatMap(_.script).isDefined),
         (),
         GenericError(s"Smart assets can't participate in ExchangeTransactions (SmartAssetsFeature is disabled)")
       )
       _ <- Either.cond(
         smartTradesEnabled || !blockchain.hasScript(buyer),
         (),
-        GenericError(s"Buyer $buyer can't participate in ExchangeTransaction because it has assigned Script (SmartAssetsFeature is disabled)")
+        GenericError(s"Buyer $buyer can't participate in ExchangeTransaction because it has assigned Script (SmartAccountsTrades is disabled)")
       )
       _ <- Either.cond(
         smartTradesEnabled || !blockchain.hasScript(seller),
         (),
-        GenericError(s"Seller $seller can't participate in ExchangeTransaction because it has assigned Script (SmartAssetsFeature is disabled)")
+        GenericError(s"Seller $seller can't participate in ExchangeTransaction because it has assigned Script (SmartAccountsTrades is disabled)")
       )
       t                     <- enoughVolume(tx, blockchain)
       buyPriceAssetChange   <- t.buyOrder.getSpendAmount(t.price, t.amount).liftValidationError(tx).map(-_)
