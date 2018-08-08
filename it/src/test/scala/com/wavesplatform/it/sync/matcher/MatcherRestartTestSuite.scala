@@ -58,7 +58,7 @@ class MatcherRestartTestSuite
 
       // reboot matcher's node
       docker.killAndStartContainer(dockerNodes().head)
-      Thread.sleep(30.seconds.toMillis)
+      Thread.sleep(60.seconds.toMillis)
 
       val height = nodes.map(_.height).max
 
