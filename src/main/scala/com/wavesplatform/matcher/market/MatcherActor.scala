@@ -7,26 +7,29 @@ import akka.persistence.{PersistentActor, RecoveryCompleted}
 import akka.routing.FromConfig
 import akka.util.Timeout
 import com.google.common.base.Charsets
+import com.wavesplatform.account.Address
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.BalanceChanged
+import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
-import play.api.libs.json._
-import com.wavesplatform.account.Address
-import com.wavesplatform.utils.{Base58, NTP, ScorexLogging}
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.ValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, Validation}
-import scorex.utils._
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.{AssetId, ValidationError}
+import com.wavesplatform.utils.{Base58, NTP, ScorexLogging}
+import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
+import io.netty.channel.group.ChannelGroup
+import play.api.libs.json._
+import scorex.utils._
 
 import scala.collection.{immutable, mutable}
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import scala.language.reflectiveCalls
 
 class MatcherActor(orderHistory: ActorRef,
@@ -113,6 +116,40 @@ class MatcherActor(orderHistory: ActorRef,
     }
   }
 
+  def verify(script: Script, order: Order): Either[ValidationError, Unit] = {
+    MatcherScriptRunner[Boolean](script, order) match {
+      case (ctx, Left(execError)) => Left(ScriptExecutionError(script.text, execError, ctx.letDefs, true))
+      case (ctx, Right(false)) =>
+        Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, true))
+      case (_, Right(true)) => Right(())
+    }
+  }
+
+  def checkOrderScript(o: Order)(f: => Unit): Unit = {
+    lazy val matcherScriptValidation: Either[ValidationError, Unit] =
+      blockchain
+        .accountScript(o.matcherPublicKey.toAddress)
+        .map(verify(_, o))
+        .getOrElse(Right(()))
+
+    lazy val senderScriptValidation: Either[ValidationError, Unit] =
+      blockchain
+        .accountScript(o.sender.toAddress)
+        .map(verify(_, o))
+        .getOrElse(Right(()))
+
+    val validationResult = for {
+      _ <- matcherScriptValidation
+      _ <- senderScriptValidation
+    } yield ()
+
+    validationResult
+      .fold(
+        err => sender() ! StatusCodeMatcherResponse(StatusCodes.Forbidden, err.toString),
+        _ => f
+      )
+  }
+
   def createAndForward(order: Order): Unit = {
     val orderBook = createOrderBook(order.assetPair)
     persistAsync(OrderBookCreated(order.assetPair)) { _ =>
@@ -165,9 +202,11 @@ class MatcherActor(orderHistory: ActorRef,
     case order: Order =>
       checkAssetPair(order) {
         checkBlacklistedAddress(order.senderPublicKey) {
-          context
-            .child(OrderBookActor.name(order.assetPair))
-            .fold(createAndForward(order))(forwardReq(order))
+          checkOrderScript(order) {
+            context
+              .child(OrderBookActor.name(order.assetPair))
+              .fold(createAndForward(order))(forwardReq(order))
+          }
         }
       }
 
