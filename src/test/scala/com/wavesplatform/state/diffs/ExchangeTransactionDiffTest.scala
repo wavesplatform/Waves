@@ -333,16 +333,16 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         .explicitGet()
       assetPair = AssetPair(Some(asset1.id()), Some(asset2.id()))
       o1 <- Gen.oneOf(
-        OrderV1.buy(buyer, master, assetPair, 100000000, 100000000, ts + 8, ts + 10000, enoughFee),
-        OrderV2.buy(buyer, master, assetPair, 100000000, 100000000, ts + 8, ts + 10000, enoughFee)
+        OrderV1.buy(seller, master, assetPair, 1000000, 1000000, ts + 8, ts + 10000, enoughFee),
+        OrderV2.buy(seller, master, assetPair, 1000000, 1000000, ts + 8, ts + 10000, enoughFee)
       )
       o2 <- Gen.oneOf(
-        OrderV1.sell(seller, master, assetPair, 100000000, 100000000, ts + 9, ts + 10000, enoughFee),
-        OrderV2.sell(seller, master, assetPair, 100000000, 100000000, ts + 9, ts + 10000, enoughFee)
+        OrderV1.sell(buyer, master, assetPair, 1000000, 1000000, ts + 9, ts + 10000, enoughFee),
+        OrderV2.sell(buyer, master, assetPair, 1000000, 1000000, ts + 9, ts + 10000, enoughFee)
       )
       exchangeTx = {
         ExchangeTransactionV2
-          .create(master, o1, o2, 100000000, 100000000, enoughFee, enoughFee, enoughFee, ts + 10)
+          .create(master, o1, o2, 1000000, 1000000, enoughFee, enoughFee, enoughFee, ts + 10)
           .explicitGet()
       }
     } yield (genesis, List(tr1, tr2), List(asset1, asset2, setMatcherScript, setSellerScript, setBuyerScript), exchangeTx)
