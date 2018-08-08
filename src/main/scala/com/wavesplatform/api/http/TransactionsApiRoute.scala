@@ -18,7 +18,7 @@ import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
@@ -342,7 +342,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case DataTransaction          => jsv.as[SignedDataRequest].toTx
               case SetScriptTransaction     => jsv.as[SignedSetScriptRequest].toTx
               case SponsorFeeTransaction    => jsv.as[SignedSponsorFeeRequest].toTx
-              case ExchangeTransaction      => jsv.as[SignedExchangeRequest].toTx
+              case ExchangeTransactionV1    => jsv.as[SignedExchangeRequest].toTx
+              case ExchangeTransactionV2    => jsv.as[SignedExchangeRequestV2].toTx
             }
         }
         doBroadcast(r)

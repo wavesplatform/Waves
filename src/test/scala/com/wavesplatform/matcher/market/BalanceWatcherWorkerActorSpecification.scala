@@ -74,7 +74,8 @@ class BalanceWatcherWorkerActorSpecification
         amount = 100L,
         timestamp = 1L,
         expiration = 1000L,
-        matcherFee = 100000L
+        matcherFee = 100000L,
+        version = 1: Byte
       )
 
       "send a cancel request to the matcher" in withActors { actors =>
@@ -106,7 +107,8 @@ class BalanceWatcherWorkerActorSpecification
         amount = 100L,
         timestamp = 1L,
         expiration = 1000L,
-        matcherFee = 3L
+        matcherFee = 3L,
+        version = 1
       )
 
       "not cancel a valid order" in withActors { actors =>

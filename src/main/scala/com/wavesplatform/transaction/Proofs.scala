@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.ValidationError.GenericError
 
 import scala.util.Try
 
-case class Proofs private (proofs: Seq[ByteStr]) {
+case class Proofs(proofs: Seq[ByteStr]) {
   val bytes: Coeval[Array[Byte]]  = Coeval.evalOnce(Proofs.Version +: Deser.serializeArrays(proofs.map(_.arr)))
   val base58: Coeval[Seq[String]] = Coeval.evalOnce(proofs.map(p => Base58.encode(p.arr)))
 }

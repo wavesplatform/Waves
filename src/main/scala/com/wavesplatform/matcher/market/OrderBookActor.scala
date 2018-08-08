@@ -292,11 +292,11 @@ class OrderBookActor(assetPair: AssetPair,
           tx <- createTransaction(o, c)
           _  <- utx.putIfNew(tx)
         } yield tx) match {
-          case Right(tx) if tx.isInstanceOf[ExchangeTransaction] =>
+          case Right(tx: ExchangeTransaction) =>
             lastTrade = Some(c.order)
             allChannels.broadcastTx(tx)
             processEvent(event)
-            context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
+            context.system.eventStream.publish(ExchangeTransactionCreated(tx))
             if (event.submittedRemaining > 0)
               Some(o.partial(event.submittedRemaining))
             else None

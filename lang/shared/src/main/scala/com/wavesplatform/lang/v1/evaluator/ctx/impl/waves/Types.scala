@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.CaseType
+import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, UnionType}
 
 object Types {
 
@@ -187,10 +187,12 @@ object Types {
     dataTransactionType
   )
 
+  val transactionsCommonType = UnionType("Transaction", activeTransactionTypes.map(_.typeRef))
+
   val transactionTypes = obsoleteTransactionTypes ++ activeTransactionTypes
 
-  val outgoingTransactionType = UNION.create(activeTransactionTypes.map(_.typeRef))
-  val anyTransactionType      = UNION.create(transactionTypes.map(_.typeRef))
+  val scriptInputType    = UNION.create((orderType :: activeTransactionTypes).map(_.typeRef))
+  val anyTransactionType = UNION.create(transactionTypes.map(_.typeRef))
 
-  val wavesTypes = Seq(addressType, aliasType, transfer, orderType, assetPairType, dataEntryType) ++ transactionTypes
+  val wavesTypes = Seq(addressType, aliasType, transfer, orderType, assetPairType, dataEntryType, transactionsCommonType) ++ transactionTypes
 }

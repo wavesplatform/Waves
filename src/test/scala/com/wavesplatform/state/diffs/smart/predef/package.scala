@@ -10,6 +10,7 @@ import monix.eval.Coeval
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
 import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import shapeless.Coproduct
 
 package object predef {
   val networkByte: Byte = 'u'
@@ -20,8 +21,7 @@ package object predef {
       _             <- Either.cond(expr.size == 1, (), expr.mkString("\n"))
       compileResult <- CompilerV1(dummyCompilerContext, expr.head)
       (typedExpr, tpe) = compileResult
-      er               = EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr)
-      r <- er._2
+      r <- EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(Coproduct(tx)), Coeval(???), null), typedExpr)._2
     } yield r
   }
 

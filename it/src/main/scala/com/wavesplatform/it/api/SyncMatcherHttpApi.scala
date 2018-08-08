@@ -7,6 +7,8 @@ import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.{Assertions, Matchers}
 import play.api.libs.json.{Format, Json, Writes}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.state.ByteStr
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -43,8 +45,9 @@ object SyncMatcherHttpApi extends Assertions {
                    orderType: OrderType,
                    price: Long,
                    amount: Long,
+                   version: Byte,
                    timeToLive: Duration = 30.days - 1.seconds): MatcherResponse =
-      Await.result(async(m).placeOrder(sender, pair, orderType, price, amount, timeToLive), RequestAwaitTime)
+      Await.result(async(m).placeOrder(sender, pair, orderType, price, amount, version, timeToLive), RequestAwaitTime)
 
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
       Await.result(async(m).orderStatus(orderId, assetPair, waitForStatus), RequestAwaitTime)
@@ -92,13 +95,15 @@ object SyncMatcherHttpApi extends Assertions {
                      orderType: OrderType,
                      price: Long,
                      amount: Long,
+                     version: Byte,
                      timeToLive: Duration = 30.days - 1.seconds): Order = {
       val creationTime        = System.currentTimeMillis()
       val timeToLiveTimestamp = creationTime + timeToLive.toMillis
       val matcherPublicKey    = m.publicKey
-      val unsigned            = Order(node.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, 300000, Array())
-      val signature           = crypto.sign(node.privateKey, unsigned.toSign)
-      unsigned.copy(signature = signature)
+      val unsigned =
+        Order(node.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, 300000, Proofs.empty, version)
+      val signature = crypto.sign(node.privateKey, unsigned.bodyBytes())
+      unsigned.updateProofs(Proofs(Seq(ByteStr(signature))))
     }
   }
 
