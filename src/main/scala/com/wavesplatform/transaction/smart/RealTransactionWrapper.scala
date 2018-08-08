@@ -49,7 +49,7 @@ object RealTransactionWrapper {
       timestamp = o.timestamp,
       expiration = o.expiration,
       matcherFee = o.matcherFee,
-      bodyBytes = ByteVector(o.toSign),
+      bodyBytes = ByteVector(o.bodyBytes()),
       proofs = o.proofs.proofs.map(a => ByteVector(a.arr)).toIndexedSeq
     )
 

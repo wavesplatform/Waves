@@ -2,7 +2,10 @@ package com.wavesplatform.lang.v1.traits.domain
 
 import scodec.bits.ByteVector
 
-sealed trait Tx
+case class TransferItem(recipient: Recipient, amount: Long)
+
+trait Tx
+
 object Tx {
 
   case class Header(id: ByteVector, fee: Long, timestamp: Long, version: Long)
