@@ -71,7 +71,6 @@ trait Order extends BytesSerializable with JsonSerializable with Signed {
   import Order._
 
   val sender = senderPublicKey
-  //val signatureValid = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(price, amount) &&
@@ -93,10 +92,8 @@ trait Order extends BytesSerializable with JsonSerializable with Signed {
     (getReceiveAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
   }
 
-  def toSign: Array[Byte]
-
   @ApiModelProperty(hidden = true)
-  val id: Coeval[Array[Byte]] = Coeval.evalOnce(crypto.fastHash(toSign))
+  val id: Coeval[Array[Byte]] = Coeval.evalOnce(crypto.fastHash(bodyBytes()))
 
   @ApiModelProperty(hidden = true)
   val idStr: Coeval[String] = Coeval.evalOnce(Base58.encode(id()))
@@ -105,7 +102,7 @@ trait Order extends BytesSerializable with JsonSerializable with Signed {
   val bytes: Coeval[Array[Byte]]
 
   @ApiModelProperty(hidden = true)
-  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign)
+  val bodyBytes: Coeval[Array[Byte]]
 
   @ApiModelProperty(hidden = true)
   def getReceiveAssetId: Option[AssetId] = orderType match {
@@ -249,7 +246,7 @@ object Order {
           matcherFee: Long,
           version: Byte = 1): Order = {
     val unsigned = Order(sender, matcher, pair, OrderType.BUY, price, amount, timestamp, expiration, matcherFee, Proofs.empty, version)
-    val sig      = crypto.sign(sender, unsigned.toSign)
+    val sig      = crypto.sign(sender, unsigned.bodyBytes())
     unsigned.updateProofs(Proofs(Seq(ByteStr(sig))))
   }
 
@@ -263,7 +260,7 @@ object Order {
            matcherFee: Long,
            version: Byte = 1): Order = {
     val unsigned = Order(sender, matcher, pair, OrderType.SELL, price, amount, timestamp, expiration, matcherFee, Proofs.empty, version)
-    val sig      = crypto.sign(sender, unsigned.toSign)
+    val sig      = crypto.sign(sender, unsigned.bodyBytes())
     unsigned.updateProofs(Proofs(Seq(ByteStr(sig))))
   }
 
@@ -278,13 +275,13 @@ object Order {
             matcherFee: Long,
             version: Byte): Order = {
     val unsigned = Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, Proofs.empty, version)
-    val sig      = crypto.sign(sender, unsigned.toSign)
+    val sig      = crypto.sign(sender, unsigned.bodyBytes())
     unsigned.updateProofs(Proofs(Seq(ByteStr(sig))))
   }
 
   def sign(unsigned: Order, sender: PrivateKeyAccount): Order = {
     require(unsigned.senderPublicKey == sender)
-    val sig = crypto.sign(sender, unsigned.toSign)
+    val sig = crypto.sign(sender, unsigned.bodyBytes())
     unsigned.updateProofs(Proofs(Seq(ByteStr(sig))))
   }
 
