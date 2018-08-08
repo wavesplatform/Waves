@@ -58,17 +58,20 @@ class MatcherActor(orderHistory: ActorRef,
       desc.fold("Unknown")(d => new String(d.name, Charsets.UTF_8))
     }
 
+  def getAssetInfo(asset: Option[AssetId], desc: Option[AssetDescription]): Option[AssetInfo] =
+    asset.fold(Option(8))(_ => desc.map(_.decimals)).map(AssetInfo)
+
   private def createMarketData(pair: AssetPair): MarketData = {
     val amountDesc = pair.amountAsset.flatMap(blockchain.assetDescription)
-    val priceDesc  = pair.amountAsset.flatMap(blockchain.assetDescription)
+    val priceDesc  = pair.priceAsset.flatMap(blockchain.assetDescription)
 
     MarketData(
       pair,
       getAssetName(pair.amountAsset, amountDesc),
       getAssetName(pair.priceAsset, priceDesc),
       NTP.correctedTime(),
-      amountDesc.map(t => AssetInfo(t.decimals)),
-      priceDesc.map(t => AssetInfo(t.decimals))
+      getAssetInfo(pair.amountAsset, amountDesc),
+      getAssetInfo(pair.priceAsset, priceDesc)
     )
   }
 
