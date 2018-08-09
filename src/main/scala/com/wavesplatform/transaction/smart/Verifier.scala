@@ -23,7 +23,7 @@ object Verifier {
           case (et: ExchangeTransaction, scriptOpt) => verifyExchange(et, blockchain, scriptOpt, currentBlockHeight)
           case (_, Some(script))                    => verifyTx(blockchain, script, currentBlockHeight, pt, false)
           case (stx: SignedTransaction, None)       => stx.signaturesValid()
-          case _                                    => verifyAsEllipticCurveSignature(pt)
+          case _                                    => verifyTxProofsAsEllipticCurveSignature(pt)
         }
     }).flatMap(tx => {
       for {
@@ -66,23 +66,25 @@ object Verifier {
                      matcherScriptOpt: Option[Script],
                      height: Int): Either[ValidationError, Transaction] = {
 
+    val sellOrder = et.sellOrder
+    val buyOrder  = et.buyOrder
+
     lazy val matcherTxVerification =
-      matcherScriptOpt match {
-        case Some(script) => verifyTx(blockchain, script, height, et, false)
-        case None         => verifyAsEllipticCurveSignature(et)
-      }
+      matcherScriptOpt
+        .map(verifyTx(blockchain, _, height, et, false))
+        .getOrElse(verifyTxProofsAsEllipticCurveSignature(et))
 
     lazy val sellerOrderVerification =
       blockchain
-        .accountScript(et.sellOrder.sender.toAddress)
-        .map(verifyOrder(blockchain, _, height, et.sellOrder))
-        .getOrElse(Right(()))
+        .accountScript(sellOrder.sender.toAddress)
+        .map(verifyOrder(blockchain, _, height, sellOrder))
+        .getOrElse(verifyOrderProofsAsEllipticCurveSignature(sellOrder))
 
     lazy val buyerOrderVerification =
       blockchain
-        .accountScript(et.buyOrder.sender.toAddress)
-        .map(verifyOrder(blockchain, _, height, et.buyOrder))
-        .getOrElse(Right(()))
+        .accountScript(buyOrder.sender.toAddress)
+        .map(verifyOrder(blockchain, _, height, buyOrder))
+        .getOrElse(verifyOrderProofsAsEllipticCurveSignature(buyOrder))
 
     for {
       _ <- matcherTxVerification
@@ -91,13 +93,20 @@ object Verifier {
     } yield et
   }
 
-  def verifyAsEllipticCurveSignature(pt: ProvenTransaction): Either[ValidationError, ProvenTransaction] =
-    pt.proofs.proofs match {
-      case p :: Nil =>
-        Either.cond(crypto.verify(p.arr, pt.bodyBytes(), pt.sender.publicKey),
-                    pt,
-                    GenericError(s"Script doesn't exist and proof doesn't validate as signature for $pt"))
-      case _ => Left(GenericError("Transactions from non-scripted accounts must have exactly 1 proof"))
-    }
+  def verifyTxProofsAsEllipticCurveSignature(pt: ProvenTransaction): Either[ValidationError, ProvenTransaction] = {
+    verifyAsEllipticCurveSignature(pt.proofs, pt.bodyBytes(), pt.sender.publicKey)
+      .map(_ => pt)
+  }
 
+  def verifyOrderProofsAsEllipticCurveSignature(o: Order): Either[ValidationError, Order] = {
+    verifyAsEllipticCurveSignature(o.proofs, o.bodyBytes(), o.sender.publicKey)
+      .map(_ => o)
+  }
+
+  def verifyAsEllipticCurveSignature(proofs: Proofs, message: Array[Byte], signerPK: Array[Byte]): Either[ValidationError, Unit] =
+    proofs.proofs match {
+      case p :: Nil =>
+        Either.cond(crypto.verify(p.arr, message, signerPK), (), GenericError(s"Proof can't be validated as signature"))
+      case _ => Left(GenericError("Exactly one proof expected"))
+    }
 }
