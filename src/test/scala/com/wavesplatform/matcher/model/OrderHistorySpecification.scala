@@ -126,7 +126,6 @@ class OrderHistorySpecification
     val exec = OrderExecuted(LimitOrder(ord2), LimitOrder(ord1))
     oh.orderExecuted(exec)
 
-    exec shouldBe 8574
     oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Filled(exec.executedAmount)
     oh.orderInfo(ord2.id()).status shouldBe LimitOrder.Filled(exec.executedAmount)
 
@@ -359,10 +358,10 @@ class OrderHistorySpecification
     }
      */
 
-    oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 110000000L + LimitOrder.getPartialFee(
+    oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 110000000L + submitted.matcherFee - LimitOrder.getPartialFee(
       submitted.matcherFee,
       submitted.amount,
-      submitted.amount - counter.amount
+      exec.executedAmount
     )
     oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
     activeOrderIds(counter.senderPublicKey, Set(pair.amountAsset)) shouldBe Seq(submitted.id())
@@ -449,7 +448,6 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord2)))
     oh.orderAccepted(OrderAdded(LimitOrder(ord3)))
     oh.orderExecuted(OrderExecuted(LimitOrder(ord4), LimitOrder(ord1)))
-    oh.orderAccepted(OrderAdded(LimitOrder.limitOrder(ord4.price, 1000000000, 0, ord4)))
     oh.orderCanceled(OrderCanceled(LimitOrder(ord3), unmatchable = false))
     oh.orderAccepted(OrderAdded(LimitOrder(ord5)))
 
