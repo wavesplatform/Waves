@@ -291,7 +291,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
         val blockWithExchange = TestBlock.create(Seq(exchangeWithResignedOrder))
 
-        assertLeft(preconBlocks, blockWithExchange, fs)("Proof can't be validated as signature")
+        assertLeft(preconBlocks, blockWithExchange, fs)("Script doesn't exist and proof doesn't validate as signature")
     }
   }
 
@@ -330,7 +330,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
         val blockWithExchange = TestBlock.create(Seq(exchangeWithResignedOrder))
 
-        assertLeft(preconBlocks, blockWithExchange, fs)("Proof can't be validated as signature")
+        assertLeft(preconBlocks, blockWithExchange, fs)("Script doesn't exist and proof doesn't validate as signature")
     }
   }
 

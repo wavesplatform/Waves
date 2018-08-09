@@ -6,8 +6,8 @@ import com.wavesplatform.state.{ByteStr, EitherExt2}
 import com.wavesplatform.transaction.ValidationError.OrderValidationError
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.utils.{Base58, NTP}
-import org.scalatest._
 import org.scalacheck.Gen
+import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
 
@@ -23,89 +23,85 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
   }
 
   property("ExchangeTransaction balance changes") {
-    forAll(
-      accountGen,
-      accountGen,
-      accountGen,
-      assetPairGen,
-      Gen.oneOf((1: Byte, 1: Byte, 1: Byte),
-                (1: Byte, 1: Byte, 2: Byte),
-                (1: Byte, 2: Byte, 2: Byte),
-                (2: Byte, 1: Byte, 2: Byte),
-                (2: Byte, 2: Byte, 2: Byte))
-    ) { (sender1: PrivateKeyAccount, sender2: PrivateKeyAccount, matcher: PrivateKeyAccount, pair: AssetPair, versions) =>
-      val time                 = NTP.correctedTime()
-      val expirationTimestamp  = time + Order.MaxLiveTime
-      val buyPrice             = 60 * Order.PriceConstant
-      val sellPrice            = 50 * Order.PriceConstant
-      val buyAmount            = 2
-      val sellAmount           = 3
-      val mf1                  = 1
-      val mf2                  = 2
-      val (o1ver, o2ver, tver) = versions
+    val versionsGen: Gen[(Byte, Byte, Byte)] = Gen.oneOf((1: Byte, 1: Byte, 1: Byte),
+                                                         (1: Byte, 1: Byte, 2: Byte),
+                                                         (1: Byte, 2: Byte, 2: Byte),
+                                                         (2: Byte, 1: Byte, 2: Byte),
+                                                         (2: Byte, 2: Byte, 2: Byte))
+    forAll(accountGen, accountGen, accountGen, assetPairGen, versionsGen) {
+      case (sender1, sender2, matcher, pair, versions) =>
+        val time                 = NTP.correctedTime()
+        val expirationTimestamp  = time + Order.MaxLiveTime
+        val buyPrice             = 60 * Order.PriceConstant
+        val sellPrice            = 50 * Order.PriceConstant
+        val buyAmount            = 2
+        val sellAmount           = 3
+        val mf1                  = 1
+        val mf2                  = 2
+        val (o1ver, o2ver, tver) = versions
 
-      val buy  = Order.buy(sender1, matcher, pair, buyPrice, buyAmount, time, expirationTimestamp, mf1, o1ver)
-      val sell = Order.sell(sender2, matcher, pair, sellPrice, sellAmount, time, expirationTimestamp, mf2, o2ver)
+        val buy  = Order.buy(sender1, matcher, pair, buyPrice, buyAmount, time, expirationTimestamp, mf1, o1ver)
+        val sell = Order.sell(sender2, matcher, pair, sellPrice, sellAmount, time, expirationTimestamp, mf2, o2ver)
 
-      def create(matcher: PrivateKeyAccount = sender1,
-                 buyOrder: Order = buy,
-                 sellOrder: Order = sell,
-                 price: Long = sellPrice,
-                 amount: Long = buyAmount,
-                 buyMatcherFee: Long = mf1,
-                 sellMatcherFee: Long = 1,
-                 fee: Long = 1,
-                 timestamp: Long = expirationTimestamp - Order.MaxLiveTime) = {
-        if (tver == 1) {
-          ExchangeTransactionV1.create(
-            matcher = sender1,
-            buyOrder = buyOrder.asInstanceOf[OrderV1],
-            sellOrder = sellOrder.asInstanceOf[OrderV1],
-            price = price,
-            amount = amount,
-            buyMatcherFee = buyMatcherFee,
-            sellMatcherFee = sellMatcherFee,
-            fee = fee,
-            timestamp = timestamp
-          )
-        } else {
-          ExchangeTransactionV2.create(
-            matcher = sender1,
-            buyOrder = buyOrder,
-            sellOrder = sellOrder,
-            price = price,
-            amount = amount,
-            buyMatcherFee = buyMatcherFee,
-            sellMatcherFee = sellMatcherFee,
-            fee = fee,
-            timestamp = timestamp
-          )
+        def create(matcher: PrivateKeyAccount = sender1,
+                   buyOrder: Order = buy,
+                   sellOrder: Order = sell,
+                   price: Long = sellPrice,
+                   amount: Long = buyAmount,
+                   buyMatcherFee: Long = mf1,
+                   sellMatcherFee: Long = 1,
+                   fee: Long = 1,
+                   timestamp: Long = expirationTimestamp - Order.MaxLiveTime) = {
+          if (tver == 1) {
+            ExchangeTransactionV1.create(
+              matcher = sender1,
+              buyOrder = buyOrder.asInstanceOf[OrderV1],
+              sellOrder = sellOrder.asInstanceOf[OrderV1],
+              price = price,
+              amount = amount,
+              buyMatcherFee = buyMatcherFee,
+              sellMatcherFee = sellMatcherFee,
+              fee = fee,
+              timestamp = timestamp
+            )
+          } else {
+            ExchangeTransactionV2.create(
+              matcher = sender1,
+              buyOrder = buyOrder,
+              sellOrder = sellOrder,
+              price = price,
+              amount = amount,
+              buyMatcherFee = buyMatcherFee,
+              sellMatcherFee = sellMatcherFee,
+              fee = fee,
+              timestamp = timestamp
+            )
+          }
         }
-      }
 
-      buy.version shouldBe o1ver
-      sell.version shouldBe o2ver
+        buy.version shouldBe o1ver
+        sell.version shouldBe o2ver
 
-      create() shouldBe an[Right[_, _]]
+        create() shouldBe an[Right[_, _]]
 
-      create(fee = -1) shouldBe an[Left[_, _]]
-      create(amount = -1) shouldBe an[Left[_, _]]
-      create(price = -1) shouldBe an[Left[_, _]]
-      create(amount = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
-      create(sellMatcherFee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
-      create(buyMatcherFee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
-      create(fee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
-      create(buyOrder = buy.updateMatcher(sender2)) shouldBe an[Left[_, _]]
-      create(sellOrder = buy.updateMatcher(sender2)) shouldBe an[Left[_, _]]
-      create(
-        buyOrder = buy.updatePair(buy.assetPair.copy(amountAsset = None)),
-        sellOrder = sell.updatePair(sell.assetPair.copy(priceAsset = Some(ByteStr(Array(1: Byte)))))
-      ) shouldBe an[Left[_, _]]
-      create(buyOrder = buy.updateExpiration(1L)) shouldBe an[Left[_, _]]
-      create(price = buy.price + 1) shouldBe an[Left[_, _]]
-      create(price = sell.price - 1) shouldBe an[Left[_, _]]
-      create(sellOrder = sell.updateAmount(-1)) shouldBe an[Left[_, _]]
-      create(buyOrder = buy.updateAmount(-1)) shouldBe an[Left[_, _]]
+        create(fee = -1) shouldBe an[Left[_, _]]
+        create(amount = -1) shouldBe an[Left[_, _]]
+        create(price = -1) shouldBe an[Left[_, _]]
+        create(amount = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
+        create(sellMatcherFee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
+        create(buyMatcherFee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
+        create(fee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.updateMatcher(sender2)) shouldBe an[Left[_, _]]
+        create(sellOrder = buy.updateMatcher(sender2)) shouldBe an[Left[_, _]]
+        create(
+          buyOrder = buy.updatePair(buy.assetPair.copy(amountAsset = None)),
+          sellOrder = sell.updatePair(sell.assetPair.copy(priceAsset = Some(ByteStr(Array(1: Byte)))))
+        ) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.updateExpiration(1L)) shouldBe an[Left[_, _]]
+        create(price = buy.price + 1) shouldBe an[Left[_, _]]
+        create(price = sell.price - 1) shouldBe an[Left[_, _]]
+        create(sellOrder = sell.updateAmount(-1)) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.updateAmount(-1)) shouldBe an[Left[_, _]]
 
     }
   }

@@ -43,8 +43,6 @@ case class OrderV2(@ApiModelProperty(dataType = "java.lang.String") senderPublic
   @ApiModelProperty(hidden = true)
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign ++ proofs.bytes())
 
-  override def updateProofs(p: Proofs): Order = copy(proofs = p)
-
   // For tests
   override def updateExpiration(nexpiration: Long): Order  = copy(expiration = nexpiration)
   override def updateTimestamp(ntimestamp: Long): Order    = copy(timestamp = ntimestamp)

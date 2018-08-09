@@ -182,8 +182,6 @@ trait Order extends BytesSerializable with JsonSerializable with Signed {
 
   override def hashCode(): Int = idStr.hashCode()
 
-  def updateProofs(proofs: Proofs): Order
-
   // For tests
   def updateExpiration(expiration: Long): Order
   def updateTimestamp(Timestamp: Long): Order
@@ -297,5 +295,14 @@ object Order {
 
   def assetIdBytes(assetId: Option[AssetId]): Array[Byte] = {
     assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
+  }
+
+  implicit class OrderOps(val o: Order) extends AnyVal {
+    @inline def updateProofs(p: Proofs): Order = {
+      o match {
+        case o1 @ OrderV1(_, _, _, _, _, _, _, _, _, _) => o1.copy(proofs = p)
+        case o2 @ OrderV2(_, _, _, _, _, _, _, _, _, _) => o2.copy(proofs = p)
+      }
+    }
   }
 }

@@ -54,7 +54,6 @@ object ExchangeTransaction {
         else ExchangeTransactionV1.parseBytes(bytes)
       }
 
-
   def validateExchangeParams(buyOrder: Order,
                              sellOrder: Order,
                              price: Long,
@@ -65,7 +64,9 @@ object ExchangeTransaction {
                              timestamp: Long): Either[ValidationError, Unit] = {
     lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
 
-    if (amount <= 0) {
+    if (fee <= 0 ) {
+      Left(ValidationError.InsufficientFee())
+    } else if (amount <= 0) {
       Left(ValidationError.NegativeAmount(amount, "assets"))
     } else if (amount > Order.MaxAmount) {
       Left(GenericError("amount too large"))
