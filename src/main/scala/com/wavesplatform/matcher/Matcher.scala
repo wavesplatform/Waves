@@ -84,10 +84,14 @@ class Matcher(actorSystem: ActorSystem,
   @volatile var matcherServerBinding: ServerBinding = _
 
   def shutdownMatcher(): Unit = {
+    log.info("Shutting down matcher")
     val stopMatcherTimeout = 5.minutes
     Await.result(gracefulStop(matcher, stopMatcherTimeout, MatcherActor.Shutdown), stopMatcherTimeout)
+    log.debug("Matcher's actor system has been shut down")
     db.close()
+    log.debug("Matcher's database closed")
     Await.result(matcherServerBinding.unbind(), 10.seconds)
+    log.info("Matcher shutdown successful")
   }
 
   private def checkDirectory(directory: File): Unit = if (!directory.exists()) {

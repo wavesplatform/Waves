@@ -324,6 +324,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       peerDatabase.close()
 
       Try(Await.result(actorSystem.terminate(), 2.minute)).failed.map(e => log.error("Failed to terminate actor system", e))
+      log.debug("Node's actor system shutdown successful")
 
       blockchainUpdater.shutdown()
       rxExtensionLoaderShutdown.foreach(_.shutdown())
@@ -345,8 +346,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   }
 
   private def shutdownAndWait(scheduler: SchedulerService, name: String, timeout: FiniteDuration = 1.minute): Unit = {
+    log.debug(s"Shutting down $name")
     scheduler.shutdown()
-    val r = Await.result(scheduler.awaitTermination(timeout, global), Duration.Inf)
+    val r = Await.result(scheduler.awaitTermination(timeout, global), 2 * timeout)
     if (r)
       log.info(s"$name was shutdown successfully")
     else
