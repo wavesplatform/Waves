@@ -23,7 +23,7 @@ object Verifier {
           case (et: ExchangeTransaction, scriptOpt) => verifyExchange(et, blockchain, scriptOpt, currentBlockHeight)
           case (_, Some(script))                    => verifyTx(blockchain, script, currentBlockHeight, pt, false)
           case (stx: SignedTransaction, None)       => stx.signaturesValid()
-          case _                                    => verifyTxProofsAsEllipticCurveSignature(pt)
+          case _                                    => verifyAsEllipticCurveSignature(pt)
         }
     }).flatMap(tx => {
       for {
@@ -72,19 +72,19 @@ object Verifier {
     lazy val matcherTxVerification =
       matcherScriptOpt
         .map(verifyTx(blockchain, _, height, et, false))
-        .getOrElse(verifyTxProofsAsEllipticCurveSignature(et))
+        .getOrElse(verifyAsEllipticCurveSignature(et))
 
     lazy val sellerOrderVerification =
       blockchain
         .accountScript(sellOrder.sender.toAddress)
         .map(verifyOrder(blockchain, _, height, sellOrder))
-        .getOrElse(verifyOrderProofsAsEllipticCurveSignature(sellOrder))
+        .getOrElse(sellOrder.signaturesValid())
 
     lazy val buyerOrderVerification =
       blockchain
         .accountScript(buyOrder.sender.toAddress)
         .map(verifyOrder(blockchain, _, height, buyOrder))
-        .getOrElse(verifyOrderProofsAsEllipticCurveSignature(buyOrder))
+        .getOrElse(buyOrder.signaturesValid())
 
     for {
       _ <- matcherTxVerification
@@ -93,20 +93,12 @@ object Verifier {
     } yield et
   }
 
-  def verifyTxProofsAsEllipticCurveSignature(pt: ProvenTransaction): Either[ValidationError, ProvenTransaction] = {
-    verifyAsEllipticCurveSignature(pt.proofs, pt.bodyBytes(), pt.sender.publicKey)
-      .map(_ => pt)
-  }
-
-  def verifyOrderProofsAsEllipticCurveSignature(o: Order): Either[ValidationError, Order] = {
-    verifyAsEllipticCurveSignature(o.proofs, o.bodyBytes(), o.sender.publicKey)
-      .map(_ => o)
-  }
-
-  def verifyAsEllipticCurveSignature(proofs: Proofs, message: Array[Byte], signerPK: Array[Byte]): Either[ValidationError, Unit] =
-    proofs.proofs match {
+  def verifyAsEllipticCurveSignature(pt: ProvenTransaction): Either[ValidationError, ProvenTransaction] =
+    pt.proofs.proofs match {
       case p :: Nil =>
-        Either.cond(crypto.verify(p.arr, message, signerPK), (), GenericError(s"Proof can't be validated as signature"))
-      case _ => Left(GenericError("Exactly one proof expected"))
+        Either.cond(crypto.verify(p.arr, pt.bodyBytes(), pt.sender.publicKey),
+                    pt,
+                    GenericError(s"Script doesn't exist and proof doesn't validate as signature for $pt"))
+      case _ => Left(GenericError("Transactions from non-scripted accounts must have exactly 1 proof"))
     }
 }
