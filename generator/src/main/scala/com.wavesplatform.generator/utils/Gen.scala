@@ -5,10 +5,13 @@ import java.util.concurrent.ThreadLocalRandom
 import com.wavesplatform.generator.utils.Implicits._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Proofs, Transaction}
+import scodec.bits.ByteVector
 import scorex.crypto.signatures.Curve25519._
 
 object Gen {
@@ -90,5 +93,61 @@ object Gen {
   def address(uniqNumber: Int): Iterator[Address] = Iterator.randomContinually(address.take(uniqNumber).toSeq)
 
   def address(limitUniqNumber: Option[Int]): Iterator[Address] = limitUniqNumber.map(address(_)).getOrElse(address)
+
+  def setScriptAllowedScript(i: Int): Script = {
+    val expr = BLOCK(
+      LET("A", CONST_BYTEVECTOR(ByteVector.fromHex("0x30dfd681a026cba7ae2193f291398ba390062187d52954022891cadb9d1ac87d").get)),
+      BLOCK(
+        LET("B", CONST_BYTEVECTOR(ByteVector.fromHex("0x9e6a3565145298ffb6042410579fc8745a48a7cb690afae8b9e8aaba35e25b4c").get)),
+        BLOCK(
+          LET("C", CONST_BYTEVECTOR(ByteVector.fromHex("0x4196cb134edfd03197a1c6de649ee0b8a3308ca2d84c87e56f186acd4de28f2a").get)),
+          BLOCK(
+            LET("proofs", GETTER(REF("tx"), "proofs")),
+            BLOCK(
+              LET(
+                "AC",
+                IF(
+                  FUNCTION_CALL(Native(500),
+                                List(GETTER(REF("tx"), "bodyBytes"), FUNCTION_CALL(Native(401), List(REF("proofs"), CONST_LONG(0))), REF("A"))),
+                  CONST_LONG(1),
+                  CONST_LONG(0)
+                )
+              ),
+              BLOCK(
+                LET(
+                  "BC",
+                  IF(
+                    FUNCTION_CALL(Native(500),
+                                  List(GETTER(REF("tx"), "bodyBytes"), FUNCTION_CALL(Native(401), List(REF("proofs"), CONST_LONG(1))), REF("B"))),
+                    CONST_LONG(1),
+                    CONST_LONG(0)
+                  )
+                ),
+                BLOCK(
+                  LET(
+                    "CC",
+                    IF(
+                      FUNCTION_CALL(Native(500),
+                                    List(GETTER(REF("tx"), "bodyBytes"), FUNCTION_CALL(Native(401), List(REF("proofs"), CONST_LONG(2))), REF("C"))),
+                      CONST_LONG(1),
+                      CONST_LONG(0)
+                    )
+                  ),
+                  IF(
+                    FUNCTION_CALL(Native(103),
+                                  List(FUNCTION_CALL(Native(100), List(FUNCTION_CALL(Native(100), List(REF("AC"), REF("BC"))), REF("CC"))),
+                                       CONST_LONG(2))),
+                    TRUE,
+                    FUNCTION_CALL(Native(0), List(CONST_LONG(3), CONST_LONG(3)))
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    ???
+  }
 
 }

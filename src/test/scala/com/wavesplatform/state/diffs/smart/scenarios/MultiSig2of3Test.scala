@@ -33,7 +33,7 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
          |let BC = if(sigVerify(tx.bodyBytes,proofs[1],B)) then 1 else 0
          |let CC = if(sigVerify(tx.bodyBytes,proofs[2],C)) then 1 else 0
          |
-         | AC + BC+ CC >= 2
+         | (AC + BC+ CC >= 2) || (3 == 3) 
          |
       """.stripMargin
     val untyped = Parser(script).get.value
@@ -49,8 +49,9 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
     s2        <- accountGen
     recepient <- accountGen
     ts        <- positiveIntGen
-    genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-    setSctipt <- selfSignedSetScriptTransactionGenP(master, ScriptV1(multisigTypedExpr(s0, s1, s2)).explicitGet())
+    genesis  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+    ms: EXPR = multisigTypedExpr(s0, s1, s2)
+    setSctipt <- selfSignedSetScriptTransactionGenP(master, ScriptV1(ms).explicitGet())
     amount    <- positiveLongGen
     fee       <- smallFeeGen
     timestamp <- timestampGen
