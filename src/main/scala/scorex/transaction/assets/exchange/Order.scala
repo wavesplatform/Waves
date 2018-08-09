@@ -197,11 +197,8 @@ object Order {
   private val AssetIdLength = 32
 
   def correctAmount(a: Long, price: Long): Long = {
-    val min = (BigDecimal(Order.PriceConstant) / price).setScale(0, RoundingMode.CEILING)
-    if (min > 0)
-      ((BigDecimal(a) / min).toBigInt() * min.toBigInt()).bigInteger.longValueExact()
-    else
-      a
+    val settledTotal = (BigDecimal(price) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
+    (BigDecimal(settledTotal) / price * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
   }
 
   def buy(sender: PrivateKeyAccount,

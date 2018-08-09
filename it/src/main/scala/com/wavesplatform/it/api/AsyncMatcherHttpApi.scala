@@ -111,6 +111,9 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherGet(s"/matcher/orderbook/$amountAsset/$priceAsset/tradableBalance/${sender.address}").as[Map[String, Long]]
     }
 
+    def tradingMarkets() =
+      matcherGet(s"/matcher/orderbook").as[MarketDataInfo]
+
     def waitOrderStatus(assetPair: AssetPair,
                         orderId: String,
                         expectedStatus: String,

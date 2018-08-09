@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.ReportingTestName
-import com.wavesplatform.it.api.LevelResponse
+import com.wavesplatform.it.api.{AssetDecimalsInfo, LevelResponse}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
@@ -26,12 +26,17 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   private def bobNode = nodes(2)
 
-  private val aliceSellAmount = 500
+  private val aliceSellAmount         = 500
+  private val amountAssetName         = "AliceCoin"
+  private val aliceCoinDecimals: Byte = 0
 
   "Check cross ordering between Alice and Bob " - {
     // Alice issues new asset
+
     val aliceAsset =
-      aliceNode.issue(aliceNode.address, "AliceCoin", "AliceCoin for matcher's tests", AssetQuantity, 0, reissuable = false, 100000000L).id
+      aliceNode
+        .issue(aliceNode.address, amountAssetName, "AliceCoin for matcher's tests", AssetQuantity, aliceCoinDecimals, reissuable = false, 100000000L)
+        .id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
@@ -46,6 +51,18 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
     "matcher should respond with Public key" in {
       matcherNode.matcherGet("/matcher").getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe matcherNode.publicKeyStr
+    }
+
+    "get opened trading markets" in {
+      val openMarkets = matcherNode.tradingMarkets()
+      openMarkets.markets.size shouldBe 1
+      val markets = openMarkets.markets.head
+
+      markets.amountAssetName shouldBe amountAssetName
+      markets.amountAssetInfo shouldBe Some(AssetDecimalsInfo(aliceCoinDecimals))
+
+      markets.priceAssetName shouldBe "WAVES"
+      markets.priceAssetInfo shouldBe Some(AssetDecimalsInfo(8))
     }
 
     "sell order could be placed correctly" - {

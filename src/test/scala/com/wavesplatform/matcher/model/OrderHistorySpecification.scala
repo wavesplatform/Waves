@@ -62,7 +62,7 @@ class OrderHistorySpecification
 
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Accepted
-    oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe 8574L
+    oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe 10000L
     oh.openVolume(ord1.senderPublicKey, pair.priceAsset) shouldBe 0L
     oh.openVolume(ord1.senderPublicKey, None) shouldBe ord1.matcherFee
 
@@ -183,21 +183,12 @@ class OrderHistorySpecification
       submittedOrderInfo.status shouldBe LimitOrder.PartiallyFilled(100000000)
     }
 
-//    val addedEvent = OrderAdded(exec.submitted.partial(exec.submittedRemainingAmount, exec.submittedRemainingFee))
-//    oh.orderAccepted(addedEvent)
-
-    // check info
-    withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
-      oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0L
-      oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
-      activeOrderIds(counter.senderPublicKey, Set(None)) shouldBe empty
-    }
-
-    withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
-      oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L // it receives much more, than fee
-      oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe (BigDecimal(0.00085) * (submitted.amount - counter.amount)).toLongExact
-      activeOrderIds(submitted.senderPublicKey, Set(pair.priceAsset)) shouldBe Seq(submitted.id())
-    }
+    // ord1 == counter
+    // ord2 == submitted
+    oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe
+      math.max(0L, OrderInfo.safeSum(LimitOrder.getPartialFee(submitted.matcherFee, submitted.amount, submitted.amount - counter.amount), -20000000L))
+    oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe (BigDecimal(0.00085) * 20000000L).toLong
+    activeOrderIds(submitted.senderPublicKey, Set(pair.priceAsset)) shouldBe Seq(submitted.id())
   }
 
   property("Buy WAVES order - filled with 2 steps, sell order - partial") {
@@ -327,17 +318,15 @@ class OrderHistorySpecification
     }
 
     val submittedOrderInfo = oh.orderInfo(submitted.id())
-    withClue(s"submitted: ${submitted.id()}") {
+//    withClue(s"submitted: ${submitted.id()}") {
 //      exec.submittedRemainingAmount shouldBe 110000000L
 //      exec.submittedRemainingAmount shouldBe submittedOrderInfo.remaining
 //
 //      exec.submittedRemainingFee shouldBe 157143L
 //      exec.submittedRemainingFee shouldBe submittedOrderInfo.remainingFee
 
-      //submittedOrderInfo.status shouldBe LimitOrder.PartiallyFilled(100000000)
-    }
-
-    withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
+    /*
+      withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
       // Will receive 165900 < fee
       // 208!
       println(s"""|
@@ -368,6 +357,15 @@ class OrderHistorySpecification
       oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
       activeOrderIds(counter.senderPublicKey, Set(pair.amountAsset)) shouldBe Seq(submitted.id())
     }
+     */
+
+    oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 110000000L + LimitOrder.getPartialFee(
+      submitted.matcherFee,
+      submitted.amount,
+      submitted.amount - counter.amount
+    )
+    oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
+    activeOrderIds(counter.senderPublicKey, Set(pair.amountAsset)) shouldBe Seq(submitted.id())
   }
 
   property("Cancel buy order") {

@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.ReportingTestName
+import com.wavesplatform.it.api.AssetDecimalsInfo
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
@@ -19,7 +20,7 @@ import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.duration._
 import scala.math.BigDecimal.RoundingMode
-import scala.util.{Random, Try}
+import scala.util.Random
 
 class TradeBalanceAndRoundingTestSuite
     extends FreeSpec
@@ -78,6 +79,18 @@ class TradeBalanceAndRoundingTestSuite
       nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
     }
 
+    "get opened trading markets. USD price-asset " in {
+      val openMarkets = matcherNode.tradingMarkets()
+      openMarkets.markets.size shouldBe 1
+      val markets = openMarkets.markets.head
+
+      markets.amountAssetName shouldBe "WAVES"
+      markets.amountAssetInfo shouldBe Some(AssetDecimalsInfo(8))
+
+      markets.priceAssetName shouldBe usdAssetName
+      markets.priceAssetInfo shouldBe Some(AssetDecimalsInfo(Decimals))
+    }
+
     "check usd and waves balance after fill" in {
 
       val aliceWavesBalanceAfter = matcherNode.accountBalances(aliceNode.address)._1
@@ -113,7 +126,10 @@ class TradeBalanceAndRoundingTestSuite
       matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES") shouldBe expectedBobTradableBalance
       matcherNode.tradableBalance(aliceNode, wavesUsdPair)("WAVES") shouldBe aliceNode.accountBalances(aliceNode.address)._1
 
-      matcherNode.cancelOrder(bobNode, wavesUsdPair, matcherNode.fullOrderHistory(bobNode).head.id)
+      val orderId = matcherNode.fullOrderHistory(bobNode).head.id
+      matcherNode.fullOrderHistory(bobNode).size should be(1)
+      matcherNode.cancelOrder(bobNode, wavesUsdPair, orderId)
+      matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Cancelled", 1.minute)
       matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES") shouldBe bobNode.accountBalances(bobNode.address)._1
     }
   }
@@ -199,11 +215,22 @@ class TradeBalanceAndRoundingTestSuite
 
   }
 
+  "get opened trading markets. Check WCT-USD" in {
+    val openMarkets = matcherNode.tradingMarkets()
+    val markets     = openMarkets.markets.last
+
+    markets.amountAssetName shouldBe wctAssetName
+    markets.amountAssetInfo shouldBe Some(AssetDecimalsInfo(Decimals))
+
+    markets.priceAssetName shouldBe usdAssetName
+    markets.priceAssetInfo shouldBe Some(AssetDecimalsInfo(Decimals))
+  }
+
   "Alice and Bob trade WCT-WAVES on not enoght fee when place order" - {
     val wctWavesSellAmount = 2
     val wctWavesPrice      = 11234560000000L
 
-    "bob lease all waves exect half matcher fee" in {
+    "bob lease all waves exact half matcher fee" in {
       val leasingAmount = bobNode.accountBalances(bobNode.address)._1 - leasingFee - matcherFee / 2
       val leaseTxId =
         bobNode.lease(bobNode.address, matcherNode.address, leasingAmount, leasingFee).id
@@ -222,12 +249,10 @@ class TradeBalanceAndRoundingTestSuite
   }
 
   def correctAmount(a: Long, price: Long): Long = {
-    val min = (BigDecimal(Order.PriceConstant) / price).setScale(0, RoundingMode.CEILING)
-    if (min > 0)
-      Try(((BigDecimal(a) / min).toBigInt() * min.toBigInt()).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
-    else
-      a
+    val settledTotal = (BigDecimal(price) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
+    (BigDecimal(settledTotal) / price * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
   }
+
   def receiveAmount(ot: OrderType, matchPrice: Long, matchAmount: Long): Long =
     if (ot == BUY) correctAmount(matchAmount, matchPrice)
     else {
@@ -242,7 +267,7 @@ object TradeBalanceAndRoundingTestSuite {
   import com.wavesplatform.it.NodeConfigs._
 
   private val ForbiddenAssetId = "FdbnAsset"
-  private val Decimals: Byte   = 2
+  val Decimals: Byte           = 2
 
   private val minerDisabled = parseString("waves.miner.enable = no")
   private val matcherConfig = parseString(s"""
@@ -264,10 +289,12 @@ object TradeBalanceAndRoundingTestSuite {
   private val alicePk   = PrivateKeyAccount.fromSeed(aliceSeed).right.get
   private val bobPk     = PrivateKeyAccount.fromSeed(bobSeed).right.get
 
+  val usdAssetName = "USD-X"
+  val wctAssetName = "WCT-X"
   val IssueUsdTx: IssueTransactionV1 = IssueTransactionV1
     .selfSigned(
       sender = alicePk,
-      name = "USD-X".getBytes(),
+      name = usdAssetName.getBytes(),
       description = "asset description".getBytes(),
       quantity = defaultAssetQuantity,
       decimals = Decimals,
@@ -281,7 +308,7 @@ object TradeBalanceAndRoundingTestSuite {
   val IssueWctTx: IssueTransactionV1 = IssueTransactionV1
     .selfSigned(
       sender = bobPk,
-      name = "WCT-X".getBytes(),
+      name = wctAssetName.getBytes(),
       description = "asset description".getBytes(),
       quantity = defaultAssetQuantity,
       decimals = Decimals,
