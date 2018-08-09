@@ -2,6 +2,7 @@ package com.wavesplatform.it.api
 
 import com.google.common.primitives.Longs
 import com.wavesplatform.crypto
+import com.wavesplatform.http.api_key
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
 import com.wavesplatform.matcher.api.CancelOrderRequest
@@ -78,6 +79,18 @@ object AsyncMatcherHttpApi extends Assertions {
       val signedRequest             = request.copy(signature = sig)
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
       matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", signedRequest.json).as[MatcherStatusResponse]
+    }
+
+    def postWithAPiKey(path: String): Future[Response] =
+      post(
+        s"${matcherNode.matcherApiEndpoint}$path",
+        (rb: RequestBuilder) =>
+          rb.withApiKey(matcherNode.apiKey)
+            .setHeader("Content-type", "application/json;charset=utf-8")
+      )
+
+    def cancelOrderWithApiKey(orderId: String) = {
+      postWithAPiKey(s"/matcher/orders/cancel/${orderId}").as[MatcherStatusResponse]
     }
 
     def fullOrdersHistory(sender: Node) = {
@@ -169,6 +182,10 @@ object AsyncMatcherHttpApi extends Assertions {
       ByteStr(crypto.sign(privateKey, publicKey ++ Longs.toByteArray(timestamp)))
     }
 
+  }
+
+  implicit class RequestBuilderOps(self: RequestBuilder) {
+    def withApiKey(x: String): RequestBuilder = self.setHeader(api_key.name, x)
   }
 
 }

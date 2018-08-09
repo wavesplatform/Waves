@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.matcher
 
+import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -20,7 +21,7 @@ import scala.concurrent.duration._
 import scala.math.BigDecimal.RoundingMode
 import scala.util.{Random, Try}
 
-class AutoCancellingOrderTestSuite
+class CancellOrderTestSuite
     extends FreeSpec
     with Matchers
     with BeforeAndAfterAll
@@ -28,7 +29,7 @@ class AutoCancellingOrderTestSuite
     with NodesFromDocker
     with ReportingTestName {
 
-  import AutoCancellingOrderTestSuite._
+  import CancellOrderTestSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -41,6 +42,20 @@ class AutoCancellingOrderTestSuite
   matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
   matcherNode.signedIssue(createSignedIssueRequest(IssueWctTx))
   nodes.waitForHeightArise()
+
+  "cancel order using api-key" in {
+    val orderId = matcherNode.placeOrder(bobNode, wavesUsdPair, OrderType.SELL, 800, 100.waves).message.id
+    matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Accepted", 1.minute)
+
+    matcherNode.cancelOrderWithApiKey(orderId)
+    matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Cancelled", 1.minute)
+
+    matcherNode.fullOrderHistory(bobNode).head.status shouldBe "Cancelled"
+    matcherNode.orderHistoryByPair(bobNode, wavesUsdPair).head.status shouldBe "Cancelled"
+    matcherNode.orderBook(wavesUsdPair).bids shouldBe empty
+    matcherNode.orderBook(wavesUsdPair).asks shouldBe empty
+
+  }
 
   "Alice and Bob trade WAVES-USD" - {
     "place usd-waves order" in {
@@ -80,7 +95,7 @@ class AutoCancellingOrderTestSuite
 
 }
 
-object AutoCancellingOrderTestSuite {
+object CancellOrderTestSuite {
 
   import ConfigFactory._
   import com.wavesplatform.it.NodeConfigs._
