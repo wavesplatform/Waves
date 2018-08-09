@@ -133,8 +133,8 @@ class MatcherApiRoute(wallet: Wallet,
     }
   }
 
-  @Path("/market/{amountAsset}/{priceAsset}")
-  @ApiOperation(value = "Get Information for A Market", notes = "Get basic market information", httpMethod = "GET")
+  @Path("/orderbook/{amountAsset}/{priceAsset}/status")
+  @ApiOperation(value = "Get Market Status", notes = "Get current market data such as last trade, best bid and ask", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
