@@ -135,8 +135,7 @@ object AsyncMatcherHttpApi extends Assertions {
       val matcherPublicKey    = matcherNode.publicKey
       val unsigned =
         Order(sender.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, 300000, Proofs.empty, version)
-      val signature = crypto.sign(sender.privateKey, unsigned.bodyBytes())
-      unsigned.updateProofs(Proofs(Seq(ByteStr(signature))))
+      Order.sign(unsigned, sender.privateKey)
     }
 
     def placeOrder(order: Order): Future[MatcherResponse] =
