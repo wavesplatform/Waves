@@ -289,7 +289,7 @@ object MatcherActor {
                         amountAssetInfo: Option[AssetInfo],
                         priceAssetinfo: Option[AssetInfo]) {
     val (decs, zeros) = {
-      val decs = priceAssetinfo.map(_.decimals).getOrElse(0) - amountAssetInfo.map(_.decimals).getOrElse(0) - 8
+      val decs = priceAssetinfo.map(_.decimals).getOrElse(0) - amountAssetInfo.map(_.decimals).getOrElse(0)
       if (decs > 0) {
         (decs, BigInt(10).pow(decs).toLong)
       } else {
