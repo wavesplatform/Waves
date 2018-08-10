@@ -78,13 +78,13 @@ object Verifier {
       blockchain
         .accountScript(sellOrder.sender.toAddress)
         .map(verifyOrder(blockchain, _, height, sellOrder))
-        .getOrElse(sellOrder.signaturesValid())
+        .getOrElse(Order.validateOrderProofsAsSignature(sellOrder))
 
     lazy val buyerOrderVerification =
       blockchain
         .accountScript(buyOrder.sender.toAddress)
         .map(verifyOrder(blockchain, _, height, buyOrder))
-        .getOrElse(buyOrder.signaturesValid())
+        .getOrElse(Order.validateOrderProofsAsSignature(buyOrder))
 
     for {
       _ <- matcherTxVerification

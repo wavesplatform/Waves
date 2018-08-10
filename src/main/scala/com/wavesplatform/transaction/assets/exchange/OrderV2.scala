@@ -29,8 +29,6 @@ case class OrderV2(@ApiModelProperty(dataType = "java.lang.String") senderPublic
 
   override def version: Byte = 2
 
-  override def signature: Array[Byte] = proofs.proofs(0).arr
-
   def toSign: Array[Byte] =
     (version +: senderPublicKey.publicKey) ++ matcherPublicKey.publicKey ++
       assetPair.bytes ++ orderType.bytes ++
@@ -38,21 +36,8 @@ case class OrderV2(@ApiModelProperty(dataType = "java.lang.String") senderPublic
       Longs.toByteArray(timestamp) ++ Longs.toByteArray(expiration) ++
       Longs.toByteArray(matcherFee)
 
-  val signatureValid = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
-
   @ApiModelProperty(hidden = true)
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign ++ proofs.bytes())
-
-  // For tests
-  override def updateExpiration(nexpiration: Long): Order  = copy(expiration = nexpiration)
-  override def updateTimestamp(ntimestamp: Long): Order    = copy(timestamp = ntimestamp)
-  override def updateFee(fee: Long): Order                 = copy(matcherFee = fee)
-  override def updateAmount(namount: Long): Order          = copy(amount = namount)
-  override def updatePrice(nprice: Long): Order            = copy(price = nprice)
-  override def updateMatcher(pk: PrivateKeyAccount): Order = copy(matcherPublicKey = pk)
-  override def updateSender(pk: PrivateKeyAccount): Order  = copy(senderPublicKey = pk)
-  override def updatePair(pair: AssetPair): Order          = copy(assetPair = pair)
-  override def updateType(t: OrderType): Order             = copy(orderType = t)
 }
 
 object OrderV2 {

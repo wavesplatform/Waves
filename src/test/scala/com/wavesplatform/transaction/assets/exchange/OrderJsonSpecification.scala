@@ -111,7 +111,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         case s: JsSuccess[Order] =>
           val o = s.get
           o.json().toString() should be(json.toString())
-          o.signaturesValid().isRight should be(true)
+          Order.validateOrderProofsAsSignature(o).isRight should be(true)
       }
     }
   }

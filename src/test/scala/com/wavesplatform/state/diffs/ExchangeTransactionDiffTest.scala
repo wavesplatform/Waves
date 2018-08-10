@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.{Order => _, _}
+import com.wavesplatform.OrderOps._
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -279,9 +280,11 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       case (gen1, gen2, issue1, issue2, exchange) =>
         val exchangeWithResignedOrder = exchange match {
           case e1 @ ExchangeTransactionV1(bo, so, _, _, _, _, _, _, _) =>
-            e1.copy(buyOrder = changeOrderSignature(so.senderPublicKey.publicKey, bo))
+            val newSig = ByteStr(crypto.sign(so.senderPublicKey.publicKey, bo.bodyBytes()))
+            e1.copy(buyOrder = bo.updateProofs(Proofs(Seq(newSig))).asInstanceOf[OrderV1])
           case e2 @ ExchangeTransactionV2(bo, so, _, _, _, _, _, _, _) =>
-            e2.copy(sellOrder = changeOrderSignature(bo.senderPublicKey.publicKey, so))
+            val newSig = ByteStr(crypto.sign(bo.senderPublicKey.publicKey, so.bodyBytes()))
+            e2.copy(sellOrder = so.updateProofs(Proofs(Seq(newSig))))
         }
 
         val preconBlocks = Seq(
@@ -318,7 +321,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
         val exchangeWithResignedOrder = exchange match {
           case e1 @ ExchangeTransactionV1(_, so, _, _, _, _, _, _, _) =>
-            e1.copy(buyOrder = changeOrderProofs(so, newProofs))
+            e1.copy(buyOrder = so.updateProofs(newProofs).asInstanceOf[OrderV1])
           case e2 @ ExchangeTransactionV2(_, so, _, _, _, _, _, _, _) =>
             e2.copy(buyOrder = changeOrderProofs(so, newProofs))
         }

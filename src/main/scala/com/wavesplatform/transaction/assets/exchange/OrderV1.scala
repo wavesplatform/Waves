@@ -25,7 +25,8 @@ case class OrderV1(@ApiModelProperty(dataType = "java.lang.String") senderPublic
                    @ApiModelProperty(value = "Order time to live, max = 30 days") expiration: Long,
                    @ApiModelProperty(example = "100000") matcherFee: Long,
                    @ApiModelProperty(dataType = "Proofs") proofs: Proofs)
-    extends Order {
+    extends Order
+    with Signed {
 
   override def version: Byte = 1
 
@@ -42,17 +43,6 @@ case class OrderV1(@ApiModelProperty(dataType = "java.lang.String") senderPublic
 
   @ApiModelProperty(hidden = true)
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign ++ signature)
-
-  // For tests
-  override def updateExpiration(nexpiration: Long): OrderV1  = copy(expiration = nexpiration)
-  override def updateTimestamp(ntimestamp: Long): OrderV1    = copy(timestamp = ntimestamp)
-  override def updateFee(fee: Long): OrderV1                 = copy(matcherFee = fee)
-  override def updateAmount(namount: Long): OrderV1          = copy(amount = namount)
-  override def updatePrice(nprice: Long): OrderV1            = copy(price = nprice)
-  override def updateMatcher(pk: PrivateKeyAccount): OrderV1 = copy(matcherPublicKey = pk)
-  override def updateSender(pk: PrivateKeyAccount): OrderV1  = copy(senderPublicKey = pk)
-  override def updatePair(pair: AssetPair): OrderV1          = copy(assetPair = pair)
-  override def updateType(t: OrderType): OrderV1             = copy(orderType = t)
 }
 
 object OrderV1 {

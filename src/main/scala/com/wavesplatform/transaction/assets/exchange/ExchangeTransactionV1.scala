@@ -13,8 +13,8 @@ import scorex.crypto.signatures.Curve25519._
 
 import scala.util.{Failure, Success, Try}
 
-case class ExchangeTransactionV1(buyOrder: Order,
-                                 sellOrder: Order,
+case class ExchangeTransactionV1(buyOrder: OrderV1,
+                                 sellOrder: OrderV1,
                                  price: Long,
                                  amount: Long,
                                  buyMatcherFee: Long,
@@ -41,7 +41,7 @@ case class ExchangeTransactionV1(buyOrder: Order,
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature.arr)
 
-  override val signedDescendants: Coeval[Seq[Order]] = Coeval.evalOnce(Seq(buyOrder, sellOrder))
+  override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(Seq(buyOrder, sellOrder))
 }
 
 object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1] with TransactionParser.HardcodedVersion1 {
