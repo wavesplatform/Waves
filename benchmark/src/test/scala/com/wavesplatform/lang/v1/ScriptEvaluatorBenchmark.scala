@@ -2,15 +2,14 @@ package com.wavesplatform.lang.v1
 
 import java.util.concurrent.TimeUnit
 
-import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{BYTEVECTOR, LIST}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FROMBASE58, TOBASE58, SIGVERIFY}
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.evaluator.ctx.{CaseObj, CaseType, EvaluationContext, LazyVal}
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Base58
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -42,53 +41,12 @@ class ScriptEvaluatorBenchmark {
   def base58decode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(EvaluatorV1[Boolean](st.context, st.decode))
 }
 
-object ScriptEvaluatorBenchmark {
-  val BodySize = 1024
-
-  val TxType = CaseType(
-    "Transaction",
-    List(
-      "bodyBytes"       -> BYTEVECTOR,
-      "senderPublicKey" -> BYTEVECTOR,
-      "proofs"          -> LIST(BYTEVECTOR)
-    )
-  )
-
-  def contextStub: EvaluationContext = {
-    val (sk, pk)  = Curve25519.createKeyPair("seed".getBytes())
-    val bodyBytes = new Array[Byte](BodySize)
-    Random.nextBytes(bodyBytes)
-    val signature = ByteVector(Curve25519.sign(sk, bodyBytes))
-    val proofs = (1 to 6).map { _ =>
-      val proof = new Array[Byte](64)
-      Random.nextBytes(proof)
-      ByteVector(proof)
-    }
-
-    val txObj = CaseObj(
-      TxType.typeRef,
-      Map(
-        "bodyBytes" -> ByteVector(bodyBytes),
-        "senderPk"  -> ByteVector(pk),
-        "proofs"    -> (signature +: proofs :+ ByteVector.empty) // real signature, 6 random byte strings, empty proof
-      )
-    )
-
-    Monoid.combineAll(
-      Seq(
-        PureContext.evalContext,
-        CryptoContext.build(Global).evaluationContext,
-        EvaluationContext.build(typeDefs = Map.empty, letDefs = Map("tx" -> LazyVal(EitherT.pure(txObj))), functions = Seq.empty)
-      ))
-  }
-}
-
 @State(Scope.Benchmark)
 class NestedBlocks {
   val context: EvaluationContext = PureContext.evalContext
 
   val expr: EXPR = {
-    val blockCount = 284 // yields script of complexity 1998
+    val blockCount = 300
     val cond       = FUNCTION_CALL(PureContext.eq, List(REF(s"v$blockCount"), CONST_LONG(0)))
     val blocks = (1 to blockCount).foldRight[EXPR](cond) { (i, e) =>
       BLOCK(LET(s"v$i", REF(s"v${i - 1}")), e)
@@ -102,46 +60,63 @@ class Base58Perf {
   val context: EvaluationContext = Monoid.combine(PureContext.evalContext, CryptoContext.build(Global).evaluationContext)
 
   val encode: EXPR = {
-    val base58Count = 75 // yields script of 8171 bytes
-    val lets = (1 to base58Count)
+    val base58Count = 120
+    val sum = (1 to base58Count).foldRight[EXPR](CONST_LONG(0)) {
+      case (i, e) => FUNCTION_CALL(PureContext.sumLong, List(REF("v" + i), e))
+    }
+    (1 to base58Count)
       .map { i =>
         val b = new Array[Byte](64)
         Random.nextBytes(b)
-        s"let v$i = size(toBase58String(base58'${Base58.encode(b)}'))\n"
+        LET("v" + i, FUNCTION_CALL(PureContext.sizeString, List(FUNCTION_CALL(Native(TOBASE58), List(CONST_BYTEVECTOR(ByteVector(b)))))))
       }
-      .reduce(_ + _)
-    val sum    = (1 to base58Count).map(i => s"v$i").reduce(_ + " + " + _)
-    val script = lets + sum + " == 0"
-    ScriptCompiler(script).explicitGet()._1.expr.asInstanceOf[EXPR]
+      .foldRight[EXPR](FUNCTION_CALL(PureContext.eq, List(sum, CONST_LONG(base58Count)))) {
+        case (let, e) => BLOCK(let, e)
+      }
   }
 
   val decode: EXPR = {
-    val base58Length = 5950 // yields script of 8169 bytes
+    val base58Length = 6000
     val b            = new Array[Byte](base58Length)
     Random.nextBytes(b)
-    val script = s"""size(fromBase58String(\"${Base58.encode(b)}\")) == 0"""
-    ScriptCompiler(script).explicitGet()._1.expr.asInstanceOf[EXPR]
+    FUNCTION_CALL(
+      PureContext.eq,
+      List(FUNCTION_CALL(PureContext.sizeBytes, List(FUNCTION_CALL(Native(FROMBASE58), List(CONST_STRING(Base58.encode(b)))))),
+           CONST_LONG(base58Length))
+    )
   }
 }
 
 @State(Scope.Benchmark)
 class Signatures {
-  import ScriptEvaluatorBenchmark._
-  val context: EvaluationContext = contextStub
+  val context: EvaluationContext = Monoid.combine(PureContext.evalContext, CryptoContext.build(Global).evaluationContext)
 
   val expr: EXPR = {
-    val sigCount = 17 // yields script of complexity 1920
-    val script = (1 to sigCount)
+    val sigCount = 20
+    val sum = (1 to sigCount).foldRight[EXPR](CONST_LONG(0)) {
+      case (i, e) => FUNCTION_CALL(PureContext.sumLong, List(REF("v" + i), e))
+    }
+    (1 to sigCount)
       .map { i =>
-        val pk = new Array[Byte](32)
-        Random.nextBytes(pk)
-        (pk, i)
+        val msg = new Array[Byte](1024)
+        Random.nextBytes(msg)
+        val seed = new Array[Byte](256)
+        Random.nextBytes(seed)
+        val (sk, pk) = Curve25519.createKeyPair(seed)
+        val sig      = Curve25519.sign(sk, msg)
+
+        LET(
+          "v" + i,
+          IF(
+            FUNCTION_CALL(Native(SIGVERIFY),
+                          List(CONST_BYTEVECTOR(ByteVector(msg)), CONST_BYTEVECTOR(ByteVector(sig)), CONST_BYTEVECTOR(ByteVector(pk)))),
+            CONST_LONG(1),
+            CONST_LONG(0)
+          )
+        )
       }
-      .map {
-        case (pk, i) =>
-          s"sigVerify(tx.bodyBytes, tx.proofs[${i % 7}], base58'${Base58.encode(pk)}')"
+      .foldRight[EXPR](FUNCTION_CALL(PureContext.eq, List(sum, CONST_LONG(sigCount)))) {
+        case (let, e) => BLOCK(let, e)
       }
-      .reduce(_ + " ||\n" + _)
-    ScriptCompiler(script).explicitGet()._1.expr.asInstanceOf[EXPR]
   }
 }
