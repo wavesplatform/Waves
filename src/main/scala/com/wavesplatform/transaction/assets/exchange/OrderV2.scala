@@ -29,15 +29,20 @@ case class OrderV2(@ApiModelProperty(dataType = "java.lang.String") senderPublic
 
   override def version: Byte = 2
 
-  def toSign: Array[Byte] =
+  override def signature: Array[Byte] = proofs.proofs(0).arr
+
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     (version +: senderPublicKey.publicKey) ++ matcherPublicKey.publicKey ++
       assetPair.bytes ++ orderType.bytes ++
       Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
       Longs.toByteArray(timestamp) ++ Longs.toByteArray(expiration) ++
       Longs.toByteArray(matcherFee)
+  )
+
+  val signatureValid = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), senderPublicKey.publicKey))
 
   @ApiModelProperty(hidden = true)
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign ++ proofs.bytes())
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ proofs.bytes())
 }
 
 object OrderV2 {
@@ -52,7 +57,7 @@ object OrderV2 {
           expiration: Long,
           matcherFee: Long): Order = {
     val unsigned = OrderV2(sender, matcher, pair, OrderType.BUY, price, amount, timestamp, expiration, matcherFee, Proofs.empty)
-    val sig      = crypto.sign(sender, unsigned.toSign)
+    val sig      = crypto.sign(sender, unsigned.bodyBytes())
     unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
   }
 
@@ -65,7 +70,7 @@ object OrderV2 {
            expiration: Long,
            matcherFee: Long): Order = {
     val unsigned = OrderV2(sender, matcher, pair, OrderType.SELL, price, amount, timestamp, expiration, matcherFee, Proofs.empty)
-    val sig      = crypto.sign(sender, unsigned.toSign)
+    val sig      = crypto.sign(sender, unsigned.bodyBytes())
     unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
   }
 
@@ -79,7 +84,7 @@ object OrderV2 {
             expiration: Long,
             matcherFee: Long): Order = {
     val unsigned = OrderV2(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, Proofs.empty)
-    val sig      = crypto.sign(sender, unsigned.toSign)
+    val sig      = crypto.sign(sender, unsigned.bodyBytes())
     unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
   }
 

@@ -72,7 +72,6 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
   import Order._
 
   val sender = senderPublicKey
-  //val signatureValid = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(price, amount) &&
@@ -94,10 +93,8 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
     (getReceiveAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
   }
 
-  def toSign: Array[Byte]
-
   @ApiModelProperty(hidden = true)
-  val id: Coeval[Array[Byte]] = Coeval.evalOnce(crypto.fastHash(toSign))
+  val id: Coeval[Array[Byte]] = Coeval.evalOnce(crypto.fastHash(bodyBytes()))
 
   @ApiModelProperty(hidden = true)
   val idStr: Coeval[String] = Coeval.evalOnce(Base58.encode(id()))
@@ -106,7 +103,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
   val bytes: Coeval[Array[Byte]]
 
   @ApiModelProperty(hidden = true)
-  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign)
+  val bodyBytes: Coeval[Array[Byte]]
 
   @ApiModelProperty(hidden = true)
   def getReceiveAssetId: Option[AssetId] = orderType match {
@@ -269,7 +266,7 @@ object Order {
 
   def sign(unsigned: Order, sender: PrivateKeyAccount): Order = {
     require(unsigned.senderPublicKey == sender)
-    val sig = crypto.sign(sender, unsigned.toSign)
+    val sig = crypto.sign(sender, unsigned.bodyBytes())
     unsigned match {
       case o @ OrderV2(_, _, _, _, _, _, _, _, _, _) =>
         o.copy(proofs = Proofs(Seq(ByteStr(sig))))
