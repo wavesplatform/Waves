@@ -1,19 +1,20 @@
 package com.wavesplatform.transaction.assets.exchange
 
+import cats.data.State
 import com.google.common.primitives.{Ints, Longs}
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.crypto
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction._
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.transaction.ValidationError.{GenericError, OrderValidationError}
-import com.wavesplatform.transaction._
 import scorex.crypto.signatures.Curve25519._
-import scala.util.{Failure, Success, Try}
-import cats.data.State
 
-case class ExchangeTransactionV1(buyOrder: Order,
-                                 sellOrder: Order,
+import scala.util.{Failure, Success, Try}
+
+case class ExchangeTransactionV1(buyOrder: OrderV1,
+                                 sellOrder: OrderV1,
                                  price: Long,
                                  amount: Long,
                                  buyMatcherFee: Long,
@@ -40,7 +41,7 @@ case class ExchangeTransactionV1(buyOrder: Order,
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature.arr)
 
-  override val signedDescendants: Coeval[Seq[Order]] = Coeval.evalOnce(Seq(buyOrder, sellOrder))
+  override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(Seq(buyOrder, sellOrder))
 }
 
 object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1] with TransactionParser.HardcodedVersion1 {
@@ -70,40 +71,27 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
              fee: Long,
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, TransactionT] = {
-    lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
-
-    if (fee <= 0) {
-      Left(ValidationError.InsufficientFee())
-    } else if (amount <= 0) {
-      Left(ValidationError.NegativeAmount(amount, "assets"))
-    } else if (price <= 0) {
-      Left(GenericError("price should be > 0"))
-    } else if (price > Order.MaxAmount) {
-      Left(GenericError("price too large"))
-    } else if (amount > Order.MaxAmount) {
-      Left(GenericError("amount too large"))
-    } else if (sellMatcherFee > Order.MaxAmount) {
-      Left(GenericError("sellMatcherFee too large"))
-    } else if (buyMatcherFee > Order.MaxAmount) {
-      Left(GenericError("buyMatcherFee too large"))
-    } else if (fee > Order.MaxAmount) {
-      Left(GenericError("fee too large"))
-    } else if (buyOrder.orderType != OrderType.BUY) {
-      Left(GenericError("buyOrder should has OrderType.BUY"))
-    } else if (sellOrder.orderType != OrderType.SELL) {
-      Left(GenericError("sellOrder should has OrderType.SELL"))
-    } else if (buyOrder.matcherPublicKey != sellOrder.matcherPublicKey) {
-      Left(GenericError("buyOrder.matcher should be the same as sellOrder.matcher"))
-    } else if (buyOrder.assetPair != sellOrder.assetPair) {
-      Left(GenericError("Both orders should have same AssetPair"))
-    } else if (!buyOrder.isValid(timestamp)) {
-      Left(OrderValidationError(buyOrder, buyOrder.isValid(timestamp).messages()))
-    } else if (!sellOrder.isValid(timestamp)) {
-      Left(OrderValidationError(sellOrder, sellOrder.isValid(timestamp).labels.mkString("\n")))
-    } else if (!priceIsValid) {
-      Left(GenericError("priceIsValid"))
-    } else {
-      Right(ExchangeTransactionV1(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature))
+    validateExchangeParams(
+      buyOrder,
+      sellOrder,
+      price,
+      amount,
+      buyMatcherFee,
+      sellMatcherFee,
+      fee,
+      timestamp
+    ).map { _ =>
+      ExchangeTransactionV1(
+        buyOrder,
+        sellOrder,
+        price,
+        amount,
+        buyMatcherFee,
+        sellMatcherFee,
+        fee,
+        timestamp,
+        signature
+      )
     }
   }
 

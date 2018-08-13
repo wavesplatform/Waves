@@ -3,11 +3,13 @@ package com.wavesplatform.transaction
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.matcher.ValidationMatcher
 import com.wavesplatform.state.ByteStr
-import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.state.diffs._
+import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.NTP
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.OrderOps._
+import com.wavesplatform.transaction.smart.Verifier
 
 class OrderSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with ValidationMatcher {
 
@@ -92,24 +94,26 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
   }
 
   property("Order signature validation") {
+    val err = "proof doesn't validate as signature"
     forAll(orderGen, accountGen) {
       case (order, pka) =>
-        order.signaturesValid() shouldBe an[Right[_, _]]
-        order.updateSender(pka).signaturesValid() should produce("InvalidSignature")
-        order.updateMatcher(pka).signaturesValid() should produce("InvalidSignature")
+        Verifier.verifyAsEllipticCurveSignature(order) shouldBe an[Right[_, _]]
+        Verifier.verifyAsEllipticCurveSignature(order.updateSender(pka)) should produce(err)
+        Verifier.verifyAsEllipticCurveSignature(order.updateMatcher(pka)) should produce(err)
         val assetPair = order.assetPair
-        order
-          .updatePair(assetPair.copy(amountAsset = assetPair.amountAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_))))
-          .signaturesValid() should produce("InvalidSignature")
-        order
-          .updatePair(assetPair.copy(priceAsset = assetPair.priceAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_))))
-          .signaturesValid() should produce("InvalidSignature")
-        order.updateType(OrderType.reverse(order.orderType)).signaturesValid() should produce("InvalidSignature")
-        order.updatePrice(order.price + 1).signaturesValid() should produce("InvalidSignature")
-        order.updateAmount(order.amount + 1).signaturesValid() should produce("InvalidSignature")
-        order.updateExpiration(order.expiration + 1).signaturesValid() should produce("InvalidSignature")
-        order.updateFee(order.matcherFee + 1).signaturesValid() should produce("InvalidSignature")
-        order.updateProofs(Proofs(Seq(ByteStr(pka.publicKey ++ pka.publicKey)))).signaturesValid() should produce("InvalidSignature")
+        Verifier.verifyAsEllipticCurveSignature(
+          order
+            .updatePair(assetPair.copy(
+              amountAsset = assetPair.amountAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_))))) should produce(err)
+        Verifier.verifyAsEllipticCurveSignature(order
+          .updatePair(assetPair.copy(priceAsset = assetPair.priceAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_))))) should produce(
+          err)
+        Verifier.verifyAsEllipticCurveSignature(order.updateType(OrderType.reverse(order.orderType))) should produce(err)
+        Verifier.verifyAsEllipticCurveSignature(order.updatePrice(order.price + 1)) should produce(err)
+        Verifier.verifyAsEllipticCurveSignature(order.updateAmount(order.amount + 1)) should produce(err)
+        Verifier.verifyAsEllipticCurveSignature(order.updateExpiration(order.expiration + 1)) should produce(err)
+        Verifier.verifyAsEllipticCurveSignature(order.updateFee(order.matcherFee + 1)) should produce(err)
+        Verifier.verifyAsEllipticCurveSignature(order.updateProofs(Proofs(Seq(ByteStr(pka.publicKey ++ pka.publicKey))))) should produce(err)
     }
   }
 

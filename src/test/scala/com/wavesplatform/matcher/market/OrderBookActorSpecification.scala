@@ -3,6 +3,8 @@ package com.wavesplatform.matcher.market
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
+import com.wavesplatform.OrderOps._
+import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
@@ -12,16 +14,15 @@ import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{Blockchain, ByteStr, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
-import org.scalamock.scalatest.PathMockFactory
-import org.scalatest._
-import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.utils.{NTP, ScorexLogging}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.utils.{NTP, ScorexLogging}
+import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
+import io.netty.channel.group.ChannelGroup
+import org.scalamock.scalatest.PathMockFactory
+import org.scalatest._
 
 import scala.concurrent.duration._
 
