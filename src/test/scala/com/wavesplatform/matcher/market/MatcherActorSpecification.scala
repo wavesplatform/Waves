@@ -98,7 +98,8 @@ class MatcherActorSpecification
           100L,
           1L,
           1000L,
-          100000L
+          100000L,
+          1: Byte
         )
 
       val invalidOrder = sameAssetsOrder()
@@ -153,7 +154,8 @@ class MatcherActorSpecification
           100L,
           1L,
           1000L,
-          100000L
+          100000L,
+          1: Byte
         )
 
       val invalidOrder = sameAssetsOrder()

@@ -5,13 +5,13 @@ import java.util.concurrent.ThreadLocalRandom
 import cats.Show
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
 import com.wavesplatform.state.DataEntry.{MaxValueSize, Type}
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, EitherExt2, IntegerDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, EitherExt2, IntegerDataEntry, StringDataEntry}
 import org.slf4j.LoggerFactory
 import com.wavesplatform.account.{Alias, PrivateKeyAccount}
 import com.wavesplatform.utils.LoggerFacade
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseTransactionV1}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
@@ -131,14 +131,23 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
               val sender = accounts.find(_.address == assetTx.sender.address).get
               logOption(BurnTransactionV1.selfSigned(sender, assetTx.id(), Random.nextInt(1000), moreThatStandartFee, ts))
             })
-          case ExchangeTransaction =>
+          case ExchangeTransactionV1 =>
             val matcher   = randomFrom(accounts).get
             val seller    = randomFrom(accounts).get
             val pair      = AssetPair(None, Some(tradeAssetIssue.id()))
-            val sellOrder = Order.sell(seller, matcher, pair, 100000000, 1, ts, ts + 30.days.toMillis, moreThatStandartFee * 3)
+            val sellOrder = OrderV1.sell(seller, matcher, pair, 100000000, 1, ts, ts + 30.days.toMillis, moreThatStandartFee * 3)
             val buyer     = randomFrom(accounts).get
-            val buyOrder  = Order.buy(buyer, matcher, pair, 100000000, 1, ts, ts + 1.day.toMillis, moreThatStandartFee * 3)
-            logOption(ExchangeTransaction.create(matcher, buyOrder, sellOrder, 100000000, 1, 300000, 300000, moreThatStandartFee * 3, ts))
+            val buyOrder  = OrderV1.buy(buyer, matcher, pair, 100000000, 1, ts, ts + 1.day.toMillis, moreThatStandartFee * 3)
+            logOption(ExchangeTransactionV1.create(matcher, buyOrder, sellOrder, 100000000, 1, 300000, 300000, moreThatStandartFee * 3, ts))
+          case ExchangeTransactionV2 =>
+            val matcher = randomFrom(accounts).get
+            val seller  = randomFrom(accounts).get
+            val pair    = AssetPair(None, Some(tradeAssetIssue.id()))
+            // XXX generate order version
+            val sellOrder = OrderV1.sell(seller, matcher, pair, 100000000, 1, ts, ts + 30.days.toMillis, moreThatStandartFee * 3)
+            val buyer     = randomFrom(accounts).get
+            val buyOrder  = OrderV1.buy(buyer, matcher, pair, 100000000, 1, ts, ts + 1.day.toMillis, moreThatStandartFee * 3)
+            logOption(ExchangeTransactionV2.create(matcher, buyOrder, sellOrder, 100000000, 1, 300000, 300000, moreThatStandartFee * 3, ts))
           case LeaseTransactionV1 =>
             val sender   = randomFrom(accounts).get
             val useAlias = r.nextBoolean()
@@ -195,6 +204,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
               etype match {
                 case t if t == Type.Integer.id => IntegerDataEntry(key, r.nextLong)
                 case t if t == Type.Boolean.id => BooleanDataEntry(key, r.nextBoolean)
+                case t if t == Type.String.id  => StringDataEntry(key, r.nextLong.toString)
                 case t if t == Type.Binary.id =>
                   val size = r.nextInt(MaxValueSize + 1)
                   val b    = new Array[Byte](size)

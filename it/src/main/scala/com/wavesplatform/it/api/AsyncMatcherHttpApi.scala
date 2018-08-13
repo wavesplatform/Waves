@@ -13,6 +13,7 @@ import org.scalatest.Assertions
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json.Writes
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.Proofs
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -53,6 +54,11 @@ object AsyncMatcherHttpApi extends Assertions {
     def orderBook(assetPair: AssetPair): Future[OrderBookResponse] = {
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
       matcherGet(s"/matcher/orderbook/${amountAsset}/${priceAsset}").as[OrderBookResponse]
+    }
+
+    def marketStatus(assetPair: AssetPair): Future[MarketStatusResponse] = {
+      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
+      matcherGet(s"/matcher/orderbook/$amountAsset/$priceAsset/status").as[MarketStatusResponse]
     }
 
     def parseAssetPair(assetPair: AssetPair) = {
@@ -121,13 +127,16 @@ object AsyncMatcherHttpApi extends Assertions {
                      orderType: OrderType,
                      price: Long,
                      amount: Long,
-                     timeToLive: Duration = 30.days - 1.seconds): Order = {
+                     version: Byte,
+                     timeToLive: Duration = 30.days - 1.seconds,
+    ): Order = {
       val creationTime        = System.currentTimeMillis()
       val timeToLiveTimestamp = creationTime + timeToLive.toMillis
       val matcherPublicKey    = matcherNode.publicKey
-      val unsigned            = Order(sender.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, 300000, Array())
-      val signature           = crypto.sign(sender.privateKey, unsigned.toSign)
-      unsigned.copy(signature = signature)
+      val unsigned =
+        Order(sender.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, 300000, Proofs.empty, version)
+      val signature = crypto.sign(sender.privateKey, unsigned.bodyBytes())
+      unsigned.updateProofs(Proofs(Seq(ByteStr(signature))))
     }
 
     def placeOrder(order: Order): Future[MatcherResponse] =
@@ -138,8 +147,9 @@ object AsyncMatcherHttpApi extends Assertions {
                    orderType: OrderType,
                    price: Long,
                    amount: Long,
+                   version: Byte,
                    timeToLive: Duration = 30.days - 1.seconds): Future[MatcherResponse] = {
-      val order = prepareOrder(sender, pair, orderType, price, amount, timeToLive)
+      val order = prepareOrder(sender, pair, orderType, price, amount, version, timeToLive)
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
     }
 

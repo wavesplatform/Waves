@@ -143,6 +143,8 @@ object AsyncHttpApi extends Assertions {
 
     def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 
+    def getAddresses: Future[Seq[String]] = get(s"/addresses").as[Seq[String]]
+
     def scriptInfo(address: String): Future[AddressApiRoute.AddressScriptInfo] =
       get(s"/addresses/scriptInfo/$address").as[AddressApiRoute.AddressScriptInfo]
 
@@ -481,9 +483,14 @@ object AsyncHttpApi extends Assertions {
       n.assetBalance(acc, assetIdString).map(_.balance shouldBe balance)
     }
 
+    def calculateFee(jsobj: JsObject): Future[FeeInfo] =
+      postJsObjectWithApiKey("/transactions/calculateFee", jsobj).as[FeeInfo]
+
   }
 
   implicit class NodesAsyncHttpApi(nodes: Seq[Node]) extends Matchers {
+    def height: Future[Seq[Int]] = traverse(nodes)(_.height)
+
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit p: Position): Future[Unit] =
       for {
         allHeights   <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
@@ -493,7 +500,7 @@ object AsyncHttpApi extends Assertions {
 
     def waitForHeightArise(): Future[Unit] =
       for {
-        height <- traverse(nodes)(_.height).map(_.max)
+        height <- height.map(_.max)
         _      <- traverse(nodes)(_.waitForHeight(height + 1))
       } yield ()
 

@@ -9,6 +9,7 @@ import org.scalatest._
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.concurrent.Future
 
 class BlockSizeConstraintsSuite extends FreeSpec with Matchers with TransferSending with NodesFromDocker {
   import BlockSizeConstraintsSuite._
@@ -19,13 +20,15 @@ class BlockSizeConstraintsSuite extends FreeSpec with Matchers with TransferSend
   private val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet
   private val miner         = nodes.head
 
+  val transfers = generateTransfersToRandomAddresses(maxTxsGroup, nodeAddresses)
   s"Block is limited by size after activation" in result(
     for {
-      _                                        <- processRequests(generateTransfersToRandomAddresses(maxTxs, nodeAddresses), includeAttachment = true)
-      _                                        <- miner.waitForHeight(3)
-      _                                        <- processRequests(generateTransfersToRandomAddresses(maxTxs, nodeAddresses), includeAttachment = true)
-      _                                        <- miner.waitForHeight(4)
-      Seq(blockHeaderBefore, blockHeaderAfter) <- miner.blockHeadersSeq(2, 3)
+      _                 <- Future.sequence((0 to maxGroups).map(_ => processRequests(transfers, includeAttachment = true)))
+      _                 <- miner.waitForHeight(3)
+      _                 <- Future.sequence((0 to maxGroups).map(_ => processRequests(transfers, includeAttachment = true)))
+      blockHeaderBefore <- miner.blockHeadersAt(2)
+      _                 <- miner.waitForHeight(4)
+      blockHeaderAfter  <- miner.blockHeadersAt(3)
     } yield {
       val maxSizeInBytesAfterActivation = (1.1d * 1024 * 1024).toInt // including headers
       val blockSizeInBytesBefore        = blockHeaderBefore.blocksize
@@ -34,13 +37,14 @@ class BlockSizeConstraintsSuite extends FreeSpec with Matchers with TransferSend
       val blockSizeInBytesAfter = blockHeaderAfter.blocksize
       blockSizeInBytesAfter should be <= maxSizeInBytesAfterActivation
     },
-    6.minutes
+    10.minutes
   )
 
 }
 
 object BlockSizeConstraintsSuite {
-  private val maxTxs          = 5000 // More, than 1mb of block
+  private val maxTxsGroup     = 500 // More, than 1mb of block
+  private val maxGroups       = 9
   private val txsInMicroBlock = 500
   private val ConfigOverrides = ConfigFactory.parseString(s"""akka.http.server {
                                                              |  parsing.max-content-length = 3737439
@@ -53,7 +57,7 @@ object BlockSizeConstraintsSuite {
                                                              |  miner {
                                                              |    quorum = 0
                                                              |    minimal-block-generation-offset = 60000ms
-                                                             |    micro-block-interval = 3s
+                                                             |    micro-block-interval = 1s
                                                              |    max-transactions-in-key-block = 0
                                                              |    max-transactions-in-micro-block = $txsInMicroBlock
                                                              |  }

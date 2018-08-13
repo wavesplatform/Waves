@@ -60,23 +60,30 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
     .withDefault(1)
     .build(false)
 
-  private def miner                  = nodes.head
-  private val smartAccountPrivateKey = PrivateKeyAccount.fromSeed(NodeConfigs.Default(1).getString("account-seed")).explicitGet()
+  private def miner                   = nodes.head
+  private val smartAccountPrivateKey  = PrivateKeyAccount.fromSeed(NodeConfigs.Default(1).getString("account-seed")).explicitGet()
+  private val simpleAccountPrivateKey = PrivateKeyAccount.fromSeed(NodeConfigs.Default(2).getString("account-seed")).explicitGet()
 
   s"Block is limited by size after activation" in result(
     for {
-      _                  <- miner.signedBroadcast(Json.toJsObject(toRequest(setScriptTx(smartAccountPrivateKey))) + ("type" -> JsNumber(13)))
-      _                  <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartAccountPrivateKey.address))
-      _                  <- miner.waitForHeight(4)
+      _ <- miner.signedBroadcast(Json.toJsObject(toRequest(setScriptTx(smartAccountPrivateKey))) + ("type" -> JsNumber(13)))
+      _ <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartAccountPrivateKey.address))
+      _ <- miner.waitForHeight(5)
+      _ <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartAccountPrivateKey.address))
+      _ <- scala.concurrent.Future.sequence((0 to 9).map(_ =>
+        processRequests(generateTransfersFromAccount((50 - MaxScriptRunsInBlock / 10), simpleAccountPrivateKey.address))))
+      _                  <- miner.waitForHeight(6)
       blockWithSetScript <- miner.blockHeadersAt(2)
       restBlocks         <- miner.blockHeadersSeq(3, 4)
+      newBlock           <- miner.blockHeadersAt(5)
     } yield {
-      (1 to (1 + MaxScriptRunsInBlock)) should contain(blockWithSetScript.transactionCount)
+      blockWithSetScript.transactionCount should (be <= (MaxScriptRunsInBlock + 1) and be >= 1)
       restBlocks.foreach { x =>
-        (1 to MaxScriptRunsInBlock) should contain(x.transactionCount)
+        x.transactionCount should be(MaxScriptRunsInBlock)
       }
+      newBlock.transactionCount should be > MaxScriptRunsInBlock
     },
-    6.minutes
+    12.minutes
   )
 
   private def setScriptTx(sender: PrivateKeyAccount) =

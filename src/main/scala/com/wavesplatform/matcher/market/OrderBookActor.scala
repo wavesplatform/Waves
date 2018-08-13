@@ -48,6 +48,8 @@ class OrderBookActor(assetPair: AssetPair,
   private var apiSender           = Option.empty[ActorRef]
   private var cancellable         = Option.empty[Cancellable]
 
+  private var lastTrade: Option[Order] = None
+
   private lazy val alreadyCanceledOrders = CacheBuilder
     .newBuilder()
     .maximumSize(AlreadyCanceledCacheSize)
@@ -125,6 +127,8 @@ class OrderBookActor(assetPair: AssetPair,
       sender() ! GetOrdersResponse(orderBook.bids.values.flatten.toSeq)
     case GetOrderBookRequest(pair, depth) =>
       handleGetOrderBook(pair, depth)
+    case GetMarketStatusRequest(pair) =>
+      handleGetMarketStatus(pair)
   }
 
   private def onCancelOrder(cancel: CancelOrder): Unit = {
@@ -195,7 +199,13 @@ class OrderBookActor(assetPair: AssetPair,
     if (pair == assetPair) {
       val d = Math.min(depth.getOrElse(MaxDepth), MaxDepth)
       sender() ! GetOrderBookResponse(pair, orderBook.bids.take(d).map(aggregateLevel).toSeq, orderBook.asks.take(d).map(aggregateLevel).toSeq)
-    } else sender() ! GetOrderBookResponse(pair, Seq(), Seq())
+    } else sender() ! GetOrderBookResponse.empty(pair)
+  }
+
+  private def handleGetMarketStatus(pair: AssetPair): Unit = {
+    if (pair == assetPair) {
+      sender() ! GetMarketStatusResponse(pair, orderBook.bids.headOption.map(_._1), orderBook.asks.headOption.map(_._1), lastTrade)
+    } else sender() ! GetMarketStatusResponse(pair, None, None, None)
   }
 
   private def onAddOrder(order: Order): Unit = {
@@ -282,10 +292,11 @@ class OrderBookActor(assetPair: AssetPair,
           tx <- createTransaction(o, c)
           _  <- utx.putIfNew(tx)
         } yield tx) match {
-          case Right(tx) if tx.isInstanceOf[ExchangeTransaction] =>
+          case Right(tx: ExchangeTransaction) =>
+            lastTrade = Some(c.order)
             allChannels.broadcastTx(tx)
             processEvent(event)
-            context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
+            context.system.eventStream.publish(ExchangeTransactionCreated(tx))
             if (event.submittedRemaining > 0)
               Some(o.partial(event.submittedRemaining))
             else None
@@ -354,6 +365,8 @@ object OrderBookActor {
 
   case class GetOrderBookRequest(assetPair: AssetPair, depth: Option[Int]) extends OrderBookRequest
 
+  case class GetMarketStatusRequest(assetPair: AssetPair) extends OrderBookRequest
+
   case class DeleteOrderBookRequest(assetPair: AssetPair) extends OrderBookRequest
 
   case class CancelOrder(assetPair: AssetPair, sender: PublicKeyAccount, orderId: String) extends OrderBookRequest {
@@ -399,6 +412,16 @@ object OrderBookActor {
 
   object GetOrderBookResponse {
     def empty(pair: AssetPair): GetOrderBookResponse = GetOrderBookResponse(pair, Seq(), Seq())
+  }
+
+  case class GetMarketStatusResponse(pair: AssetPair, bid: Option[Price], ask: Option[Price], last: Option[Order]) extends MatcherResponse {
+    def json: JsValue = Json.obj(
+      "lastPrice" -> last.map(_.price),
+      "lastSide"  -> last.map(_.orderType.toString),
+      "bestBid"   -> bid,
+      "bestAsk"   -> ask
+    )
+    val code = StatusCodes.OK
   }
 
   // Direct requests

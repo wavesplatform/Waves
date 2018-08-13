@@ -2,8 +2,10 @@ package com.wavesplatform.matcher.market
 
 import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import akka.pattern.ask
 import akka.persistence.{PersistentActor, RecoveryCompleted}
 import akka.routing.FromConfig
+import akka.util.Timeout
 import com.google.common.base.Charsets
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
@@ -23,6 +25,8 @@ import scorex.utils._
 import com.wavesplatform.wallet.Wallet
 
 import scala.collection.{immutable, mutable}
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.reflectiveCalls
 
 class MatcherActor(orderHistory: ActorRef,
@@ -36,6 +40,8 @@ class MatcherActor(orderHistory: ActorRef,
     with ScorexLogging {
 
   import MatcherActor._
+
+  private implicit val timeout: Timeout = 5.seconds
 
   val tradedPairs = mutable.Map.empty[AssetPair, MarketData]
 
@@ -141,6 +147,20 @@ class MatcherActor(orderHistory: ActorRef,
   def forwardToOrderBook: Receive = {
     case GetMarkets =>
       sender() ! GetMarketsResponse(getMatcherPublicKey, tradedPairs.values.toSeq)
+
+    case req: GetMarketStatusRequest =>
+      val snd = sender()
+      checkAssetPair(req) {
+        context
+          .child(OrderBookActor.name(req.assetPair))
+          .fold {
+            snd ! StatusCodeMatcherResponse(StatusCodes.NotFound, "Market not found")
+          } { orderbook =>
+            (orderbook ? req)
+              .mapTo[GetMarketStatusResponse]
+              .map(snd ! _)
+          }
+      }
 
     case order: Order =>
       checkAssetPair(order) {

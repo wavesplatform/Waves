@@ -17,8 +17,6 @@ package object history {
   val DefaultBaseTarget           = 1000L
   val DefaultBlockchainSettings = BlockchainSettings(
     addressSchemeCharacter = 'N',
-    maxTransactionsPerBlockDiff = MaxTransactionsPerBlockDiff,
-    minBlocksInMemory = MaxBlocksInMemory,
     functionalitySettings = TestFunctionalitySettings.Enabled,
     genesisSettings = null
   )

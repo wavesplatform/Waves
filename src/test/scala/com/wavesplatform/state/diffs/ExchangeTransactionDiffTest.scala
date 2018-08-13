@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import cats._
+import cats.{Order => _, _}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
@@ -14,12 +14,15 @@ import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.transaction.ValidationError.AccountBalanceError
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.{GenesisTransaction, ValidationError}
 
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
+
+  val fs = TestFunctionalitySettings.Enabled.copy(
+    preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.SmartAccountsTrades.id -> 0))
 
   property("preserves waves invariant, stores match info, rewards matcher") {
 
@@ -38,7 +41,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(preconditionsAndExchange) {
       case ((gen1, gen2, issue1, issue2, exchange)) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1, issue2))), TestBlock.create(Seq(exchange))) {
+        assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1, issue2))), TestBlock.create(Seq(exchange)), fs) {
           case (blockDiff, state) =>
             val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
             totalPortfolioDiff.balance shouldBe 0
@@ -68,7 +71,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
       maybeAsset1              <- Gen.option(issue1.id())
       maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
-      exchange                 <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
+      exchange                 <- exchangeV1GeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
     } yield (gen1, gen2, setScript, issue1, issue2, exchange)
 
     forAll(preconditionsAndExchange) {
@@ -86,14 +89,19 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       gen1: GenesisTransaction = GenesisTransaction.create(buyer, 1 * Constants.UnitsInWave, ts).explicitGet()
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).explicitGet()
       issue1: IssueTransactionV1 <- issueGen(buyer)
-      exchange                   <- exchangeGeneratorP(buyer, seller, None, Some(issue1.id()), fixedMatcherFee = Some(300000))
-    } yield (gen1, gen2, issue1, exchange)
+      exchange <- Gen.oneOf(
+        exchangeV1GeneratorP(buyer, seller, None, Some(issue1.id()), fixedMatcherFee = Some(300000)),
+        exchangeV2GeneratorP(buyer, seller, None, Some(issue1.id()), fixedMatcherFee = Some(300000))
+      )
+    } yield {
+      (gen1, gen2, issue1, exchange)
+    }
 
     forAll(preconditions) {
       case ((gen1, gen2, issue1, exchange)) =>
         whenever(exchange.amount > 300000) {
-          assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(exchange))) {
-            case (blockDiff, state) =>
+          assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(exchange)), fs) {
+            case (blockDiff, _) =>
               val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
               totalPortfolioDiff.balance shouldBe 0
               totalPortfolioDiff.effectiveBalance shouldBe 0
@@ -108,10 +116,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
   def createExTx(buy: Order, sell: Order, price: Long, matcher: PrivateKeyAccount, ts: Long): Either[ValidationError, ExchangeTransaction] = {
     val mf     = buy.matcherFee
     val amount = math.min(buy.amount, sell.amount)
-    ExchangeTransaction.create(
+    ExchangeTransactionV1.create(
       matcher = matcher,
-      buyOrder = buy,
-      sellOrder = sell,
+      buyOrder = buy.asInstanceOf[OrderV1],
+      sellOrder = sell.asInstanceOf[OrderV1],
       price = price,
       amount = amount,
       buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
@@ -142,7 +150,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         val buy       = Order.buy(buyer, matcher, assetPair, price, 1000000L, Ts, Ts + 1, MatcherFee)
         val sell      = Order.sell(seller, matcher, assetPair, price, 1L, Ts, Ts + 1, MatcherFee)
         val tx        = createExTx(buy, sell, price, matcher, Ts).explicitGet()
-        assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(tx))) {
+        assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(tx)), fs) {
           case (blockDiff, state) =>
             blockDiff.portfolios(tx.sender).balance shouldBe tx.buyMatcherFee + tx.sellMatcherFee - tx.fee
             state.portfolio(tx.sender).balance shouldBe 0L
@@ -171,7 +179,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         val buy       = Order.buy(buyer, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
         val sell      = Order.sell(seller, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
         val tx        = createExTx(buy, sell, price, matcher, Ts).explicitGet()
-        assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(tx))) { totalDiffEi =>
+        assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(tx)), fs) { totalDiffEi =>
           inside(totalDiffEi) {
             case Left(TransactionValidationError(AccountBalanceError(errs), _)) =>
               errs should contain key seller.toAddress

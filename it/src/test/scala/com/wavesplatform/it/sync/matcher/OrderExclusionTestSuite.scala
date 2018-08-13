@@ -47,7 +47,7 @@ class OrderExclusionTestSuite
     "sell order could be placed and status it's correct" in {
       // Alice places sell order
       val aliceOrder = matcherNode
-        .placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 500, 70.seconds)
+        .placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 500, 2: Byte, 70.seconds)
 
       aliceOrder.status shouldBe "OrderAccepted"
 

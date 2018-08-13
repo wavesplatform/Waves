@@ -6,7 +6,7 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, ExchangeTransactionV1, Order, OrderV1}
 
 object SignedExchangeRequest {
   implicit val orderFormat: Format[Order]                                 = com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
@@ -38,6 +38,14 @@ case class SignedExchangeRequest(@ApiModelProperty(value = "Base58 encoded sende
     for {
       _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-      _t         <- ExchangeTransaction.create(order1, order2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, _signature)
+      _t <- ExchangeTransactionV1.create(order1.asInstanceOf[OrderV1],
+                                         order2.asInstanceOf[OrderV1],
+                                         price,
+                                         amount,
+                                         buyMatcherFee,
+                                         sellMatcherFee,
+                                         fee,
+                                         timestamp,
+                                         _signature)
     } yield _t
 }

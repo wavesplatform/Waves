@@ -132,11 +132,7 @@ object GenesisSettings {
   )
 }
 
-case class BlockchainSettings(addressSchemeCharacter: Char,
-                              maxTransactionsPerBlockDiff: Int,
-                              minBlocksInMemory: Int,
-                              functionalitySettings: FunctionalitySettings,
-                              genesisSettings: GenesisSettings)
+case class BlockchainSettings(addressSchemeCharacter: Char, functionalitySettings: FunctionalitySettings, genesisSettings: GenesisSettings)
 
 object BlockchainType extends Enumeration {
   val TESTNET = Value("TESTNET")
@@ -163,8 +159,6 @@ object BlockchainSettings {
 
     BlockchainSettings(
       addressSchemeCharacter = addressSchemeCharacter,
-      maxTransactionsPerBlockDiff = config.as[Int](s"$configPath.max-transactions-per-block-diff"),
-      minBlocksInMemory = config.as[Int](s"$configPath.min-blocks-in-memory"),
       functionalitySettings = functionalitySettings,
       genesisSettings = genesisSettings
     )

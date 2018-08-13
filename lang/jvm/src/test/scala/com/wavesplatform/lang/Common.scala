@@ -1,15 +1,17 @@
 package com.wavesplatform.lang
 
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext}
-import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import monix.eval.Coeval
 import org.scalacheck.Shrink
 import org.scalatest.matchers.{MatchResult, Matcher}
+import shapeless.{:+:, CNil}
 
 import scala.util.{Left, Right, Try}
 
@@ -46,24 +48,31 @@ object Common {
   val pointTypeA = CaseType("PointA", List("X"  -> LONG, "YA" -> LONG))
   val pointTypeB = CaseType("PointB", List("X"  -> LONG, "YB" -> LONG))
   val pointTypeC = CaseType("PointC", List("YB" -> LONG))
+  val pointTypeD = CaseType("PointD", List("YB" -> UNION(LONG, UNIT)))
 
   val AorB    = UNION(pointTypeA.typeRef, pointTypeB.typeRef)
   val AorBorC = UNION(pointTypeA.typeRef, pointTypeB.typeRef, pointTypeC.typeRef)
   val BorC    = UNION(pointTypeB.typeRef, pointTypeC.typeRef)
+  val CorD    = UNION(pointTypeC.typeRef, pointTypeD.typeRef)
 
-  val pointAInstance = CaseObj(pointTypeA.typeRef, Map("X"  -> 3L, "YA" -> 40L))
-  val pointBInstance = CaseObj(pointTypeB.typeRef, Map("X"  -> 3L, "YB" -> 41L))
-  val pointCInstance = CaseObj(pointTypeC.typeRef, Map("YB" -> 42L))
+  val pointAInstance     = CaseObj(pointTypeA.typeRef, Map("X" -> 3L, "YA" -> 40L))
+  val pointBInstance     = CaseObj(pointTypeB.typeRef, Map("X" -> 3L, "YB" -> 41L))
+  val pointCInstance     = CaseObj(pointTypeC.typeRef, Map("YB" -> 42L))
+  val pointDInstance1    = CaseObj(pointTypeD.typeRef, Map("YB" -> 43L))
+  private val unit: Unit = ()
+  val pointDInstance2    = CaseObj(pointTypeD.typeRef, Map("YB" -> unit))
 
-  val sampleTypes = Seq(pointTypeA, pointTypeB, pointTypeC) ++ Seq(UnionType("PointAB", AorB.l), UnionType("PointBC", BorC.l))
+  val sampleTypes = Seq(pointTypeA, pointTypeB, pointTypeC, pointTypeD) ++ Seq(UnionType("PointAB", AorB.l),
+                                                                               UnionType("PointBC", BorC.l),
+                                                                               UnionType("PointCD", CorD.l))
 
   def sampleUnionContext(instance: CaseObj) =
     EvaluationContext.build(Map.empty, Map("p" -> LazyVal(EitherT.pure(instance))), Seq.empty)
 
-  def emptyBlockchainEnvironment(h: Int = 1, tx: Coeval[Tx] = Coeval(???), nByte: Byte = 'T'): Environment = new Environment {
+  def emptyBlockchainEnvironment(h: Int = 1, in: Coeval[Tx :+: Ord :+: CNil] = Coeval(???), nByte: Byte = 'T'): Environment = new Environment {
     override def height: Int       = h
     override def networkByte: Byte = nByte
-    override def transaction: Tx   = tx()
+    override def inputEntity       = in()
 
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
     override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???

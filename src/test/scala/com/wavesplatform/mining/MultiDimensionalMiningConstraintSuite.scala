@@ -23,7 +23,7 @@ class MultiDimensionalMiningConstraintSuite
         if isLeft || isRight
         leftMaxSize  <- if (isLeft) Gen.const(0) else Gen.chooseNum(1, Int.MaxValue)
         rightMaxSize <- if (isRight) Gen.const(0) else Gen.chooseNum(1, Int.MaxValue)
-      } yield MultiDimensionalMiningConstraint(createConstConstraint(leftMaxSize), createConstConstraint(rightMaxSize))
+      } yield MultiDimensionalMiningConstraint(createConstConstraint(leftMaxSize, 1), createConstConstraint(rightMaxSize, 1))
 
       "should be true if one dimension is empty" in forAll(emptyConstraintGen) { constraint =>
         constraint.isEmpty shouldBe true
@@ -33,7 +33,7 @@ class MultiDimensionalMiningConstraintSuite
       val nonEmptyConstraintGen: Gen[MultiDimensionalMiningConstraint] = for {
         leftMaxSize  <- Gen.chooseNum(1, Int.MaxValue)
         rightMaxSize <- Gen.chooseNum(1, Int.MaxValue)
-      } yield MultiDimensionalMiningConstraint(createConstConstraint(leftMaxSize), createConstConstraint(rightMaxSize))
+      } yield MultiDimensionalMiningConstraint(createConstConstraint(leftMaxSize, 1), createConstConstraint(rightMaxSize, 1))
 
       "should be false is both of two dimensions are non-empty" in forAll(nonEmptyConstraintGen) { constraint =>
         constraint.isEmpty shouldBe false
