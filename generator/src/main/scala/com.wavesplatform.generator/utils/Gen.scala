@@ -3,7 +3,7 @@ package com.wavesplatform.generator.utils
 import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.generator.utils.Implicits._
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -14,23 +14,28 @@ import scorex.crypto.signatures.Curve25519._
 object Gen {
   private def random = ThreadLocalRandom.current
 
-  def oracleScript(oracle: PrivateKeyAccount): Script = {
+  def oracleScript(oracle: PrivateKeyAccount, data: Set[DataEntry[_]]): Script = {
+    val conditions =
+      data.map {
+        case IntegerDataEntry(key, value) => s"""(extract(getInteger(oracle, "$key")) == $value)"""
+        case BooleanDataEntry(key, _)     => s"""extract(getBoolean(oracle, "$key"))"""
+        case BinaryDataEntry(key, value)  => s"""(extract(getBinary(oracle, "$key")) == $value)"""
+        case StringDataEntry(key, value)  => s"""(extract(getString(oracle, "$key")) == "$value")"""
+      } reduce [String] { case (l, r) => s"$l && $r " }
+
     val src =
       s"""
-        |let oracle = Address(base58'${oracle.address}')
-        |
-        |match tx {
-        |  case t: TransferTransaction =>
-        |    let enabled = extract(getBoolean(oracle,"transfers"))
-        |    enabled
-        |  case _: SetScriptTransaction => true
-        |  case _ => false
-        |}
-      """.stripMargin
+         |let oracle = Address(base58'${oracle.address}')
+         |
+         |match tx {
+         |  case _: SetScriptTransaction => true
+         |  case _                       => $conditions
+         |}
+       """.stripMargin
 
-    val (script, _) = ScriptCompiler(src).explicitGet()
+    val script = ScriptCompiler(src).explicitGet()
 
-    script
+    script._1
   }
 
   def multiSigScript(owners: Seq[PrivateKeyAccount], requiredProofsCount: Int): Script = {

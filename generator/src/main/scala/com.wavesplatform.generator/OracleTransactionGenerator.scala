@@ -1,14 +1,14 @@
 package com.wavesplatform.generator
 
 import cats.Show
+import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.generator.OracleTransactionGenerator.Settings
 import com.wavesplatform.generator.utils.Gen
-import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.transaction.{DataTransaction, Transaction}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.it.util._
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
+import com.wavesplatform.transaction.{DataTransaction, Transaction}
 
 class OracleTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKeyAccount]) extends TransactionGenerator {
   override def next(): Iterator[Transaction] = generate(settings).toIterator
@@ -22,16 +22,16 @@ class OracleTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
 
     val enoughFee = 0.005.waves
 
-    val setScript =
+    val setScript: Transaction =
       SetScriptTransaction
         .selfSigned(1, scriptedAccount, Some(script), enoughFee, System.currentTimeMillis())
         .explicitGet()
 
-    val setFlag = DataTransaction
-      .selfSigned(1, oracle, List(BooleanDataEntry("transfers", settings.enabled)), enoughFee, System.currentTimeMillis())
+    val setDataTx: Transaction = DataTransaction
+      .selfSigned(1, oracle, settings.requiredData.toList, enoughFee, System.currentTimeMillis())
       .explicitGet()
 
-    val transactions =
+    val transactions: List[Transaction] =
       List
         .fill(settings.transactions) {
           TransferTransactionV1
@@ -48,17 +48,17 @@ class OracleTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
             .explicitGet()
         }
 
-    setScript +: setFlag +: transactions
+    setScript +: setDataTx +: transactions
   }
 }
 
 object OracleTransactionGenerator {
-  final case class Settings(transactions: Int, enabled: Boolean)
+  final case class Settings(transactions: Int, requiredData: Set[DataEntry[_]])
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>
-      s"Transactions: ${x.transactions}" +
-        s"Enabled: ${x.enabled}"
+      s"Transactions: ${x.transactions}\n" +
+        s"DataEntries: ${x.requiredData}\n"
     }
   }
 }
