@@ -78,13 +78,13 @@ object Verifier {
       blockchain
         .accountScript(sellOrder.sender.toAddress)
         .map(verifyOrder(blockchain, _, height, sellOrder))
-        .getOrElse(Order.validateOrderProofsAsSignature(sellOrder))
+        .getOrElse(verifyAsEllipticCurveSignature(sellOrder))
 
     lazy val buyerOrderVerification =
       blockchain
         .accountScript(buyOrder.sender.toAddress)
         .map(verifyOrder(blockchain, _, height, buyOrder))
-        .getOrElse(Order.validateOrderProofsAsSignature(buyOrder))
+        .getOrElse(verifyAsEllipticCurveSignature(buyOrder))
 
     for {
       _ <- matcherTxVerification
@@ -93,7 +93,7 @@ object Verifier {
     } yield et
   }
 
-  def verifyAsEllipticCurveSignature(pt: ProvenTransaction): Either[ValidationError, ProvenTransaction] =
+  def verifyAsEllipticCurveSignature[T <: Proven with Authorized](pt: T): Either[ValidationError, T] =
     pt.proofs.proofs match {
       case p :: Nil =>
         Either.cond(crypto.verify(p.arr, pt.bodyBytes(), pt.sender.publicKey),

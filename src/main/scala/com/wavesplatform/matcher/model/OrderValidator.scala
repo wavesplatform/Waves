@@ -10,6 +10,7 @@ import com.wavesplatform.transaction.AssetAcc
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.utils.NTP
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -45,8 +46,8 @@ trait OrderValidator {
 
   def validateNewOrder(order: Order): Either[GenericError, Order] = {
     val orderSignatureVerification =
-      Order
-        .validateOrderProofsAsSignature(order)
+      Verifier
+        .verifyAsEllipticCurveSignature(order)
         .map(_ => ())
         .leftMap(_.toString)
 

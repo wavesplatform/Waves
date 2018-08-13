@@ -285,16 +285,4 @@ object Order {
     assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
   }
 
-  def validateOrderProofsAsSignature(o: Order): Either[ValidationError, Order] = {
-    o.proofs.proofs.headOption
-      .toRight(GenericError("Proofs cannot be empty"))
-      .flatMap(bystr => {
-        Either
-          .cond(
-            crypto.verify(bystr.arr, o.bodyBytes(), o.sender.publicKey),
-            o,
-            GenericError("Proofs cannot be verified as signature")
-          )
-      })
-  }
 }

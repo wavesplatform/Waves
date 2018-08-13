@@ -9,6 +9,7 @@ import com.wavesplatform.utils.NTP
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import com.wavesplatform.OrderOps._
+import com.wavesplatform.transaction.smart.Verifier
 
 class OrderSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with ValidationMatcher {
 
@@ -95,25 +96,26 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
   property("Order signature validation") {
     forAll(orderGen, accountGen) {
       case (order, pka) =>
-        Order.validateOrderProofsAsSignature(order) shouldBe an[Right[_, _]]
-        Order.validateOrderProofsAsSignature(order.updateSender(pka)) should produce("Proofs cannot be verified as signature")
-        Order.validateOrderProofsAsSignature(order.updateMatcher(pka)) should produce("Proofs cannot be verified as signature")
+        Verifier.verifyAsEllipticCurveSignature(order) shouldBe an[Right[_, _]]
+        Verifier.verifyAsEllipticCurveSignature(order.updateSender(pka)) should produce("Proofs cannot be verified as signature")
+        Verifier.verifyAsEllipticCurveSignature(order.updateMatcher(pka)) should produce("Proofs cannot be verified as signature")
         val assetPair = order.assetPair
-        Order.validateOrderProofsAsSignature(
+        Verifier.verifyAsEllipticCurveSignature(
           order
             .updatePair(assetPair.copy(
               amountAsset = assetPair.amountAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_))))) should produce(
           "Proofs cannot be verified as signature")
-        Order.validateOrderProofsAsSignature(order
+        Verifier.verifyAsEllipticCurveSignature(order
           .updatePair(assetPair.copy(priceAsset = assetPair.priceAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_))))) should produce(
           "Proofs cannot be verified as signature")
-        Order.validateOrderProofsAsSignature(order.updateType(OrderType.reverse(order.orderType))) should produce("Proofs cannot be verified as signature")
-        Order.validateOrderProofsAsSignature(order.updatePrice(order.price + 1)) should produce("Proofs cannot be verified as signature")
-        Order.validateOrderProofsAsSignature(order.updateAmount(order.amount + 1)) should produce("Proofs cannot be verified as signature")
-        Order.validateOrderProofsAsSignature(order.updateExpiration(order.expiration + 1)) should produce("Proofs cannot be verified as signature")
-        Order.validateOrderProofsAsSignature(order.updateFee(order.matcherFee + 1)) should produce("Proofs cannot be verified as signature")
-        Order.validateOrderProofsAsSignature(order.updateProofs(Proofs(Seq(ByteStr(pka.publicKey ++ pka.publicKey))))) should produce(
+        Verifier.verifyAsEllipticCurveSignature(order.updateType(OrderType.reverse(order.orderType))) should produce(
           "Proofs cannot be verified as signature")
+        Verifier.verifyAsEllipticCurveSignature(order.updatePrice(order.price + 1)) should produce("Proofs cannot be verified as signature")
+        Verifier.verifyAsEllipticCurveSignature(order.updateAmount(order.amount + 1)) should produce("Proofs cannot be verified as signature")
+        Verifier.verifyAsEllipticCurveSignature(order.updateExpiration(order.expiration + 1)) should produce("Proofs cannot be verified as signature")
+        Verifier.verifyAsEllipticCurveSignature(order.updateFee(order.matcherFee + 1)) should produce("Proofs cannot be verified as signature")
+        Verifier.verifyAsEllipticCurveSignature(order.updateProofs(Proofs(Seq(ByteStr(pka.publicKey ++ pka.publicKey))))) should produce(
+          "proof doesn't validate as signature")
     }
   }
 
