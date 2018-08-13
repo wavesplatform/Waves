@@ -201,6 +201,8 @@ object Order {
     (BigDecimal(settledTotal) / price * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
   }
 
+  def correctAmount(o: Order): Long = correctAmount(o.amount, o.price)
+
   def buy(sender: PrivateKeyAccount,
           matcher: PublicKeyAccount,
           pair: AssetPair,

@@ -33,26 +33,13 @@ trait OrderValidator {
 
     val b: Map[Option[ByteStr], Long] = Seq(lo.spentAcc, lo.feeAcc).map(a => a.assetId -> spendableBalance(a)).toMap
 
-    val fakeOrderInfo: OrderInfo = ??? //Events.collectChanges(OrderAdded(lo))(lo.order.id())._2
-    val openPortfolioForNewOrder =
-      Events.orderInfoDiff(lo.order, OrderInfo.empty, fakeOrderInfo).getOrElse(order.senderPublicKey, OpenPortfolio.empty)
+    val newOrder = Events.createOpenPortfolio(OrderAdded(lo)).getOrElse(order.senderPublicKey, OpenPortfolio.empty)
+    val open     = b.keySet.map(id => id -> orderHistory.openVolume(order.senderPublicKey, id)).toMap
+    val needs    = OpenPortfolio(open).combine(newOrder)
 
-    // TODO fee
-    val open  = b.keySet.map(id => id -> orderHistory.openVolume(order.senderPublicKey, id)).toMap
-    val needs = OpenPortfolio(open).combine(openPortfolioForNewOrder)
+    val res: Boolean = b.combine(needs.orders.mapValues(-_)).forall(_._2 >= 0)
 
-    val rest = Monoid.combineAll(
-      Seq(
-        b,
-        needs.orders.mapValues(-_),
-        Map(
-          lo.feeAsset -> (if (lo.rcvAsset == lo.feeAsset) lo.getReceiveAmount else 0L)
-        )
-      )
-    )
-    val res: Boolean = rest.forall(_._2 >= 0)
-
-    res :| s"Not enough tradable balance: ${b.combine(open.mapValues(-_))}, needs: $openPortfolioForNewOrder"
+    res :| s"Not enough tradable balance: ${b.combine(open.mapValues(-_))}, needs: $newOrder"
   }
 
   def getTradableBalance(acc: AssetAcc): Long = timer.refine("action" -> "tradableBalance").measure {

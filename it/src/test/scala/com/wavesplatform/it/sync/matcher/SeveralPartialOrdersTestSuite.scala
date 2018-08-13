@@ -62,8 +62,8 @@ class SeveralPartialOrdersTestSuite
       val bobOrder   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, price, sellOrderAmount)
       val bobOrderId = matcherNode.placeOrder(bobOrder).message.id
       matcherNode.waitOrderStatus(wavesUsdPair, bobOrderId, "Accepted", 1.minute)
-      matcherNode.reservedBalance(bobNode)("WAVES") shouldBe correctAmount(sellOrderAmount, price) + matcherFee
-      matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES") shouldBe bobWavesBalanceBefore - (correctedSellAmount + matcherFee)
+      matcherNode.reservedBalance(bobNode)("WAVES") shouldBe sellOrderAmount + matcherFee
+      matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES") shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
 
       val aliceOrder   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, price, buyOrderAmount)
       val aliceOrderId = matcherNode.placeOrder(aliceOrder).message.id
@@ -124,12 +124,10 @@ class SeveralPartialOrdersTestSuite
   }
 
   def correctAmount(a: Long, price: Long): Long = {
-    val min = (BigDecimal(Order.PriceConstant) / price).setScale(0, RoundingMode.CEILING)
-    if (min > 0)
-      Try(((BigDecimal(a) / min).toBigInt() * min.toBigInt()).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
-    else
-      a
+    val settledTotal = (BigDecimal(price) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
+    (BigDecimal(settledTotal) / price * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
   }
+
   def receiveAmount(ot: OrderType, matchPrice: Long, matchAmount: Long): Long =
     if (ot == BUY) correctAmount(matchAmount, matchPrice)
     else {

@@ -26,12 +26,15 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
   private def combine(order: Order, event: Event, curr: OrderInfo, diff: OrderInfoDiff): OrderInfo = {
     val r =
       if (diff.isNew) {
+        val executedAmount = diff.executedAmount.getOrElse(0L)
+        val remainingFee   = order.matcherFee - diff.totalExecutedFee.getOrElse(order.matcherFee)
         OrderInfo(
           amount = order.amount,
-          filled = diff.executedAmount.getOrElse(0L),
+          filled = executedAmount,
           canceled = diff.nowCanceled.getOrElse(false),
           minAmount = diff.newMinAmount,
-          remainingFee = order.matcherFee - diff.totalExecutedFee.getOrElse(order.matcherFee)
+          remainingFee = remainingFee,
+          remainingSpend = LimitOrder(order).partial(order.amount - executedAmount, remainingFee).getSpendAmount
         )
       } else {
         OrderInfo(
@@ -39,7 +42,8 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
           filled = curr.filled + diff.executedAmount.getOrElse(0L),
           canceled = diff.nowCanceled.getOrElse(curr.canceled),
           minAmount = diff.newMinAmount.orElse(curr.minAmount),
-          remainingFee = order.matcherFee - diff.totalExecutedFee.getOrElse(curr.remainingFee)
+          remainingFee = order.matcherFee - diff.totalExecutedFee.getOrElse(curr.remainingFee),
+          remainingSpend = diff.remainingSpend.getOrElse(curr.remainingSpend)
         )
       }
 
@@ -124,12 +128,26 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
   def orderAccepted(event: OrderAdded): Unit = db.readWrite { rw =>
     val lo = event.order
     saveOrder(rw, lo.order)
-    val newOrders = saveOrderInfo(rw, event)
-    val opDiff    = Events.createOpenPortfolio(event)
+
+    val prevOrderInfo    = OrderInfo(lo.order.amount, 0L, false, Some(lo.minAmountOfAmountAsset), lo.order.matcherFee, lo.getSpendAmount)
+    val newOrders        = saveOrderInfo(rw, event)
+    val updatedOrderInfo = orderInfo(lo.order.id())
+
+    //val opDiff          = Events.createOpenPortfolio(event)
+    val opDiff = orderInfoDiffNew(
+      lo.order,
+      updatedOrderInfo
+    )
+    val opOrderInfoDiff = orderInfoDiff(lo.order, prevOrderInfo, updatedOrderInfo)
     println(s"""|
                 |orderAccepted:
                 |opDiff:
                 |${toString(opDiff)}
+                |
+                |opOrderInfoDiff:
+                |${toString(opOrderInfoDiff)}
+                |
+                |
                 |""".stripMargin)
     saveOpenVolume(rw, opDiff)
 
@@ -144,15 +162,47 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
     }
   }
 
+  def toString(x: OrderInfo): String = {
+    s"""|$x
+        |remaining: ${x.remaining}
+        |remainingFee: ${x.remainingFee}""".stripMargin
+  }
+
   def orderExecuted(event: OrderExecuted): Unit = db.readWrite { rw =>
     saveOrder(rw, event.submitted.order)
+    val prevCounterInfo = orderInfo(event.counter.order.id())
+    val prevSubmittedInfo = OrderInfo(event.submitted.order.amount,
+                                      0L,
+                                      false,
+                                      Some(event.submitted.minAmountOfAmountAsset),
+                                      event.submitted.order.matcherFee,
+                                      event.submitted.getSpendAmount)
     saveOrderInfo(rw, event)
+    val updatedCounterInfo   = orderInfo(event.counter.order.id())
+    val updatedSubmittedInfo = orderInfo(event.submitted.order.id())
 
     val submittedAddedOpDiff = Events.createOpenPortfolio(OrderAdded(event.submitted)) // ?
     val eventDiff            = Events.createOpenPortfolio(event)                       // ?
     //val diff            = createOpenPortfolio(event)
-    val opDiff          = Monoid.combine(submittedAddedOpDiff, eventDiff)
+    val opDiff = Monoid
+      .combine(submittedAddedOpDiff, eventDiff)
+//      .updated(
+//        event.counter.order.senderPublicKey.toAddress,
+//        opOrderInfoDiff(event.counter.order.senderPublicKey.toAddress)
+//      )
     val submittedStatus = orderInfo(event.submitted.order.id()).status
+    // worked for OHS - Buy WAVES order - filled with 2 steps, sell order - partial
+    val submittedOpOrderInfoDiff = orderInfoDiffNew(
+      event.submitted.order,
+      updatedSubmittedInfo
+    )
+    // leads to -1
+    // val submittedOpOrderInfoDiff = Events.createOpenPortfolio(OrderAdded(event.submittedRemaining))
+    val counterInfoDiff = orderInfoDiff(event.counter.order, prevCounterInfo, updatedCounterInfo)
+    val opOrderInfoDiff = Monoid.combine(
+      counterInfoDiff,
+      if (submittedStatus.isFinal) Map.empty[Address, OpenPortfolio] else submittedOpOrderInfoDiff
+    )
     println(s"""|
                 |orderExecuted:
                 |
@@ -165,6 +215,24 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
                 |opDiff:
                 |${toString(opDiff)}
                 |
+                |opOrderInfoDiff:
+                |${toString(opOrderInfoDiff)}
+                |
+                |submittedOpOrderInfoDiff:
+                |${toString(submittedOpOrderInfoDiff)}
+                |
+                |counterInfoDiff:
+                |${toString(counterInfoDiff)}
+                |
+                |prevCounterInfo:
+                |${toString(prevCounterInfo)}
+                |
+                |updatedCounterInfo:
+                |${toString(updatedCounterInfo)}
+                |
+                |updatedSubmittedInfo:
+                |${toString(updatedSubmittedInfo)}
+                |
                 |event.counter (id=${event.counter.order.id()}): ${event.counter}
                 |event.counterRemainingAmount: ${event.counterRemainingAmount}
                 |event.counterRemainingFee: ${event.counterRemainingFee}
@@ -176,7 +244,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
                 |submittedStatus: $submittedStatus
                 |""".stripMargin)
 
-    saveOpenVolume(rw, opDiff)
+    saveOpenVolume(rw, opOrderInfoDiff)
 
     if (!submittedStatus.isFinal) {
       import event.submitted.{order => submittedOrder}

@@ -12,9 +12,10 @@ case class OrderInfoDiff(isNew: Boolean = false,
                          executedAmount: Option[Long] = None,
                          nowCanceled: Option[Boolean] = None,
                          newMinAmount: Option[Long] = None,
-                         totalExecutedFee: Option[Long] = None)
+                         totalExecutedFee: Option[Long] = None,
+                         remainingSpend: Option[Long] = None)
 
-case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: Option[Long], remainingFee: Long) {
+case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: Option[Long], remainingFee: Long, remainingSpend: Long) {
   def remaining: Long = if (canceled) 0L else amount - filled
 
   def status: LimitOrder.OrderStatus = {
@@ -34,7 +35,7 @@ object OrderInfo {
   def safeSum(x: Long, y: Long): Long         = Try(Math.addExact(x, y)).getOrElse(Long.MaxValue)
   implicit val longSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
 
-  val empty = OrderInfo(0L, 0L, false, None, 0L)
+  val empty = OrderInfo(0L, 0L, false, None, 0L, 0L)
 
   implicit val orderInfoFormat: Format[OrderInfo] = Json.format[OrderInfo]
 

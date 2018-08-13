@@ -23,19 +23,21 @@ object MatcherKeys {
     Option(_).fold[OrderInfo](OrderInfo.empty) { b =>
       val bb = ByteBuffer.wrap(b)
       b.length match {
-        case 17 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, None, 0)
-        case 33 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, Some(bb.getLong), bb.getLong)
+        case 17 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, None, 0, 0)
+        case 33 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, Some(bb.getLong), bb.getLong, 0) // TODO
+        case 41 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, Some(bb.getLong), bb.getLong, bb.getLong)
       }
 
     },
     oi =>
       ByteBuffer
-        .allocate(33)
+        .allocate(41)
         .putLong(oi.amount)
         .putLong(oi.filled)
         .put(if (oi.canceled) 1.toByte else 0.toByte)
         .putLong(oi.minAmount.getOrElse(0L))
         .putLong(oi.remainingFee)
+        .putLong(oi.remainingSpend)
         .array()
   )
 
