@@ -38,7 +38,7 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
 
       assetScript = s"""
                     |
-                    | match input {
+                    | match tx {
                     |   case ttx: TransferTransaction =>
                     |      let king = Address(base58'${king.address}')
                     |      let company = Address(base58'${company.address}')

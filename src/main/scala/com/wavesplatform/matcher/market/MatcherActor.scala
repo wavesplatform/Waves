@@ -6,6 +6,7 @@ import akka.pattern.ask
 import akka.persistence.{PersistentActor, RecoveryCompleted}
 import akka.routing.FromConfig
 import akka.util.Timeout
+import cats.implicits._
 import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
 import com.wavesplatform.matcher.MatcherSettings
@@ -126,17 +127,19 @@ class MatcherActor(orderHistory: ActorRef,
   }
 
   def checkOrderScript(o: Order)(f: => Unit): Unit = {
-    lazy val matcherScriptValidation: Either[ValidationError, Unit] =
+    lazy val matcherScriptValidation: Either[String, Unit] =
       blockchain
         .accountScript(o.matcherPublicKey.toAddress)
         .map(verify(_, o))
         .getOrElse(Right(()))
+        .leftMap(_ => "Order not allowed by matcher script")
 
-    lazy val senderScriptValidation: Either[ValidationError, Unit] =
+    lazy val senderScriptValidation: Either[String, Unit] =
       blockchain
         .accountScript(o.sender.toAddress)
         .map(verify(_, o))
         .getOrElse(Right(()))
+        .leftMap(_ => "Order not allowed by sender script")
 
     val validationResult = for {
       _ <- matcherScriptValidation
@@ -145,7 +148,7 @@ class MatcherActor(orderHistory: ActorRef,
 
     validationResult
       .fold(
-        err => sender() ! StatusCodeMatcherResponse(StatusCodes.Forbidden, err.toString),
+        err => sender() ! StatusCodeMatcherResponse(StatusCodes.Forbidden, err),
         _ => f
       )
   }

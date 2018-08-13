@@ -4,12 +4,13 @@ import cats.data.EitherT
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, UNIT}
+import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.orderObject
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.RealTransactionWrapper
 import monix.eval.Coeval
@@ -31,23 +32,35 @@ object MatcherContext {
       ("tx", (orderType.typeRef, LazyVal(EitherT(inputEntityCoeval))))
     )
 
-    def inaccessibleFunction(name: String) =
-      NativeFunction(name, 1, 1, UNIT, Seq.empty: _*) {
+    def inaccessibleFunction(name: String, internalName: Short): BaseFunction =
+      NativeFunction(name, 1, internalName, UNIT, Seq.empty: _*) {
         case _ =>
           s"Function ${name} is inaccessible when running script on matcher".asLeft
       }
 
-    val getIntegerF: BaseFunction           = inaccessibleFunction("getInteger")
-    val getBooleanF: BaseFunction           = inaccessibleFunction("getBoolean")
-    val getBinaryF: BaseFunction            = inaccessibleFunction("getBinary")
-    val getStringF: BaseFunction            = inaccessibleFunction("getString")
-    val txByIdF: BaseFunction               = inaccessibleFunction("txByIdF")
-    val txHeightByIdF: BaseFunction         = inaccessibleFunction("txHeightByIdF")
-    val addressFromPublicKeyF: BaseFunction = inaccessibleFunction("addressFromPublicKeyF")
-    val addressFromStringF: BaseFunction    = inaccessibleFunction("addressFromStringF")
-    val addressFromRecipientF: BaseFunction = inaccessibleFunction("addressFromRecipientF")
-    val assetBalanceF: BaseFunction         = inaccessibleFunction("assetBalanceF")
-    val wavesBalanceF: BaseFunction         = inaccessibleFunction("wavesBalanceF")
+    def inaccessibleUserFunction(name: String): BaseFunction = {
+      NativeFunction(
+        name,
+        1,
+        FunctionTypeSignature(UNIT, Seq.empty, FunctionHeader.User(name)),
+        ev = {
+          case _ =>
+            s"Function ${name} is inaccessible when running script on matcher".asLeft
+        }
+      )
+    }
+
+    val getIntegerF: BaseFunction           = inaccessibleFunction("getInteger", DATA_LONG)
+    val getBooleanF: BaseFunction           = inaccessibleFunction("getBoolean", DATA_BOOLEAN)
+    val getBinaryF: BaseFunction            = inaccessibleFunction("getBinary", DATA_BYTES)
+    val getStringF: BaseFunction            = inaccessibleFunction("getString", DATA_STRING)
+    val txByIdF: BaseFunction               = inaccessibleFunction("txByIdF", GETTRANSACTIONBYID)
+    val txHeightByIdF: BaseFunction         = inaccessibleFunction("txHeightByIdF", TRANSACTIONHEIGHTBYID)
+    val addressFromPublicKeyF: BaseFunction = inaccessibleUserFunction("addressFromPublicKeyF")
+    val addressFromStringF: BaseFunction    = inaccessibleUserFunction("addressFromStringF")
+    val addressFromRecipientF: BaseFunction = inaccessibleFunction("addressFromRecipientF", ADDRESSFROMRECIPIENT)
+    val assetBalanceF: BaseFunction         = inaccessibleFunction("assetBalanceF", ACCOUNTASSETBALANCE)
+    val wavesBalanceF: BaseFunction         = inaccessibleUserFunction("wavesBalanceF")
 
     val functions = Seq(
       txByIdF,
