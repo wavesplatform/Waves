@@ -124,12 +124,12 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
             val reissuable = r.nextBoolean()
             randomFrom(reissuableIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
-              logOption(ReissueTransactionV1.selfSigned(sender, assetTx.id(), Random.nextInt(Int.MaxValue), reissuable, moreThatStandartFee, ts))
+              logOption(ReissueTransactionV1.selfSigned(sender, assetTx.id(), Random.nextInt(Int.MaxValue), reissuable, 100000000L, ts))
             })
           case BurnTransactionV1 =>
             randomFrom(validIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
-              logOption(BurnTransactionV1.selfSigned(sender, assetTx.id(), Random.nextInt(1000), moreThatStandartFee, ts))
+              logOption(BurnTransactionV1.selfSigned(sender, assetTx.id(), Random.nextInt(1000), 100000000L, ts))
             })
           case ExchangeTransactionV1 =>
             val matcher   = randomFrom(accounts).get
@@ -188,7 +188,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
                                                      sender,
                                                      transfers.toList,
                                                      ts,
-                                                     100000 + 50000 * transferCount,
+                                                     200000 + 50000 * transferCount,
                                                      Array.fill(r.nextInt(100))(r.nextInt().toByte)))
             }
           case DataTransaction =>
@@ -197,23 +197,26 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
 
             val data = for {
               _ <- 0 until count
-              keyLen = r.nextInt(10)
-              key    = Random.nextString(keyLen)
-              etype  = r.nextInt(Type.maxId)
+              etype = r.nextInt(Type.maxId)
             } yield
               etype match {
-                case t if t == Type.Integer.id => IntegerDataEntry(key, r.nextLong)
-                case t if t == Type.Boolean.id => BooleanDataEntry(key, r.nextBoolean)
-                case t if t == Type.String.id  => StringDataEntry(key, r.nextLong.toString)
+                case t if t == Type.Integer.id => IntegerDataEntry(Random.nextString(10), r.nextLong)
+                case t if t == Type.Boolean.id => BooleanDataEntry(Random.nextString(10), r.nextBoolean)
+                case t if t == Type.String.id  => StringDataEntry(Random.nextString(10), r.nextLong.toString)
                 case t if t == Type.Binary.id =>
                   val size = r.nextInt(MaxValueSize + 1)
                   val b    = new Array[Byte](size)
                   r.nextBytes(b)
-                  BinaryDataEntry(key, ByteStr(b))
+                  BinaryDataEntry(Random.nextString(10), ByteStr(b))
               }
             val size = 128 + data.map(_.toBytes.length).sum
             val fee  = 100000 * (size / 1024 + 1)
             logOption(DataTransaction.selfSigned(1, sender, data.toList, fee, ts))
+          case SponsorFeeTransaction =>
+            randomFrom(validIssueTxs).flatMap(assetTx => {
+              val sender = accounts.find(_.address == assetTx.sender.address).get
+              logOption(SponsorFeeTransaction.selfSigned(1, sender, assetTx.id(), Some(Random.nextInt(1000)), 100000000L, ts))
+            })
         }
 
         (tx.map(tx => allTxsWithValid :+ tx).getOrElse(allTxsWithValid), tx match {
