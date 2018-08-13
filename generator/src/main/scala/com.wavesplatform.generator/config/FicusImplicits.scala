@@ -14,7 +14,10 @@ trait FicusImplicits {
     def toTxType(key: String): TransactionParser = TransactionParsers.by(converter.convert(key)).get
 
     CollectionReaders.mapValueReader[Double].map { xs =>
-      xs.map { case (k, v) => toTxType(k) -> v }
+      xs.map { case (k, v) => {
+        println(s"$k - $v")
+        toTxType(k) -> v
+      } }
     }
   }
 
