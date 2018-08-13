@@ -8,6 +8,7 @@ import play.api.libs.json._
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.utils.Base58
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
+import com.wavesplatform.transaction.smart.Verifier
 
 class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -111,7 +112,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         case s: JsSuccess[Order] =>
           val o = s.get
           o.json().toString() should be(json.toString())
-          o.signaturesValid().isRight should be(true)
+          Verifier.verifyAsEllipticCurveSignature(o) shouldBe 'right
       }
     }
   }

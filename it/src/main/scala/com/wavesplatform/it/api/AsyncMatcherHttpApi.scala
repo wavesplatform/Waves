@@ -6,14 +6,14 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.asynchttpclient.Dsl.{get => _get}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.Assertions
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json.Writes
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.transaction.Proofs
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -135,8 +135,7 @@ object AsyncMatcherHttpApi extends Assertions {
       val matcherPublicKey    = matcherNode.publicKey
       val unsigned =
         Order(sender.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, 300000, Proofs.empty, version)
-      val signature = crypto.sign(sender.privateKey, unsigned.bodyBytes())
-      unsigned.updateProofs(Proofs(Seq(ByteStr(signature))))
+      Order.sign(unsigned, sender.privateKey)
     }
 
     def placeOrder(order: Order): Future[MatcherResponse] =

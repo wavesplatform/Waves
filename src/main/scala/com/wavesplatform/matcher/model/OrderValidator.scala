@@ -1,17 +1,18 @@
 package com.wavesplatform.matcher.model
 
 import cats.implicits._
+import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.matcher.model.Events.OrderAdded
 import com.wavesplatform.state._
-import com.wavesplatform.utx.UtxPool
-import com.wavesplatform.account.PublicKeyAccount
-import com.wavesplatform.utils.NTP
 import com.wavesplatform.transaction.AssetAcc
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, Validation}
+import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.smart.Verifier
+import com.wavesplatform.utils.NTP
+import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 
 trait OrderValidator {
@@ -44,10 +45,16 @@ trait OrderValidator {
   }
 
   def validateNewOrder(order: Order): Either[GenericError, Order] = {
+    val orderSignatureVerification =
+      Verifier
+        .verifyAsEllipticCurveSignature(order)
+        .map(_ => ())
+        .leftMap(_.toString)
+
     val v =
       (order.matcherPublicKey == matcherPubKey) :| "Incorrect matcher public key" &&
         (order.expiration > NTP.correctedTime() + MinExpiration) :| "Order expiration should be > 1 min" &&
-        order.signaturesValid().isRight :| "signature should be valid" &&
+        orderSignatureVerification &&
         order.isValid(NTP.correctedTime()) &&
         (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
         (orderHistory.orderStatus(order.idStr()) == LimitOrder.NotFound) :| "Order is already accepted" &&
