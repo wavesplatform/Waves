@@ -10,10 +10,12 @@ import com.wavesplatform.transaction.ValidationError.Validation
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, toJson}
 import com.wavesplatform.utils.Base58
+import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import monix.eval.Coeval
 import play.api.libs.json.{Format, JsObject, JsValue, Json}
 import scorex.crypto.signatures.Curve25519._
 
+import scala.annotation.meta.field
 import scala.util.{Either, Failure, Success, Try}
 
 case class MassTransferTransaction private (version: Byte,
@@ -75,7 +77,12 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
 
   val MaxTransferCount = 100
 
-  case class Transfer(recipient: String, amount: Long)
+  @ApiModel
+  case class Transfer(@(ApiModelProperty @field)(dataType = "string",
+                                                 example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk",
+                                                 required = true,
+                                                 allowEmptyValue = false) recipient: String,
+                      @(ApiModelProperty @field)(dataType = "long", example = "3000000000", required = true, allowEmptyValue = false) amount: Long)
 
   case class ParsedTransfer(address: AddressOrAlias, amount: Long)
 
