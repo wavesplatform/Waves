@@ -365,7 +365,9 @@ case class MatcherApiRoute(wallet: Wallet,
     ))
   def orderStatus: Route = (path("orderbook" / AssetPairPM / ByteStrPM) & get) { (p, orderId) =>
     withAssetPair(p, redirectToInverse = true, s"/$orderId") { _ =>
-      val status = DBUtils.orderInfo(db, orderId).status
+      val info = DBUtils.orderInfo(db, orderId)
+      println(s"/orderbook/{amountAsset}/{priceAsset}/{orderId} (orderStatus) of $orderId: $info, status: ${info.status}")
+      val status = info.status
       val code   = if (status == LimitOrder.NotFound) StatusCodes.NotFound else StatusCodes.OK
       complete(code -> status.json)
     }

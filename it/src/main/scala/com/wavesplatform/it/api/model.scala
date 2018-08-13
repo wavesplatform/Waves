@@ -1,7 +1,6 @@
 package com.wavesplatform.it.api
 
 import play.api.libs.json.{Format, Json}
-import scorex.transaction.assets.exchange.OrderType
 
 // USCE no longer contains references to non-serializable Request/Response objects
 // to work around https://github.com/scalatest/scalatest/issues/556

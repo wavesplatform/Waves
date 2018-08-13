@@ -23,27 +23,27 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
   private val saveOrderInfoTimer  = timer.refine("action" -> "save-order-info")
   private val openVolumeTimer     = timer.refine("action" -> "open-volume")
 
-  private def combine(order: Order, event: Event, curr: OrderInfo, diff: OrderInfoDiff): OrderInfo = {
+  private def combine(order: Order, curr: OrderInfo, diff: OrderInfoDiff): OrderInfo = {
     val r =
       if (diff.isNew) {
-        val executedAmount = diff.executedAmount.getOrElse(0L)
-        val remainingFee   = order.matcherFee - diff.totalExecutedFee.getOrElse(order.matcherFee)
+        val executedAmount = curr.filled + diff.addExecutedAmount.getOrElse(0L)
+        val remainingFee   = order.matcherFee - diff.executedFee.getOrElse(0L)
         OrderInfo(
           amount = order.amount,
           filled = executedAmount,
           canceled = diff.nowCanceled.getOrElse(false),
           minAmount = diff.newMinAmount,
           remainingFee = remainingFee,
-          remainingSpend = LimitOrder(order).partial(order.amount - executedAmount, remainingFee).getSpendAmount
+          totalSpend = curr.totalSpend + diff.lastSpend.getOrElse(0L)
         )
       } else {
         OrderInfo(
           amount = order.amount,
-          filled = curr.filled + diff.executedAmount.getOrElse(0L),
+          filled = curr.filled + diff.addExecutedAmount.getOrElse(0L),
           canceled = diff.nowCanceled.getOrElse(curr.canceled),
           minAmount = diff.newMinAmount.orElse(curr.minAmount),
-          remainingFee = order.matcherFee - diff.totalExecutedFee.getOrElse(curr.remainingFee),
-          remainingSpend = diff.remainingSpend.getOrElse(curr.remainingSpend)
+          remainingFee = curr.remainingFee - diff.executedFee.getOrElse(0L),
+          totalSpend = curr.totalSpend + diff.lastSpend.getOrElse(0L)
         )
       }
 
@@ -58,7 +58,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
 
   private def saveOrderInfo(rw: RW, event: Event): Seq[Order] =
     saveOrderInfoTimer.measure(db.readWrite { rw =>
-      val diff = Events.collectChanges(event)
+      val diff = Events.collectChanges(rw, event)
 
       println(s"""
            |saveOrderInfo: ${diff.size} changes
@@ -67,7 +67,8 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
         case (o, d) =>
           val orderId  = o.id()
           val curr     = DBUtils.orderInfo(rw, orderId)
-          val combined = combine(o, event, curr, d)
+          val combined = combine(o, curr, d)
+          println(s"Saving new order info for $orderId: $combined")
           rw.put(MatcherKeys.orderInfo(orderId), combined)
           o
       }
@@ -126,10 +127,17 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
   private def saveOrder(rw: RW, order: Order): Unit = rw.put(MatcherKeys.order(order.id()), Some(order))
 
   def orderAccepted(event: OrderAdded): Unit = db.readWrite { rw =>
+    println(s"orderAccepted start: $event")
     val lo = event.order
     saveOrder(rw, lo.order)
 
-    val prevOrderInfo    = OrderInfo(lo.order.amount, 0L, false, Some(lo.minAmountOfAmountAsset), lo.order.matcherFee, lo.getSpendAmount)
+    // OrderAccepted sended after matchOrder!
+    println(s"orderAccepted for ${event.order.order.id()} prev order info: ${orderInfo(lo.order.id())}")
+    val prevOrderInfo = {
+      val x = orderInfo(lo.order.id())
+      if (x == OrderInfo.empty) OrderInfo(lo.order.amount, 0L, false, Some(lo.minAmountOfAmountAsset), lo.order.matcherFee, 0L)
+      else x
+    }
     val newOrders        = saveOrderInfo(rw, event)
     val updatedOrderInfo = orderInfo(lo.order.id())
 
@@ -160,6 +168,8 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
       val spendAssetId = if (o.orderType == OrderType.BUY) o.assetPair.priceAsset else o.assetPair.amountAsset
       rw.put(MatcherKeys.addressOrders(o.senderPublicKey, nextSeqNr), Some(OrderAssets(o.id(), spendAssetId)))
     }
+
+    println(s"orderAccepted end: $event")
   }
 
   def toString(x: OrderInfo): String = {
@@ -169,14 +179,9 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
   }
 
   def orderExecuted(event: OrderExecuted): Unit = db.readWrite { rw =>
+    println(s"orderExecuted start: $event")
     saveOrder(rw, event.submitted.order)
     val prevCounterInfo = orderInfo(event.counter.order.id())
-    val prevSubmittedInfo = OrderInfo(event.submitted.order.amount,
-                                      0L,
-                                      false,
-                                      Some(event.submitted.minAmountOfAmountAsset),
-                                      event.submitted.order.matcherFee,
-                                      event.submitted.getSpendAmount)
     saveOrderInfo(rw, event)
     val updatedCounterInfo   = orderInfo(event.counter.order.id())
     val updatedSubmittedInfo = orderInfo(event.submitted.order.id())
@@ -190,7 +195,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
 //        event.counter.order.senderPublicKey.toAddress,
 //        opOrderInfoDiff(event.counter.order.senderPublicKey.toAddress)
 //      )
-    val submittedStatus = orderInfo(event.submitted.order.id()).status
+    val submittedStatus = updatedSubmittedInfo.status
     // worked for OHS - Buy WAVES order - filled with 2 steps, sell order - partial
     val submittedOpOrderInfoDiff = orderInfoDiffNew(
       event.submitted.order,
@@ -237,11 +242,13 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
                 |event.counterRemainingAmount: ${event.counterRemainingAmount}
                 |event.counterRemainingFee: ${event.counterRemainingFee}
                 |
+                |counter status: ${updatedCounterInfo.status}
+                |
                 |event.submitted (id=${event.submitted.order.id()}): ${event.submitted}
                 |event.submittedRemainingAmount: ${event.submittedRemainingAmount}
                 |event.submittedRemainingFee: ${event.submittedRemainingFee}
                 |
-                |submittedStatus: $submittedStatus
+                |submitted status: $submittedStatus
                 |""".stripMargin)
 
     saveOpenVolume(rw, opOrderInfoDiff)
@@ -253,11 +260,23 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
       rw.put(k, nextSeqNr)
       rw.put(MatcherKeys.addressOrders(submittedOrder.senderPublicKey, nextSeqNr), Some(OrderAssets(submittedOrder.id(), event.submitted.spentAsset)))
     }
+    println(s"orderExecuted end: $event")
   }
 
   def orderCanceled(event: OrderCanceled): Unit = db.readWrite { rw =>
-    saveOrderInfo(rw, event)
-    saveOpenVolume(rw, Events.createOpenPortfolio(event))
+    println(s"orderCanceled start: $event")
+    saveOrderInfo(rw, event) // !!
+    val info = DBUtils.orderInfo(rw, event.limitOrder.order.id())
+    val opDiff = orderInfoDiffCancel(
+      event.limitOrder.order,
+      info
+    )
+    println(s"""|
+          |info: $info
+          |opDiff: $opDiff
+          |""".stripMargin)
+    saveOpenVolume(rw, opDiff) //Events.createOpenPortfolio(event)) // TODO
+    println(s"orderCanceled end: $event")
   }
 
   def orderInfo(id: ByteStr): OrderInfo = DBUtils.orderInfo(db, id)

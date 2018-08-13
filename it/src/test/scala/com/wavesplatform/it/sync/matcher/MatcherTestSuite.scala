@@ -208,9 +208,17 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         val aliceBalance   = aliceNode.accountBalances(aliceNode.address)._1
         val bobBalance     = bobNode.accountBalances(bobNode.address)._1
 
+        val orders1 = matcherNode.orderBook(aliceWavesPair)
+        log.debug(s"""|orderBook 1:
+                      |$orders1""".stripMargin)
+
         // Bob places buy order on amount bigger then left in sell orders
         val order5 = matcherNode.placeOrder(bobNode, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 130)
         order5.status should be("OrderAccepted")
+
+        val orders2 = matcherNode.orderBook(aliceWavesPair)
+        log.debug(s"""|orderBook 2:
+                      |$orders2""".stripMargin)
 
         // Check that the order is partially filled
         matcherNode.waitOrderStatus(aliceWavesPair, order5.message.id, "PartiallyFilled")

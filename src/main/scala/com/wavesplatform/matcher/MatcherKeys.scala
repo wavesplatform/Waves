@@ -37,7 +37,7 @@ object MatcherKeys {
         .put(if (oi.canceled) 1.toByte else 0.toByte)
         .putLong(oi.minAmount.getOrElse(0L))
         .putLong(oi.remainingFee)
-        .putLong(oi.remainingSpend)
+        .putLong(oi.totalSpend)
         .array()
   )
 

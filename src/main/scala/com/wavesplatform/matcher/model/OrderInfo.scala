@@ -9,13 +9,13 @@ import scorex.transaction.AssetId
 import scala.util.Try
 
 case class OrderInfoDiff(isNew: Boolean = false,
-                         executedAmount: Option[Long] = None,
+                         addExecutedAmount: Option[Long] = None,
                          nowCanceled: Option[Boolean] = None,
                          newMinAmount: Option[Long] = None,
-                         totalExecutedFee: Option[Long] = None,
-                         remainingSpend: Option[Long] = None)
+                         executedFee: Option[Long] = None,
+                         lastSpend: Option[Long] = None)
 
-case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: Option[Long], remainingFee: Long, remainingSpend: Long) {
+case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: Option[Long], remainingFee: Long, totalSpend: Long) {
   def remaining: Long = if (canceled) 0L else amount - filled
 
   def status: LimitOrder.OrderStatus = {

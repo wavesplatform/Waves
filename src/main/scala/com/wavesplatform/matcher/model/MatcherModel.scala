@@ -2,6 +2,8 @@ package com.wavesplatform.matcher.model
 
 import cats.Monoid
 import cats.implicits._
+import com.wavesplatform.database.RW
+import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.state.{ByteStr, Portfolio}
 import play.api.libs.json.{JsObject, JsValue, Json}
@@ -26,6 +28,7 @@ sealed trait LimitOrder {
   def order: Order
   def partial(amount: Long, fee: Long): LimitOrder
 
+  def getUncorrectedSpendAmount: Long
   def getSpendAmount: Long
   def getReceiveAmount: Long
 
@@ -56,12 +59,14 @@ case class BuyLimitOrder(price: Price, amount: Long, fee: Long, order: Order) ex
   def partial(amount: Long, fee: Long): LimitOrder = copy(amount = amount, fee = fee)
   def getReceiveAmount: Long                       = amountOfAmountAsset
   def getSpendAmount: Long                         = amountOfPriceAsset
+  def getUncorrectedSpendAmount: Long              = amountOfPriceAsset
 }
 
 case class SellLimitOrder(price: Price, amount: Long, fee: Long, order: Order) extends LimitOrder {
   def partial(amount: Long, fee: Long): LimitOrder = copy(amount = amount, fee = fee)
   def getReceiveAmount: Long                       = amountOfPriceAsset
   def getSpendAmount: Long                         = amountOfAmountAsset
+  def getUncorrectedSpendAmount: Long              = amount
 }
 
 object LimitOrder {
@@ -160,16 +165,18 @@ object Events {
     case class Changes(updatedPortfolio: Portfolio, changedAssets: Set[Option[AssetId]])
   }
 
-  def collectChanges(event: Event): Seq[(Order, OrderInfoDiff)] = {
+  def collectChanges(rw: RW, event: Event): Seq[(Order, OrderInfoDiff)] = {
     event match {
       case OrderAdded(lo) =>
         Seq(
           (lo.order,
-           OrderInfoDiff(isNew = true,
-                         executedAmount = Some(0L),
-                         totalExecutedFee = Some(0L),
-                         newMinAmount = Some(lo.minAmountOfAmountAsset),
-                         remainingSpend = Some(lo.getSpendAmount))))
+           OrderInfoDiff(
+             isNew = DBUtils.orderInfo(rw, lo.order.id()) == OrderInfo.empty, // TODO
+             addExecutedAmount = Some(0L),
+             executedFee = Some(0L),
+             newMinAmount = Some(lo.minAmountOfAmountAsset),
+             lastSpend = Some(0L)
+           )))
       case oe: OrderExecuted =>
         val submitted = oe.submittedExecuted
         val counter   = oe.counterExecuted
@@ -195,18 +202,19 @@ object Events {
           // Some(o1.minAmountOfAmountAsset)
           (submitted.order,
            OrderInfoDiff(
-             isNew = true,
-             executedAmount = Some(submitted.amountOfAmountAsset),
-             totalExecutedFee = Some(submitted.fee),
+             isNew = DBUtils.orderInfo(rw, submitted.order.id()) == OrderInfo.empty, // TODO
+             addExecutedAmount = Some(oe.executedAmount),
+             executedFee = Some(submitted.fee),
              newMinAmount = Some(submitted.minAmountOfAmountAsset),
-             remainingSpend = Some(oe.submittedRemaining.getSpendAmount) // ?
+             lastSpend = Some(submitted.getSpendAmount)
            )),
           (counter.order,
            OrderInfoDiff(
-             executedAmount = Some(counter.amountOfAmountAsset),
-             totalExecutedFee = Some(counter.fee),
+             isNew = DBUtils.orderInfo(rw, counter.order.id()) == OrderInfo.empty, // TODO
+             addExecutedAmount = Some(oe.executedAmount),
+             executedFee = Some(counter.fee),
              newMinAmount = Some(counter.minAmountOfAmountAsset),
-             remainingSpend = Some(oe.counterRemaining.getSpendAmount) // ?
+             lastSpend = Some(counter.getSpendAmount)
            ))
         )
       case OrderCanceled(lo, unmatchable) =>
@@ -273,7 +281,8 @@ object Events {
           Map(o2.order.senderPublicKey.toAddress -> op2)
         )
       case OrderCanceled(lo, unmatchable) =>
-        val feeDiff = if (!unmatchable && lo.feeAcc == lo.rcvAcc) math.max(lo.fee - lo.getReceiveAmount, 0L) else lo.fee
+        val feeDiff = if (unmatchable) 0L else if (lo.feeAcc == lo.rcvAcc) math.max(lo.fee - lo.getReceiveAmount, 0L) else lo.fee
+
         Map(
           lo.order.senderPublicKey.toAddress ->
             OpenPortfolio(
@@ -282,21 +291,6 @@ object Events {
                 Map(lo.feeAsset   -> -feeDiff)
               )))
     }
-  }
-
-  def createOpenPortfolioDiff(event: Events.OrderAdded, newOrderInfo: OrderInfo): Map[Address, OpenPortfolio] = {
-    import event.order.order
-    Map(
-      order.senderPublicKey.toAddress -> OpenPortfolio(
-        Monoid.combine(
-          if (order.getSpendAssetId == order.assetPair.amountAsset)
-            Map(order.getSpendAssetId -> newOrderInfo.remaining)
-          else
-            Map(order.getSpendAssetId -> event.order.getSpendAmount),
-          Map(event.order.feeAsset -> newOrderInfo.remainingFee)
-        )
-      )
-    )
   }
 
   private def releaseFee(totalReceiveAmount: Long, matcherFee: Long, prevRemaining: Long, updatedRemaining: Long): Long = {
@@ -323,8 +317,9 @@ object Events {
   }
 
   def orderInfoDiffNew(order: Order, oi: OrderInfo): Map[Address, OpenPortfolio] = {
-    val lo             = LimitOrder(order) //.partial(oi.remaining, oi.remainingFee) // wrong
-    val remainingSpend = oi.remainingSpend
+    val lo             = LimitOrder(order)
+    val maxSpendAmount = lo.getUncorrectedSpendAmount //lo.getSpendAmount
+    val remainingSpend = maxSpendAmount - oi.totalSpend
     val remainingFee   = if (lo.feeAcc == lo.rcvAcc) math.max(oi.remainingFee - lo.getReceiveAmount, 0L) else oi.remainingFee
 
     println(s"orderInfoDiffNew: remaining spend=$remainingSpend, remaining fee=$remainingFee")
@@ -341,7 +336,7 @@ object Events {
   // works only for existed prev
   def orderInfoDiff(order: Order, prev: OrderInfo, updated: OrderInfo): Map[Address, OpenPortfolio] = {
     val lo           = LimitOrder(order)
-    val changedSpend = updated.remainingSpend - prev.remainingSpend
+    val changedSpend = prev.totalSpend - updated.totalSpend
     val changedFee   = -releaseFee(order, prev.remainingFee, updated.remainingFee)
     println(s"orderInfoDiff: changed spend=$changedSpend, fee=$changedFee")
     Map(
@@ -349,6 +344,23 @@ object Events {
         Monoid.combine(
           Map(order.getSpendAssetId -> changedSpend),
           Map(lo.feeAsset           -> changedFee)
+        )
+      )
+    )
+  }
+
+  def orderInfoDiffCancel(order: Order, curr: OrderInfo): Map[Address, OpenPortfolio] = {
+    val lo             = LimitOrder(order)
+    val maxSpendAmount = lo.getUncorrectedSpendAmount //lo.getSpendAmount
+    val remainingSpend = curr.totalSpend - maxSpendAmount
+    val remainingFee   = -releaseFee(order, curr.remainingFee, 0)
+
+    println(s"orderInfoDiffCancel: remaining spend=$remainingSpend, remaining fee=$remainingFee")
+    Map(
+      order.sender.toAddress -> OpenPortfolio(
+        Monoid.combine(
+          Map(order.getSpendAssetId -> remainingSpend),
+          Map(lo.feeAsset           -> remainingFee)
         )
       )
     )

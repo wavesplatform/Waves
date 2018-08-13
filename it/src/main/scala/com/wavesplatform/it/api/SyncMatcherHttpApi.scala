@@ -58,6 +58,13 @@ object SyncMatcherHttpApi extends Assertions {
                         waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(m).waitOrderStatus(assetPair, orderId, expectedStatus), waitTime)
 
+    def waitOrderStatusAndAmount(assetPair: AssetPair,
+                                 orderId: String,
+                                 expectedStatus: String,
+                                 expectedFilledAmount: Option[Long],
+                                 waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+      Await.result(async(m).waitOrderStatusAndAmount(assetPair, orderId, expectedStatus, expectedFilledAmount), waitTime)
+
     def reservedBalance(sender: Node, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
       Await.result(async(m).reservedBalance(sender), waitTime)
 

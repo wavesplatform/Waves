@@ -20,19 +20,24 @@ object OrderBook {
 
   import Events._
 
-  def matchOrder(ob: OrderBook, o: LimitOrder): Event = o match {
-    case oo: BuyLimitOrder =>
-      if (ob.bestAsk.exists(oo.price >= _.price)) {
-        OrderExecuted(o, ob.bestAsk.get)
-      } else {
-        OrderAdded(oo)
-      }
-    case oo: SellLimitOrder =>
-      if (ob.bestBid.exists(oo.price <= _.price)) {
-        OrderExecuted(o, ob.bestBid.get)
-      } else {
-        OrderAdded(oo)
-      }
+  def matchOrder(ob: OrderBook, o: LimitOrder): Event = {
+    val r = o match {
+      case oo: BuyLimitOrder =>
+        if (ob.bestAsk.exists(oo.price >= _.price)) {
+          OrderExecuted(o, ob.bestAsk.get)
+        } else {
+          OrderAdded(oo)
+        }
+      case oo: SellLimitOrder =>
+        if (ob.bestBid.exists(oo.price <= _.price)) {
+          OrderExecuted(o, ob.bestBid.get)
+        } else {
+          OrderAdded(oo)
+        }
+    }
+
+    println(s"matchOrder:\nob=$ob\no=$o\nr=$r")
+    r
   }
 
   def cancelOrder(ob: OrderBook, orderId: ByteStr): Option[OrderCanceled] = {

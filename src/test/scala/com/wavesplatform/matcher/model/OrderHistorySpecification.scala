@@ -51,7 +51,7 @@ class OrderHistorySpecification
     val info = oh.orderInfo(ord.id())
     withClue("info") {
       info.status shouldBe LimitOrder.Accepted
-      info shouldBe OrderInfo(ord.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, lo.getSpendAmount)
+      info shouldBe OrderInfo(ord.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, 0L)
     }
 
     withClue("reserved assets") {
@@ -72,7 +72,7 @@ class OrderHistorySpecification
     val info = oh.orderInfo(ord.id())
     withClue("info") {
       info.status shouldBe LimitOrder.Accepted
-      info shouldBe OrderInfo(ord.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, lo.getSpendAmount)
+      info shouldBe OrderInfo(ord.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, 0L)
     }
 
     withClue("reserved assets") {
@@ -94,7 +94,7 @@ class OrderHistorySpecification
     val info = oh.orderInfo(ord.id())
     withClue("info") {
       info.status shouldBe LimitOrder.Accepted
-      info shouldBe OrderInfo(ord.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, lo.getSpendAmount)
+      info shouldBe OrderInfo(ord.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, 0L)
     }
 
     withClue("reserved assets considering amount of received WAVES") {
@@ -158,7 +158,7 @@ class OrderHistorySpecification
     }
 
     withClue("correction was used to reserve assets") {
-      oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe Order.correctAmount(ord1) + ord1.matcherFee + Order.correctAmount(ord2) + ord2.matcherFee
+      oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe ord1.amount + ord1.matcherFee + ord2.amount + ord2.matcherFee
       oh.openVolume(ord1.senderPublicKey, pair.priceAsset) shouldBe 0L
     }
 
@@ -180,13 +180,37 @@ class OrderHistorySpecification
     val spend2  = LimitOrder(ord).partial(amount2, fee2).getSpendAmount
 
     println(s"""|
-                    |total receive: ${LimitOrder(ord).getReceiveAmount}
+              |total receive: ${LimitOrder(ord).getReceiveAmount}
               |total spend: ${LimitOrder(ord).getSpendAmount} BTC
               |buy ${amount1 + amount2} WAVES (one time), spend ${LimitOrder(ord).partial(amount1 + amount2, fee1 + fee2).getSpendAmount} BTC
               |buy $amount1 WAVES, spend $spend1 BTC
               |buy $amount2 WAVES, spend $spend2 BTC
               |buy ${amount1 + amount2} WAVES (two parts), spend ${spend1 + spend2} BTC
               |""".stripMargin)
+  }
+
+  property("test2") {
+    val pair = AssetPair(mkAssetId("Alice"), None)
+
+    val counter   = sell(pair, 200000000L, 100, matcherFee = Some(300000))
+    val submitted = buy(pair, 200000000L, 130, matcherFee = Some(300000))
+
+    println(s"""|counter:   ${counter.id()}
+                |submitted: ${submitted.id()}""".stripMargin)
+
+    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
+    println(oh.orderInfo(counter.id()))
+
+    oh.orderCanceled(OrderCanceled(LimitOrder(counter), unmatchable = false))
+    println(oh.orderInfo(counter.id()))
+
+    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
+    println(oh.orderInfo(counter.id()))
+
+    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    oh.orderExecuted(exec)
+
+    oh.orderInfo(submitted.id()).status shouldBe LimitOrder.PartiallyFilled(100)
   }
 
   property("Buy WAVES order filled exactly") {
@@ -225,6 +249,12 @@ class OrderHistorySpecification
 
     oh.orderAccepted(OrderAdded(LimitOrder(counter)))
     val counterOrderInfo1 = oh.orderInfo(counter.id())
+    withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
+//      (counterOrderInfo1.remainingSpend + counterOrderInfo1.remainingFee) shouldBe counter.amount + counter.matcherFee
+//      oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe counterOrderInfo1.remainingSpend + counterOrderInfo1.remainingFee // todo
+      oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
+      activeOrderIds(counter.senderPublicKey, Set(None)) shouldBe Seq(counter.id())
+    }
 
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
     exec.executedAmount shouldBe 420169L
@@ -277,8 +307,8 @@ class OrderHistorySpecification
     }
 
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
-      oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe counterOrderInfo.remainingSpend + counterOrderInfo.remainingFee
-      oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe (exec.counterRemaining.getSpendAmount + exec.counterRemainingFee)
+      val remainingSpend = counter.amount - counterOrderInfo.totalSpend
+      oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe remainingSpend + counterOrderInfo.remainingFee
       oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
       activeOrderIds(counter.senderPublicKey, Set(None)) shouldBe Seq(counter.id())
     }
@@ -344,48 +374,48 @@ class OrderHistorySpecification
   }
 
   property("Buy WAVES order - filled with 2 steps, sell order - partial") {
-    val pair = AssetPair(None, mkAssetId("BTC"))
-    val ord1 = buy(pair, 0.0008, 100000000, matcherFee = Some(300001L))
-    val ord2 = sell(pair, 0.00075, 50000000, matcherFee = Some(300001L))
-    val ord3 = sell(pair, 0.0008, 80000000, matcherFee = Some(300001L)) // works with 300000L
+    val pair       = AssetPair(None, mkAssetId("BTC"))
+    val counter    = buy(pair, 0.0008, 100000000, matcherFee = Some(300001L))
+    val submitted1 = sell(pair, 0.00075, 50000000, matcherFee = Some(300001L))
+    val submitted2 = sell(pair, 0.0008, 80000000, matcherFee = Some(300001L)) // works with 300000L
 
     println(s"==== before added")
-    oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
-    println(s"== order added ord1: ${ord1.id()}")
-    val exec1 = OrderExecuted(LimitOrder(ord2), LimitOrder(ord1)) //LimitOrder.limitOrder(ord1.price, ord1.amount - ord2.amount, 150001L, ord1))
-    println(s"== order executed: submitted=ord2 (${ord2.id()}), counter=ord1 (${ord1.id()}")
+    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
+    println(s"== order added counter: ${counter.id()}")
+    val exec1 = OrderExecuted(LimitOrder(submitted1), LimitOrder(counter)) //LimitOrder.limitOrder(ord1.price, ord1.amount - ord2.amount, 150001L, ord1))
+    println(s"== order executed: submitted1(${submitted1.id()}), counter (${counter.id()}")
 
     println(s"==== before executed 1")
     oh.orderExecuted(exec1)
 
     println(s"""
          |orderInfo:
-         |ord1 (id=${ord1.id()}, status=${oh.orderInfo(ord1.id()).status}): ${oh.orderInfo(ord1.id())}
-         |ord2 (id=${ord2.id()}, status=${oh.orderInfo(ord2.id()).status}): ${oh.orderInfo(ord2.id())}
-         |ord3 (id=${ord3.id()}, status=${oh.orderInfo(ord3.id()).status}): ${oh.orderInfo(ord3.id())}
+         |counter (id=${counter.id()}, status=${oh.orderInfo(counter.id()).status}): ${oh.orderInfo(counter.id())}
+         |submitted1 (id=${submitted1.id()}, status=${oh.orderInfo(submitted1.id()).status}): ${oh.orderInfo(submitted1.id())}
+         |submitted2 (id=${submitted2.id()}, status=${oh.orderInfo(submitted2.id()).status}): ${oh.orderInfo(submitted2.id())}
          |""".stripMargin)
 
-    val o1Info1 = oh.orderInfo(ord1.id())
-    val o2Info1 = oh.orderInfo(ord2.id())
+    val counterInfo1    = oh.orderInfo(counter.id())
+    val submitted1Info1 = oh.orderInfo(submitted1.id())
 
     // ord3 & ord1
-    exec1.counterRemainingAmount shouldBe o1Info1.remaining
-    exec1.counterRemainingFee shouldBe o1Info1.remainingFee
-    o1Info1.status shouldBe LimitOrder.PartiallyFilled(50000000)
+    exec1.counterRemainingAmount shouldBe counterInfo1.remaining
+    exec1.counterRemainingFee shouldBe counterInfo1.remainingFee
+    counterInfo1.status shouldBe LimitOrder.PartiallyFilled(50000000)
 
-    exec1.submittedRemainingAmount shouldBe o2Info1.remaining
-    exec1.submittedRemainingFee shouldBe o2Info1.remainingFee
-    o2Info1.status shouldBe LimitOrder.Filled(50000000)
+    exec1.submittedRemainingAmount shouldBe submitted1Info1.remaining
+    exec1.submittedRemainingFee shouldBe submitted1Info1.remainingFee
+    submitted1Info1.status shouldBe LimitOrder.Filled(50000000)
 
-    oh.orderInfo(ord3.id()).status shouldBe LimitOrder.NotFound
+    oh.orderInfo(submitted2.id()).status shouldBe LimitOrder.NotFound
 
     println(s"==== before executed 2")
-    val exec2 = OrderExecuted(LimitOrder(ord3), exec1.counterRemaining) // ord1
+    val exec2 = OrderExecuted(LimitOrder(submitted2), exec1.counterRemaining) // ord1
     println(s"==== after executed 2")
 
-    println(s"""== order executed: ${ord3.id()}, ${exec1.counter.order.id()}
-               |exec2.counterRemaining (ord1: ${ord1.id()}): ${exec2.counterRemaining}
-               |exec2.submittedRemaining (ord3: ${ord3.id()}): ${exec2.submittedRemaining}
+    println(s"""== order executed: ${submitted2.id()}, ${exec1.counter.order.id()}
+               |exec2.counterRemaining (counter: ${counter.id()}): ${exec2.counterRemaining}
+               |exec2.submittedRemaining (submitted2: ${submitted2.id()}): ${exec2.submittedRemaining}
                |""".stripMargin)
     oh.orderExecuted(exec2)
 //    oh.orderAccepted(OrderAdded(exec2.submitted.partial(exec2.submittedRemainingAmount, exec1.submittedRemainingFee)))
@@ -393,43 +423,68 @@ class OrderHistorySpecification
 
     println(s"""
          |orderInfo:
-         |ord1 (id=${ord1.id()}, status=${oh.orderInfo(ord1.id()).status}): ${oh.orderInfo(ord1.id())}
-         |ord2 (id=${ord2.id()}, status=${oh.orderInfo(ord2.id()).status}): ${oh.orderInfo(ord2.id())}
-         |ord3 (id=${ord3.id()}, status=${oh.orderInfo(ord3.id()).status}): ${oh.orderInfo(ord3.id())}
+         |counter (id=${counter.id()}, status=${oh.orderInfo(counter.id()).status}): ${oh.orderInfo(counter.id())}
+         |submitted1 (id=${submitted1.id()}, status=${oh.orderInfo(submitted1.id()).status}): ${oh.orderInfo(submitted1.id())}
+         |submitted2 (id=${submitted2.id()}, status=${oh.orderInfo(submitted2.id()).status}): ${oh.orderInfo(submitted2.id())}
          |""".stripMargin)
 
-    val o1Info2 = oh.orderInfo(ord1.id())
-    exec2.counterRemainingAmount shouldBe o1Info2.remaining
-    //exec2.counterRemainingFee shouldBe o1Info2.remainingFee // 1 vs 0
-    oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Filled(100000000) // fails
+    val counterInfo2 = oh.orderInfo(counter.id())
+    withClue(s"counter: ${counter.id()}") {
+      println(counterInfo2)
+      exec2.counterRemainingAmount shouldBe counterInfo2.remaining
+      exec2.counterRemainingFee shouldBe counterInfo2.remainingFee // 1 vs 0
+      oh.orderInfo(counter.id()).status shouldBe LimitOrder.Filled(100000000) // fails
+    }
 
-    oh.orderInfo(ord2.id()).status shouldBe LimitOrder.Filled(50000000)
+    oh.orderInfo(submitted1.id()).status shouldBe LimitOrder.Filled(50000000)
 
-    val o3Info2 = oh.orderInfo(ord3.id())
-    exec2.submittedRemainingAmount shouldBe o3Info2.remaining
-    exec2.submittedRemainingFee shouldBe o3Info2.remainingFee
-    oh.orderInfo(ord3.id()).status shouldBe LimitOrder.PartiallyFilled(50000000)
+    val submitted2Info1 = oh.orderInfo(submitted2.id())
+    exec2.submittedRemainingAmount shouldBe submitted2Info1.remaining
+    exec2.submittedRemainingFee shouldBe submitted2Info1.remainingFee
+    oh.orderInfo(submitted2.id()).status shouldBe LimitOrder.PartiallyFilled(50000000)
 
-    oh.openVolume(ord1.senderPublicKey, pair.priceAsset) shouldBe 0L
-    oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe 0L
-    activeOrderIds(ord1.senderPublicKey, Set(None)) shouldBe empty
+    oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
+    oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0L
+    activeOrderIds(counter.senderPublicKey, Set(None)) shouldBe empty
 
-    oh.openVolume(ord2.senderPublicKey, pair.priceAsset) shouldBe 0L
-    oh.openVolume(ord2.senderPublicKey, pair.amountAsset) shouldBe 0L
-    activeOrderIds(ord2.senderPublicKey, Set(None)) shouldBe empty
+    oh.openVolume(submitted1.senderPublicKey, pair.priceAsset) shouldBe 0L
+    oh.openVolume(submitted1.senderPublicKey, pair.amountAsset) shouldBe 0L
+    activeOrderIds(submitted1.senderPublicKey, Set(None)) shouldBe empty
 
     println(s"""ord3:
-         |amount volume: ${o3Info2.amount - o3Info2.filled + o3Info2.remainingFee}
-         |o3Info2.amount: ${o3Info2.amount}
-         |o3Info2.filled: ${o3Info2.filled}
-         |o3Info2.remainingFee: ${o3Info2.remainingFee}
-         |o3Info2.remaining: ${o3Info2.remaining}
+         |amount volume: ${submitted2Info1.amount - submitted2Info1.filled + submitted2Info1.remainingFee}
+         |o3Info2.amount: ${submitted2Info1.amount}
+         |o3Info2.filled: ${submitted2Info1.filled}
+         |o3Info2.remainingFee: ${submitted2Info1.remainingFee}
+         |o3Info2.remaining: ${submitted2Info1.remaining}
          |""".stripMargin)
-    withClue(s"account checks, ord3.senderPublicKey: ${ord3.senderPublicKey}, ord3.order.id=${ord3.id()}") {
-      oh.openVolume(ord3.senderPublicKey, pair.amountAsset) shouldBe (o3Info2.remainingSpend + o3Info2.remainingFee) // ord3.matcherFee * 3 / 8 + 30000000L // or it's ok?
-      oh.openVolume(ord3.senderPublicKey, pair.priceAsset) shouldBe 0L
-      activeOrderIds(ord3.senderPublicKey, Set(pair.amountAsset)) shouldBe Seq(ord3.id())
+    withClue(s"account checks, ord3.senderPublicKey: ${submitted2.senderPublicKey}, ord3.order.id=${submitted2.id()}") {
+      val remainingSpend = LimitOrder(submitted2).getSpendAmount - submitted2Info1.totalSpend
+      oh.openVolume(submitted2.senderPublicKey, pair.amountAsset) shouldBe (remainingSpend + submitted2Info1.remainingFee) // ord3.matcherFee * 3 / 8 + 30000000L // or it's ok?
+      oh.openVolume(submitted2.senderPublicKey, pair.priceAsset) shouldBe 0L
+      activeOrderIds(submitted2.senderPublicKey, Set(pair.amountAsset)) shouldBe Seq(submitted2.id())
     }
+  }
+
+  property("Total execution of two counter orders and the one submitted") {
+    val pair = AssetPair(mkAssetId("Alice"), None)
+
+    val counter1  = buy(pair, 190000000L, 150, matcherFee = Some(300000))
+    val counter2  = buy(pair, 200000000L, 200, matcherFee = Some(300000))
+    val submitted = sell(pair, 210000000L, 350, matcherFee = Some(300000))
+
+    println(s"""|counter1: ${counter1.id()}
+                |counter2: ${counter2.id()}
+                |submitted: ${submitted.id()}""".stripMargin)
+
+    oh.orderAccepted(OrderAdded(LimitOrder(counter1)))
+    oh.orderAccepted(OrderAdded(LimitOrder(counter2)))
+
+    val exec1 = OrderExecuted(LimitOrder(submitted), LimitOrder(counter1))
+    oh.orderExecuted(exec1)
+    oh.orderExecuted(OrderExecuted(exec1.submittedRemaining, LimitOrder(counter2)))
+
+    oh.orderInfo(submitted.id()).status shouldBe LimitOrder.Filled(350)
   }
 
   property("Partially with own order") {
@@ -560,22 +615,22 @@ class OrderHistorySpecification
   }
 
   property("Cancel partially executed order") {
-    val pair = AssetPair(None, mkAssetId("BTC"))
-    val ord1 = sell(pair, 0.0008, 2100000000, matcherFee = Some(300000L))
-    val ord2 = buy(pair, 0.00081, 1000000000, matcherFee = Some(300000L))
+    val pair      = AssetPair(None, mkAssetId("BTC"))
+    val counter   = sell(pair, 0.0008, 2100000000, matcherFee = Some(300000L))
+    val submitted = buy(pair, 0.00081, 1000000000, matcherFee = Some(300000L))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
-    val exec1 = OrderExecuted(LimitOrder(ord2), LimitOrder(ord1))
+    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
+    val exec1 = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
     oh.orderExecuted(exec1)
     oh.orderCanceled(OrderCanceled(exec1.counter.partial(exec1.counterRemainingAmount, exec1.counterRemainingFee), unmatchable = false))
 
-    oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Cancelled(1000000000)
-    oh.orderInfo(ord2.id()).status shouldBe LimitOrder.Filled(1000000000)
+    oh.orderInfo(counter.id()).status shouldBe LimitOrder.Cancelled(1000000000)
+    oh.orderInfo(submitted.id()).status shouldBe LimitOrder.Filled(1000000000)
 
-    oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe 0L
-    oh.openVolume(ord1.senderPublicKey, pair.priceAsset) shouldBe 0L
-    activeOrderIds(ord1.senderPublicKey, Set(None)) shouldBe empty
-    activeOrderIds(ord2.senderPublicKey, Set(None)) shouldBe empty
+    oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0L
+    oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
+    activeOrderIds(counter.senderPublicKey, Set(None)) shouldBe empty
+    activeOrderIds(submitted.senderPublicKey, Set(None)) shouldBe empty
   }
 
   property("Delete order") {
@@ -598,7 +653,7 @@ class OrderHistorySpecification
     println(s"expectedAmountReserved = $expectedAmountReserved")
     oh.openVolume(pk, pair.amountAsset) shouldBe 0 // We receive 210000000 >> 300000 WAVES
 
-    val expectedPriceReserved = counterInfo.remainingSpend
+    val expectedPriceReserved = LimitOrder(counter).getSpendAmount - counterInfo.totalSpend
     println(s"expectedPriceReserved = $expectedPriceReserved")
     oh.openVolume(pk, pair.priceAsset) shouldBe expectedPriceReserved // was 0.0008 * 110000000L
 
@@ -680,8 +735,8 @@ class OrderHistorySpecification
     DBUtils.reservedBalance(db, pk) shouldBe
       Map(
         None -> (2 * matcherFee - LimitOrder(ord1).getReceiveAmount - LimitOrder(ord2).getReceiveAmount),
-        ass1 -> Order.correctAmount(ord1.amount, ord1.price),
-        ass2 -> Order.correctAmount(ord2.amount, ord2.price)
+        ass1 -> ord1.amount,
+        ass2 -> ord2.amount
       )
   }
 }

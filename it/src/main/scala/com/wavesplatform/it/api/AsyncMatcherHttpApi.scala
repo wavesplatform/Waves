@@ -125,6 +125,18 @@ object AsyncMatcherHttpApi extends Assertions {
         5.seconds)
     }
 
+    def waitOrderStatusAndAmount(assetPair: AssetPair,
+                                 orderId: String,
+                                 expectedStatus: String,
+                                 expectedFilledAmount: Option[Long],
+                                 retryInterval: FiniteDuration = 1.second): Future[MatcherStatusResponse] = {
+      waitFor[MatcherStatusResponse](
+        s"order(amountAsset=${assetPair.amountAsset}, priceAsset=${assetPair.priceAsset}, orderId=$orderId) status == $expectedStatus")(
+        _.orderStatus(orderId, assetPair),
+        s => s.status == expectedStatus && s.filledAmount == expectedFilledAmount,
+        5.seconds)
+    }
+
     def prepareOrder(sender: Node,
                      pair: AssetPair,
                      orderType: OrderType,

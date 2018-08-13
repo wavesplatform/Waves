@@ -82,45 +82,6 @@ class SeveralPartialOrdersTestSuite
       matcherNode.reservedBalance(bobNode) shouldBe empty
       matcherNode.reservedBalance(aliceNode) shouldBe empty
     }
-
-//    "check usd and waves balance after fill" in {
-//
-//      val aliceWavesBalanceAfter = matcherNode.accountBalances(aliceNode.address)._1
-//      val aliceUsdBalance        = matcherNode.assetBalance(aliceNode.address, UsdId.base58).balance
-//
-//      val bobWavesBalanceAfter = matcherNode.accountBalances(bobNode.address)._1
-//      val bobUsdBalance        = matcherNode.assetBalance(bobNode.address, UsdId.base58).balance
-//
-//      (aliceWavesBalanceAfter - aliceWavesBalanceBefore) should be(
-//        adjustedAmount - (BigInt(matcherFee) * adjustedAmount / buyOrderAmount).bigInteger.longValue())
-//
-//      aliceUsdBalance - defaultAssetQuantity should be(-adjustedTotal)
-//      bobWavesBalanceAfter - bobWavesBalanceBefore should be(
-//        -adjustedAmount - (BigInt(matcherFee) * adjustedAmount / sellOrderAmount).bigInteger.longValue())
-//      bobUsdBalance should be(adjustedTotal)
-//    }
-//
-//    "check filled amount and tradable balance" in {
-//      val bobsOrderId  = matcherNode.fullOrderHistory(bobNode).head.id
-//      val filledAmount = matcherNode.orderStatus(bobsOrderId, wavesUsdPair).filledAmount.getOrElse(0L)
-//
-//      filledAmount shouldBe adjustedAmount
-//    }
-//    "check reserved balance" in {
-//
-//      val expectedBobReservedBalance = correctedSellAmount - adjustedAmount + (BigInt(matcherFee) - (BigInt(matcherFee) * adjustedAmount / sellOrderAmount))
-//      matcherNode.reservedBalance(bobNode)("WAVES") shouldBe expectedBobReservedBalance
-//
-//      matcherNode.reservedBalance(aliceNode) shouldBe empty
-//    }
-//    "check waves-usd tradable  balance" in {
-//      val expectedBobTradableBalance = bobWavesBalanceBefore - (correctedSellAmount + matcherFee)
-//      matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES") shouldBe expectedBobTradableBalance
-//      matcherNode.tradableBalance(aliceNode, wavesUsdPair)("WAVES") shouldBe aliceNode.accountBalances(aliceNode.address)._1
-//
-//      matcherNode.cancelOrder(bobNode, wavesUsdPair, matcherNode.fullOrderHistory(bobNode).head.id)
-//      matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES") shouldBe bobNode.accountBalances(bobNode.address)._1
-//    }
   }
 
   def correctAmount(a: Long, price: Long): Long = {

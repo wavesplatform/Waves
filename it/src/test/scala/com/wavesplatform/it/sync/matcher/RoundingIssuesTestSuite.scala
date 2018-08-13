@@ -43,17 +43,17 @@ class RoundingIssuesTestSuite
     val aliceBalanceBefore = matcherNode.accountBalances(aliceNode.address)._1
     val bobBalanceBefore   = matcherNode.accountBalances(bobNode.address)._1
 
-    val order1   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, 238, 3100000000L)
-    val order1Id = matcherNode.placeOrder(order1).message.id
+    val counter   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, 238, 3100000000L)
+    val counterId = matcherNode.placeOrder(counter).message.id
 
-    val order2   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, 235, 425532L)
-    val order2Id = matcherNode.placeOrder(order2).message.id
+    val submitted   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, 235, 425532L)
+    val submittedId = matcherNode.placeOrder(submitted).message.id
 
-    matcherNode.waitOrderStatus(wavesUsdPair, order2Id, "Filled", 1.minute)
-    matcherNode.waitOrderStatus(wavesUsdPair, order1Id, "PartiallyFilled", 1.minute)
+    matcherNode.waitOrderStatusAndAmount(wavesUsdPair, submittedId, "Filled", Some(420169L), 1.minute)
+    matcherNode.waitOrderStatusAndAmount(wavesUsdPair, counterId, "PartiallyFilled", Some(420169L), 1.minute)
 
-    matcherNode.cancelOrder(aliceNode, wavesUsdPair, order1Id)
-    val tx = matcherNode.transactionsByOrder(order1Id).head
+    matcherNode.cancelOrder(aliceNode, wavesUsdPair, counterId)
+    val tx = matcherNode.transactionsByOrder(counterId).head
 
     matcherNode.waitForTransaction(tx.id)
     val rawExchangeTx = matcherNode.rawTransactionInfo(tx.id)
