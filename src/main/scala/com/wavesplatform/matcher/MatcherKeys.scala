@@ -23,7 +23,7 @@ object MatcherKeys {
     Option(_).fold[OrderInfo](OrderInfo.empty) { b =>
       val bb = ByteBuffer.wrap(b)
       b.length match {
-        case 17 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, None, 0, 0)
+        case 17 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, None, 0, 0) // TODO
         case 33 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, Some(bb.getLong), bb.getLong, 0) // TODO
         case 41 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, Some(bb.getLong), bb.getLong, bb.getLong)
       }
