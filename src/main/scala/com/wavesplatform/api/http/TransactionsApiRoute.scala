@@ -1,10 +1,8 @@
 package com.wavesplatform.api.http
 
-import java.util.NoSuchElementException
-
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.utx.UtxPool
@@ -14,7 +12,7 @@ import javax.ws.rs.Path
 import play.api.libs.json._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.DataRequest._
-import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request, SignedCreateAliasV1Request, SignedCreateAliasV2Request}
+import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request}
 import com.wavesplatform.api.http.assets.SponsorFeeRequest._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.leasing._
@@ -23,7 +21,6 @@ import com.wavesplatform.utils.Time
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
@@ -240,35 +237,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   def broadcast: Route = (pathPrefix("broadcast") & post) {
     handleExceptions(jsonExceptionHandler) {
       json[JsObject] { jsv =>
-        val typeId  = (jsv \ "type").as[Byte]
-        val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
-
-        val r = TransactionParsers.by(typeId, version) match {
-          case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
-          case Some(x) =>
-            x match {
-              case IssueTransactionV1       => jsv.as[SignedIssueV1Request].toTx
-              case IssueTransactionV2       => jsv.as[SignedIssueV2Request].toTx
-              case TransferTransactionV1    => jsv.as[SignedTransferV1Request].toTx
-              case TransferTransactionV2    => jsv.as[SignedTransferV2Request].toTx
-              case MassTransferTransaction  => jsv.as[SignedMassTransferRequest].toTx
-              case ReissueTransactionV1     => jsv.as[SignedReissueV1Request].toTx
-              case ReissueTransactionV2     => jsv.as[SignedReissueV2Request].toTx
-              case BurnTransactionV1        => jsv.as[SignedBurnV1Request].toTx
-              case BurnTransactionV2        => jsv.as[SignedBurnV2Request].toTx
-              case LeaseTransactionV1       => jsv.as[SignedLeaseV1Request].toTx
-              case LeaseTransactionV2       => jsv.as[SignedLeaseV2Request].toTx
-              case LeaseCancelTransactionV1 => jsv.as[SignedLeaseCancelV1Request].toTx
-              case LeaseCancelTransactionV2 => jsv.as[SignedLeaseCancelV2Request].toTx
-              case CreateAliasTransactionV1 => jsv.as[SignedCreateAliasV1Request].toTx
-              case CreateAliasTransactionV2 => jsv.as[SignedCreateAliasV2Request].toTx
-              case DataTransaction          => jsv.as[SignedDataRequest].toTx
-              case SetScriptTransaction     => jsv.as[SignedSetScriptRequest].toTx
-              case SponsorFeeTransaction    => jsv.as[SignedSponsorFeeRequest].toTx
-              case ExchangeTransaction      => jsv.as[SignedExchangeRequest].toTx
-            }
-        }
-        doBroadcast(r)
+        doBroadcast(TransactionFactory.fromSignedRequest(jsv))
       }
     }
   }
@@ -297,11 +266,6 @@ case class TransactionsApiRoute(settings: RestAPISettings,
         mtt.compactJson(addresses.toSet)
       case _ => txToExtendedJson(tx)
     }
-  }
-
-  private val jsonExceptionHandler = ExceptionHandler {
-    case JsResultException(err)    => complete(WrongJson(errors = err))
-    case e: NoSuchElementException => complete(WrongJson(Some(e)))
   }
 }
 
