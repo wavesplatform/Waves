@@ -34,7 +34,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
           canceled = diff.nowCanceled.getOrElse(false),
           minAmount = diff.newMinAmount,
           remainingFee = remainingFee,
-          totalSpend = curr.totalSpend + diff.lastSpend.getOrElse(0L)
+          unsafeTotalSpend = OrderInfo.safeSum(curr.totalSpend(LimitOrder(order)), diff.lastSpend.getOrElse(0L))
         )
       } else {
         OrderInfo(
@@ -43,7 +43,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
           canceled = diff.nowCanceled.getOrElse(curr.canceled),
           minAmount = diff.newMinAmount.orElse(curr.minAmount),
           remainingFee = curr.remainingFee - diff.executedFee.getOrElse(0L),
-          totalSpend = curr.totalSpend + diff.lastSpend.getOrElse(0L)
+          unsafeTotalSpend = OrderInfo.safeSum(curr.totalSpend(LimitOrder(order)), diff.lastSpend.getOrElse(0L))
         )
       }
 
@@ -58,7 +58,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
 
   private def saveOrderInfo(rw: RW, event: Event): Seq[Order] =
     saveOrderInfoTimer.measure(db.readWrite { rw =>
-      val diff = Events.collectChanges(rw, event)
+      val diff = Events.collectChanges(event)(x => DBUtils.orderInfoOpt(rw, x.id()).isEmpty)
 
       println(s"""
            |saveOrderInfo: ${diff.size} changes
@@ -142,11 +142,11 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
     val updatedOrderInfo = orderInfo(lo.order.id())
 
     //val opDiff          = Events.createOpenPortfolio(event)
-    val opDiff = orderInfoDiffNew(
+    val opDiff = orderInfoDiffAccepted(
       lo.order,
       updatedOrderInfo
     )
-    val opOrderInfoDiff = orderInfoDiff(lo.order, prevOrderInfo, updatedOrderInfo)
+    val opOrderInfoDiff = orderInfoDiffExecuted(lo.order, prevOrderInfo, updatedOrderInfo)
     println(s"""|
                 |orderAccepted:
                 |opDiff:
@@ -186,39 +186,18 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
     val updatedCounterInfo   = orderInfo(event.counter.order.id())
     val updatedSubmittedInfo = orderInfo(event.submitted.order.id())
 
-    val submittedAddedOpDiff = Events.createOpenPortfolio(OrderAdded(event.submitted)) // ?
-    val eventDiff            = Events.createOpenPortfolio(event)                       // ?
-    //val diff            = createOpenPortfolio(event)
-    val opDiff = Monoid
-      .combine(submittedAddedOpDiff, eventDiff)
-//      .updated(
-//        event.counter.order.senderPublicKey.toAddress,
-//        opOrderInfoDiff(event.counter.order.senderPublicKey.toAddress)
-//      )
     val submittedStatus = updatedSubmittedInfo.status
-    // worked for OHS - Buy WAVES order - filled with 2 steps, sell order - partial
-    val submittedOpOrderInfoDiff = orderInfoDiffNew(
+    val submittedOpOrderInfoDiff = orderInfoDiffAccepted(
       event.submitted.order,
       updatedSubmittedInfo
     )
-    // leads to -1
-    // val submittedOpOrderInfoDiff = Events.createOpenPortfolio(OrderAdded(event.submittedRemaining))
-    val counterInfoDiff = orderInfoDiff(event.counter.order, prevCounterInfo, updatedCounterInfo)
+    val counterInfoDiff = orderInfoDiffExecuted(event.counter.order, prevCounterInfo, updatedCounterInfo)
     val opOrderInfoDiff = Monoid.combine(
       counterInfoDiff,
       if (submittedStatus.isFinal) Map.empty[Address, OpenPortfolio] else submittedOpOrderInfoDiff
     )
     println(s"""|
                 |orderExecuted:
-                |
-                |submittedAddedOpDiff:
-                |${toString(submittedAddedOpDiff)}
-                |
-                |eventDiff:
-                |${toString(eventDiff)}
-                |
-                |opDiff:
-                |${toString(opDiff)}
                 |
                 |opOrderInfoDiff:
                 |${toString(opOrderInfoDiff)}
@@ -275,7 +254,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
           |info: $info
           |opDiff: $opDiff
           |""".stripMargin)
-    saveOpenVolume(rw, opDiff) //Events.createOpenPortfolio(event)) // TODO
+    saveOpenVolume(rw, opDiff)
     println(s"orderCanceled end: $event")
   }
 

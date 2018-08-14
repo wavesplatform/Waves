@@ -1,10 +1,8 @@
 package com.wavesplatform.matcher.model
 
 import cats.implicits._
-import cats.kernel.Monoid
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
-import com.wavesplatform.matcher.model.Events.OrderAdded
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
 import com.wavesplatform.utx.UtxPool
@@ -32,10 +30,15 @@ trait OrderValidator {
     val lo = LimitOrder(order)
 
     val b: Map[Option[ByteStr], Long] = Seq(lo.spentAcc, lo.feeAcc).map(a => a.assetId -> spendableBalance(a)).toMap
+    val newOrder = Events
+      .orderInfoDiffAccepted(
+        lo.order,
+        OrderInfo(order.amount, 0L, canceled = false, None, order.matcherFee, 0L)
+      )
+      .getOrElse(order.senderPublicKey, OpenPortfolio.empty)
 
-    val newOrder = Events.createOpenPortfolio(OrderAdded(lo)).getOrElse(order.senderPublicKey, OpenPortfolio.empty)
-    val open     = b.keySet.map(id => id -> orderHistory.openVolume(order.senderPublicKey, id)).toMap
-    val needs    = OpenPortfolio(open).combine(newOrder)
+    val open  = b.keySet.map(id => id -> orderHistory.openVolume(order.senderPublicKey, id)).toMap
+    val needs = OpenPortfolio(open).combine(newOrder)
 
     val res: Boolean = b.combine(needs.orders.mapValues(-_)).forall(_._2 >= 0)
 

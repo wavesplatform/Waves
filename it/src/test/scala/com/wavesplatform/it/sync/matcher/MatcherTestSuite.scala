@@ -33,10 +33,9 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   "Check cross ordering between Alice and Bob " - {
     // Alice issues new asset
 
-    val aliceAsset =
-      aliceNode
-        .issue(aliceNode.address, amountAssetName, "AliceCoin for matcher's tests", AssetQuantity, aliceCoinDecimals, reissuable = false, 100000000L)
-        .id
+    val aliceAsset = aliceNode
+      .issue(aliceNode.address, amountAssetName, "AliceCoin for matcher's tests", AssetQuantity, aliceCoinDecimals, reissuable = false, 100000000L)
+      .id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
@@ -46,8 +45,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     matcherNode.assertAssetBalance(matcherNode.address, aliceAsset, 0)
     bobNode.assertAssetBalance(bobNode.address, aliceAsset, 0)
 
-    val order1 =
-      matcherNode.placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, aliceSellAmount)
+    val order1 = matcherNode.placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, aliceSellAmount)
 
     "matcher should respond with Public key" in {
       matcherNode.matcherGet("/matcher").getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe matcherNode.publicKeyStr
@@ -68,9 +66,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     "sell order could be placed correctly" - {
       // Alice places sell order
       "alice places sell order" in {
-//        val order1 =
-//          matcherNode.placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, aliceSellAmount, 2.minutes)
-
         order1.status shouldBe "OrderAccepted"
 
         // Alice checks that the order in order book
@@ -104,8 +99,8 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         matcherNode.waitOrderStatus(aliceWavesPair, order1.message.id, "PartiallyFilled")
         matcherNode.waitOrderStatus(aliceWavesPair, order2.message.id, "Filled")
 
-        //matcherNode.orderHistoryByPair(bobNode, aliceWavesPair) should contain(order2.message.id)
-        //matcherNode.fullOrderHistory(bobNode) should contain(order2.message.id)
+        matcherNode.orderHistoryByPair(bobNode, aliceWavesPair) should contain(order2.message.id)
+        matcherNode.fullOrderHistory(bobNode) should contain(order2.message.id)
 
         nodes.waitForHeightArise()
 
@@ -208,17 +203,9 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         val aliceBalance   = aliceNode.accountBalances(aliceNode.address)._1
         val bobBalance     = bobNode.accountBalances(bobNode.address)._1
 
-        val orders1 = matcherNode.orderBook(aliceWavesPair)
-        log.debug(s"""|orderBook 1:
-                      |$orders1""".stripMargin)
-
         // Bob places buy order on amount bigger then left in sell orders
         val order5 = matcherNode.placeOrder(bobNode, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 130)
         order5.status should be("OrderAccepted")
-
-        val orders2 = matcherNode.orderBook(aliceWavesPair)
-        log.debug(s"""|orderBook 2:
-                      |$orders2""".stripMargin)
 
         // Check that the order is partially filled
         matcherNode.waitOrderStatus(aliceWavesPair, order5.message.id, "PartiallyFilled")

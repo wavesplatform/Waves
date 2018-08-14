@@ -15,8 +15,17 @@ case class OrderInfoDiff(isNew: Boolean = false,
                          executedFee: Option[Long] = None,
                          lastSpend: Option[Long] = None)
 
-case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: Option[Long], remainingFee: Long, totalSpend: Long) {
+case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: Option[Long], remainingFee: Long, unsafeTotalSpend: Long) {
   def remaining: Long = if (canceled) 0L else amount - filled
+
+  /**
+    * TODO: Remove in future
+    * @param orig Original means LimitOrder(order) without partial fills
+    * @return
+    */
+  def totalSpend(orig: LimitOrder): Long =
+    if (unsafeTotalSpend == Long.MinValue) orig.getRawSpendAmount - orig.partial(filled, orig.order.matcherFee - remainingFee).getSpendAmount
+    else unsafeTotalSpend
 
   def status: LimitOrder.OrderStatus = {
     if (amount == 0) LimitOrder.NotFound

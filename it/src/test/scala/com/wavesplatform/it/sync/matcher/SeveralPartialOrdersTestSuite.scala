@@ -7,19 +7,19 @@ import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.sync.matcherFee
 import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.util._
 import com.wavesplatform.utils.Base58
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.api.http.assets.SignedIssueV1Request
 import scorex.transaction.AssetId
 import scorex.transaction.assets.IssueTransactionV1
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.it.util._
 import scorex.transaction.assets.exchange.OrderType.BUY
+import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.duration._
 import scala.math.BigDecimal.RoundingMode
-import scala.util.{Random, Try}
+import scala.util.Random
 
 class SeveralPartialOrdersTestSuite
     extends FreeSpec
@@ -44,17 +44,11 @@ class SeveralPartialOrdersTestSuite
 
   "Alice and Bob trade WAVES-USD" - {
     nodes.waitForHeightArise()
-    val aliceWavesBalanceBefore = matcherNode.accountBalances(aliceNode.address)._1
-    val bobWavesBalanceBefore   = matcherNode.accountBalances(bobNode.address)._1
+    val bobWavesBalanceBefore = matcherNode.accountBalances(bobNode.address)._1
 
     val price           = 238
     val buyOrderAmount  = 425532L
     val sellOrderAmount = 840340L
-
-    val correctedSellAmount = correctAmount(sellOrderAmount, price)
-
-    val adjustedAmount = receiveAmount(OrderType.BUY, price, buyOrderAmount)
-    val adjustedTotal  = receiveAmount(OrderType.SELL, price, buyOrderAmount)
 
     "place usd-waves order" in {
       // Alice wants to sell USD for Waves

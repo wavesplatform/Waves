@@ -134,11 +134,7 @@ class TradeBalanceAndRoundingTestSuite
       matcherNode.fullOrderHistory(bobNode).size should be(1)
       matcherNode.cancelOrder(bobNode, wavesUsdPair, orderId)
       matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Cancelled", 1.minute)
-      matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES") shouldBe bobNode.accountBalances(bobNode.address)._1 // 420167
-
-      // 39999899159624 was not equal to 39999899579791
-      // 39999899159624 - 39999899579791 = -420167
-      //
+      matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES") shouldBe bobNode.accountBalances(bobNode.address)._1
     }
   }
 
@@ -186,12 +182,6 @@ class TradeBalanceAndRoundingTestSuite
       val aliceUsdBalance = aliceNode.assetBalance(aliceNode.address, UsdId.base58).balance
       val bobUsdBalance   = bobNode.assetBalance(bobNode.address, UsdId.base58).balance
 
-      val aliceWavesBalanceBefore = matcherNode.accountBalances(aliceNode.address)._1
-      val bobWavesBalanceBefore   = matcherNode.accountBalances(bobNode.address)._1
-
-      val aliceWctBalance = aliceNode.assetBalance(aliceNode.address, WctId.base58).balance
-      val bobWctBalance   = bobNode.assetBalance(bobNode.address, WctId.base58).balance
-
       val bobOrderId = matcherNode.placeOrder(bobNode, wctUsdPair, SELL, wctUsdPrice, wctUsdSellAmount).message.id
       matcherNode.waitOrderStatus(wctUsdPair, bobOrderId, "Accepted", 1.minute)
       val aliceOrderId = matcherNode.placeOrder(aliceNode, wctUsdPair, BUY, wctUsdPrice, wctUsdBuyAmount).message.id
@@ -199,15 +189,6 @@ class TradeBalanceAndRoundingTestSuite
 
       val exchangeTx = matcherNode.transactionsByOrder(aliceOrderId).headOption.getOrElse(fail("Expected an exchange transaction"))
       nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
-
-      val aliceWavesBalanceAfter = matcherNode.accountBalances(aliceNode.address)._1
-      val bobWavesBalanceAfter   = matcherNode.accountBalances(bobNode.address)._1
-
-      val aliceUsdBalanceAfter = aliceNode.assetBalance(aliceNode.address, UsdId.base58).balance
-      val bobUsdBalanceAfter   = bobNode.assetBalance(bobNode.address, UsdId.base58).balance
-
-      val aliceWCTBalanceAfter = aliceNode.assetBalance(aliceNode.address, WctId.base58).balance
-      val bobWCTBalanceAfter   = bobNode.assetBalance(bobNode.address, WctId.base58).balance
 
       matcherNode.reservedBalance(bobNode)(s"$WctId") should be(wctUsdSellAmount - correctAmount(wctUsdBuyAmount, wctUsdPrice))
       matcherNode.tradableBalance(bobNode, wctUsdPair)(s"$WctId") shouldBe defaultAssetQuantity - wctUsdSellAmount
