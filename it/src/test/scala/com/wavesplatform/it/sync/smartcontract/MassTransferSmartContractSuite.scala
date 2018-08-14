@@ -31,7 +31,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
   test("airdrop emulation via MassTransfer") {
     val scriptText = {
       val untyped = Parser(s"""
-        match input {
+        match tx {
           case ttx: MassTransferTransaction =>
             let commonAmount = (ttx.transfers[0].amount + ttx.transfers[1].amount)
             let totalAmountToUsers = commonAmount == 8000000000
