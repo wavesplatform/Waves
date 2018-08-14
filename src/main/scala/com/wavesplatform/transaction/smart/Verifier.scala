@@ -22,7 +22,10 @@ object Verifier extends Instrumented with ScorexLogging {
   private val orderScriptExecutionTime = Kamon.metrics.histogram("order-script-execution-time")
   private val orderScriptExecuted      = Kamon.metrics.counter("order-script-executed")
 
-  private val signatureStats = Kamon.metrics.entity(TxMetrics, "signature-verification-stats")
+  private val txSignatureStats = Kamon.metrics.entity(TxMetrics, "signature-verification-stats")
+
+  private val orderSignatureChecked        = Kamon.metrics.counter("order-signature-verified")
+  private val orderSignatureProcessingTime = Kamon.metrics.histogram("order-signature-verification-time")
 
   private type TxOrd = Transaction :+: Order :+: CNil
 
@@ -37,11 +40,11 @@ object Verifier extends Instrumented with ScorexLogging {
               verifyTx(blockchain, script, currentBlockHeight, pt, false)
             }
           case (stx: SignedTransaction, None) =>
-            measureAndIncSuccessful(signatureStats.processingTime(stx.builder.typeId), signatureStats.processed(stx.builder.typeId)) {
+            measureAndIncSuccessful(txSignatureStats.processingTime(stx.builder.typeId), txSignatureStats.processed(stx.builder.typeId)) {
               stx.signaturesValid()
             }
           case _ =>
-            measureAndIncSuccessful(signatureStats.processingTime(pt.builder.typeId), signatureStats.processed(pt.builder.typeId)) {
+            measureAndIncSuccessful(txSignatureStats.processingTime(pt.builder.typeId), txSignatureStats.processed(pt.builder.typeId)) {
               verifyAsEllipticCurveSignature(pt)
             }
 
@@ -100,7 +103,7 @@ object Verifier extends Instrumented with ScorexLogging {
           measureAndIncSuccessful(txAccountScriptStats.processingTime(typeId), txAccountScriptStats.processed(typeId)) {
             verifyTx(blockchain, script, height, et, false)
         })
-        .getOrElse(measureAndIncSuccessful(signatureStats.processingTime(typeId), signatureStats.processed(typeId)) {
+        .getOrElse(measureAndIncSuccessful(txSignatureStats.processingTime(typeId), txSignatureStats.processed(typeId)) {
           verifyAsEllipticCurveSignature(et)
         })
 
@@ -109,10 +112,10 @@ object Verifier extends Instrumented with ScorexLogging {
         .accountScript(sellOrder.sender.toAddress)
         .map(script =>
           measureAndIncSuccessful(orderScriptExecutionTime, orderScriptExecuted) {
-            verifyOrder(blockchain, script, height, et)
+            verifyOrder(blockchain, script, height, sellOrder)
         })
-        .getOrElse(measureAndIncSuccessful(signatureStats.processingTime(typeId), signatureStats.processed(typeId)) {
-          verifyAsEllipticCurveSignature(et)
+        .getOrElse(measureAndIncSuccessful(orderSignatureProcessingTime, orderSignatureChecked) {
+          verifyAsEllipticCurveSignature(sellOrder)
         })
 
     lazy val buyerOrderVerification =
@@ -120,10 +123,10 @@ object Verifier extends Instrumented with ScorexLogging {
         .accountScript(buyOrder.sender.toAddress)
         .map(script =>
           measureAndIncSuccessful(orderScriptExecutionTime, orderScriptExecuted) {
-            verifyOrder(blockchain, script, height, et)
+            verifyOrder(blockchain, script, height, buyOrder)
         })
-        .getOrElse(measureAndIncSuccessful(signatureStats.processingTime(typeId), signatureStats.processed(typeId)) {
-          verifyAsEllipticCurveSignature(et)
+        .getOrElse(measureAndIncSuccessful(orderSignatureProcessingTime, orderSignatureChecked) {
+          verifyAsEllipticCurveSignature(buyOrder)
         })
 
     for {
