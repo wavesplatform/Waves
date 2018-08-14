@@ -114,9 +114,15 @@ class MatcherActor(orderHistory: ActorRef,
   }
 
   def createAndForward(order: Order): Unit = {
-    val orderBook = createOrderBook(order.assetPair)
-    persistAsync(OrderBookCreated(order.assetPair)) { _ =>
-      forwardReq(order)(orderBook)
+    val pair      = order.assetPair
+    val orderBook = createOrderBook(pair)
+    val md        = tradedPairs(pair)
+    if (order.price % md.zeros == 0) {
+      persistAsync(OrderBookCreated(pair)) { _ =>
+        forwardReq(order)(orderBook)
+      }
+    } else {
+      sender() ! OrderRejected(s"Invalid price. Last ${md.decs} digits should be zero")
     }
   }
 
@@ -281,7 +287,16 @@ object MatcherActor {
                         priceAssetName: String,
                         created: Long,
                         amountAssetInfo: Option[AssetInfo],
-                        priceAssetinfo: Option[AssetInfo])
+                        priceAssetinfo: Option[AssetInfo]) {
+    val (decs, zeros) = {
+      val decs = priceAssetinfo.map(_.decimals).getOrElse(0) - amountAssetInfo.map(_.decimals).getOrElse(0)
+      if (decs > 0) {
+        (decs, BigInt(10).pow(decs).toLong)
+      } else {
+        (0, 1L)
+      }
+    }
+  }
 
   def compare(buffer1: Option[Array[Byte]], buffer2: Option[Array[Byte]]): Int = {
     if (buffer1.isEmpty && buffer2.isEmpty) 0

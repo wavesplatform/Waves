@@ -219,8 +219,6 @@ object SyncHttpApi extends Assertions {
 
     def blockAt(height: Int): Block = Await.result(async(n).blockAt(height), RequestAwaitTime)
 
-    def blockHeadersSeq(from: Int, to: Int): Seq[BlockHeaders] = Await.result(async(n).blockHeadersSeq(from, to), RequestAwaitTime)
-
     def blockSeq(fromHeight: Int, toHeight: Int) = Await.result(async(n).blockSeq(fromHeight, toHeight), RequestAwaitTime)
 
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
