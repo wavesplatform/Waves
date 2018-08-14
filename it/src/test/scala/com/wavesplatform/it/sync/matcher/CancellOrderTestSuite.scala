@@ -50,8 +50,8 @@ class CancellOrderTestSuite
     matcherNode.cancelOrderWithApiKey(orderId)
     matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Cancelled", 1.minute)
 
-    matcherNode.fullOrderHistory(bobNode).head.status shouldBe "Cancelled"
-    matcherNode.orderHistoryByPair(bobNode, wavesUsdPair).head.status shouldBe "Cancelled"
+    matcherNode.fullOrderHistory(bobNode).filter(_.id == orderId).head.status shouldBe "Cancelled"
+    matcherNode.orderHistoryByPair(bobNode, wavesUsdPair).filter(_.id == orderId).head.status shouldBe "Cancelled"
     matcherNode.orderBook(wavesUsdPair).bids shouldBe empty
     matcherNode.orderBook(wavesUsdPair).asks shouldBe empty
 
@@ -60,8 +60,8 @@ class CancellOrderTestSuite
   "Alice and Bob trade WAVES-USD" - {
     "place usd-waves order" in {
       // Alice wants to sell USD for Waves
-      matcherNode.placeOrder(bobNode, wavesUsdPair, OrderType.SELL, 800, 100.waves).message.id
-      matcherNode.placeOrder(bobNode, wavesUsdPair, OrderType.SELL, 700, 100.waves).message.id
+      val orderId1      = matcherNode.placeOrder(bobNode, wavesUsdPair, OrderType.SELL, 800, 100.waves).message.id
+      val orderId2      = matcherNode.placeOrder(bobNode, wavesUsdPair, OrderType.SELL, 700, 100.waves).message.id
       val bobSellOrder3 = matcherNode.placeOrder(bobNode, wavesUsdPair, OrderType.SELL, 600, 100.waves).message.id
 
       matcherNode.fullOrderHistory(aliceNode)
@@ -74,7 +74,10 @@ class CancellOrderTestSuite
 
       Thread.sleep(2000)
       matcherNode.fullOrderHistory(aliceNode)
-      matcherNode.fullOrderHistory(bobNode).forall(_.status == "Accepted") shouldBe true
+      val orders = matcherNode.fullOrderHistory(bobNode)
+      for (orderId <- Seq(orderId1, orderId2)) {
+        orders.filter(_.id == orderId).head.status shouldBe "Accepted"
+      }
     }
 
   }
