@@ -3,24 +3,23 @@ package com.wavesplatform.utx
 import java.util.concurrent.ConcurrentHashMap
 
 import cats._
-import com.wavesplatform.metrics.Instrumented
+import com.wavesplatform.account.Address
+import com.wavesplatform.consensus.TransactionsOrdering
+import com.wavesplatform.metrics.{Instrumented, TxMetrics}
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import com.wavesplatform.state.{Blockchain, ByteStr, Diff, Portfolio}
-import kamon.Kamon
-import kamon.metric.instrument.{Time => KamonTime}
-import monix.eval.Task
-import monix.execution.Scheduler
-import monix.execution.schedulers.SchedulerService
-import com.wavesplatform.account.Address
-import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.utils.{ScorexLogging, Time}
+import kamon.Kamon
+import monix.eval.Task
+import monix.execution.Scheduler
+import monix.execution.schedulers.SchedulerService
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -53,9 +52,9 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
     scheduler.shutdown()
   }
 
-  private val utxPoolSizeStats    = Kamon.metrics.minMaxCounter("utx-pool-size", 500.millis)
-  private val processingTimeStats = Kamon.metrics.histogram("utx-transaction-processing-time", KamonTime.Milliseconds)
-  private val putRequestStats     = Kamon.metrics.counter("utx-pool-put-if-new")
+  private val utxPoolSizeStats   = Kamon.metrics.minMaxCounter("utx-pool-size", 500.millis)
+  private val utxProcessingStats = Kamon.metrics.entity(TxMetrics, "utx-processing")
+  private val putRequestStats    = Kamon.metrics.counter("utx-pool-put-if-new")
 
   private def removeExpired(currentTs: Long): Unit = {
     def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > utxSettings.maxTransactionAge
@@ -168,22 +167,20 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
 
   private def putIfNew(b: Blockchain, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
     putRequestStats.increment()
-    measureSuccessful(
-      processingTimeStats, {
-        for {
-          _    <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
-          _    <- checkNotBlacklisted(tx)
-          _    <- checkAlias(b, tx)
-          _    <- canReissue(b, tx)
-          _    <- feeCalculator.enoughFee(tx, blockchain, fs)
-          diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
-        } yield {
-          utxPoolSizeStats.increment()
-          pessimisticPortfolios.add(tx.id(), diff)
-          (Option(transactions.put(tx.id(), tx)).isEmpty, diff)
-        }
+    measureAndIncSuccessful(utxProcessingStats.processingTime(tx.builder.typeId), utxProcessingStats.processed(tx.builder.typeId)) {
+      for {
+        _    <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+        _    <- checkNotBlacklisted(tx)
+        _    <- checkAlias(b, tx)
+        _    <- canReissue(b, tx)
+        _    <- feeCalculator.enoughFee(tx, blockchain, fs)
+        diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
+      } yield {
+        utxPoolSizeStats.increment()
+        pessimisticPortfolios.add(tx.id(), diff)
+        (Option(transactions.put(tx.id(), tx)).isEmpty, diff)
       }
-    )
+    }
   }
 }
 
