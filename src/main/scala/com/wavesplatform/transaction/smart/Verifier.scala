@@ -16,8 +16,11 @@ import shapeless.{:+:, CNil, Coproduct}
 
 object Verifier extends Instrumented with ScorexLogging {
 
-  private val accountScriptStats = Kamon.metrics.entity(TxMetrics, "account-script-execution-stats")
-  private val assetScriptStats   = Kamon.metrics.entity(TxMetrics, "asset-script-execution-stats")
+  private val txAccountScriptStats = Kamon.metrics.entity(TxMetrics, "account-script-execution-stats")
+  private val assetScriptStats     = Kamon.metrics.entity(TxMetrics, "asset-script-execution-stats")
+
+  private val orderScriptExecutionTime = Kamon.metrics.histogram("order-script-execution-time")
+  private val orderScriptExecuted      = Kamon.metrics.counter("order-script-executed")
 
   private val signatureStats = Kamon.metrics.entity(TxMetrics, "signature-verification-stats")
 
@@ -28,9 +31,20 @@ object Verifier extends Instrumented with ScorexLogging {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
         (pt, blockchain.accountScript(pt.sender)) match {
-          case (et: ExchangeTransaction, scriptOpt) => verifyExchange(et, blockchain, scriptOpt, currentBlockHeight)case (_, Some(script))              => verifyTx(blockchain, script, currentBlockHeight, pt, false)
-          case (stx: SignedTransaction, None) =>measureAndIncSuccessful(signatureStats.processingTime(stx.builder.typeId), signatureStats.processed(stx.builder.typeId)) { stx.signaturesValid()}
-          case _                              => verifyAsEllipticCurveSignature(pt)
+          case (et: ExchangeTransaction, scriptOpt) => verifyExchange(et, blockchain, scriptOpt, currentBlockHeight)
+          case (_, Some(script)) =>
+            measureAndIncSuccessful(txAccountScriptStats.processingTime(pt.builder.typeId), txAccountScriptStats.processed(pt.builder.typeId)) {
+              verifyTx(blockchain, script, currentBlockHeight, pt, false)
+            }
+          case (stx: SignedTransaction, None) =>
+            measureAndIncSuccessful(signatureStats.processingTime(stx.builder.typeId), signatureStats.processed(stx.builder.typeId)) {
+              stx.signaturesValid()
+            }
+          case _ =>
+            measureAndIncSuccessful(signatureStats.processingTime(pt.builder.typeId), signatureStats.processed(pt.builder.typeId)) {
+              verifyAsEllipticCurveSignature(pt)
+            }
+
         }
     }).flatMap(tx => {
       for {
@@ -43,7 +57,11 @@ object Verifier extends Instrumented with ScorexLogging {
         }
 
         script <- blockchain.assetDescription(assetId).flatMap(_.script)
-      } yield verifyTx(blockchain, script, currentBlockHeight, tx, true)
+      } yield {
+        measureAndIncSuccessful(assetScriptStats.processingTime(tx.builder.typeId), assetScriptStats.processed(tx.builder.typeId)) {
+          verifyTx(blockchain, script, currentBlockHeight, tx, true)
+        }
+      }
     }.getOrElse(Either.right(tx)))
 
   def verifyTx(blockchain: Blockchain,
@@ -56,24 +74,6 @@ object Verifier extends Instrumented with ScorexLogging {
       case (ctx, Right(false)) =>
         Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, isTokenScript))
       case (_, Right(true)) => Right(transaction)
-  def verify(blockchain: Blockchain,
-             script: Script,
-             height: Int,
-             transaction: Transaction,
-             isTokenScript: Boolean): Either[ValidationError, Transaction] = {
-    val stats =
-      if (isTokenScript) assetScriptStats
-      else accountScriptStats
-
-    val txTypeId = transaction.builder.typeId
-
-    measureAndIncSuccessful(stats.processingTime(txTypeId), stats.processed(txTypeId)) {
-      ScriptRunner[Boolean](height, Coproduct(transaction), blockchain, script) match {
-        case (ctx, Left(execError)) => Left(ScriptExecutionError(script.text, execError, ctx.letDefs, isTokenScript))
-        case (ctx, Right(false)) =>
-          Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, isTokenScript))
-        case (_, Right(true)) => Right(transaction)
-      }
     }
   }
 
@@ -90,26 +90,41 @@ object Verifier extends Instrumented with ScorexLogging {
                      blockchain: Blockchain,
                      matcherScriptOpt: Option[Script],
                      height: Int): Either[ValidationError, Transaction] = {
-
+    val typeId    = et.builder.typeId
     val sellOrder = et.sellOrder
     val buyOrder  = et.buyOrder
 
     lazy val matcherTxVerification =
       matcherScriptOpt
-        .map(verifyTx(blockchain, _, height, et, false))
-        .getOrElse(verifyAsEllipticCurveSignature(et))
+        .map(script =>
+          measureAndIncSuccessful(txAccountScriptStats.processingTime(typeId), txAccountScriptStats.processed(typeId)) {
+            verifyTx(blockchain, script, height, et, false)
+        })
+        .getOrElse(measureAndIncSuccessful(signatureStats.processingTime(typeId), signatureStats.processed(typeId)) {
+          verifyAsEllipticCurveSignature(et)
+        })
 
     lazy val sellerOrderVerification =
       blockchain
         .accountScript(sellOrder.sender.toAddress)
-        .map(verifyOrder(blockchain, _, height, sellOrder))
-        .getOrElse(verifyAsEllipticCurveSignature(sellOrder))
+        .map(script =>
+          measureAndIncSuccessful(orderScriptExecutionTime, orderScriptExecuted) {
+            verifyOrder(blockchain, script, height, et)
+        })
+        .getOrElse(measureAndIncSuccessful(signatureStats.processingTime(typeId), signatureStats.processed(typeId)) {
+          verifyAsEllipticCurveSignature(et)
+        })
 
     lazy val buyerOrderVerification =
       blockchain
         .accountScript(buyOrder.sender.toAddress)
-        .map(verifyOrder(blockchain, _, height, buyOrder))
-        .getOrElse(verifyAsEllipticCurveSignature(buyOrder))
+        .map(script =>
+          measureAndIncSuccessful(orderScriptExecutionTime, orderScriptExecuted) {
+            verifyOrder(blockchain, script, height, et)
+        })
+        .getOrElse(measureAndIncSuccessful(signatureStats.processingTime(typeId), signatureStats.processed(typeId)) {
+          verifyAsEllipticCurveSignature(et)
+        })
 
     for {
       _ <- matcherTxVerification
@@ -125,17 +140,5 @@ object Verifier extends Instrumented with ScorexLogging {
                     pt,
                     GenericError(s"Script doesn't exist and proof doesn't validate as signature for $pt"))
       case _ => Left(GenericError("Transactions from non-scripted accounts must have exactly 1 proof"))
-  def verifyAsEllipticCurveSignature(pt: ProvenTransaction): Either[ValidationError, ProvenTransaction] = {
-    val txTypeId = pt.builder.typeId
-    measureAndIncSuccessful(signatureStats.processingTime(txTypeId), signatureStats.processed(txTypeId)) {
-      pt.proofs.proofs match {
-        case p :: Nil =>
-          Either.cond(crypto.verify(p.arr, pt.bodyBytes(), pt.sender.publicKey),
-                      pt,
-                      GenericError(s"Script doesn't exist and proof doesn't validate as signature for $pt"))
-        case _ => Left(GenericError("Transactions from non-scripted accounts must have exactly 1 proof"))
-      }
     }
-  }
-
 }
