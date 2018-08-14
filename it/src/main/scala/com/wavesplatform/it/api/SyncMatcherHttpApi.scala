@@ -1,14 +1,12 @@
 package com.wavesplatform.it.api
 
-import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
+import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.{Assertions, Matchers}
 import play.api.libs.json.{Format, Json, Writes}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.state.ByteStr
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -102,8 +100,7 @@ object SyncMatcherHttpApi extends Assertions {
       val matcherPublicKey    = m.publicKey
       val unsigned =
         Order(node.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, 300000, Proofs.empty, version)
-      val signature = crypto.sign(node.privateKey, unsigned.bodyBytes())
-      unsigned.updateProofs(Proofs(Seq(ByteStr(signature))))
+      Order.sign(unsigned, node.privateKey)
     }
   }
 
