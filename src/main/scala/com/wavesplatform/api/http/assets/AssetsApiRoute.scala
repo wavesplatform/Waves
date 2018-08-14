@@ -2,23 +2,23 @@ package com.wavesplatform.api.http.assets
 
 import akka.http.scaladsl.server.Route
 import com.google.common.base.Charsets
-import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{Blockchain, ByteStr}
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
-import io.swagger.annotations._
-import javax.ws.rs.Path
-import play.api.libs.json._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http._
 import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.utils.{Base58, Time}
+import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory}
+import com.wavesplatform.utils.{Base58, Time}
+import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
+import io.netty.channel.group.ChannelGroup
+import io.swagger.annotations._
+import javax.ws.rs.Path
+import play.api.libs.json._
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -100,9 +100,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.api.http.assets.TransferV2Request",
-        defaultValue =
-          "{\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500,\"feeAssetId\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\",\"fee\":1579331567487095949,\"timestamp\":4231642878298810008}"
+        dataType = "com.wavesplatform.api.http.assets.TransferV2Request"
       )
     ))
   def transfer: Route =
@@ -131,9 +129,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.api.http.assets.MassTransferRequest",
-        defaultValue =
-          "{\"version\": 1, \"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"transfers\":(\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",100000000),\"fee\":100000,\"timestamp\":1517315595291}"
+        dataType = "com.wavesplatform.api.http.assets.MassTransferRequest"
       )
     ))
   def massTransfer: Route =
@@ -149,7 +145,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         required = true,
         paramType = "body",
         dataType = "com.wavesplatform.api.http.assets.IssueV1Request",
-        defaultValue =
+        example =
           "{\"sender\":\"string\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000,\"decimals\":7,\"reissuable\":false,\"fee\":100000000}"
       )
     ))
@@ -166,7 +162,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         required = true,
         paramType = "body",
         dataType = "com.wavesplatform.api.http.assets.ReissueV1Request",
-        defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100000,\"reissuable\":false,\"fee\":1}"
+        example = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100000,\"reissuable\":false,\"fee\":1}"
       )
     ))
   def reissue: Route =
@@ -186,7 +182,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         required = true,
         paramType = "body",
         dataType = "com.wavesplatform.api.http.assets.BurnV1Request",
-        defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100,\"fee\":100000}"
+        example = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100,\"fee\":100000}"
       )
     ))
   def burnRoute: Route =
