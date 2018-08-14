@@ -221,8 +221,10 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
         resp.lastPrice shouldBe Some(2.waves * Order.PriceConstant)
         resp.lastSide shouldBe Some("sell")
-        resp.bestBid shouldBe Some(2.waves * Order.PriceConstant)
-        resp.bestAsk shouldBe None
+        resp.bid shouldBe Some(2.waves * Order.PriceConstant)
+        resp.bidAmount shouldBe Some(30)
+        resp.ask shouldBe None
+        resp.askAmount shouldBe None
       }
 
       "request order book for blacklisted pair" in {

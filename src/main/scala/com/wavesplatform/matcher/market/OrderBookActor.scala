@@ -203,9 +203,10 @@ class OrderBookActor(assetPair: AssetPair,
   }
 
   private def handleGetMarketStatus(pair: AssetPair): Unit = {
-    if (pair == assetPair) {
-      sender() ! GetMarketStatusResponse(pair, orderBook.bids.headOption.map(_._1), orderBook.asks.headOption.map(_._1), lastTrade)
-    } else sender() ! GetMarketStatusResponse(pair, None, None, None)
+    if (pair == assetPair)
+      sender() ! GetMarketStatusResponse(pair, orderBook.bids.headOption, orderBook.asks.headOption, lastTrade)
+    else
+      sender() ! GetMarketStatusResponse(pair, None, None, None)
   }
 
   private def onAddOrder(order: Order): Unit = {
@@ -414,13 +415,20 @@ object OrderBookActor {
     def empty(pair: AssetPair): GetOrderBookResponse = GetOrderBookResponse(pair, Seq(), Seq())
   }
 
-  case class GetMarketStatusResponse(pair: AssetPair, bid: Option[Price], ask: Option[Price], last: Option[Order]) extends MatcherResponse {
-    def json: JsValue = Json.obj(
-      "lastPrice" -> last.map(_.price),
-      "lastSide"  -> last.map(_.orderType.toString),
-      "bestBid"   -> bid,
-      "bestAsk"   -> ask
-    )
+  case class GetMarketStatusResponse(pair: AssetPair,
+                                     bid: Option[(Price, Level[LimitOrder])],
+                                     ask: Option[(Price, Level[LimitOrder])],
+                                     last: Option[Order])
+      extends MatcherResponse {
+    def json: JsValue =
+      Json.obj(
+        "lastPrice" -> last.map(_.price),
+        "lastSide"  -> last.map(_.orderType.toString),
+        "bid"       -> bid.map(_._1),
+        "bidAmount" -> bid.map(_._2.map(_.amount).sum),
+        "ask"       -> ask.map(_._1),
+        "askAmount" -> ask.map(_._2.map(_.amount).sum)
+      )
     val code = StatusCodes.OK
   }
 
