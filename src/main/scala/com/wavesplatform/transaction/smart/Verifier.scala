@@ -16,16 +16,16 @@ import shapeless.{:+:, CNil, Coproduct}
 
 object Verifier extends Instrumented with ScorexLogging {
 
-  private val txAccountScriptStats = Kamon.metrics.entity(TxMetrics, "account-script-execution-stats")
-  private val assetScriptStats     = Kamon.metrics.entity(TxMetrics, "asset-script-execution-stats")
+  private lazy val txAccountScriptStats = Kamon.metrics.entity(TxMetrics, "account-script-execution-stats")
+  private lazy val assetScriptStats     = Kamon.metrics.entity(TxMetrics, "asset-script-execution-stats")
 
-  private val orderScriptExecutionTime = Kamon.metrics.histogram("order-script-execution-time")
-  private val orderScriptExecuted      = Kamon.metrics.counter("order-script-executed")
+  private lazy val orderScriptExecutionTime = Kamon.metrics.histogram("order-script-execution-time")
+  private lazy val orderScriptExecuted      = Kamon.metrics.counter("order-script-executed")
 
-  private val txSignatureStats = Kamon.metrics.entity(TxMetrics, "signature-verification-stats")
+  private lazy val txSignatureStats = Kamon.metrics.entity(TxMetrics, "signature-verification-stats")
 
-  private val orderSignatureChecked        = Kamon.metrics.counter("order-signature-verified")
-  private val orderSignatureProcessingTime = Kamon.metrics.histogram("order-signature-verification-time")
+  private lazy val orderSignatureChecked        = Kamon.metrics.counter("order-signature-verified")
+  private lazy val orderSignatureProcessingTime = Kamon.metrics.histogram("order-signature-verification-time")
 
   private type TxOrd = Transaction :+: Order :+: CNil
 

@@ -9,6 +9,8 @@ class TxMetrics(instrumentFactory: InstrumentFactory) extends GenericEntityRecor
 
   private val txIdentifiers = TransactionParsers.all.values.toList.map { builder =>
     val txTypeName = builder.typeId match {
+      case 1  => "Genesis"
+      case 2  => "Payment"
       case 3  => "Issue"
       case 4  => "Transfer"
       case 5  => "Reissue"
