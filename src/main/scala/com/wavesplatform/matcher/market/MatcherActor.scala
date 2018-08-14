@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.market
 
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorRef, Props, Terminated}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence.{PersistentActor, RecoveryCompleted, _}
 import com.google.common.base.Charsets
@@ -168,7 +168,12 @@ class MatcherActor(orderHistory: ActorRef,
         )
       }
 
-      context.actorOf(Props(classOf[GracefulShutdownActor], context.children.toVector, self))
+      if (context.children.isEmpty) {
+        shutdownStatus = shutdownStatus.copy(orderBooksStopped = true)
+        shutdownStatus.tryComplete()
+      } else {
+        context.actorOf(Props(classOf[GracefulShutdownActor], context.children.toVector, self))
+      }
   }
 
   def initPredefinedPairs(): Unit = {
@@ -348,12 +353,12 @@ object MatcherActor {
   }
 
   class GracefulShutdownActor(children: Vector[ActorRef], receiver: ActorRef) extends Actor {
-    children.foreach(_ ! Shutdown)
+    children.map(context.watch).foreach(_ ! Shutdown)
 
     override def receive: Receive = state(children.size)
 
     private def state(expectedResponses: Int): Receive = {
-      case ShutdownComplete =>
+      case _: Terminated =>
         if (expectedResponses > 1) context.become(state(expectedResponses - 1))
         else {
           receiver ! ShutdownComplete
