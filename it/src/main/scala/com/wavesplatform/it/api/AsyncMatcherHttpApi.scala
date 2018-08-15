@@ -1,7 +1,5 @@
 package com.wavesplatform.it.api
 
-import java.io
-
 import com.google.common.primitives.Longs
 import com.wavesplatform.crypto
 import com.wavesplatform.http.api_key
@@ -80,14 +78,14 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherGet(s"/matcher/orderbook/$amountAsset/$priceAsset").as[OrderBookResponse]
     }
 
-    def parseAssetPair(assetPair: AssetPair): (io.Serializable, io.Serializable) = {
+    def parseAssetPair(assetPair: AssetPair): (String, String) = {
       val amountAsset = assetPair.amountAsset match {
         case None => "WAVES"
-        case _    => assetPair.amountAsset.get
+        case _    => assetPair.amountAsset.get.base58
       }
       val priceAsset = assetPair.priceAsset match {
         case None => "WAVES"
-        case _    => assetPair.priceAsset.get
+        case _    => assetPair.priceAsset.get.base58
       }
       (amountAsset, priceAsset)
     }
