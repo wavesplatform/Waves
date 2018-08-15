@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTra
 import com.wavesplatform.utils.Base58
 import monix.eval.Coeval
 import play.api.libs.json.{Format, JsObject, JsValue, Json}
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 
 import scala.util.{Either, Failure, Success, Try}
 

@@ -6,7 +6,7 @@ import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, Exc
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
-import scorex.crypto.signatures.Curve25519
+import com.wavesplatform.crypto._
 
 import scala.util.{Failure, Success, Try}
 
@@ -15,7 +15,7 @@ object TransactionParsers {
   val TimestampLength            = 8
   val AmountLength               = 8
   val TypeLength                 = 1
-  val SignatureStringLength: Int = base58Length(Curve25519.SignatureLength)
+  val SignatureStringLength: Int = base58Length(SignatureLength)
 
   private val old: Map[Byte, TransactionParser] = Seq[TransactionParser](
     GenesisTransaction,

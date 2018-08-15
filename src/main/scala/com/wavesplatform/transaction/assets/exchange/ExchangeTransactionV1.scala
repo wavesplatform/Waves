@@ -9,7 +9,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction._
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 
 import scala.util.{Failure, Success, Try}
 

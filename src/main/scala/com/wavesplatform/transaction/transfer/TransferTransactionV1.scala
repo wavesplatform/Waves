@@ -6,7 +6,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction._
 import monix.eval.Coeval
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 
 import scala.util.{Failure, Success, Try}
 
