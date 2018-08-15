@@ -14,7 +14,7 @@ case class OrderInfoDiff(addExecutedAmount: Option[Long] = None,
                          executedFee: Option[Long] = None,
                          lastSpend: Option[Long] = None)
 
-case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: Option[Long], remainingFee: Long, unsafeTotalSpend: Long) {
+case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: Option[Long], remainingFee: Long, unsafeTotalSpend: Option[Long]) {
   def remaining: Long = if (canceled) 0L else amount - filled
 
   /**
@@ -23,8 +23,7 @@ case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: O
     * @return
     */
   def totalSpend(orig: LimitOrder): Long =
-    if (unsafeTotalSpend == Long.MinValue) orig.getRawSpendAmount - orig.partial(filled, orig.order.matcherFee - remainingFee).getSpendAmount
-    else unsafeTotalSpend
+    unsafeTotalSpend.getOrElse(orig.getRawSpendAmount - orig.partial(filled, orig.order.matcherFee - remainingFee).getSpendAmount)
 
   def status: LimitOrder.OrderStatus = {
     if (amount == 0) LimitOrder.NotFound
@@ -43,7 +42,7 @@ object OrderInfo {
   def safeSum(x: Long, y: Long): Long         = Try(Math.addExact(x, y)).getOrElse(Long.MaxValue)
   implicit val longSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
 
-  val empty = OrderInfo(0L, 0L, false, None, 0L, 0L)
+  val empty = OrderInfo(0L, 0L, false, None, 0L, Some(0L))
 
   implicit val orderInfoFormat: Format[OrderInfo] = Json.format[OrderInfo]
 

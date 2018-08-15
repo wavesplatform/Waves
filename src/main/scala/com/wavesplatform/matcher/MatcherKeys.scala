@@ -2,13 +2,13 @@ package com.wavesplatform.matcher
 
 import java.nio.ByteBuffer
 
+import com.google.common.primitives.Longs
 import com.wavesplatform.database.Key
 import com.wavesplatform.matcher.model.OrderInfo
 import com.wavesplatform.state.ByteStr
 import scorex.account.Address
 import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
-import com.google.common.primitives.Longs
 
 object MatcherKeys {
   import com.wavesplatform.database.KeyHelpers._
@@ -26,24 +26,26 @@ object MatcherKeys {
   )
   def orderInfo(orderId: ByteStr): Key[OrderInfo] = Key(
     bytes(2, orderId.arr),
-    Option(_).fold[OrderInfo](OrderInfo.empty)(orderInfoParser),
-    oi =>
-      ByteBuffer
-        .allocate(41)
+    Option(_).fold[OrderInfo](OrderInfo.empty)(orderInfoParser), { oi =>
+      val allocateBytes = if (oi.unsafeTotalSpend.isEmpty) 33 else 41
+      val buf = ByteBuffer
+        .allocate(allocateBytes)
         .putLong(oi.amount)
         .putLong(oi.filled)
         .put(if (oi.canceled) 1.toByte else 0.toByte)
         .putLong(oi.minAmount.getOrElse(0L))
         .putLong(oi.remainingFee)
-        .putLong(oi.unsafeTotalSpend)
-        .array()
+
+      oi.unsafeTotalSpend.foreach(buf.putLong)
+      buf.array()
+    }
   )
   private def orderInfoParser(input: Array[Byte]): OrderInfo = {
     val bb = ByteBuffer.wrap(input)
     input.length match {
-      case 17 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, None, 0, Long.MinValue)
-      case 33 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, Some(bb.getLong), bb.getLong, Long.MinValue)
-      case 41 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, Some(bb.getLong), bb.getLong, bb.getLong)
+      case 17 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, None, 0, None)
+      case 33 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, Some(bb.getLong), bb.getLong, None)
+      case 41 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, Some(bb.getLong), bb.getLong, Some(bb.getLong))
     }
   }
 

@@ -51,7 +51,7 @@ class OrderHistorySpecification
     val info = oh.orderInfo(ord.id())
     withClue("info") {
       info.status shouldBe LimitOrder.Accepted
-      info shouldBe OrderInfo(ord.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, 0L)
+      info shouldBe OrderInfo(ord.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, Some(0L))
     }
 
     withClue("reserved assets") {
@@ -72,7 +72,7 @@ class OrderHistorySpecification
     val info = oh.orderInfo(ord.id())
     withClue("info") {
       info.status shouldBe LimitOrder.Accepted
-      info shouldBe OrderInfo(ord.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, 0L)
+      info shouldBe OrderInfo(ord.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, Some(0L))
     }
 
     withClue("reserved assets") {
@@ -94,7 +94,7 @@ class OrderHistorySpecification
     val info = oh.orderInfo(ord.id())
     withClue("info") {
       info.status shouldBe LimitOrder.Accepted
-      info shouldBe OrderInfo(ord.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, 0L)
+      info shouldBe OrderInfo(ord.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, Some(0L))
     }
 
     withClue("reserved assets considering amount of received WAVES") {
@@ -251,7 +251,7 @@ class OrderHistorySpecification
     withClue(s"counter: ${submitted.id()}") {
       counterOrderInfo.filled shouldBe exec.executedAmount
 
-      // exec.counterRemainingAmount shouldBe 420171L
+      exec.counterRemainingAmount shouldBe 420171L
       exec.counterRemainingAmount shouldBe counter.amount - exec.executedAmount
       exec.counterRemainingAmount shouldBe counterOrderInfo.remaining
 
@@ -274,17 +274,17 @@ class OrderHistorySpecification
     }
 
     // see OrderBookActor.handleMatchEvent
-    // oh.orderAccepted(OrderAdded(exec.submitted.partial(exec.submittedRemainingAmount, exec.submittedRemainingFee)))
+    oh.orderAccepted(OrderAdded(exec.submittedRemaining))
 
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
-      val remainingSpend = counter.amount - counterOrderInfo.unsafeTotalSpend
+      val remainingSpend = counter.amount - counterOrderInfo.totalSpend(LimitOrder(counter))
       oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe remainingSpend + counterOrderInfo.remainingFee
       oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
       activeOrderIds(counter.senderPublicKey, Set(None)) shouldBe Seq(counter.id())
     }
 
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
-      oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L // -1 because it unspent 1 asset
+      oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
       oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
       activeOrderIds(submitted.senderPublicKey, Set(None)) shouldBe empty
     }
@@ -298,19 +298,9 @@ class OrderHistorySpecification
     println("\norderAccepted start\n")
     // check info
     oh.orderAccepted(OrderAdded(LimitOrder(counter)))
-    println("\norderAccepted end\n")
-
-    // check info
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
-
-    println(s"""|
-                |submitted:
-                |will receive: ${exec.submitted.getReceiveAmount} ${exec.submitted.rcvAsset}
-                |will spend: ${exec.submitted.getSpendAmount} ${exec.submitted.spentAsset}
-                |""".stripMargin)
-    println("\norderExecuted start\n")
     oh.orderExecuted(exec)
-    println("\norderExecuted end\n")
+    oh.orderAccepted(OrderAdded(exec.submittedRemaining))
 
     val counterOrderInfo = oh.orderInfo(counter.id())
     withClue(s"counter: ${counter.id()}") {
@@ -333,9 +323,6 @@ class OrderHistorySpecification
 
       submittedOrderInfo.status shouldBe LimitOrder.PartiallyFilled(100000000)
     }
-
-    // OLD LINE
-    // oh.orderAccepted(OrderAdded(exec.submitted.partial(exec.submittedRemainingAmount, 0)))
 
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
       oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe
@@ -384,15 +371,14 @@ class OrderHistorySpecification
 
     println(s"==== before executed 2")
     val exec2 = OrderExecuted(LimitOrder(submitted2), exec1.counterRemaining) // ord1
+    oh.orderExecuted(exec2)
+    oh.orderAccepted(OrderAdded(exec2.submittedRemaining))
     println(s"==== after executed 2")
 
     println(s"""== order executed: ${submitted2.id()}, ${exec1.counter.order.id()}
                |exec2.counterRemaining (counter: ${counter.id()}): ${exec2.counterRemaining}
                |exec2.submittedRemaining (submitted2: ${submitted2.id()}): ${exec2.submittedRemaining}
                |""".stripMargin)
-    oh.orderExecuted(exec2)
-//    oh.orderAccepted(OrderAdded(exec2.submitted.partial(exec2.submittedRemainingAmount, exec1.submittedRemainingFee)))
-//    println(s"==    order added: ${exec2.submitted.order.id()}")
 
     println(s"""
          |orderInfo:
@@ -416,8 +402,7 @@ class OrderHistorySpecification
     exec2.submittedRemainingFee shouldBe submitted2Info1.remainingFee
     oh.orderInfo(submitted2.id()).status shouldBe LimitOrder.PartiallyFilled(50000000)
 
-    // OLD LINE
-    // oh.orderAccepted(OrderAdded(exec2.submitted.partial(exec2.submittedRemainingAmount, 0)))
+    oh.orderAccepted(OrderAdded(exec2.submittedRemaining))
 
     oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
     oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0L
@@ -435,7 +420,8 @@ class OrderHistorySpecification
          |o3Info2.remaining: ${submitted2Info1.remaining}
          |""".stripMargin)
     withClue(s"account checks, ord3.senderPublicKey: ${submitted2.senderPublicKey}, ord3.order.id=${submitted2.id()}") {
-      val remainingSpend = LimitOrder(submitted2).getSpendAmount - submitted2Info1.unsafeTotalSpend
+      val lo             = LimitOrder(submitted2)
+      val remainingSpend = lo.getSpendAmount - submitted2Info1.totalSpend(lo)
       oh.openVolume(submitted2.senderPublicKey, pair.amountAsset) shouldBe (remainingSpend + submitted2Info1.remainingFee) // ord3.matcherFee * 3 / 8 + 30000000L // or it's ok?
       oh.openVolume(submitted2.senderPublicKey, pair.priceAsset) shouldBe 0L
       activeOrderIds(submitted2.senderPublicKey, Set(pair.amountAsset)) shouldBe Seq(submitted2.id())
@@ -458,8 +444,7 @@ class OrderHistorySpecification
 
     val exec1 = OrderExecuted(LimitOrder(submitted), LimitOrder(counter1))
     oh.orderExecuted(exec1)
-    // ADD OLD LINE
-    // orderAccepted
+    oh.orderAccepted(OrderAdded(exec1.submittedRemaining))
     oh.orderExecuted(OrderExecuted(exec1.submittedRemaining, LimitOrder(counter2)))
 
     oh.orderInfo(submitted.id()).status shouldBe LimitOrder.Filled(350)
@@ -559,8 +544,7 @@ class OrderHistorySpecification
     val expectedAmountReserved = counterOrderInfo.remainingFee + submittedOrderInfo.remaining + submittedOrderInfo.remainingFee
     expectedAmountReserved shouldBe 110157143L
 
-    // OLD LINE
-    // oh.orderAccepted(OrderAdded(exec.submitted.partial(exec.submittedRemainingAmount, 0)))
+    oh.orderAccepted(OrderAdded(exec.submittedRemaining))
 
     // check price
     oh.openVolume(pk, pair.amountAsset) shouldBe expectedAmountReserved
@@ -633,7 +617,8 @@ class OrderHistorySpecification
     println(s"expectedAmountReserved = $expectedAmountReserved")
     oh.openVolume(pk, pair.amountAsset) shouldBe 0 // We receive 210000000 >> 300000 WAVES
 
-    val expectedPriceReserved = LimitOrder(counter).getSpendAmount - counterInfo.unsafeTotalSpend
+    val counterLo             = LimitOrder(counter)
+    val expectedPriceReserved = counterLo.getSpendAmount - counterInfo.totalSpend(counterLo)
     println(s"expectedPriceReserved = $expectedPriceReserved")
     oh.openVolume(pk, pair.priceAsset) shouldBe expectedPriceReserved // was 0.0008 * 110000000L
 
@@ -657,8 +642,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord3)))
     val exec = OrderExecuted(LimitOrder(ord4), LimitOrder(ord1))
     oh.orderExecuted(exec)
-    //oh.orderAccepted(OrderAdded(exec.submittedRemaining))
-    //oh.orderAccepted(OrderAdded(LimitOrder.limitOrder(ord4.price, 1000000000, 0, ord4)))
+    oh.orderAccepted(OrderAdded(exec.submittedRemaining))
     oh.orderCanceled(OrderCanceled(LimitOrder(ord3), unmatchable = false))
     oh.orderAccepted(OrderAdded(LimitOrder(ord5)))
 

@@ -35,7 +35,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
           canceled = diff.nowCanceled.getOrElse(false),
           minAmount = diff.newMinAmount,
           remainingFee = remainingFee,
-          unsafeTotalSpend = diff.lastSpend.getOrElse(0L)
+          unsafeTotalSpend = diff.lastSpend.orElse(Some(0L))
         )
       case Some(x) =>
         OrderInfo(
@@ -44,7 +44,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
           canceled = diff.nowCanceled.getOrElse(x.canceled),
           minAmount = diff.newMinAmount.orElse(x.minAmount),
           remainingFee = x.remainingFee - diff.executedFee.getOrElse(0L),
-          unsafeTotalSpend = OrderInfo.safeSum(x.totalSpend(LimitOrder(order)), diff.lastSpend.getOrElse(0L))
+          unsafeTotalSpend = Some(OrderInfo.safeSum(x.totalSpend(LimitOrder(order)), diff.lastSpend.getOrElse(0L)))
         )
     }
 
@@ -136,24 +136,26 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
     println(s"orderAccepted for ${event.order.order.id()} prev order info: ${orderInfo(lo.order.id())}")
     val updated = saveOrderInfo(rw, event)
 
-    val opDiff = diffAccepted(updated(lo.order.id()))
-    println(s"""|
+    if (updated(lo.order.id()).origInfo.isEmpty) {
+      val opDiff = diffAccepted(updated(lo.order.id()))
+      println(s"""|
                 |orderAccepted:
                 |opDiff:
                 |${toString(opDiff)}
                 |
                 |""".stripMargin)
-    saveOpenVolume(rw, opDiff)
+      saveOpenVolume(rw, opDiff)
 
-    // for OrderAdded events, updatedInfo contains just one element
-    for (x <- updated.values) {
-      val o         = x.order
-      val k         = MatcherKeys.addressOrdersSeqNr(o.senderPublicKey)
-      val nextSeqNr = rw.get(k) + 1
-      rw.put(k, nextSeqNr)
+      // for OrderAdded events, updatedInfo contains just one element
+      for (x <- updated.values) {
+        val o         = x.order
+        val k         = MatcherKeys.addressOrdersSeqNr(o.senderPublicKey)
+        val nextSeqNr = rw.get(k) + 1
+        rw.put(k, nextSeqNr)
 
-      val spendAssetId = if (o.orderType == OrderType.BUY) o.assetPair.priceAsset else o.assetPair.amountAsset
-      rw.put(MatcherKeys.addressOrders(o.senderPublicKey, nextSeqNr), Some(OrderAssets(o.id(), spendAssetId)))
+        val spendAssetId = if (o.orderType == OrderType.BUY) o.assetPair.priceAsset else o.assetPair.amountAsset
+        rw.put(MatcherKeys.addressOrders(o.senderPublicKey, nextSeqNr), Some(OrderAssets(o.id(), spendAssetId)))
+      }
     }
 
     println(s"orderAccepted end: $event")
@@ -253,11 +255,11 @@ object OrderHistory {
   }
 
   def diffAccepted(change: OrderInfoChange): Map[Address, OpenPortfolio] = {
-    import change.{order, updatedInfo => newOrderInfo}
+    import change._
     val lo             = LimitOrder(order)
     val maxSpendAmount = lo.getRawSpendAmount
-    val remainingSpend = maxSpendAmount - newOrderInfo.totalSpend(lo)
-    val remainingFee   = if (lo.feeAcc == lo.rcvAcc) math.max(newOrderInfo.remainingFee - lo.getReceiveAmount, 0L) else newOrderInfo.remainingFee
+    val remainingSpend = maxSpendAmount - updatedInfo.totalSpend(lo)
+    val remainingFee   = if (lo.feeAcc == lo.rcvAcc) math.max(updatedInfo.remainingFee - lo.getReceiveAmount, 0L) else updatedInfo.remainingFee
 
     println(s"orderInfoDiffNew: remaining spend=$remainingSpend, remaining fee=$remainingFee")
     Map(
