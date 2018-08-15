@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.matcher
 
-import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
