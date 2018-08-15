@@ -330,7 +330,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         }
       }
 
-      "cancel orders by pair" in {
+      "cancel orders by pair" ignore {
         val ordersToCancel = fileOrders(orderLimit + ordersNum, aliceWavesPair)
         val ordersToRetain = fileOrders(ordersNum, aliceWavesPair2)
         val ts             = Some(System.currentTimeMillis)
@@ -352,7 +352,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         assertBadRequest(matcherNode.cancelOrder(aliceNode, aliceWavesPair, None, ts))
       }
 
-      "cancel all orders" in {
+      "cancel all orders" ignore {
         val orders1 = fileOrders(orderLimit + ordersNum, aliceWavesPair)
         val orders2 = fileOrders(orderLimit + ordersNum, aliceWavesPair2)
         val ts      = Some(System.currentTimeMillis)
