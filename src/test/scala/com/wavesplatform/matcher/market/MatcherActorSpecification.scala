@@ -4,6 +4,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.model.StatusCodes
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.StatusCodeMatcherResponse
 import com.wavesplatform.matcher.fixtures.RestartableActor
@@ -14,16 +15,16 @@ import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, Valida
 import com.wavesplatform.matcher.model.LevelAgg
 import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, LeaseBalance, Portfolio}
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
-import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.utils.{NTP, ScorexLogging}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.utils.{NTP, ScorexLogging}
+import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
+import io.netty.channel.group.ChannelGroup
+import org.scalamock.scalatest.PathMockFactory
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 
 import scala.concurrent.duration.DurationInt
 
@@ -163,9 +164,54 @@ class MatcherActorSpecification
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid AssetPair"))
     }
 
+    "Reject order when script fails" in {
+      val sender = PrivateKeyAccount("Trader#1".getBytes)
+
+      val script = ScriptCompiler(
+        """
+          |match tx {
+          |  case _: Order => false
+          |  case _ => false
+          |}
+        """.stripMargin
+      ).explicitGet()._1
+
+      val order = Order(
+        sender,
+        MatcherAccount,
+        AssetPair(strToSomeAssetId("asset#2"), strToSomeAssetId("asset#1")),
+        OrderType.BUY,
+        100000000L,
+        100L,
+        1L,
+        1000L,
+        100000L,
+        1: Byte
+      )
+
+      (blockchain.accountScript _)
+        .when(order.sender.toAddress)
+        .returns(Some(script))
+
+      (blockchain.accountScript _)
+        .when(MatcherAccount.toAddress)
+        .returns(None)
+
+      actor ! order
+      expectMsg(StatusCodeMatcherResponse(StatusCodes.Forbidden, "Order not allowed by sender script"))
+    }
+
     "restore OrderBook after restart" in {
       val pair  = AssetPair(strToSomeAssetId("123"), None)
       val order = buy(pair, 1, 2000)
+
+      (blockchain.accountScript _)
+        .when(order.sender.toAddress)
+        .returns(None)
+
+      (blockchain.accountScript _)
+        .when(order.matcherPublicKey.toAddress)
+        .returns(None)
 
       actor ! order
       expectMsg(OrderAccepted(order))
@@ -181,6 +227,14 @@ class MatcherActorSpecification
 
       val pair  = AssetPair(a2, a1)
       val order = buy(pair, 1, 2000)
+
+      (blockchain.accountScript _)
+        .when(order.sender.toAddress)
+        .returns(None)
+
+      (blockchain.accountScript _)
+        .when(order.matcherPublicKey.toAddress)
+        .returns(None)
 
       actor ! order
       expectMsg(OrderAccepted(order))
