@@ -5,7 +5,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import com.wavesplatform.account._
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 import scala.util.{Failure, Success, Try}
 
 case class CreateAliasTransactionV1 private (sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, signature: ByteStr)

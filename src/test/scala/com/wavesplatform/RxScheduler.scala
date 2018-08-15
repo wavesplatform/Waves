@@ -9,7 +9,7 @@ import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.block.{Block, MicroBlock, SignerData}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.transaction.transfer._
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 

@@ -6,7 +6,7 @@ import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.utils.Base58
-import scorex.crypto.signatures.Curve25519.SignatureLength
+import com.wavesplatform.crypto.SignatureLength
 
 import scala.util.{Failure, Success}
 
