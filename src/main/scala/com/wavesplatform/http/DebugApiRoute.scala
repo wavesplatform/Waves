@@ -321,7 +321,7 @@ case class DebugApiRoute(ws: WavesSettings,
     Array(
       new ApiImplicitParam(name = "transaction", value = "Signed transaction", required = true, dataType = "string", paramType = "body")
     ))
-  def validate: Route = (path("validate") & post & withAuth) {
+  def validate: Route = (path("validate") & post) {
     handleExceptions(jsonExceptionHandler) {
       json[JsObject] { jsv =>
         TransactionFactory
