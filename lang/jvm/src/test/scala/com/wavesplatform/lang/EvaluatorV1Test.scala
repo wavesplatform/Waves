@@ -408,7 +408,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("fromBase58String(String) works as the native one") {
     val gen = for {
-      len <- Gen.choose(0, 512)
+      len <- Gen.choose(0, Global.MaxBase58Bytes)
       xs  <- Gen.containerOfN[Array, Byte](len, Arbitrary.arbByte.arbitrary)
     } yield Base58.encode(xs)
 
@@ -416,6 +416,20 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(CONST_STRING(xs)))
       val actual = ev[ByteVector](defaultCryptoContext.evaluationContext, expr)._2
       actual shouldBe Right(ByteVector(Base58.decode(xs).get))
+    }
+  }
+
+  property("fromBase58String(String) input is 100 chars max") {
+    import Global.{MaxBase58String => Max}
+    val gen = for {
+      len <- Gen.choose(Max + 1, Max * 2)
+      xs  <- Gen.containerOfN[Array, Byte](len, Arbitrary.arbByte.arbitrary)
+    } yield Base58.encode(xs)
+
+    forAll(gen) { xs =>
+      val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(CONST_STRING(xs)))
+      val actual = ev[ByteVector](defaultCryptoContext.evaluationContext, expr)._2
+      actual shouldBe Left("base58Decode input exceeds 100")
     }
   }
 
