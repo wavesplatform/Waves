@@ -1,16 +1,17 @@
 package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{TransferSending, _}
-import com.wavesplatform.state.ByteStr
-import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
+import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scala.util.Random
+import com.wavesplatform.it.{TransferSending, _}
+import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
+
 import scala.concurrent.duration._
+import scala.util.Random
 
 class MatcherRestartTestSuite
     extends FreeSpec
@@ -78,7 +79,7 @@ class MatcherRestartTestSuite
       orders2.asks.head.amount shouldBe 1000
       orders2.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
-      val cancel = matcherNode.cancelOrder(aliceNode, aliceWavesPair, firstOrder)
+      val cancel = matcherNode.cancelOrder(aliceNode, aliceWavesPair, Some(firstOrder))
       cancel.status should be("OrderCanceled")
 
       val orders3 = matcherNode.orderBook(aliceWavesPair)

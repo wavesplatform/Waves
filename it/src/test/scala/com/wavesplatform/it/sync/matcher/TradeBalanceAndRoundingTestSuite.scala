@@ -132,7 +132,7 @@ class TradeBalanceAndRoundingTestSuite
 
       val orderId = matcherNode.fullOrderHistory(bobNode).head.id
       matcherNode.fullOrderHistory(bobNode).size should be(1)
-      matcherNode.cancelOrder(bobNode, wavesUsdPair, orderId)
+      matcherNode.cancelOrder(bobNode, wavesUsdPair, Some(orderId))
       matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Cancelled", 1.minute)
       matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES") shouldBe bobNode.accountBalances(bobNode.address)._1
     }

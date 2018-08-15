@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.matcher
 
-import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.api.http.assets.SignedIssueV1Request
@@ -21,15 +20,9 @@ import scala.concurrent.duration._
 import scala.math.BigDecimal.RoundingMode
 import scala.util.{Random, Try}
 
-class CancellOrderTestSuite
-    extends FreeSpec
-    with Matchers
-    with BeforeAndAfterAll
-    with CancelAfterFailure
-    with NodesFromDocker
-    with ReportingTestName {
+class CancelOrderTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with NodesFromDocker with ReportingTestName {
 
-  import CancellOrderTestSuite._
+  import CancelOrderTestSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -98,7 +91,7 @@ class CancellOrderTestSuite
 
 }
 
-object CancellOrderTestSuite {
+object CancelOrderTestSuite {
 
   import ConfigFactory._
   import com.wavesplatform.it.NodeConfigs._

@@ -2,9 +2,9 @@ package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.ReportingTestName
-import com.wavesplatform.it.api.{AssetDecimalsInfo, LevelResponse}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
+import com.wavesplatform.it.api.{AssetDecimalsInfo, LevelResponse}
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
@@ -68,13 +68,14 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       "alice places sell order" in {
         order1.status shouldBe "OrderAccepted"
 
-      // Alice checks that the order in order book
-      matcherNode.orderStatus(order1.message.id, aliceWavesPair).status shouldBe "Accepted"
+        // Alice checks that the order in order book
+        matcherNode.orderStatus(order1.message.id, aliceWavesPair).status shouldBe "Accepted"
 
-      // Alice check that order is correct
-      val orders = matcherNode.orderBook(aliceWavesPair)
-      orders.asks.head.amount shouldBe aliceSellAmount
-      orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
+        // Alice check that order is correct
+        val orders = matcherNode.orderBook(aliceWavesPair)
+        orders.asks.head.amount shouldBe aliceSellAmount
+        orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
+      }
 
       "frozen amount should be listed via matcherBalance REST endpoint" in {
         matcherNode.reservedBalance(aliceNode) shouldBe Map(aliceAsset -> aliceSellAmount)

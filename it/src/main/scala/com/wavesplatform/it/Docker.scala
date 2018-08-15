@@ -351,21 +351,6 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     node
   }
 
-  def restartContainer(node: DockerNode): DockerNode = {
-    val id            = node.containerId
-    val containerInfo = inspectContainer(id)
-    val ports         = containerInfo.networkSettings().ports()
-    log.info(s"New ports: ${ports.toString}")
-    client.restartContainer(id, 10)
-
-    node.nodeInfo = getNodeInfo(node.containerId, node.settings)
-    Await.result(
-      node.waitForStartup().flatMap(_ => connectToAll(node)),
-      3.minutes
-    )
-    node
-  }
-
   override def close(): Unit = {
     if (isStopped.compareAndSet(false, true)) {
       log.info("Stopping containers")
