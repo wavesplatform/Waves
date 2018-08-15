@@ -64,8 +64,8 @@ object AsyncMatcherHttpApi extends Assertions {
         .as[MatcherStatusResponse]
     }
 
-    def transactionsByOrder(orderId: String): Future[Seq[Transaction]] =
-      matcherGet(s"/matcher/transactions/$orderId").as[Seq[Transaction]]
+    def transactionsByOrder(orderId: String): Future[Seq[ExchangeTransaction]] =
+      matcherGet(s"/matcher/transactions/$orderId").as[Seq[ExchangeTransaction]]
 
     def orderBook(assetPair: AssetPair): Future[OrderBookResponse] = {
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
@@ -92,6 +92,18 @@ object AsyncMatcherHttpApi extends Assertions {
       val signedRequest             = request.copy(signature = sig)
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
       matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", signedRequest.json).as[MatcherStatusResponse]
+    }
+
+    def postWithAPiKey(path: String): Future[Response] =
+      post(
+        s"${matcherNode.matcherApiEndpoint}$path",
+        (rb: RequestBuilder) =>
+          rb.withApiKey(matcherNode.apiKey)
+            .setHeader("Content-type", "application/json;charset=utf-8")
+      )
+
+    def cancelOrderWithApiKey(orderId: String) = {
+      postWithAPiKey(s"/matcher/orders/cancel/${orderId}").as[MatcherStatusResponse]
     }
 
     def fullOrdersHistory(sender: Node): Future[Seq[OrderbookHistory]] = {
@@ -136,6 +148,18 @@ object AsyncMatcherHttpApi extends Assertions {
         s"order(amountAsset=${assetPair.amountAsset}, priceAsset=${assetPair.priceAsset}, orderId=$orderId) status == $expectedStatus")(
         _.orderStatus(orderId, assetPair),
         _.status == expectedStatus,
+        5.seconds)
+    }
+
+    def waitOrderStatusAndAmount(assetPair: AssetPair,
+                                 orderId: String,
+                                 expectedStatus: String,
+                                 expectedFilledAmount: Option[Long],
+                                 retryInterval: FiniteDuration = 1.second): Future[MatcherStatusResponse] = {
+      waitFor[MatcherStatusResponse](
+        s"order(amountAsset=${assetPair.amountAsset}, priceAsset=${assetPair.priceAsset}, orderId=$orderId) status == $expectedStatus")(
+        _.orderStatus(orderId, assetPair),
+        s => s.status == expectedStatus && s.filledAmount == expectedFilledAmount,
         5.seconds)
     }
 
@@ -187,6 +211,10 @@ object AsyncMatcherHttpApi extends Assertions {
       ByteStr(crypto.sign(privateKey, publicKey ++ Longs.toByteArray(timestamp)))
     }
 
+  }
+
+  implicit class RequestBuilderOps(self: RequestBuilder) {
+    def withApiKey(x: String): RequestBuilder = self.setHeader(api_key.name, x)
   }
 
 }

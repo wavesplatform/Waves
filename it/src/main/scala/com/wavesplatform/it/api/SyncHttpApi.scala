@@ -1,6 +1,6 @@
 package com.wavesplatform.it.api
 
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.StatusCodes.BadRequest
 import com.wavesplatform.it.Node
 import com.wavesplatform.state.DataEntry
 import org.asynchttpclient.Response
@@ -21,8 +21,8 @@ object SyncHttpApi extends Assertions {
 
   implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
 
-  def assertBadRequest[R](f: => R): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Assertions.assert(statusCode == StatusCodes.BadRequest.intValue)
+  def assertBadRequest[R](f: => R, expectedStatusCode: Int = 400): Assertion = Try(f) match {
+    case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Assertions.assert(statusCode == expectedStatusCode)
     case Failure(e)                                               => Assertions.fail(e)
     case _                                                        => Assertions.fail("Expecting bad request")
   }
@@ -30,7 +30,7 @@ object SyncHttpApi extends Assertions {
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
       Assertions.assert(
-        statusCode == StatusCodes.BadRequest.intValue &&
+        statusCode == BadRequest.intValue &&
           responseBody.replace("\n", "").matches(s".*$errorRegex.*"))
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail("Expecting bad request")
@@ -38,7 +38,7 @@ object SyncHttpApi extends Assertions {
 
   def assertBadRequestAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
-      Assertions.assert(statusCode == StatusCodes.BadRequest.intValue && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
+      Assertions.assert(statusCode == BadRequest.intValue && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail(s"Expecting bad request")
   }

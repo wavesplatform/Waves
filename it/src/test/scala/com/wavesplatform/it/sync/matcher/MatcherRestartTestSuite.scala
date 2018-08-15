@@ -62,7 +62,7 @@ class MatcherRestartTestSuite
 
       val height = nodes.map(_.height).max
 
-      matcherNode.waitForHeight(height + 1)
+      matcherNode.waitForHeight(height + 1, 40.seconds)
       matcherNode.orderStatus(firstOrder, aliceWavesPair).status shouldBe "Accepted"
       matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
 

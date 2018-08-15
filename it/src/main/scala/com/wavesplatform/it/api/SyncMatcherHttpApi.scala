@@ -49,7 +49,7 @@ object SyncMatcherHttpApi extends Assertions {
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
       Await.result(async(m).orderStatus(orderId, assetPair, waitForStatus), RequestAwaitTime)
 
-    def transactionsByOrder(orderId: String): Seq[Transaction] =
+    def transactionsByOrder(orderId: String): Seq[ExchangeTransaction] =
       Await.result(async(m).transactionsByOrder(orderId), RequestAwaitTime)
 
     def waitOrderStatus(assetPair: AssetPair,
@@ -57,6 +57,13 @@ object SyncMatcherHttpApi extends Assertions {
                         expectedStatus: String,
                         waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(m).waitOrderStatus(assetPair, orderId, expectedStatus), waitTime)
+
+    def waitOrderStatusAndAmount(assetPair: AssetPair,
+                                 orderId: String,
+                                 expectedStatus: String,
+                                 expectedFilledAmount: Option[Long],
+                                 waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+      Await.result(async(m).waitOrderStatusAndAmount(assetPair, orderId, expectedStatus, expectedFilledAmount), waitTime)
 
     def reservedBalance(sender: Node, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
       Await.result(async(m).reservedBalance(sender), waitTime)
@@ -79,6 +86,9 @@ object SyncMatcherHttpApi extends Assertions {
                     timestamp: Option[Long] = None,
                     waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(m).cancelOrder(sender, assetPair, orderId, timestamp), waitTime)
+
+    def cancelOrderWithApiKey(orderId: String, waitTime: Duration = OrderRequestAwaitTime) =
+      Await.result(async(m).cancelOrderWithApiKey(orderId), waitTime)
 
     def matcherGet(path: String,
                    f: RequestBuilder => RequestBuilder = identity,

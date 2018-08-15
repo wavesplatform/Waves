@@ -8,8 +8,16 @@ import scorex.transaction.AssetId
 
 import scala.util.Try
 
-case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: Option[Long], remainingFee: Long) {
+case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: Option[Long], remainingFee: Long, unsafeTotalSpend: Option[Long]) {
   def remaining: Long = if (canceled) 0L else amount - filled
+
+  /**
+    * TODO: Remove in future
+    * @param orig Original means LimitOrder(order) without any partial fills
+    * @return
+    */
+  def totalSpend(orig: LimitOrder): Long =
+    unsafeTotalSpend.getOrElse(orig.getRawSpendAmount - orig.partial(filled, orig.order.matcherFee - remainingFee).getSpendAmount)
 
   def status: LimitOrder.OrderStatus = {
     if (amount == 0) LimitOrder.NotFound
@@ -28,17 +36,7 @@ object OrderInfo {
   def safeSum(x: Long, y: Long): Long         = Try(Math.addExact(x, y)).getOrElse(Long.MaxValue)
   implicit val longSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
 
-  val empty = OrderInfo(0L, 0L, false, None, 0L)
-
-  // TODO refactor this
-  def combine(older: OrderInfo, newer: OrderInfo): OrderInfo =
-    OrderInfo(
-      math.max(older.amount, newer.amount),
-      older.filled.combine(newer.filled),
-      newer.canceled,
-      newer.minAmount,
-      newer.remainingFee
-    )
+  val empty = OrderInfo(0L, 0L, false, None, 0L, Some(0L))
 
   implicit val orderInfoFormat: Format[OrderInfo] = Json.format[OrderInfo]
 

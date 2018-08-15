@@ -387,7 +387,7 @@ class OrderBookActor(assetPair: AssetPair,
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
             (
-              if (event.submittedRemainingAmount < 0) None
+              if (event.submittedRemainingAmount <= 0) None
               else
                 Some(
                   o.partial(
@@ -395,7 +395,7 @@ class OrderBookActor(assetPair: AssetPair,
                     event.submittedRemainingFee
                   )
                 ),
-              if (event.counterRemainingAmount < 0) None
+              if (event.counterRemainingAmount <= 0) None
               else
                 Some(
                   c.partial(
