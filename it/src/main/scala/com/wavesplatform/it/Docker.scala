@@ -335,7 +335,36 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
                  |OOM killed: ${containerInfo.state().oomKilled()}""".stripMargin)
   }
 
-  def restartNode(node: DockerNode): Unit = client.restartContainer(node.containerId, 10)
+  def killAndStartContainer(node: DockerNode): DockerNode = {
+    val id = node.containerId
+    log.info(s"Killing container with id: $id")
+    takeProfileSnapshot(node)
+    client.killContainer(id, DockerClient.Signal.SIGINT)
+    saveProfile(node)
+    saveLog(node)
+    client.startContainer(id)
+    node.nodeInfo = getNodeInfo(node.containerId, node.settings)
+    Await.result(
+      node.waitForStartup().flatMap(_ => connectToAll(node)),
+      3.minutes
+    )
+    node
+  }
+
+  def restartContainer(node: DockerNode): DockerNode = {
+    val id            = node.containerId
+    val containerInfo = inspectContainer(id)
+    val ports         = containerInfo.networkSettings().ports()
+    log.info(s"New ports: ${ports.toString}")
+    client.restartContainer(id, 10)
+
+    node.nodeInfo = getNodeInfo(node.containerId, node.settings)
+    Await.result(
+      node.waitForStartup().flatMap(_ => connectToAll(node)),
+      3.minutes
+    )
+    node
+  }
 
   override def close(): Unit = {
     if (isStopped.compareAndSet(false, true)) {

@@ -1,24 +1,27 @@
 package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.api.http.assets.SignedIssueV1Request
 import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
+import com.wavesplatform.it.sync.matcherFee
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.IssueTransactionV1
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 import com.wavesplatform.utils.Base58
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
+import scorex.account.PrivateKeyAccount
+import scorex.api.http.assets.SignedIssueV1Request
+import scorex.transaction.AssetId
+import scorex.transaction.assets.IssueTransactionV1
+import scorex.transaction.assets.exchange.OrderType.BUY
+import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.duration._
+import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-class RoundingIssuesTestSuite
+class SeveralPartialOrdersTestSuite
     extends FreeSpec
     with Matchers
     with BeforeAndAfterAll
@@ -26,7 +29,7 @@ class RoundingIssuesTestSuite
     with NodesFromDocker
     with ReportingTestName {
 
-  import RoundingIssuesTestSuite._
+  import SeveralPartialOrdersTestSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -39,40 +42,56 @@ class RoundingIssuesTestSuite
   matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
   nodes.waitForHeightArise()
 
-  "should correctly fill an order with small amount" in {
-    val aliceBalanceBefore = matcherNode.accountBalances(aliceNode.address)._1
-    val bobBalanceBefore   = matcherNode.accountBalances(bobNode.address)._1
+  "Alice and Bob trade WAVES-USD" - {
+    nodes.waitForHeightArise()
+    val bobWavesBalanceBefore = matcherNode.accountBalances(bobNode.address)._1
 
-    val counter   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, 238, 3100000000L)
-    val counterId = matcherNode.placeOrder(counter).message.id
+    val price           = 238
+    val buyOrderAmount  = 425532L
+    val sellOrderAmount = 840340L
 
-    val submitted   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, 235, 425532L)
-    val submittedId = matcherNode.placeOrder(submitted).message.id
+    "place usd-waves order" in {
+      // Alice wants to sell USD for Waves
 
-    matcherNode.waitOrderStatusAndAmount(wavesUsdPair, submittedId, "Filled", Some(420169L), 1.minute)
-    matcherNode.waitOrderStatusAndAmount(wavesUsdPair, counterId, "PartiallyFilled", Some(420169L), 1.minute)
+      val bobOrder   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, price, sellOrderAmount)
+      val bobOrderId = matcherNode.placeOrder(bobOrder).message.id
+      matcherNode.waitOrderStatus(wavesUsdPair, bobOrderId, "Accepted", 1.minute)
+      matcherNode.reservedBalance(bobNode)("WAVES") shouldBe sellOrderAmount + matcherFee
+      matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES") shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
 
-    matcherNode.cancelOrder(aliceNode, wavesUsdPair, Some(counterId))
-    val tx = matcherNode.transactionsByOrder(counterId).head
+      val aliceOrder   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, price, buyOrderAmount)
+      val aliceOrderId = matcherNode.placeOrder(aliceOrder).message.id
+      matcherNode.waitOrderStatus(wavesUsdPair, aliceOrderId, "Filled", 1.minute)
 
-    matcherNode.waitForTransaction(tx.id)
-    val rawExchangeTx = matcherNode.rawTransactionInfo(tx.id)
+      val aliceOrder2   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, price, buyOrderAmount)
+      val aliceOrder2Id = matcherNode.placeOrder(aliceOrder2).message.id
+      matcherNode.waitOrderStatus(wavesUsdPair, aliceOrder2Id, "Filled", 1.minute)
 
-    (rawExchangeTx \ "price").as[Long] shouldBe 238L
-    (rawExchangeTx \ "amount").as[Long] shouldBe 420169L
-    (rawExchangeTx \ "buyMatcherFee").as[Long] shouldBe 40L
-    (rawExchangeTx \ "sellMatcherFee").as[Long] shouldBe 296219L
+      // Bob wants to buy some USD
+      matcherNode.waitOrderStatus(wavesUsdPair, bobOrderId, "Filled", 1.minute)
 
-    val aliceBalanceAfter = matcherNode.accountBalances(aliceNode.address)._1
-    val bobBalanceAfter   = matcherNode.accountBalances(bobNode.address)._1
-
-    (aliceBalanceAfter - aliceBalanceBefore) shouldBe (-40L + 420169L)
-    (bobBalanceAfter - bobBalanceBefore) shouldBe (-296219L - 420169L)
+      // Each side get fair amount of assets
+      val exchangeTx = matcherNode.transactionsByOrder(bobOrder.id().base58).headOption.getOrElse(fail("Expected an exchange transaction"))
+      nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
+      matcherNode.reservedBalance(bobNode) shouldBe empty
+      matcherNode.reservedBalance(aliceNode) shouldBe empty
+    }
   }
+
+  def correctAmount(a: Long, price: Long): Long = {
+    val settledTotal = (BigDecimal(price) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
+    (BigDecimal(settledTotal) / price * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
+  }
+
+  def receiveAmount(ot: OrderType, matchPrice: Long, matchAmount: Long): Long =
+    if (ot == BUY) correctAmount(matchAmount, matchPrice)
+    else {
+      (BigInt(matchAmount) * matchPrice / Order.PriceConstant).bigInteger.longValueExact()
+    }
 
 }
 
-object RoundingIssuesTestSuite {
+object SeveralPartialOrdersTestSuite {
 
   import ConfigFactory._
   import com.wavesplatform.it.NodeConfigs._

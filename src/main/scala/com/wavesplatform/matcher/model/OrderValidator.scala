@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
-import com.wavesplatform.matcher.model.Events.OrderAdded
+import com.wavesplatform.matcher.model.OrderHistory.OrderInfoChange
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.AssetAcc
@@ -30,13 +30,13 @@ trait OrderValidator {
   private def isBalanceWithOpenOrdersEnough(order: Order): Validation = {
     val lo = LimitOrder(order)
 
-    val b: Map[Option[ByteStr], Long] = (Map(lo.spentAcc -> 0L) ++ Map(lo.feeAcc -> 0L))
-      .map { case (a, _) => a -> spendableBalance(a) }
-      .map { case (a, v) => a.assetId -> v }
+    val b: Map[Option[ByteStr], Long] = Seq(lo.spentAcc, lo.feeAcc).map(a => a.assetId -> spendableBalance(a)).toMap
+    val newOrder = OrderHistory
+      .diffAccepted(OrderInfoChange(lo.order, None, OrderInfo(order.amount, 0L, canceled = false, None, order.matcherFee, Some(0L))))
+      .getOrElse(order.senderPublicKey, OpenPortfolio.empty)
 
-    val newOrder = Events.createOpenPortfolio(OrderAdded(lo)).getOrElse(order.senderPublicKey, OpenPortfolio.empty)
-    val open     = b.keySet.map(id => id -> orderHistory.openVolume(order.senderPublicKey, id)).toMap
-    val needs    = OpenPortfolio(open).combine(newOrder)
+    val open  = b.keySet.map(id => id -> orderHistory.openVolume(order.senderPublicKey, id)).toMap
+    val needs = OpenPortfolio(open).combine(newOrder)
 
     val res: Boolean = b.combine(needs.orders.mapValues(-_)).forall(_._2 >= 0)
 

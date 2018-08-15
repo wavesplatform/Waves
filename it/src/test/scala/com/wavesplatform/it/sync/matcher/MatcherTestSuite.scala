@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.ReportingTestName
-import com.wavesplatform.it.api.LevelResponse
+import com.wavesplatform.it.api.{AssetDecimalsInfo, LevelResponse}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
@@ -26,12 +26,16 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   private def bobNode = nodes(2)
 
-  private val aliceSellAmount = 500
+  private val aliceSellAmount         = 500
+  private val amountAssetName         = "AliceCoin"
+  private val aliceCoinDecimals: Byte = 0
 
   "Check cross ordering between Alice and Bob " - {
     // Alice issues new asset
-    val aliceAsset =
-      aliceNode.issue(aliceNode.address, "AliceCoin", "AliceCoin for matcher's tests", AssetQuantity, 0, reissuable = false, 100000000L).id
+
+    val aliceAsset = aliceNode
+      .issue(aliceNode.address, amountAssetName, "AliceCoin for matcher's tests", AssetQuantity, aliceCoinDecimals, reissuable = false, 100000000L)
+      .id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
@@ -41,16 +45,28 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     matcherNode.assertAssetBalance(matcherNode.address, aliceAsset, 0)
     bobNode.assertAssetBalance(bobNode.address, aliceAsset, 0)
 
+    val order1 = matcherNode.placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, aliceSellAmount, 2.minutes)
+
     "matcher should respond with Public key" in {
       matcherNode.matcherGet("/matcher").getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe matcherNode.publicKeyStr
     }
 
+    "get opened trading markets" in {
+      val openMarkets = matcherNode.tradingMarkets()
+      openMarkets.markets.size shouldBe 1
+      val markets = openMarkets.markets.head
+
+      markets.amountAssetName shouldBe amountAssetName
+      markets.amountAssetInfo shouldBe Some(AssetDecimalsInfo(aliceCoinDecimals))
+
+      markets.priceAssetName shouldBe "WAVES"
+      markets.priceAssetInfo shouldBe Some(AssetDecimalsInfo(8))
+    }
+
     "sell order could be placed correctly" - {
       // Alice places sell order
-      val order1 =
-        matcherNode.placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, aliceSellAmount, 2.minutes)
-
-      order1.status shouldBe "OrderAccepted"
+      "alice places sell order" in {
+        order1.status shouldBe "OrderAccepted"
 
       // Alice checks that the order in order book
       matcherNode.orderStatus(order1.message.id, aliceWavesPair).status shouldBe "Accepted"
@@ -82,8 +98,8 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         matcherNode.waitOrderStatus(aliceWavesPair, order1.message.id, "PartiallyFilled")
         matcherNode.waitOrderStatus(aliceWavesPair, order2.message.id, "Filled")
 
-        //matcherNode.orderHistoryByPair(bobNode, aliceWavesPair) should contain(order2.message.id)
-        //matcherNode.fullOrderHistory(bobNode) should contain(order2.message.id)
+        matcherNode.orderHistoryByPair(bobNode, aliceWavesPair).map(_.id) should contain(order2.message.id)
+        matcherNode.fullOrderHistory(bobNode).map(_.id) should contain(order2.message.id)
 
         nodes.waitForHeightArise()
 
