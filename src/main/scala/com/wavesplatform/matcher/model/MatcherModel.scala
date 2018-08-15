@@ -106,7 +106,6 @@ object LimitOrder {
 
   def apply(o: Order): LimitOrder = {
     val partialFee = getPartialFee(o.matcherFee, o.amount, o.amount)
-    println(s"MatcherModel: LimitOrder.apply(${o.sender}): partialFee: $partialFee")
     o.orderType match {
       case OrderType.BUY  => BuyLimitOrder(o.price, o.amount, partialFee, o)
       case OrderType.SELL => SellLimitOrder(o.price, o.amount, partialFee, o)
@@ -159,50 +158,5 @@ object Events {
   object BalanceChanged {
     val empty: BalanceChanged = BalanceChanged(Map.empty)
     case class Changes(updatedPortfolio: Portfolio, changedAssets: Set[Option[AssetId]])
-  }
-
-  def collectChanges(event: Event): Seq[(Order, OrderInfoDiff)] = {
-    event match {
-      case OrderAdded(lo) =>
-        Seq((lo.order, OrderInfoDiff(newMinAmount = Some(lo.minAmountOfAmountAsset))))
-      case oe: OrderExecuted =>
-        val submitted = oe.submittedExecuted
-        val counter   = oe.counterExecuted
-        println(s"""
-                   |collectChanges (from Event):
-                   |submitted (id=${oe.submitted.order.id()}) executionAmount(counter): ${oe.submitted.executionAmount(oe.counter)}
-                   |submitted.amount: ${submitted.amount}/${submitted.order.amount}
-                   |submitted.amountOfAmountAsset: ${submitted.amountOfAmountAsset}
-                   |submitted.amountOfPriceAsset: ${submitted.amountOfPriceAsset}
-                   |submitted fee: ${submitted.fee}/${submitted.order.matcherFee}
-                   |submittedRemaining.getSpendAmount: ${oe.submittedRemaining.getSpendAmount}
-                   |
-                   |counter (id=${oe.counter.order.id()}) amountOfAmountAsset: ${oe.counter.amountOfAmountAsset}
-                   |counter.amount: ${counter.amount}/${counter.order.amount}
-                   |counter.amountOfAmountAsset: ${counter.amountOfAmountAsset}
-                   |counter.amountOfPriceAsset: ${counter.amountOfPriceAsset}
-                   |counterRemaining.getSpendAmount: ${oe.counterRemaining.getSpendAmount}
-                   |counter fee: ${counter.fee}/${counter.order.matcherFee}
-                   |""".stripMargin)
-        Seq(
-          (submitted.order,
-           OrderInfoDiff(
-             addExecutedAmount = Some(oe.executedAmount),
-             executedFee = Some(submitted.fee),
-             newMinAmount = Some(submitted.minAmountOfAmountAsset),
-             lastSpend = Some(submitted.getSpendAmount)
-           )),
-          (counter.order,
-           OrderInfoDiff(
-             addExecutedAmount = Some(oe.executedAmount),
-             executedFee = Some(counter.fee),
-             newMinAmount = Some(counter.minAmountOfAmountAsset),
-             lastSpend = Some(counter.getSpendAmount)
-           ))
-        )
-      case OrderCanceled(lo, unmatchable) =>
-        // The order should not have Cancelled status, if it was cancelled by unmatchable amounts
-        Seq((lo.order, OrderInfoDiff(nowCanceled = Some(!unmatchable))))
-    }
   }
 }

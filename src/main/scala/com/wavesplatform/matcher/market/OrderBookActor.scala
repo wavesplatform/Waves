@@ -323,7 +323,6 @@ class OrderBookActor(assetPair: AssetPair,
     if (counterRemains.isDefined) {
       if (!counterRemains.get.isValid) {
         val canceled = Events.OrderCanceled(counterRemains.get, unmatchable = true)
-        println(s"matchOrder($limitOrder), counterRemains is invalid")
         processEvent(canceled)
       }
     }
@@ -332,7 +331,6 @@ class OrderBookActor(assetPair: AssetPair,
         matchOrder(submittedRemains.get)
       } else {
         val canceled = Events.OrderCanceled(submittedRemains.get, unmatchable = true)
-        println(s"matchOrder($limitOrder), submittedRemains is invalid")
         processEvent(canceled)
       }
     }
@@ -347,7 +345,6 @@ class OrderBookActor(assetPair: AssetPair,
 
   private def processInvalidTransaction(event: OrderExecuted, err: ValidationError): Option[LimitOrder] = {
     def cancelCounterOrder(): Option[LimitOrder] = {
-      println(s"cancelCounterOrder: ${event.counter}")
       processEvent(Events.OrderCanceled(event.counter, unmatchable = false))
       Some(event.submitted)
     }
@@ -367,7 +364,6 @@ class OrderBookActor(assetPair: AssetPair,
           Some(event.submitted)
         }
       case _: NegativeAmount =>
-        println(s"cancel order because of NegativeAmount: ${event.submitted}, $err")
         processEvent(Events.OrderCanceled(event.submitted, unmatchable = true))
         None
       case _ =>

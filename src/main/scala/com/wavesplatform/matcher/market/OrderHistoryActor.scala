@@ -60,7 +60,6 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
     case ev: OrderExecuted =>
       executedTimer.measure(orderHistory.orderExecuted(ev))
     case ev: OrderCanceled =>
-      println(s"Got $ev from ${sender()}")
       cancelledTimer.measure(orderHistory.orderCanceled(ev))
     case RecoverFromOrderBook(ob) =>
       recoverFromOrderBook(ob)
@@ -71,7 +70,6 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   def forceCancelOrder(id: ByteStr): Unit = {
     orderHistory.order(id).map((_, orderHistory.orderInfo(id))) match {
       case Some((o, oi)) =>
-        println(s"forceCancelOrder($id):\no=$o\noi=$oi")
         orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, oi.remainingFee, o), unmatchable = false))
         sender() ! o
       case None =>
@@ -108,7 +106,6 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   }
 
   def recoverFromOrderBook(ob: OrderBook): Unit = {
-    println("recoverFromOrderBook")
     ob.asks.foreach {
       case (_, orders) =>
         orders.foreach(o => orderHistory.orderAccepted(OrderAdded(o)))
