@@ -57,7 +57,7 @@ class MatcherMassOrdersTestSuite
     bobNode.assertAssetBalance(bobNode.address, aliceAsset, AssetQuantity / 2)
     bobNode.assertAssetBalance(bobNode.address, aliceSecondAsset, AssetQuantity / 2)
 
-    // Alice places sell order
+    // Alice places sell orders
     val aliceOrderIdFill = matcherNode
       .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, 10.minutes)
       .message
@@ -91,6 +91,13 @@ class MatcherMassOrdersTestSuite
     orderStatus(aliceNode, alicePartialOrderId) shouldBe "PartiallyFilled"
 
     "Mass orders creation with random lifetime. Active orders still in list" in {
+
+      matcherNode.ordersByAddress(aliceNode, activeOnly = false).length shouldBe 4
+      matcherNode.ordersByAddress(aliceNode, activeOnly = true).length shouldBe 2
+
+      matcherNode.ordersByAddress(bobNode, activeOnly = false).length shouldBe 2
+      matcherNode.ordersByAddress(bobNode, activeOnly = true).length shouldBe 0
+
       val orderIds = matcherNode.fullOrderHistory(aliceNode).map(_.id)
 
       orderIds should contain(aliceActiveOrderId)

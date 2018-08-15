@@ -379,10 +379,13 @@ case class MatcherApiRoute(wallet: Wallet,
       new ApiImplicitParam(name = "address", value = "Address", dataType = "string", paramType = "path")
     ))
   def getAllOrderHistory: Route = (path("orders" / AddressPM) & get & withAuth) { address =>
-    complete(StatusCodes.OK -> DBUtils.ordersByAddress(db, address, Set.empty, true, matcherSettings.maxOrdersPerRequest).map {
-      case (order, orderInfo) =>
-        orderJson(order, orderInfo)
-    })
+    parameters('activeOnly.as[Boolean].?) { activeOnly =>
+      complete(
+        StatusCodes.OK -> DBUtils.ordersByAddress(db, address, Set.empty, activeOnly.getOrElse(true), matcherSettings.maxOrdersPerRequest).map {
+          case (order, orderInfo) =>
+            orderJson(order, orderInfo)
+        })
+    }
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/tradableBalance/{address}")
