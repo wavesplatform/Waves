@@ -39,7 +39,7 @@ object AsyncMatcherHttpApi extends Assertions {
                              statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200,
                              waitForStatus: Boolean = false): Future[Response] = retrying(
       _get(s"${matcherNode.matcherApiEndpoint}$path")
-        .setHeader(api_key.name, matcherNode.apiKey)
+        .withApiKey(matcherNode.apiKey)
         .build()
     )
 
@@ -57,6 +57,14 @@ object AsyncMatcherHttpApi extends Assertions {
     def matcherPost[A: Writes](path: String, body: A): Future[Response] =
       post(s"${matcherNode.matcherApiEndpoint}$path",
            (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
+
+    def postWithAPiKey(path: String): Future[Response] =
+      post(
+        s"${matcherNode.matcherApiEndpoint}$path",
+        (rb: RequestBuilder) =>
+          rb.withApiKey(matcherNode.apiKey)
+            .setHeader("Content-type", "application/json;charset=utf-8")
+      )
 
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): Future[MatcherStatusResponse] = {
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
@@ -94,16 +102,8 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", signedRequest.json).as[MatcherStatusResponse]
     }
 
-    def postWithAPiKey(path: String): Future[Response] =
-      post(
-        s"${matcherNode.matcherApiEndpoint}$path",
-        (rb: RequestBuilder) =>
-          rb.withApiKey(matcherNode.apiKey)
-            .setHeader("Content-type", "application/json;charset=utf-8")
-      )
-
-    def cancelOrderWithApiKey(orderId: String) = {
-      postWithAPiKey(s"/matcher/orders/cancel/${orderId}").as[MatcherStatusResponse]
+    def cancelOrderWithApiKey(orderId: String): Future[MatcherStatusResponse] = {
+      postWithAPiKey(s"/matcher/orders/cancel/$orderId").as[MatcherStatusResponse]
     }
 
     def fullOrdersHistory(sender: Node): Future[Seq[OrderbookHistory]] = {

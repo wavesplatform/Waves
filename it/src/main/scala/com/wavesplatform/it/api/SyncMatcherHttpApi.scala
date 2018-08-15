@@ -87,7 +87,7 @@ object SyncMatcherHttpApi extends Assertions {
                     waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(m).cancelOrder(sender, assetPair, orderId, timestamp), waitTime)
 
-    def cancelOrderWithApiKey(orderId: String, waitTime: Duration = OrderRequestAwaitTime) =
+    def cancelOrderWithApiKey(orderId: String, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(m).cancelOrderWithApiKey(orderId), waitTime)
 
     def matcherGet(path: String,
