@@ -99,9 +99,8 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         matcherNode.waitOrderStatus(aliceWavesPair, order1.message.id, "PartiallyFilled")
         matcherNode.waitOrderStatus(aliceWavesPair, order2.message.id, "Filled")
 
-        //TODO:
-        //matcherNode.orderHistoryByPair(bobNode, aliceWavesPair) should contain(order2.message.id)
-        //matcherNode.fullOrderHistory(bobNode) should contain(order2.message.id)
+        matcherNode.orderHistoryByPair(bobNode, aliceWavesPair).map(_.id) should contain(order2.message.id)
+        matcherNode.fullOrderHistory(bobNode).map(_.id) should contain(order2.message.id)
 
         nodes.waitForHeightArise()
 

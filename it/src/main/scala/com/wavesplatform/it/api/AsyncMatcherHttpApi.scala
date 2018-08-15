@@ -88,7 +88,7 @@ object AsyncMatcherHttpApi extends Assertions {
     def orderHistoryByPair(sender: Node, assetPair: AssetPair) = {
       val ts                        = System.currentTimeMillis()
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
-      matcherGetWithSignature(s"/matcher/orderbook/${amountAsset}/${priceAsset}/publicKey/${sender.publicKeyStr}", ts, signature(sender, ts))
+      matcherGetWithSignature(s"/matcher/orderbook/$amountAsset/$priceAsset/publicKey/${sender.publicKeyStr}", ts, signature(sender, ts))
         .as[Seq[OrderbookHistory]]
     }
 

@@ -136,7 +136,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
     println(s"orderAccepted for ${event.order.order.id()} prev order info: ${orderInfo(lo.order.id())}")
     val updated = saveOrderInfo(rw, event)
 
-    if (updated(lo.order.id()).origInfo.isEmpty) {
+    if (updated(lo.order.id()).isNew) {
       val opDiff = diffAccepted(updated(lo.order.id()))
       println(s"""|
                 |orderAccepted:
@@ -203,12 +203,18 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
 
     saveOpenVolume(rw, opOrderInfoDiff)
 
-    if (!submitted.updatedInfo.status.isFinal) { // && submitted.origInfo.isEmpty
+    println(
+      s"Adding ${submitted.order.id()} to ${submitted.order.senderPublicKey}? isFinal: ${submitted.updatedInfo.status.isFinal}, isNew: ${submitted.isNew}")
+    if (submitted.isNew) {
       import event.submitted.{order => submittedOrder}
+      println(s"Adding ${submitted.order.id()} to ${submittedOrder.senderPublicKey}")
       val k         = MatcherKeys.addressOrdersSeqNr(submittedOrder.senderPublicKey)
       val nextSeqNr = rw.get(k) + 1
       rw.put(k, nextSeqNr)
-      rw.put(MatcherKeys.addressOrders(submittedOrder.senderPublicKey, nextSeqNr), Some(OrderAssets(submittedOrder.id(), event.submitted.spentAsset)))
+      rw.put(
+        MatcherKeys.addressOrders(submittedOrder.senderPublicKey.toAddress, nextSeqNr),
+        Some(OrderAssets(submittedOrder.id(), event.submitted.spentAsset))
+      )
     }
     println(s"orderExecuted end: $event")
   }
@@ -244,7 +250,9 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
 object OrderHistory {
   import OrderInfo.orderStatusOrdering
 
-  case class OrderInfoChange(order: Order, origInfo: Option[OrderInfo], updatedInfo: OrderInfo)
+  case class OrderInfoChange(order: Order, origInfo: Option[OrderInfo], updatedInfo: OrderInfo) {
+    def isNew: Boolean = origInfo.isEmpty
+  }
 
   object OrderHistoryOrdering extends Ordering[(ByteStr, OrderInfo, Option[Order])] {
     def orderBy(oh: (ByteStr, OrderInfo, Option[Order])): (OrderStatus, Long) = (oh._2.status, -oh._3.map(_.timestamp).getOrElse(0L))
