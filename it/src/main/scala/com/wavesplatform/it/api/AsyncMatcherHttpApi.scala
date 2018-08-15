@@ -51,8 +51,8 @@ object AsyncMatcherHttpApi extends Assertions {
         .as[MatcherStatusResponse]
     }
 
-    def transactionsByOrder(orderId: String): Future[Seq[Transaction]] =
-      matcherGet(s"/matcher/transactions/$orderId").as[Seq[Transaction]]
+    def transactionsByOrder(orderId: String): Future[Seq[ExchangeTransaction]] =
+      matcherGet(s"/matcher/transactions/$orderId").as[Seq[ExchangeTransaction]]
 
     def orderBook(assetPair: AssetPair): Future[OrderBookResponse] = {
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
@@ -101,7 +101,7 @@ object AsyncMatcherHttpApi extends Assertions {
     def orderHistoryByPair(sender: Node, assetPair: AssetPair) = {
       val ts                        = System.currentTimeMillis()
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
-      matcherGetWithSignature(s"/matcher/orderbook/${amountAsset}/${priceAsset}/publicKey/${sender.publicKeyStr}", ts, signature(sender, ts))
+      matcherGetWithSignature(s"/matcher/orderbook/$amountAsset/$priceAsset/publicKey/${sender.publicKeyStr}", ts, signature(sender, ts))
         .as[Seq[OrderbookHistory]]
     }
 
@@ -135,6 +135,18 @@ object AsyncMatcherHttpApi extends Assertions {
         s"order(amountAsset=${assetPair.amountAsset}, priceAsset=${assetPair.priceAsset}, orderId=$orderId) status == $expectedStatus")(
         _.orderStatus(orderId, assetPair),
         _.status == expectedStatus,
+        5.seconds)
+    }
+
+    def waitOrderStatusAndAmount(assetPair: AssetPair,
+                                 orderId: String,
+                                 expectedStatus: String,
+                                 expectedFilledAmount: Option[Long],
+                                 retryInterval: FiniteDuration = 1.second): Future[MatcherStatusResponse] = {
+      waitFor[MatcherStatusResponse](
+        s"order(amountAsset=${assetPair.amountAsset}, priceAsset=${assetPair.priceAsset}, orderId=$orderId) status == $expectedStatus")(
+        _.orderStatus(orderId, assetPair),
+        s => s.status == expectedStatus && s.filledAmount == expectedFilledAmount,
         5.seconds)
     }
 

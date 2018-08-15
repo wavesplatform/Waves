@@ -75,6 +75,45 @@ object Transaction {
   implicit val transactionFormat: Format[Transaction] = Json.format
 }
 
+case class OrderInfo(id: String,
+                     sender: String,
+                     senderPublicKey: String,
+                     matcherPublicKey: String,
+                     assetPair: AssetPairResponse,
+                     orderType: String,
+                     price: Long,
+                     amount: Long,
+                     timestamp: Long,
+                     expiration: Long,
+                     matcherFee: Long,
+                     signature: String)
+object OrderInfo {
+  implicit val transactionFormat: Format[OrderInfo] = Json.format
+}
+
+case class AssetPairResponse(amountAsset: Option[String], priceAsset: Option[String])
+object AssetPairResponse {
+  implicit val pairResponseFormat: Format[AssetPairResponse] = Json.format
+}
+
+case class ExchangeTransaction(`type`: Int,
+                               id: String,
+                               sender: String,
+                               senderPublicKey: String,
+                               fee: Long,
+                               timestamp: Long,
+                               signature: String,
+                               order1: OrderInfo,
+                               order2: OrderInfo,
+                               price: Long,
+                               amount: Long,
+                               buyMatcherFee: Long,
+                               sellMatcherFee: Long,
+                               height: Option[Int])
+object ExchangeTransaction {
+  implicit val transactionFormat: Format[ExchangeTransaction] = Json.format
+}
+
 case class TransactionInfo(`type`: Int, id: String, fee: Long, timestamp: Long, sender: Option[String], height: Int)
 object TransactionInfo {
   implicit val format: Format[TransactionInfo] = Json.format
