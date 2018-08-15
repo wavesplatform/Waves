@@ -227,8 +227,8 @@ class OrderHistorySpecification
     exec.executedAmount shouldBe 420169L
 
     oh.orderExecuted(exec)
-    val counterOrderInfo2    = oh.orderInfo(counter.id())
-    val counterOrderInfoDiff = Events.orderInfoDiffExecuted(counter, counterOrderInfo1, counterOrderInfo2)
+    val counterOrderInfo2 = oh.orderInfo(counter.id())
+    //val counterOrderInfoDiff = OrderHistory.orderInfoDiffExecuted(counter, counterOrderInfo1, counterOrderInfo2)
     println(s"""|
           |counterOrderInfo1:
           |$counterOrderInfo1
@@ -244,7 +244,7 @@ class OrderHistorySpecification
           |calculated remaining diff: ${counterOrderInfo2.remaining - counterOrderInfo1.remaining}
           |calculated remainingFee diff: ${counterOrderInfo2.remainingFee - counterOrderInfo1.remainingFee}
           |calculated remaining total: ${counterOrderInfo2.remaining - counterOrderInfo1.remaining + counterOrderInfo2.remainingFee - counterOrderInfo1.remainingFee}
-          |$counterOrderInfoDiff
+          |
           |""".stripMargin)
 
     val counterOrderInfo = oh.orderInfo(counter.id())
@@ -273,8 +273,8 @@ class OrderHistorySpecification
       submittedOrderInfo.status shouldBe LimitOrder.Filled(exec.executedAmount)
     }
 
-    // ADD OLD LINE
-    // orderAccepted
+    // see OrderBookActor.handleMatchEvent
+    // oh.orderAccepted(OrderAdded(exec.submitted.partial(exec.submittedRemainingAmount, exec.submittedRemainingFee)))
 
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
       val remainingSpend = counter.amount - counterOrderInfo.unsafeTotalSpend
@@ -655,9 +655,10 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     oh.orderAccepted(OrderAdded(LimitOrder(ord2)))
     oh.orderAccepted(OrderAdded(LimitOrder(ord3)))
-    oh.orderExecuted(OrderExecuted(LimitOrder(ord4), LimitOrder(ord1)))
-    // OLD LINE
-    // oh.orderAccepted(OrderAdded(LimitOrder.limitOrder(ord4.price, 1000000000, 0, ord4)))
+    val exec = OrderExecuted(LimitOrder(ord4), LimitOrder(ord1))
+    oh.orderExecuted(exec)
+    //oh.orderAccepted(OrderAdded(exec.submittedRemaining))
+    //oh.orderAccepted(OrderAdded(LimitOrder.limitOrder(ord4.price, 1000000000, 0, ord4)))
     oh.orderCanceled(OrderCanceled(LimitOrder(ord3), unmatchable = false))
     oh.orderAccepted(OrderAdded(LimitOrder(ord5)))
 

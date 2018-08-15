@@ -1,7 +1,5 @@
 package com.wavesplatform.matcher.model
 
-import cats.Monoid
-import cats.implicits._
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.state.{ByteStr, Portfolio}
 import play.api.libs.json.{JsObject, JsValue, Json}
@@ -21,8 +19,8 @@ case class LevelAgg(price: Long, amount: Long)
 
 sealed trait LimitOrder {
   def price: Price
-  def amount: Long // remaining
-  def fee: Long    // remaining
+  def amount: Long // could be remaining or executed, see OrderExecuted
+  def fee: Long    // same
   def order: Order
   def partial(amount: Long, fee: Long): LimitOrder
 
@@ -163,10 +161,10 @@ object Events {
     case class Changes(updatedPortfolio: Portfolio, changedAssets: Set[Option[AssetId]])
   }
 
-  def collectChanges(event: Event)(isNew: Order => Boolean): Seq[(Order, OrderInfoDiff)] = {
+  def collectChanges(event: Event): Seq[(Order, OrderInfoDiff)] = {
     event match {
       case OrderAdded(lo) =>
-        Seq((lo.order, OrderInfoDiff(isNew = isNew(lo.order), newMinAmount = Some(lo.minAmountOfAmountAsset))))
+        Seq((lo.order, OrderInfoDiff(newMinAmount = Some(lo.minAmountOfAmountAsset))))
       case oe: OrderExecuted =>
         val submitted = oe.submittedExecuted
         val counter   = oe.counterExecuted
@@ -189,7 +187,6 @@ object Events {
         Seq(
           (submitted.order,
            OrderInfoDiff(
-             isNew = isNew(submitted.order),
              addExecutedAmount = Some(oe.executedAmount),
              executedFee = Some(submitted.fee),
              newMinAmount = Some(submitted.minAmountOfAmountAsset),
@@ -197,7 +194,6 @@ object Events {
            )),
           (counter.order,
            OrderInfoDiff(
-             isNew = isNew(counter.order),
              addExecutedAmount = Some(oe.executedAmount),
              executedFee = Some(counter.fee),
              newMinAmount = Some(counter.minAmountOfAmountAsset),
@@ -208,77 +204,5 @@ object Events {
         // The order should not have Cancelled status, if it was cancelled by unmatchable amounts
         Seq((lo.order, OrderInfoDiff(nowCanceled = Some(!unmatchable))))
     }
-  }
-
-  private def releaseFee(totalReceiveAmount: Long, matcherFee: Long, prevRemaining: Long, updatedRemaining: Long): Long = {
-    val executedBefore = matcherFee - prevRemaining
-    val restReserved   = math.max(matcherFee - totalReceiveAmount - executedBefore, 0L)
-
-    val executed = prevRemaining - updatedRemaining
-    println(s"""|
-            |releaseFee:
-            |totalReceiveAmount: $totalReceiveAmount
-            |matcherFee: $matcherFee
-            |prevRemaining: $prevRemaining
-            |executedBefore: $executedBefore
-            |restReserved: $restReserved
-            |executed: $executed
-            |""".stripMargin)
-    math.min(executed, restReserved)
-  }
-
-  private def releaseFee(order: Order, prevRemaining: Long, updatedRemaining: Long): Long = {
-    val lo = LimitOrder(order)
-    if (lo.rcvAsset == lo.feeAsset) releaseFee(lo.getReceiveAmount, order.matcherFee, prevRemaining, updatedRemaining)
-    else prevRemaining - updatedRemaining
-  }
-
-  def orderInfoDiffAccepted(order: Order, newOrderInfo: OrderInfo): Map[Address, OpenPortfolio] = {
-    val lo             = LimitOrder(order)
-    val maxSpendAmount = lo.getRawSpendAmount
-    val remainingSpend = maxSpendAmount - newOrderInfo.totalSpend(lo)
-    val remainingFee   = if (lo.feeAcc == lo.rcvAcc) math.max(newOrderInfo.remainingFee - lo.getReceiveAmount, 0L) else newOrderInfo.remainingFee
-
-    println(s"orderInfoDiffNew: remaining spend=$remainingSpend, remaining fee=$remainingFee")
-    Map(
-      order.sender.toAddress -> OpenPortfolio(
-        Monoid.combine(
-          Map(order.getSpendAssetId -> remainingSpend),
-          Map(lo.feeAsset           -> remainingFee)
-        )
-      )
-    )
-  }
-
-  def orderInfoDiffExecuted(order: Order, prev: OrderInfo, updated: OrderInfo): Map[Address, OpenPortfolio] = {
-    val lo           = LimitOrder(order)
-    val changedSpend = prev.totalSpend(lo) - updated.totalSpend(lo)
-    val changedFee   = -releaseFee(order, prev.remainingFee, updated.remainingFee)
-    println(s"orderInfoDiff: changed spend=$changedSpend, fee=$changedFee")
-    Map(
-      order.sender.toAddress -> OpenPortfolio(
-        Monoid.combine(
-          Map(order.getSpendAssetId -> changedSpend),
-          Map(lo.feeAsset           -> changedFee)
-        )
-      )
-    )
-  }
-
-  def orderInfoDiffCancel(order: Order, curr: OrderInfo): Map[Address, OpenPortfolio] = {
-    val lo             = LimitOrder(order)
-    val maxSpendAmount = lo.getRawSpendAmount
-    val remainingSpend = curr.totalSpend(lo) - maxSpendAmount
-    val remainingFee   = -releaseFee(order, curr.remainingFee, 0)
-
-    println(s"orderInfoDiffCancel: remaining spend=$remainingSpend, remaining fee=$remainingFee")
-    Map(
-      order.sender.toAddress -> OpenPortfolio(
-        Monoid.combine(
-          Map(order.getSpendAssetId -> remainingSpend),
-          Map(lo.feeAsset           -> remainingFee)
-        )
-      )
-    )
   }
 }
