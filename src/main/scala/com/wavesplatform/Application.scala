@@ -241,6 +241,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
                         settings.blockchainSettings.functionalitySettings),
         DebugApiRoute(
           settings,
+          blockchainUpdater,
           wallet,
           blockchainUpdater,
           peerDatabase,

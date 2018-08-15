@@ -50,24 +50,4 @@ class StorageCodecsSpec extends FreeSpec with Matchers with PropertyChecks {
     val r2 = CheckpointCodec.decode(bytes.slice(2, bytes.length))
     r2.isLeft shouldBe true
   }
-
-  "TupleCodec" in {
-    val codec = Tuple2Codec[String, Short](StringCodec, ShortCodec)
-    val x     = ("foo", 10: Short)
-    codec.decode(codec.encode(x)).explicitGet().value shouldBe x
-  }
-
-  "OptionCodec" - {
-    val codec = OptionCodec[String](StringCodec)
-
-    "None" in {
-      codec.decode(codec.encode(None)).explicitGet().value shouldBe None
-    }
-
-    "Some(x)" in {
-      val x = Option("foo")
-      codec.decode(codec.encode(x)).explicitGet().value shouldBe x
-    }
-  }
-
 }

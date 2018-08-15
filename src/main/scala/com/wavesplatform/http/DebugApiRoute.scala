@@ -15,15 +15,18 @@ import com.wavesplatform.crypto
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{ByteStr, LeaseBalance, NG, Portfolio}
+import com.wavesplatform.state.{Blockchain, ByteStr, LeaseBalance, NG, Portfolio}
 import com.wavesplatform.transaction._
-import com.wavesplatform.utils.{Base58, ScorexLogging}
+import com.wavesplatform.utils.{Base58, NTP, ScorexLogging}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
+
+import com.wavesplatform.state.diffs.TransactionDiffer
+import com.wavesplatform.transaction.smart.Verifier
 import monix.eval.{Coeval, Task}
 import play.api.libs.json._
 
@@ -34,6 +37,7 @@ import scala.util.{Failure, Success}
 @Path("/debug")
 @Api(value = "/debug")
 case class DebugApiRoute(ws: WavesSettings,
+                         blockchain: Blockchain,
                          wallet: Wallet,
                          ng: NG,
                          peerDatabase: PeerDatabase,
@@ -58,7 +62,7 @@ case class DebugApiRoute(ws: WavesSettings,
 
   override val settings = ws.restAPISettings
   override lazy val route: Route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print
+    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print ~ validate
   }
 
   @Path("/blocks/{howMany}")
@@ -310,6 +314,30 @@ case class DebugApiRoute(ws: WavesSettings,
         case NonFatal(_) => complete(StatusCodes.BadRequest)
       }
     } ~ complete(StatusCodes.BadRequest)
+  }
+
+  @Path("/validate")
+  @ApiOperation(value = "Validate Transaction", notes = "Validates a transaction and measures time spent in milliseconds", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "transaction", value = "Signed transaction", required = true, dataType = "string", paramType = "body")
+    ))
+  def validate: Route = (path("validate") & post) {
+    handleExceptions(jsonExceptionHandler) {
+      json[JsObject] { jsv =>
+        import ws.blockchainSettings.{functionalitySettings => fs}
+        val h  = blockchain.height
+        val t0 = System.nanoTime
+        val diffEi = for {
+          tx <- TransactionFactory.fromSignedRequest(jsv)
+          _  <- Verifier(blockchain, h)(tx)
+          ei <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, NTP.correctedTime(), h)(blockchain, tx)
+        } yield ei
+        val timeSpent = (System.nanoTime - t0) / 1000 / 1000.0
+        val response  = Json.obj("valid" -> diffEi.isRight, "validationTime" -> timeSpent)
+        diffEi.fold(err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)), _ => response)
+      }
+    }
   }
 }
 
