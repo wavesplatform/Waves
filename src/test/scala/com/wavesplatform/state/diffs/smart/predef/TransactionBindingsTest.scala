@@ -329,7 +329,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       def pg(ord: Order) = {
         val oType = ord.orderType.toString
         val script = s"""
-           |   let ${oType}Id = t.${oType}Order.id == base58'${ByteStr(ord.id.value).base58}'
+           |   let ${oType}Id = t.${oType}Order.id == base58'${ord.id.value}'
            |   let ${oType}Sender = t.${oType}Order.sender == addressFromPublicKey(base58'${ByteStr(ord.sender.publicKey).base58}')
            |   let ${oType}SenderPk = t.${oType}Order.senderPublicKey == base58'${ByteStr(ord.sender.publicKey).base58}'
            |   let ${oType}MatcherPk = t.${oType}Order.matcherPublicKey == base58'${ByteStr(ord.matcherPublicKey.publicKey).base58}'

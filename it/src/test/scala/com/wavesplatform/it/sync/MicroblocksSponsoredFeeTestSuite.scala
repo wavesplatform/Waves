@@ -18,8 +18,7 @@ class MicroblocksSponsoredFeeTestSuite extends FreeSpec with Matchers with Cance
   val minSponsorFee     = Token
   val SmallFee          = Token + Token / 2
 
-  private def sponsorAddress = nodes(1).address
-  private def secondAddress  = nodes(2).address
+  private def secondAddress = nodes(2).address
 
   private def txRequestsGen(n: Int, sponsorAssetId: String): Unit = {
     1 to n map (_ => {
@@ -28,7 +27,6 @@ class MicroblocksSponsoredFeeTestSuite extends FreeSpec with Matchers with Cance
   }
 
   "fee distribution with sponsorship" - {
-
     val sponsorAssetId = sponsor
       .issue(sponsor.address, "SponsoredAsset", "Created by Sponsorship Suite", sponsorAssetTotal, decimals = 2, reissuable = false, fee = issueFee)
       .id
@@ -60,7 +58,6 @@ class MicroblocksSponsoredFeeTestSuite extends FreeSpec with Matchers with Cance
         case Seq((minerBalance1, blockFee1), (minerBalance2, blockFee2)) =>
           minerBalance2 should be(minerBalance1 + blockFee1 * 6 / 10 + blockFee2 * 4 / 10)
       }
-
     }
   }
 

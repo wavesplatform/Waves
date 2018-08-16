@@ -26,6 +26,9 @@ import io.swagger.annotations._
 import javax.ws.rs.Path
 
 import com.wavesplatform.state.diffs.TransactionDiffer
+
+import com.wavesplatform.state.diffs.TransactionDiffer
+import com.wavesplatform.transaction.smart.Verifier
 import monix.eval.{Coeval, Task}
 import play.api.libs.json._
 
@@ -324,19 +327,17 @@ case class DebugApiRoute(ws: WavesSettings,
   def validate: Route = (path("validate") & post) {
     handleExceptions(jsonExceptionHandler) {
       json[JsObject] { jsv =>
-        TransactionFactory
-          .fromSignedRequest(jsv)
-          .fold(
-            ApiError.fromValidationError,
-            tx => {
-              val t0 = System.nanoTime
-              import ws.blockchainSettings.{functionalitySettings => fs}
-              val diffEi    = TransactionDiffer(fs, blockchain.lastBlockTimestamp, NTP.correctedTime(), blockchain.height)(blockchain, tx)
-              val timeSpent = (System.nanoTime - t0) / 1000 / 1000.0
-              val response  = Json.obj("valid" -> diffEi.isRight, "validationTime" -> timeSpent)
-              diffEi.fold(err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)), _ => response)
-            }
-          )
+        import ws.blockchainSettings.{functionalitySettings => fs}
+        val h  = blockchain.height
+        val t0 = System.nanoTime
+        val diffEi = for {
+          tx <- TransactionFactory.fromSignedRequest(jsv)
+          _  <- Verifier(blockchain, h)(tx)
+          ei <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, NTP.correctedTime(), h)(blockchain, tx)
+        } yield ei
+        val timeSpent = (System.nanoTime - t0) / 1000 / 1000.0
+        val response  = Json.obj("valid" -> diffEi.isRight, "validationTime" -> timeSpent)
+        diffEi.fold(err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)), _ => response)
       }
     }
   }

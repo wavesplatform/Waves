@@ -12,6 +12,7 @@ import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
+import scala.math.BigDecimal.RoundingMode
 import scala.util.Try
 
 sealed trait OrderType {
@@ -35,7 +36,7 @@ object OrderType {
   def apply(value: Int): OrderType = value match {
     case 0 => OrderType.BUY
     case 1 => OrderType.SELL
-    case _ => throw new RuntimeException("Unexpected OrderType")
+    case _ => throw new RuntimeException(s"Unexpected OrderType: $value")
   }
 
   def apply(value: String): OrderType = value match {
@@ -94,6 +95,9 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
   }
 
   @ApiModelProperty(hidden = true)
+  val bodyBytes: Coeval[Array[Byte]]
+
+  @ApiModelProperty(hidden = true)
   val id: Coeval[Array[Byte]] = Coeval.evalOnce(crypto.fastHash(bodyBytes()))
 
   @ApiModelProperty(hidden = true)
@@ -101,9 +105,6 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
 
   @ApiModelProperty(hidden = true)
   val bytes: Coeval[Array[Byte]]
-
-  @ApiModelProperty(hidden = true)
-  val bodyBytes: Coeval[Array[Byte]]
 
   @ApiModelProperty(hidden = true)
   def getReceiveAssetId: Option[AssetId] = orderType match {
@@ -120,6 +121,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
   @ApiModelProperty(hidden = true)
   def getSpendAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] =
     Try {
+      // We should not correct amount here, because it could lead to fork. See ExchangeTransactionDiff
       if (orderType == OrderType.SELL) matchAmount
       else {
         val spend = BigInt(matchAmount) * matchPrice / PriceConstant
@@ -223,6 +225,13 @@ object Order {
             matcherFee,
             Proofs(Seq(ByteStr(signature))))
   }
+
+  def correctAmount(a: Long, price: Long): Long = {
+    val settledTotal = (BigDecimal(price) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
+    (BigDecimal(settledTotal) / price * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
+  }
+
+  def correctAmount(o: Order): Long = correctAmount(o.amount, o.price)
 
   def buy(sender: PrivateKeyAccount,
           matcher: PublicKeyAccount,
