@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs
 
+import com.wavesplatform.metrics.{Instrumented, TxProcessingStats}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError.UnsupportedTransactionType
@@ -9,8 +10,11 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{SetScriptTransaction, Verifier}
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.utils.ScorexLogging
 
-object TransactionDiffer {
+object TransactionDiffer extends Instrumented with ScorexLogging {
+
+  private val stats = TxProcessingStats("transaction-differ")
 
   case class TransactionValidationError(cause: ValidationError, tx: Transaction) extends ValidationError
 
@@ -42,7 +46,9 @@ object TransactionDiffer {
         case stx: SponsorFeeTransaction   => AssetTransactionsDiff.sponsor(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(stx)
         case _                            => Left(UnsupportedTransactionType)
       }
-      positiveDiff <- BalanceDiffValidation(blockchain, currentBlockHeight, settings)(diff)
+      positiveDiff <- measureAndIncSuccessful(stats.balanceValidationTime(tx.builder.typeId), stats.balancesValidated(tx.builder.typeId)) {
+        BalanceDiffValidation(blockchain, currentBlockHeight, settings)(diff)
+      }
     } yield positiveDiff
   }.left.map(TransactionValidationError(_, tx))
 }
