@@ -145,7 +145,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
     val sig = Base58.encode(signature)
     Json.obj(
       "version"          -> version,
-      "id"               -> Base58.encode(id()),
+      "id"               -> idStr(),
       "sender"           -> senderPublicKey.address,
       "senderPublicKey"  -> Base58.encode(senderPublicKey.publicKey),
       "matcherPublicKey" -> Base58.encode(matcherPublicKey.publicKey),

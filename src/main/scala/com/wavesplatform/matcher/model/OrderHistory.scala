@@ -47,6 +47,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
       )
   }
 
+  // TODO ByteStr(
   private def saveOrderInfo(rw: RW, event: Event): Map[Array[Byte], OrderInfoChange] =
     saveOrderInfoTimer.measure(db.readWrite { rw =>
       val orderInfoDiffs = collectChanges(event)

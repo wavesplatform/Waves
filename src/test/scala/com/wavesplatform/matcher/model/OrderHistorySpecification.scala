@@ -197,13 +197,13 @@ class OrderHistorySpecification
       oh.orderInfo(submitted.id()).status shouldBe LimitOrder.Filled(exec.executedAmount)
     }
 
-    withClue(s"has no reserved assets, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
+    withClue(s"has no reserved assets, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.idStr()}") {
       oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0L
       oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
       activeOrderIds(counter.senderPublicKey, Set(None)) shouldBe empty
     }
 
-    withClue(s"has no reserved assets, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
+    withClue(s"has no reserved assets, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.idStr()}") {
       oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
       oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
       activeOrderIds(submitted.senderPublicKey, Set(None)) shouldBe empty
@@ -218,7 +218,7 @@ class OrderHistorySpecification
     val counterLo = LimitOrder(counter)
     oh.orderAccepted(OrderAdded(counterLo))
     val counterOrderInfo1 = oh.orderInfo(counter.id())
-    withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
+    withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.idStr()}") {
       oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe counterLo.getRawSpendAmount - counterOrderInfo1.totalSpend(counterLo) + counterOrderInfo1.remainingFee
       oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
       activeOrderIds(counter.senderPublicKey, Set(None)).map(ByteStr(_)) shouldBe Seq(counter.id()).map(ByteStr(_))
@@ -229,7 +229,7 @@ class OrderHistorySpecification
 
     oh.orderExecuted(exec)
     val counterOrderInfo = oh.orderInfo(counter.id())
-    withClue(s"counter: ${submitted.id()}") {
+    withClue(s"counter: ${submitted.idStr()}") {
       counterOrderInfo.filled shouldBe exec.executedAmount
 
       exec.counterRemainingAmount shouldBe 420171L
@@ -243,7 +243,7 @@ class OrderHistorySpecification
     }
 
     val submittedOrderInfo = oh.orderInfo(submitted.id())
-    withClue(s"submitted: ${counter.id()}") {
+    withClue(s"submitted: ${counter.idStr()}") {
       exec.submittedRemainingAmount shouldBe 5363L
       exec.submittedRemainingAmount shouldBe submitted.amount - exec.executedAmount
       exec.submittedRemainingAmount shouldBe submittedOrderInfo.remaining
@@ -257,14 +257,14 @@ class OrderHistorySpecification
     // see OrderBookActor.handleMatchEvent
     oh.orderAccepted(OrderAdded(exec.submittedRemaining))
 
-    withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
+    withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.idStr()}") {
       val remainingSpend = counter.amount - counterOrderInfo.totalSpend(LimitOrder(counter))
       oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe remainingSpend + counterOrderInfo.remainingFee
       oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
       activeOrderIds(counter.senderPublicKey, Set(None)).map(ByteStr(_)) shouldBe Seq(counter.id()).map(ByteStr(_))
     }
 
-    withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
+    withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.idStr()}") {
       oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
       oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
       activeOrderIds(submitted.senderPublicKey, Set(None)) shouldBe empty
@@ -282,7 +282,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(exec.submittedRemaining))
 
     val counterOrderInfo = oh.orderInfo(counter.id())
-    withClue(s"counter: ${counter.id()}") {
+    withClue(s"counter: ${counter.idStr()}") {
       exec.counterRemainingAmount shouldBe 0L
       exec.counterRemainingAmount shouldBe counterOrderInfo.remaining
 
@@ -293,7 +293,7 @@ class OrderHistorySpecification
     }
 
     val submittedOrderInfo = oh.orderInfo(submitted.id())
-    withClue(s"submitted: ${submitted.id()}") {
+    withClue(s"submitted: ${submitted.idStr()}") {
       exec.submittedRemainingAmount shouldBe 20000000L
       exec.submittedRemainingAmount shouldBe submittedOrderInfo.remaining
 
@@ -303,7 +303,7 @@ class OrderHistorySpecification
       submittedOrderInfo.status shouldBe LimitOrder.PartiallyFilled(100000000)
     }
 
-    withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
+    withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.idStr()}") {
       oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe
         math.max(0L,
                  OrderInfo.safeSum(LimitOrder.getPartialFee(submitted.matcherFee, submitted.amount, submitted.amount - counter.amount), -20000000L))
@@ -340,7 +340,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(exec2.submittedRemaining))
 
     val counterInfo2 = oh.orderInfo(counter.id())
-    withClue(s"counter: ${counter.id()}") {
+    withClue(s"counter: ${counter.idStr()}") {
       exec2.counterRemainingAmount shouldBe counterInfo2.remaining
       exec2.counterRemainingFee shouldBe counterInfo2.remainingFee
       oh.orderInfo(counter.id()).status shouldBe LimitOrder.Filled(100000000)
@@ -363,7 +363,7 @@ class OrderHistorySpecification
     oh.openVolume(submitted1.senderPublicKey, pair.amountAsset) shouldBe 0L
     activeOrderIds(submitted1.senderPublicKey, Set(None)) shouldBe empty
 
-    withClue(s"account checks, ord3.senderPublicKey: ${submitted2.senderPublicKey}, ord3.order.id=${submitted2.id()}") {
+    withClue(s"account checks, ord3.senderPublicKey: ${submitted2.senderPublicKey}, ord3.order.id=${submitted2.idStr()}") {
       val lo             = LimitOrder(submitted2)
       val remainingSpend = lo.getSpendAmount - submitted2Info1.totalSpend(lo)
       oh.openVolume(submitted2.senderPublicKey, pair.amountAsset) shouldBe remainingSpend + submitted2Info1.remainingFee
@@ -401,7 +401,7 @@ class OrderHistorySpecification
     oh.orderExecuted(exec)
 
     val counterOrderInfo = oh.orderInfo(counter.id())
-    withClue(s"counter: ${counter.id()}") {
+    withClue(s"counter: ${counter.idStr()}") {
       exec.counterRemainingAmount shouldBe 0L
       exec.counterRemainingAmount shouldBe counterOrderInfo.remaining
 
@@ -412,7 +412,7 @@ class OrderHistorySpecification
     }
 
     val submittedOrderInfo = oh.orderInfo(submitted.id())
-    withClue(s"submitted: ${submitted.id()}") {
+    withClue(s"submitted: ${submitted.idStr()}") {
       exec.submittedRemainingAmount shouldBe submitted.amount - exec.executedAmount
       exec.submittedRemainingAmount shouldBe submittedOrderInfo.remaining
 

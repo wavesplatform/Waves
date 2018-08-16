@@ -19,7 +19,7 @@ import com.wavesplatform.state.{Blockchain, ByteStr, Diff, LeaseBalance, Portfol
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import com.wavesplatform.utils.{Base58, NTP, ScorexLogging}
+import com.wavesplatform.utils.{NTP, ScorexLogging}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
@@ -311,7 +311,7 @@ class OrderBookActorSpecification
 
       within(10.seconds) {
         actor ! GetOrdersRequest
-        expectMsgType[GetOrdersResponse].orders.map(_.order.id()) should have size 100
+        expectMsgType[GetOrdersResponse].orders should have size 100
       }
     }
 
@@ -441,7 +441,7 @@ class OrderBookActorSpecification
       receiveN(1)
       getOrders(actor) shouldEqual Seq(BuyLimitOrder(price * Order.PriceConstant, amount, expiredOrder.matcherFee, expiredOrder))
       actor ! OrderCleanup
-      expectMsg(OrderCanceled(Base58.encode(expiredOrder.id())))
+      expectMsg(OrderCanceled(expiredOrder.idStr()))
       getOrders(actor).size should be(0)
     }
 

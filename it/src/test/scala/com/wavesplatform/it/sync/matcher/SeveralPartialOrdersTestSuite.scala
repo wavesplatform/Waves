@@ -71,7 +71,7 @@ class SeveralPartialOrdersTestSuite
       matcherNode.waitOrderStatus(wavesUsdPair, bobOrderId, "Filled", 1.minute)
 
       // Each side get fair amount of assets
-      val exchangeTx = matcherNode.transactionsByOrder(Base58.encode(bobOrder.id())).headOption.getOrElse(fail("Expected an exchange transaction"))
+      val exchangeTx = matcherNode.transactionsByOrder(bobOrder.idStr()).headOption.getOrElse(fail("Expected an exchange transaction"))
       nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
       matcherNode.reservedBalance(bobNode) shouldBe empty
       matcherNode.reservedBalance(aliceNode) shouldBe empty

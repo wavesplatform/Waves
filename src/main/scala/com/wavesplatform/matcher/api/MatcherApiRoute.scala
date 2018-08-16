@@ -189,7 +189,7 @@ case class MatcherApiRoute(wallet: Wallet,
                 .map {
                   case (order, _) =>
                     orderBook(order.assetPair).fold {
-                      log.warn(s"Can't find pair ${order.assetPair} for order ${order.id()}")
+                      log.warn(s"Can't find pair ${order.assetPair} for order ${order.idStr()}")
                       Future.successful[Any](())
                     } { x =>
                       cancelTimer.measure(x ? CancelOrder(order.assetPair, req.senderPublicKey, ByteStr(order.id())))
@@ -243,7 +243,7 @@ case class MatcherApiRoute(wallet: Wallet,
                   .map {
                     case (order, _) =>
                       orderBook(order.assetPair).fold {
-                        log.warn(s"Can't find pair ${order.assetPair} for order ${order.id()}")
+                        log.warn(s"Can't find pair ${order.assetPair} for order ${order.idStr()}")
                         Future.successful[Any](())
                       } { x =>
                         cancelTimer.measure(x ? CancelOrder(order.assetPair, req.senderPublicKey, ByteStr(order.id())))
@@ -546,7 +546,7 @@ object MatcherApiRoute {
 
   def orderJson(order: Order, orderInfo: OrderInfo): JsObject =
     Json.obj(
-      "id"        -> order.id(),
+      "id"        -> order.idStr(),
       "type"      -> order.orderType.toString,
       "amount"    -> order.amount,
       "price"     -> order.price,

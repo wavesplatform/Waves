@@ -181,7 +181,7 @@ class OrderBookActor(assetPair: AssetPair,
     case ValidationTimeoutExceeded =>
       validationTimeouts.increment()
       log.warn(s"Validation timeout exceeded for $sentMessage")
-      val orderId = sentMessage.fold(_.cancel.orderId, _.order.id())
+      val orderId = sentMessage.fold(_.cancel.orderId, x => ByteStr(x.order.id()))
       cancelInProgressOrders.invalidate(orderId)
       apiSender.foreach(_ ! OperationTimedOut)
       becomeFullCommands()
@@ -312,7 +312,7 @@ class OrderBookActor(assetPair: AssetPair,
         log.debug(s"Order rejected: $err.err")
         apiSender.foreach(_ ! OrderRejected(err.err))
       case Right(o) =>
-        log.debug(s"Order accepted: '${o.id()}' in '${o.assetPair.key}', trying to match ...")
+        log.debug(s"Order accepted: '${o.idStr()}' in '${o.assetPair.key}', trying to match ...")
         apiSender.foreach(_ ! OrderAccepted(o))
         timer.measure(matchOrder(LimitOrder(o)))
     }

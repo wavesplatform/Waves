@@ -77,7 +77,7 @@ class TradeBalanceAndRoundingTestSuite
       matcherNode.waitOrderStatusAndAmount(wavesUsdPair, bobOrder1Id, "PartiallyFilled", Some(420169L), 1.minute)
 
       // Each side get fair amount of assets
-      val exchangeTx = matcherNode.transactionsByOrder(Base58.encode(aliceOrder.id())).headOption.getOrElse(fail("Expected an exchange transaction"))
+      val exchangeTx = matcherNode.transactionsByOrder(aliceOrder.idStr()).headOption.getOrElse(fail("Expected an exchange transaction"))
       nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
     }
 
@@ -165,7 +165,7 @@ class TradeBalanceAndRoundingTestSuite
       matcherNode.waitOrderStatus(wavesUsdPair, bobOrder1Id, "PartiallyFilled", 1.minute)
 
       // Each side get fair amount of assets
-      val exchangeTx = matcherNode.transactionsByOrder(Base58.encode(aliceOrder.id())).headOption.getOrElse(fail("Expected an exchange transaction"))
+      val exchangeTx = matcherNode.transactionsByOrder(aliceOrder.idStr()).headOption.getOrElse(fail("Expected an exchange transaction"))
       nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
       matcherNode.cancelOrder(bobNode, wavesUsdPair, Some(bobOrder1Id))
     }
