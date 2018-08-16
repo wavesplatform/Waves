@@ -21,7 +21,8 @@ package object predef {
       _             <- Either.cond(expr.size == 1, (), expr.mkString("\n"))
       compileResult <- CompilerV1(dummyCompilerContext, expr.head)
       (typedExpr, tpe) = compileResult
-      r <- EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(Coproduct(tx)), Coeval(???), null), typedExpr)._2
+      er               = EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(Coproduct(tx)), Coeval(???), null), typedExpr)
+      r <- er._2
     } yield r
   }
 

@@ -2,9 +2,9 @@ package com.wavesplatform.state.reader
 
 import cats.implicits._
 import cats.kernel.Monoid
-import com.wavesplatform.state._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.state._
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -95,7 +95,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
     case l @ Left(AliasIsDisabled(_)) => l
     case Right(addr)                  => Right(diff.aliases.getOrElse(alias, addr))
-    case _                            => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
+    case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
   override def allActiveLeases: Set[LeaseTransaction] = {

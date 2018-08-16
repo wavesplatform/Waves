@@ -9,7 +9,9 @@ class RW(db: DB) extends AutoCloseable {
 
   def get[V](key: Key[V]): V = key.parse(db.get(key.keyBytes, readOptions))
 
-  def put[V](key: Key[V], value: V): Unit = batch.put(key.keyBytes, key.encode(value))
+  def put[V](key: Key[V], value: V): Unit = put(key.keyBytes, key.encode(value))
+
+  def put(key: Array[Byte], value: Array[Byte]): Unit = batch.put(key, value)
 
   def delete(key: Array[Byte]): Unit = batch.delete(key)
 

@@ -21,11 +21,11 @@ class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure 
 
     val cancelLeaseTxId = sender.cancelLease(firstAddress, createdLeaseTxId, fee = minFee).id
     notMiner.waitForTransaction(cancelLeaseTxId)
+    nodes.waitForHeightArise()
     val status1 = getStatus(createdLeaseTxId)
     status1 shouldBe Canceled
     val sizeActiveLeases = sender.activeLeases(firstAddress).size
     sizeActiveLeases shouldBe 0
-
   }
 
   private def getStatus(txId: String): String = {
@@ -36,13 +36,13 @@ class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure 
 }
 
 object LeaseStatusTestSuite {
-  private val blockGenerationOffest = "10000ms"
+  private val blockGenerationOffset = "10000ms"
   import com.wavesplatform.it.NodeConfigs.Default
 
   private val minerConfig = ConfigFactory.parseString(s"""waves {
        |   miner{
        |      enable = yes
-       |      minimal-block-generation-offset = $blockGenerationOffest
+       |      minimal-block-generation-offset = $blockGenerationOffset
        |      quorum = 0
        |      micro-block-interval = 3s
        |      max-transactions-in-key-block = 0
@@ -52,7 +52,7 @@ object LeaseStatusTestSuite {
 
   private val notMinerConfig = ConfigFactory.parseString(s"""waves {
        |   miner.enable = no
-       |   miner.minimal-block-generation-offset = $blockGenerationOffest
+       |   miner.minimal-block-generation-offset = $blockGenerationOffset
        |}
      """.stripMargin)
 
