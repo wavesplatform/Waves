@@ -60,7 +60,7 @@ class OrderHistorySpecification
       oh.openVolume(ord.senderPublicKey, None) shouldBe ord.matcherFee
     }
 
-    activeOrderIds(ord.senderPublicKey, Set(pair.priceAsset)) shouldBe Seq(ord.id())
+    activeOrderIds(ord.senderPublicKey, Set(pair.priceAsset)).map(ByteStr(_)) shouldBe Seq(ord.id()).map(ByteStr(_))
   }
 
   property("New sell order added") {
@@ -81,7 +81,7 @@ class OrderHistorySpecification
       oh.openVolume(ord.senderPublicKey, None) shouldBe ord.matcherFee
     }
 
-    activeOrderIds(ord.senderPublicKey, Set(pair.amountAsset)) shouldBe Seq(ord.id())
+    activeOrderIds(ord.senderPublicKey, Set(pair.amountAsset)).map(ByteStr(_)) shouldBe Seq(ord.id()).map(ByteStr(_))
   }
 
   property("New buy WAVES order added") {
@@ -102,7 +102,7 @@ class OrderHistorySpecification
       oh.openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 8L
     }
 
-    activeOrderIds(ord.senderPublicKey, Set(pair.priceAsset)) shouldBe Seq(ord.id())
+    activeOrderIds(ord.senderPublicKey, Set(pair.priceAsset)).map(ByteStr(_)) shouldBe Seq(ord.id()).map(ByteStr(_))
   }
 
   property("New sell WAVES order added") {
@@ -115,7 +115,7 @@ class OrderHistorySpecification
     oh.openVolume(ord.senderPublicKey, pair.amountAsset) shouldBe 10000L + ord.matcherFee
     oh.openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 0L
 
-    activeOrderIds(ord.senderPublicKey, Set(pair.amountAsset)) shouldBe Seq(ord.id())
+    activeOrderIds(ord.senderPublicKey, Set(pair.amountAsset)).map(ByteStr(_)) shouldBe Seq(ord.id()).map(ByteStr(_))
   }
 
   property("Should not reserve fee, if seller receives more WAVES than total fee in sell order") {
@@ -161,7 +161,8 @@ class OrderHistorySpecification
       oh.openVolume(ord1.senderPublicKey, pair.priceAsset) shouldBe 0L
     }
 
-    activeOrderIds(ord1.senderPublicKey, Set(pair.priceAsset, pair.amountAsset)).toSet shouldBe Set(ord1.id(), ord2.id())
+    activeOrderIds(ord1.senderPublicKey, Set(pair.priceAsset, pair.amountAsset)).toSet.map(ByteStr(_)) shouldBe Set(ord1.id(), ord2.id())
+      .map(ByteStr(_))
   }
 
   property("allowed add, then cancel, then add the same order") {
@@ -220,7 +221,7 @@ class OrderHistorySpecification
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
       oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe counterLo.getRawSpendAmount - counterOrderInfo1.totalSpend(counterLo) + counterOrderInfo1.remainingFee
       oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
-      activeOrderIds(counter.senderPublicKey, Set(None)) shouldBe Seq(counter.id())
+      activeOrderIds(counter.senderPublicKey, Set(None)).map(ByteStr(_)) shouldBe Seq(counter.id()).map(ByteStr(_))
     }
 
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
@@ -260,7 +261,7 @@ class OrderHistorySpecification
       val remainingSpend = counter.amount - counterOrderInfo.totalSpend(LimitOrder(counter))
       oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe remainingSpend + counterOrderInfo.remainingFee
       oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
-      activeOrderIds(counter.senderPublicKey, Set(None)) shouldBe Seq(counter.id())
+      activeOrderIds(counter.senderPublicKey, Set(None)).map(ByteStr(_)) shouldBe Seq(counter.id()).map(ByteStr(_))
     }
 
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
@@ -307,7 +308,7 @@ class OrderHistorySpecification
         math.max(0L,
                  OrderInfo.safeSum(LimitOrder.getPartialFee(submitted.matcherFee, submitted.amount, submitted.amount - counter.amount), -20000000L))
       oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe (BigDecimal(0.00085) * 20000000L).toLong
-      activeOrderIds(submitted.senderPublicKey, Set(pair.priceAsset)) shouldBe Seq(submitted.id())
+      activeOrderIds(submitted.senderPublicKey, Set(pair.priceAsset)).map(ByteStr(_)) shouldBe Seq(submitted.id()).map(ByteStr(_))
     }
   }
 
@@ -367,7 +368,7 @@ class OrderHistorySpecification
       val remainingSpend = lo.getSpendAmount - submitted2Info1.totalSpend(lo)
       oh.openVolume(submitted2.senderPublicKey, pair.amountAsset) shouldBe remainingSpend + submitted2Info1.remainingFee
       oh.openVolume(submitted2.senderPublicKey, pair.priceAsset) shouldBe 0L
-      activeOrderIds(submitted2.senderPublicKey, Set(pair.amountAsset)) shouldBe Seq(submitted2.id())
+      activeOrderIds(submitted2.senderPublicKey, Set(pair.amountAsset)).map(ByteStr(_)) shouldBe Seq(submitted2.id()).map(ByteStr(_))
     }
   }
 
@@ -426,7 +427,7 @@ class OrderHistorySpecification
 
     oh.openVolume(pk, pair.amountAsset) shouldBe expectedAmountReserved
     oh.openVolume(pk, pair.priceAsset) shouldBe 0L
-    activeOrderIds(pk, Set(pair.amountAsset)) shouldBe Seq(submitted.id())
+    activeOrderIds(pk, Set(pair.amountAsset)).map(ByteStr(_)) shouldBe Seq(submitted.id()).map(ByteStr(_))
   }
 
   property("Cancel buy order") {
@@ -499,7 +500,7 @@ class OrderHistorySpecification
     oh.deleteOrder(pk, counter.id()) shouldBe false
     oh.deleteOrder(pk, submitted.id()) shouldBe true
 
-    activeOrderIds(pk, Set(pair.priceAsset)) shouldBe Seq(counter.id())
+    activeOrderIds(pk, Set(pair.priceAsset)).map(ByteStr(_)) shouldBe Seq(counter.id()).map(ByteStr(_))
   }
 
   property("Sorting by status then timestamp") {
@@ -520,11 +521,11 @@ class OrderHistorySpecification
     oh.orderCanceled(OrderCanceled(LimitOrder(ord3), unmatchable = false))
     oh.orderAccepted(OrderAdded(LimitOrder(ord5)))
 
-    allOrderIds(ord1.senderPublicKey, Set.empty) shouldBe
-      Seq(ord5.id(), ord4.id(), ord2.id(), ord3.id(), ord1.id())
+    allOrderIds(ord1.senderPublicKey, Set.empty).map(ByteStr(_)) shouldBe
+      Seq(ord5.id(), ord4.id(), ord2.id(), ord3.id(), ord1.id()).map(ByteStr(_))
 
-    activeOrderIds(ord1.senderPublicKey, Set.empty) shouldBe
-      Seq(ord5.id(), ord4.id(), ord2.id())
+    activeOrderIds(ord1.senderPublicKey, Set.empty).map(ByteStr(_)) shouldBe
+      Seq(ord5.id(), ord4.id(), ord2.id()).map(ByteStr(_))
   }
 
   property("History with more than max limit") {
@@ -543,7 +544,7 @@ class OrderHistorySpecification
 
     oh.orderAccepted(OrderAdded(LimitOrder(newOrder)))
 
-    allOrderIds(pk, Set.empty) shouldBe orders.reverse.tail.map(_.id()) :+ newOrder.id()
+    allOrderIds(pk, Set.empty).map(ByteStr(_)) shouldBe (orders.reverse.tail.map(_.id()) :+ newOrder.id()).map(ByteStr(_))
   }
 
   property("History with more than max limit and canceled order") {
@@ -557,7 +558,7 @@ class OrderHistorySpecification
     }
 
     oh.orderCanceled(OrderCanceled(LimitOrder(orders.last), unmatchable = false))
-    allOrderIds(pk, Set.empty) shouldBe orders.reverse.tail.map(_.id())
+    allOrderIds(pk, Set.empty).map(ByteStr(_)) shouldBe orders.reverse.tail.map(_.id()).map(ByteStr(_))
   }
 
   property("Open Portfolio for two assets") {

@@ -188,7 +188,7 @@ class OrderBookActor(assetPair: AssetPair,
 
     case ValidateOrderResult(validatedOrderId, res) =>
       sentMessage match {
-        case Right(sent) if validatedOrderId == sent.order.id() =>
+        case Right(sent) if sent.order.id().sameElements(validatedOrderId.arr) =>
           cancellable.foreach(_.cancel())
           handleValidateOrderResult(res)
         case x =>

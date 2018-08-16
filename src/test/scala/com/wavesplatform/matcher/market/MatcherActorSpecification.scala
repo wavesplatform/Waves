@@ -10,11 +10,10 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.matcher.api.StatusCodeMatcherResponse
 import com.wavesplatform.matcher.fixtures.RestartableActor
-import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse, MarketData}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
-import com.wavesplatform.matcher.model.{LevelAgg, OrderBook}
+import com.wavesplatform.matcher.model.OrderBook
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherTestData}
 import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, LeaseBalance, Portfolio}
@@ -126,27 +125,6 @@ class MatcherActorSpecification
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Amount and price assets must be different"))
     }
 
-    "accept orders with AssetPair with same assets" in {
-      def sameAssetsOrder(): Order =
-        Order.apply(
-          PrivateKeyAccount("123".getBytes()),
-          MatcherAccount,
-          AssetPair(strToSomeAssetId("asset1"), strToSomeAssetId("asset1")),
-          OrderType.BUY,
-          100000000L,
-          100L,
-          1L,
-          1000L,
-          100000L,
-          1: Byte
-        )
-
-      val invalidOrder = sameAssetsOrder()
-      actor ! invalidOrder
-      expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid AssetPair"))
-      // expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Amount and price assets must be different"))
-    }
-
     "Reject order when script fails" in {
       val sender = PrivateKeyAccount("Trader#1".getBytes)
 
@@ -182,26 +160,6 @@ class MatcherActorSpecification
 
       actor ! order
       expectMsg(StatusCodeMatcherResponse(StatusCodes.Forbidden, "Order not allowed by sender script"))
-    }
-
-    "restore OrderBook after restart" in {
-      val pair  = AssetPair(strToSomeAssetId("123"), None)
-      val order = buy(pair, 1, 2000)
-
-      (blockchain.accountScript _)
-        .when(order.sender.toAddress)
-        .returns(None)
-
-      (blockchain.accountScript _)
-        .when(order.matcherPublicKey.toAddress)
-        .returns(None)
-
-      actor ! order
-      expectMsg(OrderAccepted(order))
-
-      actor ! RestartActor
-      actor ! GetOrderBookRequest(pair, None)
-      expectMsg(GetOrderBookResponse(pair, Seq(LevelAgg(100000000, 2000)), Seq()))
     }
 
     "return all open markets" in {

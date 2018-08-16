@@ -207,6 +207,15 @@ class MatcherActor(orderHistory: ActorRef,
         removeOrderBook(ob.assetPair)
       }
 
+    case x: CancelOrder =>
+      checkAssetPair(x.assetPair, x) {
+        context
+          .child(OrderBookActor.name(x.assetPair))
+          .fold {
+            sender() ! OrderCancelRejected(s"Order '${x.orderId}' is already cancelled or never existed in '${x.assetPair.key}' pair")
+          }(forwardReq(x))
+      }
+
     case x: ForceCancelOrder =>
       checkAssetPair(x.assetPair, x) {
         orderBook(x.assetPair)

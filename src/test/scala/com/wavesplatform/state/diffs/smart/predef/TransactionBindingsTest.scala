@@ -8,6 +8,7 @@ import org.scalatest.prop.PropertyChecks
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.transaction.{Proofs, ProvenTransaction, VersionedTransaction}
 import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.utils.Base58
 import play.api.libs.json.Json // For string escapes.
 
 class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
@@ -329,7 +330,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       def pg(ord: Order) = {
         val oType = ord.orderType.toString
         val script = s"""
-           |   let ${oType}Id = t.${oType}Order.id == base58'${ord.id.value}'
+           |   let ${oType}Id = t.${oType}Order.id == base58'${Base58.encode(ord.id())}'
            |   let ${oType}Sender = t.${oType}Order.sender == addressFromPublicKey(base58'${ByteStr(ord.sender.publicKey).base58}')
            |   let ${oType}SenderPk = t.${oType}Order.senderPublicKey == base58'${ByteStr(ord.sender.publicKey).base58}'
            |   let ${oType}MatcherPk = t.${oType}Order.matcherPublicKey == base58'${ByteStr(ord.matcherPublicKey.publicKey).base58}'
@@ -366,7 +367,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           "AssetPairAmount",
           "AssetPairPrice",
           "Proofs"
-        ).map(i => s"${oType}$i")
+        ).map(i => s"$oType$i")
           .mkString(" && ")
 
         (script, lets)
