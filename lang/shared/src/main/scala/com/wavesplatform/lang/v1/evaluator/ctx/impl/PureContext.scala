@@ -1,5 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
+import java.nio.charset.StandardCharsets
+
 import cats.data.EitherT
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -65,12 +67,13 @@ object PureContext {
   }
 
   val _isInstanceOf: BaseFunction = NativeFunction("_isInstanceOf", 1, ISINSTANCEOF, BOOLEAN, "obj" -> TYPEPARAM('T'), "of" -> STRING) {
-    case (p: Boolean) :: ("Boolean") :: Nil => Right(true)
-    case (p: String) :: ("String") :: Nil   => Right(true)
-    case (p: Long) :: ("Int") :: Nil        => Right(true)
-    case (()) :: ("Unit") :: Nil            => Right(true)
-    case (p: CaseObj) :: (s: String) :: Nil => Right(p.caseType.name == s)
-    case _                                  => Right(false)
+    case (p: Boolean) :: ("Boolean") :: Nil       => println(s"iio(bool) -> true"); Right(true)///
+    case (p: ByteVector) :: ("ByteVector") :: Nil => Right(true)
+    case (p: String) :: ("String") :: Nil         => Right(true)
+    case (p: Long) :: ("Int") :: Nil              => Right(true)
+    case (()) :: ("Unit") :: Nil                  => Right(true)
+    case (p: CaseObj) :: (s: String) :: Nil       => Right(p.caseType.name == s)
+    case z                                        => println(s"iio($z) -> false"); Right(false)///
   }
 
   val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "byteVector" -> BYTEVECTOR) {
@@ -78,9 +81,34 @@ object PureContext {
     case xs                      => notImplemented("size(byte[])", xs)
   }
 
+  val toBytesBoolean: BaseFunction = NativeFunction("toBytes", 1, BOOLEAN_TO_BYTES, BYTEVECTOR, "b" -> BOOLEAN) {
+    case (b: Boolean) :: Nil => Right(ByteVector(if (b) 1 else 0))
+    case _ => ???
+  }
+
+  val toBytesLong: BaseFunction = NativeFunction("toBytes", 1, LONG_TO_BYTES, BYTEVECTOR, "n" -> LONG) {
+    case (n: Long) :: Nil => Right(ByteVector.fromLong(n))
+    case _ => ???
+  }
+
+  val toBytesString: BaseFunction = NativeFunction("toBytes", 1, STRING_TO_BYTES, BYTEVECTOR, "s" -> STRING) {
+    case (s: String) :: Nil => Right(ByteVector(s.getBytes(StandardCharsets.UTF_8)))
+    case _ => ???
+  }
+
   val sizeString: BaseFunction = NativeFunction("size", 1, SIZE_STRING, LONG, "xs" -> STRING) {
     case (bv: String) :: Nil => Right(bv.length.toLong)
     case xs                  => notImplemented("size(String)", xs)
+  }
+
+  val toStringBoolean: BaseFunction = NativeFunction("toString", 1, BOOLEAN_TO_STRING, STRING, "b" -> BOOLEAN) {
+    case (b: Boolean) :: Nil => Right(b.toString)
+    case _ => ???
+  }
+
+  val toStringLong: BaseFunction = NativeFunction("toString", 1, LONG_TO_STRING, STRING, "n" -> LONG) {
+    case (n: Long) :: Nil => Right(n.toString)
+    case _ => ???
   }
 
   val takeBytes: BaseFunction = NativeFunction("take", 1, TAKE_BYTES, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
@@ -237,11 +265,16 @@ object PureContext {
   private val functions = Seq(
     fraction,
     sizeBytes,
+    toBytesBoolean,
+    toBytesLong,
+    toBytesString,
     takeBytes,
     dropBytes,
     takeRightBytes,
     dropRightBytes,
     sizeString,
+    toStringBoolean,
+    toStringLong,
     takeString,
     dropString,
     takeRightString,
