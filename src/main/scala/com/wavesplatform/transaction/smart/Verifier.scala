@@ -18,11 +18,11 @@ object Verifier extends Instrumented with ScorexLogging {
 
   val stats = TxProcessingStats("verifier")
 
-  val orderScriptExecutionTime = Kamon.metrics.histogram("order-script-execution-time")
-  val orderscriptsExecuted     = Kamon.metrics.counter("order-scripts-executed")
+  val orderScriptExecutionTime = Kamon.histogram("order-script-execution-time")
+  val orderscriptsExecuted     = Kamon.counter("order-scripts-executed")
 
-  val orderSignatureVerificationTime = Kamon.metrics.histogram("order-signature-verification-time")
-  val orderSignaturesVerified        = Kamon.metrics.counter("order-signatures-verified")
+  val orderSignatureVerificationTime = Kamon.histogram("order-signature-verification-time")
+  val orderSignaturesVerified        = Kamon.counter("order-signatures-verified")
 
   private type TxOrd = Transaction :+: Order :+: CNil
 

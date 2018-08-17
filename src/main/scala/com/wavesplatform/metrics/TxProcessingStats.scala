@@ -2,28 +2,28 @@ package com.wavesplatform.metrics
 
 import com.wavesplatform.transaction.TransactionParsers
 import kamon.Kamon
-import kamon.metric.instrument.{Counter, Histogram}
+import kamon.metric.{Counter, Histogram}
 
 final case class TxProcessingStats(component: String) {
 
   final case class TxStatsHolder(txTypeName: String) {
     private def mkCounter(name: String) =
-      Kamon.metrics.counter(name, Map("transaction-type" -> txTypeName, "component" -> component))
+      Kamon.counter(name).refine(Map("transaction-type" -> txTypeName, "component" -> component))
 
     private def mkHistogram(name: String) =
-      Kamon.metrics.histogram(name, Map("transaction-type" -> txTypeName, "component" -> component))
+      Kamon.histogram(name).refine(Map("transaction-type" -> txTypeName, "component" -> component))
 
-    private[TxProcessingStats] val scriptExecutionTimer         = mkHistogram("tx-script-execution")
-    private[TxProcessingStats] val scriptExecutionCounter       = mkCounter("tx-scripts-executed")
-    private[TxProcessingStats] val assetScriptExecutionTimer    = mkHistogram("tx-asset-script-execution")
-    private[TxProcessingStats] val assetScriptsExecuted         = mkCounter("tx-asset-scripts-executed")
-    private[TxProcessingStats] val signatureVerificationTimer   = mkHistogram("tx-signature-validation")
-    private[TxProcessingStats] val signatureVerificationCounter = mkCounter("tx-signatures-validated")
-    private[TxProcessingStats] val balanceValidationTimer       = mkHistogram("tx-balance-validation")
-    private[TxProcessingStats] val balanceValidationCounter     = mkCounter("tx-balances-validated")
-    private[TxProcessingStats] val transactionDiffTime          = mkHistogram("tx-diff-time")
-    private[TxProcessingStats] val transactionDiffCounter       = mkCounter("tx-diff-counter")
-    private[TxProcessingStats] val utxProcessingTimer           = mkHistogram("utx-transaction-processing-time")
+    val scriptExecutionTimer: Histogram       = mkHistogram("tx-script-execution")
+    val scriptExecutionCounter: Counter       = mkCounter("tx-scripts-executed")
+    val assetScriptExecutionTimer: Histogram  = mkHistogram("tx-asset-script-execution")
+    val assetScriptsExecuted: Counter         = mkCounter("tx-asset-scripts-executed")
+    val signatureVerificationTimer: Histogram = mkHistogram("tx-signature-validation")
+    val signatureVerificationCounter: Counter = mkCounter("tx-signatures-validated")
+    val balanceValidationTimer: Histogram     = mkHistogram("tx-balance-validation")
+    val balanceValidationCounter: Counter     = mkCounter("tx-balances-validated")
+    val transactionDiffTime: Histogram        = mkHistogram("tx-diff-time")
+    val transactionDiffCounter: Counter       = mkCounter("tx-diff-counter")
+    val utxProcessingTimer: Histogram         = mkHistogram("utx-transaction-processing-time")
   }
 
   private val txIdentifiers = TransactionParsers.all.values.toList.map { builder =>
