@@ -10,6 +10,7 @@ import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
+import kamon.metric.MeasurementUnit
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import com.wavesplatform.account.{Address, Alias}
@@ -530,13 +531,11 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
 
 object BlockchainUpdaterImpl extends ScorexLogging {
 
-  import kamon.metric.instrument.{Time => KTime}
-
-  private val blockMicroForkStats       = Kamon.metrics.counter("block-micro-fork")
-  private val microMicroForkStats       = Kamon.metrics.counter("micro-micro-fork")
-  private val microBlockForkStats       = Kamon.metrics.counter("micro-block-fork")
-  private val microBlockForkHeightStats = Kamon.metrics.histogram("micro-block-fork-height")
-  private val forgeBlockTimeStats       = Kamon.metrics.histogram("forge-block-time", KTime.Milliseconds)
+  private val blockMicroForkStats       = Kamon.counter("block-micro-fork")
+  private val microMicroForkStats       = Kamon.counter("micro-micro-fork")
+  private val microBlockForkStats       = Kamon.counter("micro-block-fork")
+  private val microBlockForkHeightStats = Kamon.histogram("micro-block-fork-height")
+  private val forgeBlockTimeStats       = Kamon.histogram("forge-block-time", MeasurementUnit.time.milliseconds)
 
   def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
     b1.signerData.generator == b2.signerData.generator &&

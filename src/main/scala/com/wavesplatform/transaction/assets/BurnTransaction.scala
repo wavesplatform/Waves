@@ -6,7 +6,7 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.transaction._
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 
 trait BurnTransaction extends ProvenTransaction with VersionedTransaction {
 

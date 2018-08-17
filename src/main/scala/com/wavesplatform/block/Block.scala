@@ -15,7 +15,7 @@ import com.wavesplatform.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensus
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 import scala.util.{Failure, Try}
 
 class BlockHeader(val timestamp: Long,

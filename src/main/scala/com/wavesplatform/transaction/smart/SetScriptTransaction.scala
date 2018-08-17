@@ -10,7 +10,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import monix.eval.Coeval
 import play.api.libs.json.Json
-import scorex.crypto.signatures.Curve25519.KeyLength
+import com.wavesplatform.crypto.KeyLength
 
 import scala.util.{Failure, Success, Try}
 

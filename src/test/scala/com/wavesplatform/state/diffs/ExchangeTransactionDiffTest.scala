@@ -200,6 +200,53 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     }
   }
 
+  property("Diff for ExchangeTransaction works as expected and doesn't use rounding inside") {
+    val MatcherFee = 300000L
+    val Ts         = 1000L
+
+    val preconditions: Gen[
+      (PrivateKeyAccount, PrivateKeyAccount, PrivateKeyAccount, GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
+      for {
+        buyer   <- accountGen
+        seller  <- accountGen
+        matcher <- accountGen
+        ts      <- timestampGen
+        gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).explicitGet()
+        gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).explicitGet()
+        gen3: GenesisTransaction = GenesisTransaction.create(matcher, ENOUGH_AMT, ts).explicitGet()
+        issue1: IssueTransactionV1 <- issueGen(buyer, fixedQuantity = Some(Long.MaxValue))
+      } yield (buyer, seller, matcher, gen1, gen2, gen3, issue1)
+
+    val (buyer, seller, matcher, gen1, gen2, gen3, issue1) = preconditions.sample.get
+    val assetPair                                          = AssetPair(None, Some(issue1.id()))
+
+    val buy  = Order.buy(buyer, matcher, assetPair, 238, 3100000000L, Ts, Ts + 1, MatcherFee, version = 1: Byte).asInstanceOf[OrderV1]
+    val sell = Order.sell(seller, matcher, assetPair, 235, 425532L, Ts, Ts + 1, MatcherFee, version = 1: Byte).asInstanceOf[OrderV1]
+    val tx = ExchangeTransactionV1
+      .create(
+        matcher = matcher,
+        buyOrder = buy,
+        sellOrder = sell,
+        price = 238,
+        amount = 425532,
+        buyMatcherFee = 41,
+        sellMatcherFee = 300000,
+        fee = buy.matcherFee,
+        timestamp = Ts
+      )
+      .explicitGet()
+
+    assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1))), TestBlock.create(Seq(tx))) { totalDiffEi =>
+      inside(totalDiffEi) {
+        case Right(diff) =>
+          import diff.portfolios
+          portfolios(buyer).balance shouldBe (-41L + 425532L)
+          portfolios(seller).balance shouldBe (-300000L - 425532L)
+          portfolios(matcher).balance shouldBe (+41L + 300000L - tx.fee)
+      }
+    }
+  }
+
   val fsV2 = TestFunctionalitySettings.Enabled
     .copy(
       preActivatedFeatures = Map(

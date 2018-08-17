@@ -37,6 +37,8 @@ import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
+import kamon.influxdb.CustomInfluxDBReporter
+import kamon.system.SystemMetrics
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler._
 import monix.execution.schedulers.SchedulerService
@@ -298,7 +300,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     //on unexpected shutdown
     sys.addShutdownHook {
-      Kamon.shutdown()
+      Await.ready(Kamon.stopAllReporters(), 20.seconds)
       Metrics.shutdown()
       shutdown(utxStorage, network)
     }
@@ -329,6 +331,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       peerDatabase.close()
 
       Try(Await.result(actorSystem.terminate(), 2.minute)).failed.map(e => log.error("Failed to terminate actor system", e))
+      log.debug("Node's actor system shutdown successful")
 
       blockchainUpdater.shutdown()
       rxExtensionLoaderShutdown.foreach(_.shutdown())
@@ -350,8 +353,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   }
 
   private def shutdownAndWait(scheduler: SchedulerService, name: String, timeout: FiniteDuration = 1.minute): Unit = {
+    log.debug(s"Shutting down $name")
     scheduler.shutdown()
-    val r = Await.result(scheduler.awaitTermination(timeout, global), Duration.Inf)
+    val r = Await.result(scheduler.awaitTermination(timeout, global), 2 * timeout)
     if (r)
       log.info(s"$name was shutdown successfully")
     else
@@ -416,7 +420,13 @@ object Application extends ScorexLogging {
     }
 
     val settings = WavesSettings.fromConfig(config)
-    Kamon.start(config)
+    if (config.getBoolean("kamon.enable")) {
+      log.info("Aggregated metrics are enabled")
+      Kamon.reconfigure(config)
+      Kamon.addReporter(new CustomInfluxDBReporter())
+      SystemMetrics.startCollecting()
+    }
+
     val isMetricsStarted = Metrics.start(settings.metrics)
 
     RootActorSystem.start("wavesplatform", config) { actorSystem =>

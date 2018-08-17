@@ -4,12 +4,12 @@ import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.smart.BlockchainContext
+import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{DataTransaction, Transaction}
 import com.wavesplatform.utils.dummyCompilerContext
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval
-import com.wavesplatform.transaction.{DataTransaction, Transaction}
-import com.wavesplatform.transaction.smart.BlockchainContext
-import com.wavesplatform.transaction.transfer.TransferTransaction
 import shapeless.Coproduct
 
 package object predef {
@@ -21,7 +21,8 @@ package object predef {
       _             <- Either.cond(expr.size == 1, (), expr.mkString("\n"))
       compileResult <- CompilerV1(dummyCompilerContext, expr.head)
       (typedExpr, tpe) = compileResult
-      r <- EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(Coproduct(tx)), Coeval(???), null), typedExpr)._2
+      er               = EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(Coproduct(tx)), Coeval(???), null), typedExpr)
+      r <- er._2
     } yield r
   }
 

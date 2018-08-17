@@ -6,7 +6,7 @@ import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.transaction._
-import scorex.crypto.signatures.Curve25519.SignatureLength
+import com.wavesplatform.crypto.SignatureLength
 import scala.util.{Failure, Success, Try}
 
 case class LeaseTransactionV1 private (sender: PublicKeyAccount,
