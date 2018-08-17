@@ -11,18 +11,17 @@ import scala.util.{Success, Try}
 
 case class AssetPair(@ApiModelProperty(dataType = "java.lang.String") amountAsset: Option[AssetId],
                      @ApiModelProperty(dataType = "java.lang.String") priceAsset: Option[AssetId]) {
+  import AssetPair._
   @ApiModelProperty(hidden = true)
-  lazy val priceAssetStr: String = priceAsset.map(_.base58).getOrElse(AssetPair.WavesName)
+  lazy val priceAssetStr: String = assetIdStr(priceAsset)
   @ApiModelProperty(hidden = true)
-  lazy val amountAssetStr: String = amountAsset.map(_.base58).getOrElse(AssetPair.WavesName)
+  lazy val amountAssetStr: String = assetIdStr(amountAsset)
 
   override def toString: String = key
 
   def key: String = amountAssetStr + "-" + priceAssetStr
 
-  def isValid: Validation = {
-    (amountAsset != priceAsset) :| "Invalid AssetPair"
-  }
+  def isValid: Validation = (amountAsset != priceAsset) :| "Invalid AssetPair"
 
   def bytes: Array[Byte] = assetIdBytes(amountAsset) ++ assetIdBytes(priceAsset)
 
@@ -30,12 +29,16 @@ case class AssetPair(@ApiModelProperty(dataType = "java.lang.String") amountAsse
     "amountAsset" -> amountAsset.map(_.base58),
     "priceAsset"  -> priceAsset.map(_.base58)
   )
+
+  def reverse = AssetPair(priceAsset, amountAsset)
 }
 
 object AssetPair {
   val WavesName = "WAVES"
 
-  private def extractAssetId(a: String): Try[Option[AssetId]] = a match {
+  def assetIdStr(aid: Option[AssetId]): String = aid.fold(WavesName)(_.base58)
+
+  def extractAssetId(a: String): Try[Option[AssetId]] = a match {
     case `WavesName` => Success(None)
     case other       => ByteStr.decodeBase58(other).map(Option(_))
   }

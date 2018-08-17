@@ -70,7 +70,7 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 object CustomFeeTransactionSuite {
   val minerAddress             = Default(0).getString("address")
   val senderAddress            = Default(3).getString("address")
-  val defaultAssetQuantity     = 1000000
+  val defaultAssetQuantity     = 999999999999l
   val featureCheckBlocksPeriod = 13
 
   private val seed = Default(3).getString("account-seed")
@@ -117,7 +117,7 @@ object CustomFeeTransactionSuite {
       quantity,
       decimals,
       reissuable,
-      fee,
+      issueFee,
       timestamp,
       signature.base58
     )

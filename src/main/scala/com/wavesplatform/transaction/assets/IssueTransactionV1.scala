@@ -7,7 +7,7 @@ import monix.eval.Coeval
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.Script
-import scorex.crypto.signatures.Curve25519.SignatureLength
+import com.wavesplatform.crypto.SignatureLength
 import scala.util.{Failure, Success, Try}
 
 case class IssueTransactionV1 private (sender: PublicKeyAccount,

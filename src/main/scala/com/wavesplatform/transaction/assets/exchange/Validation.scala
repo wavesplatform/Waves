@@ -36,5 +36,8 @@ case object Validation {
       case Right(_)  => Validation(true)
     }
 
-  val success = Validation(status = true)
+  val success             = Validation(status = true)
+  val failure: Validation = Validation(status = false)
+
+  def failure(l: String): Validation = Validation(status = false, Set(l))
 }

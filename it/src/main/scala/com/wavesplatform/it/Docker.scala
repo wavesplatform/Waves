@@ -320,6 +320,37 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     }
   }
 
+  def stopContainer(node: DockerNode): Unit = {
+    val id = node.containerId
+    log.info(s"Stopping container with id: $id")
+    takeProfileSnapshot(node)
+    client.stopContainer(node.containerId, 10)
+    saveProfile(node)
+    saveLog(node)
+    val containerInfo = client.inspectContainer(node.containerId)
+    log.debug(s"""Container information for ${node.name}:
+                 |Exit code: ${containerInfo.state().exitCode()}
+                 |Error: ${containerInfo.state().error()}
+                 |Status: ${containerInfo.state().status()}
+                 |OOM killed: ${containerInfo.state().oomKilled()}""".stripMargin)
+  }
+
+  def killAndStartContainer(node: DockerNode): DockerNode = {
+    val id = node.containerId
+    log.info(s"Killing container with id: $id")
+    takeProfileSnapshot(node)
+    client.killContainer(id, DockerClient.Signal.SIGINT)
+    saveProfile(node)
+    saveLog(node)
+    client.startContainer(id)
+    node.nodeInfo = getNodeInfo(node.containerId, node.settings)
+    Await.result(
+      node.waitForStartup().flatMap(_ => connectToAll(node)),
+      3.minutes
+    )
+    node
+  }
+
   override def close(): Unit = {
     if (isStopped.compareAndSet(false, true)) {
       log.info("Stopping containers")

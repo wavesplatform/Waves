@@ -2,20 +2,24 @@ package com.wavesplatform.transaction
 
 import com.google.common.base.Charsets
 import com.wavesplatform.account._
-import com.wavesplatform.api.http.DataRequest
-import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request}
+import com.wavesplatform.api.http.DataRequest._
+import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request, SignedCreateAliasV1Request, SignedCreateAliasV2Request}
+import com.wavesplatform.api.http.assets.SponsorFeeRequest._
 import com.wavesplatform.api.http.assets._
-import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseCancelV2Request, LeaseV1Request, LeaseV2Request}
+import com.wavesplatform.api.http.leasing._
+import com.wavesplatform.api.http.{DataRequest, SignedDataRequest, versionReads}
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{Base58, Time}
 import com.wavesplatform.wallet.Wallet
+import play.api.libs.json.JsValue
 
 object TransactionFactory {
 
@@ -614,4 +618,35 @@ object TransactionFactory {
         Proofs.empty
       )
     } yield tx
+
+  def fromSignedRequest(jsv: JsValue): Either[ValidationError, Transaction] = {
+    val typeId  = (jsv \ "type").as[Byte]
+    val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
+    TransactionParsers.by(typeId, version) match {
+      case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
+      case Some(x) =>
+        x match {
+          case IssueTransactionV1       => jsv.as[SignedIssueV1Request].toTx
+          case IssueTransactionV2       => jsv.as[SignedIssueV2Request].toTx
+          case TransferTransactionV1    => jsv.as[SignedTransferV1Request].toTx
+          case TransferTransactionV2    => jsv.as[SignedTransferV2Request].toTx
+          case MassTransferTransaction  => jsv.as[SignedMassTransferRequest].toTx
+          case ReissueTransactionV1     => jsv.as[SignedReissueV1Request].toTx
+          case ReissueTransactionV2     => jsv.as[SignedReissueV2Request].toTx
+          case BurnTransactionV1        => jsv.as[SignedBurnV1Request].toTx
+          case BurnTransactionV2        => jsv.as[SignedBurnV2Request].toTx
+          case LeaseTransactionV1       => jsv.as[SignedLeaseV1Request].toTx
+          case LeaseTransactionV2       => jsv.as[SignedLeaseV2Request].toTx
+          case LeaseCancelTransactionV1 => jsv.as[SignedLeaseCancelV1Request].toTx
+          case LeaseCancelTransactionV2 => jsv.as[SignedLeaseCancelV2Request].toTx
+          case CreateAliasTransactionV1 => jsv.as[SignedCreateAliasV1Request].toTx
+          case CreateAliasTransactionV2 => jsv.as[SignedCreateAliasV2Request].toTx
+          case DataTransaction          => jsv.as[SignedDataRequest].toTx
+          case SetScriptTransaction     => jsv.as[SignedSetScriptRequest].toTx
+          case SponsorFeeTransaction    => jsv.as[SignedSponsorFeeRequest].toTx
+          case ExchangeTransactionV1    => jsv.as[SignedExchangeRequest].toTx
+          case ExchangeTransactionV2    => jsv.as[SignedExchangeRequestV2].toTx
+        }
+    }
+  }
 }
