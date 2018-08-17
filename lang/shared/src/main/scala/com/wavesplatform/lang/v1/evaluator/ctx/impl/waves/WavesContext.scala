@@ -34,16 +34,13 @@ object WavesContext {
     def getDataFromArrayF(name: String, internalName: Short, dataType: DataType): BaseFunction =
       NativeFunction(name, 10, internalName, UNION(dataType.innerType, UNIT), "data" -> LIST(dataEntryType.typeRef), "key" -> STRING) {
         case (data: IndexedSeq[CaseObj] @unchecked) :: (key: String) :: Nil =>
-          val x = data.find(_.fields("key") == key).map(_.fields("value"))
-          val y = x match {
+          data.find(_.fields("key") == key).map(_.fields("value")) match {
             case Some(n: Long) if dataType == DataType.Long => Right(n)
             case Some(b: Boolean) if dataType == DataType.Boolean => Right(b)
             case Some(b: ByteVector) if dataType == DataType.ByteArray => Right(b)
             case Some(s: String) if dataType == DataType.String => Right(s)
             case _ => Right(())
           }
-          println(s"data-from-array(type $dataType) ($x) -> $y")///
-          y
         case _ => ???
       }
 

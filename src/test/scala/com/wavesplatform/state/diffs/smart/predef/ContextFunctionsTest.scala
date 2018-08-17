@@ -94,7 +94,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                |  let negatives = badInt || badBool || badBin || badStr || noSuchKey
                |  positives && ! negatives
                | }
-               | case _ => throw
+               | case _ => throw()
                |}
                |""".stripMargin,
           tx
@@ -135,7 +135,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                |  let negatives = badInt || badBool || badBin || badStr
                |  positives && ! negatives
                | }
-               | case _ => throw
+               | case _ => throw()
                |}
                |""".stripMargin,
           tx
