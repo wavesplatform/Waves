@@ -17,7 +17,7 @@ import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherSettings}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{AssetDescription, Blockchain}
-import com.wavesplatform.transaction.ValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
+import com.wavesplatform.transaction.ValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.smart.script.Script
@@ -32,6 +32,7 @@ import scorex.utils._
 import scala.collection.immutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.util.Try
 
 class MatcherActor(orderHistory: ActorRef,
                    pairBuilder: AssetPairBuilder,
@@ -102,14 +103,20 @@ class MatcherActor(orderHistory: ActorRef,
     if (v) f else sender() ! StatusCodeMatcherResponse(StatusCodes.Forbidden, v.messages())
   }
 
-  def verify(script: Script, order: Order): Either[ValidationError, Unit] = {
-    MatcherScriptRunner[Boolean](script, order) match {
-      case (ctx, Left(execError)) => Left(ScriptExecutionError(script.text, execError, ctx.letDefs, true))
-      case (ctx, Right(false)) =>
-        Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, true))
-      case (_, Right(true)) => Right(())
-    }
-  }
+  def verify(script: Script, order: Order): Either[ValidationError, Unit] =
+    Try {
+      MatcherScriptRunner[Boolean](script, order) match {
+        case (ctx, Left(execError)) => Left(ScriptExecutionError(script.text, execError, ctx.letDefs, true))
+        case (ctx, Right(false)) =>
+          Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, true))
+        case (_, Right(true)) => Right(())
+      }
+    }.getOrElse(
+      Left(GenericError("""
+            |Uncaught execution error.
+            |Probably script does not return boolean, and can't validate any transaction or order.
+          """.stripMargin))
+    )
 
   def checkOrderScript(o: Order)(f: => Unit): Unit = {
     lazy val matcherScriptValidation: Either[String, Unit] =
