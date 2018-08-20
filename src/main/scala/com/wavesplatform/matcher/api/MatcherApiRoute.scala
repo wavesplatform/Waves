@@ -11,7 +11,6 @@ import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResp
 import com.wavesplatform.matcher.market.MatcherTransactionWriter.GetTransactionsByOrder
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
-import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherSettings}
 import com.wavesplatform.metrics.TimerExt
@@ -41,7 +40,7 @@ case class MatcherApiRoute(wallet: Wallet,
                            matcher: ActorRef,
                            orderHistory: ActorRef,
                            orderBook: AssetPair => Option[ActorRef],
-                           orderBookSnapshot: AssetPair => Option[OrderBook],
+                           orderBookSnapshot: OrderBookSnapshotHttpCache,
                            txWriter: ActorRef,
                            settings: RestAPISettings,
                            matcherSettings: MatcherSettings,
@@ -100,11 +99,7 @@ case class MatcherApiRoute(wallet: Wallet,
   def getOrderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
     parameters('depth.as[Int].?) { depth =>
       withAssetPair(p, redirectToInverse = true) { pair =>
-        complete(
-          orderBookSnapshot(pair)
-            .fold(GetOrderBookResponse.empty(pair))(handleGetOrderBook(pair, _, depth))
-            .toHttpResponse
-        )
+        complete(orderBookSnapshot.get(pair, depth))
       }
     }
   }
@@ -292,10 +287,7 @@ case class MatcherApiRoute(wallet: Wallet,
     implicit val timeout: Timeout = Timeout(10.seconds)
     val resp: Future[MatcherResponse] = (orderHistory ? ForceCancelOrderFromHistory(orderId)).flatMap {
       case Some(order: Order) => (matcher ? ForceCancelOrder(order.assetPair, orderId)).mapTo[MatcherResponse]
-      case None =>
-        Future {
-          OrderCancelRejected("Order not found")
-        }
+      case None               => Future.successful(OrderCancelRejected("Order not found"))
     }
 
     complete(resp.map(_.toHttpResponse))
@@ -412,18 +404,6 @@ case class MatcherApiRoute(wallet: Wallet,
 
 object MatcherApiRoute {
   private implicit val timeout: Timeout = 5.seconds
-
-  private def handleGetOrderBook(pair: AssetPair, orderBook: OrderBook, depth: Option[Int]): GetOrderBookResponse = {
-    def aggregateLevel(l: (Price, Level[LimitOrder])) = LevelAgg(l._1, l._2.foldLeft(0L)((b, o) => b + o.amount))
-
-    val d = Math.min(depth.getOrElse(MaxDepth), MaxDepth)
-    GetOrderBookResponse(
-      NTP.correctedTime(),
-      pair,
-      orderBook.bids.take(d).map(aggregateLevel).toSeq,
-      orderBook.asks.take(d).map(aggregateLevel).toSeq
-    )
-  }
 
   def orderJson(order: Order, orderInfo: OrderInfo): JsObject =
     Json.obj(

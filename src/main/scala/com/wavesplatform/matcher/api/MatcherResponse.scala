@@ -8,6 +8,7 @@ trait MatcherResponse {
   def toHttpResponse: HttpResponse
 
   protected def httpJsonResponse(entity: JsValue, status: StatusCode = StatusCodes.OK) = HttpResponse(
+    status = status,
     headers = collection.immutable.Seq(`Content-Type`(MediaTypes.`application/json`)),
     entity = Json.stringify(entity)
   )

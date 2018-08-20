@@ -471,7 +471,6 @@ object OrderBookActor {
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
-  val MaxDepth                 = 50
   val AlreadyCanceledCacheSize = 10000L
 
   private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit) {
