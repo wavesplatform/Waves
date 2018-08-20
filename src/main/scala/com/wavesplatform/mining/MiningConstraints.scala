@@ -10,7 +10,7 @@ import com.wavesplatform.block.Block
 case class MiningConstraints(total: MiningConstraint, keyBlock: MiningConstraint, micro: MiningConstraint)
 
 object MiningConstraints {
-  val MaxScriptRunsInBlock              = 100
+  val MaxScriptRunsInBlock              = 10000
   private val ClassicAmountOfTxsInBlock = 100
   private val MaxTxsSizeInBytes         = 1 * 1024 * 1024 // 1 megabyte
 

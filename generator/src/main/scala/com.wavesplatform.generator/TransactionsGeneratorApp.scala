@@ -97,6 +97,20 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
           c.copy(multisig = c.multisig.copy(firstRun = x))
         },
       )
+
+    cmd("oracle")
+      .action { (_, c) =>
+        c.copy(mode = Mode.ORACLE)
+      }
+      .text("Oracle load test")
+      .children(
+        opt[Int]("transactions").abbr("t").optional().text("number of transactions").action { (x, c) =>
+          c.copy(multisig = c.multisig.copy(transactions = x))
+        },
+        opt[Boolean]("enabled").abbr("e").optional().text("DataEnty value").action { (x, c) =>
+          c.copy(multisig = c.multisig.copy(firstRun = x))
+        },
+      )
   }
 
   val defaultConfig = ConfigFactory.load().as[GeneratorSettings]("generator")
@@ -114,6 +128,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         case Mode.WIDE     => new WideTransactionGenerator(finalConfig.wide, finalConfig.privateKeyAccounts)
         case Mode.DYN_WIDE => new DynamicWideTransactionGenerator(finalConfig.dynWide, finalConfig.privateKeyAccounts)
         case Mode.MULTISIG => new MultisigTransactionGenerator(finalConfig.multisig, finalConfig.privateKeyAccounts)
+        case Mode.ORACLE   => new OracleTransactionGenerator(finalConfig.oracle, finalConfig.privateKeyAccounts)
       }
 
       val threadPool                            = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
