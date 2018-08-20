@@ -11,6 +11,8 @@ import com.wavesplatform.transaction.smart.script.{Script, ScriptRunner}
 import com.wavesplatform.transaction.transfer._
 import shapeless.{:+:, CNil, Coproduct}
 
+import scala.util.Try
+
 object Verifier {
 
   private type TxOrd = Transaction :+: Order :+: CNil
@@ -43,23 +45,41 @@ object Verifier {
                script: Script,
                height: Int,
                transaction: Transaction,
-               isTokenScript: Boolean): Either[ValidationError, Transaction] = {
-    ScriptRunner[Boolean](height, Coproduct[TxOrd](transaction), blockchain, script) match {
-      case (ctx, Left(execError)) => Left(ScriptExecutionError(script.text, execError, ctx.letDefs, isTokenScript))
-      case (ctx, Right(false)) =>
-        Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, isTokenScript))
-      case (_, Right(true)) => Right(transaction)
-    }
-  }
+               isTokenScript: Boolean): Either[ValidationError, Transaction] =
+    Try {
+      ScriptRunner[Boolean](height, Coproduct[TxOrd](transaction), blockchain, script) match {
+        case (ctx, Left(execError)) => Left(ScriptExecutionError(execError, script.text, ctx.letDefs, isTokenScript))
+        case (ctx, Right(false)) =>
+          Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, isTokenScript))
+        case (_, Right(true)) => Right(transaction)
+      }
+    }.getOrElse(Left(ScriptExecutionError(
+      """
+      |Uncaught execution error.
+      |Probably script does not return boolean, and can't validate any transaction or order.
+    """.stripMargin,
+      script.text,
+      Map.empty,
+      isTokenScript
+    )))
 
-  def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): Either[ValidationError, Order] = {
-    ScriptRunner[Boolean](height, Coproduct[TxOrd](order), blockchain, script) match {
-      case (ctx, Left(execError)) => Left(ScriptExecutionError(script.text, execError, ctx.letDefs, false))
-      case (ctx, Right(false)) =>
-        Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, false))
-      case (_, Right(true)) => Right(order)
-    }
-  }
+  def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): Either[ValidationError, Order] =
+    Try {
+      ScriptRunner[Boolean](height, Coproduct[TxOrd](order), blockchain, script) match {
+        case (ctx, Left(execError)) => Left(ScriptExecutionError(execError, script.text, ctx.letDefs, false))
+        case (ctx, Right(false)) =>
+          Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, false))
+        case (_, Right(true)) => Right(order)
+      }
+    }.getOrElse(Left(ScriptExecutionError(
+      """
+      |Uncaught execution error.
+      |Probably script does not return boolean, and can't validate any transaction or order.
+    """.stripMargin,
+      script.text,
+      Map.empty,
+      false
+    )))
 
   def verifyExchange(et: ExchangeTransaction,
                      blockchain: Blockchain,
