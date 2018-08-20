@@ -1,31 +1,25 @@
 package com.wavesplatform.matcher.api
 
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers.`Content-Type`
 import play.api.libs.json.{JsNull, JsValue, Json}
 
 trait MatcherResponse {
-  def json: JsValue
-  def code: StatusCode
-}
+  def toHttpResponse: HttpResponse
 
-trait GenericMatcherResponse extends MatcherResponse {
-  def success: Boolean
-  def message: String
-
-  def result: JsValue = JsNull
-
-  def json: JsValue = Json.obj(
-    "success" -> success,
-    "message" -> message,
-    "result"  -> result
+  protected def httpJsonResponse(entity: JsValue, status: StatusCode = StatusCodes.OK) = HttpResponse(
+    headers = collection.immutable.Seq(`Content-Type`(MediaTypes.`application/json`)),
+    entity = Json.stringify(entity)
   )
-  def code: StatusCode = if (success) StatusCodes.OK else StatusCodes.BadRequest
 }
 
-case class StatusCodeMatcherResponse(override val code: StatusCode, message: String) extends GenericMatcherResponse {
-  override def success: Boolean = code == StatusCodes.OK
-}
-
-case class BadMatcherResponse(override val code: StatusCode, message: String) extends GenericMatcherResponse {
-  override def success: Boolean = code == StatusCodes.OK
+case class StatusCodeMatcherResponse(code: StatusCode, message: String) extends MatcherResponse {
+  override def toHttpResponse: HttpResponse = httpJsonResponse(
+    entity = Json.obj(
+      "success" -> (code == StatusCodes.OK),
+      "message" -> message,
+      "result"  -> JsNull // For backward compatibility
+    ),
+    status = code
+  )
 }
