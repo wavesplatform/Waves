@@ -28,7 +28,7 @@ object PureContext {
                val bstr = b.asInstanceOf[String]
                val al = astr.length
                val bl = bstr.length
-               Either.cond(Math.min(al, bl) <= 100 || al + bl <= 4000, astr + bstr, "String is too large")
+               Either.cond(Math.min(al, bl) <= 100 || al + bl <= 2000, astr + bstr, "String is too large")
              })
   val sumByteVector: BaseFunction =
     createRawOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES)((a, b) => {
@@ -36,7 +36,7 @@ object PureContext {
                val bvec = b.asInstanceOf[ByteVector]
                val al = avec.length
                val bl = bvec.length
-               Either.cond(Math.min(al, bl) <= 128 || al + bl <= 4096, ByteVector.concat(Seq(avec, bvec)), "ByteVector is too large")
+               Either.cond(Math.min(al, bl) <= 256 || al + bl <= 4096, ByteVector.concat(Seq(avec, bvec)), "ByteVector is too large")
        })
   val ge: BaseFunction = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)((a, b) => a.asInstanceOf[Long] >= b.asInstanceOf[Long])
   val gt: BaseFunction = createOp(GT_OP, LONG, BOOLEAN, GT_LONG)((a, b) => a.asInstanceOf[Long] > b.asInstanceOf[Long])
