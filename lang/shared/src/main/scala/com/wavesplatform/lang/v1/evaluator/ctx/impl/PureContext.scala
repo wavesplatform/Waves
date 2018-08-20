@@ -23,9 +23,21 @@ object PureContext {
   val modLong: BaseFunction   = createTryOp(MOD_OP, LONG, LONG, MOD_LONG)((a, b) => Math.floorMod(a.asInstanceOf[Long], b.asInstanceOf[Long]))
   val sumLong: BaseFunction   = createTryOp(SUM_OP, LONG, LONG, SUM_LONG)((a, b) => Math.addExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
   val subLong: BaseFunction   = createTryOp(SUB_OP, LONG, LONG, SUB_LONG)((a, b) => Math.subtractExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
-  val sumString: BaseFunction = createOp(SUM_OP, STRING, STRING, SUM_STRING)((a, b) => a.asInstanceOf[String] + b.asInstanceOf[String])
+  val sumString: BaseFunction = createRawOp(SUM_OP, STRING, STRING, SUM_STRING)((a, b) => {
+               val astr = a.asInstanceOf[String]
+               val bstr = b.asInstanceOf[String]
+               val al = astr.length
+               val bl = bstr.length
+               Either.cond(Math.min(al, bl) <= 100 || al + bl <= 4000, astr + bstr, "String is too large")
+             })
   val sumByteVector: BaseFunction =
-    createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES)((a, b) => ByteVector.concat(Seq(a.asInstanceOf[ByteVector], b.asInstanceOf[ByteVector])))
+    createRawOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES)((a, b) => {
+               val avec = a.asInstanceOf[ByteVector]
+               val bvec = b.asInstanceOf[ByteVector]
+               val al = avec.length
+               val bl = bvec.length
+               Either.cond(Math.min(al, bl) <= 128 || al + bl <= 4096, ByteVector.concat(Seq(avec, bvec)), "ByteVector is too large")
+       })
   val ge: BaseFunction = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)((a, b) => a.asInstanceOf[Long] >= b.asInstanceOf[Long])
   val gt: BaseFunction = createOp(GT_OP, LONG, BOOLEAN, GT_LONG)((a, b) => a.asInstanceOf[Long] > b.asInstanceOf[Long])
 
@@ -213,6 +225,12 @@ object PureContext {
       )
     case xs => notImplemented("dropRight(xs: String, number: Long)", xs)
   }
+
+  private def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (Any, Any) => Either[String, Any]): BaseFunction =
+    NativeFunction(opsToFunctions(op), 1, func, r, "a" -> t, "b" -> t) {
+      case a :: b :: Nil => body(a, b)
+      case _             => ???
+    }
 
   private def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (Any, Any) => Any): BaseFunction =
     NativeFunction(opsToFunctions(op), 1, func, r, "a" -> t, "b" -> t) {
