@@ -38,7 +38,7 @@ class BigString extends BaseTransactionSuite with CancelAfterFailure {
         let pkB = base58'${ByteStr(acc1.publicKey)}'
         let pkC = base58'${ByteStr(acc2.publicKey)}'
 
-        let a0 = "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
+        let a0 = "йцукенгшщзхъфывапролдячсмитьбюйцукпврарвараравртавтрвапваппвпавп"
         ${(for (b <- 1 to 20) yield { "let a" + b + "=a" + (b - 1) + "+a" + (b - 1) }).mkString("\n")}
         
         a20 == a0 || match tx {

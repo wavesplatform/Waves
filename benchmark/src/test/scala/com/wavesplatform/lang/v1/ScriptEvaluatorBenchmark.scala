@@ -132,12 +132,15 @@ class Signatures {
 class Concat {
   val context: EvaluationContext = PureContext.evalContext
 
-  private def expr(term: EXPR, func: FunctionHeader, count: Int) =
-    (1 to count).foldLeft[EXPR](term) {
-      case (e, _) => FUNCTION_CALL(func, List(e, term))
+  private val Steps = 180
+
+  private def expr(init: EXPR, func: FunctionHeader, operand: EXPR, count: Int) =
+    (1 to count).foldLeft[EXPR](init) {
+      case (e, _) => FUNCTION_CALL(func, List(e, operand))
     }
 
-  val strings: EXPR = expr(CONST_STRING("a" * 100), PureContext.sumString, 1000)
+  val strings: EXPR = expr(CONST_STRING("a" * (Short.MaxValue - Steps)), PureContext.sumString, CONST_STRING("a"), Steps)
 
-  val bytes: EXPR = expr(CONST_BYTEVECTOR(ByteVector.fill(256)(0)), PureContext.sumByteVector, 1000)
+  val bytes: EXPR =
+    expr(CONST_BYTEVECTOR(ByteVector.fill(Short.MaxValue - Steps)(0)), PureContext.sumByteVector, CONST_BYTEVECTOR(ByteVector(0)), Steps)
 }
