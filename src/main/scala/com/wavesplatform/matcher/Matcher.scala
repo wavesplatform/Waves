@@ -41,7 +41,7 @@ class Matcher(actorSystem: ActorSystem,
 
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, ActorRef])
   private val orderBooksSnapshotCache = new OrderBookSnapshotHttpCache(
-    OrderBookSnapshotHttpCache.Settings(5.seconds, List(1, 10, 100)),
+    matcherSettings.orderBookSnapshotHttpCache,
     p => Option(orderBookCache.get(p))
   )
 
