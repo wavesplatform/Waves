@@ -17,15 +17,31 @@ import scala.util.Try
 
 object PureContext {
   private val defaultThrowMessage = "Explicit script termination"
+  val MaxStringResult = 2000
+  val MaxStringStep = 100
+  val MaxBytesResult = 4096
+  val MaxBytesStep = 256
 
   val mulLong: BaseFunction   = createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => Math.multiplyExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
   val divLong: BaseFunction   = createTryOp(DIV_OP, LONG, LONG, DIV_LONG)((a, b) => Math.floorDiv(a.asInstanceOf[Long], b.asInstanceOf[Long]))
   val modLong: BaseFunction   = createTryOp(MOD_OP, LONG, LONG, MOD_LONG)((a, b) => Math.floorMod(a.asInstanceOf[Long], b.asInstanceOf[Long]))
   val sumLong: BaseFunction   = createTryOp(SUM_OP, LONG, LONG, SUM_LONG)((a, b) => Math.addExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
   val subLong: BaseFunction   = createTryOp(SUB_OP, LONG, LONG, SUB_LONG)((a, b) => Math.subtractExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
-  val sumString: BaseFunction = createOp(SUM_OP, STRING, STRING, SUM_STRING)((a, b) => a.asInstanceOf[String] + b.asInstanceOf[String])
+  val sumString: BaseFunction = createRawOp(SUM_OP, STRING, STRING, SUM_STRING, 10)((a, b) => {
+               val astr = a.asInstanceOf[String]
+               val bstr = b.asInstanceOf[String]
+               val al = astr.length
+               val bl = bstr.length
+               Either.cond(Math.min(al, bl) <= MaxStringStep || al + bl <= MaxStringResult, astr + bstr, "String is too large")
+             })
   val sumByteVector: BaseFunction =
-    createOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES)((a, b) => ByteVector.concat(Seq(a.asInstanceOf[ByteVector], b.asInstanceOf[ByteVector])))
+    createRawOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES, 10)((a, b) => {
+               val avec = a.asInstanceOf[ByteVector]
+               val bvec = b.asInstanceOf[ByteVector]
+               val al = avec.length
+               val bl = bvec.length
+               Either.cond(Math.min(al, bl) <= MaxBytesStep || al + bl <= MaxBytesResult, ByteVector.concat(Seq(avec, bvec)), "ByteVector is too large")
+       })
   val ge: BaseFunction = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)((a, b) => a.asInstanceOf[Long] >= b.asInstanceOf[Long])
   val gt: BaseFunction = createOp(GT_OP, LONG, BOOLEAN, GT_LONG)((a, b) => a.asInstanceOf[Long] > b.asInstanceOf[Long])
 
@@ -214,10 +230,27 @@ object PureContext {
     case xs => notImplemented("dropRight(xs: String, number: Long)", xs)
   }
 
-  private def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (Any, Any) => Any): BaseFunction =
-    NativeFunction(opsToFunctions(op), 1, func, r, "a" -> t, "b" -> t) {
+  def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, complicity: Int = 1)(body: (Any, Any) => Either[String, Any]): BaseFunction =
+    NativeFunction(opsToFunctions(op), complicity, func, r, "a" -> t, "b" -> t) {
+      case a :: b :: Nil => body(a, b)
+      case _             => ???
+    }
+
+  def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, complicity: Int = 1)(body: (Any, Any) => Any): BaseFunction =
+    NativeFunction(opsToFunctions(op), complicity, func, r, "a" -> t, "b" -> t) {
       case a :: b :: Nil => Right(body(a, b))
       case _             => ???
+    }
+
+  def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, complicity: Int = 1)(body: (Any, Any) => Any): BaseFunction =
+    NativeFunction(opsToFunctions(op), complicity, func, r, "a" -> t, "b" -> t) {
+      case a :: b :: Nil =>
+        try {
+          Right(body(a, b))
+        } catch {
+          case e: Throwable => Left(e.getMessage)
+        }
+      case _ => ???
     }
 
   val getElement: BaseFunction =
@@ -240,17 +273,6 @@ object PureContext {
     case p :: Nil => IF(FUNCTION_CALL(eq, List(p, FALSE)), TRUE, FALSE)
     case _        => ???
   }
-
-  private def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short)(body: (Any, Any) => Any): BaseFunction =
-    NativeFunction(opsToFunctions(op), 1, func, r, "a" -> t, "b" -> t) {
-      case a :: b :: Nil =>
-        try {
-          Right(body(a, b))
-        } catch {
-          case e: Throwable => Left(e.getMessage)
-        }
-      case _ => ???
-    }
 
   private val operators: Seq[BaseFunction] = Seq(
     mulLong,

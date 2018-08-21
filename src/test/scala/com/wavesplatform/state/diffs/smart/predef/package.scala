@@ -30,6 +30,7 @@ package object predef {
        | # Pure context
        | # 1) basic(+ eq) -> mulLong, divLong, modLong, sumLong, subLong, sumString, sumByteVector
        |
+       | let rnd = tx.timestamp % 2 == 0
        | let longAll = 1000 * 2 == 2000 && 1000 / 2 == 500 && 1000 % 2 == 0 && 1000 + 2 == 1002 && 1000 - 2 == 998
        | let sumString = "ha" + "-" +"ha" == "ha-ha"
        | let sumByteVector = match tx {
@@ -149,7 +150,7 @@ package object predef {
        |
        | let crypto = bks && sig && str58 && str64
        |
-       | pure && waves && crypto
+       | if rnd then pure && waves else crypto
     """.stripMargin
 
 }
