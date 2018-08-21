@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentHashMap
 import cats._
 import com.wavesplatform.account.Address
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.metrics.{Instrumented, TxProcessingStats}
+import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
@@ -55,9 +55,9 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
     scheduler.shutdown()
   }
 
-  private val utxPoolSizeStats = Kamon.rangeSampler("utx-pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
-  private val putRequestStats  = Kamon.counter("utx-pool-put-if-new")
-  private val txStats          = TxProcessingStats("utx-pool")
+  private val utxPoolSizeStats    = Kamon.rangeSampler("utx-pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
+  private val processingTimeStats = Kamon.histogram("utx-transaction-processing-time", MeasurementUnit.time.milliseconds)
+  private val putRequestStats     = Kamon.counter("utx-pool-put-if-new")
 
   private def removeExpired(currentTs: Long): Unit = {
     def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > utxSettings.maxTransactionAge
@@ -167,16 +167,14 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
   private def putIfNew(b: Blockchain, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
     putRequestStats.increment()
     measureSuccessful(
-      txStats.utxProcessingTimer(tx.builder.typeId), {
+      processingTimeStats, {
         for {
-          _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
-          _ <- checkNotBlacklisted(tx)
-          _ <- checkAlias(b, tx)
-          _ <- canReissue(b, tx)
-          _ <- feeCalculator.enoughFee(tx, blockchain, fs)
-          diff <- measureAndIncSuccessful(txStats.transactionDiffTime(tx.builder.typeId), txStats.transactionDiffCounter(tx.builder.typeId)) {
-            TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
-          }
+          _    <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+          _    <- checkNotBlacklisted(tx)
+          _    <- checkAlias(b, tx)
+          _    <- canReissue(b, tx)
+          _    <- feeCalculator.enoughFee(tx, blockchain, fs)
+          diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
         } yield {
           pessimisticPortfolios.add(tx.id(), diff)
           val isNew = Option(transactions.put(tx.id(), tx)).isEmpty

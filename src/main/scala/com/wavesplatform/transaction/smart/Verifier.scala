@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.smart
 
 import cats.implicits._
 import com.wavesplatform.crypto
-import com.wavesplatform.metrics.{Instrumented, TxProcessingStats}
+import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction._
@@ -13,11 +13,14 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.ScorexLogging
 import kamon.Kamon
 import shapeless.{:+:, CNil, Coproduct}
+
 import scala.util.Try
 
 object Verifier extends Instrumented with ScorexLogging {
 
-  val stats = TxProcessingStats("verifier")
+  val stats = TxProcessingStats
+
+  import stats.TxTimerExt
 
   val orderScriptExecutionTime = Kamon.histogram("order-script-execution-time")
   val orderscriptsExecuted     = Kamon.counter("order-scripts-executed")
@@ -32,20 +35,17 @@ object Verifier extends Instrumented with ScorexLogging {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
         (pt, blockchain.accountScript(pt.sender)) match {
-          case (et: ExchangeTransaction, scriptOpt) => verifyExchange(et, blockchain, scriptOpt, currentBlockHeight)
+          case (et: ExchangeTransaction, scriptOpt) =>
+            verifyExchange(et, blockchain, scriptOpt, currentBlockHeight)
           case (_, Some(script)) =>
-            measureAndIncSuccessful(stats.scriptExecutionTime(pt.builder.typeId), stats.scriptsExecuted(pt.builder.typeId)) {
-              verifyTx(blockchain, script, currentBlockHeight, pt, false)
-            }
+            stats.accountScriptExecution
+              .measureForType(pt.builder.typeId)(verifyTx(blockchain, script, currentBlockHeight, pt, false))
           case (stx: SignedTransaction, None) =>
-            measureAndIncSuccessful(stats.signatureVerificationTime(stx.builder.typeId), stats.signaturesVerified(stx.builder.typeId)) {
-              stx.signaturesValid()
-            }
+            stats.signatureVerification
+              .measureForType(stx.builder.typeId)(stx.signaturesValid())
           case _ =>
-            measureAndIncSuccessful(stats.signatureVerificationTime(tx.builder.typeId), stats.signaturesVerified(tx.builder.typeId)) {
-              verifyAsEllipticCurveSignature(pt)
-            }
-
+            stats.signatureVerification
+              .measureForType(tx.builder.typeId)(verifyAsEllipticCurveSignature(pt))
         }
     }).flatMap(tx => {
       for {
@@ -59,9 +59,8 @@ object Verifier extends Instrumented with ScorexLogging {
 
         script <- blockchain.assetDescription(assetId).flatMap(_.script)
       } yield {
-        measureAndIncSuccessful(stats.assetScriptExecutionTimer(tx.builder.typeId), stats.assetScriptsExecuted(tx.builder.typeId)) {
-          verifyTx(blockchain, script, currentBlockHeight, tx, true)
-        }
+        stats.assetScriptExecution
+          .measureForType(tx.builder.typeId)(verifyTx(blockchain, script, currentBlockHeight, tx, true))
       }
     }.getOrElse(Either.right(tx)))
 
@@ -115,35 +114,23 @@ object Verifier extends Instrumented with ScorexLogging {
 
     lazy val matcherTxVerification =
       matcherScriptOpt
-        .map(script =>
-          measureAndIncSuccessful(stats.scriptExecutionTime(typeId), stats.scriptsExecuted(typeId)) {
-            verifyTx(blockchain, script, height, et, false)
-        })
-        .getOrElse(measureAndIncSuccessful(stats.signatureVerificationTime(typeId), stats.signaturesVerified(typeId)) {
-          verifyAsEllipticCurveSignature(et)
-        })
+        .map { script =>
+          stats.accountScriptExecution
+            .measureForType(typeId)(verifyTx(blockchain, script, height, et, false))
+        }
+        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(et)))
 
     lazy val sellerOrderVerification =
       blockchain
         .accountScript(sellOrder.sender.toAddress)
-        .map(script =>
-          measureAndIncSuccessful(orderScriptExecutionTime, orderscriptsExecuted) {
-            verifyOrder(blockchain, script, height, sellOrder)
-        })
-        .getOrElse(measureAndIncSuccessful(orderSignatureVerificationTime, orderSignaturesVerified) {
-          verifyAsEllipticCurveSignature(sellOrder)
-        })
+        .map(script => stats.orderValidation.measure(verifyOrder(blockchain, script, height, sellOrder)))
+        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(sellOrder)))
 
     lazy val buyerOrderVerification =
       blockchain
         .accountScript(buyOrder.sender.toAddress)
-        .map(script =>
-          measureAndIncSuccessful(orderScriptExecutionTime, orderscriptsExecuted) {
-            verifyOrder(blockchain, script, height, buyOrder)
-        })
-        .getOrElse(measureAndIncSuccessful(orderSignatureVerificationTime, orderSignaturesVerified) {
-          verifyAsEllipticCurveSignature(buyOrder)
-        })
+        .map(script => stats.orderValidation.measure(verifyOrder(blockchain, script, height, buyOrder)))
+        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(buyOrder)))
 
     for {
       _ <- matcherTxVerification
