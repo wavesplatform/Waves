@@ -17,10 +17,8 @@ import scala.util.Try
 
 object PureContext {
   private val defaultThrowMessage = "Explicit script termination"
-  val MaxStringResult = 2000
-  val MaxStringStep = 100
-  val MaxBytesResult = 4096
-  val MaxBytesStep = 256
+  val MaxStringResult = Short.MaxValue
+  val MaxBytesResult = 65536
 
   val mulLong: BaseFunction   = createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => Math.multiplyExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
   val divLong: BaseFunction   = createTryOp(DIV_OP, LONG, LONG, DIV_LONG)((a, b) => Math.floorDiv(a.asInstanceOf[Long], b.asInstanceOf[Long]))
@@ -32,7 +30,7 @@ object PureContext {
                val bstr = b.asInstanceOf[String]
                val al = astr.length
                val bl = bstr.length
-               Either.cond(Math.min(al, bl) <= MaxStringStep || al + bl <= MaxStringResult, astr + bstr, "String is too large")
+               Either.cond(al + bl <= MaxStringResult, astr + bstr, "String is too large")
              })
   val sumByteVector: BaseFunction =
     createRawOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES, 10)((a, b) => {
@@ -40,7 +38,7 @@ object PureContext {
                val bvec = b.asInstanceOf[ByteVector]
                val al = avec.length
                val bl = bvec.length
-               Either.cond(Math.min(al, bl) <= MaxBytesStep || al + bl <= MaxBytesResult, ByteVector.concat(Seq(avec, bvec)), "ByteVector is too large")
+               Either.cond(al + bl <= MaxBytesResult, ByteVector.concat(Seq(avec, bvec)), "ByteVector is too large")
        })
   val ge: BaseFunction = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)((a, b) => a.asInstanceOf[Long] >= b.asInstanceOf[Long])
   val gt: BaseFunction = createOp(GT_OP, LONG, BOOLEAN, GT_LONG)((a, b) => a.asInstanceOf[Long] > b.asInstanceOf[Long])
