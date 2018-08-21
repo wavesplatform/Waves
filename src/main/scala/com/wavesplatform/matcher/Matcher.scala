@@ -93,6 +93,7 @@ class Matcher(actorSystem: ActorSystem,
 
   def shutdownMatcher(): Unit = {
     val stopMatcherTimeout = 5.minutes
+    orderBooksSnapshotCache.close()
     Await.result(gracefulStop(matcher, stopMatcherTimeout, MatcherActor.Shutdown), stopMatcherTimeout)
     db.close()
     Await.result(matcherServerBinding.unbind(), 10.seconds)

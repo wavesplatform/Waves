@@ -11,7 +11,7 @@ import scorex.transaction.assets.exchange.AssetPair
 object JsonSerializer {
 
   private val coreTypeSerializers = new SimpleModule()
-  coreTypeSerializers.addDeserializer(classOf[AssetPair], new AssetPairSerializer)
+  coreTypeSerializers.addDeserializer(classOf[AssetPair], new AssetPairDeserializer)
 
   private val mapper = new ObjectMapper() with ScalaObjectMapper
   mapper.registerModule(DefaultScalaModule)
@@ -20,15 +20,15 @@ object JsonSerializer {
   def serialize(value: Any): String                             = mapper.writeValueAsString(value)
   def deserialize[T](value: String)(implicit m: Manifest[T]): T = mapper.readValue(value)
 
-  private class AssetPairSerializer extends StdDeserializer[AssetPair](classOf[AssetPair]) {
+  private class AssetPairDeserializer extends StdDeserializer[AssetPair](classOf[AssetPair]) {
     override def deserialize(p: JsonParser, ctxt: DeserializationContext): AssetPair = {
       val node = p.getCodec.readTree[JsonNode](p)
-      def readAsset(fieldName: String) = {
+      def readAssetId(fieldName: String) = {
         val x = node.get(fieldName).asText(AssetPair.WavesName)
         if (x == AssetPair.WavesName) None else Some(ByteStr.decodeBase58(x).get)
       }
 
-      AssetPair(readAsset("amountAsset"), readAsset("priceAsset"))
+      AssetPair(readAssetId("amountAsset"), readAssetId("priceAsset"))
     }
   }
 

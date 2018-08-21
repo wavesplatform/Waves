@@ -19,9 +19,8 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
   private val defaultAssetPair = AssetPair(None, Some(ByteStr("asset".getBytes)))
 
   "OrderBookSnapshotHttpCache" - {
-    "should cache" in {
-      val cache = createDefaultCache
-      def get   = cache.get(defaultAssetPair, Some(1))
+    "should cache" in using(createDefaultCache) { cache =>
+      def get = cache.get(defaultAssetPair, Some(1))
 
       val a = get
       val b = get
@@ -29,9 +28,8 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
       a shouldBe b
     }
 
-    "should not drop the cache if the timeout after an access was not reached" in {
-      val cache = createDefaultCache
-      def get   = cache.get(defaultAssetPair, Some(1))
+    "should not drop the cache if the timeout after an access was not reached" in using(createDefaultCache) { cache =>
+      def get = cache.get(defaultAssetPair, Some(1))
 
       val a = get
       Thread.sleep(30)
@@ -40,9 +38,8 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
       a shouldBe b
     }
 
-    "should drop the cache after timeout" in {
-      val cache = createDefaultCache
-      def get   = cache.get(defaultAssetPair, Some(1))
+    "should drop the cache after timeout" in using(createDefaultCache) { cache =>
+      def get = cache.get(defaultAssetPair, Some(1))
 
       val a = get
       Thread.sleep(70)
@@ -52,18 +49,28 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
     }
 
     "should aggregate levels and preserve right order" - {
-      "asks" in {
-        // Two levels: one is aggregated and one is not
-        val askLimitOrders = Gen
-          .containerOfN[Vector, Order](2, orderGen)
-          .map { xs =>
-            val r = xs.head +: xs.tail.map(_.copy(price = xs.head.price - 1))
-            r.map(x => SellLimitOrder(x.price, x.amount, x.matcherFee, x)).groupBy(_.price)
-          }
-          .sample
-          .get
+      // Two levels: one is aggregated and one is not
 
-        val cache = new OrderBookSnapshotHttpCache(
+      val askLimitOrders = Gen
+        .containerOfN[Vector, Order](2, orderGen)
+        .map { xs =>
+          val r = xs.head +: xs.tail.map(_.copy(price = xs.head.price - 1))
+          r.map(x => SellLimitOrder(x.price, x.amount, x.matcherFee, x)).groupBy(_.price)
+        }
+        .sample
+        .get
+
+      val bidLimitOrders = Gen
+        .containerOfN[Vector, Order](2, orderGen)
+        .map { xs =>
+          val r = xs.head +: xs.tail.map(_.copy(price = xs.head.price + 1))
+          r.map(x => BuyLimitOrder(x.price, x.amount, x.matcherFee, x)).groupBy(_.price)
+        }
+        .sample
+        .get
+
+      "asks" in using {
+        new OrderBookSnapshotHttpCache(
           OrderBookSnapshotHttpCache.Settings(1.minute, List(3, 9)), { _ =>
             Some(
               OrderBook(
@@ -73,7 +80,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
             )
           }
         )
-
+      } { cache =>
         val ob = orderBookFrom(cache.get(defaultAssetPair, Some(3)))
 
         withClue("bids size")(ob.bids shouldBe empty)
@@ -92,18 +99,8 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
         }
       }
 
-      "bids" in {
-        // Two levels: one is aggregated and one is not
-        val bidLimitOrders = Gen
-          .containerOfN[Vector, Order](2, orderGen)
-          .map { xs =>
-            val r = xs.head +: xs.tail.map(_.copy(price = xs.head.price + 1))
-            r.map(x => BuyLimitOrder(x.price, x.amount, x.matcherFee, x)).groupBy(_.price)
-          }
-          .sample
-          .get
-
-        val cache = new OrderBookSnapshotHttpCache(
+      "bids" in using {
+        new OrderBookSnapshotHttpCache(
           OrderBookSnapshotHttpCache.Settings(1.minute, List(3, 9)), { _ =>
             Some(
               OrderBook(
@@ -113,7 +110,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
             )
           }
         )
-
+      } { cache =>
         val ob = orderBookFrom(cache.get(defaultAssetPair, Some(3)))
 
         withClue("bids size")(ob.bids.size shouldBe 2)
@@ -136,60 +133,64 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
     "should return the nearest depth cache" - {
       // Two levels: one is aggregated and one is not
       val bidLimitOrders = randomBidLimitOrders
-      val cache = new OrderBookSnapshotHttpCache(
-        OrderBookSnapshotHttpCache.Settings(1.minute, List(3, 9)), { _ =>
-          Some(
-            OrderBook(
-              bids = TreeMap(bidLimitOrders.toSeq: _*),
-              asks = TreeMap.empty
+      using {
+        new OrderBookSnapshotHttpCache(
+          OrderBookSnapshotHttpCache.Settings(1.minute, List(3, 9)), { _ =>
+            Some(
+              OrderBook(
+                bids = TreeMap(bidLimitOrders.toSeq: _*),
+                asks = TreeMap.empty
+              )
             )
-          )
-        }
-      )
-
-      "None -> 9" in {
-        val ob = orderBookFrom(cache.get(defaultAssetPair, None))
-        ob.bids.size shouldBe 9
-      }
-
-      Seq(
-        0  -> 3,
-        1  -> 3,
-        3  -> 3,
-        5  -> 9,
-        10 -> 9
-      ).foreach {
-        case (depth, expectedSize) =>
-          s"$depth -> $expectedSize" in {
-            val ob = orderBookFrom(cache.get(defaultAssetPair, Some(depth)))
-            ob.bids.size shouldBe expectedSize
           }
+        )
+      } { cache =>
+        "None -> 9" in {
+          val ob = orderBookFrom(cache.get(defaultAssetPair, None))
+          ob.bids.size shouldBe 9
+        }
+
+        Seq(
+          0  -> 3,
+          1  -> 3,
+          3  -> 3,
+          5  -> 9,
+          10 -> 9
+        ).foreach {
+          case (depth, expectedSize) =>
+            s"$depth -> $expectedSize" in {
+              val ob = orderBookFrom(cache.get(defaultAssetPair, Some(depth)))
+              ob.bids.size shouldBe expectedSize
+            }
+        }
       }
     }
 
     "should clear all depth caches after invalidate" in {
       val bidLimitOrders = randomBidLimitOrders
       val depths         = List(1, 3, 7, 9)
-      val cache = new OrderBookSnapshotHttpCache(
-        OrderBookSnapshotHttpCache.Settings(1.minute, depths), { _ =>
-          Some(
-            OrderBook(
-              bids = TreeMap(bidLimitOrders.toSeq: _*),
-              asks = TreeMap.empty
+      using {
+        new OrderBookSnapshotHttpCache(
+          OrderBookSnapshotHttpCache.Settings(1.minute, depths), { _ =>
+            Some(
+              OrderBook(
+                bids = TreeMap(bidLimitOrders.toSeq: _*),
+                asks = TreeMap.empty
+              )
             )
-          )
-        }
-      )
+          }
+        )
+      } { cache =>
+        val prev = depths.map(x => x -> orderBookFrom(cache.get(defaultAssetPair, Some(x)))).toMap
 
-      val prev = depths.map(x => x -> orderBookFrom(cache.get(defaultAssetPair, Some(x)))).toMap
+        Thread.sleep(100)
+        cache.invalidate(defaultAssetPair)
 
-      Thread.sleep(100)
-      cache.invalidate(defaultAssetPair)
-
-      depths.foreach { depth =>
-        withClue(s"cache for depth=$depth was invalidated") {
-          val curr = orderBookFrom(cache.get(defaultAssetPair, Some(depth)))
-          curr.timestamp shouldNot be(prev(depth).timestamp)
+        depths.foreach { depth =>
+          withClue(s"cache for depth=$depth was invalidated") {
+            val curr = orderBookFrom(cache.get(defaultAssetPair, Some(depth)))
+            curr.timestamp shouldNot be(prev(depth).timestamp)
+          }
         }
       }
     }
@@ -212,4 +213,13 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
       }
       .sample
       .get
+
+  private def using[T <: AutoCloseable](create: => T)(f: T => Unit): Unit = {
+    val x = create
+    try {
+      f(x)
+    } finally {
+      x.close()
+    }
+  }
 }
