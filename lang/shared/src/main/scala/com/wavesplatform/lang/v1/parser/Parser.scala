@@ -154,7 +154,12 @@ object Parser {
 
   val functionCallArgs: P[Seq[EXPR]] = comment ~ baseExpr.rep(sep = comment ~ "," ~ comment) ~ comment
 
-  val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | functionCallP | refP)
+  val maybeFunctionCallP: P[EXPR] =  (Index ~~ refP ~~ P("(" ~/ functionCallArgs ~ ")").? ~~ Index).map {
+    case (start, REF(_, functionName), Some(args), accessEnd) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
+    case (_, id, None, _) => id
+  }
+
+  val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | maybeFunctionCallP)
 
   abstract class Accessor
   case class Getter(name: PART[String]) extends Accessor
@@ -205,10 +210,6 @@ object Parser {
     ("" ~ comment ~ Index ~ "." ~/ comment ~ anyVarName.map(Getter) ~~ Index) |
     (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
   )
-
-  val functionCallP: P[EXPR] =  (Index ~~ refP ~~ "(" ~/ functionCallArgs ~ ")" ~~ Index).map {
-    case (start, REF(_, functionName), args, accessEnd) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
-  }
 
   val maybeAccessP: P[EXPR] =
     P(Index ~~ extractableAtom ~~ Index ~~ NoCut(accessP).rep)
