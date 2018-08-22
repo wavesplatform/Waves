@@ -175,6 +175,9 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
     }
   }
 
+  /**
+    * @note It is expected, that this event is for stored order
+    */
   def orderCanceled(event: OrderCanceled): Unit = db.readWrite { rw =>
     val updated = saveOrderInfo(rw, event)
     val opDiff  = diffCancel(updated(event.limitOrder.order.id()))

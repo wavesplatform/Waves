@@ -389,6 +389,26 @@ class OrderHistorySpecification
     oh.orderInfo(submitted.id()).status shouldBe LimitOrder.Filled(350)
   }
 
+  property("Reserved balance should empty after full rounded execution") {
+    val pair = AssetPair(mkAssetId("BTC"), mkAssetId("ETH"))
+
+    val alicePk = PrivateKeyAccount("alice".getBytes("utf-8"))
+    val counter = buy(pair, 0.00031887, 923431000L, matcherFee = Some(300000), sender = Some(alicePk))
+
+    val bobPk     = PrivateKeyAccount("bob".getBytes("utf-8"))
+    val submitted = sell(pair, 0.00031887, 223345000L, matcherFee = Some(300000), sender = Some(bobPk))
+
+    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
+
+    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    exec.executedAmount shouldBe 223344937L
+    oh.orderExecuted(exec)
+
+    withClue("Account of submitted order should have positive balances:") {
+      DBUtils.reservedBalance(db, bobPk) shouldBe empty
+    }
+  }
+
   property("Partially with own order") {
     val pk        = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair      = AssetPair(None, mkAssetId("BTC"))
