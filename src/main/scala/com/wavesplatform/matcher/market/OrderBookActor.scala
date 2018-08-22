@@ -326,7 +326,15 @@ class OrderBookActor(assetPair: AssetPair,
         processEvent(canceled)
       }
     }
-    if (submittedRemains.exists(_.isValid)) matchOrder(submittedRemains.get)
+    // if (submittedRemains.exists(_.isValid)) matchOrder(submittedRemains.get)
+    if (submittedRemains.isDefined) {
+      if (submittedRemains.get.isValid) {
+        matchOrder(submittedRemains.get)
+      } else {
+        val canceled = Events.OrderCanceled(submittedRemains.get, unmatchable = true)
+        processEvent(canceled)
+      }
+    }
   }
 
   private def processEvent(e: Event): Unit = {
