@@ -1,7 +1,6 @@
 package com.wavesplatform.matcher.api
 
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers.`Content-Type`
 import play.api.libs.json.{JsNull, JsValue, Json}
 
 trait MatcherResponse {
@@ -9,8 +8,10 @@ trait MatcherResponse {
 
   protected def httpJsonResponse(entity: JsValue, status: StatusCode = StatusCodes.OK) = HttpResponse(
     status = status,
-    headers = collection.immutable.Seq(`Content-Type`(MediaTypes.`application/json`)),
-    entity = Json.stringify(entity)
+    entity = HttpEntity(
+      ContentTypes.`application/json`,
+      Json.stringify(entity)
+    )
   )
 }
 

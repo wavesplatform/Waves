@@ -1,8 +1,7 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{ActorRef, Cancellable, Props, Stash}
-import akka.http.scaladsl.model.headers.`Content-Type`
-import akka.http.scaladsl.model.{HttpResponse, MediaTypes, StatusCodes}
+import akka.http.scaladsl.model._
 import akka.persistence._
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.matcher.MatcherSettings
@@ -525,8 +524,10 @@ object OrderBookActor {
 
   case class GetOrderBookResponse(ts: Long, pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends MatcherResponse {
     override def toHttpResponse: HttpResponse = HttpResponse(
-      headers = collection.immutable.Seq(`Content-Type`(MediaTypes.`application/json`)),
-      entity = JsonSerializer.serialize(OrderBookResult(ts, pair, bids, asks))
+      entity = HttpEntity(
+        ContentTypes.`application/json`,
+        JsonSerializer.serialize(OrderBookResult(ts, pair, bids, asks))
+      )
     )
   }
 
