@@ -84,7 +84,7 @@ class RoundingIssuesTestSuite
 
     withClue("Bob's reserved balance before cancel")(matcherNode.reservedBalance(bobNode) shouldBe empty)
 
-    matcherNode.cancelOrder(aliceNode, ethBtcPair, counterId)
+    matcherNode.cancelOrder(aliceNode, ethBtcPair, Some(counterId))
     val tx = matcherNode.transactionsByOrder(counterId).head
 
     matcherNode.waitForTransaction(tx.id)

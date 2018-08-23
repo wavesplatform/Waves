@@ -86,7 +86,7 @@ class SeveralPartialOrdersTestSuite
       orderBook2.asks shouldBe List(LevelResponse(bobOrder2.price, bobOrder2.amount))
       orderBook2.bids shouldBe empty
 
-      matcherNode.cancelOrder(bobNode, wavesUsdPair, bobOrder2Id)
+      matcherNode.cancelOrder(bobNode, wavesUsdPair, Some(bobOrder2Id))
       nodes.waitForHeightArise()
 
       matcherNode.reservedBalance(bobNode) shouldBe empty
