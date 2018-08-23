@@ -5,24 +5,24 @@ import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 
 import cats._
+import com.wavesplatform.account.Address
+import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import com.wavesplatform.state.{Blockchain, ByteStr, Diff, Portfolio}
+import com.wavesplatform.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets.ReissueTransaction
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.utils.{ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
-import com.wavesplatform.account.Address
-import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.utils.{ScorexLogging, Time}
-import com.wavesplatform.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
-import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.ReissueTransaction
-import com.wavesplatform.transaction.transfer._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.DurationLong
