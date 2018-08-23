@@ -4,17 +4,20 @@ import java.util.concurrent.Executors
 
 import cats.implicits.showInterpolator
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.generator.Preconditions.{CreateAccountP, IssueP, LeaseP, PAction, PGenSettings, UniverseHolder}
 import com.wavesplatform.generator.cli.ScoptImplicits
 import com.wavesplatform.generator.config.FicusImplicits
+import com.wavesplatform.generator.utils.Universe
+import com.wavesplatform.network.RawBytes
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.settings.inetSocketAddressReader
+import com.wavesplatform.utils.LoggerFacade
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
 import org.slf4j.LoggerFactory
 import scopt.OptionParser
-import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.utils.LoggerFacade
 
 import scala.concurrent._
 import scala.concurrent.duration._
@@ -112,8 +115,11 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         },
       )
   }
+  val config = ConfigFactory.load()
 
-  val defaultConfig = ConfigFactory.load().as[GeneratorSettings]("generator")
+  val preconditions = config.as[PGenSettings]("preconditions")(Preconditions.preconditionsReader)
+  val defaultConfig = config.as[GeneratorSettings]("generator")
+
   parser.parse(args, defaultConfig) match {
     case None => parser.failure("Failed to parse command line parameters")
     case Some(finalConfig) =>
@@ -135,11 +141,18 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(threadPool)
 
       val sender = new NetworkSender(finalConfig.addressScheme, "generator", nonce = Random.nextLong())
+
       sys.addShutdownHook(sender.close())
+
+      val (universe, initialTransactions) = Preconditions.mk(preconditions)
+
+      Universe.AccountsWithBalances = universe.accountsWithBalances
+      Universe.IssuedAssets = universe.issuedAssets
+      Universe.Leases = universe.leases
 
       val workers = finalConfig.sendTo.map { node =>
         log.info(s"Creating worker: ${node.getHostString}:${node.getPort}")
-        new Worker(finalConfig.worker, sender, node, generator)
+        new Worker(finalConfig.worker, sender, node, generator, initialTransactions.map(RawBytes.from))
       }
 
       def close(status: Int): Unit = {
