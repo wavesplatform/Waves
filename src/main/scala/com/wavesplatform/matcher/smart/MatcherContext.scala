@@ -50,10 +50,10 @@ object MatcherContext {
       )
     }
 
-    val getIntegerF: BaseFunction           = inaccessibleFunction("getInteger", DATA_LONG)
-    val getBooleanF: BaseFunction           = inaccessibleFunction("getBoolean", DATA_BOOLEAN)
-    val getBinaryF: BaseFunction            = inaccessibleFunction("getBinary", DATA_BYTES)
-    val getStringF: BaseFunction            = inaccessibleFunction("getString", DATA_STRING)
+    val getIntegerF: BaseFunction           = inaccessibleFunction("getInteger", DATA_LONG_FROM_STATE)
+    val getBooleanF: BaseFunction           = inaccessibleFunction("getBoolean", DATA_BOOLEAN_FROM_STATE)
+    val getBinaryF: BaseFunction            = inaccessibleFunction("getBinary", DATA_BYTES_FROM_STATE)
+    val getStringF: BaseFunction            = inaccessibleFunction("getString", DATA_STRING_FROM_STATE)
     val txByIdF: BaseFunction               = inaccessibleFunction("txByIdF", GETTRANSACTIONBYID)
     val txHeightByIdF: BaseFunction         = inaccessibleFunction("txHeightByIdF", TRANSACTIONHEIGHTBYID)
     val addressFromPublicKeyF: BaseFunction = inaccessibleUserFunction("addressFromPublicKeyF")
