@@ -137,14 +137,6 @@ class MatcherActor(orderHistory: ActorRef,
         removeOrderBook(ob.assetPair)
       }
 
-    case x: ForceCancelOrder =>
-      checkAssetPair(x.assetPair, x) {
-        orderBook(x.assetPair)
-          .fold {
-            sender() ! OrderCancelRejected(s"Order '${x.orderId}' is already cancelled or never existed in '${x.assetPair.key}' pair")
-          }(forwardReq(x))
-      }
-
     case Shutdown =>
       val s = sender()
       shutdownStatus = shutdownStatus.copy(
@@ -314,23 +306,24 @@ object MatcherActor {
 
   case object ShutdownComplete
 
-  case class GetMarketsResponse(publicKey: Array[Byte], markets: Seq[MarketData]) extends MatcherResponse {
-    override def toHttpResponse: HttpResponse =
-      httpJsonResponse(
+  case class GetMarketsResponse(publicKey: Array[Byte], markets: Seq[MarketData])
+      extends MatcherResponse(
+        StatusCodes.OK,
         Json.obj(
           "matcherPublicKey" -> Base58.encode(publicKey),
-          "markets" -> JsArray(markets.map(m =>
-            Json.obj(
-              "amountAsset"     -> m.pair.amountAssetStr,
-              "amountAssetName" -> m.amountAssetName,
-              "amountAssetInfo" -> m.amountAssetInfo,
-              "priceAsset"      -> m.pair.priceAssetStr,
-              "priceAssetName"  -> m.priceAssetName,
-              "priceAssetInfo"  -> m.priceAssetinfo,
-              "created"         -> m.created
-          )))
-        ))
-  }
+          "markets" -> JsArray(
+            markets.map(m =>
+              Json.obj(
+                "amountAsset"     -> m.pair.amountAssetStr,
+                "amountAssetName" -> m.amountAssetName,
+                "amountAssetInfo" -> m.amountAssetInfo,
+                "priceAsset"      -> m.pair.priceAssetStr,
+                "priceAssetName"  -> m.priceAssetName,
+                "priceAssetInfo"  -> m.priceAssetinfo,
+                "created"         -> m.created
+            )))
+        )
+      )
 
   case class AssetInfo(decimals: Int)
   implicit val assetInfoFormat: Format[AssetInfo] = Json.format[AssetInfo]

@@ -1,10 +1,9 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{Actor, Props}
-import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
-import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ExpirableOrderHistoryRequest, _}
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model._
@@ -42,8 +41,6 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   def processExpirableRequest(r: Any): Unit = r match {
     case ValidateOrder(o, _) =>
       sender() ! ValidateOrderResult(o.id(), validateNewOrder(o))
-    case ValidateCancelOrder(co, _) =>
-      sender() ! ValidateCancelResult(co.orderId, validateCancelOrder(co))
     case req: DeleteOrderFromHistory =>
       deleteFromOrderHistory(req)
     case GetTradableBalance(assetPair, addr, _) =>
@@ -61,20 +58,17 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       executedTimer.measure(orderHistory.orderExecuted(ev))
     case ev: OrderCanceled =>
       cancelledTimer.measure(orderHistory.orderCanceled(ev))
-    case RecoverFromOrderBook(ob) =>
-      recoverFromOrderBook(ob)
     case ForceCancelOrderFromHistory(id) =>
       forceCancelOrder(id)
   }
 
   def forceCancelOrder(id: ByteStr): Unit = {
-    orderHistory.order(id).map((_, orderHistory.orderInfo(id))) match {
-      case Some((o, oi)) =>
-        orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, oi.remainingFee, o), unmatchable = false))
-        sender() ! Some(o)
-      case None =>
-        sender() ! None
+    val maybeOrder = orderHistory.order(id)
+    for (o <- maybeOrder) {
+      val oi = orderHistory.orderInfo(id)
+      orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, oi.remainingFee, o), unmatchable = false))
     }
+    sender ! maybeOrder
   }
 
   def getPairTradableBalance(assetPair: AssetPair, acc: Address): GetTradableBalanceResponse = {
@@ -104,18 +98,6 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
         sender() ! StatusCodeMatcherResponse(StatusCodes.BadRequest, "Order couldn't be deleted")
     }
   }
-
-  def recoverFromOrderBook(ob: OrderBook): Unit = {
-    ob.asks.foreach {
-      case (_, orders) =>
-        orders.foreach(o => orderHistory.orderAccepted(OrderAdded(o)))
-    }
-    ob.bids.foreach {
-      case (_, orders) =>
-        orders.foreach(o => orderHistory.orderAccepted(OrderAdded(o)))
-    }
-  }
-
 }
 
 object OrderHistoryActor {
@@ -127,9 +109,7 @@ object OrderHistoryActor {
   def props(db: DB, settings: MatcherSettings, utxPool: UtxPool, wallet: Wallet): Props =
     Props(new OrderHistoryActor(db, settings, utxPool, wallet))
 
-  sealed trait OrderHistoryRequest
-
-  sealed trait ExpirableOrderHistoryRequest extends OrderHistoryRequest {
+  sealed trait ExpirableOrderHistoryRequest {
     def ts: Long
   }
 
@@ -139,21 +119,12 @@ object OrderHistoryActor {
 
   case class ValidateOrderResult(validatedOrderId: ByteStr, result: Either[GenericError, Order])
 
-  case class ValidateCancelOrder(cancel: CancelOrder, ts: Long) extends ExpirableOrderHistoryRequest
+  case class ForceCancelOrderFromHistory(orderId: ByteStr)
 
-  case class ValidateCancelResult(validatedOrderId: ByteStr, result: Either[GenericError, CancelOrder])
-
-  case class RecoverFromOrderBook(ob: OrderBook) extends OrderHistoryRequest
-
-  case class ForceCancelOrderFromHistory(orderId: ByteStr) extends OrderHistoryRequest
-
-  case class OrderDeleted(orderId: ByteStr) extends MatcherResponse {
-    override def toHttpResponse: HttpResponse = httpJsonResponse(Json.obj("status" -> "OrderDeleted", "orderId" -> orderId))
-  }
+  case class OrderDeleted(orderId: ByteStr) extends MatcherResponse(StatusCodes.OK, Json.obj("status" -> "OrderDeleted", "orderId" -> orderId))
 
   case class GetTradableBalance(assetPair: AssetPair, address: Address, ts: Long) extends ExpirableOrderHistoryRequest
 
-  case class GetTradableBalanceResponse(balances: Map[String, Long]) extends MatcherResponse {
-    override def toHttpResponse: HttpResponse = httpJsonResponse(JsObject(balances.map { case (k, v) => (k, JsNumber(v)) }))
-  }
+  case class GetTradableBalanceResponse(balances: Map[String, Long])
+      extends MatcherResponse(StatusCodes.OK, JsObject(balances.map { case (k, v) => (k, JsNumber(v)) }))
 }

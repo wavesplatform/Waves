@@ -1,11 +1,10 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{ActorRef, Cancellable, Props, Stash}
-import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.{StatusCodes, _}
 import akka.persistence._
-import com.google.common.cache.CacheBuilder
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.{CancelOrderRequest, JsonSerializer, MatcherResponse}
+import com.wavesplatform.matcher.api.{JsonSerializer, MatcherResponse}
 import com.wavesplatform.matcher.market.MatcherActor.{Shutdown, ShutdownComplete}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
@@ -67,31 +66,15 @@ class OrderBookActor(assetPair: AssetPair,
     onComplete = () => ()
   )
 
-  private lazy val alreadyCanceledOrders = CacheBuilder
-    .newBuilder()
-    .maximumSize(AlreadyCanceledCacheSize)
-    .build[ByteStr, java.lang.Boolean]()
-
-  private lazy val cancelInProgressOrders = CacheBuilder
-    .newBuilder()
-    .maximumSize(AlreadyCanceledCacheSize)
-    .build[ByteStr, java.lang.Boolean]()
-
   val okCancel: java.lang.Boolean     = Boolean.box(true)
   val failedCancel: java.lang.Boolean = Boolean.box(false)
 
   private def fullCommands: Receive = readOnlyCommands orElse snapshotsCommands orElse executeCommands
 
   private def executeCommands: Receive = {
-    case order: Order =>
-      onAddOrder(order)
-    case cancel: CancelOrder =>
-      onCancelOrder(cancel)
-    case ForceCancelOrder(_, orderId) =>
-      log.trace(s"Force cancel order $orderId")
-      onForceCancelOrder(orderId)
-    case OrderCleanup =>
-      onOrderCleanup(orderBook, NTP.correctedTime())
+    case order: Order        => onAddOrder(order)
+    case cancel: CancelOrder => onCancelOrder(cancel.orderId)
+    case OrderCleanup        => onOrderCleanup(orderBook, NTP.correctedTime())
   }
 
   private def snapshotsCommands: Receive = {
@@ -100,12 +83,11 @@ class OrderBookActor(assetPair: AssetPair,
 
     case SaveSnapshotSuccess(metadata) =>
       lastSnapshotSequenceNr = metadata.sequenceNr
-      log.info(s"Snapshot saved with metadata $metadata")
       deleteMessages(metadata.sequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest.copy(maxSequenceNr = metadata.sequenceNr - 1))
 
     case SaveSnapshotFailure(metadata, reason) =>
-      log.error(s"Failed to save snapshot: $metadata, $reason.")
+      log.error(s"Failed to save snapshot: $metadata", reason)
       if (shutdownStatus.initiated) {
         shutdownStatus = shutdownStatus.copy(
           oldSnapshotsDeleted = true,
@@ -173,36 +155,20 @@ class OrderBookActor(assetPair: AssetPair,
       }
   }
 
-  private def waitingValidation(sentMessage: Either[ValidateCancelOrder, ValidateOrder]): Receive = readOnlyCommands orElse {
+  private def waitingValidation(sentMessage: ValidateOrder): Receive = readOnlyCommands orElse {
     case ValidationTimeoutExceeded =>
       validationTimeouts.increment()
       log.warn(s"Validation timeout exceeded for $sentMessage")
-      val orderId = sentMessage.fold(_.cancel.orderId, _.order.id())
-      cancelInProgressOrders.invalidate(orderId)
       apiSender.foreach(_ ! OperationTimedOut)
       becomeFullCommands()
 
     case ValidateOrderResult(validatedOrderId, res) =>
-      sentMessage match {
-        case Right(sent) if validatedOrderId == sent.order.id() =>
-          cancellable.foreach(_.cancel())
-          handleValidateOrderResult(res)
-        case x =>
-          log.warn(s"Unexpected message: $x")
+      if (validatedOrderId == sentMessage.order.id()) {
+        cancellable.foreach(_.cancel())
+        handleValidateOrderResult(res)
+      } else {
+        log.warn(s"Unexpected ValidateOrderResult for order $validatedOrderId while waiting for ${sentMessage.order.id()}")
       }
-
-    case ValidateCancelResult(validatedOrderId, res) =>
-      sentMessage match {
-        case Left(sent) if validatedOrderId == sent.cancel.orderId =>
-          cancellable.foreach(_.cancel())
-          handleValidateCancelResult(res.map(x => x.orderId))
-        case x =>
-          log.warn(s"Unexpected message: $x")
-      }
-
-    case cancel: CancelOrder if Option(cancelInProgressOrders.getIfPresent(cancel.orderId)).nonEmpty =>
-      log.info(s"Order($assetPair, ${cancel.orderId}) is already being canceled")
-      sender() ! OrderCancelRejected("Order is already being canceled")
 
     case ev =>
       log.trace("Stashed: " + ev)
@@ -218,37 +184,6 @@ class OrderBookActor(assetPair: AssetPair,
       sender() ! GetOrdersResponse(orderBook.bids.values.flatten.toSeq)
   }
 
-  private def onCancelOrder(cancel: CancelOrder): Unit = {
-    Option(alreadyCanceledOrders.getIfPresent(cancel.orderId)) match {
-      case Some(`okCancel`) =>
-        log.info(s"Order($assetPair, ${cancel.orderId}) is already canceled")
-        sender() ! OrderCanceled(cancel.orderId.base58)
-      case Some(_) =>
-        log.info(s"Order($assetPair, ${cancel.orderId}) is already not found")
-        sender() ! OrderCancelRejected("Order not found")
-      case None =>
-        val msg = ValidateCancelOrder(cancel, NTP.correctedTime())
-        orderHistory ! msg
-        apiSender = Some(sender())
-        cancellable = Some(context.system.scheduler.scheduleOnce(settings.validationTimeout, self, ValidationTimeoutExceeded))
-        context.become(waitingValidation(Left(msg)))
-        cancelInProgressOrders.put(cancel.orderId, okCancel)
-    }
-  }
-
-  private def onForceCancelOrder(orderIdToCancel: ByteStr): Unit = {
-    OrderBook.cancelOrder(orderBook, orderIdToCancel) match {
-      case Some(oc) =>
-        val st = cancelTimer.start()
-        persist(oc) { _ =>
-          applyEvent(oc)
-          sender() ! OrderCanceled(orderIdToCancel.base58)
-          st.stop()
-        }
-      case _ => sender() ! OrderCancelRejected("Order not found")
-    }
-  }
-
   private def onOrderCleanup(orderBook: OrderBook, ts: Long): Unit = {
     orderBook.asks.values
       .++(orderBook.bids.values)
@@ -258,39 +193,28 @@ class OrderBookActor(assetPair: AssetPair,
         validation
       })
       .map(_.order.id())
-      .foreach(x => handleValidateCancelResult(Right(x)))
+      .foreach(onCancelOrder)
   }
 
-  private def handleValidateCancelResult(res: Either[GenericError, ByteStr]): Unit = {
-    res match {
-      case Left(err) =>
-        apiSender.foreach(_ ! OrderCancelRejected(err.err))
-      case Right(orderIdToCancel) =>
-        cancelInProgressOrders.invalidate(orderIdToCancel)
-        OrderBook.cancelOrder(orderBook, orderIdToCancel) match {
-          case Some(oc) =>
-            val st = cancelTimer.start()
-            alreadyCanceledOrders.put(orderIdToCancel, okCancel)
-            persist(oc) { _ =>
-              handleCancelEvent(oc)
-              apiSender.foreach(_ ! OrderCanceled(orderIdToCancel.base58))
-              st.stop()
-            }
-          case _ =>
-            alreadyCanceledOrders.put(orderIdToCancel, failedCancel)
-            apiSender.foreach(_ ! OrderCancelRejected("Order not found"))
+  private def onCancelOrder(orderIdToCancel: ByteStr): Unit =
+    OrderBook.cancelOrder(orderBook, orderIdToCancel) match {
+      case Some(oc) =>
+        val st = cancelTimer.start()
+        persist(oc) { _ =>
+          handleCancelEvent(oc)
+          sender() ! OrderCanceled(orderIdToCancel.base58)
+          st.stop()
         }
+      case _ =>
+        apiSender.foreach(_ ! OrderCancelRejected("Order not found"))
     }
-
-    becomeFullCommands()
-  }
 
   private def onAddOrder(order: Order): Unit = {
     val msg = ValidateOrder(order, NTP.correctedTime())
     orderHistory ! msg
     apiSender = Some(sender())
     cancellable = Some(context.system.scheduler.scheduleOnce(settings.validationTimeout, self, ValidationTimeoutExceeded))
-    context.become(waitingValidation(Right(msg)))
+    context.become(waitingValidation(msg))
   }
 
   private def handleValidateOrderResult(res: Either[GenericError, Order]): Unit = {
@@ -422,14 +346,9 @@ class OrderBookActor(assetPair: AssetPair,
 
   override def receiveCommand: Receive = fullCommands
 
-  val isMigrateToNewOrderHistoryStorage: Boolean = settings.isMigrateToNewOrderHistoryStorage
-
   override def receiveRecover: Receive = {
     case evt: Event =>
       applyEvent(evt)
-      if (isMigrateToNewOrderHistoryStorage) {
-        orderHistory ! evt
-      }
 
     case RecoveryCompleted =>
       log.info(assetPair.toString() + " - Recovery completed!")
@@ -439,9 +358,6 @@ class OrderBookActor(assetPair: AssetPair,
       lastSnapshotSequenceNr = metadata.sequenceNr
       orderBook = snapshot.orderBook
       updateSnapshot(orderBook)
-      if (isMigrateToNewOrderHistoryStorage) {
-        orderHistory ! RecoverFromOrderBook(orderBook)
-      }
       log.debug(s"Recovering OrderBook from snapshot: $snapshot for $persistenceId")
   }
 
@@ -472,60 +388,33 @@ object OrderBookActor {
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
-  val AlreadyCanceledCacheSize = 10000L
-
   private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit) {
     def completed: Boolean  = initiated && oldMessagesDeleted && oldSnapshotsDeleted
     def tryComplete(): Unit = if (completed) onComplete()
   }
 
-  //protocol
-  sealed trait OrderBookRequest {
-    def assetPair: AssetPair
-  }
+  case class DeleteOrderBookRequest(assetPair: AssetPair)
 
-  case class DeleteOrderBookRequest(assetPair: AssetPair) extends OrderBookRequest
-
-  case class CancelOrder(assetPair: AssetPair, req: CancelOrderRequest) extends OrderBookRequest {
-    lazy val orderId: ByteStr          = req.orderId
-    override lazy val toString: String = s"CancelOrder($assetPair, ${req.senderPublicKey}, $orderId)"
-  }
-
-  case class ForceCancelOrder(assetPair: AssetPair, orderId: ByteStr) extends OrderBookRequest
+  case class CancelOrder(orderId: ByteStr)
 
   case object OrderCleanup
 
-  case object OperationTimedOut extends MatcherResponse {
-    override def toHttpResponse: HttpResponse = httpJsonResponse(
-      entity = Json.obj("status" -> "OperationTimedOut", "message" -> "Operation is timed out, please try later"),
-      status = StatusCodes.InternalServerError
-    )
-  }
+  case object OperationTimedOut
+      extends MatcherResponse(StatusCodes.InternalServerError,
+                              Json.obj("status" -> "OperationTimedOut", "message" -> "Operation is timed out, please try later"))
 
-  case class OrderAccepted(order: Order) extends MatcherResponse {
-    override def toHttpResponse: HttpResponse = httpJsonResponse(Json.obj("status" -> "OrderAccepted", "message" -> order.json()))
-  }
+  case class OrderAccepted(order: Order) extends MatcherResponse(StatusCodes.OK, Json.obj("status" -> "OrderAccepted", "message" -> order.json()))
 
-  case class OrderRejected(message: String) extends MatcherResponse {
-    override def toHttpResponse: HttpResponse = httpJsonResponse(
-      entity = Json.obj("status" -> "OrderRejected", "message" -> message),
-      status = StatusCodes.BadRequest
-    )
-  }
+  case class OrderRejected(message: String)
+      extends MatcherResponse(StatusCodes.BadRequest, Json.obj("status" -> "OrderRejected", "message" -> message))
 
-  case class OrderCanceled(orderId: String) extends MatcherResponse {
-    override def toHttpResponse: HttpResponse = httpJsonResponse(Json.obj("status" -> "OrderCanceled", "orderId" -> orderId))
-  }
+  case class OrderCanceled(orderId: String) extends MatcherResponse(StatusCodes.OK, Json.obj("status" -> "OrderCanceled", "orderId" -> orderId))
 
-  case class OrderCancelRejected(message: String) extends MatcherResponse {
-    override def toHttpResponse: HttpResponse = httpJsonResponse(
-      entity = Json.obj("status" -> "OrderCancelRejected", "message" -> message),
-      status = StatusCodes.BadRequest
-    )
-  }
+  case class OrderCancelRejected(message: String)
+      extends MatcherResponse(StatusCodes.BadRequest, Json.obj("status" -> "OrderCancelRejected", "message" -> message))
 
-  case class GetOrderBookResponse(ts: Long, pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends MatcherResponse {
-    override def toHttpResponse: HttpResponse = HttpResponse(
+  case class GetOrderBookResponse(ts: Long, pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) {
+    def toHttpResponse: HttpResponse = HttpResponse(
       entity = HttpEntity(
         ContentTypes.`application/json`,
         JsonSerializer.serialize(OrderBookResult(ts, pair, bids, asks))
@@ -551,5 +440,4 @@ object OrderBookActor {
   case class Snapshot(orderBook: OrderBook)
 
   case object ValidationTimeoutExceeded
-
 }

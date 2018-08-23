@@ -6,7 +6,6 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
@@ -487,13 +486,10 @@ class OrderBookActorSpecification
         val actor        = createOrderBookActor(historyActor.ref)
 
         val order = buy(pair, 1, 1)
-        actor ! CancelOrder(pair, CancelOrderRequest(order.senderPublicKey, order.id(), order.signature))
+        actor ! CancelOrder(order.id())
 
         val unexpectedOrder = buy(pair, 1, 2)
-        actor.tell(
-          CancelOrder(pair, CancelOrderRequest(unexpectedOrder.senderPublicKey, unexpectedOrder.id(), unexpectedOrder.signature)),
-          historyActor.ref
-        )
+        actor.tell(CancelOrder(unexpectedOrder.id()), historyActor.ref)
         expectNoMsg()
       }
     }
