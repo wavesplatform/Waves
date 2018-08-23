@@ -130,40 +130,31 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
     saveOrder(rw, lo.order)
 
     val updated = saveOrderInfo(rw, event)
+    val opDiff  = diff(event, updated)
+    saveOpenVolume(rw, opDiff)
 
-    if (updated(lo.order.id()).isNew) {
-      val opDiff = diffAccepted(updated(lo.order.id()))
-      saveOpenVolume(rw, opDiff)
-
+    val accepted = updated(lo.order.id())
+    if (accepted.origInfo.isEmpty) {
       // for OrderAdded events, updatedInfo contains just one element
-      updated.values.foreach { x =>
-        val o         = x.order
-        val k         = MatcherKeys.addressOrdersSeqNr(o.senderPublicKey)
-        val nextSeqNr = rw.get(k) + 1
-        rw.put(k, nextSeqNr)
+      val o         = accepted.order
+      val k         = MatcherKeys.addressOrdersSeqNr(o.senderPublicKey)
+      val nextSeqNr = rw.get(k) + 1
+      rw.put(k, nextSeqNr)
 
-        val spendAssetId = if (o.orderType == OrderType.BUY) o.assetPair.priceAsset else o.assetPair.amountAsset
-        rw.put(MatcherKeys.addressOrders(o.senderPublicKey, nextSeqNr), Some(OrderAssets(o.id(), spendAssetId)))
-      }
+      val spendAssetId = if (o.orderType == OrderType.BUY) o.assetPair.priceAsset else o.assetPair.amountAsset
+      rw.put(MatcherKeys.addressOrders(o.senderPublicKey, nextSeqNr), Some(OrderAssets(o.id(), spendAssetId)))
     }
   }
 
   def orderExecuted(event: OrderExecuted): Unit = db.readWrite { rw =>
     saveOrder(rw, event.submitted.order)
 
-    val updated   = saveOrderInfo(rw, event)
+    val updated = saveOrderInfo(rw, event)
+    val opDiff  = diff(event, updated)
+    saveOpenVolume(rw, opDiff)
+
     val submitted = updated(event.submitted.order.id())
-
-    val submittedOpOrderInfoDiff = diffAccepted(updated(event.submitted.order.id()))
-    val counterInfoDiff          = diffExecuted(updated(event.counter.order.id()))
-    val opOrderInfoDiff = Monoid.combine(
-      counterInfoDiff,
-      if (submitted.updatedInfo.status.isFinal) Map.empty[Address, OpenPortfolio] else submittedOpOrderInfoDiff
-    )
-
-    saveOpenVolume(rw, opOrderInfoDiff)
-
-    if (submitted.isNew) {
+    if (submitted.origInfo.isEmpty) {
       import event.submitted.{order => submittedOrder}
       val k         = MatcherKeys.addressOrdersSeqNr(submittedOrder.senderPublicKey)
       val nextSeqNr = rw.get(k) + 1
@@ -177,7 +168,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
 
   def orderCanceled(event: OrderCanceled): Unit = db.readWrite { rw =>
     val updated = saveOrderInfo(rw, event)
-    val opDiff  = diffCancel(updated(event.limitOrder.order.id()))
+    val opDiff  = diff(event, updated)
     saveOpenVolume(rw, opDiff)
   }
 
@@ -200,9 +191,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
 object OrderHistory {
   import OrderInfo.orderStatusOrdering
 
-  case class OrderInfoChange(order: Order, origInfo: Option[OrderInfo], updatedInfo: OrderInfo) {
-    def isNew: Boolean = origInfo.isEmpty
-  }
+  case class OrderInfoChange(order: Order, origInfo: Option[OrderInfo], updatedInfo: OrderInfo)
 
   object OrderHistoryOrdering extends Ordering[(ByteStr, OrderInfo, Option[Order])] {
     def orderBy(oh: (ByteStr, OrderInfo, Option[Order])): (OrderStatus, Long) = (oh._2.status, -oh._3.map(_.timestamp).getOrElse(0L))
@@ -218,8 +207,20 @@ object OrderHistory {
                                    executedFee: Option[Long] = None,
                                    lastSpend: Option[Long] = None)
 
-  def diffAccepted(change: OrderInfoChange): Map[Address, OpenPortfolio] = {
-    import change._
+  def diff(event: Event, changes: Map[ByteStr, OrderInfoChange]): Map[Address, OpenPortfolio] = {
+    changes.values.foldLeft(Map.empty[Address, OpenPortfolio]) {
+      case (r, change) =>
+        Monoid.combine(r, event match {
+          case _: OrderCanceled => diffCancel(change)
+          case _ =>
+            if (change.origInfo.isEmpty) diffAccepted(change)
+            else diffExecuted(change)
+        })
+    }
+  }
+
+  private def diffAccepted(change: OrderInfoChange): Map[Address, OpenPortfolio] = {
+    import change.{order, updatedInfo}
     val lo             = LimitOrder(order)
     val maxSpendAmount = lo.getRawSpendAmount
     val remainingSpend = maxSpendAmount - updatedInfo.totalSpend(lo)
@@ -235,7 +236,7 @@ object OrderHistory {
     )
   }
 
-  def diffExecuted(change: OrderInfoChange): Map[Address, OpenPortfolio] = {
+  private def diffExecuted(change: OrderInfoChange): Map[Address, OpenPortfolio] = {
     import change.{order, updatedInfo}
     val prev         = change.origInfo.getOrElse(throw new IllegalStateException("origInfo must be defined"))
     val lo           = LimitOrder(order)
@@ -252,7 +253,7 @@ object OrderHistory {
     )
   }
 
-  def diffCancel(change: OrderInfoChange): Map[Address, OpenPortfolio] = {
+  private def diffCancel(change: OrderInfoChange): Map[Address, OpenPortfolio] = {
     import change.{order, updatedInfo}
     val lo             = LimitOrder(order)
     val maxSpendAmount = lo.getRawSpendAmount

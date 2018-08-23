@@ -352,8 +352,6 @@ class OrderHistorySpecification
     exec2.submittedRemainingFee shouldBe submitted2Info1.remainingFee
     oh.orderInfo(submitted2.id()).status shouldBe LimitOrder.PartiallyFilled(50000000)
 
-    oh.orderAccepted(OrderAdded(exec2.submittedRemaining))
-
     oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
     oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0L
     activeOrderIds(counter.senderPublicKey, Set(None)) shouldBe empty
@@ -389,6 +387,27 @@ class OrderHistorySpecification
     oh.orderInfo(submitted.id()).status shouldBe LimitOrder.Filled(350)
   }
 
+  property("Reserved balance should empty after full rounded execution") {
+    val pair = AssetPair(mkAssetId("BTC"), mkAssetId("ETH"))
+
+    val alicePk = PrivateKeyAccount("alice".getBytes("utf-8"))
+    val counter = buy(pair, 0.00031887, 923431000L, matcherFee = Some(300000), sender = Some(alicePk))
+
+    val bobPk     = PrivateKeyAccount("bob".getBytes("utf-8"))
+    val submitted = sell(pair, 0.00031887, 223345000L, matcherFee = Some(300000), sender = Some(bobPk))
+
+    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
+
+    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    exec.executedAmount shouldBe 223344937L
+    oh.orderExecuted(exec)
+    oh.orderCanceled(OrderCanceled(exec.submittedRemaining, unmatchable = true))
+
+    withClue("Account of submitted order should have positive balances:") {
+      DBUtils.reservedBalance(db, bobPk) shouldBe empty
+    }
+  }
+
   property("Partially with own order") {
     val pk        = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair      = AssetPair(None, mkAssetId("BTC"))
@@ -398,6 +417,7 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(counter)))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
     oh.orderExecuted(exec)
+    oh.orderAccepted(OrderAdded(exec.submittedRemaining))
 
     val counterOrderInfo = oh.orderInfo(counter.id())
     withClue(s"counter: ${counter.id()}") {
@@ -421,8 +441,6 @@ class OrderHistorySpecification
 
     val expectedAmountReserved = counterOrderInfo.remainingFee + submittedOrderInfo.remaining + submittedOrderInfo.remainingFee
     expectedAmountReserved shouldBe 110157143L
-
-    oh.orderAccepted(OrderAdded(exec.submittedRemaining))
 
     oh.openVolume(pk, pair.amountAsset) shouldBe expectedAmountReserved
     oh.openVolume(pk, pair.priceAsset) shouldBe 0L
