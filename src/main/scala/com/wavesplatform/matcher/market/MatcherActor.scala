@@ -145,16 +145,21 @@ class MatcherActor(orderHistory: ActorRef,
       )
   }
 
+  def checkOrder(order: Order)(f: => Unit): Unit = {
+    val pair = order.assetPair
+    val md   = tradedPairs(pair)
+    if (order.price % md.zeros == 0) {
+      f
+    } else {
+      sender() ! OrderRejected(s"Invalid price. Last ${md.decs} digits should be zero")
+    }
+  }
+
   def createAndForward(order: Order): Unit = {
     val pair      = order.assetPair
     val orderBook = createOrderBook(pair)
-    val md        = tradedPairs(pair)
-    if (order.price % md.zeros == 0) {
-      persistAsync(OrderBookCreated(pair)) { _ =>
-        forwardReq(order)(orderBook)
-      }
-    } else {
-      sender() ! OrderRejected(s"Invalid price. Last ${md.decs} digits should be zero")
+    persistAsync(OrderBookCreated(pair)) { _ =>
+      forwardReq(order)(orderBook)
     }
   }
 
@@ -199,10 +204,12 @@ class MatcherActor(orderHistory: ActorRef,
       }
 
     case order: Order =>
-      checkAssetPair(order.assetPair, order) {
-        checkBlacklistedAddress(order.senderPublicKey) {
-          checkOrderScript(order) {
-            orderBook(order.assetPair).fold(createAndForward(order))(forwardReq(order))
+      checkOrder(order) {
+        checkAssetPair(order.assetPair, order) {
+          checkBlacklistedAddress(order.senderPublicKey) {
+            checkOrderScript(order) {
+              orderBook(order.assetPair).fold(createAndForward(order))(forwardReq(order))
+            }
           }
         }
       }
