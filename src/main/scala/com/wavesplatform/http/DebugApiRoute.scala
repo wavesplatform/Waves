@@ -2,6 +2,7 @@ package com.wavesplatform.http
 
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
+import javax.ws.rs.Path
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
@@ -15,20 +16,16 @@ import com.wavesplatform.crypto
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.{Blockchain, ByteStr, LeaseBalance, NG, Portfolio}
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.utils.{Base58, NTP, ScorexLogging}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
-import javax.ws.rs.Path
-
-import com.wavesplatform.state.diffs.TransactionDiffer
-
-import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.smart.Verifier
 import monix.eval.{Coeval, Task}
 import play.api.libs.json._
 
