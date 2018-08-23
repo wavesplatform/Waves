@@ -246,7 +246,8 @@ object CompilerV1 {
       }
     }
 
-    val default: Either[CompilationError, Expressions.EXPR] = Right(Expressions.REF(AnyPos, PART.VALID(AnyPos, PureContext.errRef)))
+    val default: Either[CompilationError, Expressions.EXPR] = Right(
+      Expressions.FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "throw"), List.empty))
     cases.foldRight(default) {
       case (mc, furtherEi) =>
         furtherEi match {

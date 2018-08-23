@@ -1,5 +1,7 @@
 package com.wavesplatform.lang
 
+import java.nio.ByteBuffer
+
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
@@ -22,6 +24,8 @@ import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
+
+import scala.util.Try
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
@@ -740,5 +744,33 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       context = EvaluationContext(typeDefs = Map(point -> pointType), letDefs = Map.empty, functions = Map.empty),
       FUNCTION_CALL(pointCtor, List(CONST_LONG(1), CONST_LONG(2)))
     )._2 shouldBe Right(CaseObj(pointType.typeRef, Map("X" -> 1, "Y" -> 2)))
+  }
+
+  property("toString") {
+    import PureContext.{toStringBoolean, toStringLong}
+    def evalToString(f: FunctionHeader, arg: EXPR) = ev[String](expr = FUNCTION_CALL(f, List(arg)))._2
+
+    evalToString(toStringBoolean, TRUE) shouldBe Right("true")
+    evalToString(toStringBoolean, FALSE) shouldBe Right("false")
+
+    forAll(Gen.choose(Long.MinValue, Long.MaxValue), Gen.alphaNumStr) { (n, s) =>
+      evalToString(toStringLong, CONST_LONG(n)) shouldBe Right(n.toString)
+      Try(evalToString(toStringLong, CONST_STRING(""))).isFailure shouldBe true
+      Try(evalToString(toStringBoolean, CONST_STRING(""))).isFailure shouldBe true
+    }
+  }
+
+  property("toBytes") {
+    import PureContext.{toBytesBoolean, toBytesLong, toBytesString}
+    def evalToBytes(f: FunctionHeader, arg: EXPR) = ev[ByteVector](expr = FUNCTION_CALL(f, List(arg)))._2
+
+    evalToBytes(toBytesBoolean, TRUE) shouldBe Right(ByteVector(1))
+    evalToBytes(toBytesBoolean, FALSE) shouldBe Right(ByteVector(0))
+    Try(evalToBytes(toStringBoolean, REF("unit"))).isFailure shouldBe true
+
+    forAll(Gen.choose(Long.MinValue, Long.MaxValue), Gen.alphaNumStr) { (n, s) =>
+      evalToBytes(toBytesLong, CONST_LONG(n)) shouldBe Right(ByteVector(ByteBuffer.allocate(8).putLong(n).array))
+      evalToBytes(toBytesString, CONST_STRING(s)) shouldBe Right(ByteVector(s.getBytes("UTF-8")))
+    }
   }
 }

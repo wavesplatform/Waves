@@ -53,7 +53,7 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
                     |      let isRecipientAgreed = if(isDefined(recipientAgreement)) then extract(recipientAgreement) else false
                     |      let senderAddress = addressFromPublicKey(ttx.senderPublicKey)
                     |      senderAddress.bytes == company.bytes || (isNotary1Agreed && isRecipientAgreed)
-                    |   case other => throw
+                    |   case other => throw()
                     | }
         """.stripMargin
 
