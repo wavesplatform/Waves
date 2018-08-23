@@ -90,7 +90,10 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
 
     case OrderCanceled(lo, unmatchable) =>
       // The order should not have Cancelled status, if it was cancelled by unmatchable amounts
-      Seq((lo.order, OrderInfoDiff(nowCanceled = Some(!unmatchable))))
+      val canceled = !unmatchable
+      // Hack to get the right status
+      val newMinAmount = if (canceled) None else Some(lo.order.amount)
+      Seq((lo.order, OrderInfoDiff(nowCanceled = Some(canceled), newMinAmount = newMinAmount)))
   }
 
   def openVolume(address: Address, assetId: Option[AssetId]): Long =

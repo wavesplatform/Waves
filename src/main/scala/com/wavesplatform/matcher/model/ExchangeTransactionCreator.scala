@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.MatcherSettings
+import com.wavesplatform.matcher.model.Events.OrderExecuted
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
@@ -22,15 +23,15 @@ trait ExchangeTransactionCreator extends ScorexLogging {
     txTime
   }
 
-  def createTransaction(submitted: LimitOrder, counter: LimitOrder): Either[ValidationError, ExchangeTransaction] = {
+  def createTransaction(event: OrderExecuted): Either[ValidationError, ExchangeTransaction] = {
+    import event.{counter, submitted}
     wallet
       .privateKeyAccount(submitted.order.matcherPublicKey)
       .flatMap(matcherPrivateKey => {
         val price             = counter.price
-        val amount            = math.min(submitted.executionAmount(counter), counter.amountOfAmountAsset)
         val (buy, sell)       = Order.splitByType(submitted.order, counter.order)
-        val (buyFee, sellFee) = calculateMatcherFee(buy, sell, amount)
-        ExchangeTransaction.create(matcherPrivateKey, buy, sell, price, amount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
+        val (buyFee, sellFee) = calculateMatcherFee(buy, sell, event.executedAmount)
+        ExchangeTransaction.create(matcherPrivateKey, buy, sell, price, event.executedAmount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
       })
   }
 

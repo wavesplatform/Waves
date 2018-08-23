@@ -8,7 +8,9 @@ import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.util._
+import org.scalatest.concurrent.Eventually
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
+
 import scala.util.Random
 import scala.concurrent.duration._
 
@@ -19,7 +21,8 @@ class MatcherRestartTestSuite
     with CancelAfterFailure
     with ReportingTestName
     with NodesFromDocker
-    with TransferSending {
+    with TransferSending
+    with Eventually {
 
   import MatcherRestartTestSuite._
 
@@ -49,9 +52,11 @@ class MatcherRestartTestSuite
       matcherNode.orderStatus(firstOrder, aliceWavesPair).status shouldBe "Accepted"
 
       // check that order is correct
-      val orders = matcherNode.orderBook(aliceWavesPair)
-      orders.asks.head.amount shouldBe 500
-      orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
+      eventually {
+        val orders = matcherNode.orderBook(aliceWavesPair)
+        orders.asks.head.amount shouldBe 500
+        orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
+      }
 
       // sell order should be in the aliceNode orderbook
       matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
@@ -66,23 +71,28 @@ class MatcherRestartTestSuite
       matcherNode.orderStatus(firstOrder, aliceWavesPair).status shouldBe "Accepted"
       matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
 
-      val orders1 = matcherNode.orderBook(aliceWavesPair)
-      orders1.asks.head.amount shouldBe 500
-      orders1.asks.head.price shouldBe 2.waves * Order.PriceConstant
+      eventually {
+        val orders1 = matcherNode.orderBook(aliceWavesPair)
+        orders1.asks.head.amount shouldBe 500
+        orders1.asks.head.price shouldBe 2.waves * Order.PriceConstant
+      }
 
-      val aliceSecondOrder = matcherNode
-        .placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 500, 5.minutes)
+      val aliceSecondOrder = matcherNode.placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 500, 5.minutes)
       aliceSecondOrder.status shouldBe "OrderAccepted"
 
-      val orders2 = matcherNode.orderBook(aliceWavesPair)
-      orders2.asks.head.amount shouldBe 1000
-      orders2.asks.head.price shouldBe 2.waves * Order.PriceConstant
+      eventually {
+        val orders2 = matcherNode.orderBook(aliceWavesPair)
+        orders2.asks.head.amount shouldBe 1000
+        orders2.asks.head.price shouldBe 2.waves * Order.PriceConstant
+      }
 
       val cancel = matcherNode.cancelOrder(aliceNode, aliceWavesPair, firstOrder)
       cancel.status should be("OrderCanceled")
 
-      val orders3 = matcherNode.orderBook(aliceWavesPair)
-      orders3.asks.head.amount shouldBe 500
+      eventually {
+        val orders3 = matcherNode.orderBook(aliceWavesPair)
+        orders3.asks.head.amount shouldBe 500
+      }
 
       matcherNode.orderStatus(firstOrder, aliceWavesPair).status should be("Cancelled")
       matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
