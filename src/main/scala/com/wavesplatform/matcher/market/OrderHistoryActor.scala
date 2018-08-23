@@ -18,16 +18,13 @@ import scorex.account.Address
 import scorex.transaction.AssetAcc
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.utils.{NTP, ScorexLogging}
+import scorex.utils.NTP
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxPool, val wallet: Wallet)
-    extends Actor
-    with OrderValidator
-    with ScorexLogging {
+class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxPool, val wallet: Wallet) extends Actor with OrderValidator {
 
   val orderHistory = new OrderHistory(db, settings)
 
@@ -59,13 +56,10 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
         processExpirableRequest(req)
       }
     case ev: OrderAdded =>
-      log.info(s"$ev")
       addedTimer.measure(orderHistory.orderAccepted(ev))
     case ev: OrderExecuted =>
-      log.info(s"$ev")
       executedTimer.measure(orderHistory.orderExecuted(ev))
     case ev: OrderCanceled =>
-      log.info(s"$ev")
       cancelledTimer.measure(orderHistory.orderCanceled(ev))
     case RecoverFromOrderBook(ob) =>
       recoverFromOrderBook(ob)

@@ -93,14 +93,6 @@ class SeveralPartialOrdersTestSuite
       matcherNode.reservedBalance(aliceNode) shouldBe empty
     }
 
-    /*
-    val price           = 238
-    val buyOrderAmount  = 425532L
-    val sellOrderAmount = 840340L
-
-    840340 + 300000 - 420169 - 420169
-     */
-
     "place one submitted orders and two counter" in {
       val aliceOrder1   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, price, buyOrderAmount)
       val aliceOrder1Id = matcherNode.placeOrder(aliceOrder1).message.id

@@ -130,12 +130,11 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
     saveOrder(rw, lo.order)
 
     val updated = saveOrderInfo(rw, event)
-    val opDiff  = diff(updated)
-    println(s"executed:\n${opDiff.mkString("\n")}")
+    val opDiff  = diff(event, updated)
     saveOpenVolume(rw, opDiff)
 
     val accepted = updated(lo.order.id())
-    if (accepted.isNew) {
+    if (accepted.origInfo.isEmpty) {
       // for OrderAdded events, updatedInfo contains just one element
       val o         = accepted.order
       val k         = MatcherKeys.addressOrdersSeqNr(o.senderPublicKey)
@@ -151,12 +150,11 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
     saveOrder(rw, event.submitted.order)
 
     val updated = saveOrderInfo(rw, event)
-    val opDiff  = diff(updated)
-    println(s"executed:\n${opDiff.mkString("\n")}")
+    val opDiff  = diff(event, updated)
     saveOpenVolume(rw, opDiff)
 
     val submitted = updated(event.submitted.order.id())
-    if (submitted.isNew) {
+    if (submitted.origInfo.isEmpty) {
       import event.submitted.{order => submittedOrder}
       val k         = MatcherKeys.addressOrdersSeqNr(submittedOrder.senderPublicKey)
       val nextSeqNr = rw.get(k) + 1
@@ -168,12 +166,9 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
     }
   }
 
-  /**
-    * @note It is expected, that this event is for stored order
-    */
   def orderCanceled(event: OrderCanceled): Unit = db.readWrite { rw =>
-    val opDiff = diff(saveOrderInfo(rw, event))
-    println(s"canceled:\n${opDiff.mkString("\n")}")
+    val updated = saveOrderInfo(rw, event)
+    val opDiff  = diff(event, updated)
     saveOpenVolume(rw, opDiff)
   }
 
@@ -196,9 +191,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
 object OrderHistory {
   import OrderInfo.orderStatusOrdering
 
-  case class OrderInfoChange(order: Order, origInfo: Option[OrderInfo], updatedInfo: OrderInfo) {
-    def isNew: Boolean = origInfo.isEmpty
-  }
+  case class OrderInfoChange(order: Order, origInfo: Option[OrderInfo], updatedInfo: OrderInfo)
 
   object OrderHistoryOrdering extends Ordering[(ByteStr, OrderInfo, Option[Order])] {
     def orderBy(oh: (ByteStr, OrderInfo, Option[Order])): (OrderStatus, Long) = (oh._2.status, -oh._3.map(_.timestamp).getOrElse(0L))
@@ -214,28 +207,20 @@ object OrderHistory {
                                    executedFee: Option[Long] = None,
                                    lastSpend: Option[Long] = None)
 
-  def diff(changes: Map[ByteStr, OrderHistory.OrderInfoChange]): Map[Address, OpenPortfolio] = {
-    var r = Map.empty[Address, OpenPortfolio]
-    changes.values
-      .foreach { change =>
-        val portfolioChanges =
-          if (change.updatedInfo.canceled) diffCancel(change)
-          else if (change.isNew) {
-            if (change.updatedInfo.status.isFinal) Map.empty[Address, OpenPortfolio]
-            else diffAccepted(change)
-          } else diffExecuted(change)
-
-        portfolioChanges.foreach {
-          case (address, portfolioChange) =>
-            val origPortfolio = r.getOrElse(address, OpenPortfolio.empty)
-            r = r.updated(address, Monoid.combine(origPortfolio, portfolioChange))
-        }
+  def diff(event: Event, changes: Map[ByteStr, OrderInfoChange]): Map[Address, OpenPortfolio] = {
+    import alleycats.std.iterable._
+    changes.values.foldMap { change =>
+      event match {
+        case _: OrderCanceled => diffCancel(change)
+        case _ =>
+          if (change.origInfo.isEmpty) diffAccepted(change)
+          else diffExecuted(change)
       }
-    r
+    }
   }
 
   private def diffAccepted(change: OrderInfoChange): Map[Address, OpenPortfolio] = {
-    import change._
+    import change.{order, updatedInfo}
     val lo             = LimitOrder(order)
     val maxSpendAmount = lo.getRawSpendAmount
     val remainingSpend = maxSpendAmount - updatedInfo.totalSpend(lo)
