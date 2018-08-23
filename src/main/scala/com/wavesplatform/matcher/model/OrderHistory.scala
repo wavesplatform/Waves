@@ -208,14 +208,14 @@ object OrderHistory {
                                    lastSpend: Option[Long] = None)
 
   def diff(event: Event, changes: Map[ByteStr, OrderInfoChange]): Map[Address, OpenPortfolio] = {
-    import alleycats.std.iterable._
-    changes.values.foldMap { change =>
-      event match {
-        case _: OrderCanceled => diffCancel(change)
-        case _ =>
-          if (change.origInfo.isEmpty) diffAccepted(change)
-          else diffExecuted(change)
-      }
+    changes.values.foldLeft(Map.empty[Address, OpenPortfolio]) {
+      case (r, change) =>
+        Monoid.combine(r, event match {
+          case _: OrderCanceled => diffCancel(change)
+          case _ =>
+            if (change.origInfo.isEmpty) diffAccepted(change)
+            else diffExecuted(change)
+        })
     }
   }
 
