@@ -145,22 +145,13 @@ class MatcherActor(orderHistory: ActorRef,
       )
   }
 
-  def checkOrder(order: Order)(f: => Unit): Unit = {
-    val pair = order.assetPair
-    val md   = tradedPairs(pair)
-    if (order.price % md.zeros == 0) {
-      f
-    } else {
-      sender() ! OrderRejected(s"Invalid price. Last ${md.decs} digits should be zero")
-    }
-  }
-
-  def createAndForward(order: Order): Unit = {
-    val pair      = order.assetPair
-    val orderBook = createOrderBook(pair)
-    persistAsync(OrderBookCreated(pair)) { _ =>
-      forwardReq(order)(orderBook)
-    }
+  def getOrderBook(pair: AssetPair)(f: ActorRef => Unit): Unit = {
+    orderBook(pair).fold({
+      val newOrderBook = createOrderBook(pair)
+      persistAsync(OrderBookCreated(pair)) { _ =>
+        f(newOrderBook)
+      }
+    })(f)
   }
 
   def returnEmptyOrderBook(pair: AssetPair): Unit = {
@@ -169,7 +160,7 @@ class MatcherActor(orderHistory: ActorRef,
 
   def forwardReq(req: Any)(orderBook: ActorRef): Unit = orderBook forward req
 
-  def checkAssetPair(assetPair: AssetPair, msg: Any)(f: => Unit): Unit =
+  def checkAssetPair(assetPair: AssetPair)(f: => Unit): Unit =
     pairBuilder.validateAssetPair(assetPair) match {
       case Right(_) => f
       case Left(e) =>
@@ -191,7 +182,7 @@ class MatcherActor(orderHistory: ActorRef,
 
     case req: GetMarketStatusRequest =>
       val snd = sender()
-      checkAssetPair(req.assetPair, req) {
+      checkAssetPair(req.assetPair) {
         context
           .child(OrderBookActor.name(req.assetPair))
           .fold {
@@ -204,25 +195,31 @@ class MatcherActor(orderHistory: ActorRef,
       }
 
     case order: Order =>
-      checkOrder(order) {
-        checkAssetPair(order.assetPair, order) {
-          checkBlacklistedAddress(order.senderPublicKey) {
-            checkOrderScript(order) {
-              orderBook(order.assetPair).fold(createAndForward(order))(forwardReq(order))
-            }
+      val pair = order.assetPair
+      checkAssetPair(pair) {
+        checkBlacklistedAddress(order.senderPublicKey) {
+          checkOrderScript(order) {
+            getOrderBook(pair)({ a =>
+              val md = tradedPairs(pair)
+              if (order.price % md.zeros == 0) {
+                forwardReq(order)(a)
+              } else {
+                sender() ! OrderRejected(s"Invalid price. Last ${md.decs} digits should be zero")
+              }
+            })
           }
         }
       }
 
     case ob: DeleteOrderBookRequest =>
-      checkAssetPair(ob.assetPair, ob) {
+      checkAssetPair(ob.assetPair) {
         orderBook(ob.assetPair)
           .fold(returnEmptyOrderBook(ob.assetPair))(forwardReq(ob))
         removeOrderBook(ob.assetPair)
       }
 
     case x: CancelOrder =>
-      checkAssetPair(x.assetPair, x) {
+      checkAssetPair(x.assetPair) {
         context
           .child(OrderBookActor.name(x.assetPair))
           .fold {
@@ -231,7 +228,7 @@ class MatcherActor(orderHistory: ActorRef,
       }
 
     case x: ForceCancelOrder =>
-      checkAssetPair(x.assetPair, x) {
+      checkAssetPair(x.assetPair) {
         orderBook(x.assetPair)
           .fold {
             sender() ! OrderCancelRejected(s"Order '${x.orderId}' is already cancelled or never existed in '${x.assetPair.key}' pair")
