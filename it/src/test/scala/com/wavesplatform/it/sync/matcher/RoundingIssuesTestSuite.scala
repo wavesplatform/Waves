@@ -36,7 +36,7 @@ class RoundingIssuesTestSuite
 
   private def bobNode = nodes(2)
 
-  matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
+  Seq(IssueUsdTx, IssueEthTx, IssueBtcTx).map(createSignedIssueRequest).foreach(matcherNode.signedIssue)
   nodes.waitForHeightArise()
 
   "should correctly fill an order with small amount" in {
@@ -49,8 +49,9 @@ class RoundingIssuesTestSuite
     val submitted   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, 235, 425532L)
     val submittedId = matcherNode.placeOrder(submitted).message.id
 
-    matcherNode.waitOrderStatusAndAmount(wavesUsdPair, submittedId, "Filled", Some(420169L), 1.minute)
-    matcherNode.waitOrderStatusAndAmount(wavesUsdPair, counterId, "PartiallyFilled", Some(420169L), 1.minute)
+    val filledAmount = 420169L
+    matcherNode.waitOrderStatusAndAmount(wavesUsdPair, submittedId, "Filled", Some(filledAmount), 1.minute)
+    matcherNode.waitOrderStatusAndAmount(wavesUsdPair, counterId, "PartiallyFilled", Some(filledAmount), 1.minute)
 
     matcherNode.cancelOrder(aliceNode, wavesUsdPair, counterId)
     val tx = matcherNode.transactionsByOrder(counterId).head
@@ -58,8 +59,8 @@ class RoundingIssuesTestSuite
     matcherNode.waitForTransaction(tx.id)
     val rawExchangeTx = matcherNode.rawTransactionInfo(tx.id)
 
-    (rawExchangeTx \ "price").as[Long] shouldBe 238L
-    (rawExchangeTx \ "amount").as[Long] shouldBe 420169L
+    (rawExchangeTx \ "price").as[Long] shouldBe counter.price
+    (rawExchangeTx \ "amount").as[Long] shouldBe filledAmount
     (rawExchangeTx \ "buyMatcherFee").as[Long] shouldBe 40L
     (rawExchangeTx \ "sellMatcherFee").as[Long] shouldBe 296219L
 
@@ -68,6 +69,27 @@ class RoundingIssuesTestSuite
 
     (aliceBalanceAfter - aliceBalanceBefore) shouldBe (-40L + 420169L)
     (bobBalanceAfter - bobBalanceBefore) shouldBe (-296219L - 420169L)
+  }
+
+  "reserved balance should not be negative" in {
+    val counter   = matcherNode.prepareOrder(aliceNode, ethBtcPair, OrderType.BUY, 31887L, 923431000L)
+    val counterId = matcherNode.placeOrder(counter).message.id
+
+    val submitted   = matcherNode.prepareOrder(bobNode, ethBtcPair, OrderType.SELL, 31887L, 223345000L)
+    val submittedId = matcherNode.placeOrder(submitted).message.id
+
+    val filledAmount = 223344937L
+    matcherNode.waitOrderStatusAndAmount(ethBtcPair, submittedId, "Filled", Some(filledAmount), 1.minute)
+    matcherNode.waitOrderStatusAndAmount(ethBtcPair, counterId, "PartiallyFilled", Some(filledAmount), 1.minute)
+
+    withClue("Bob's reserved balance before cancel")(matcherNode.reservedBalance(bobNode) shouldBe empty)
+
+    matcherNode.cancelOrder(aliceNode, ethBtcPair, counterId)
+    val tx = matcherNode.transactionsByOrder(counterId).head
+
+    matcherNode.waitForTransaction(tx.id)
+
+    withClue("Alice's reserved balance after cancel")(matcherNode.reservedBalance(aliceNode) shouldBe empty)
   }
 
 }
@@ -98,6 +120,9 @@ object RoundingIssuesTestSuite {
   private val aliceSeed = _Configs(1).getString("account-seed")
   private val alicePk   = PrivateKeyAccount.fromSeed(aliceSeed).right.get
 
+  private val bobSeed = _Configs(2).getString("account-seed")
+  private val bobPk   = PrivateKeyAccount.fromSeed(bobSeed).right.get
+
   val IssueUsdTx: IssueTransactionV1 = IssueTransactionV1
     .selfSigned(
       sender = alicePk,
@@ -114,14 +139,51 @@ object RoundingIssuesTestSuite {
 
   val UsdId: AssetId = IssueUsdTx.id()
 
+  val IssueEthTx: IssueTransactionV1 = IssueTransactionV1
+    .selfSigned(
+      sender = bobPk,
+      name = "ETH-X".getBytes(),
+      description = "asset description".getBytes(),
+      quantity = defaultAssetQuantity,
+      decimals = 8,
+      reissuable = false,
+      fee = 1.waves,
+      timestamp = System.currentTimeMillis()
+    )
+    .right
+    .get
+
+  val EthId: AssetId = IssueEthTx.id()
+
+  val IssueBtcTx: IssueTransactionV1 = IssueTransactionV1
+    .selfSigned(
+      sender = alicePk,
+      name = "BTC-X".getBytes(),
+      description = "asset description".getBytes(),
+      quantity = defaultAssetQuantity,
+      decimals = 8,
+      reissuable = false,
+      fee = 1.waves,
+      timestamp = System.currentTimeMillis()
+    )
+    .right
+    .get
+
+  val BtcId: AssetId = IssueBtcTx.id()
+
   val wavesUsdPair = AssetPair(
     amountAsset = None,
     priceAsset = Some(UsdId)
   )
 
+  val ethBtcPair = AssetPair(
+    amountAsset = Some(EthId),
+    priceAsset = Some(BtcId)
+  )
+
   private val updatedMatcherConfig = parseString(s"""
                                                     |waves.matcher {
-                                                    |  price-assets = [ "$UsdId", "WAVES"]
+                                                    |  price-assets = ["$UsdId", "$BtcId", "WAVES"]
                                                     |}
      """.stripMargin)
 
