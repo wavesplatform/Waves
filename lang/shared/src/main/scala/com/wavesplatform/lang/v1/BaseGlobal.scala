@@ -6,6 +6,7 @@ package com.wavesplatform.lang.v1
   */
 trait BaseGlobal {
   val MaxBase58Bytes = 64
+  val MaxBase58String = 100
   val MaxLiteralLength = 12 * 1024
   val MaxAddressLength = 36
 

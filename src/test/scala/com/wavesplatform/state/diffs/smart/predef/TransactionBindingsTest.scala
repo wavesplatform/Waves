@@ -60,7 +60,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |      }
            |    let attachment = t.attachment == base58'${ByteStr(t.attachment).base58}'
            |   ${assertProvenPart("t")} && amount && feeAssetId && assetId && recipient && attachment
-           | case other => throw
+           | case other => throw()
            | }
            |""".stripMargin,
         t,
@@ -85,7 +85,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                    .map(_.bytes().base64)
                    .getOrElse("")}' else isDefined(t.script) == false
                  |   ${assertProvenPart("t")} && quantity && decimals && reissuable && script && name && description
-                 | case other => throw
+                 | case other => throw()
                  | }
                  |""".stripMargin
 
@@ -108,7 +108,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           |   let quantity = t.quantity == ${t.quantity}
           |   let assetId = t.assetId == base58'${t.assetId.base58}'
           |   ${assertProvenPart("t")} && quantity && assetId
-          | case other => throw
+          | case other => throw()
           | }
           |""".stripMargin,
         t,
@@ -129,7 +129,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           |   let assetId = t.assetId == base58'${t.assetId.base58}'
           |   let reissuable = t.reissuable == ${t.reissuable}
           |   ${assertProvenPart("t")} && quantity && assetId && reissuable
-          | case other => throw
+          | case other => throw()
           | }
           |""".stripMargin,
         t,
@@ -148,7 +148,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           |   ${provenPart(t)}
           |   let alias = t.alias == ${Json.toJson(t.alias.name)}
           |   ${assertProvenPart("t")} && alias
-          | case other => throw
+          | case other => throw()
           | }
           |""".stripMargin,
         t,
@@ -171,7 +171,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           |       case a: Alias => a.alias == ${Json.toJson(t.recipient.cast[Alias].map(_.name).getOrElse(""))}
           |      }
           |   ${assertProvenPart("t")} && amount && recipient
-          | case other => throw
+          | case other => throw()
           | }
           |""".stripMargin,
         t,
@@ -190,7 +190,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           |   ${provenPart(t)}
           |   let leaseId = t.leaseId == base58'${t.leaseId.base58}'
           |   ${assertProvenPart("t")} && leaseId
-          | case other => throw
+          | case other => throw()
           | }
           |""".stripMargin,
         t,
@@ -211,7 +211,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           |   let minSponsoredAssetFee = if (${t.minSponsoredAssetFee.isDefined}) then extract(t.minSponsoredAssetFee) == ${t.minSponsoredAssetFee
              .getOrElse(0)} else isDefined(t.minSponsoredAssetFee) == false
           |   ${assertProvenPart("t")} && assetId && minSponsoredAssetFee
-          | case other => throw
+          | case other => throw()
           | }
           |""".stripMargin,
         t,
@@ -232,7 +232,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
              .map(_.bytes().base64)
              .getOrElse("")}' else isDefined(t.script) == false
            |   ${assertProvenPart("t")} && script
-           | case other => throw
+           | case other => throw()
            | }
            |""".stripMargin,
         t,
@@ -266,7 +266,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                  |   ${provenPart(t)}
                  |   ${t.data.indices.map(pg).mkString("\n")}
                  |   $resString
-                 | case other => throw
+                 | case other => throw()
                  | }
                  |""".stripMargin
 
@@ -311,7 +311,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                       |     ${t.transfers.indices.map(pg).mkString("\n")}
                       |   ${provenPart(t)}
                       |   $resString && assetId && transferCount && totalAmount && attachment
-                      | case other => throw
+                      | case other => throw()
                       | }
                       |""".stripMargin
 
@@ -382,7 +382,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                 |   ${pg(t.buyOrder)._1}
                 |   ${pg(t.sellOrder)._1}
                 |   ${assertProvenPart("t")} && price && amount && buyMatcherFee && sellMatcherFee && ${pg(t.buyOrder)._2} && ${pg(t.sellOrder)._2}
-                | case other => throw
+                | case other => throw()
                 | }
                 |""".stripMargin
 

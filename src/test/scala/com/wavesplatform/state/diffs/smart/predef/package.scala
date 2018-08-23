@@ -101,14 +101,33 @@ package object predef {
        |     case _ => false
        | }
        | let entries = match tx {
-       |   case d: DataTransaction => true || true
-       |   case d: TransferTransaction =>
+       |   case d: DataTransaction =>
+       |     let int = extract(getInteger(d.data, "${tx.data(0).key}"))
+       |     let bool = extract(getBoolean(d.data, "${tx.data(1).key}"))
+       |     let blob = extract(getBinary(d.data, "${tx.data(2).key}"))
+       |     let str = extract(getString(d.data, "${tx.data(3).key}"))
+       |     let dataByKey = toString(int) == "${tx.data(0).value}" || toString(bool) == "${tx.data(1).value}" ||
+       |                     size(blob) > 0 || str == "${tx.data(3).value}"
+       |
+       |     let d0 = extract(getInteger(d.data, 0))
+       |     let d1 = extract(getBoolean(d.data, 1))
+       |     let d2 = getBinary(d.data, 2)
+       |     let d3 = getString(d.data, 3)
+       |     let dataByIndex = toBytes(d0) == base64'abcdef' || toBytes(d1) == base64'ghijkl' ||
+       |                       isDefined(d2) || toBytes(extract(d3)) == base64'mnopqr'
+       |
+       |     dataByKey && dataByIndex
+       |
+       |   case t: TransferTransaction =>
        |     let add = Address(base58'${t.recipient.bytes.base58}')
        |     let long = extract(getInteger(add,"${tx.data(0).key}")) == ${tx.data(0).value}
        |     let bool = extract(getBoolean(add,"${tx.data(1).key}")) == ${tx.data(1).value}
        |     let bin = extract(getBinary(add,"${tx.data(2).key}")) ==  base58'${tx.data(2).value}'
        |     let str = extract(getString(add,"${tx.data(3).key}")) == "${tx.data(3).value}"
        |     long && bool && bin && str
+       |
+       |   case a: CreateAliasTransaction => throw("oh no")
+       |   case b: BurnTransaction => throw()
        |   case _ => false
        | }
        |
