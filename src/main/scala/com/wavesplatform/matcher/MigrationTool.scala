@@ -94,8 +94,9 @@ object MigrationTool extends ScorexLogging {
           case Some(order) =>
             calculatedReservedBalances.compute(
               order.sender, { (_, prevBalances) =>
+                val lo             = LimitOrder(order)
                 val spendId        = order.getSpendAssetId
-                val spendRemaining = order.getSpendAmount(order.price, orderInfo.remaining).explicitGet()
+                val spendRemaining = lo.getRawSpendAmount - orderInfo.totalSpend(lo)
                 val remainingFee   = order.matcherFee - LimitOrder.getPartialFee(order.matcherFee, order.amount, orderInfo.filled)
 
                 if (remainingFee != orderInfo.remainingFee) {
