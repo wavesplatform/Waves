@@ -1,19 +1,18 @@
 package com.wavesplatform.state.diffs
 
 import cats.implicits._
+import com.wavesplatform.account.Address
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, ByteStr, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.account.Address
-import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.transaction.ValidationError.AccountBalanceError
+import com.wavesplatform.utils.ScorexLogging
 
 import scala.util.{Left, Right}
 
 object BalanceDiffValidation extends ScorexLogging with Instrumented {
 
   def apply(b: Blockchain, currentHeight: Int, fs: FunctionalitySettings)(d: Diff): Either[AccountBalanceError, Diff] = {
-
     val changedAccounts = d.portfolios.keySet
 
     val positiveBalanceErrors: Map[Address, String] = changedAccounts

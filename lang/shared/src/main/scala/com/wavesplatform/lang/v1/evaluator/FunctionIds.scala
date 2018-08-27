@@ -4,6 +4,7 @@ object FunctionIds {
 
   val EQ: Short           = 0
   val ISINSTANCEOF: Short = 1
+  val THROW: Short        = 2
 
   val SUM_LONG: Short = 100
   val SUB_LONG: Short = 101
@@ -26,6 +27,11 @@ object FunctionIds {
 
   val SIZE_LIST: Short = 400
   val GET_LIST: Short  = 401
+  val LONG_TO_BYTES: Short = 410
+  val STRING_TO_BYTES: Short = 411
+  val BOOLEAN_TO_BYTES: Short = 412
+  val LONG_TO_STRING: Short = 420
+  val BOOLEAN_TO_STRING: Short = 421
 
   // Crypto
   val SIGVERIFY: Short = 500
@@ -42,10 +48,17 @@ object FunctionIds {
   val GETTRANSACTIONBYID: Short    = 1000
   val TRANSACTIONHEIGHTBYID: Short = 1001
   val ACCOUNTASSETBALANCE: Short   = 1003
-  val DATA_LONG: Short             = 1050
-  val DATA_BOOLEAN: Short          = 1051
-  val DATA_BYTES: Short            = 1052
-  val DATA_STRING: Short           = 1053
+
+  val DATA_LONG_FROM_ARRAY: Short = 1040
+  val DATA_BOOLEAN_FROM_ARRAY: Short = 1041
+  val DATA_BYTES_FROM_ARRAY: Short = 1042
+  val DATA_STRING_FROM_ARRAY: Short = 1043
+
+  val DATA_LONG_FROM_STATE: Short             = 1050
+  val DATA_BOOLEAN_FROM_STATE: Short          = 1051
+  val DATA_BYTES_FROM_STATE: Short            = 1052
+  val DATA_STRING_FROM_STATE: Short           = 1053
+
   val ADDRESSFROMRECIPIENT: Short  = 1060
 
 }

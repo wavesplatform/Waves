@@ -148,7 +148,7 @@ object CommonValidation {
     case tx: DataTransaction =>
       val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts, height)) tx.bodyBytes() else tx.bytes()
       Right(1 + (base.length - 1) / 1024)
-    case _: SetScriptTransaction  => Right(1)
+    case _: SetScriptTransaction  => Right(10)
     case _: SponsorFeeTransaction => Right(1000)
     case _                        => Left(UnsupportedTransactionType)
   }

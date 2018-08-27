@@ -53,7 +53,7 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
                     |      let isRecipientAgreed = if(isDefined(recipientAgreement)) then extract(recipientAgreement) else false
                     |      let senderAddress = addressFromPublicKey(ttx.senderPublicKey)
                     |      senderAddress.bytes == company.bytes || (isNotary1Agreed && isRecipientAgreed)
-                    |   case other => throw
+                    |   case other => throw()
                     | }
         """.stripMargin
 
@@ -129,9 +129,8 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
   }
 
   property("addressFromString() returns None when address is too long") {
-    import Global.MaxAddressLength
-    val longAddress = "A" * (MaxAddressLength + 1)
-    eval[Any](s"""addressFromString("$longAddress")""") shouldBe Right(())
+    val longAddress = "A" * (Global.MaxBase58String + 1)
+    eval[Any](s"""addressFromString("$longAddress")""") shouldBe Left("base58Decode input exceeds 100")
   }
 
   property("Scenario") {
