@@ -5,7 +5,7 @@ import java.util.concurrent.Executors
 import cats.implicits.showInterpolator
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.generator.Preconditions.{CreateAccountP, IssueP, LeaseP, PAction, PGenSettings, UniverseHolder}
+import com.wavesplatform.generator.Preconditions.PGenSettings
 import com.wavesplatform.generator.cli.ScoptImplicits
 import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.generator.utils.Universe
