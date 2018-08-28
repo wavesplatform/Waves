@@ -37,7 +37,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
     case None =>
       val executedAmount = diff.addExecutedAmount.getOrElse(0L)
       val remainingFee   = order.matcherFee - diff.executedFee.getOrElse(0L)
-      val canceled       = if (curr.isEmpty) diff.systemCancel else diff.cancelledByUser
+      val canceled       = if (curr.isEmpty) diff.cancelledByUser.map(!_) else diff.cancelledByUser
 
       OrderInfo(
         amount = order.amount,
@@ -96,7 +96,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
       val canceled = !unmatchable
       // Hack to get the right status
       val newMinAmount = if (canceled) None else Some(lo.order.amount)
-      Seq((lo.order, OrderInfoDiff(cancelledByUser = Some(canceled), newMinAmount = newMinAmount, systemCancel = Some(unmatchable))))
+      Seq((lo.order, OrderInfoDiff(cancelledByUser = Some(canceled), newMinAmount = newMinAmount)))
   }
 
   def openVolume(address: Address, assetId: Option[AssetId]): Long =
@@ -224,8 +224,7 @@ object OrderHistory {
                                    cancelledByUser: Option[Boolean] = None,
                                    newMinAmount: Option[Long] = None,
                                    executedFee: Option[Long] = None,
-                                   lastSpend: Option[Long] = None,
-                                   systemCancel: Option[Boolean] = None)
+                                   lastSpend: Option[Long] = None)
 
   def diff(event: Event, changes: Map[ByteStr, OrderInfoChange]): Map[Address, OpenPortfolio] = {
     println(s"doing diff for $event")
