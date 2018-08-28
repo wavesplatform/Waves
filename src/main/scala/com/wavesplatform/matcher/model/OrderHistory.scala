@@ -227,7 +227,6 @@ object OrderHistory {
                                    lastSpend: Option[Long] = None)
 
   def diff(event: Event, changes: Map[ByteStr, OrderInfoChange]): Map[Address, OpenPortfolio] = {
-    println(s"doing diff for $event")
     changes.values.foldLeft(Map.empty[Address, OpenPortfolio]) {
       case (r, change) =>
         Monoid.combine(

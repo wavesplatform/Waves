@@ -245,9 +245,7 @@ class TradeBalanceAndRoundingTestSuite
     matcherNode.waitOrderStatus(wavesUsdPair, aliceOrderId, "Cancelled", 1.minute)
 
     withClue("Alice's reserved balance:") {
-      matcherNode.reservedBalance(aliceNode).foreach {
-        case (assetId, b) => withClue(assetId)(b should be >= 0L)
-      }
+      matcherNode.reservedBalance(aliceNode) shouldBe empty
     }
 
     val aliceOrders = matcherNode.ordersByAddress(aliceNode.address, activeOnly = false, 1.minute)
