@@ -101,8 +101,7 @@ object MigrationTool extends ScorexLogging {
                   prevBalances.updated(spendId, prevBalances.getOrElse(spendId, 0L) + spendRemaining)
                 }
 
-                // Fee correction
-                if (order.getReceiveAssetId.isEmpty) r else r.updated(None, r.getOrElse(None, 0L) + orderInfo.remainingFee)
+                r.updated(None, r.getOrElse(None, 0L) + orderInfo.remainingFee)
               }
             )
         }
