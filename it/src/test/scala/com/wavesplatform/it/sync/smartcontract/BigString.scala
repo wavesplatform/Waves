@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, transferAmount}
@@ -10,7 +9,7 @@ import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV2, LeaseTransactionV2}
+import com.wavesplatform.transaction.lease.{LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.utils.dummyCompilerContext
@@ -81,7 +80,8 @@ class BigString extends BaseTransactionSuite with CancelAfterFailure {
     val signedLeasing =
       unsignedLeasing.copy(proofs = Proofs(Seq(sigLeasingA, ByteStr.empty, sigLeasingC)))
 
-    assertBadRequest(sender.signedBroadcast(signedLeasing.json() + ("type" -> JsNumber(LeaseTransactionV2.typeId.toInt))).id)
+    assertBadRequestAndMessage(sender.signedBroadcast(signedLeasing.json() + ("type" -> JsNumber(LeaseTransactionV2.typeId.toInt))).id,
+                               "String is too large")
 
     val leasingId = Base58.encode(unsignedLeasing.id().arr)
 
