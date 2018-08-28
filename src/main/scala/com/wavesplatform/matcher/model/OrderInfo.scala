@@ -17,7 +17,7 @@ case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: O
     * @return
     */
   def totalSpend(orig: LimitOrder): Long =
-    unsafeTotalSpend.getOrElse(orig.getRawSpendAmount - orig.partial(filled, orig.order.matcherFee - remainingFee).getSpendAmount)
+    unsafeTotalSpend.getOrElse(orig.partial(filled, orig.order.matcherFee - remainingFee).getSpendAmount)
 
   def status: LimitOrder.OrderStatus = {
     if (amount == 0) LimitOrder.NotFound
