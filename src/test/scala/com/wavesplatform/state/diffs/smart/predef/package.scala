@@ -8,7 +8,6 @@ import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
 import com.wavesplatform.utils.dummyCompilerContext
-import fastparse.core.Parsed.Success
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -16,7 +15,7 @@ package object predef {
   val networkByte: Byte = 'u'
 
   def runScript[T](script: String, tx: Transaction = null, networkByte: Byte = networkByte): Either[String, T] = {
-    val Success(expr, _) = Parser(script)
+    val expr = Parser(script).explicitGet()
     for {
       compileResult <- CompilerV1(dummyCompilerContext, expr)
       (typedExpr, tpe) = compileResult

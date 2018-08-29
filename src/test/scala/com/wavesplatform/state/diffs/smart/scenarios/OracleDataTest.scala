@@ -54,7 +54,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
                                    |   long && bool && bin && str
                                    |}""".stripMargin
       setScript <- {
-        val untypedAllFieldsRequiredScript = Parser(allFieldsRequiredScript).get.value
+        val untypedAllFieldsRequiredScript = Parser(allFieldsRequiredScript).explicitGet()
         val typedAllFieldsRequiredScript = CompilerV1(dummyCompilerContext, untypedAllFieldsRequiredScript).explicitGet()._1
         selfSignedSetScriptTransactionGenP(master, ScriptV1(typedAllFieldsRequiredScript).explicitGet())
       }

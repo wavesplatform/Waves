@@ -41,7 +41,7 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
          |}
          |
       """.stripMargin
-    val untyped = Parser(script).get.value
+    val untyped = Parser(script).explicitGet()
     CompilerV1(dummyCompilerContext, untyped).explicitGet()._1
   }
 

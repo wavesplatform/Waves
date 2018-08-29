@@ -3,7 +3,8 @@ package com.wavesplatform.lang.v1.parser
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.UnaryOperation._
-import fastparse.{WhitespaceApi, core}
+import fastparse.WhitespaceApi
+import fastparse.core.Parsed.{Failure, Success}
 import scodec.bits.ByteVector
 
 object Parser {
@@ -19,14 +20,14 @@ object Parser {
   import White._
   import fastparse.noApi._
 
-  val keywords               = Set("let", "base58", "base64", "true", "false", "if", "then", "else", "match", "case")
-  val lowerChar      = CharIn('a' to 'z')
-  val upperChar      = CharIn('A' to 'Z')
-  val char           = lowerChar | upperChar
-  val digit          = CharIn('0' to '9')
-  val unicodeSymbolP = P("\\u" ~/ Pass ~~ (char | digit).repX(min = 0, max = 4))
-  val notEndOfString = CharPred(_ != '\"')
-  val specialSymbols = P("\\" ~~ AnyChar)
+  val keywords         = Set("let", "base58", "base64", "true", "false", "if", "then", "else", "match", "case")
+  val lowerChar        = CharIn('a' to 'z')
+  val upperChar        = CharIn('A' to 'Z')
+  val char             = lowerChar | upperChar
+  val digit            = CharIn('0' to '9')
+  val unicodeSymbolP   = P("\\u" ~/ Pass ~~ (char | digit).repX(min = 0, max = 4))
+  val notEndOfString   = CharPred(_ != '\"')
+  val specialSymbols   = P("\\" ~~ AnyChar)
   val comment: P[Unit] = P("#" ~~ CharPred(_ != '\n').repX).rep.map(_ => ())
 
   val escapedUnicodeSymbolP: P[(Int, String, Int)] = P(Index ~~ (NoCut(unicodeSymbolP) | specialSymbols).! ~~ Index)
@@ -59,13 +60,13 @@ object Parser {
           } else if (x.startsWith("\\")) {
             if (x.length == 2) {
               consumedString.append(x(1) match {
-                case 'b' => "\b"
-                case 'f' => "\f"
-                case 'n' => "\n"
-                case 'r' => "\r"
-                case 't' => "\t"
+                case 'b'  => "\b"
+                case 'f'  => "\f"
+                case 'n'  => "\n"
+                case 'r'  => "\r"
+                case 't'  => "\t"
                 case '\\' => "\\"
-                case '"' => "\""
+                case '"'  => "\""
                 case _ =>
                   errors :+= s"""unknown escaped symbol: '$x'. The valid are \b, \f, \n, \r, \t"""
                   x
@@ -154,9 +155,9 @@ object Parser {
 
   val functionCallArgs: P[Seq[EXPR]] = comment ~ baseExpr.rep(sep = comment ~ "," ~ comment) ~ comment
 
-  val maybeFunctionCallP: P[EXPR] =  (Index ~~ refP ~~ P("(" ~/ functionCallArgs ~ ")").? ~~ Index).map {
+  val maybeFunctionCallP: P[EXPR] = (Index ~~ refP ~~ P("(" ~/ functionCallArgs ~ ")").? ~~ Index).map {
     case (start, REF(_, functionName), Some(args), accessEnd) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
-    case (_, id, None, _) => id
+    case (_, id, None, _)                                     => id
   }
 
   val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | maybeFunctionCallP)
@@ -208,7 +209,7 @@ object Parser {
 
   val accessP: P[(Int, Accessor, Int)] = P(
     ("" ~ comment ~ Index ~ "." ~/ comment ~ anyVarName.map(Getter) ~~ Index) |
-    (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
+      (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
   )
 
   val maybeAccessP: P[EXPR] =
@@ -218,13 +219,11 @@ object Parser {
           accessors.foldLeft(obj) {
             case (e, (accessStart, a, accessEnd)) =>
               a match {
-                case Getter(n) => GETTER(Pos(start, accessEnd), e, n)
+                case Getter(n)        => GETTER(Pos(start, accessEnd), e, n)
                 case ListIndex(index) => FUNCTION_CALL(Pos(start, accessEnd), PART.VALID(Pos(accessStart, accessEnd), "getElement"), List(e, index))
               }
           }
       }
-
-
 
   val byteVectorP: P[EXPR] =
     P(Index ~~ "base" ~~ ("58" | "64").! ~~ "'" ~/ Pass ~~ CharPred(_ != '\'').repX.! ~~ "'" ~~ Index)
@@ -305,5 +304,10 @@ object Parser {
       } | acc
   }
 
-  def apply(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ (baseExpr | invalid) ~ End).parse(str)
+  def apply(str: String): Either[String, EXPR] =
+    P(Start ~ (baseExpr | invalid) ~ End).parse(str) match {
+      case Success(expr, _)        => Right(expr)
+      case fail @ Failure(_, _, _) => Left(fail.msg)
+    }
+
 }
