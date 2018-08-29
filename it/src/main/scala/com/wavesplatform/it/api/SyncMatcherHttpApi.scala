@@ -1,5 +1,6 @@
 package com.wavesplatform.it.api
 
+import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -66,9 +67,15 @@ object SyncMatcherHttpApi extends Assertions {
       Await.result(async(m).waitOrderStatusAndAmount(assetPair, orderId, expectedStatus, expectedFilledAmount), waitTime)
 
     def reservedBalance(sender: Node, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
+      reservedBalance(sender.privateKey, waitTime)
+
+    def reservedBalance(sender: PrivateKeyAccount, waitTime: Duration): Map[String, Long] =
       Await.result(async(m).reservedBalance(sender), waitTime)
 
     def tradableBalance(sender: Node, assetPair: AssetPair, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
+      tradableBalance(sender.privateKey, assetPair, waitTime)
+
+    def tradableBalance(sender: PrivateKeyAccount, assetPair: AssetPair, waitTime: Duration): Map[String, Long] =
       Await.result(async(m).tradableBalance(sender, assetPair), waitTime)
 
     def tradingMarkets(waitTime: Duration = OrderRequestAwaitTime): MarketDataInfo =
@@ -85,6 +92,13 @@ object SyncMatcherHttpApi extends Assertions {
                     orderId: Option[String],
                     timestamp: Option[Long] = None,
                     waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+      cancelOrder(sender.privateKey, assetPair, orderId, timestamp, waitTime)
+
+    def cancelOrder(sender: PrivateKeyAccount,
+                    assetPair: AssetPair,
+                    orderId: Option[String],
+                    timestamp: Option[Long],
+                    waitTime: Duration): MatcherStatusResponse =
       Await.result(async(m).cancelOrder(sender, assetPair, orderId, timestamp), waitTime)
 
     def cancelAllOrders(sender: Node, timestamp: Option[Long] = None, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
@@ -130,7 +144,10 @@ object SyncMatcherHttpApi extends Assertions {
     }
 
     def ordersByAddress(sender: Node, activeOnly: Boolean, waitTime: Duration = RequestAwaitTime): Seq[OrderbookHistory] =
-      Await.result(async(m).ordersByAddress(sender, activeOnly), waitTime)
+      ordersByAddress(sender.address, activeOnly, waitTime)
+
+    def ordersByAddress(senderAddress: String, activeOnly: Boolean, waitTime: Duration): Seq[OrderbookHistory] =
+      Await.result(async(m).ordersByAddress(senderAddress, activeOnly), waitTime)
   }
 
 }

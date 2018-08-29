@@ -447,6 +447,20 @@ class OrderHistorySpecification
     activeOrderIds(pk, Set(pair.amountAsset)) shouldBe Seq(submitted.id())
   }
 
+  property("Submitted order Canceled during match") {
+    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
+
+    val pair      = AssetPair(None, mkAssetId("USD"))
+    val counter   = buy(pair, 0.1, 10000000L, matcherFee = Some(300000L))
+    val submitted = sell(pair, 10, 100000L, Some(pk), Some(300000L))
+
+    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
+    oh.orderCanceled(OrderCanceled(LimitOrder(submitted), unmatchable = true))
+
+    oh.openVolume(pk, pair.amountAsset) should be >= 0L
+    oh.openVolume(pk, pair.priceAsset) should be >= 0L
+  }
+
   property("Cancel buy order") {
     val ord1 = buy(pair, 0.0008, 100000000, matcherFee = Some(300000L))
 

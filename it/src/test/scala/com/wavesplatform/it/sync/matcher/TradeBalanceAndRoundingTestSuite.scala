@@ -40,8 +40,7 @@ class TradeBalanceAndRoundingTestSuite
 
   private def bobNode = nodes(2)
 
-  matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
-  matcherNode.signedIssue(createSignedIssueRequest(IssueWctTx))
+  Seq(IssueUsdTx, IssueWctTx).map(createSignedIssueRequest).foreach(matcherNode.signedIssue)
   nodes.waitForHeightArise()
 
   "Alice and Bob trade WAVES-USD" - {
@@ -178,7 +177,6 @@ class TradeBalanceAndRoundingTestSuite
     val wctUsdPrice      = 12739213
 
     "place wct-usd order" in {
-
       val aliceUsdBalance = aliceNode.assetBalance(aliceNode.address, UsdId.base58).balance
       val bobUsdBalance   = bobNode.assetBalance(bobNode.address, UsdId.base58).balance
 
@@ -214,7 +212,7 @@ class TradeBalanceAndRoundingTestSuite
     markets.priceAssetInfo shouldBe Some(AssetDecimalsInfo(Decimals))
   }
 
-  "Alice and Bob trade WCT-WAVES on not enoght fee when place order" - {
+  "Alice and Bob trade WCT-WAVES on not enough fee when place order" - {
     val wctWavesSellAmount = 2
     val wctWavesPrice      = 11234560000000L
 
@@ -234,6 +232,29 @@ class TradeBalanceAndRoundingTestSuite
 
       bobNode.cancelLease(bobNode.address, leaseTxId, leasingFee)
     }
+  }
+
+  "Submitted order Canceled during match" in {
+    val bobOrder   = matcherNode.prepareOrder(matcherNode, wavesUsdPair, OrderType.SELL, 10L, 10000000L)
+    val bobOrderId = matcherNode.placeOrder(bobOrder).message.id
+    matcherNode.waitOrderStatus(wavesUsdPair, bobOrderId, "Accepted", 1.minute)
+
+    val aliceOrder   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, 1000L, 100000L)
+    val aliceOrderId = matcherNode.placeOrder(aliceOrder).message.id
+
+    matcherNode.waitOrderStatus(wavesUsdPair, aliceOrderId, "Cancelled", 1.minute)
+
+    withClue("Alice's reserved balance:") {
+      matcherNode.reservedBalance(aliceNode) shouldBe empty
+    }
+
+    val aliceOrders = matcherNode.ordersByAddress(aliceNode.address, activeOnly = false, 1.minute)
+    aliceOrders should not be empty
+
+    val order = aliceOrders.find(_.id == aliceOrderId).getOrElse(throw new IllegalStateException(s"Alice should have the $aliceOrderId order"))
+    order.status shouldBe "Cancelled"
+
+    matcherNode.cancelOrder(matcherNode, wavesUsdPair, Some(bobOrderId))
   }
 
   def correctAmount(a: Long, price: Long): Long = {
@@ -308,7 +329,7 @@ object TradeBalanceAndRoundingTestSuite {
     .get
 
   val UsdId: AssetId = IssueUsdTx.id()
-  val WctId          = IssueWctTx.id()
+  val WctId: AssetId = IssueWctTx.id()
 
   val wctUsdPair = AssetPair(
     amountAsset = Some(WctId),
@@ -327,7 +348,7 @@ object TradeBalanceAndRoundingTestSuite {
 
   private val updatedMatcherConfig = parseString(s"""
                                                     |waves.matcher {
-                                                    |  price-assets = [ "$UsdId", "WAVES"]
+                                                    |  price-assets = ["$UsdId", "WAVES"]
                                                     |}
      """.stripMargin)
 

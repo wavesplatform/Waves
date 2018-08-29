@@ -380,7 +380,7 @@ class OrderBookActor(assetPair: AssetPair,
 
       case event @ OrderExecuted(o, c) =>
         (for {
-          tx <- createTransaction(o, c)
+          tx <- createTransaction(event)
           _  <- utx.putIfNew(tx)
         } yield tx) match {
           case Right(tx) if tx.isInstanceOf[ExchangeTransaction] =>
@@ -406,7 +406,9 @@ class OrderBookActor(assetPair: AssetPair,
                 )
             )
           case Left(ex) =>
-            log.info(s"Can't create tx: $ex\no1: ${Json.prettyPrint(o.order.json())}\no2: ${Json.prettyPrint(c.order.json())}")
+            log.info(s"""Can't create tx: $ex
+                 |o1: (amount=${o.amount}, fee=${o.fee}): ${Json.prettyPrint(o.order.json())}
+                 |o2: (amount=${c.amount}, fee=${c.fee}): ${Json.prettyPrint(c.order.json())}""".stripMargin)
             (processInvalidTransaction(event, ex), None)
         }
 
