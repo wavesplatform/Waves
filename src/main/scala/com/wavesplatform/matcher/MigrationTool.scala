@@ -11,7 +11,7 @@ import com.wavesplatform.crypto.DigestSize
 import com.wavesplatform.database.DBExt
 import com.wavesplatform.db.openDB
 import com.wavesplatform.matcher.api.DBUtils
-import com.wavesplatform.matcher.model.{LimitOrder, OrderInfo}
+import com.wavesplatform.matcher.model.LimitOrder
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.{ByteStr, EitherExt2}
 import com.wavesplatform.transaction.AssetId
@@ -77,7 +77,6 @@ object MigrationTool extends ScorexLogging {
     log.info("Recalculating reserved balances")
     val calculatedReservedBalances = new JHashMap[Address, Map[Option[AssetId], Long]]()
     val ordersToDelete             = Seq.newBuilder[ByteStr]
-    val orderInfoToUpdate          = Seq.newBuilder[(ByteStr, OrderInfo)]
     val key                        = MatcherKeys.orderInfo(ByteStr(Array.emptyByteArray))
 
     var discrepancyCounter = 0
@@ -94,20 +93,15 @@ object MigrationTool extends ScorexLogging {
           case Some(order) =>
             calculatedReservedBalances.compute(
               order.sender, { (_, prevBalances) =>
+                val lo             = LimitOrder(order)
                 val spendId        = order.getSpendAssetId
-                val spendRemaining = order.getSpendAmount(order.price, orderInfo.remaining).explicitGet()
-                val remainingFee   = order.matcherFee - LimitOrder.getPartialFee(order.matcherFee, order.amount, orderInfo.filled)
-
-                if (remainingFee != orderInfo.remainingFee) {
-                  orderInfoToUpdate += orderId -> orderInfo.copy(remainingFee = remainingFee)
-                }
+                val spendRemaining = lo.getRawSpendAmount - orderInfo.totalSpend(lo)
 
                 val r = Option(prevBalances).fold(Map(spendId -> spendRemaining)) { prevBalances =>
                   prevBalances.updated(spendId, prevBalances.getOrElse(spendId, 0L) + spendRemaining)
                 }
 
-                // Fee correction
-                if (order.getReceiveAssetId.isEmpty) r else r.updated(None, r.getOrElse(None, 0L) + remainingFee)
+                r.updated(None, r.getOrElse(None, 0L) + orderInfo.remainingFee)
               }
             )
         }
@@ -166,17 +160,6 @@ object MigrationTool extends ScorexLogging {
 
       for (((address, assetId), value) <- corrections.result()) {
         rw.put(MatcherKeys.openVolume(address, assetId), Some(value))
-      }
-    }
-
-    val allUpdatedOrderInfo = orderInfoToUpdate.result()
-    if (allUpdatedOrderInfo.nonEmpty) {
-      log.info(s"Writing ${allUpdatedOrderInfo.size} updated order info values")
-
-      db.readWrite { rw =>
-        for ((id, oi) <- allUpdatedOrderInfo) {
-          rw.put(MatcherKeys.orderInfo(id), oi)
-        }
       }
     }
 

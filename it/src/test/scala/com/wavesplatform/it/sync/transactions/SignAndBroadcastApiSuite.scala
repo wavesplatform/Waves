@@ -1,19 +1,18 @@
 package com.wavesplatform.it.sync.transactions
 
+import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.api.http.assets.SignedTransferV1Request
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.{issueFee, someAssetAmount}
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
+import com.wavesplatform.utils.{Base58, NTP}
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json._
-import com.wavesplatform.account.PublicKeyAccount
-import com.wavesplatform.api.http.assets.SignedTransferV1Request
-import com.wavesplatform.utils.{Base58, NTP}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import com.wavesplatform.it.sync._
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 
 import scala.util.Random
 
@@ -22,7 +21,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
     val txId = sender.transfer(firstAddress, secondAddress, 1.waves, fee = 1.waves).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
-    val jsv1               = Json.parse((sender.get(s"/transactions/info/$txId")).getResponseBody)
+    val jsv1               = Json.parse(sender.get(s"/transactions/info/$txId").getResponseBody)
     val hasPositiveHeight1 = (jsv1 \ "height").asOpt[Int].map(_ > 0)
     assert(hasPositiveHeight1.getOrElse(false))
 
@@ -179,7 +178,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
     for (v <- supportedVersions) {
       val isProof = Option(v).nonEmpty
       val rnd     = Random.alphanumeric.take(9).mkString.toLowerCase
-      signBroadcastAndCalcFee(Json.obj("type" -> 10, "sender" -> firstAddress, "alias" -> s"myalias${rnd}"), usesProofs = isProof, version = v)
+      signBroadcastAndCalcFee(Json.obj("type" -> 10, "sender" -> firstAddress, "alias" -> s"myalias$rnd"), usesProofs = isProof, version = v)
     }
   }
 
@@ -191,7 +190,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
         "sender"  -> firstAddress,
         "data" -> List(
           IntegerDataEntry("int", 923275292849183L),
-          BooleanDataEntry("bool", true),
+          BooleanDataEntry("bool", value = true),
           BinaryDataEntry("blob", ByteStr(Array.tabulate(445)(_.toByte))),
           StringDataEntry("str", "AAA-AAA")
         )

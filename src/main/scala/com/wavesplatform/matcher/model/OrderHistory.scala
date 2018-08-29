@@ -11,7 +11,7 @@ import com.wavesplatform.matcher.{MatcherKeys, MatcherSettings, OrderAssets}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange.Order
 import kamon.Kamon
 import org.iq80.leveldb.DB
 
@@ -29,7 +29,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
       OrderInfo(
         amount = order.amount,
         filled = x.filled + diff.addExecutedAmount.getOrElse(0L),
-        canceled = diff.nowCanceled.getOrElse(x.canceled),
+        canceled = diff.cancelledByUser.getOrElse(x.canceled),
         minAmount = diff.newMinAmount.orElse(x.minAmount),
         remainingFee = x.remainingFee - diff.executedFee.getOrElse(0L),
         unsafeTotalSpend = Some(OrderInfo.safeSum(x.totalSpend(LimitOrder(order)), diff.lastSpend.getOrElse(0L)))
@@ -37,10 +37,12 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
     case None =>
       val executedAmount = diff.addExecutedAmount.getOrElse(0L)
       val remainingFee   = order.matcherFee - diff.executedFee.getOrElse(0L)
+      val canceled       = if (curr.isEmpty) diff.cancelledByUser.map(!_) else diff.cancelledByUser
+
       OrderInfo(
         amount = order.amount,
         filled = executedAmount,
-        canceled = diff.nowCanceled.getOrElse(false),
+        canceled = canceled.getOrElse(false),
         minAmount = diff.newMinAmount,
         remainingFee = remainingFee,
         unsafeTotalSpend = diff.lastSpend.orElse(Some(0L))
@@ -53,9 +55,10 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
 
       val updatedInfo = orderInfoDiffs.map {
         case (order, orderInfoDiff) =>
-          val orderId = order.id()
-          val orig    = DBUtils.orderInfoOpt(rw, orderId)
-          val change  = OrderInfoChange(order, orig, combine(order, orig, orderInfoDiff))
+          val orderId  = order.id()
+          val orig     = DBUtils.orderInfoOpt(rw, orderId)
+          val combined = combine(order, orig, orderInfoDiff)
+          val change   = OrderInfoChange(order, orig, combined)
           rw.put(MatcherKeys.orderInfo(orderId), change.updatedInfo)
           orderId -> change
       }
@@ -90,7 +93,10 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
 
     case OrderCanceled(lo, unmatchable) =>
       // The order should not have Cancelled status, if it was cancelled by unmatchable amounts
-      Seq((lo.order, OrderInfoDiff(nowCanceled = Some(!unmatchable))))
+      val canceled = !unmatchable
+      // Hack to get the right status
+      val newMinAmount = if (canceled) None else Some(lo.order.amount)
+      Seq((lo.order, OrderInfoDiff(cancelledByUser = Some(canceled), newMinAmount = newMinAmount)))
   }
 
   def openVolume(address: Address, assetId: Option[AssetId]): Long =
@@ -140,9 +146,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
       val k         = MatcherKeys.addressOrdersSeqNr(o.senderPublicKey)
       val nextSeqNr = rw.get(k) + 1
       rw.put(k, nextSeqNr)
-
-      val spendAssetId = if (o.orderType == OrderType.BUY) o.assetPair.priceAsset else o.assetPair.amountAsset
-      rw.put(MatcherKeys.addressOrders(o.senderPublicKey, nextSeqNr), Some(OrderAssets(o.id(), spendAssetId)))
+      rw.put(MatcherKeys.addressOrders(o.senderPublicKey, nextSeqNr), Some(OrderAssets(o.id(), lo.spentAsset)))
     }
   }
 
@@ -170,6 +174,21 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
     val updated = saveOrderInfo(rw, event)
     val opDiff  = diff(event, updated)
     saveOpenVolume(rw, opDiff)
+
+    val canceledOrder = event.limitOrder.order
+    val canceled      = updated(canceledOrder.id())
+    // When the submitted order can't be matched, it cancelled immediately
+    if (canceled.origInfo.isEmpty) {
+      saveOrder(rw, canceledOrder)
+      val owner     = canceledOrder.senderPublicKey.toAddress
+      val k         = MatcherKeys.addressOrdersSeqNr(owner)
+      val nextSeqNr = rw.get(k) + 1
+      rw.put(k, nextSeqNr)
+      rw.put(
+        MatcherKeys.addressOrders(owner, nextSeqNr),
+        Some(OrderAssets(canceledOrder.id(), event.limitOrder.spentAsset))
+      )
+    }
   }
 
   def orderInfo(id: ByteStr): OrderInfo = DBUtils.orderInfo(db, id)
@@ -202,7 +221,7 @@ object OrderHistory {
   }
 
   private case class OrderInfoDiff(addExecutedAmount: Option[Long] = None,
-                                   nowCanceled: Option[Boolean] = None,
+                                   cancelledByUser: Option[Boolean] = None,
                                    newMinAmount: Option[Long] = None,
                                    executedFee: Option[Long] = None,
                                    lastSpend: Option[Long] = None)
@@ -210,12 +229,13 @@ object OrderHistory {
   def diff(event: Event, changes: Map[ByteStr, OrderInfoChange]): Map[Address, OpenPortfolio] = {
     changes.values.foldLeft(Map.empty[Address, OpenPortfolio]) {
       case (r, change) =>
-        Monoid.combine(r, event match {
-          case _: OrderCanceled => diffCancel(change)
-          case _ =>
-            if (change.origInfo.isEmpty) diffAccepted(change)
-            else diffExecuted(change)
-        })
+        Monoid.combine(
+          r,
+          event match {
+            case _: OrderCanceled => if (change.origInfo.isEmpty) Map.empty else diffCancel(change)
+            case _                => if (change.origInfo.isEmpty) diffAccepted(change) else diffExecuted(change)
+          }
+        )
     }
   }
 

@@ -4,6 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.api.http.assets.SignedIssueV1Request
 import com.wavesplatform.it.ReportingTestName
+import com.wavesplatform.it.api.LevelResponse
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
@@ -90,6 +91,26 @@ class RoundingIssuesTestSuite
     matcherNode.waitForTransaction(tx.id)
 
     withClue("Alice's reserved balance after cancel")(matcherNode.reservedBalance(aliceNode) shouldBe empty)
+  }
+
+  "should correctly fill 2 counter orders" in {
+    val counter1 = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, 60L, 98333333L)
+    matcherNode.placeOrder(counter1).message.id
+
+    val counter2   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, 70L, 100000000L)
+    val counter2Id = matcherNode.placeOrder(counter2).message.id
+
+    val submitted   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, 1000L, 100000000L)
+    val submittedId = matcherNode.placeOrder(submitted).message.id
+
+    matcherNode.waitOrderStatusAndAmount(wavesUsdPair, counter2Id, "PartiallyFilled", Some(2857143L), 1.minute)
+    matcherNode.waitOrderStatusAndAmount(wavesUsdPair, submittedId, "Filled", Some(99523810L), 1.minute)
+
+    withClue("orderBook check") {
+      val ob = matcherNode.orderBook(wavesUsdPair)
+      ob.bids shouldBe empty
+      ob.asks shouldBe List(LevelResponse(70L, 97142857L)) // = 100000000 - 2857143
+    }
   }
 
 }
