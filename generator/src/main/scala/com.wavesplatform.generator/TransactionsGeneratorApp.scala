@@ -115,10 +115,16 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         },
       )
   }
-  val config = ConfigFactory.load()
 
-  val preconditions = config.as[PGenSettings]("preconditions")(Preconditions.preconditionsReader)
-  val defaultConfig = config.as[GeneratorSettings]("generator")
+  val preconditions =
+    ConfigFactory
+      .load("preconditions.conf")
+      .as[PGenSettings]("preconditions")(Preconditions.preconditionsReader)
+
+  val defaultConfig =
+    ConfigFactory
+      .load()
+      .as[GeneratorSettings]("generator")
 
   parser.parse(args, defaultConfig) match {
     case None => parser.failure("Failed to parse command line parameters")
