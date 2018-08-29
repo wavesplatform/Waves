@@ -301,7 +301,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
         val transferBobId = aliceNode.transfer(aliceNode.address, bobNode.address, transferAmount, TransactionFee, None, None).id
         nodes.waitForHeightAriseAndTxPresent(transferBobId)
-
       }
 
     }

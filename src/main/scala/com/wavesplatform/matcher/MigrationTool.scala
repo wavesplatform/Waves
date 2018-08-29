@@ -96,12 +96,13 @@ object MigrationTool extends ScorexLogging {
                 val lo             = LimitOrder(order)
                 val spendId        = order.getSpendAssetId
                 val spendRemaining = lo.getRawSpendAmount - orderInfo.totalSpend(lo)
+                val remainingFee   = releaseFee(lo, orderInfo.remainingFee, 0)
 
                 val r = Option(prevBalances).fold(Map(spendId -> spendRemaining)) { prevBalances =>
                   prevBalances.updated(spendId, prevBalances.getOrElse(spendId, 0L) + spendRemaining)
                 }
 
-                r.updated(None, r.getOrElse(None, 0L) + orderInfo.remainingFee)
+                r.updated(None, r.getOrElse(None, 0L) + remainingFee)
               }
             )
         }
@@ -225,5 +226,21 @@ object MigrationTool extends ScorexLogging {
     val AddressPortfolio      = SK("portfolios", addr)
     val Transactions          = SK("transactions", byteStr)
     val OrdersToTxIds         = SK("ord-to-tx-ids", byteStr)
+  }
+
+  /**
+    * @return How much reserved fee we should return during this update
+    */
+  private def releaseFee(totalReceiveAmount: Long, matcherFee: Long, prevRemaining: Long, updatedRemaining: Long): Long = {
+    val executedBefore = matcherFee - prevRemaining
+    val restReserved   = math.max(matcherFee - totalReceiveAmount - executedBefore, 0L)
+
+    val executed = prevRemaining - updatedRemaining
+    math.min(executed, restReserved)
+  }
+
+  private def releaseFee(lo: LimitOrder, prevRemaining: Long, updatedRemaining: Long): Long = {
+    if (lo.rcvAsset == lo.feeAsset) releaseFee(lo.getReceiveAmount, lo.order.matcherFee, prevRemaining, updatedRemaining)
+    else prevRemaining - updatedRemaining
   }
 }
