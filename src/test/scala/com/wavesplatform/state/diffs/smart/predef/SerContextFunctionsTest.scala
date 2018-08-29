@@ -48,7 +48,7 @@ class SerContextFunctionsTest extends PropSpec with PropertyChecks with Matchers
       .right
       .get
 
-    val untypedScript  = Parser(scriptWithAllFunctions(dtx, ttx)).get.value.head
+    val untypedScript  = Parser(scriptWithAllFunctions(dtx, ttx)).get.value
     val compiledScript = CompilerV1(dummyCompilerContext, untypedScript).explicitGet()._1
     val bytes = Array[Byte](4, 0, 0, 0, 7, 108, 111, 110, 103, 65, 108, 108, 3, 3, 3, 3, 9, 0, 0, 0, 0, 0, 0, 2, 9, 0, 0, 104, 0, 0, 0, 2, 0, 0, 0, 0,
       0, 0, 0, 3, -24, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 7, -48, 9, 0, 0, 0, 0, 0, 0, 2, 9, 0, 0, 105, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0,

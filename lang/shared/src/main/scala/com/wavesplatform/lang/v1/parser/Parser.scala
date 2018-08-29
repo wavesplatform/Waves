@@ -305,12 +305,5 @@ object Parser {
       } | acc
   }
 
-  val statements: P[Seq[EXPR]] = (baseExpr | invalid).rep(min = 1).map { xs =>
-    xs.foldLeft(Vector.empty[EXPR]) {
-      case (init :+ INVALID(p1, _), INVALID(p2, _)) => init :+ INVALID(Pos(p1.start, p2.end), "can't parse the expression")
-      case (init, x)                                          => init :+ x
-    }
-  }
-
-  def apply(str: String): core.Parsed[Seq[EXPR], Char, String] = P(Start ~ statements ~ End).parse(str)
+  def apply(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ (baseExpr | invalid) ~ End).parse(str)
 }

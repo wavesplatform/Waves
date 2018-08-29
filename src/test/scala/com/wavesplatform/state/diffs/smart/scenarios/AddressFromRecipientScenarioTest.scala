@@ -45,8 +45,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
         |  case other => throw()
         |  }
         |  """.stripMargin)
-    assert(expr.size == 1)
-    val Right((typedExpr, _)) = CompilerV1(com.wavesplatform.utils.dummyCompilerContext, expr.head)
+    val Right((typedExpr, _)) = CompilerV1(com.wavesplatform.utils.dummyCompilerContext, expr)
     EvaluatorV1[CaseObj](context, typedExpr)._2
   }
 
