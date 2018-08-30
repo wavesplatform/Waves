@@ -108,7 +108,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   private def eval[T](code: String, pointInstance: Option[CaseObj] = None, pointType: FINAL = AorBorC): Either[String, T] = {
-    val untyped = Parser(code).explicitGet()
+    val untyped = Parser(code).get.value
     val lazyVal                                      = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, (FINAL, LazyVal)] = Map(("p", (pointType, lazyVal)))
     val ctx: CTX =

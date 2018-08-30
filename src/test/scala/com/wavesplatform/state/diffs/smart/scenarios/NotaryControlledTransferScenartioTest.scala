@@ -57,7 +57,7 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
                     | }
         """.stripMargin
 
-      untypedScript = Parser(assetScript).explicitGet()
+      untypedScript = Parser(assetScript).get.value
 
       typedScript = ScriptV1(CompilerV1(dummyCompilerContext, untypedScript).explicitGet()._1).explicitGet()
 
@@ -108,7 +108,7 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
        transferFromAToB)
 
   private def eval[T](code: String) = {
-    val untyped = Parser(code).explicitGet()
+    val untyped = Parser(code).get.value
     val typed = CompilerV1(dummyCompilerContext, untyped).map(_._1)
     typed.flatMap(EvaluatorV1[T](dummyEvaluationContext, _)._2)
   }

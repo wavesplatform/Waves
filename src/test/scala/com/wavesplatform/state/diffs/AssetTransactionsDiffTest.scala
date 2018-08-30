@@ -1,23 +1,24 @@
 package com.wavesplatform.state.diffs
 
 import cats._
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
+import com.wavesplatform.utils.dummyCompilerContext
+import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import fastparse.core.Parsed
+import org.scalacheck.{Arbitrary, Gen}
+import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
+import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.dummyCompilerContext
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
-import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.prop.PropertyChecks
-import org.scalatest.{Matchers, PropSpec}
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
@@ -216,7 +217,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   }
 
   private def createScript(code: String) = {
-    val expr = Parser(code).explicitGet()
+    val Parsed.Success(expr, _) = Parser(code).get
     ScriptV1(CompilerV1(dummyCompilerContext, expr).explicitGet()._1).explicitGet()
   }
 

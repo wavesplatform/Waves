@@ -6,7 +6,9 @@ import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
+import fastparse.core.Parsed.{Failure, Success}
 import org.scalacheck.Gen
+import org.scalatest.exceptions.TestFailedException
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
@@ -14,7 +16,28 @@ import scorex.crypto.encode.{Base58 => ScorexBase58}
 
 class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
-  private def parse(x: String): EXPR = Parser(x).explicitGet()
+  private def parse(x: String): EXPR = Parser(x) match {
+    case Success(r, _)            => r
+    case e: Failure[Char, String] => catchParseError(x, e)
+  }
+
+  private def catchParseError(x: String, e: Failure[Char, String]): Nothing = {
+    import e.{index => i}
+    println(s"val code1 = new String(Array[Byte](${x.getBytes.mkString(",")}))")
+    println(s"""val code2 = "${escapedCode(x)}"""")
+    println(s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${e.extra.traced.fullStack
+      .mkString("\n")}")
+    throw new TestFailedException("Test failed", 0)
+  }
+
+  private def escapedCode(s: String): String =
+    s.flatMap {
+      case '"'  => "\\\""
+      case '\n' => "\\n"
+      case '\r' => "\\r"
+      case '\t' => "\\t"
+      case x    => x.toChar.toString
+    }.mkString
 
   private def cleanOffsets(l: LET): LET =
     l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value), types = l.types.map(cleanOffsets(_)))
@@ -454,7 +477,9 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("array accessor") {
-    parse("x[0]") shouldBe FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "getElement"), List(REF(AnyPos, PART.VALID(AnyPos, "x")), CONST_LONG(AnyPos, 0)))
+    parse("x[0]") shouldBe FUNCTION_CALL(AnyPos,
+                                            PART.VALID(AnyPos, "getElement"),
+                                            List(REF(AnyPos, PART.VALID(AnyPos, "x")), CONST_LONG(AnyPos, 0)))
   }
 
   property("multiple array accessors") {
@@ -1180,25 +1205,25 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
   property("operations priority") {
     parse("a-b+c") shouldBe BINARY_OP(AnyPos,
-                                      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), SUB_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
-                                      SUM_OP,
-                                      REF(AnyPos, PART.VALID(AnyPos, "c")))
+                                         BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), SUB_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
+                                         SUM_OP,
+                                         REF(AnyPos, PART.VALID(AnyPos, "c")))
     parse("a+b-c") shouldBe BINARY_OP(AnyPos,
-                                      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), SUM_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
-                                      SUB_OP,
-                                      REF(AnyPos, PART.VALID(AnyPos, "c")))
+                                         BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), SUM_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
+                                         SUB_OP,
+                                         REF(AnyPos, PART.VALID(AnyPos, "c")))
     parse("a+b*c") shouldBe BINARY_OP(AnyPos,
-                                      REF(AnyPos, PART.VALID(AnyPos, "a")),
-                                      SUM_OP,
-                                      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "b")), MUL_OP, REF(AnyPos, PART.VALID(AnyPos, "c"))))
+                                         REF(AnyPos, PART.VALID(AnyPos, "a")),
+                                         SUM_OP,
+                                         BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "b")), MUL_OP, REF(AnyPos, PART.VALID(AnyPos, "c"))))
     parse("a*b-c") shouldBe BINARY_OP(AnyPos,
-                                      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), MUL_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
-                                      SUB_OP,
-                                      REF(AnyPos, PART.VALID(AnyPos, "c")))
+                                         BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), MUL_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
+                                         SUB_OP,
+                                         REF(AnyPos, PART.VALID(AnyPos, "c")))
     parse("a/b*c") shouldBe BINARY_OP(AnyPos,
-                                      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), DIV_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
-                                      MUL_OP,
-                                      REF(AnyPos, PART.VALID(AnyPos, "c")))
+                                         BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), DIV_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
+                                         MUL_OP,
+                                         REF(AnyPos, PART.VALID(AnyPos, "c")))
     parse("a<b==c>=d") shouldBe BINARY_OP(
       AnyPos,
       BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "b")), LT_OP, REF(AnyPos, PART.VALID(AnyPos, "a"))),

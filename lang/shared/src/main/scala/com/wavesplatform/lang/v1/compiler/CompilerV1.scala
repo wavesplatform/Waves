@@ -22,12 +22,15 @@ class CompilerV1(ctx: CompilerContext) extends ExprCompiler {
   override val version: V = V1
 
   override def compile(input: String, directives: List[Directive]): Either[String, version.ExprT] = {
-    Parser(input)
-      .flatMap(CompilerV1(ctx, _))
-      .flatMap {
-        case (expr, BOOLEAN) => Right(expr)
-        case _               => Left("Script should return boolean")
-      }
+    Parser(input) match {
+      case fastparse.core.Parsed.Success(xs, _) =>
+        CompilerV1(ctx, xs) match {
+          case Left(err)              => Left(err.toString)
+          case Right((expr, BOOLEAN)) => Right(expr)
+          case Right((_, _))          => Left("Script should return boolean")
+        }
+      case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
+    }
   }
 }
 
@@ -239,7 +242,8 @@ object CompilerV1 {
       }
     }
 
-    val default: Either[CompilationError, Expressions.EXPR] = Right(Expressions.FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "throw"), List.empty))
+    val default: Either[CompilationError, Expressions.EXPR] = Right(
+      Expressions.FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "throw"), List.empty))
     cases.foldRight(default) {
       case (mc, furtherEi) =>
         furtherEi match {

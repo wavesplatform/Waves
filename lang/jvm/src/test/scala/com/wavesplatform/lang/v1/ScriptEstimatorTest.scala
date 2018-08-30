@@ -36,7 +36,7 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
   }
 
   private def compile(code: String): EXPR = {
-    val untyped = Parser(code).explicitGet()
+    val untyped = Parser(code).get.value
     CompilerV1(ctx, untyped).map(_._1).explicitGet()
   }
 
