@@ -14,6 +14,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.GenesisTransaction
 import org.scalacheck.Gen
+import shapeless.Coproduct
 
 class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -97,7 +98,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                | case _ => throw()
                |}
                |""".stripMargin,
-          tx
+          Coproduct(tx)
         )
         result shouldBe Right(true)
     }
@@ -138,7 +139,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                | case _ => throw()
                |}
                |""".stripMargin,
-          tx
+          Coproduct(tx)
         )
         ok shouldBe Right(true)
 
@@ -149,7 +150,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
              | case _ => false
              |}
              |""".stripMargin,
-          tx
+          Coproduct(tx)
         )
         outOfBounds shouldBe Left(s"java.lang.IndexOutOfBoundsException: $badIndex")
     }
