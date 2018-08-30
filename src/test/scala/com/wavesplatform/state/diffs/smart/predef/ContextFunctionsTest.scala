@@ -6,13 +6,13 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState}
+import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.utils.dummyCompilerContext
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
-import com.wavesplatform.transaction.GenesisTransaction
 
 class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditionsAndPayments = for {
@@ -28,11 +28,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
     dataTransaction <- dataTransactionGenP(recipient, List(long, bool, bin, str))
     transfer        <- transferGeneratorP(ts, master, recipient.toAddress, 100000000L)
 
-    untypedScript = {
-      val r = Parser(scriptWithAllFunctions(dataTransaction, transfer)).get.value
-      assert(r.size == 1)
-      r.head
-    }
+    untypedScript = Parser(scriptWithAllFunctions(dataTransaction, transfer)).get.value
 
     typedScript = {
       val compilerScript = CompilerV1(dummyCompilerContext, untypedScript).explicitGet()._1

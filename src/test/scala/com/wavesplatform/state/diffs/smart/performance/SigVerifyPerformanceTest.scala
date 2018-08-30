@@ -1,22 +1,22 @@
 package com.wavesplatform.state.diffs.smart.performance
 
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state._
-import com.wavesplatform.utils._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
+import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
-import com.wavesplatform.transaction.transfer._
 
 class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
@@ -53,8 +53,7 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
   ignore("parallel native signature verification vs sequential scripted signature verification") {
     val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)"
     val untypedScript = Parser(textScript).get.value
-    assert(untypedScript.size == 1)
-    val typedScript = CompilerV1(dummyCompilerContext, untypedScript.head).explicitGet()._1
+    val typedScript   = CompilerV1(dummyCompilerContext, untypedScript).explicitGet()._1
 
     forAll(differentTransfers(typedScript)) {
       case (gen, setScript, transfers, scriptTransfers) =>
