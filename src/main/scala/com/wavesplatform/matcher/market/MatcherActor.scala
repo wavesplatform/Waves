@@ -124,10 +124,19 @@ class MatcherActor(orderHistory: ActorRef,
       sender() ! GetMarketsResponse(getMatcherPublicKey, tradedPairs.values.toSeq)
 
     case order: Order =>
-      checkAssetPair(order.assetPair, order) {
-        checkBlacklistedAddress(order.senderPublicKey) {
-          orderBook(order.assetPair).fold(createAndForward(order))(forwardReq(order))
+      try {
+        if (blockchain.hasScript(order.senderPublicKey)) {
+          sender() ! StatusCodeMatcherResponse(StatusCodes.Forbidden, s"Trading on scripted account isn't allowed yet.")
+        } else {
+          checkAssetPair(order.assetPair, order) {
+            checkBlacklistedAddress(order.senderPublicKey) {
+              orderBook(order.assetPair).fold(createAndForward(order))(forwardReq(order))
+            }
+          }
         }
+      } catch {
+        case e: Throwable =>
+          sender() ! StatusCodeMatcherResponse(StatusCodes.InternalServerError, s"Order fail: $e")
       }
 
     case ob: DeleteOrderBookRequest =>

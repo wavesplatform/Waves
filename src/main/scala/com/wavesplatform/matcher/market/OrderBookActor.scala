@@ -32,7 +32,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class OrderBookActor(assetPair: AssetPair,
                      updateSnapshot: OrderBook => Unit,
                      val orderHistory: ActorRef,
-                     val blockchain: Blockchain,
+                     implicit val blockchain: Blockchain,
                      val wallet: Wallet,
                      val utx: UtxPool,
                      val allChannels: ChannelGroup,

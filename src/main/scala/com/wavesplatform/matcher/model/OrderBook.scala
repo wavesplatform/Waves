@@ -1,13 +1,17 @@
 package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{Blockchain, ByteStr}
 
 import scala.collection.immutable.TreeMap
 
 case class OrderBook(bids: TreeMap[Price, Level[BuyLimitOrder]], asks: TreeMap[Price, Level[SellLimitOrder]]) {
-  def bestBid: Option[BuyLimitOrder]  = bids.headOption.flatMap(_._2.headOption)
-  def bestAsk: Option[SellLimitOrder] = asks.headOption.flatMap(_._2.headOption)
+  def bestBid(implicit blockchain: Blockchain): Option[BuyLimitOrder] =
+    bids.iterator.flatMap(_._2.iterator).find(o => !blockchain.hasScript(o.order.senderPublicKey))
+  def bestAsk(implicit blockchain: Blockchain): Option[SellLimitOrder] =
+    asks.iterator.flatMap(_._2.iterator).find(o => !blockchain.hasScript(o.order.senderPublicKey))
+//  def bestBid: Option[BuyLimitOrder]  = bids.headOption.flatMap(_._2.headOption)
+//  def bestAsk: Option[SellLimitOrder] = asks.headOption.flatMap(_._2.headOption)
 
 }
 
@@ -20,7 +24,7 @@ object OrderBook {
 
   import Events._
 
-  def matchOrder(ob: OrderBook, o: LimitOrder): Event = o match {
+  def matchOrder(ob: OrderBook, o: LimitOrder)(implicit blockchain: Blockchain): Event = o match {
     case oo: BuyLimitOrder =>
       if (ob.bestAsk.exists(oo.price >= _.price)) {
         OrderExecuted(o, ob.bestAsk.get)
@@ -84,7 +88,7 @@ object OrderBook {
     case None => ob
   }
 
-  def updateState(ob: OrderBook, event: Event): OrderBook = event match {
+  def updateState(ob: OrderBook, event: Event)(implicit blockchain: Blockchain): OrderBook = event match {
     case OrderAdded(o: BuyLimitOrder) =>
       val orders = ob.bids.getOrElse(o.price, Vector.empty)
       ob.copy(bids = ob.bids + (o.price -> (orders :+ o)))
