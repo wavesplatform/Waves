@@ -31,7 +31,7 @@ class BlockchainUpdaterMicroblockBadSignaturesTest
 
   property("bad total resulting block signature") {
     assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
-    scenario(preconditionsAndPayments) {
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
       case (domain, (genesis, payment, payment2)) =>
         val block0                 = buildBlockOfTxs(randomSig, Seq(genesis))
         val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2).map(Seq(_)))
@@ -44,7 +44,7 @@ class BlockchainUpdaterMicroblockBadSignaturesTest
 
   property("bad microBlock signature") {
     assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
-    scenario(preconditionsAndPayments) {
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
       case (domain, (genesis, payment, payment2)) =>
         val block0                 = buildBlockOfTxs(randomSig, Seq(genesis))
         val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2).map(Seq(_)))
@@ -57,7 +57,7 @@ class BlockchainUpdaterMicroblockBadSignaturesTest
 
   property("other sender") {
     assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
-    scenario(preconditionsAndPayments) {
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
       case (domain, (genesis, payment, payment2)) =>
         val otherSigner = PrivateKeyAccount(TestBlock.randomOfLength(KeyLength).arr)
         val block0      = buildBlockOfTxs(randomSig, Seq(genesis))
