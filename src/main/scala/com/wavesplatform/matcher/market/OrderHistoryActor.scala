@@ -1,9 +1,9 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{Actor, Props}
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse}
+import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ExpirableOrderHistoryRequest, _}
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
@@ -101,7 +101,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
         orderHistory.deleteOrder(req.address, req.id)
         sender() ! OrderDeleted(req.id)
       case _ =>
-        sender() ! BadMatcherResponse(StatusCodes.BadRequest, "Order couldn't be deleted")
+        sender() ! StatusCodeMatcherResponse(StatusCodes.BadRequest, "Order couldn't be deleted")
     }
   }
 
@@ -148,14 +148,12 @@ object OrderHistoryActor {
   case class ForceCancelOrderFromHistory(orderId: ByteStr) extends OrderHistoryRequest
 
   case class OrderDeleted(orderId: ByteStr) extends MatcherResponse {
-    val json: JsObject            = Json.obj("status" -> "OrderDeleted", "orderId" -> orderId)
-    val code: StatusCodes.Success = StatusCodes.OK
+    override def toHttpResponse: HttpResponse = httpJsonResponse(Json.obj("status" -> "OrderDeleted", "orderId" -> orderId))
   }
 
   case class GetTradableBalance(assetPair: AssetPair, address: Address, ts: Long) extends ExpirableOrderHistoryRequest
 
   case class GetTradableBalanceResponse(balances: Map[String, Long]) extends MatcherResponse {
-    val json: JsObject   = JsObject(balances.map { case (k, v) => (k, JsNumber(v)) })
-    val code: StatusCode = StatusCodes.OK
+    override def toHttpResponse: HttpResponse = httpJsonResponse(JsObject(balances.map { case (k, v) => (k, JsNumber(v)) }))
   }
 }

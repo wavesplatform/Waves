@@ -1,11 +1,11 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{ActorRef, Cancellable, Props, Stash}
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model._
 import akka.persistence._
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.{CancelOrderRequest, MatcherResponse}
+import com.wavesplatform.matcher.api.{CancelOrderRequest, JsonSerializer, MatcherResponse}
 import com.wavesplatform.matcher.market.MatcherActor.{Shutdown, ShutdownComplete}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
@@ -122,7 +122,7 @@ class OrderBookActor(assetPair: AssetPair,
         .foreach(x => context.system.eventStream.publish(Events.OrderCanceled(x, unmatchable = false)))
       deleteMessages(lastSequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
-      sender() ! GetOrderBookResponse(pair, Seq(), Seq())
+      sender() ! GetOrderBookResponse(NTP.correctedTime(), pair, Seq(), Seq())
       context.stop(self)
 
     case DeleteSnapshotsSuccess(criteria) =>
@@ -472,7 +472,6 @@ object OrderBookActor {
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
-  val MaxDepth                 = 50
   val AlreadyCanceledCacheSize = 10000L
 
   private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit) {
@@ -497,37 +496,45 @@ object OrderBookActor {
   case object OrderCleanup
 
   case object OperationTimedOut extends MatcherResponse {
-    val json = Json.obj("status" -> "OperationTimedOut", "message" -> "Operation is timed out, please try later")
-    val code = StatusCodes.InternalServerError
+    override def toHttpResponse: HttpResponse = httpJsonResponse(
+      entity = Json.obj("status" -> "OperationTimedOut", "message" -> "Operation is timed out, please try later"),
+      status = StatusCodes.InternalServerError
+    )
   }
 
   case class OrderAccepted(order: Order) extends MatcherResponse {
-    val json: JsObject            = Json.obj("status" -> "OrderAccepted", "message" -> order.json())
-    val code: StatusCodes.Success = StatusCodes.OK
+    override def toHttpResponse: HttpResponse = httpJsonResponse(Json.obj("status" -> "OrderAccepted", "message" -> order.json()))
   }
 
   case class OrderRejected(message: String) extends MatcherResponse {
-    val json: JsObject                = Json.obj("status" -> "OrderRejected", "message" -> message)
-    val code: StatusCodes.ClientError = StatusCodes.BadRequest
+    override def toHttpResponse: HttpResponse = httpJsonResponse(
+      entity = Json.obj("status" -> "OrderRejected", "message" -> message),
+      status = StatusCodes.BadRequest
+    )
   }
 
   case class OrderCanceled(orderId: String) extends MatcherResponse {
-    val json: JsObject            = Json.obj("status" -> "OrderCanceled", "orderId" -> orderId)
-    val code: StatusCodes.Success = StatusCodes.OK
+    override def toHttpResponse: HttpResponse = httpJsonResponse(Json.obj("status" -> "OrderCanceled", "orderId" -> orderId))
   }
 
   case class OrderCancelRejected(message: String) extends MatcherResponse {
-    val json: JsObject                = Json.obj("status" -> "OrderCancelRejected", "message" -> message)
-    val code: StatusCodes.ClientError = StatusCodes.BadRequest
+    override def toHttpResponse: HttpResponse = httpJsonResponse(
+      entity = Json.obj("status" -> "OrderCancelRejected", "message" -> message),
+      status = StatusCodes.BadRequest
+    )
   }
 
-  case class GetOrderBookResponse(pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends MatcherResponse {
-    val json: JsValue             = Json.toJson(OrderBookResult(NTP.correctedTime(), pair, bids, asks))
-    val code: StatusCodes.Success = StatusCodes.OK
+  case class GetOrderBookResponse(ts: Long, pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends MatcherResponse {
+    override def toHttpResponse: HttpResponse = HttpResponse(
+      entity = HttpEntity(
+        ContentTypes.`application/json`,
+        JsonSerializer.serialize(OrderBookResult(ts, pair, bids, asks))
+      )
+    )
   }
 
   object GetOrderBookResponse {
-    def empty(pair: AssetPair): GetOrderBookResponse = GetOrderBookResponse(pair, Seq(), Seq())
+    def empty(pair: AssetPair): GetOrderBookResponse = GetOrderBookResponse(NTP.correctedTime(), pair, Seq(), Seq())
   }
 
   // Direct requests

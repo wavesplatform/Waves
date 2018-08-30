@@ -10,7 +10,7 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.pattern.gracefulStop
 import akka.stream.ActorMaterializer
 import com.wavesplatform.db._
-import com.wavesplatform.matcher.api.MatcherApiRoute
+import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderHistoryActor}
 import com.wavesplatform.matcher.model.OrderBook
 import com.wavesplatform.settings.{BlockchainSettings, RestAPISettings}
@@ -38,9 +38,17 @@ class Matcher(actorSystem: ActorSystem,
 
   private val pairBuilder    = new AssetPairBuilder(matcherSettings, blockchain)
   private val orderBookCache = new ConcurrentHashMap[AssetPair, OrderBook](1000, 0.9f, 10)
-  private val orderBooks     = new AtomicReference(Map.empty[AssetPair, ActorRef])
 
-  private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBook): Unit = orderBookCache.put(assetPair, newSnapshot)
+  private val orderBooks = new AtomicReference(Map.empty[AssetPair, ActorRef])
+  private val orderBooksSnapshotCache = new OrderBookSnapshotHttpCache(
+    matcherSettings.orderBookSnapshotHttpCache,
+    p => Option(orderBookCache.get(p))
+  )
+
+  private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBook): Unit = {
+    orderBookCache.put(assetPair, newSnapshot)
+    orderBooksSnapshotCache.invalidate(assetPair)
+  }
 
   lazy val matcherApiRoutes = Seq(
     MatcherApiRoute(
@@ -49,7 +57,7 @@ class Matcher(actorSystem: ActorSystem,
       matcher,
       orderHistory,
       p => Option(orderBooks.get()).flatMap(_.get(p)),
-      p => Option(orderBookCache.get(p)),
+      orderBooksSnapshotCache,
       txWriter,
       restAPISettings,
       matcherSettings,
@@ -85,6 +93,7 @@ class Matcher(actorSystem: ActorSystem,
 
   def shutdownMatcher(): Unit = {
     val stopMatcherTimeout = 5.minutes
+    orderBooksSnapshotCache.close()
     Await.result(gracefulStop(matcher, stopMatcherTimeout, MatcherActor.Shutdown), stopMatcherTimeout)
     db.close()
     Await.result(matcherServerBinding.unbind(), 10.seconds)

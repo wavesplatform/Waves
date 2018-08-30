@@ -1,7 +1,7 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{Actor, Props}
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.HttpResponse
 import com.wavesplatform.database.{DBExt, RW}
 import com.wavesplatform.matcher.api.MatcherResponse
 import com.wavesplatform.matcher.model.Events._
@@ -57,8 +57,7 @@ object MatcherTransactionWriter {
   case class GetTransactionsByOrder(orderId: ByteStr)
 
   case class GetTransactionsResponse(txs: Seq[ExchangeTransaction]) extends MatcherResponse {
-    val json                      = JsArray(txs.map(_.json()))
-    val code: StatusCodes.Success = StatusCodes.OK
+    override def toHttpResponse: HttpResponse = httpJsonResponse(JsArray(txs.map(_.json())))
   }
 
   private def appendTxId(rw: RW, orderId: ByteStr, txId: ByteStr): Unit = {

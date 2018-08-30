@@ -8,7 +8,6 @@ import scala.collection.immutable.TreeMap
 case class OrderBook(bids: TreeMap[Price, Level[BuyLimitOrder]], asks: TreeMap[Price, Level[SellLimitOrder]]) {
   def bestBid: Option[BuyLimitOrder]  = bids.headOption.flatMap(_._2.headOption)
   def bestAsk: Option[SellLimitOrder] = asks.headOption.flatMap(_._2.headOption)
-
 }
 
 object OrderBook {

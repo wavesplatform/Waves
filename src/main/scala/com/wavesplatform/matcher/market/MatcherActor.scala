@@ -3,10 +3,10 @@ package com.wavesplatform.matcher.market
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, Props, Terminated}
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import akka.http.scaladsl.model._
 import akka.persistence.{PersistentActor, RecoveryCompleted, _}
 import com.google.common.base.Charsets
-import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse, StatusCodeMatcherResponse}
+import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.OrderBook
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherSettings}
@@ -254,7 +254,7 @@ class MatcherActor(orderHistory: ActorRef,
       shutdownStatus = shutdownStatus.copy(orderBooksStopped = true)
       shutdownStatus.tryComplete()
 
-    case _ if shutdownStatus.initiated => sender() ! BadMatcherResponse(StatusCodes.ServiceUnavailable, "System is going shutdown")
+    case _ if shutdownStatus.initiated => sender() ! StatusCodeMatcherResponse(StatusCodes.ServiceUnavailable, "System is going shutdown")
   }
 
   override def receiveCommand: Receive = forwardToOrderBook orElse snapshotsCommands
@@ -315,25 +315,21 @@ object MatcherActor {
   case object ShutdownComplete
 
   case class GetMarketsResponse(publicKey: Array[Byte], markets: Seq[MarketData]) extends MatcherResponse {
-    def getMarketsJs: JsValue =
-      JsArray(
-        markets.map(m =>
-          Json.obj(
-            "amountAsset"     -> m.pair.amountAssetStr,
-            "amountAssetName" -> m.amountAssetName,
-            "amountAssetInfo" -> m.amountAssetInfo,
-            "priceAsset"      -> m.pair.priceAssetStr,
-            "priceAssetName"  -> m.priceAssetName,
-            "priceAssetInfo"  -> m.priceAssetinfo,
-            "created"         -> m.created
-        )))
-
-    def json: JsValue = Json.obj(
-      "matcherPublicKey" -> Base58.encode(publicKey),
-      "markets"          -> getMarketsJs
-    )
-
-    def code: StatusCode = StatusCodes.OK
+    override def toHttpResponse: HttpResponse =
+      httpJsonResponse(
+        Json.obj(
+          "matcherPublicKey" -> Base58.encode(publicKey),
+          "markets" -> JsArray(markets.map(m =>
+            Json.obj(
+              "amountAsset"     -> m.pair.amountAssetStr,
+              "amountAssetName" -> m.amountAssetName,
+              "amountAssetInfo" -> m.amountAssetInfo,
+              "priceAsset"      -> m.pair.priceAssetStr,
+              "priceAssetName"  -> m.priceAssetName,
+              "priceAssetInfo"  -> m.priceAssetinfo,
+              "created"         -> m.created
+          )))
+        ))
   }
 
   case class AssetInfo(decimals: Int)

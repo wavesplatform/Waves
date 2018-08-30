@@ -2,6 +2,7 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.matcher.MatcherSettings
+import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import org.scalatest.{FlatSpec, Matchers}
 import scorex.transaction.assets.exchange.AssetPair
 
@@ -39,6 +40,10 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    blacklisted-names: ["b"]
         |    blacklisted-addresses: ["c"]
         |    validation-timeout = 10m
+        |    order-book-snapshot-http-cache {
+        |      cache-timeout = 11m
+        |      depth-ranges = [1, 5, 333]
+        |    }
         |  }
         |}""".stripMargin))
 
@@ -66,5 +71,9 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")
     settings.validationTimeout shouldBe 10.minutes
     settings.blacklistedAddresses shouldBe Set("c")
+    settings.orderBookSnapshotHttpCache shouldBe OrderBookSnapshotHttpCache.Settings(
+      cacheTimeout = 11.minutes,
+      depthRanges = List(1, 5, 333)
+    )
   }
 }
