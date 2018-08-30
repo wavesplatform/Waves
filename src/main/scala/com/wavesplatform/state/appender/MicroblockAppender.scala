@@ -44,7 +44,7 @@ object MicroblockAppender extends ScorexLogging with Instrumented {
     import md.microBlock
     val microblockTotalResBlockSig = microBlock.totalResBlockSig
     (for {
-      _                <- EitherT(Task.now(microBlock.signaturesValid()))
+      _                <- EitherT(Task.now(microBlock.sigValidEi()))
       validApplication <- EitherT(apply(checkpoint, blockchainUpdater, utxStorage, scheduler)(microBlock))
     } yield validApplication).value.map {
       case Right(()) =>
