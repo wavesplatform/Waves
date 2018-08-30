@@ -36,11 +36,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
     dataTransaction <- compactDataTransactionGen(recipient)
     transfer        <- transferGeneratorP(ts, master, recipient.toAddress, 100000000L)
 
-    untypedScript = {
-      val r = Parser(scriptWithAllFunctions(dataTransaction, transfer)).get.value
-      assert(r.size == 1)
-      r.head
-    }
+    untypedScript = Parser(scriptWithAllFunctions(dataTransaction, transfer)).get.value
 
     typedScript = {
       val compilerScript = CompilerV1(dummyCompilerContext, untypedScript).explicitGet()._1

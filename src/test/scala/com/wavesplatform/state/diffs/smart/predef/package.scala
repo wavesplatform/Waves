@@ -18,8 +18,7 @@ package object predef {
   def runScript[T](script: String, t: In = null, networkByte: Byte = networkByte): Either[String, T] = {
     val Success(expr, _) = Parser(script)
     for {
-      _             <- Either.cond(expr.size == 1, (), expr.mkString("\n"))
-      compileResult <- CompilerV1(dummyCompilerContext, expr.head)
+      compileResult <- CompilerV1(dummyCompilerContext, expr)
       (typedExpr, tpe) = compileResult
       er               = EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(t), Coeval(???), null), typedExpr)
       r <- er._2

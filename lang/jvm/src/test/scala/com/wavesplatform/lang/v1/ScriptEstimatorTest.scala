@@ -37,8 +37,7 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
 
   private def compile(code: String): EXPR = {
     val untyped = Parser(code).get.value
-    require(untyped.size == 1)
-    CompilerV1(ctx, untyped.head).map(_._1).explicitGet()
+    CompilerV1(ctx, untyped).map(_._1).explicitGet()
   }
 
   property("successful on very deep expressions(stack overflow check)") {
