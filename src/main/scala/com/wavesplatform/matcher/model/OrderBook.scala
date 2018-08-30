@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
+import com.wavesplatform.state.ByteStr
 
 import scala.collection.immutable.TreeMap
 
@@ -34,19 +35,19 @@ object OrderBook {
       }
   }
 
-  def cancelOrder(ob: OrderBook, orderId: String): Option[OrderCanceled] = {
+  def cancelOrder(ob: OrderBook, orderId: ByteStr): Option[OrderCanceled] = {
     ob.bids
-      .find { case (_, v) => v.exists(_.order.idStr() == orderId) }
-      .orElse(ob.asks.find { case (_, v) => v.exists(_.order.idStr() == orderId) })
+      .find { case (_, v) => v.exists(_.order.id() == orderId) }
+      .orElse(ob.asks.find { case (_, v) => v.exists(_.order.id() == orderId) })
       .fold(Option.empty[OrderCanceled]) {
         case (_, v) =>
-          Some(OrderCanceled(v.find(_.order.idStr() == orderId).get))
+          Some(OrderCanceled(v.find(_.order.id() == orderId).get, unmatchable = false))
       }
   }
 
-  private def updateCancelOrder(ob: OrderBook, limitOrder: LimitOrder): (OrderBook) = {
+  private def updateCancelOrder(ob: OrderBook, limitOrder: LimitOrder): OrderBook = {
     (limitOrder match {
-      case oo @ BuyLimitOrder(p, _, _) =>
+      case oo @ BuyLimitOrder(p, _, _, _) =>
         ob.bids.get(p).map { lvl =>
           val updatedQ = lvl.filter(_ != oo)
           ob.copy(bids = if (updatedQ.nonEmpty) {
@@ -55,7 +56,7 @@ object OrderBook {
             ob.bids - p
           })
         }
-      case oo @ SellLimitOrder(p, _, _) =>
+      case oo @ SellLimitOrder(p, _, _, _) =>
         ob.asks.get(p).map { lvl =>
           val updatedQ = lvl.filter(_ != oo)
           ob.copy(asks = if (updatedQ.nonEmpty) {
@@ -67,18 +68,18 @@ object OrderBook {
     }).getOrElse(ob)
   }
 
-  private def updateExecutedBuy(ob: OrderBook, o: BuyLimitOrder, r: Long) = ob.bids.get(o.price) match {
+  private def updateExecutedBuy(ob: OrderBook, o: BuyLimitOrder, remainingAmount: Long, remainingFee: Long) = ob.bids.get(o.price) match {
     case Some(l) =>
       val (l1, l2) = l.span(_ != o)
-      val ll       = if (r > 0) (l1 :+ o.copy(amount = r)) ++ l2.tail else l1 ++ l2.tail
+      val ll       = if (remainingAmount > 0) (l1 :+ o.copy(amount = remainingAmount, fee = remainingFee)) ++ l2.tail else l1 ++ l2.tail
       ob.copy(bids = if (ll.isEmpty) ob.bids - o.price else ob.bids + (o.price -> ll))
     case None => ob
   }
 
-  private def updateExecutedSell(ob: OrderBook, o: SellLimitOrder, r: Long) = ob.asks.get(o.price) match {
+  private def updateExecutedSell(ob: OrderBook, o: SellLimitOrder, remainingAmount: Long, remainingFee: Long) = ob.asks.get(o.price) match {
     case Some(l) =>
       val (l1, l2) = l.span(_ != o)
-      val ll       = if (r > 0) (l1 :+ o.copy(amount = r)) ++ l2.tail else l1 ++ l2.tail
+      val ll       = if (remainingAmount > 0) (l1 :+ o.copy(amount = remainingAmount, fee = remainingFee)) ++ l2.tail else l1 ++ l2.tail
       ob.copy(asks = if (ll.isEmpty) ob.asks - o.price else ob.asks + (o.price -> ll))
     case None => ob
   }
@@ -90,8 +91,8 @@ object OrderBook {
     case OrderAdded(o: SellLimitOrder) =>
       val orders = ob.asks.getOrElse(o.price, Vector.empty)
       ob.copy(asks = ob.asks + (o.price -> (orders :+ o)))
-    case e @ OrderExecuted(_, c: BuyLimitOrder)  => updateExecutedBuy(ob, c, e.counterRemaining)
-    case e @ OrderExecuted(_, c: SellLimitOrder) => updateExecutedSell(ob, c, e.counterRemaining)
-    case OrderCanceled(limitOrder)               => updateCancelOrder(ob, limitOrder)
+    case e @ OrderExecuted(_, c: BuyLimitOrder)  => updateExecutedBuy(ob, c, e.counterRemainingAmount, e.counterRemainingFee)
+    case e @ OrderExecuted(_, c: SellLimitOrder) => updateExecutedSell(ob, c, e.counterRemainingAmount, e.counterRemainingFee)
+    case OrderCanceled(limitOrder, _)            => updateCancelOrder(ob, limitOrder)
   }
 }

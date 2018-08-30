@@ -1,22 +1,23 @@
 package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.StatusCodes.BadRequest
+import com.wavesplatform.api.http.AddressApiRoute
+import com.wavesplatform.api.http.assets.SignedIssueV1Request
 import com.wavesplatform.features.api.ActivationStatus
+import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
 import com.wavesplatform.state.DataEntry
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
-import play.api.libs.json.{Format, JsObject, Json, Writes}
-import com.wavesplatform.api.http.AddressApiRoute
-import com.wavesplatform.api.http.assets.SignedIssueV1Request
-import com.wavesplatform.http.DebugMessage
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
+import play.api.libs.json._
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Try}
 
 object SyncHttpApi extends Assertions {
@@ -29,8 +30,8 @@ object SyncHttpApi extends Assertions {
     implicit val format: Format[NotFoundErrorMessage] = Json.format
   }
 
-  def assertBadRequest[R](f: => R): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Assertions.assert(statusCode == StatusCodes.BadRequest.intValue)
+  def assertBadRequest[R](f: => R, expectedStatusCode: Int = 400): Assertion = Try(f) match {
+    case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Assertions.assert(statusCode == expectedStatusCode)
     case Failure(e)                                               => Assertions.fail(e)
     case _                                                        => Assertions.fail("Expecting bad request")
   }
@@ -38,7 +39,7 @@ object SyncHttpApi extends Assertions {
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
       Assertions.assert(
-        statusCode == StatusCodes.BadRequest.intValue &&
+        statusCode == BadRequest.intValue &&
           responseBody.replace("\n", "").matches(s".*$errorRegex.*"))
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail("Expecting bad request")
@@ -46,7 +47,7 @@ object SyncHttpApi extends Assertions {
 
   def assertBadRequestAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
-      Assertions.assert(statusCode == StatusCodes.BadRequest.intValue && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
+      Assertions.assert(statusCode == BadRequest.intValue && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail(s"Expecting bad request")
   }
@@ -200,6 +201,9 @@ object SyncHttpApi extends Assertions {
     def createAddress(): String =
       Await.result(async(n).createAddress, RequestAwaitTime)
 
+    def rawTransactionInfo(txId: String): JsValue =
+      Await.result(async(n).rawTransactionInfo(txId), RequestAwaitTime)
+
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): TransactionInfo =
       Await.result(async(n).waitForTransaction(txId), RequestAwaitTime)
 
@@ -217,7 +221,9 @@ object SyncHttpApi extends Assertions {
     def height: Int =
       Await.result(async(n).height, RequestAwaitTime)
 
-    def blockAt(height: Int) = Await.result(async(n).blockAt(height), RequestAwaitTime)
+    def blockAt(height: Int): Block = Await.result(async(n).blockAt(height), RequestAwaitTime)
+
+    def blockHeadersSeq(from: Int, to: Int): Seq[BlockHeaders] = Await.result(async(n).blockHeadersSeq(from, to), RequestAwaitTime)
 
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       Await.result(async(n).rollback(to, returnToUTX), RequestAwaitTime)
@@ -225,6 +231,9 @@ object SyncHttpApi extends Assertions {
     def findTransactionInfo(txId: String): Option[TransactionInfo] = Await.result(async(n).findTransactionInfo(txId), RequestAwaitTime)
 
     def connectedPeers: Seq[Peer] = (Json.parse(get("/peers/connected").getResponseBody) \ "peers").as[Seq[Peer]]
+
+    def calculateFee(tx: JsObject): FeeInfo =
+      Await.result(async(n).calculateFee(tx), RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
@@ -233,6 +242,9 @@ object SyncHttpApi extends Assertions {
 
     private val TxInBlockchainAwaitTime = 8 * nodes.head.blockDelay
     private val ConditionAwaitTime      = 5.minutes
+
+    def height(implicit pos: Position): Seq[Int] =
+      Await.result(async(nodes).height, TxInBlockchainAwaitTime)
 
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
       Await.result(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime)

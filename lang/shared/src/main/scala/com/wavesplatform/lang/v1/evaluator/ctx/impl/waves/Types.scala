@@ -122,8 +122,6 @@ object Types {
     "Order",
     List(
       "id"               -> BYTEVECTOR,
-      "sender"           -> addressType.typeRef,
-      "senderPublicKey"  -> BYTEVECTOR,
       "matcherPublicKey" -> BYTEVECTOR,
       "assetPair"        -> assetPairType.typeRef,
       "orderType"        -> ordTypeType,
@@ -132,8 +130,7 @@ object Types {
       "timestamp"        -> LONG,
       "expiration"       -> LONG,
       "matcherFee"       -> LONG,
-      "signature"        -> BYTEVECTOR
-    )
+    ) ++ proven
   )
   val exchangeTransactionType = CaseType(
     "ExchangeTransaction",

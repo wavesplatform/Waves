@@ -1,12 +1,14 @@
 package com.wavesplatform.api.http
 
+import java.util.NoSuchElementException
+
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server._
 import com.wavesplatform.crypto
 import com.wavesplatform.http.{ApiMarshallers, PlayJsonException, api_key, deprecated_api_key}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils.Base58
-import play.api.libs.json.Reads
+import play.api.libs.json.{JsResultException, Reads}
 
 trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
   val settings: RestAPISettings
@@ -25,6 +27,11 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
     entity(as[A]) { a =>
       complete(f(a))
     }
+  }
+
+  val jsonExceptionHandler = ExceptionHandler {
+    case JsResultException(err)    => complete(WrongJson(errors = err))
+    case e: NoSuchElementException => complete(WrongJson(Some(e)))
   }
 
   def withAuth: Directive0 = apiKeyHash.fold[Directive0](complete(ApiKeyNotValid)) { hashFromSettings =>

@@ -61,5 +61,5 @@ object MicroblockAppender extends ScorexLogging with Instrumented {
     }
   }
 
-  private val microblockProcessingTimeStats = Kamon.metrics.histogram("microblock-processing-time")
+  private val microblockProcessingTimeStats = Kamon.histogram("microblock-processing-time")
 }

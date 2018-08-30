@@ -19,7 +19,8 @@ package object predef {
     for {
       compileResult <- CompilerV1(dummyCompilerContext, expr)
       (typedExpr, tpe) = compileResult
-      r <- EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr)._2
+      er               = EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr)
+      r <- er._2
     } yield r
   }
 
@@ -28,6 +29,7 @@ package object predef {
        | # Pure context
        | # 1) basic(+ eq) -> mulLong, divLong, modLong, sumLong, subLong, sumString, sumByteVector
        |
+       | let rnd = tx.timestamp % 2 == 0
        | let longAll = 1000 * 2 == 2000 && 1000 / 2 == 500 && 1000 % 2 == 0 && 1000 + 2 == 1002 && 1000 - 2 == 998
        | let sumString = "ha" + "-" +"ha" == "ha-ha"
        | let sumByteVector = match tx {
@@ -98,14 +100,33 @@ package object predef {
        |     case _ => false
        | }
        | let entries = match tx {
-       |   case d: DataTransaction => true || true
-       |   case d: TransferTransaction =>
+       |   case d: DataTransaction =>
+       |     let int = extract(getInteger(d.data, "${tx.data(0).key}"))
+       |     let bool = extract(getBoolean(d.data, "${tx.data(1).key}"))
+       |     let blob = extract(getBinary(d.data, "${tx.data(2).key}"))
+       |     let str = extract(getString(d.data, "${tx.data(3).key}"))
+       |     let dataByKey = toString(int) == "${tx.data(0).value}" || toString(bool) == "${tx.data(1).value}" ||
+       |                     size(blob) > 0 || str == "${tx.data(3).value}"
+       |
+       |     let d0 = extract(getInteger(d.data, 0))
+       |     let d1 = extract(getBoolean(d.data, 1))
+       |     let d2 = getBinary(d.data, 2)
+       |     let d3 = getString(d.data, 3)
+       |     let dataByIndex = toBytes(d0) == base64'abcdef' || toBytes(d1) == base64'ghijkl' ||
+       |                       isDefined(d2) || toBytes(extract(d3)) == base64'mnopqr'
+       |
+       |     dataByKey && dataByIndex
+       |
+       |   case t: TransferTransaction =>
        |     let add = Address(base58'${t.recipient.bytes.base58}')
        |     let long = extract(getInteger(add,"${tx.data(0).key}")) == ${tx.data(0).value}
        |     let bool = extract(getBoolean(add,"${tx.data(1).key}")) == ${tx.data(1).value}
        |     let bin = extract(getBinary(add,"${tx.data(2).key}")) ==  base58'${tx.data(2).value}'
        |     let str = extract(getString(add,"${tx.data(3).key}")) == "${tx.data(3).value}"
        |     long && bool && bin && str
+       |
+       |   case a: CreateAliasTransaction => throw("oh no")
+       |   case b: BurnTransaction => throw()
        |   case _ => false
        | }
        |
@@ -128,7 +149,7 @@ package object predef {
        |
        | let crypto = bks && sig && str58 && str64
        |
-       | pure && waves && crypto
+       | if rnd then pure && waves else crypto
     """.stripMargin
 
 }

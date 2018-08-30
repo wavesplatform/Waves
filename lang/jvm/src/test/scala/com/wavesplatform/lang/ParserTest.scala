@@ -401,22 +401,6 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parse("FOO(X)".stripMargin) shouldBe FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "FOO"), List(REF(AnyPos, PART.VALID(AnyPos, "X"))))
   }
 
-  property("function call on curly braces") {
-    parse("{ 1 }(2, 3, 4)") shouldBe FUNCTION_CALL(
-      AnyPos,
-      PART.INVALID(AnyPos, "'CONST_LONG(RealPos(2,3),1)' is not a function name"),
-      List(CONST_LONG(AnyPos, 2), CONST_LONG(AnyPos, 3), CONST_LONG(AnyPos, 4))
-    )
-  }
-
-  property("function call on round braces") {
-    parse("( 1 )(2, 3, 4)") shouldBe FUNCTION_CALL(
-      AnyPos,
-      PART.INVALID(AnyPos, "'CONST_LONG(RealPos(2,3),1)' is not a function name"),
-      List(CONST_LONG(AnyPos, 2), CONST_LONG(AnyPos, 3), CONST_LONG(AnyPos, 4))
-    )
-  }
-
   property("isDefined") {
     parse("isDefined(X)") shouldBe FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "isDefined"), List(REF(AnyPos, PART.VALID(AnyPos, "X"))))
   }

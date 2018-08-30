@@ -1,18 +1,20 @@
 package com.wavesplatform.transaction.assets.exchange
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.crypto
-import com.wavesplatform.state.ByteStr
-import io.swagger.annotations.ApiModelProperty
-import monix.eval.{Coeval, Task}
-import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.crypto
 import com.wavesplatform.serialization.{BytesSerializable, Deser, JsonSerializable}
+import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.ValidationError.{GenericError, InvalidSignature}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.utils.Base58
+import io.swagger.annotations.ApiModelProperty
+import monix.eval.{Coeval, Task}
+import play.api.libs.json.{JsObject, Json}
+import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
+
+import scala.math.BigDecimal.RoundingMode
 import scala.util.Try
 
 sealed trait OrderType {
@@ -36,7 +38,7 @@ object OrderType {
   def apply(value: Int): OrderType = value match {
     case 0 => OrderType.BUY
     case 1 => OrderType.SELL
-    case _ => throw new RuntimeException("Unexpected OrderType")
+    case _ => throw new RuntimeException(s"Unexpected OrderType: $value")
   }
 
   def apply(value: String): OrderType = value match {
@@ -70,8 +72,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
 
   import Order._
 
-  val sender         = senderPublicKey
-  val signatureValid = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
+  val sender: PublicKeyAccount        = senderPublicKey
+  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(price, amount) &&
@@ -101,13 +103,13 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
       Longs.toByteArray(matcherFee)
 
   @ApiModelProperty(hidden = true)
-  val id: Coeval[Array[Byte]] = Coeval.evalOnce(crypto.fastHash(toSign))
-
-  @ApiModelProperty(hidden = true)
-  val idStr: Coeval[String] = Coeval.evalOnce(Base58.encode(id()))
+  val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(crypto.fastHash(toSign)))
 
   @ApiModelProperty(hidden = true)
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign ++ signature)
+
+  @ApiModelProperty(hidden = true)
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign)
 
   @ApiModelProperty(hidden = true)
   def getReceiveAssetId: Option[AssetId] = orderType match {
@@ -124,6 +126,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   @ApiModelProperty(hidden = true)
   def getSpendAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] =
     Try {
+      // We should not correct amount here, because it could lead to fork. See ExchangeTransactionDiff
       if (orderType == OrderType.SELL) matchAmount
       else {
         val spend = BigInt(matchAmount) * matchPrice / PriceConstant
@@ -145,7 +148,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   @ApiModelProperty(hidden = true)
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     Json.obj(
-      "id"               -> Base58.encode(id()),
+      "id"               -> id().base58,
       "sender"           -> senderPublicKey.address,
       "senderPublicKey"  -> Base58.encode(senderPublicKey.publicKey),
       "matcherPublicKey" -> Base58.encode(matcherPublicKey.publicKey),
@@ -180,7 +183,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     }
   }
 
-  override def hashCode(): Int = idStr.hashCode()
+  override def hashCode(): Int = id().hashCode()
 
   @ApiModelProperty(hidden = true)
   def getSignedDescendants: Coeval[Seq[Signed]] = signedDescendants
@@ -195,6 +198,13 @@ object Order {
   val PriceConstant         = 100000000L
   val MaxAmount: Long       = 100 * PriceConstant * PriceConstant
   private val AssetIdLength = 32
+
+  def correctAmount(a: Long, price: Long): Long = {
+    val settledTotal = (BigDecimal(price) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
+    (BigDecimal(settledTotal) / price * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
+  }
+
+  def correctAmount(o: Order): Long = correctAmount(o.amount, o.price)
 
   def buy(sender: PrivateKeyAccount,
           matcher: PublicKeyAccount,

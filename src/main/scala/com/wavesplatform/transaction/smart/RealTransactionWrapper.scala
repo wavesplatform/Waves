@@ -34,7 +34,7 @@ object RealTransactionWrapper {
   implicit def assetPair(a: AssetPair): APair = APair(a.amountAsset.map(toByteVector), a.priceAsset.map(toByteVector))
   implicit def ord(o: Order): Ord =
     Ord(
-      id = ByteVector(o.id.value),
+      id = ByteVector(o.id.value.arr),
       sender = Recipient.Address(ByteVector(o.sender.bytes.arr)),
       senderPublicKey = ByteVector(o.senderPublicKey.publicKey),
       matcherPublicKey = ByteVector(o.matcherPublicKey.publicKey),
@@ -48,7 +48,8 @@ object RealTransactionWrapper {
       timestamp = o.timestamp,
       expiration = o.expiration,
       matcherFee = o.matcherFee,
-      signature = ByteVector(o.signature)
+      bodyBytes = ByteVector(o.bodyBytes()),
+      proofs = IndexedSeq(ByteVector(o.signature))
     )
 
   implicit def aoaToRecipient(aoa: AddressOrAlias): Recipient = aoa match {

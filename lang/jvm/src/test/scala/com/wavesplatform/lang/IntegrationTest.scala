@@ -21,7 +21,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """
         |match p {
         |  case pa: PointA => let x = 3
-        |  case _ => throw
+        |  case _ => throw()
         |}
       """.stripMargin
 
@@ -224,7 +224,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |      case pc: PointC => pc.YB
         |    }
         |  }
-        |  case other => throw
+        |  case other => throw()
         |}""".stripMargin
     eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(3)
     eval[Long](sampleScript, Some(pointCInstance)) shouldBe Right(42)
@@ -246,4 +246,17 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Unit]("p.YB", Some(pointDInstance2), CorD) shouldBe Right(())
   }
 
+  property("throw") {
+    val script =
+      """
+        |match p {
+        |  case a: PointA => 0
+        |  case b: PointB => throw()
+        |  case c: PointC => throw("arrgh")
+        |}
+      """.stripMargin
+    eval[Long](script, Some(pointAInstance)) shouldBe Right(0)
+    eval[Long](script, Some(pointBInstance)) shouldBe Left("Explicit script termination")
+    eval[Long](script, Some(pointCInstance)) shouldBe Left("arrgh")
+  }
 }

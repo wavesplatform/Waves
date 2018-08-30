@@ -3,15 +3,15 @@ package com.wavesplatform.it.sync.matcher
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
-import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.duration._
-import com.wavesplatform.it.util._
 import scala.util.Random
-import com.wavesplatform.it.api.SyncMatcherHttpApi._
 
 class OrderExclusionTestSuite
     extends FreeSpec
@@ -40,10 +40,6 @@ class OrderExclusionTestSuite
     aliceNode.assertAssetBalance(aliceNode.address, aliceAsset, AssetQuantity)
     aliceNode.assertAssetBalance(matcherNode.address, aliceAsset, 0)
 
-    "matcher responds with Public key" in {
-      matcherNode.matcherGet("/matcher").getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe matcherNode.publicKeyStr
-    }
-
     "sell order could be placed and status it's correct" in {
       // Alice places sell order
       val aliceOrder = matcherNode
@@ -55,7 +51,7 @@ class OrderExclusionTestSuite
 
       // Alice checks that the order in order book
       matcherNode.orderStatus(orderId, aliceWavesPair).status shouldBe "Accepted"
-      matcherNode.orderHistory(aliceNode).head.status shouldBe "Accepted"
+      matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
 
       // Alice check that order is correct
       val orders = matcherNode.orderBook(aliceWavesPair)
@@ -63,11 +59,11 @@ class OrderExclusionTestSuite
       orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
       // sell order should be in the aliceNode orderbook
-      matcherNode.orderHistory(aliceNode).head.status shouldBe "Accepted"
+      matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
 
       //wait for expiration of order
       matcherNode.waitOrderStatus(aliceWavesPair, orderId, "Cancelled", 2.minutes)
-      matcherNode.orderHistory(aliceNode).head.status shouldBe "Cancelled"
+      matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Cancelled"
     }
   }
 

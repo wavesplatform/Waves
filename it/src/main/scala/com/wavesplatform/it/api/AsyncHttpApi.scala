@@ -173,6 +173,8 @@ object AsyncHttpApi extends Assertions {
 
     def waitForHeight(expectedHeight: Int): Future[Int] = waitFor[Int](s"height >= $expectedHeight")(_.height, h => h >= expectedHeight, 5.seconds)
 
+    def rawTransactionInfo(txId: String): Future[JsValue] = get(s"/transactions/info/$txId").map(r => Json.parse(r.getResponseBody))
+
     def transactionInfo(txId: String): Future[TransactionInfo] = get(s"/transactions/info/$txId").as[TransactionInfo]
 
     def transactionsByAddress(address: String, limit: Int): Future[Seq[Seq[TransactionInfo]]] =
@@ -483,9 +485,14 @@ object AsyncHttpApi extends Assertions {
       n.assetBalance(acc, assetIdString).map(_.balance shouldBe balance)
     }
 
+    def calculateFee(jsobj: JsObject): Future[FeeInfo] =
+      postJsObjectWithApiKey("/transactions/calculateFee", jsobj).as[FeeInfo]
+
   }
 
   implicit class NodesAsyncHttpApi(nodes: Seq[Node]) extends Matchers {
+    def height: Future[Seq[Int]] = traverse(nodes)(_.height)
+
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit p: Position): Future[Unit] =
       for {
         allHeights   <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
@@ -495,7 +502,7 @@ object AsyncHttpApi extends Assertions {
 
     def waitForHeightArise(): Future[Unit] =
       for {
-        height <- traverse(nodes)(_.height).map(_.max)
+        height <- height.map(_.max)
         _      <- traverse(nodes)(_.waitForHeight(height + 1))
       } yield ()
 

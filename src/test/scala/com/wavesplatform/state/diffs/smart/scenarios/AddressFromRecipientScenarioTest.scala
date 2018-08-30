@@ -41,7 +41,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
     val Parsed.Success(expr, _) = Parser("""
         | match tx {
         |  case t : TransferTransaction =>  addressFromRecipient(t.recipient)
-        |  case other => throw
+        |  case other => throw()
         |  }
         |  """.stripMargin)
     val Right((typedExpr, _))   = CompilerV1(com.wavesplatform.utils.dummyCompilerContext, expr)

@@ -20,16 +20,50 @@ object WavesContext {
   def build(env: Environment): CTX = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
-    def getdataF(name: String, internalName: Short, dataType: DataType): BaseFunction =
+    def getDataFromStateF(name: String, internalName: Short, dataType: DataType): BaseFunction =
       NativeFunction(name, 100, internalName, UNION(dataType.innerType, UNIT), "addressOrAlias" -> addressOrAliasType, "key" -> STRING) {
         case (addressOrAlias: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addressOrAlias, k, dataType).map(fromOption)
         case _                                               => ???
       }
 
-    val getIntegerF: BaseFunction = getdataF("getInteger", DATA_LONG, DataType.Long)
-    val getBooleanF: BaseFunction = getdataF("getBoolean", DATA_BOOLEAN, DataType.Boolean)
-    val getBinaryF: BaseFunction  = getdataF("getBinary", DATA_BYTES, DataType.ByteArray)
-    val getStringF: BaseFunction  = getdataF("getString", DATA_STRING, DataType.String)
+    val getIntegerFromStateF: BaseFunction = getDataFromStateF("getInteger", DATA_LONG_FROM_STATE, DataType.Long)
+    val getBooleanFromStateF: BaseFunction = getDataFromStateF("getBoolean", DATA_BOOLEAN_FROM_STATE, DataType.Boolean)
+    val getBinaryFromStateF: BaseFunction  = getDataFromStateF("getBinary", DATA_BYTES_FROM_STATE, DataType.ByteArray)
+    val getStringFromStateF: BaseFunction  = getDataFromStateF("getString", DATA_STRING_FROM_STATE, DataType.String)
+
+    def getDataFromArrayF(name: String, internalName: Short, dataType: DataType): BaseFunction =
+      NativeFunction(name, 10, internalName, UNION(dataType.innerType, UNIT), "data" -> LIST(dataEntryType.typeRef), "key" -> STRING) {
+        case (data: IndexedSeq[CaseObj] @unchecked) :: (key: String) :: Nil =>
+          data.find(_.fields("key") == key).map(_.fields("value")) match {
+            case Some(n: Long) if dataType == DataType.Long => Right(n)
+            case Some(b: Boolean) if dataType == DataType.Boolean => Right(b)
+            case Some(b: ByteVector) if dataType == DataType.ByteArray => Right(b)
+            case Some(s: String) if dataType == DataType.String => Right(s)
+            case _ => Right(())
+          }
+        case _ => ???
+      }
+
+    val getIntegerFromArrayF: BaseFunction = getDataFromArrayF("getInteger", DATA_LONG_FROM_ARRAY, DataType.Long)
+    val getBooleanFromArrayF: BaseFunction = getDataFromArrayF("getBoolean", DATA_BOOLEAN_FROM_ARRAY, DataType.Boolean)
+    val getBinaryFromArrayF: BaseFunction = getDataFromArrayF("getBinary", DATA_BYTES_FROM_ARRAY, DataType.ByteArray)
+    val getStringFromArrayF: BaseFunction = getDataFromArrayF("getString", DATA_STRING_FROM_ARRAY, DataType.String)
+
+    def getDataByIndexF(name: String, dataType: DataType): BaseFunction =
+      UserFunction(name, UNION(dataType.innerType, UNIT), "data" -> LIST(dataEntryType.typeRef), "index" -> LONG) {
+        case data :: index :: Nil =>
+          BLOCK(
+            LET("@val", GETTER(FUNCTION_CALL(PureContext.getElement, List(data, index)), "value")),
+            IF(FUNCTION_CALL(PureContext._isInstanceOf, List(REF("@val"), CONST_STRING(dataType.innerType.name))),
+              REF("@val"),
+              REF("unit")))
+        case _ => ???
+      }
+
+    val getIntegerByIndexF: BaseFunction = getDataByIndexF("getInteger", DataType.Long)
+    val getBooleanByIndexF: BaseFunction = getDataByIndexF("getBoolean", DataType.Boolean)
+    val getBinaryByIndexF: BaseFunction = getDataByIndexF("getBinary", DataType.ByteArray)
+    val getStringByIndexF: BaseFunction = getDataByIndexF("getString", DataType.String)
 
     def secureHashExpr(xs: EXPR): EXPR = FUNCTION_CALL(
       FunctionHeader.Native(KECCAK256),
@@ -218,10 +252,18 @@ object WavesContext {
     val functions = Seq(
       txByIdF,
       txHeightByIdF,
-      getIntegerF,
-      getBooleanF,
-      getBinaryF,
-      getStringF,
+      getIntegerFromStateF,
+      getBooleanFromStateF,
+      getBinaryFromStateF,
+      getStringFromStateF,
+      getIntegerFromArrayF,
+      getBooleanFromArrayF,
+      getBinaryFromArrayF,
+      getStringFromArrayF,
+      getIntegerByIndexF,
+      getBooleanByIndexF,
+      getBinaryByIndexF,
+      getStringByIndexF,
       addressFromPublicKeyF,
       addressFromStringF,
       addressFromRecipientF,
