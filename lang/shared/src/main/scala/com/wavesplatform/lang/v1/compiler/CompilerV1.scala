@@ -24,14 +24,10 @@ class CompilerV1(ctx: CompilerContext) extends ExprCompiler {
   override def compile(input: String, directives: List[Directive]): Either[String, version.ExprT] = {
     Parser(input) match {
       case fastparse.core.Parsed.Success(xs, _) =>
-        if (xs.size > 1) Left("Too many expressions")
-        else if (xs.isEmpty) Left("No expression")
-        else {
-          CompilerV1(ctx, xs.head) match {
-            case Left(err)              => Left(err.toString)
-            case Right((expr, BOOLEAN)) => Right(expr)
-            case Right((_, _))          => Left("Script should return boolean")
-          }
+        CompilerV1(ctx, xs) match {
+          case Left(err)              => Left(err.toString)
+          case Right((expr, BOOLEAN)) => Right(expr)
+          case Right((_, _))          => Left("Script should return boolean")
         }
       case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
     }

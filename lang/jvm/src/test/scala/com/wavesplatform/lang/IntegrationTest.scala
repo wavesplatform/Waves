@@ -4,8 +4,8 @@ import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.CTX
-import com.wavesplatform.lang.v1.compiler.{CompilerV1, Terms}
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
+import com.wavesplatform.lang.v1.compiler.{CompilerV1, Terms}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -108,13 +108,12 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   private def eval[T](code: String, pointInstance: Option[CaseObj] = None, pointType: FINAL = AorBorC): Either[String, T] = {
-    val untyped = Parser(code).get.value
-    require(untyped.size == 1)
+    val untyped                                      = Parser(code).get.value
     val lazyVal                                      = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, (FINAL, LazyVal)] = Map(("p", (pointType, lazyVal)))
     val ctx: CTX =
       Monoid.combine(PureContext.ctx, CTX(sampleTypes, stringToTuple, Seq.empty))
-    val typed = CompilerV1(ctx.compilerContext, untyped.head)
+    val typed = CompilerV1(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1)._2)
   }
 
