@@ -138,7 +138,7 @@ case class MatcherApiRoute(wallet: Wallet,
       json[Order] { order =>
         placeTimer.measure {
           if (blockchain.hasScript(order.senderPublicKey.toAddress)) {
-            val resp = StatusCodeMatcherResponse(StatusCodes.Forbidden, s"Trading on scripted account isn't allowed yet.")
+            val resp = StatusCodeMatcherResponse(StatusCodes.Forbidden, "Trading on scripted account isn't allowed yet.")
             Future.successful(resp.code -> resp.json)
           } else {
             (matcher ? order).mapTo[MatcherResponse].map(r => r.code -> r.json)
