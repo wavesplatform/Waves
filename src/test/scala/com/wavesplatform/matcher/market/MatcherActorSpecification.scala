@@ -119,6 +119,11 @@ class MatcherActorSpecification
         )
 
       val invalidOrder = sameAssetsOrder()
+      inAnyOrderWithLogging {
+        (blockchain.hasScript _)
+          .when(invalidOrder.senderPublicKey.toAddress)
+          .returns(false)
+      }
       actor ! invalidOrder
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Amount and price assets must be different"))
     }
@@ -138,6 +143,9 @@ class MatcherActorSpecification
         )
 
       val invalidOrder = sameAssetsOrder()
+      (blockchain.hasScript _)
+        .when(invalidOrder.senderPublicKey.toAddress)
+        .returns(false)
       actor ! invalidOrder
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Amount and price assets must be different"))
     }
@@ -149,6 +157,9 @@ class MatcherActorSpecification
       val pair  = AssetPair(a2, a1)
       val order = buy(pair, 1, 2000)
 
+      (blockchain.hasScript _)
+        .when(order.senderPublicKey.toAddress)
+        .returns(false)
       actor ! order
       expectMsg(OrderAccepted(order))
 
@@ -185,6 +196,32 @@ class MatcherActorSpecification
 
       ((json \ "markets")(1) \ "amountAssetName").as[String] shouldBe a1Name
     }
+  }
+
+  "Ban orders for scripted accaunt" in {
+    def sameAssetsOrder(): Order =
+      Order.apply(
+        PrivateKeyAccount("765".getBytes()),
+        MatcherAccount,
+        AssetPair(strToSomeAssetId("asset1"), strToSomeAssetId("asset2")),
+        OrderType.BUY,
+        100000000L,
+        100L,
+        1L,
+        1000L,
+        100000L
+      )
+
+    val invalidOrder = sameAssetsOrder()
+
+    // for debbugging use
+    // inAnyOrderWithLogging { ... }
+    (blockchain.hasScript _)
+      .when(invalidOrder.senderPublicKey.toAddress)
+      .returns(true)
+
+    actor ! invalidOrder
+    expectMsg(StatusCodeMatcherResponse(StatusCodes.Forbidden, "Trading on scripted account isn't allowed yet."))
   }
 
   def strToSomeAssetId(s: String): Option[AssetId] = Some(ByteStr(s.getBytes()))
