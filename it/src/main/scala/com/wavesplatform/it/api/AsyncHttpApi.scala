@@ -471,6 +471,8 @@ object AsyncHttpApi extends Assertions {
       for {
         newBalance          <- accountBalance(acc)
         newEffectiveBalance <- accountEffectiveBalance(acc)
+        _ = Console.err.println(s"$acc exp $balance | $effectiveBalance")       ///
+        _ = Console.err.println(s"$acc act $newBalance | $newEffectiveBalance") ///
       } yield {
         withClue(s"effective balance of $acc") {
           newEffectiveBalance shouldBe effectiveBalance

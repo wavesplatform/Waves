@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features._
+import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
@@ -14,7 +15,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTrans
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{CreateAliasTransactionV1, DataTransaction, GenesisTransaction}
+import com.wavesplatform.transaction.{CreateAliasTransactionV1, DataTransaction, GenesisTransaction, Transaction}
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen, history}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -73,7 +74,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
 
     "forget rollbacked transaction for querying" in forAll(accountGen, accountGen, Gen.nonEmptyListOf(Gen.choose(1, 10))) {
       case (sender, recipient, txCount) =>
-        withDomain(createSettings(BlockchainFeatures.MassTransfer -> 0)) { d =>
+        withDomain(createSettings(MassTransfer -> 0)) { d =>
           d.appendBlock(genesisBlock(nextTs, sender, com.wavesplatform.state.diffs.ENOUGH_AMT))
 
           val genesisSignature = d.lastBlockId
@@ -304,7 +305,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
 
     "address script" in forAll(accountGen, positiveLongGen) {
       case (sender, initialBalance) =>
-        withDomain(createSettings(BlockchainFeatures.SmartAccounts -> 0)) { d =>
+        withDomain(createSettings(SmartAccounts -> 0)) { d =>
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
           val script = ScriptV1(TRUE).explicitGet()
 
@@ -356,7 +357,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
     }) {
       case (sender, (issueTransaction, sponsor1, sponsor2, cancel)) =>
         val ts = issueTransaction.timestamp
-        withDomain(createSettings(BlockchainFeatures.FeeSponsorship -> 0)) { d =>
+        withDomain(createSettings(FeeSponsorship -> 0)) { d =>
           d.appendBlock(genesisBlock(ts, sender, Long.MaxValue / 3))
           val genesisBlockId = d.lastBlockId
 
@@ -408,6 +409,51 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
           d.removeAfter(blockIdWithIssue)
 
           d.blockchainUpdater.assetDescription(sponsor1.assetId).get.sponsorship shouldBe 0
+        }
+    }
+
+    "carry fee" in forAll(for {
+      sender      <- accountGen
+      sponsorship <- sponsorFeeCancelSponsorFeeGen(sender)
+      transfer    <- transferGeneratorP(sponsorship._1.timestamp, sender, sender, 10000000000L)
+    } yield {
+      (sender, sponsorship, transfer)
+    }) {
+      case (sender, (issue, sponsor1, sponsor2, cancel), transfer) =>
+        withDomain(createSettings(NG -> 0, FeeSponsorship -> 0)) { d =>
+          val ts = issue.timestamp
+          def appendBlock(tx: Transaction) = {
+            d.appendBlock(TestBlock.create(ts, d.lastBlockId, Seq(tx)))
+            d.lastBlockId
+          }
+          def carry(fee: Long) = Some(Portfolio(fee - fee / 5 * 2, LeaseBalance(0, 0), Map.empty))
+
+          d.appendBlock(genesisBlock(ts, sender, Long.MaxValue / 3))
+          d.carryFee shouldBe carry(0)
+
+          val issueBlockId = appendBlock(issue)
+          d.carryFee shouldBe carry(issue.fee)
+
+          val sponsorBlockId = appendBlock(sponsor1)
+          d.carryFee shouldBe carry(sponsor1.fee)
+
+          appendBlock(transfer)
+          d.carryFee shouldBe carry(transfer.fee)
+
+          d.removeAfter(sponsorBlockId)
+          d.carryFee shouldBe carry(sponsor1.fee)
+
+          d.removeAfter(issueBlockId)
+          d.carryFee shouldBe carry(issue.fee)
+
+          val transferBlockId = appendBlock(transfer)
+          d.carryFee shouldBe carry(transfer.fee)
+
+          appendBlock(sponsor2)
+          d.carryFee shouldBe carry(sponsor2.fee)
+
+          d.removeAfter(transferBlockId)
+          d.carryFee shouldBe carry(transfer.fee)
         }
     }
   }

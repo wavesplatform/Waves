@@ -16,6 +16,7 @@ trait Blockchain {
   def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)]
 
   def lastBlock: Option[Block]
+  def carryFee: Option[Portfolio]
   def blockBytes(height: Int): Option[Array[Byte]]
   def blockBytes(blockId: ByteStr): Option[Array[Byte]]
 
@@ -74,6 +75,6 @@ trait Blockchain {
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
 
-  def append(diff: Diff, block: Block): Unit
+  def append(diff: Diff, carryFee: Option[Portfolio], block: Block): Unit
   def rollbackTo(targetBlockId: ByteStr): Seq[Block]
 }

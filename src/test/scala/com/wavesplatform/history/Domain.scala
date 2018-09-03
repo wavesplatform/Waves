@@ -12,4 +12,5 @@ case class Domain(blockchainUpdater: BlockchainUpdater with NG) {
   def lastBlockId                           = blockchainUpdater.lastBlockId.get
   def portfolio(address: Address)           = blockchainUpdater.portfolio(address)
   def addressTransactions(address: Address) = blockchainUpdater.addressTransactions(address, Set.empty, 128, 0)
+  def carryFee                              = blockchainUpdater.carryFee
 }
