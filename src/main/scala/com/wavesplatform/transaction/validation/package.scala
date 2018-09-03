@@ -81,5 +81,5 @@ package object validation {
   }
 
   def validateSigLength(signature: ByteStr): Either[ValidationError, Unit] =
-    Either.cond(signature.arr.length == crypto.SignatureLength, signature, ValidationError.InvalidSignature(None))
+    Either.cond(signature.arr.length == crypto.SignatureLength, (), ValidationError.InvalidSignature(None))
 }

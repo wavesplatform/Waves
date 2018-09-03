@@ -24,14 +24,12 @@ sealed trait OrderType {
 object OrderType {
 
   case object BUY extends OrderType {
-    def bytes: Array[Byte] = Array(0.toByte)
-
+    def bytes: Array[Byte]        = Array(0.toByte)
     override def toString: String = "buy"
   }
 
   case object SELL extends OrderType {
-    def bytes: Array[Byte] = Array(1.toByte)
-
+    def bytes: Array[Byte]        = Array(1.toByte)
     override def toString: String = "sell"
   }
 
