@@ -352,6 +352,36 @@ object MatcherTool extends ScorexLogging {
     log.info(s"Total records added: $totalRecordsAdded")
   }
 
+  def writeLastActive(db: DB): Unit = {
+    val lastActiveOrderIdxs: JHashMap[Address, Int] = {
+      val r   = new JHashMap[Address, Int]()
+      val key = Shorts.toByteArray(3) // MatcherKeys.addressOrdersSeqNr
+      db.iterateOver(key) { e =>
+        val addrOrdersSeqNr = Ints.fromByteArray(e.getValue)
+        if (addrOrdersSeqNr > 0) {
+          val address = Address.fromBytes(e.getKey.drop(2)).explicitGet()
+          val activeIdxs = for {
+            idx             <- (1 to db.get(MatcherKeys.addressOrdersSeqNr(address))).view
+            orderSpendAsset <- db.get(MatcherKeys.addressOrders(address, idx))
+            orderInfo = db.get(MatcherKeys.orderInfo(orderSpendAsset.orderId))
+            if !orderInfo.status.isFinal
+          } yield idx
+
+          activeIdxs.headOption.foreach(r.put(address, _))
+        }
+      }
+      r
+    }
+
+    log.info(s"Total addresses with active orders: ${lastActiveOrderIdxs.size()}")
+
+    db.readWrite { rw =>
+      lastActiveOrderIdxs.forEach { (address, lastIdx) =>
+        rw.put(MatcherKeys.lastAddressActiveOrderSeqNr(address), lastIdx)
+      }
+    }
+  }
+
   def main(args: Array[String]): Unit = {
     log.info(s"OK, engine start")
 
@@ -394,6 +424,10 @@ object MatcherTool extends ScorexLogging {
       case "create-pair-indexes" =>
         log.info("Creating pair indexes")
         createPairIndexes(db)
+        log.info("Completed")
+      case "write-last-active" =>
+        log.info("Writing last active indexes")
+        writeLastActive(db)
         log.info("Completed")
       case _ =>
     }

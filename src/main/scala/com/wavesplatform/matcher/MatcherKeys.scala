@@ -71,4 +71,6 @@ object MatcherKeys {
   def addressOrdersByPairSeqNr(address: Address, pair: AssetPair): Key[Int] = bytesSeqNr(11, address.bytes.arr ++ pair.bytes)
   def addressOrdersByPair(address: Address, pair: AssetPair, seqNr: Int): Key[Option[Order.Id]] =
     Key.opt(hBytes(11, seqNr, address.bytes.arr ++ pair.bytes), ByteStr(_), _.arr)
+
+  def lastAddressActiveOrderSeqNr(address: Address): Key[Int] = bytesSeqNr(12, address.bytes.arr)
 }
