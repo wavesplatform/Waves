@@ -340,11 +340,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
 
   override def lastBlock: Option[Block] = ngState.map(_.bestLiquidBlock).orElse(blockchain.lastBlock)
 
-  override def carryFee: Option[Portfolio] = {
-    val ng = ngState.flatMap(_.carryFee)
-    Console.err.println(s"<==> BUI.carryFee: ng $ng, bc ${blockchain.carryFee}") ///
-    ng.orElse(blockchain.carryFee)
-  }
+  override def carryFee: Long = ngState.map(_.carryFee).getOrElse(blockchain.carryFee)
 
   override def blockBytes(blockId: ByteStr): Option[Array[Byte]] =
     (for {
@@ -517,7 +513,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
       blockchain.collectLposPortfolios(pf) ++ b.result()
     }
 
-  override def append(diff: Diff, carry: Option[Portfolio], block: Block): Unit = blockchain.append(diff, carry, block)
+  override def append(diff: Diff, carry: Long, block: Block): Unit = blockchain.append(diff, carry, block)
 
   override def rollbackTo(targetBlockId: AssetId): Seq[Block] = blockchain.rollbackTo(targetBlockId)
 

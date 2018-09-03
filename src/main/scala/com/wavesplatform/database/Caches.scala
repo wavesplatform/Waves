@@ -92,7 +92,7 @@ trait Caches extends Blockchain {
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   protected def doAppend(block: Block,
-                         carryFee: Option[Portfolio],
+                         carryFee: Long,
                          addresses: Map[Address, BigInt],
                          wavesBalances: Map[BigInt, Long],
                          assetBalances: Map[BigInt, Map[ByteStr, Long]],
@@ -107,7 +107,7 @@ trait Caches extends Blockchain {
                          aliases: Map[Alias, BigInt],
                          sponsorship: Map[AssetId, Sponsorship]): Unit
 
-  override def append(diff: Diff, carryFee: Option[Portfolio], block: Block): Unit = {
+  override def append(diff: Diff, carryFee: Long, block: Block): Unit = {
     heightCache += 1
     scoreCache += block.blockScore()
     lastBlockCache = Some(block)

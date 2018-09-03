@@ -3,7 +3,6 @@ package com.wavesplatform.state
 import java.util.concurrent.TimeUnit
 
 import cats.kernel.Monoid
-import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.block.Block.BlockId
@@ -12,8 +11,7 @@ import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
 
 import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
 
-class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Option[Portfolio], val approvedFeatures: Set[Short])
-    extends ScorexLogging {
+class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long, val approvedFeatures: Set[Short]) extends ScorexLogging {
 
   private val MaxTotalDiffs = 3
 
@@ -24,11 +22,11 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Opti
     .maximumSize(MaxTotalDiffs)
     .expireAfterWrite(10, TimeUnit.MINUTES)
     .build[BlockId, Diff]()
-  var carry: Option[Portfolio] = baseBlockCarry ///make this per id
+  var carry: Long = baseBlockCarry ///make this per id
 
   def microBlockIds: Seq[BlockId] = micros.map(_.totalResBlockSig).toList
 
-  private def diffFor(totalResBlockSig: BlockId): (Diff, Option[Portfolio]) =
+  private def diffFor(totalResBlockSig: BlockId): (Diff, Long) =
     if (totalResBlockSig == base.uniqueId)
       (baseBlockDiff, baseBlockCarry)
     else
@@ -59,7 +57,7 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Opti
       base.copy(signerData = base.signerData.copy(signature = micros.head.totalResBlockSig), transactionData = transactions)
     }
 
-  def totalDiffOf(id: BlockId): Option[(Block, Diff, Option[Portfolio], DiscardedMicroBlocks)] =
+  def totalDiffOf(id: BlockId): Option[(Block, Diff, Long, DiscardedMicroBlocks)] =
     forgeBlock(id).map {
       case (b, txs) =>
         val (d, c) = diffFor(id)
@@ -106,15 +104,15 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Opti
     BlockMinerInfo(base.consensusData, base.timestamp, blockId)
   }
 
-  def append(m: MicroBlock, diff: Diff, microblockCarry: Option[Portfolio], timestamp: Long): Unit = {
+  def append(m: MicroBlock, diff: Diff, microblockCarry: Long, timestamp: Long): Unit = {
     microDiffs.put(m.totalResBlockSig, (diff, timestamp))
     micros.prepend(m)
-    carry = carry.combine(microblockCarry)
+    carry += microblockCarry
     Console.err.println(s"<==> NGS append: diff $diff")                          ///
     Console.err.println(s"<==> NGS append: carry $microblockCarry total $carry") ///
   }
 
-  def carryFee: Option[Portfolio] = carry
+  def carryFee: Long = carry
 
   Console.err.println(s"<==> NGS mdiffs=$microDiffs baseCarry=$baseBlockCarry") ///
 }

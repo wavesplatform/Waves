@@ -23,7 +23,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
                                                 blockchain: Blockchain,
                                                 maybePrevBlock: Option[Block],
                                                 block: Block,
-                                                constraint: Constraint): Either[ValidationError, (Diff, Option[Portfolio], Constraint)] = {
+                                                constraint: Constraint): Either[ValidationError, (Diff, Long, Constraint)] = {
     val stateHeight = blockchain.height
 
     // height switch is next after activation
@@ -31,10 +31,9 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     val sponsorshipHeight = Sponsorship.sponsoredFeesSwitchHeight(blockchain, settings)
 
     lazy val prevBlockFeeDistr: Option[Portfolio] =
-      if (stateHeight >= sponsorshipHeight) {
-        Console.err.println(s"FB prevFee read from $blockchain") ///
-        blockchain.carryFee
-      } else if (stateHeight > ngHeight)
+      if (stateHeight >= sponsorshipHeight)
+        Some(Portfolio.empty.copy(balance = blockchain.carryFee))
+      else if (stateHeight > ngHeight)
         maybePrevBlock.map(_.prevBlockFeePart())
       else None
 
@@ -67,7 +66,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
                                                      prevBlockTimestamp: Option[Long],
                                                      micro: MicroBlock,
                                                      timestamp: Long,
-                                                     constraint: Constraint): Either[ValidationError, (Diff, Option[Portfolio], Constraint)] = {
+                                                     constraint: Constraint): Either[ValidationError, (Diff, Long, Constraint)] = {
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
       _ <- Either.cond(blockchain.activatedFeatures.contains(BlockchainFeatures.NG.id), (), ActivationError(s"MicroBlocks are not yet activated"))
@@ -96,17 +95,16 @@ object BlockDiffer extends ScorexLogging with Instrumented {
                                                     currentBlockFeeDistr: Option[Portfolio],
                                                     timestamp: Long,
                                                     txs: Seq[Transaction],
-                                                    currentBlockHeight: Int): Either[ValidationError, (Diff, Option[Portfolio], Constraint)] = {
+                                                    currentBlockHeight: Int): Either[ValidationError, (Diff, Long, Constraint)] = {
     def updateConstraint(constraint: Constraint, blockchain: Blockchain, tx: Transaction): Constraint =
       constraint.put(blockchain, tx).asInstanceOf[Constraint]
 
-    val txDiffer                                    = TransactionDiffer(settings, prevBlockTimestamp, timestamp, currentBlockHeight) _
-    val initDiff                                    = Diff.empty.copy(portfolios = Map(blockGenerator -> currentBlockFeeDistr.orElse(prevBlockFeeDistr).orEmpty))
-    val init: (Diff, Option[Portfolio], Constraint) = (initDiff, None, initConstraint)
-    val hasNg                                       = currentBlockFeeDistr.isEmpty
-    val hasSponsorship                              = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, settings)
+    val txDiffer       = TransactionDiffer(settings, prevBlockTimestamp, timestamp, currentBlockHeight) _
+    val initDiff       = Diff.empty.copy(portfolios = Map(blockGenerator -> currentBlockFeeDistr.orElse(prevBlockFeeDistr).orEmpty))
+    val hasNg          = currentBlockFeeDistr.isEmpty
+    val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, settings)
 
-    def clearSponsorship(blockchain: Blockchain, portfolio: Portfolio): (Portfolio, Option[Portfolio]) = {
+    def clearSponsorship(blockchain: Blockchain, portfolio: Portfolio): (Portfolio, Long) = {
       val spPf =
         if (hasSponsorship)
           Portfolio.empty.copy(
@@ -121,15 +119,15 @@ object BlockDiffer extends ScorexLogging with Instrumented {
       val ngPf = if (hasNg) {
         val curPf  = spPf.multiply(Block.CurrentBlockFeePart)
         val nextPf = spPf.minus(curPf)
-        (curPf, Some(nextPf))
-      } else (spPf, None)
-      if (hasSponsorship) ngPf else ngPf.copy(_2 = None)
+        (curPf, nextPf.balance)
+      } else (spPf, 0L)
+      if (hasSponsorship) ngPf else ngPf.copy(_2 = 0L)
     }
 
     Console.err.println(s"A prevFees = $prevBlockFeeDistr")    ///
     Console.err.println(s"A currFees = $currentBlockFeeDistr") ///
     txs
-      .foldLeft(init.asRight[ValidationError]) {
+      .foldLeft((initDiff, 0L, initConstraint).asRight[ValidationError]) {
         case (r @ Left(_), _) => r
         case (Right((currDiff, carryFee, currConstraint)), tx) =>
           val updatedBlockchain = composite(blockchain, currDiff)
@@ -141,13 +139,12 @@ object BlockDiffer extends ScorexLogging with Instrumented {
               val updatedDiff = currDiff.combine(newDiff)
               Console.err.println(s"A   cbh=$currentBlockHeight ng=$hasNg sp=$hasSponsorship") ///
               if (hasNg) {
-                val (curPf, nextPf) = clearSponsorship(updatedBlockchain, tx.feeDiff())
-                Console.err.println(s"A      NG curr=$curPf")  ///
-                Console.err.println(s"A      NG next=$nextPf") ///
-                val diff  = updatedDiff.combine(Diff.empty.copy(portfolios = Map(blockGenerator -> curPf)))
-                val carry = carryFee.flatMap(pf => nextPf.map(_.combine(pf))).orElse(nextPf)
-                (diff, carry, updatedConstraint)
-              } else (updatedDiff, None, updatedConstraint)
+                val (curBlockFees, nextBlockFee) = clearSponsorship(updatedBlockchain, tx.feeDiff())
+                Console.err.println(s"A      NG curr=$curBlockFees") ///
+                Console.err.println(s"A      NG next=$nextBlockFee") ///
+                val diff = updatedDiff.combine(Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees)))
+                (diff, carryFee + nextBlockFee, updatedConstraint)
+              } else (updatedDiff, 0L, updatedConstraint)
             }
             Console.err.println(s"A   tx=$tx") ///
 //            Console.err.println(s"A   diff = ${z.map(_._1)}") ///
@@ -156,7 +153,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
           }
       }
       .map {
-        case (d, carryFee, constraint) =>
+        case (d, carry, constraint) =>
           val diffWithCancelledLeases =
             if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
               Monoid.combine(d, CancelAllLeases(composite(blockchain, d)))
@@ -172,7 +169,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
               Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn(composite(blockchain, diffWithLeasePatches)))
             else diffWithLeasePatches
 
-          (diffWithCancelledLeaseIns, carryFee, constraint)
+          (diffWithCancelledLeaseIns, carry, constraint)
       }
   }
 }

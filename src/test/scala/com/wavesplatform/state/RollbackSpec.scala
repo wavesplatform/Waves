@@ -426,7 +426,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
             d.appendBlock(TestBlock.create(ts, d.lastBlockId, Seq(tx)))
             d.lastBlockId
           }
-          def carry(fee: Long) = Some(Portfolio(fee - fee / 5 * 2, LeaseBalance(0, 0), Map.empty))
+          def carry(fee: Long) = fee - fee / 5 * 2
 
           d.appendBlock(genesisBlock(ts, sender, Long.MaxValue / 3))
           d.carryFee shouldBe carry(0)
