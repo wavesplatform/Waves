@@ -82,7 +82,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     (matcherFee < MaxAmount) :| "matcherFee too large" &&
     (timestamp > 0) :| "timestamp should be > 0" &&
     (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
-    (expiration >= atTime) :| "expiration should be > currentTime"
+    (expiration >= atTime) :| "expiration should be > currentTime" &&
+    (signature.length == crypto.SignatureLength) :| s"Invalid order signature length: must be ${crypto.SignatureLength}"
   }
 
   def isValidAmount(matchPrice: Long, matchAmount: Long): Validation = {
