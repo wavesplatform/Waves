@@ -80,7 +80,11 @@ object CommonValidation {
                                              height: Int,
                                              tx: T): Either[ValidationError, T] = tx match {
     case _: PaymentTransaction => Right(tx)
-    case _                     => if (blockchain.containsTransaction(tx.id())) Left(AlreadyInTheState(tx.id(), 0)) else Right(tx)
+    case _ =>
+      blockchain.transactionInfo(tx.id()) match {
+        case Some((h, _)) => Left(AlreadyInTheState(tx.id(), h))
+        case None         => Right(tx)
+      }
   }
 
   def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, height: Int, tx: T): Either[ValidationError, T] = {
