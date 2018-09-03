@@ -43,7 +43,6 @@ object BlockDiffer extends ScorexLogging with Instrumented {
       else
         None
 
-    Console.err.println(s"FB h=$stateHeight ng@$ngHeight sp@$sponsorshipHeight") ///
     for {
       _ <- block.sigValidEi()
       r <- apply(
@@ -124,8 +123,6 @@ object BlockDiffer extends ScorexLogging with Instrumented {
       if (hasSponsorship) ngPf else ngPf.copy(_2 = 0L)
     }
 
-    Console.err.println(s"A prevFees = $prevBlockFeeDistr")    ///
-    Console.err.println(s"A currFees = $currentBlockFeeDistr") ///
     txs
       .foldLeft((initDiff, 0L, initConstraint).asRight[ValidationError]) {
         case (r @ Left(_), _) => r
@@ -134,23 +131,15 @@ object BlockDiffer extends ScorexLogging with Instrumented {
           val updatedConstraint = updateConstraint(currConstraint, updatedBlockchain, tx)
           if (updatedConstraint.isOverfilled)
             Left(ValidationError.GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint"))
-          else {
-            val z = txDiffer(updatedBlockchain, tx).map { newDiff =>
+          else
+            txDiffer(updatedBlockchain, tx).map { newDiff =>
               val updatedDiff = currDiff.combine(newDiff)
-              Console.err.println(s"A   cbh=$currentBlockHeight ng=$hasNg sp=$hasSponsorship") ///
               if (hasNg) {
                 val (curBlockFees, nextBlockFee) = clearSponsorship(updatedBlockchain, tx.feeDiff())
-                Console.err.println(s"A      NG curr=$curBlockFees") ///
-                Console.err.println(s"A      NG next=$nextBlockFee") ///
-                val diff = updatedDiff.combine(Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees)))
+                val diff                         = updatedDiff.combine(Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees)))
                 (diff, carryFee + nextBlockFee, updatedConstraint)
               } else (updatedDiff, 0L, updatedConstraint)
             }
-            Console.err.println(s"A   tx=$tx") ///
-//            Console.err.println(s"A   diff = ${z.map(_._1)}") ///
-            Console.err.println(s"A   crry = ${z.map(_._2)}") ///
-            z
-          }
       }
       .map {
         case (d, carry, constraint) =>

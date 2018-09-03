@@ -58,7 +58,6 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
     forgeBlock(id).map {
       case (b, txs) =>
         val (d, c) = diffFor(id)
-//        Console.err.println(s"<==> NGS totalDiff $d carry $c") ///
         (b, d, c, txs)
     }
 
@@ -104,10 +103,7 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
   def append(m: MicroBlock, diff: Diff, microblockCarry: Long, timestamp: Long): Unit = {
     microDiffs.put(m.totalResBlockSig, (diff, microblockCarry, timestamp))
     micros.prepend(m)
-    Console.err.println(s"<==> NGS append: diff $diff carry $microblockCarry") ///
   }
 
   def carryFee: Long = baseBlockCarry + microDiffs.values.map(_._2).sum
-
-  Console.err.println(s"<==> NGS mdiffs=$microDiffs baseCarry=$baseBlockCarry") ///
 }
