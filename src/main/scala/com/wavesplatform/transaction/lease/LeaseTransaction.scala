@@ -29,6 +29,8 @@ trait LeaseTransaction extends ProvenTransaction with VersionedTransaction {
 
 object LeaseTransaction {
 
+  val typeId: Byte = 8
+
   object Status {
     val Active   = "active"
     val Canceled = "canceled"

@@ -41,6 +41,9 @@ trait ReissueTransaction extends ProvenTransaction with VersionedTransaction {
 }
 
 object ReissueTransaction {
+
+  val typeId: Byte = 5
+
   def validateReissueParams(quantity: Long, fee: Long): Either[ValidationError, Unit] =
     (validateAmount(quantity, "assets"), validateFee(fee))
       .mapN { case _ => () }

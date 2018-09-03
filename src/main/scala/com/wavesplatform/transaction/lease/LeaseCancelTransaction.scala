@@ -28,6 +28,9 @@ trait LeaseCancelTransaction extends ProvenTransaction with VersionedTransaction
 }
 
 object LeaseCancelTransaction {
+
+  val typeId: Byte = 9
+
   def validateLeaseCancelParams(leaseId: ByteStr, fee: Long) =
     if (leaseId.arr.length != crypto.DigestSize) {
       Left(ValidationError.GenericError("Lease transaction id is invalid"))

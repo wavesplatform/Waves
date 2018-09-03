@@ -31,7 +31,7 @@ case class TransferTransactionV2 private (version: Byte,
 
 object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2] with TransactionParser.MultipleVersions {
 
-  override val typeId: Byte                 = 4
+  override val typeId: Byte                 = TransferTransaction.typeId
   override val supportedVersions: Set[Byte] = Set(2)
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =

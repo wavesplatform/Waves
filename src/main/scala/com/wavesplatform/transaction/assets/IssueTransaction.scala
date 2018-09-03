@@ -50,6 +50,8 @@ trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
 }
 object IssueTransaction {
 
+  val typeId: Byte = 3
+
   val MaxDescriptionLength = 1000
   val MaxAssetNameLength   = 16
   val MinAssetNameLength   = 4

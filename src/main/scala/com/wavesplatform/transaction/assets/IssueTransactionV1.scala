@@ -33,7 +33,7 @@ case class IssueTransactionV1 private (sender: PublicKeyAccount,
 
 object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte = 3
+  override val typeId: Byte = IssueTransaction.typeId
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
