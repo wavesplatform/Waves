@@ -13,14 +13,12 @@ object DBUtils {
   import OrderInfo.orderStatusOrdering
 
   def ordersByAddressAndPair(db: DB, address: Address, pair: AssetPair, activeOnly: Boolean): Seq[(Order, OrderInfo)] = db.readOnly { ro =>
-    val changedAssets = Set(pair.priceAsset, pair.amountAsset)
     (for {
-      idx             <- db.get(MatcherKeys.addressOrdersSeqNr(address)) to 1 by -1
-      orderSpendAsset <- ro.get(MatcherKeys.addressOrders(address, idx))
-      if changedAssets.isEmpty || changedAssets(orderSpendAsset.spendAsset)
-      order <- ro.get(MatcherKeys.order(orderSpendAsset.orderId))
-      orderInfo = ro.get(MatcherKeys.orderInfo(orderSpendAsset.orderId))
-      if !(activeOnly && orderInfo.status.isFinal) && order.assetPair == pair
+      idx     <- db.get(MatcherKeys.addressOrdersByPairSeqNr(address, pair)) to 1 by -1
+      orderId <- ro.get(MatcherKeys.addressOrdersByPair(address, pair, idx))
+      order   <- ro.get(MatcherKeys.order(orderId))
+      orderInfo = ro.get(MatcherKeys.orderInfo(orderId))
+      if !(activeOnly && orderInfo.status.isFinal)
     } yield (order, orderInfo)).sortBy { case (order, info) => (info.status, -order.timestamp) }
   }
 
