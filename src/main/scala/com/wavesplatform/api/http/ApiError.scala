@@ -29,7 +29,7 @@ object ApiError {
       case ValidationError.NegativeMinFee(x, of)   => NegativeMinFee(s"$x per $of")
       case ValidationError.InsufficientFee(x)      => InsufficientFee(x)
       case ValidationError.InvalidName             => InvalidName
-      case ValidationError.InvalidSignature(_, _)  => InvalidSignature
+      case ValidationError.InvalidSignature(_)     => InvalidSignature
       case ValidationError.InvalidRequestSignature => InvalidSignature
       case ValidationError.TooBigArray             => TooBigArrayAllocation
       case ValidationError.OverflowError           => OverflowError

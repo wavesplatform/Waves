@@ -62,11 +62,11 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
              feeAssetId: Option[AssetId],
              feeAmount: Long,
              attachment: Array[Byte],
-             signature: ByteStr): Either[ValidationError, TransactionT] = {
-    TransferTransaction
-      .validate(amount, feeAmount, attachment)
-      .map(_ => TransferTransactionV1(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, signature))
-  }
+             signature: ByteStr): Either[ValidationError, TransactionT] =
+    for {
+      _ <- TransferTransaction.validate(amount, feeAmount, attachment)
+      _ <- com.wavesplatform.transaction.validation.validateSigLength(signature)
+    } yield TransferTransactionV1(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, signature)
 
   def signed(assetId: Option[AssetId],
              sender: PublicKeyAccount,

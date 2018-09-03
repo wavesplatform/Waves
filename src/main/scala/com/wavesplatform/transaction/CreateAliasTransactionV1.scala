@@ -41,11 +41,10 @@ object CreateAliasTransactionV1 extends TransactionParserFor[CreateAliasTransact
     }.flatten
 
   def create(sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, TransactionT] =
-    if (fee <= 0) {
-      Left(ValidationError.InsufficientFee())
-    } else {
-      Right(CreateAliasTransactionV1(sender, alias, fee, timestamp, signature))
-    }
+    for {
+      _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee())
+      _ <- com.wavesplatform.transaction.validation.validateSigLength(signature)
+    } yield CreateAliasTransactionV1(sender, alias, fee, timestamp, signature)
 
   def signed(sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
     create(sender, alias, fee, timestamp, ByteStr.empty).right.map { unsigned =>

@@ -50,9 +50,10 @@ object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] w
              fee: Long,
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, TransactionT] =
-    ReissueTransaction
-      .validateReissueParams(quantity, fee)
-      .map(_ => ReissueTransactionV1(sender, assetId, quantity, reissuable, fee, timestamp, signature))
+    for {
+      _ <- ReissueTransaction.validateReissueParams(quantity, fee)
+      _ <- com.wavesplatform.transaction.validation.validateSigLength(signature)
+    } yield ReissueTransactionV1(sender, assetId, quantity, reissuable, fee, timestamp, signature)
 
   def signed(sender: PublicKeyAccount,
              assetId: ByteStr,

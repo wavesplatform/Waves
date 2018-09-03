@@ -109,6 +109,8 @@ object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] wit
       Left(OrderValidationError(sellOrder, sellOrder.isValid(timestamp).labels.mkString("\n")))
     } else if (!priceIsValid) {
       Left(GenericError("priceIsValid"))
+    } else if (signature.arr.length != crypto.SignatureLength) {
+      Left(ValidationError.InvalidSignature(None))
     } else {
       Right(ExchangeTransaction(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature))
     }

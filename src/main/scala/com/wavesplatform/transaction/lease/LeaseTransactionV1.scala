@@ -45,9 +45,10 @@ object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with 
              timestamp: Long,
              recipient: AddressOrAlias,
              signature: ByteStr): Either[ValidationError, TransactionT] =
-    LeaseTransaction
-      .validateLeaseParams(amount, fee, recipient, sender)
-      .map(_ => LeaseTransactionV1(sender, amount, fee, timestamp, recipient, signature))
+    for {
+      _ <- LeaseTransaction.validateLeaseParams(amount, fee, recipient, sender)
+      _ <- com.wavesplatform.transaction.validation.validateSigLength(signature)
+    } yield LeaseTransactionV1(sender, amount, fee, timestamp, recipient, signature)
 
   def signed(sender: PublicKeyAccount,
              amount: Long,

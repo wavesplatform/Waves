@@ -40,7 +40,10 @@ object LeaseCancelTransactionV1 extends TransactionParserFor[LeaseCancelTransact
     }.flatten
 
   def create(sender: PublicKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, TransactionT] =
-    LeaseCancelTransaction.validateLeaseCancelParams(leaseId, fee).map(_ => LeaseCancelTransactionV1(sender, leaseId, fee, timestamp, signature))
+    for {
+      _ <- LeaseCancelTransaction.validateLeaseCancelParams(leaseId, fee)
+      _ <- com.wavesplatform.transaction.validation.validateSigLength(signature)
+    } yield LeaseCancelTransactionV1(sender, leaseId, fee, timestamp, signature)
 
   def signed(sender: PublicKeyAccount,
              leaseId: ByteStr,

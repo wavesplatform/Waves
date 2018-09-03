@@ -85,7 +85,7 @@ object MicroBlockSynchronizer {
                 .filter(_ == prevSig && !alreadyRequested(totalSig))
                 .foreach(tryDownloadNext)
             } else {
-              peerDatabase.blacklistAndClose(ch, InvalidSignature(mbInv).toString)
+              peerDatabase.blacklistAndClose(ch, InvalidSignature(Some(mbInv)).toString)
             }
           }
       }

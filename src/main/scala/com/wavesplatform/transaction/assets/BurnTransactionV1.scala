@@ -43,9 +43,10 @@ object BurnTransactionV1 extends TransactionParserFor[BurnTransactionV1] with Tr
              fee: Long,
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, TransactionT] =
-    BurnTransaction
-      .validateBurnParams(quantity, fee)
-      .map(_ => BurnTransactionV1(sender, assetId, quantity, fee, timestamp, signature))
+    for {
+      _ <- BurnTransaction.validateBurnParams(quantity, fee)
+      _ <- com.wavesplatform.transaction.validation.validateSigLength(signature)
+    } yield BurnTransactionV1(sender, assetId, quantity, fee, timestamp, signature)
 
   def signed(sender: PublicKeyAccount,
              assetId: ByteStr,
