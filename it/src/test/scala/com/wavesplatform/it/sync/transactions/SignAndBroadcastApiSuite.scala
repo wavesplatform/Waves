@@ -60,7 +60,10 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
     def assertBroadcastBadJson(json: JsObject, expectedMessage: String) =
       assertBadRequestAndMessage(sender.postJson("/transactions/broadcast", json), expectedMessage)
 
+    val expectedErrorMessage = "Script doesn't exist and proof doesn't validate"
+
     val timestamp = System.currentTimeMillis
+
     val jsonV1 = Json.obj(
       "type"            -> 10,
       "senderPublicKey" -> "8LbAU5BSrGkpk5wbjLMNjrbc9VzN9KBBYv9X8wGpmAJT",
@@ -69,8 +72,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
       "timestamp"       -> timestamp,
       "signature"       -> "A" * 64
     )
-
-    assertBroadcastBadJson(jsonV1, "invalid signature")
+    assertBroadcastBadJson(jsonV1, expectedErrorMessage)
 
     val jsonV2 = Json.obj(
       "type"            -> 10,
@@ -82,7 +84,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
       "proofs"          -> List("A" * 64)
     )
 
-    assertBroadcastBadJson(jsonV2, "Script doesn't exist and proof doesn't validate")
+    assertBroadcastBadJson(jsonV2, expectedErrorMessage)
 
     for (j <- List(jsonV1, jsonV2)) {
       assertBroadcastBadJson(j - "type", "failed to parse json message")

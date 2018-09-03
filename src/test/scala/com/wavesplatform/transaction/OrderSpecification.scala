@@ -3,11 +3,10 @@ package com.wavesplatform.transaction
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.matcher.ValidationMatcher
 import com.wavesplatform.state.ByteStr
-import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.utils.NTP
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 class OrderSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with ValidationMatcher {
 
@@ -79,24 +78,24 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
   property("Order signature validation") {
     forAll(orderGen, accountGen) {
       case (order, pka) =>
-        order.signaturesValid() shouldBe an[Right[_, _]]
-        order.copy(senderPublicKey = pka).signaturesValid() should produce("InvalidSignature")
-        order.copy(matcherPublicKey = pka).signaturesValid() should produce("InvalidSignature")
+        order.signatureValid() shouldBe true
+        order.copy(senderPublicKey = pka).signatureValid() shouldBe false
+        order.copy(matcherPublicKey = pka).signatureValid() shouldBe false
         val assetPair = order.assetPair
         order
           .copy(
             assetPair = assetPair.copy(amountAsset = assetPair.amountAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_))))
-          .signaturesValid() should produce("InvalidSignature")
+          .signatureValid() shouldBe false
         order
           .copy(
             assetPair = assetPair.copy(priceAsset = assetPair.priceAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_))))
-          .signaturesValid() should produce("InvalidSignature")
-        order.copy(orderType = OrderType.reverse(order.orderType)).signaturesValid() should produce("InvalidSignature")
-        order.copy(price = order.price + 1).signaturesValid() should produce("InvalidSignature")
-        order.copy(amount = order.amount + 1).signaturesValid() should produce("InvalidSignature")
-        order.copy(expiration = order.expiration + 1).signaturesValid() should produce("InvalidSignature")
-        order.copy(matcherFee = order.matcherFee + 1).signaturesValid() should produce("InvalidSignature")
-        order.copy(signature = pka.publicKey ++ pka.publicKey).signaturesValid() should produce("InvalidSignature")
+          .signatureValid() shouldBe false
+        order.copy(orderType = OrderType.reverse(order.orderType)).signatureValid() shouldBe false
+        order.copy(price = order.price + 1).signatureValid() shouldBe false
+        order.copy(amount = order.amount + 1).signatureValid() shouldBe false
+        order.copy(expiration = order.expiration + 1).signatureValid() shouldBe false
+        order.copy(matcherFee = order.matcherFee + 1).signatureValid() shouldBe false
+        order.copy(signature = pka.publicKey ++ pka.publicKey).signatureValid() shouldBe false
     }
   }
 

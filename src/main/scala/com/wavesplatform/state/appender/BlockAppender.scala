@@ -56,7 +56,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
     BlockStats.received(newBlock, BlockStats.Source.Broadcast, ch)
     blockReceivingLag.safeRecord(System.currentTimeMillis() - newBlock.timestamp)
     (for {
-      _                <- EitherT(Task.now(newBlock.signaturesValid()))
+      _                <- EitherT(Task.now(newBlock.sigValidEi()))
       validApplication <- EitherT(apply(checkpoint, blockchainUpdater, time, utxStorage, pos, settings, scheduler)(newBlock))
     } yield validApplication).value.map {
       case Right(None) => // block already appended

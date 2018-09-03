@@ -6,6 +6,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.script.{Script, ScriptRunner}
 import com.wavesplatform.transaction.transfer._
 
@@ -16,9 +17,14 @@ object Verifier {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
         (pt, blockchain.accountScript(pt.sender)) match {
-          case (_, Some(script))              => verify(blockchain, script, currentBlockHeight, pt, false)
-          case (stx: SignedTransaction, None) => stx.signaturesValid()
-          case _                              => verifyAsEllipticCurveSignature(pt)
+          case (_, Some(script)) => verify(blockchain, script, currentBlockHeight, pt, false)
+          case (stx: ExchangeTransaction, None) =>
+            for {
+              _ <- stx.sigValidEi()
+              _ <- stx.buyOrder.sigValidEi()
+              _ <- stx.sellOrder.sigValidEi()
+            } yield stx
+          case _ => verifyAsEllipticCurveSignature(pt)
         }
     }).flatMap(tx => {
       for {
