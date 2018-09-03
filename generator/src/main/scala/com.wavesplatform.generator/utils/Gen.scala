@@ -14,6 +14,29 @@ import scorex.crypto.signatures.Curve25519._
 object Gen {
   private def random = ThreadLocalRandom.current
 
+  def script(complexity: Boolean = true): Script = {
+    val s = if (complexity) s"""
+                               |${(for (b <- 1 to 10) yield {
+                                 s"let a$b = blake2b256(base58'') != base58'' && keccak256(base58'') != base58'' && sha256(base58'') != base58'' && sigVerify(base58'333', base58'123', base58'567')"
+                               }).mkString("\n")}
+                               |
+                               |${(for (b <- 1 to 10) yield { s"a$b" }).mkString("&&")} || true
+       """.stripMargin
+    else
+      s"""
+        |${recString(10)} || true
+      """.stripMargin
+
+    val script = ScriptCompiler(s).explicitGet()
+
+    script._1
+  }
+
+  def recString(n: Int): String =
+    if (n <= 1) "true"
+    else
+      s"if (${recString(n - 1)}) then true else false"
+
   def oracleScript(oracle: PrivateKeyAccount, data: Set[DataEntry[_]]): Script = {
     val conditions =
       data.map {

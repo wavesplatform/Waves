@@ -5,13 +5,14 @@ import java.util.concurrent.Executors
 import cats.implicits.showInterpolator
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.generator.Preconditions.PGenSettings
+import com.wavesplatform.generator.Preconditions.{PGenSettings, UniverseHolder}
 import com.wavesplatform.generator.cli.ScoptImplicits
 import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.generator.utils.Universe
 import com.wavesplatform.network.RawBytes
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.settings.inetSocketAddressReader
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.LoggerFacade
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
@@ -114,12 +115,29 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
           c.copy(multisig = c.multisig.copy(firstRun = x))
         },
       )
+
+    cmd("swarm")
+      .action { (_, c) =>
+        c.copy(mode = Mode.SWARM)
+      }
+      .text("SetScript load test")
+      .children(
+        opt[Int]("scripts").abbr("st").optional().text("number of SetScripts transactions").action { (x, c) =>
+          c.copy(swarm = c.swarm.copy(scripts = x))
+        },
+        opt[Int]("transfers").abbr("tt").optional().text("number of Transfer transactions").action { (x, c) =>
+          c.copy(swarm = c.swarm.copy(transfers = x))
+        },
+        opt[Boolean]("complexity").abbr("ct").optional().text(" script complexity").action { (x, c) =>
+          c.copy(swarm = c.swarm.copy(complexity = x))
+        },
+      )
   }
 
   val preconditions =
     ConfigFactory
       .load("preconditions.conf")
-      .as[PGenSettings]("preconditions")(Preconditions.preconditionsReader)
+      .as[Option[PGenSettings]]("preconditions")(optionValueReader(Preconditions.preconditionsReader))
 
   val defaultConfig =
     ConfigFactory
@@ -141,6 +159,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         case Mode.DYN_WIDE => new DynamicWideTransactionGenerator(finalConfig.dynWide, finalConfig.privateKeyAccounts)
         case Mode.MULTISIG => new MultisigTransactionGenerator(finalConfig.multisig, finalConfig.privateKeyAccounts)
         case Mode.ORACLE   => new OracleTransactionGenerator(finalConfig.oracle, finalConfig.privateKeyAccounts)
+        case Mode.SWARM    => new SetScriptsTransactionGenerator(finalConfig.swarm, finalConfig.privateKeyAccounts)
       }
 
       val threadPool                            = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
@@ -150,7 +169,8 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
 
       sys.addShutdownHook(sender.close())
 
-      val (universe, initialTransactions) = Preconditions.mk(preconditions)
+      val (universe, initialTransactions) = preconditions
+        .fold((UniverseHolder(), List.empty[Transaction]))(Preconditions.mk)
 
       Universe.AccountsWithBalances = universe.accountsWithBalances
       Universe.IssuedAssets = universe.issuedAssets

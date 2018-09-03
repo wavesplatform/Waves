@@ -16,7 +16,6 @@ trait FicusImplicits {
     CollectionReaders.mapValueReader[Double].map { xs =>
       xs.map {
         case (k, v) => {
-          println(s"$k - $v")
           toTxType(k) -> v
         }
       }
