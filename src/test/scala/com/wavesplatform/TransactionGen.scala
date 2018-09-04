@@ -661,8 +661,9 @@ trait TransactionGenBase extends ScriptGen {
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       setScript <- selfSignedSetScriptTransactionGenP(master, ScriptV1(typed).explicitGet())
       transfer  <- transferGeneratorPV2(ts, master, recipient.toAddress, ENOUGH_AMT / 2)
-      lease     <- leaseAndCancelGeneratorP(master, recipient.toAddress, master)
-    } yield (genesis, setScript, lease._1, transfer)
+      fee       <- smallFeeGen
+      lease = LeaseTransactionV2.selfSigned(LeaseTransactionV2.supportedVersions.head, master, ENOUGH_AMT / 2, fee, ts, recipient).explicitGet()
+    } yield (genesis, setScript, lease, transfer)
 
   def smartIssueTransactionGen(senderGen: Gen[PrivateKeyAccount] = accountGen,
                                sGen: Gen[Option[Script]] = Gen.option(scriptGen)): Gen[IssueTransactionV2] =
