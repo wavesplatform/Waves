@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.transfer._
 class TransactionFieldAccessTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   private def preconditionsTransferAndLease(
-      code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransactionV1)] = {
+      code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransactionV2)] = {
     val untyped = Parser(code).get.value
     val typed   = CompilerV1(dummyCompilerContext, untyped).explicitGet()._1
     preconditionsTransferAndLease(typed)
