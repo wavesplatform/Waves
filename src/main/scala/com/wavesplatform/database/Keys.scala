@@ -94,4 +94,7 @@ object Keys {
   val AliasIsDisabledPrefix: Short = 43
   def aliasIsDisabled(alias: Alias): Key[Boolean] =
     Key(bytes(AliasIsDisabledPrefix, alias.bytes.arr), Option(_).exists(_(0) == 1), if (_) Array[Byte](1) else Array[Byte](0))
+
+  def carryFeeHistory: Key[Seq[Int]]   = historyKey(44, Array())
+  def carryFee(height: Int): Key[Long] = Key(h(45, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 }

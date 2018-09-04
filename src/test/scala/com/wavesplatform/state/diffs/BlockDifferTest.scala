@@ -7,10 +7,9 @@ import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.block.Block
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, Diff, EitherExt2}
-import com.wavesplatform.transaction.{GenesisTransaction, ValidationError}
+import com.wavesplatform.transaction.GenesisTransaction
 import org.scalatest.{FreeSpecLike, Matchers}
 import scorex.crypto.signatures.Curve25519._
 
@@ -110,8 +109,6 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
     }
   }
 
-  //TODO: Use functionality settings and activate NG in preactivated features
-
   private def assertDiff(blocks: Seq[Block], ngAtHeight: Int)(assertion: (Diff, Blockchain) => Unit): Unit = {
     val fs = FunctionalitySettings(
       featureCheckBlocksPeriod = ngAtHeight / 2,
@@ -129,23 +126,8 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       preActivatedFeatures = Map[Short, Int]((2, ngAtHeight)),
       doubleFeaturesPeriodsAfterHeight = Int.MaxValue
     )
-    assertDiffEiWithPrev(blocks.init, blocks.last, fs)(assertion)
+    assertNgDiffState(blocks.init, blocks.last, fs)(assertion)
   }
-
-  private def assertDiffEiWithPrev(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings)(assertion: (Diff, Blockchain) => Unit): Unit =
-    withStateAndHistory(fs) { bc =>
-      def differ(prev: Option[Block], b: Block): Either[ValidationError, Diff] =
-        BlockDiffer.fromBlock(fs, bc, prev, b, MiningConstraint.Unlimited).map(_._1)
-
-      zipWithPrev(preconditions).foreach {
-        case (prev, b) =>
-          bc.append(differ(prev, b).explicitGet(), b)
-      }
-
-      val totalDiff1 = differ(preconditions.lastOption, block).explicitGet()
-      bc.append(totalDiff1, block)
-      assertion(totalDiff1, bc)
-    }
 
   private def getTwoMinersBlockChain(from: PrivateKeyAccount, to: PrivateKeyAccount, numPayments: Int): Seq[Block] = {
     val ts                   = System.currentTimeMillis() - 100000
