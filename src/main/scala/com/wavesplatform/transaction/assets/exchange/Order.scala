@@ -5,12 +5,12 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.crypto
 import com.wavesplatform.serialization.{BytesSerializable, Deser, JsonSerializable}
 import com.wavesplatform.state.ByteStr
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.ValidationError.{GenericError, InvalidSignature}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.utils.Base58
 import io.swagger.annotations.ApiModelProperty
-import monix.eval.Coeval
+import monix.eval.{Coeval, Task}
 import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 
@@ -185,6 +185,12 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
 
   override def hashCode(): Int = id().hashCode()
 
+  @ApiModelProperty(hidden = true)
+  def getSignedDescendants: Coeval[Seq[Signed]] = signedDescendants
+  @ApiModelProperty(hidden = true)
+  def getSignaturesValidMemoized: Task[Either[InvalidSignature, Order.this.type]] = signaturesValidMemoized
+  @ApiModelProperty(hidden = true)
+  def getSignaturesValid: Coeval[Either[InvalidSignature, Order.this.type]] = signaturesValid
 }
 
 object Order {

@@ -78,7 +78,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
     setScriptTransaction: SetScriptTransaction = SetScriptTransaction
       .selfSigned(1, recipient, Some(typedScript), 100000000L, ts)
       .explicitGet()
-    nextTransfer <- transferGeneratorP(ts, recipient, master.toAddress, ENOUGH_AMT)
+    nextTransfer <- transferGeneratorPV2(ts, recipient, master.toAddress, ENOUGH_AMT)
   } yield (genesis, payment, setScriptTransaction, nextTransfer)
 
   val settings = TestFunctionalitySettings.Enabled.copy(blockVersion3AfterHeight = 100)

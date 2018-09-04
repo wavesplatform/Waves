@@ -157,7 +157,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
               measureSuccessful(forgeBlockTimeStats, ng.totalDiffOf(block.reference)) match {
                 case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
                 case Some((referencedForgedBlock, referencedLiquidDiff, carry, discarded)) =>
-                  if (referencedForgedBlock.signatureValid()) {
+                  if (referencedForgedBlock.signaturesValid().isRight) {
                     if (discarded.nonEmpty) {
                       microBlockForkStats.increment()
                       microBlockForkHeightStats.record(discarded.size)
@@ -240,6 +240,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
             Left(MicroBlockAppendError("It doesn't reference last known microBlock(which exists)", microBlock))
           case _ =>
             for {
+              _ <- microBlock.signaturesValid()
               r <- {
                 val constraints  = MiningConstraints(settings.minerSettings, blockchain, blockchain.height)
                 val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)

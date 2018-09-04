@@ -60,8 +60,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             .buildAndSign(version, time, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), transactionData, recipient, Set.empty)
             .explicitGet()
           val parsedBlock = Block.parseBytes(block.bytes()).get
-          assert(block.signatureValid())
-          assert(parsedBlock.signatureValid())
+          assert(block.signaturesValid().isRight)
+          assert(parsedBlock.signaturesValid().isRight)
           assert(parsedBlock.consensusData.generationSignature == generationSignature)
           assert(parsedBlock.version.toInt == version)
           assert(parsedBlock.signerData.generator.publicKey.sameElements(recipient.publicKey))
@@ -111,8 +111,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
                         featureVotes)
           .explicitGet()
         val parsedBlock = Block.parseBytes(block.bytes()).get
-        assert(block.signatureValid())
-        assert(parsedBlock.signatureValid())
+        assert(block.signaturesValid().isRight)
+        assert(parsedBlock.signaturesValid().isRight)
         assert(parsedBlock.consensusData.generationSignature == generationSignature)
         assert(parsedBlock.version.toInt == version)
         assert(parsedBlock.signerData.generator.publicKey.sameElements(recipient.publicKey))
@@ -136,8 +136,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     forAll(bigBlockGen(100 * 1000)) {
       case block =>
         val parsedBlock = Block.parseBytes(block.bytes()).get
-        block.signatureValid() shouldBe true
-        parsedBlock.signatureValid() shouldBe true
+        block.signaturesValid() shouldBe 'right
+        parsedBlock.signaturesValid() shouldBe 'right
     }
   }
 }

@@ -259,13 +259,6 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
   private def transactionGen(sender: PrivateKeyAccount, ts: Long, feeAmount: Long): Gen[TransferTransactionV1] = accountGen.map { recipient =>
     TransferTransactionV1.selfSigned(None, sender, recipient, waves(1), ts, None, feeAmount, Array.emptyByteArray).explicitGet()
   }
-
-  private val notEnoughFeeTxWithScriptedAccount = for {
-    (sender, _, utx, ts) <- withScriptedAccount
-    feeAmount            <- choose[Long](1, extraFee - 1)
-    tx                   <- transactionGen(sender, ts + 1, feeAmount)
-  } yield (utx, tx)
-
   private val enoughFeeTxWithScriptedAccount = for {
     (sender, senderBalance, utx, ts) <- withScriptedAccount
     feeAmount                        <- choose(extraFee, senderBalance / 2)
@@ -411,14 +404,9 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
 
     // See NODE-702
     "smart accounts" - {
-      "not enough fee" in {
-        val (utx, tx) = notEnoughFeeTxWithScriptedAccount.sample.getOrElse(throw new IllegalStateException("NO SAMPLE"))
-        utx.putIfNew(tx) should produce("InsufficientFee")
-      }
-
-      "enough fee" in {
+      "not allowed" in {
         val (utx, tx) = enoughFeeTxWithScriptedAccount.sample.getOrElse(throw new IllegalStateException("NO SAMPLE"))
-        utx.putIfNew(tx) shouldBe 'right
+        utx.putIfNew(tx) should produce("signature from scripted account")
       }
     }
   }

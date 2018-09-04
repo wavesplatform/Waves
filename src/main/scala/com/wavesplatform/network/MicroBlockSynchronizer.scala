@@ -13,7 +13,6 @@ import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.MicroBlock
-import com.wavesplatform.transaction.ValidationError.InvalidSignature
 
 import scala.collection.mutable.{Set => MSet}
 import scala.concurrent.duration.FiniteDuration
@@ -75,17 +74,18 @@ object MicroBlockSynchronizer {
       .mapTask {
         case ((ch, mbInv @ MicroBlockInv(_, totalSig, prevSig, _))) =>
           Task {
-            if (mbInv.signatureValid()) {
-              microBlockOwners.get(totalSig, () => MSet.empty) += ch
-              nextInvs.get(prevSig, { () =>
-                BlockStats.inv(mbInv, ch)
-                mbInv
-              })
-              lastBlockId()
-                .filter(_ == prevSig && !alreadyRequested(totalSig))
-                .foreach(tryDownloadNext)
-            } else {
-              peerDatabase.blacklistAndClose(ch, InvalidSignature(mbInv).toString)
+            mbInv.signaturesValid() match {
+              case Left(err) =>
+                peerDatabase.blacklistAndClose(ch, err.toString)
+              case Right(_) =>
+                microBlockOwners.get(totalSig, () => MSet.empty) += ch
+                nextInvs.get(prevSig, { () =>
+                  BlockStats.inv(mbInv, ch)
+                  mbInv
+                })
+                lastBlockId()
+                  .filter(_ == prevSig && !alreadyRequested(totalSig))
+                  .foreach(tryDownloadNext)
             }
           }
       }

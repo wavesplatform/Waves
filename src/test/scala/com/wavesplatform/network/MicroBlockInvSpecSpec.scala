@@ -20,9 +20,9 @@ class MicroBlockInvSpecSpec extends FreeSpec with Matchers with PropertyChecks w
     import MicroBlockInvSpec._
 
     "deserializeData(serializedData(data)) == data" in forAll(microBlockInvGen) { inv =>
-      inv.signatureValid() shouldBe true
+      inv.signaturesValid() shouldBe 'right
       val restoredInv = deserializeData(serializeData(inv)).get
-      restoredInv.signatureValid() shouldBe true
+      restoredInv.signaturesValid() shouldBe 'right
 
       restoredInv shouldBe inv
     }
