@@ -16,9 +16,10 @@ object Verifier {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
         (pt, blockchain.accountScript(pt.sender)) match {
-          case (_, Some(script))              => verify(blockchain, script, currentBlockHeight, pt, false)
-          case (stx: SignedTransaction, None) => stx.signaturesValid()
-          case _                              => verifyAsEllipticCurveSignature(pt)
+          case (stx: SignedTransaction, None)       => stx.signaturesValid()
+          case (_: SignedTransaction, Some(_))      => Left(GenericError("Can't process transaction  with signature from scripted account"))
+          case (_: ProvenTransaction, Some(script)) => verify(blockchain, script, currentBlockHeight, pt, false)
+          case (_: ProvenTransaction, None)         => verifyAsEllipticCurveSignature(pt)
         }
     }).flatMap(tx => {
       for {
