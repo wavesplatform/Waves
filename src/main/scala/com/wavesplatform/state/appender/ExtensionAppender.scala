@@ -1,15 +1,11 @@
 package com.wavesplatform.state.appender
 
-import cats.implicits._
-import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.metrics.{BlockStats, Instrumented, Metrics}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase, formatBlocks, id}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
@@ -17,6 +13,9 @@ import io.netty.channel.group.ChannelGroup
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
 import org.influxdb.dto.Point
+import com.wavesplatform.block.Block
+import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction._
 
 import scala.util.{Left, Right}
 
@@ -34,9 +33,9 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
             allChannels: ChannelGroup,
             scheduler: Scheduler)(ch: Channel, extensionBlocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = {
     def p(blocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] =
-      Task(blocks.toVector.traverse[Signed.E, Unit](b => b.sigValidEi()).flatMap { _ =>
+      Task(Signed.validateOrdered(blocks).flatMap { newBlocks =>
         {
-          val extension = blocks.dropWhile(blockchainUpdater.contains)
+          val extension = newBlocks.dropWhile(blockchainUpdater.contains)
 
           extension.headOption.map(_.reference) match {
             case Some(lastCommonBlockId) =>
@@ -66,7 +65,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
 
                       if (i == 0) log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block $declinedBlock: $e")
                       else
-                        log.warn(s"Processed only ${i + 1} of ${blocks.size} blocks from extension, error appending next block $declinedBlock: $e")
+                        log.warn(s"Processed only ${i + 1} of ${newBlocks.size} blocks from extension, error appending next block $declinedBlock: $e")
 
                       Left(e)
                   }
