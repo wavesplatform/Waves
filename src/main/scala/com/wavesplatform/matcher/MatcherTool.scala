@@ -194,7 +194,7 @@ object MatcherTool extends ScorexLogging {
     Ints.fromByteArray(key.takeRight(4))
   )
 
-  private def recoverOrderBooks(db: DB, matcherSnapshotsDirectory: String, config: Config): Unit = {
+  private def recoverOrderBooks(db: DB, matcherSnapshotsDirectory: String, config: Config, dryRun: Boolean): Unit = {
     log.info("Recovering order books")
 
     val system = ActorSystem("matcher-tool", config)
@@ -216,50 +216,59 @@ object MatcherTool extends ScorexLogging {
 
       }
 
-      log.info(s"Collected ${orderBookSnapshots.size()} order book snapshots")
+      if (orderBookSnapshots.isEmpty) {
+        log.warn("No snapshots found, please check your configuration")
+      } else {
+        log.info(s"Collected ${orderBookSnapshots.size()} order book snapshots")
 
-      val allOrderBooks   = orderBookSnapshots.asScala.mapValues(_._1)
-      val allActiveOrders = collectActiveOrders(db)
+        val allOrderBooks   = orderBookSnapshots.asScala.mapValues(_._1)
+        val allActiveOrders = collectActiveOrders(db)
 
-      val snapshotsToUpdate     = new JHashMap[AssetPair, OrderBook]
-      var snapshotUpdateCounter = 0
-      val ordersToCancel        = Set.newBuilder[ByteStr]
+        val snapshotsToUpdate     = new JHashMap[AssetPair, OrderBook]
+        var snapshotUpdateCounter = 0
+        val ordersToCancel        = Set.newBuilder[ByteStr]
 
-      for (assetPair <- allOrderBooks.keySet ++ allActiveOrders.keySet) {
-        val orderBookFromSnapshot = allOrderBooks.getOrElse(assetPair, OrderBook.empty)
-        val computedActiveOrders  = allActiveOrders.getOrElse(assetPair, Map.empty)
+        for (assetPair <- allOrderBooks.keySet ++ allActiveOrders.keySet) {
+          val orderBookFromSnapshot = allOrderBooks.getOrElse(assetPair, OrderBook.empty)
+          val computedActiveOrders  = allActiveOrders.getOrElse(assetPair, Map.empty)
 
-        for (orderId <- computedActiveOrders.keySet ++ orderBookFromSnapshot.allOrderIds) {
-          if (!computedActiveOrders.contains(orderId)) {
-            snapshotUpdateCounter += 1
-            snapshotsToUpdate.compute(
-              assetPair, { (_, ob) =>
-                val currentOrderBook = Option(ob).getOrElse(orderBookFromSnapshot)
-                OrderBook
-                  .cancelOrder(currentOrderBook, orderId)
-                  .fold(currentOrderBook)(OrderBook.updateState(currentOrderBook, _))
-              }
-            )
-          }
-          if (!orderBookFromSnapshot.allOrderIds(orderId)) {
-            ordersToCancel += orderId
+          for (orderId <- computedActiveOrders.keySet ++ orderBookFromSnapshot.allOrderIds) {
+            if (!computedActiveOrders.contains(orderId)) {
+              snapshotUpdateCounter += 1
+              snapshotsToUpdate.compute(
+                assetPair, { (_, ob) =>
+                  val currentOrderBook = Option(ob).getOrElse(orderBookFromSnapshot)
+                  OrderBook
+                    .cancelOrder(currentOrderBook, orderId)
+                    .fold(currentOrderBook)(OrderBook.updateState(currentOrderBook, _))
+                }
+              )
+            }
+            if (!orderBookFromSnapshot.allOrderIds(orderId)) {
+              ordersToCancel += orderId
+            }
           }
         }
-      }
-      val allOrderIdsToCancel = ordersToCancel.result().map(id => id -> DBUtils.orderInfo(db, id).copy(canceled = true))
-      log.info(s"Cancelling ${allOrderIdsToCancel.size} order(s)")
-      db.readWrite { rw =>
-        for ((id, info) <- allOrderIdsToCancel) {
-          rw.put(MatcherKeys.orderInfo(id), info)
+        val allOrderIdsToCancel = ordersToCancel.result().map(id => id -> DBUtils.orderInfo(db, id).copy(canceled = true))
+        log.info(s"Cancelling ${allOrderIdsToCancel.size} order(s)")
+        db.readWrite { rw =>
+          for ((id, info) <- allOrderIdsToCancel) {
+            log.info(s"Cancelling order $id")
+            if (!dryRun) {
+              rw.put(MatcherKeys.orderInfo(id), info)
+            }
+          }
         }
-      }
 
-      log.info(s"Updating ${snapshotsToUpdate.size()} snapshot(s)")
-      snapshotDB.readWrite { rw =>
-        for ((assetPair, orderBook) <- snapshotsToUpdate.asScala) {
-          val (_, seqNr)    = orderBookSnapshots.get(assetPair)
-          val snapshotBytes = se.serialize(Snapshot(OrderBookActor.Snapshot(orderBook)))
-          rw.put(MatcherSnapshotStore.kSnapshot(assetPair.toString, seqNr), snapshotBytes.get)
+        log.info(s"Updating ${snapshotsToUpdate.size()} snapshot(s)")
+        snapshotDB.readWrite { rw =>
+          for ((assetPair, orderBook) <- snapshotsToUpdate.asScala) {
+            val (_, seqNr)    = orderBookSnapshots.get(assetPair)
+            val snapshotBytes = se.serialize(Snapshot(OrderBookActor.Snapshot(orderBook)))
+            if (!dryRun) {
+              rw.put(MatcherSnapshotStore.kSnapshot(assetPair.toString, seqNr), snapshotBytes.get)
+            }
+          }
         }
       }
     } finally {
@@ -299,7 +308,8 @@ object MatcherTool extends ScorexLogging {
         db.compactRange(null, null)
         log.info("Compaction complete")
       case "recover-orderbooks" =>
-        recoverOrderBooks(db, settings.matcherSettings.snapshotsDataDir, actualConfig)
+        val dryRun = args.length == 3 && args(2) == "--dry-run"
+        recoverOrderBooks(db, settings.matcherSettings.snapshotsDataDir, actualConfig, dryRun)
       case _ =>
     }
 
