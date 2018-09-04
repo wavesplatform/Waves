@@ -77,9 +77,10 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
              feeAmount: Long,
              attachment: Array[Byte],
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
-    create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bodyBytes())))
-    }
+    create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, com.wavesplatform.transaction.validation.EmptySig).right
+      .map { unsigned =>
+        unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bodyBytes())))
+      }
   }
 
   def selfSigned(assetId: Option[AssetId],

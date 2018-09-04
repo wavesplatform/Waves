@@ -47,7 +47,7 @@ object CreateAliasTransactionV1 extends TransactionParserFor[CreateAliasTransact
     } yield CreateAliasTransactionV1(sender, alias, fee, timestamp, signature)
 
   def signed(sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
-    create(sender, alias, fee, timestamp, ByteStr.empty).right.map { unsigned =>
+    create(sender, alias, fee, timestamp, com.wavesplatform.transaction.validation.EmptySig).right.map { unsigned =>
       unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bodyBytes())))
     }
   }

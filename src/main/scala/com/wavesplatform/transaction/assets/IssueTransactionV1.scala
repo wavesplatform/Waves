@@ -68,8 +68,9 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
              fee: Long,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
-    create(sender, name, description, quantity, decimals, reissuable, fee, timestamp, ByteStr.empty).right.map { unverified =>
-      unverified.copy(signature = ByteStr(crypto.sign(signer, unverified.bodyBytes())))
+    create(sender, name, description, quantity, decimals, reissuable, fee, timestamp, com.wavesplatform.transaction.validation.EmptySig).right.map {
+      unverified =>
+        unverified.copy(signature = ByteStr(crypto.sign(signer, unverified.bodyBytes())))
     }
 
   def selfSigned(sender: PrivateKeyAccount,

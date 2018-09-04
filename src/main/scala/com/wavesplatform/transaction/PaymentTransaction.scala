@@ -53,7 +53,7 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
   private val BaseLength   = TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
 
   def create(sender: PrivateKeyAccount, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
-    create(sender, recipient, amount, fee, timestamp, ByteStr.empty).right.map(unsigned => {
+    create(sender, recipient, amount, fee, timestamp, com.wavesplatform.transaction.validation.EmptySig).right.map(unsigned => {
       unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
     })
   }

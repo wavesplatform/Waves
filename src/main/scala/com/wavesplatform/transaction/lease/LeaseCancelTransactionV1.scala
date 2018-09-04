@@ -50,7 +50,7 @@ object LeaseCancelTransactionV1 extends TransactionParserFor[LeaseCancelTransact
              fee: Long,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
-    create(sender, leaseId, fee, timestamp, ByteStr.empty).right.map { unsigned =>
+    create(sender, leaseId, fee, timestamp, com.wavesplatform.transaction.validation.EmptySig).right.map { unsigned =>
       unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bodyBytes())))
     }
   }

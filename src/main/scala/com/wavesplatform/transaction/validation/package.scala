@@ -16,6 +16,8 @@ package object validation {
   val MaxTransferCount     = 100
   val MaxEntryCount        = 100
 
+  val EmptySig = ByteStr(Array.fill[Byte](crypto.SignatureLength)(-1))
+
   type Validated[A] = ValidatedNel[ValidationError, A]
 
   def validateFee(fee: Long): Validated[Long] = {

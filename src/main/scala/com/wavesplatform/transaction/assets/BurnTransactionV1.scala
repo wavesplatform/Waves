@@ -54,7 +54,7 @@ object BurnTransactionV1 extends TransactionParserFor[BurnTransactionV1] with Tr
              fee: Long,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
-    create(sender, assetId, quantity, fee, timestamp, ByteStr.empty).right.map { unverified =>
+    create(sender, assetId, quantity, fee, timestamp, com.wavesplatform.transaction.validation.EmptySig).right.map { unverified =>
       unverified.copy(signature = ByteStr(crypto.sign(signer, unverified.bodyBytes())))
     }
 

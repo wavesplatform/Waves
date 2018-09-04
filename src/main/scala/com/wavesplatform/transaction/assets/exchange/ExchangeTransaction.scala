@@ -63,9 +63,10 @@ object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] wit
              sellMatcherFee: Long,
              fee: Long,
              timestamp: Long): Either[ValidationError, TransactionT] = {
-    create(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).right.map { unverified =>
-      unverified.copy(signature = ByteStr(crypto.sign(matcher.privateKey, unverified.bodyBytes())))
-    }
+    create(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, com.wavesplatform.transaction.validation.EmptySig).right
+      .map { unverified =>
+        unverified.copy(signature = ByteStr(crypto.sign(matcher.privateKey, unverified.bodyBytes())))
+      }
   }
 
   def create(buyOrder: Order,
