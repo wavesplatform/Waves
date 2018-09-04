@@ -1,6 +1,7 @@
 package com.wavesplatform.utx
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform._
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.block.Block
 import com.wavesplatform.features.BlockchainFeatures
@@ -13,15 +14,13 @@ import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.{ByteStr, EitherExt2, _}
 import com.wavesplatform.transaction.ValidationError.SenderIsBlacklisted
-import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{FeeCalculator, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{FeeCalculator, Transaction}
 import com.wavesplatform.utils.Time
-import com.wavesplatform._
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
@@ -32,15 +31,6 @@ import scala.concurrent.duration._
 
 class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen with NoShrink with WithDB {
 
-  private val calculatorSettings = FeesSettings(
-    Seq(
-      GenesisTransaction,
-      IssueTransactionV1,
-      TransferTransactionV1,
-      MassTransferTransaction,
-      SetScriptTransaction
-    ).map(_.typeId.toInt -> List(FeeSettings("WAVES", 0))).toMap
-  )
   import CommonValidation.{ScriptExtraFee => extraFee}
 
   private def mkBlockchain(senderAccount: Address, senderBalance: Long) = {
@@ -57,7 +47,6 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
           )),
         genesisSettings
       ),
-      feesSettings = calculatorSettings,
       featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
@@ -82,16 +71,19 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
       .label("transferWithRecipient")
 
   private def massTransferWithRecipients(sender: PrivateKeyAccount, recipients: List[PublicKeyAccount], maxAmount: Long, time: Time) = {
+    import FeeCalculator.FeeConstants
+
     val amount    = maxAmount / (recipients.size + 1)
     val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
     val txs = for {
       version <- Gen.oneOf(MassTransferTransaction.supportedVersions.toSeq)
-      fee     <- chooseNum(extraFee, amount)
+      minFee = FeeConstants(TransferTransaction.typeId) + FeeConstants(MassTransferTransaction.typeId) * transfers.size
+      fee <- chooseNum(minFee, amount)
     } yield MassTransferTransaction.selfSigned(version, None, sender, transfers, time.getTimestamp(), fee, Array.empty[Byte]).explicitGet()
     txs.label("transferWithRecipient")
   }
 
-  private def mkCalculator(blockchain: Blockchain) = new FeeCalculator(calculatorSettings, blockchain)
+  private def mkCalculator(blockchain: Blockchain) = new FeeCalculator(blockchain)
 
   private val stateGen = for {
     sender        <- accountGen.label("sender")

@@ -55,6 +55,8 @@ trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
 
 object TransferTransaction {
 
+  val typeId: Byte = 4
+
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 

@@ -33,7 +33,8 @@ case class LeaseCancelTransactionV2 private (version: Byte,
 
 object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransactionV2] with TransactionParser.MultipleVersions {
 
-  override val typeId: Byte                 = 9
+  override val typeId: Byte = LeaseCancelTransaction.typeId
+
   override def supportedVersions: Set[Byte] = Set(2)
   private def networkByte                   = AddressScheme.current.chainId
 
