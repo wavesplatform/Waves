@@ -102,7 +102,7 @@ object AsyncMatcherHttpApi extends Assertions {
       val sig                       = crypto.sign(privateKey, request.toSign)
       val signedRequest             = request.copy(signature = sig)
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
-      matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", signedRequest.json).as[MatcherStatusResponse]
+      matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", signedRequest).as[MatcherStatusResponse]
     }
 
     def cancelOrderWithApiKey(orderId: String): Future[MatcherStatusResponse] = {

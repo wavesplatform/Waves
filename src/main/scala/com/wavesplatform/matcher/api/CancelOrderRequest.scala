@@ -5,33 +5,35 @@ import com.wavesplatform.state.ByteStr
 import com.wavesplatform.utils.Base58
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
-import play.api.libs.functional.syntax._
-import play.api.libs.json.Reads._
-import play.api.libs.json.{JsObject, JsPath, Json, Reads}
+import play.api.libs.json._
 import scorex.account.PublicKeyAccount
-import scorex.transaction.assets.exchange.OrderJson._
 
-case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
+case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") sender: PublicKeyAccount,
                               @ApiModelProperty(dataType = "java.lang.String") orderId: ByteStr,
                               @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte]) {
   @ApiModelProperty(hidden = true)
-  lazy val toSign: Array[Byte] = senderPublicKey.publicKey ++ orderId.arr
+  lazy val toSign: Array[Byte] = sender.publicKey ++ orderId.arr
 
   @ApiModelProperty(hidden = true)
-  val isSignatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
-
-  def json: JsObject = Json.obj(
-    "sender"    -> Base58.encode(senderPublicKey.publicKey),
-    "orderId"   -> orderId.base58,
-    "signature" -> Base58.encode(signature)
-  )
+  val isSignatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, toSign, sender.publicKey))
 }
 
 object CancelOrderRequest {
-  implicit val cancelOrderReads: Reads[CancelOrderRequest] = {
-    val r = (JsPath \ "sender").read[PublicKeyAccount] and
-      (JsPath \ "orderId").read[ByteStr] and
-      (JsPath \ "signature").read[Array[Byte]]
-    r(CancelOrderRequest.apply _)
-  }
+  implicit val byteArrayFormat: Format[Array[Byte]] = Format(
+    {
+      case JsString(base58String) => Base58.decode(base58String).fold(_ => JsError("Invalid signature"), b => JsSuccess(b))
+      case other                  => JsError(s"Expecting string but got $other")
+    },
+    b => JsString(Base58.encode(b))
+  )
+
+  implicit val pkFormat: Format[PublicKeyAccount] = Format(
+    {
+      case JsString(value) => PublicKeyAccount.fromBase58String(value).fold(_ => JsError("Invalid public key"), pk => JsSuccess(pk))
+      case other           => JsError(s"Expecting string but got $other")
+    },
+    pk => JsString(Base58.encode(pk.publicKey))
+  )
+
+  implicit val format: OFormat[CancelOrderRequest] = Json.format
 }

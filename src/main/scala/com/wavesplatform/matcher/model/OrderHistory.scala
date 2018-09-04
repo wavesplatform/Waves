@@ -193,7 +193,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
 
   def orderInfo(id: ByteStr): OrderInfo = DBUtils.orderInfo(db, id)
 
-  def order(id: ByteStr): Option[Order] = db.get(MatcherKeys.order(id))
+  def order(id: ByteStr): Option[Order] = DBUtils.order(db, id)
 
   def deleteOrder(address: Address, orderId: ByteStr): Boolean = db.readWrite { rw =>
     DBUtils.orderInfo(rw, orderId).status match {

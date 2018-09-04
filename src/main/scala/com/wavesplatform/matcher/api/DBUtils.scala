@@ -45,6 +45,8 @@ object DBUtils {
     } yield assetId -> volume).toMap
   }
 
+  def order(db: DB, orderId: ByteStr): Option[Order] = db.get(MatcherKeys.order(orderId))
+
   def orderInfo(db: DB, orderId: ByteStr): OrderInfo            = db.get(MatcherKeys.orderInfo(orderId))
   def orderInfo(rw: RW, orderId: ByteStr): OrderInfo            = rw.get(MatcherKeys.orderInfo(orderId))
   def orderInfoOpt(rw: RW, orderId: ByteStr): Option[OrderInfo] = rw.get(MatcherKeys.orderInfoOpt(orderId))

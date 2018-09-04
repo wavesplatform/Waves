@@ -19,14 +19,16 @@ object MatcherKeys {
 
   def order(orderId: ByteStr): Key[Option[Order]] = Key.opt(bytes(1, orderId.arr), Order.parseBytes(_).get, _.bytes())
 
+  val OrderInfoPrefix = 2.toShort
+
   def orderInfoOpt(orderId: ByteStr): Key[Option[OrderInfo]] = Key.opt(
     bytes(2, orderId.arr),
-    orderInfoParser,
-    x => throw new NotImplementedError(s"You can't write $x to the DB. Please use 'MatcherKeys.orderInfo' for this")
+    decodeOrderInfo,
+    unsupported("You can't write Option[OrderInfo] to the DB. Please use 'MatcherKeys.orderInfo' for this")
   )
   def orderInfo(orderId: ByteStr): Key[OrderInfo] = Key(
-    bytes(2, orderId.arr),
-    Option(_).fold[OrderInfo](OrderInfo.empty)(orderInfoParser), { oi =>
+    bytes(OrderInfoPrefix, orderId.arr),
+    Option(_).fold[OrderInfo](OrderInfo.empty)(decodeOrderInfo), { oi =>
       val allocateBytes = if (oi.unsafeTotalSpend.isEmpty) 33 else 41
       val buf = ByteBuffer
         .allocate(allocateBytes)
@@ -40,7 +42,8 @@ object MatcherKeys {
       buf.array()
     }
   )
-  private def orderInfoParser(input: Array[Byte]): OrderInfo = {
+
+  def decodeOrderInfo(input: Array[Byte]): OrderInfo = {
     val bb = ByteBuffer.wrap(input)
     input.length match {
       case 17 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, None, 0, None)

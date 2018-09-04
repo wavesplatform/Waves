@@ -1,11 +1,10 @@
 package com.wavesplatform.matcher.market
 
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
-import akka.http.scaladsl.model.{HttpEntity, StatusCodes}
+import akka.http.scaladsl.model.StatusCodes
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.wavesplatform.matcher.api.StatusCodeMatcherResponse
@@ -21,7 +20,6 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
-import play.api.libs.json.Json
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.AssetId
@@ -180,12 +178,8 @@ class MatcherActorSpecification
       val pair2 = AssetPair(a1, a2)
 
       val now = NTP.correctedTime()
-      val json = Json.parse(
-        GetMarketsResponse(Array(), Seq(MarketData(pair1, a1Name, waves, now, None, None), MarketData(pair2, a1Name, a2Name, now, None, None))).toHttpResponse.entity
-          .asInstanceOf[HttpEntity.Strict]
-          .getData()
-          .decodeString(StandardCharsets.UTF_8)
-      )
+      val json =
+        GetMarketsResponse(Array(), Seq(MarketData(pair1, a1Name, waves, now, None, None), MarketData(pair2, a1Name, a2Name, now, None, None))).json
 
       ((json \ "markets")(0) \ "priceAsset").as[String] shouldBe AssetPair.WavesName
       ((json \ "markets")(0) \ "priceAssetName").as[String] shouldBe waves
