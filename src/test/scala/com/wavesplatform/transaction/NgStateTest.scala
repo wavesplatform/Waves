@@ -74,4 +74,22 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
         new NgState(block, Diff.empty, 0L, Set.empty).bestLiquidBlock.uniqueId shouldBe block.uniqueId
     }
   }
+
+  property("calculates carry fee correctly") {
+    forAll(preconditionsAndPayments(5)) {
+      case (genesis, payments) =>
+        val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
+
+        val ng = new NgState(block, Diff.empty, 0L, Set.empty)
+        microBlocks.foreach(m => ng.append(m, Diff.empty, 1L, 0L))
+
+        ng.totalDiffOf(block.uniqueId).map(_._3) shouldBe Some(0L)
+        microBlocks.zipWithIndex.foreach {
+          case (m, i) =>
+            val u = ng.totalDiffOf(m.totalResBlockSig).map(_._3)
+            u shouldBe Some(i + 1)
+        }
+        ng.carryFee shouldBe microBlocks.size
+    }
+  }
 }
