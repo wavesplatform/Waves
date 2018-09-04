@@ -76,7 +76,7 @@ class MatcherMassOrdersTestSuite
         .id
 
     val aliceActiveOrderId = matcherNode
-      .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant + 1, 3, orderVersion, 10.minute)
+      .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant * 2, 3, orderVersion, 10.minute)
       .message
       .id
 
