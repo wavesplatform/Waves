@@ -24,10 +24,14 @@ object DBUtils {
 
   def ordersByAddress(db: DB, address: Address, changedAssets: Set[Option[AssetId]], activeOnly: Boolean, maxOrders: Int): Seq[(Order, OrderInfo)] =
     db.readOnly { ro =>
-      val lastActiveIdx = db.get(MatcherKeys.lastAddressActiveOrderSeqNr(address))
+      val fromIndex = db.get(MatcherKeys.addressOrdersSeqNr(address))
+      val toIndex = math.min(
+        math.max(1, fromIndex - maxOrders), // + 1
+        db.getOpt(MatcherKeys.addressOldestActiveOrderSeqNr(address)).getOrElse(1)
+      )
+
       (for {
-        idx <- (db.get(MatcherKeys.addressOrdersSeqNr(address)) to 1 by -1).view
-        if idx <= lastActiveIdx
+        idx             <- (fromIndex to toIndex by -1).view
         orderSpendAsset <- ro.get(MatcherKeys.addressOrders(address, idx))
         if changedAssets.isEmpty || changedAssets(orderSpendAsset.spendAsset)
         order <- ro.get(MatcherKeys.order(orderSpendAsset.orderId))
