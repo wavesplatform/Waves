@@ -11,7 +11,7 @@ object Signed {
   type E[A] = Either[InvalidSignature, A]
 
   implicit class SignedExt(s: Signed) {
-    def sigValidEi(): E[Unit] = Either.cond(s.signatureValid(), (), InvalidSignature(s))
+    def sigValidEi(): E[Unit] = Either.cond(s.signatureValid(), (), InvalidSignature(Some(s)))
   }
 
 }

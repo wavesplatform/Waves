@@ -43,8 +43,8 @@ object ValidationError {
     def apply(ex: Throwable): GenericError = new GenericError(Throwables.getStackTraceAsString(ex))
   }
 
-  case class InvalidSignature(s: Signed, details: Option[InvalidSignature] = None) extends ValidationError {
-    override def toString: String = s"InvalidSignature(${s.toString + " reason: " + details})"
+  case class InvalidSignature(s: Option[Signed]) extends ValidationError {
+    override def toString: String = s"InvalidSignature(${s.toString})"
   }
 
   case class ScriptExecutionError(error: String, scriptSrc: String, letDefs: Map[String, LazyVal], isTokenScript: Boolean) extends ValidationError

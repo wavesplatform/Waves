@@ -2,6 +2,8 @@ package com.wavesplatform.transaction
 
 import cats.data.{Validated, ValidatedNel}
 import cats.implicits._
+import com.wavesplatform.crypto
+import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.transfer._
 
 import scala.util.Try
@@ -13,6 +15,8 @@ package object validation {
   val MaxDecimals          = 8
   val MaxTransferCount     = 100
   val MaxEntryCount        = 100
+
+  val EmptySig = ByteStr(Array.fill[Byte](crypto.SignatureLength)(-1))
 
   type Validated[A] = ValidatedNel[ValidationError, A]
 
@@ -77,4 +81,7 @@ package object validation {
         ValidationError.TooBigArray
       )
   }
+
+  def validateSigLength(signature: ByteStr): Either[ValidationError, Unit] =
+    Either.cond(signature.arr.length == crypto.SignatureLength, (), ValidationError.InvalidSignature(None))
 }

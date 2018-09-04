@@ -54,9 +54,10 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
              fee: Long,
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, TransactionT] =
-    IssueTransaction
-      .validateIssueParams(name, description, quantity, decimals, reissuable, fee)
-      .map(_ => IssueTransactionV1(sender, name, description, quantity, decimals, reissuable, fee, timestamp, signature))
+    for {
+      _ <- IssueTransaction.validateIssueParams(name, description, quantity, decimals, reissuable, fee)
+      _ <- com.wavesplatform.transaction.validation.validateSigLength(signature)
+    } yield IssueTransactionV1(sender, name, description, quantity, decimals, reissuable, fee, timestamp, signature)
 
   def signed(sender: PublicKeyAccount,
              name: Array[Byte],
@@ -67,8 +68,9 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
              fee: Long,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
-    create(sender, name, description, quantity, decimals, reissuable, fee, timestamp, ByteStr.empty).right.map { unverified =>
-      unverified.copy(signature = ByteStr(crypto.sign(signer, unverified.bodyBytes())))
+    create(sender, name, description, quantity, decimals, reissuable, fee, timestamp, com.wavesplatform.transaction.validation.EmptySig).right.map {
+      unverified =>
+        unverified.copy(signature = ByteStr(crypto.sign(signer, unverified.bodyBytes())))
     }
 
   def selfSigned(sender: PrivateKeyAccount,

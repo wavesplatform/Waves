@@ -50,9 +50,10 @@ object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] w
              fee: Long,
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, TransactionT] =
-    ReissueTransaction
-      .validateReissueParams(quantity, fee)
-      .map(_ => ReissueTransactionV1(sender, assetId, quantity, reissuable, fee, timestamp, signature))
+    for {
+      _ <- ReissueTransaction.validateReissueParams(quantity, fee)
+      _ <- com.wavesplatform.transaction.validation.validateSigLength(signature)
+    } yield ReissueTransactionV1(sender, assetId, quantity, reissuable, fee, timestamp, signature)
 
   def signed(sender: PublicKeyAccount,
              assetId: ByteStr,
@@ -61,7 +62,7 @@ object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] w
              fee: Long,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
-    create(sender, assetId, quantity, reissuable, fee, timestamp, ByteStr.empty).right.map { unsigned =>
+    create(sender, assetId, quantity, reissuable, fee, timestamp, com.wavesplatform.transaction.validation.EmptySig).right.map { unsigned =>
       unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bodyBytes())))
     }
 
@@ -71,7 +72,7 @@ object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] w
                  reissuable: Boolean,
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] =
-    create(sender, assetId, quantity, reissuable, fee, timestamp, ByteStr.empty).right.map { unsigned =>
+    create(sender, assetId, quantity, reissuable, fee, timestamp, com.wavesplatform.transaction.validation.EmptySig).right.map { unsigned =>
       unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
     }
 }

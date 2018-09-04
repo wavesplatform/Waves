@@ -45,9 +45,10 @@ object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with 
              timestamp: Long,
              recipient: AddressOrAlias,
              signature: ByteStr): Either[ValidationError, TransactionT] =
-    LeaseTransaction
-      .validateLeaseParams(amount, fee, recipient, sender)
-      .map(_ => LeaseTransactionV1(sender, amount, fee, timestamp, recipient, signature))
+    for {
+      _ <- LeaseTransaction.validateLeaseParams(amount, fee, recipient, sender)
+      _ <- com.wavesplatform.transaction.validation.validateSigLength(signature)
+    } yield LeaseTransactionV1(sender, amount, fee, timestamp, recipient, signature)
 
   def signed(sender: PublicKeyAccount,
              amount: Long,
@@ -55,7 +56,7 @@ object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with 
              timestamp: Long,
              recipient: AddressOrAlias,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
-    create(sender, amount, fee, timestamp, recipient, ByteStr.empty).right.map { unsigned =>
+    create(sender, amount, fee, timestamp, recipient, com.wavesplatform.transaction.validation.EmptySig).right.map { unsigned =>
       unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bodyBytes())))
     }
   }

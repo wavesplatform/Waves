@@ -53,7 +53,7 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
   private val BaseLength   = TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
 
   def create(sender: PrivateKeyAccount, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
-    create(sender, recipient, amount, fee, timestamp, ByteStr.empty).right.map(unsigned => {
+    create(sender, recipient, amount, fee, timestamp, com.wavesplatform.transaction.validation.EmptySig).right.map(unsigned => {
       unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
     })
   }
@@ -63,17 +63,13 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
              amount: Long,
              fee: Long,
              timestamp: Long,
-             signature: ByteStr): Either[ValidationError, TransactionT] = {
-    if (amount <= 0) {
-      Left(ValidationError.NegativeAmount(amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
-    } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee()) //CHECK IF FEE IS POSITIVE
-    } else if (Try(Math.addExact(amount, fee)).isFailure) {
-      Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
-    } else {
-      Right(PaymentTransaction(sender, recipient, amount, fee, timestamp, signature))
-    }
-  }
+             signature: ByteStr): Either[ValidationError, TransactionT] =
+    for {
+      _ <- Either.cond(amount > 0, (), ValidationError.NegativeAmount(amount, "waves"))
+      _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee())
+      _ <- Either.cond(Try(Math.addExact(amount, fee)).isSuccess, (), ValidationError.OverflowError)
+      _ <- com.wavesplatform.transaction.validation.validateSigLength(signature)
+    } yield PaymentTransaction(sender, recipient, amount, fee, timestamp, signature)
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
