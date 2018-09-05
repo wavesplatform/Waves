@@ -82,12 +82,12 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
              proofs: Proofs): Either[ValidationError, TransactionT] =
     if (!supportedVersions.contains(version)) {
       Left(ValidationError.UnsupportedVersion(version))
-    } else if (minSponsoredAssetFee.exists(_ <= 0)) {
+    } else if (minSponsoredAssetFee.exists(_ < 0)) {
       Left(ValidationError.NegativeMinFee(minSponsoredAssetFee.get, "asset"))
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee())
     } else {
-      Right(SponsorFeeTransaction(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs))
+      Right(SponsorFeeTransaction(version, sender, assetId, minSponsoredAssetFee.filter(_ != 0), fee, timestamp, proofs))
     }
 
   def signed(version: Byte,
