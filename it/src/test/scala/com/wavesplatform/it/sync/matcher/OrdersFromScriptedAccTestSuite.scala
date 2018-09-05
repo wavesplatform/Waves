@@ -88,7 +88,7 @@ class OrdersFromScriptedAccTestSuite
 
       // sell order should be in the aliceNode orderbook
       matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
-      
+
       // Bob gets error message
       assertBadRequestAndResponse(
         matcherNode
