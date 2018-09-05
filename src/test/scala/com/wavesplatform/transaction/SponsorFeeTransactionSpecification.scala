@@ -67,6 +67,50 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
     js shouldEqual tx.json()
   }
 
+  property("JSON format validation for canceling sponsorship") {
+    val js = Json.parse(s"""{
+ "type": 14,
+ "id": "Gobt7AiyQAfduRkW8Mk3naWbzH67Zsv9rdmgRNmon1Mb",
+ "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+ "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+ "fee": $One,
+ "timestamp": 1520945679531,
+ "proofs": [
+ "3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7"
+ ],
+ "version": 1,
+ "assetId": "9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz",
+ "minSponsoredAssetFee": null
+                       }
+    """)
+
+    val tx = SponsorFeeTransaction
+      .create(
+        1,
+        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+        ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
+        None,
+        One,
+        1520945679531L,
+        Proofs(Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get))
+      )
+      .right
+      .get
+    val tx1 = SponsorFeeTransaction
+      .create(
+        1,
+        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+        ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
+        Some(0),
+        One,
+        1520945679531L,
+        Proofs(Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get))
+      )
+      .right
+      .get
+    js shouldEqual tx.json()
+    js shouldEqual tx1.json()
+  }
   val invalidFee =
     Table(
       "fee",
