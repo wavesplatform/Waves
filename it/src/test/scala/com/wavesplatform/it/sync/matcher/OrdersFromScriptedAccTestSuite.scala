@@ -88,7 +88,8 @@ class OrdersFromScriptedAccTestSuite
 
       // sell order should be in the aliceNode orderbook
       matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
-
+      
+      // Bob gets error message
       assertBadRequestAndResponse(
         matcherNode
           .placeOrder(bobNode, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 500, 10.minutes),
