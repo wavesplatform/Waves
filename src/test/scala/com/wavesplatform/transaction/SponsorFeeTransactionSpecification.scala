@@ -70,7 +70,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
   property("JSON format validation for canceling sponsorship") {
     val js = Json.parse(s"""{
  "type": 14,
- "id": "Gobt7AiyQAfduRkW8Mk3naWbzH67Zsv9rdmgRNmon1Mb",
+ "id": "HsEHzgJEkmjy2aenmbNVFrK1Na9rz4V4p7o2fY9eB9za",
  "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
  "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
  "fee": $One,
