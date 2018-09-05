@@ -14,7 +14,7 @@ object DBUtils {
 
   def ordersByAddressAndPair(db: DB, address: Address, pair: AssetPair, activeOnly: Boolean): Seq[(Order, OrderInfo)] = db.readOnly { ro =>
     (for {
-      idx     <- db.get(MatcherKeys.addressOrdersByPairSeqNr(address, pair)) to 1 by -1
+      idx     <- db.get(MatcherKeys.addressOrdersByPairSeqNr(address, pair)) to 0 by -1
       orderId <- ro.get(MatcherKeys.addressOrdersByPair(address, pair, idx))
       order   <- ro.get(MatcherKeys.order(orderId))
       orderInfo = ro.get(MatcherKeys.orderInfo(orderId))
@@ -26,8 +26,8 @@ object DBUtils {
     db.readOnly { ro =>
       val fromIndex = db.get(MatcherKeys.addressOrdersSeqNr(address))
       val toIndex = math.min(
-        math.max(1, fromIndex - maxOrders), // + 1
-        db.getOpt(MatcherKeys.addressOldestActiveOrderSeqNr(address)).getOrElse(1)
+        math.max(1, fromIndex - maxOrders + 1),
+        math.max(db.get(MatcherKeys.addressOldestActiveOrderSeqNr(address)), 1)
       )
 
       (for {
@@ -37,7 +37,7 @@ object DBUtils {
         order <- ro.get(MatcherKeys.order(orderSpendAsset.orderId))
         orderInfo = ro.get(MatcherKeys.orderInfo(orderSpendAsset.orderId))
         if !(activeOnly && orderInfo.status.isFinal)
-      } yield (order, orderInfo)).sortBy { case (order, info) => (info.status, -order.timestamp) }.take(maxOrders)
+      } yield (order, orderInfo)).sortBy { case (order, info) => (info.status, -order.timestamp) }.take(maxOrders) // TODO: swap
     }
 
   def reservedBalance(db: DB, address: Address): Map[Option[AssetId], Long] = db.readOnly { ro =>

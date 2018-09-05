@@ -247,18 +247,16 @@ case class MatcherApiRoute(wallet: Wallet,
     ))
   def getAssetPairAndPublicKeyOrderHistory: Route = (path("orderbook" / AssetPairPM / "publicKey" / PublicKeyPM) & get) { (p, publicKey) =>
     (headerValueByName("Timestamp") & headerValueByName("Signature")) { (ts, sig) =>
-      parameters('activeOnly.as[Boolean].?) { activeOnly =>
-        checkGetSignature(publicKey, ts, sig) match {
-          case Success(address) =>
-            withAssetPair(p, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
-              val orders = DBUtils.ordersByAddressAndPair(db, address, pair, activeOnly = activeOnly.getOrElse(false))
-              complete(StatusCodes.OK -> orders.map {
-                case (order, orderInfo) => orderJson(order, orderInfo)
-              })
-            }
-          case Failure(ex) =>
-            complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
-        }
+      checkGetSignature(publicKey, ts, sig) match {
+        case Success(address) =>
+          withAssetPair(p, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
+            complete(StatusCodes.OK -> DBUtils.ordersByAddressAndPair(db, address, pair, activeOnly = false).map {
+              case (order, orderInfo) =>
+                orderJson(order, orderInfo)
+            })
+          }
+        case Failure(ex) =>
+          complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
       }
     }
   }
@@ -288,12 +286,13 @@ case class MatcherApiRoute(wallet: Wallet,
       (headerValueByName("Timestamp") & headerValueByName("Signature")) { (ts, sig) =>
         checkGetSignature(publicKey, ts, sig) match {
           case Success(_) =>
-            complete {
-              val orders = DBUtils.ordersByAddress(db, publicKey, Set.empty, activeOnly.getOrElse(false), matcherSettings.maxOrdersPerRequest)
-              StatusCodes.OK -> orders.map {
-                case (order, orderInfo) => orderJson(order, orderInfo)
-              }
-            }
+            complete(
+              StatusCodes.OK -> DBUtils
+                .ordersByAddress(db, publicKey, Set.empty, activeOnly.getOrElse(false), matcherSettings.maxOrdersPerRequest)
+                .map {
+                  case (order, orderInfo) =>
+                    orderJson(order, orderInfo)
+                })
           case Failure(ex) =>
             complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
         }
