@@ -139,8 +139,6 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
 
   private def saveOrder(rw: RW, order: Order): Unit = rw.put(MatcherKeys.order(order.id()), Some(order))
 
-  private def getLastSeqNr(rw: RW, address: Address): Int = rw.get(MatcherKeys.addressOrdersSeqNr(address))
-
   private type ChangedKeys = Map[Key[_], Any]
 
   private def changedOrElse[V](changedKeys: ChangedKeys, key: Key[V], orElse: => V): V = changedKeys.getOrElse(key, orElse).asInstanceOf[V]
@@ -174,9 +172,13 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
 
   private def updateOldestActiveNr(rw: RW, change: OrderInfoChange, origKeys: ChangedKeys): ChangedKeys = {
     lazy val address              = change.order.senderPublicKey.toAddress
-    lazy val lastSeqNr            = changedOrElse(origKeys, MatcherKeys.addressOrdersSeqNr(address), math.max(getLastSeqNr(rw, address), 1))
     lazy val oldestActiveSeqNrKey = MatcherKeys.addressOldestActiveOrderSeqNr(address)
     lazy val oldestActiveSeqNr    = changedOrElse[Option[Int]](origKeys, oldestActiveSeqNrKey, rw.get(oldestActiveSeqNrKey))
+    lazy val lastSeqNr = changedOrElse(
+      origKeys,
+      MatcherKeys.addressOrdersSeqNr(address),
+      math.max(rw.get(MatcherKeys.addressOrdersSeqNr(address)), 1)
+    )
 
     def findOldestActiveNr(afterNr: Int): Option[Int] =
       (afterNr to lastSeqNr).view
