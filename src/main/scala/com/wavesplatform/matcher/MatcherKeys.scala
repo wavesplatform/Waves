@@ -2,7 +2,7 @@ package com.wavesplatform.matcher
 
 import java.nio.ByteBuffer
 
-import com.google.common.primitives.{Ints, Longs}
+import com.google.common.primitives.Longs
 import com.wavesplatform.database.Key
 import com.wavesplatform.matcher.model.OrderInfo
 import com.wavesplatform.state.ByteStr
@@ -52,9 +52,7 @@ object MatcherKeys {
     }
   }
 
-  def addressOrdersSeqNr(address: Address): Key[Int]            = bytesSeqNr(3, address.bytes.arr)
-  def addressOrdersSeqNrOpt(address: Address): Key[Option[Int]] = Key.opt(bytes(3, address.bytes.arr), Ints.fromByteArray, Ints.toByteArray)
-
+  def addressOrdersSeqNr(address: Address): Key[Int] = bytesSeqNr(3, address.bytes.arr)
   def addressOrders(address: Address, seqNr: Int): Key[Option[OrderAssets]] =
     Key.opt(hBytes(4, seqNr, address.bytes.arr), OrderAssets.read, OrderAssets.write)
 

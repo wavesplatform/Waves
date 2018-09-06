@@ -249,8 +249,6 @@ package object database {
 
     def get[A](key: Key[A]): A = key.parse(db.get(key.keyBytes))
 
-    def getOpt[A](key: Key[A]): Option[A] = Option(db.get(key.keyBytes)).map(key.parse)
-
     def iterateOver(prefix: Short)(f: JMap.Entry[Array[Byte], Array[Byte]] => Unit): Unit =
       iterateOver(Shorts.toByteArray(prefix))(f)
 

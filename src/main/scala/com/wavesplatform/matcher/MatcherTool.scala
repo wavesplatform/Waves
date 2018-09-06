@@ -11,7 +11,7 @@ import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Ints, Shorts}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.crypto.DigestSize
-import com.wavesplatform.database.{DBExt, _}
+import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
 import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}

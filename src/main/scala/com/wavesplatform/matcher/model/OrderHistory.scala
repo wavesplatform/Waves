@@ -153,8 +153,6 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
     import change.{order => o}
     val address = o.senderPublicKey.toAddress
 
-    println(s"===\naddOrderIndexes: id: ${o.id()}, address: $address, changedKeys: $changedKeys")
-
     val commonSeqNrKey  = MatcherKeys.addressOrdersSeqNr(address)
     val commonNextSeqNr = changedOrElse(changedKeys, commonSeqNrKey, rw.get(commonSeqNrKey)) + 1
 
@@ -164,7 +162,6 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
     )
 
     rw.put(commonSeqNrKey, commonNextSeqNr)
-    println(s"commonSeqNr($commonSeqNrKey): $commonNextSeqNr")
 
     val pairSeqNrKey  = MatcherKeys.addressOrdersByPairSeqNr(address, o.assetPair)
     val pairNextSeqNr = rw.get(pairSeqNrKey) + 1
@@ -176,9 +173,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
 
     rw.put(pairSeqNrKey, pairNextSeqNr)
 
-    val r = changedKeys + (commonSeqNrKey -> commonNextSeqNr)
-    println(s"addOrderIndexes: after: $changedKeys\n===")
-    r
+    changedKeys + (commonSeqNrKey -> commonNextSeqNr)
   }
 
   private def updateOldestActive(rw: RW, change: OrderInfoChange, changedKeys: ChangedKeys): ChangedKeys = {
@@ -189,9 +184,6 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
       val r = changedOrElse(changedKeys, oldestActiveSeqNrKey, rw.get(oldestActiveSeqNrKey))
       if (r == 0) lastSeqNr else r
     }
-
-    println(s"===\nupdateOldestActive: id: ${change.order.id()}, address: $address, changedKeys: $changedKeys")
-    println(s"[acc=${change.order.senderPublicKey}] changedKeys: $changedKeys, lastSeqNr: $lastSeqNr, oldestActiveSeqNr: $oldestActiveSeqNr")
 
     def findOldestActiveNr(fromNr: Int): Option[Int] =
       (fromNr to lastSeqNr).view
@@ -205,66 +197,41 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
           isActive
         }
 
-    def findOrderNr(fromNr: Int): Option[Int] =
-      (fromNr to lastSeqNr).view
-        .find { i =>
-          val x = rw.get(MatcherKeys.addressOrders(address, i))
-          x.exists(_.orderId == change.order.id())
-        }
-
-    val r = if (!change.updatedInfo.status.isFinal) {
+    val newOldestActiveSeqNr = if (!change.updatedInfo.status.isFinal) {
       // Just a new active order
-      if (oldestActiveSeqNr == lastSeqNr) {
-        println(s"[ord=${change.order.id()}] one active")
-        Some(lastSeqNr)
-      } else None
+      if (oldestActiveSeqNr == lastSeqNr) Some(lastSeqNr) else None
     } else if (change.origInfo.nonEmpty) {
       // An active order could be closed
-      val finalizedNr = findOrderNr(oldestActiveSeqNr)
+      val shouldUpdateOldestActive = rw
+        .get(MatcherKeys.addressOrders(address, oldestActiveSeqNr))
+        .map(_.orderId == change.order.id())
         .getOrElse {
-          // Impossible case
-          log.warn(
-            s"Can't find the finalized order id='${change.order.id()}' for $address in [$oldestActiveSeqNr; $lastSeqNr]. Searching the last active order from $oldestActiveSeqNr"
-          )
-          oldestActiveSeqNr
+          // Hope, this is impossible case
+          log.warn(s"Can't find nr=$oldestActiveSeqNr order for $address, will update it")
+          true
         }
 
-      println(s"[ord=${change.order.id()}] finalizedNr: $finalizedNr == oldestActiveSeqNr: $oldestActiveSeqNr")
-      if (finalizedNr == oldestActiveSeqNr) {
-        Some(findOldestActiveNr(finalizedNr + 1) match {
-          case Some(newIdx) => newIdx
-          case None =>
-            println("None")
-            log.trace(s"No active orders for $address, $oldestActiveSeqNr -> $lastSeqNr")
-            lastSeqNr
-        })
-      } else None
+      if (shouldUpdateOldestActive) findOldestActiveNr(oldestActiveSeqNr + 1).orElse(Some(lastSeqNr))
+      else None
     } else None
 
-    val xx = r
+    newOldestActiveSeqNr
       .map { x =>
-        println(s"[ord=${change.order.id()}] oldestActiveSeqNrKey($oldestActiveSeqNrKey): $oldestActiveSeqNr -> $x")
         rw.put(oldestActiveSeqNrKey, x)
         changedKeys + (oldestActiveSeqNrKey -> x)
       }
       .getOrElse(changedKeys)
-
-    println(s"updateOldestActive: after: $xx\n===")
-    xx
   }
 
   def orderAccepted(event: OrderAdded): Unit = db.readWrite { rw =>
-    println("orderAccepted")
     saveOrderInfo(rw, event)
   }
 
   def orderExecuted(event: OrderExecuted): Unit = db.readWrite { rw =>
-    println("orderExecuted")
     saveOrderInfo(rw, event)
   }
 
   def orderCanceled(event: OrderCanceled): Unit = db.readWrite { rw =>
-    println("orderCanceled")
     saveOrderInfo(rw, event)
   }
 

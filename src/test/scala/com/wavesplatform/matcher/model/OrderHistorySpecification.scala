@@ -72,9 +72,9 @@ class OrderHistorySpecification
     }
 
     withClue("orders list") {
-      val expected = Seq(ord.id())
-
       oldestActiveSeqNr(ord.senderPublicKey) shouldBe 1
+
+      val expected = Seq(ord.id())
 
       activeOrderIds(ord.senderPublicKey, Set(pair.priceAsset)) shouldBe expected
       allOrderIds(ord.senderPublicKey, Set(pair.priceAsset)) shouldBe expected
@@ -103,9 +103,9 @@ class OrderHistorySpecification
     }
 
     withClue("orders list") {
-      val expected = Seq(ord.id())
-
       oldestActiveSeqNr(ord.senderPublicKey) shouldBe 1
+
+      val expected = Seq(ord.id())
 
       activeOrderIds(ord.senderPublicKey, Set(pair.amountAsset)) shouldBe expected
       allOrderIds(ord.senderPublicKey, Set(pair.amountAsset)) shouldBe expected
@@ -193,9 +193,9 @@ class OrderHistorySpecification
     }
 
     withClue("orders list") {
-      val expected = Seq(ord2.id(), ord1.id())
-
       oldestActiveSeqNr(ord1.senderPublicKey) shouldBe 1
+
+      val expected = Seq(ord2.id(), ord1.id())
 
       activeOrderIds(ord1.senderPublicKey, pair.assets) shouldBe expected
       allOrderIds(ord1.senderPublicKey, pair.assets) shouldBe expected
@@ -220,25 +220,27 @@ class OrderHistorySpecification
 
     oh.orderInfo(submitted.id()).status shouldBe LimitOrder.PartiallyFilled(100)
 
-//    withClue("orders list of counter owner") {
-//      oldestActiveSeqNr(counter.senderPublicKey) shouldBe 1
-//
-//      activeOrderIds(counter.senderPublicKey, pair.assets) shouldBe empty
-//      allOrderIds(counter.senderPublicKey, pair.assets) shouldBe Seq(counter.id())
-//
-//      activeOrderIdsByPair(counter.senderPublicKey, pair) shouldBe empty
-//      allOrderIdsByPair(counter.senderPublicKey, pair) shouldBe Seq(counter.id())
-//    }
-//
-//    withClue("orders list of submitted owner") {
-//      oldestActiveSeqNr(submitted.senderPublicKey) shouldBe 1
-//
-//      activeOrderIds(submitted.senderPublicKey, pair.assets) shouldBe empty
-//      allOrderIds(submitted.senderPublicKey, pair.assets) shouldBe Seq(submitted.id())
-//
-//      activeOrderIdsByPair(submitted.senderPublicKey, pair) shouldBe empty
-//      allOrderIdsByPair(submitted.senderPublicKey, pair) shouldBe Seq(submitted.id())
-//    }
+    withClue("orders list of counter owner") {
+      oldestActiveSeqNr(counter.senderPublicKey) shouldBe 1
+
+      activeOrderIds(counter.senderPublicKey, pair.assets) shouldBe empty
+      allOrderIds(counter.senderPublicKey, pair.assets) shouldBe Seq(counter.id())
+
+      activeOrderIdsByPair(counter.senderPublicKey, pair) shouldBe empty
+      allOrderIdsByPair(counter.senderPublicKey, pair) shouldBe Seq(counter.id())
+    }
+
+    withClue("orders list of submitted owner") {
+      oldestActiveSeqNr(submitted.senderPublicKey) shouldBe 1
+
+      val expected = Seq(submitted.id())
+
+      activeOrderIds(submitted.senderPublicKey, pair.assets) shouldBe expected
+      allOrderIds(submitted.senderPublicKey, pair.assets) shouldBe expected
+
+      activeOrderIdsByPair(submitted.senderPublicKey, pair) shouldBe expected
+      allOrderIdsByPair(submitted.senderPublicKey, pair) shouldBe expected
+    }
   }
 
   property("Buy WAVES order filled exactly") {
@@ -347,9 +349,9 @@ class OrderHistorySpecification
     }
 
     withClue("orders list of counter owner") {
-      val expected = Seq(counter.id())
-
       oldestActiveSeqNr(counter.senderPublicKey) shouldBe 1
+
+      val expected = Seq(counter.id())
 
       activeOrderIds(counter.senderPublicKey, pair.assets) shouldBe expected
       allOrderIds(counter.senderPublicKey, pair.assets) shouldBe expected
@@ -419,9 +421,9 @@ class OrderHistorySpecification
     }
 
     withClue("orders list of submitted owner") {
-      val expected = Seq(submitted.id())
-
       oldestActiveSeqNr(submitted.senderPublicKey) shouldBe 1
+
+      val expected = Seq(submitted.id())
 
       activeOrderIds(submitted.senderPublicKey, pair.assets) shouldBe expected
       allOrderIds(submitted.senderPublicKey, pair.assets) shouldBe expected
@@ -694,10 +696,11 @@ class OrderHistorySpecification
     oh.deleteOrder(pk, submitted.id()) shouldBe true
 
     withClue("orders list") {
-      val addr     = pk.toAddress
-      val expected = Seq(counter.id())
+      val addr = pk.toAddress
 
       oldestActiveSeqNr(addr) shouldBe 1
+
+      val expected = Seq(counter.id())
 
       activeOrderIds(addr, pair.assets) shouldBe expected
       allOrderIds(addr, pair.assets) shouldBe expected
@@ -763,9 +766,9 @@ class OrderHistorySpecification
     oh.orderAccepted(OrderAdded(LimitOrder(newOrder)))
 
     withClue("orders list") {
-      val expected = orders.reverse.tail.map(_.id()) :+ newOrder.id()
-
       oldestActiveSeqNr(pk) shouldBe 1
+
+      val expected = orders.reverse.tail.map(_.id()) :+ newOrder.id()
 
       activeOrderIds(pk, pair.assets) shouldBe expected
       allOrderIds(pk, Set.empty) shouldBe expected

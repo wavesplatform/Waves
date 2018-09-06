@@ -27,7 +27,7 @@ object DBUtils {
       val fromIndex = db.get(MatcherKeys.addressOrdersSeqNr(address))
       val toIndex = math.min(
         math.max(1, fromIndex - maxOrders + 1),
-        math.max(db.get(MatcherKeys.addressOldestActiveOrderSeqNr(address)), 1)
+        db.get(MatcherKeys.addressOldestActiveOrderSeqNr(address))
       )
 
       (for {
