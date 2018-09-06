@@ -16,8 +16,6 @@ import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.Order
 import scorex.utils.ScorexLogging
 
-import scala.reflect.ClassTag
-
 class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
   import OrderHistory._
   import com.wavesplatform.matcher.MatcherKeys._
@@ -56,7 +54,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
     val orderInfoDiffs = collectChanges(event)
 
     val (_, changes) = orderInfoDiffs.foldLeft((Map.empty: ChangedKeys, Map.empty[Order.Id, OrderInfoChange])) {
-      case ((origChangedKeys, r), (order, orderInfoDiff)) =>
+      case ((origChangedKeys, origChanges), (order, orderInfoDiff)) =>
         val orderId      = order.id()
         val origInfo     = DBUtils.orderInfoOpt(rw, orderId)
         val combinedInfo = combine(order, origInfo, orderInfoDiff)
@@ -69,7 +67,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
           addOrderIndexes(rw, change, changedKeys1)
         } else changedKeys1
 
-        (updateOldestActiveNr(rw, change, changedKeys2), r.updated(orderId, change))
+        (updateOldestActiveNr(rw, change, changedKeys2), origChanges.updated(orderId, change))
     }
 
     val opDiff = diff(event, changes)
@@ -145,9 +143,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
 
   private type ChangedKeys = Map[Key[_], Any]
 
-  private def changedOrElse[V](changedKeys: ChangedKeys, key: Key[V], orElse: => V)(implicit ct: ClassTag[V]): V = {
-    changedKeys.getOrElse(key, orElse).asInstanceOf[V]
-  }
+  private def changedOrElse[V](changedKeys: ChangedKeys, key: Key[V], orElse: => V): V = changedKeys.getOrElse(key, orElse).asInstanceOf[V]
 
   private def addOrderIndexes(rw: RW, change: OrderInfoChange, changedKeys: ChangedKeys): ChangedKeys = {
     import change.{order => o}
@@ -221,7 +217,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
               case Some(x) => update(x)
               case None =>
                 rw.delete(oldestActiveSeqNrKey)
-                origKeys + (oldestActiveSeqNrKey -> None) // wrong
+                origKeys + (oldestActiveSeqNrKey -> None)
             }
           } else origKeys
         }
@@ -229,20 +225,8 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
     } else origKeys
   }
 
-  def orderAccepted(event: OrderAdded): Unit = db.readWrite { rw =>
-    saveOrderInfo(rw, event)
-  }
-
-  def orderExecuted(event: OrderExecuted): Unit = db.readWrite { rw =>
-    saveOrderInfo(rw, event)
-  }
-
-  def orderCanceled(event: OrderCanceled): Unit = db.readWrite { rw =>
-    saveOrderInfo(rw, event)
-  }
-
+  def process(event: Event): Unit       = db.readWrite(saveOrderInfo(_, event))
   def orderInfo(id: ByteStr): OrderInfo = DBUtils.orderInfo(db, id)
-
   def order(id: ByteStr): Option[Order] = DBUtils.order(db, id)
 
   def deleteOrder(address: Address, orderId: ByteStr): Boolean = db.readWrite { rw =>

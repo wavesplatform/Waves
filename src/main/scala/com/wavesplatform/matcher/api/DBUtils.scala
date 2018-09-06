@@ -37,7 +37,7 @@ object DBUtils {
         order <- ro.get(MatcherKeys.order(orderSpendAsset.orderId))
         orderInfo = ro.get(MatcherKeys.orderInfo(orderSpendAsset.orderId))
         if !(activeOnly && orderInfo.status.isFinal)
-      } yield (order, orderInfo)).sortBy { case (order, info) => (info.status, -order.timestamp) }.take(maxOrders) // TODO: swap
+      } yield (order, orderInfo)).sortBy { case (order, info) => (info.status, -order.timestamp) }.take(maxOrders)
     }
 
   def reservedBalance(db: DB, address: Address): Map[Option[AssetId], Long] = db.readOnly { ro =>

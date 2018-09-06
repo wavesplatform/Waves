@@ -11,6 +11,7 @@ import org.scalatest.prop.PropertyChecks
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.{AssetPair, Order}
+import OrderHistorySpecification._
 
 import scala.collection.mutable
 
@@ -57,7 +58,7 @@ class OrderHistorySpecification
     val ord = buy(pair, 0.0007, 10000)
 
     val lo = LimitOrder(ord)
-    oh.orderAccepted(OrderAdded(lo))
+    oh.process(OrderAdded(lo))
 
     val info = oh.orderInfo(ord.id())
     withClue("info") {
@@ -88,7 +89,7 @@ class OrderHistorySpecification
     val ord = sell(pair, 0.0007, 10000)
 
     val lo = LimitOrder(ord)
-    oh.orderAccepted(OrderAdded(LimitOrder(ord)))
+    oh.process(OrderAdded(LimitOrder(ord)))
 
     val info = oh.orderInfo(ord.id())
     withClue("info") {
@@ -120,7 +121,7 @@ class OrderHistorySpecification
     val ord  = buy(pair, 0.008, 1000, matcherFee = Some(3000))
     val lo   = LimitOrder(ord)
 
-    oh.orderAccepted(OrderAdded(lo))
+    oh.process(OrderAdded(lo))
 
     val info = oh.orderInfo(ord.id())
     withClue("info") {
@@ -141,7 +142,7 @@ class OrderHistorySpecification
     val ord  = sell(pair, 0.0008, 10000)
     val lo   = LimitOrder(ord)
 
-    oh.orderAccepted(OrderAdded(lo))
+    oh.process(OrderAdded(lo))
     oh.orderInfo(ord.id()).status shouldBe LimitOrder.Accepted
     oh.openVolume(ord.senderPublicKey, pair.amountAsset) shouldBe 10000L + ord.matcherFee
     oh.openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 0L
@@ -153,7 +154,7 @@ class OrderHistorySpecification
     val pair = AssetPair(mkAssetId("BTC"), None)
     val ord  = sell(pair, 0.01, 100000, matcherFee = Some(1000L))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(ord)))
+    oh.process(OrderAdded(LimitOrder(ord)))
 
     val oi = oh.orderInfo(ord.id())
     oi.status shouldBe LimitOrder.Accepted
@@ -165,7 +166,7 @@ class OrderHistorySpecification
     val pair = AssetPair(None, mkAssetId("BTC"))
     val ord  = buy(pair, 0.0007, 100000, matcherFee = Some(1000L))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(ord)))
+    oh.process(OrderAdded(LimitOrder(ord)))
 
     val oi = oh.orderInfo(ord.id())
     oi.status shouldBe LimitOrder.Accepted
@@ -179,8 +180,7 @@ class OrderHistorySpecification
     val ord1 = sell(pair, 0.0005, 10000, Some(pk), matcherFee = Some(30000L), ts = Some(System.currentTimeMillis()))
     val ord2 = sell(pair, 0.0008, 16000, Some(pk), matcherFee = Some(30000L), ts = Some(System.currentTimeMillis() + 1))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
-    oh.orderAccepted(OrderAdded(LimitOrder(ord2)))
+    oh.processAll(OrderAdded(LimitOrder(ord1)), OrderAdded(LimitOrder(ord2)))
 
     withClue("all orders accepted") {
       oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Accepted
@@ -211,12 +211,9 @@ class OrderHistorySpecification
     val counter   = sell(pair, 200000000L, 100, matcherFee = Some(300000))
     val submitted = buy(pair, 200000000L, 130, matcherFee = Some(300000))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
-    oh.orderCanceled(OrderCanceled(LimitOrder(counter), unmatchable = false))
-    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
-
+    oh.processAll(OrderAdded(LimitOrder(counter)), OrderCanceled(LimitOrder(counter), unmatchable = false), OrderAdded(LimitOrder(counter)))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
-    oh.orderExecuted(exec)
+    oh.process(exec)
 
     oh.orderInfo(submitted.id()).status shouldBe LimitOrder.PartiallyFilled(100)
 
@@ -248,10 +245,10 @@ class OrderHistorySpecification
     val counter   = buy(pair, 0.0008, 100000, matcherFee = Some(2000L))
     val submitted = sell(pair, 0.0007, 100000, matcherFee = Some(1000L))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
+    oh.process(OrderAdded(LimitOrder(counter)))
 
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
-    oh.orderExecuted(exec)
+    oh.process(exec)
 
     withClue("executed exactly") {
       exec.executedAmount shouldBe counter.amount
@@ -296,7 +293,7 @@ class OrderHistorySpecification
     val submitted = buy(pair, 0.00000238, 425532L, matcherFee = Some(300000L))
 
     val counterLo = LimitOrder(counter)
-    oh.orderAccepted(OrderAdded(counterLo))
+    oh.process(OrderAdded(counterLo))
     val counterOrderInfo1 = oh.orderInfo(counter.id())
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
       oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe counterLo.getRawSpendAmount - counterOrderInfo1.totalSpend(counterLo) + counterOrderInfo1.remainingFee
@@ -307,7 +304,7 @@ class OrderHistorySpecification
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
     exec.executedAmount shouldBe 420169L
 
-    oh.orderExecuted(exec)
+    oh.process(exec)
     val counterOrderInfo = oh.orderInfo(counter.id())
     withClue(s"counter: ${submitted.id()}") {
       counterOrderInfo.filled shouldBe exec.executedAmount
@@ -335,7 +332,7 @@ class OrderHistorySpecification
     }
 
     // see OrderBookActor.handleMatchEvent
-    oh.orderAccepted(OrderAdded(exec.submittedRemaining))
+    oh.process(OrderAdded(exec.submittedRemaining))
 
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
       val remainingSpend = counter.amount - counterOrderInfo.totalSpend(LimitOrder(counter))
@@ -376,10 +373,9 @@ class OrderHistorySpecification
     val counter   = sell(pair, 0.0008, 100000000, matcherFee = Some(2000L))
     val submitted = buy(pair, 0.00085, 120000000, matcherFee = Some(1000L))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
+    oh.process(OrderAdded(LimitOrder(counter)))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
-    oh.orderExecuted(exec)
-    oh.orderAccepted(OrderAdded(exec.submittedRemaining))
+    oh.processAll(exec, OrderAdded(exec.submittedRemaining))
 
     val counterOrderInfo = oh.orderInfo(counter.id())
     withClue(s"counter: ${counter.id()}") {
@@ -439,9 +435,9 @@ class OrderHistorySpecification
     val submitted1 = sell(pair, 0.00075, 50000000, matcherFee = Some(300001L))
     val submitted2 = sell(pair, 0.0008, 80000000, matcherFee = Some(300001L))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
+    oh.process(OrderAdded(LimitOrder(counter)))
     val exec1 = OrderExecuted(LimitOrder(submitted1), LimitOrder(counter))
-    oh.orderExecuted(exec1)
+    oh.process(exec1)
 
     val counterInfo1    = oh.orderInfo(counter.id())
     val submitted1Info1 = oh.orderInfo(submitted1.id())
@@ -457,8 +453,7 @@ class OrderHistorySpecification
     oh.orderInfo(submitted2.id()).status shouldBe LimitOrder.NotFound
 
     val exec2 = OrderExecuted(LimitOrder(submitted2), exec1.counterRemaining)
-    oh.orderExecuted(exec2)
-    oh.orderAccepted(OrderAdded(exec2.submittedRemaining))
+    oh.processAll(exec2, OrderAdded(exec2.submittedRemaining))
 
     val counterInfo2 = oh.orderInfo(counter.id())
     withClue(s"counter: ${counter.id()}") {
@@ -498,13 +493,9 @@ class OrderHistorySpecification
     val counter2  = buy(pair, 200000000L, 200, matcherFee = Some(300000))
     val submitted = sell(pair, 210000000L, 350, matcherFee = Some(300000))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(counter1)))
-    oh.orderAccepted(OrderAdded(LimitOrder(counter2)))
-
+    oh.processAll(OrderAdded(LimitOrder(counter1)), OrderAdded(LimitOrder(counter2)))
     val exec1 = OrderExecuted(LimitOrder(submitted), LimitOrder(counter1))
-    oh.orderExecuted(exec1)
-    oh.orderAccepted(OrderAdded(exec1.submittedRemaining))
-    oh.orderExecuted(OrderExecuted(exec1.submittedRemaining, LimitOrder(counter2)))
+    oh.processAll(exec1, OrderAdded(exec1.submittedRemaining), OrderExecuted(exec1.submittedRemaining, LimitOrder(counter2)))
 
     oh.orderInfo(submitted.id()).status shouldBe LimitOrder.Filled(350)
   }
@@ -518,12 +509,11 @@ class OrderHistorySpecification
     val bobPk     = PrivateKeyAccount("bob".getBytes("utf-8"))
     val submitted = sell(pair, 0.00031887, 223345000L, matcherFee = Some(300000), sender = Some(bobPk))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
+    oh.process(OrderAdded(LimitOrder(counter)))
 
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
     exec.executedAmount shouldBe 223344937L
-    oh.orderExecuted(exec)
-    oh.orderCanceled(OrderCanceled(exec.submittedRemaining, unmatchable = true))
+    oh.processAll(exec, OrderCanceled(exec.submittedRemaining, unmatchable = true))
 
     withClue("Account of submitted order should have positive balances:") {
       DBUtils.reservedBalance(db, bobPk) shouldBe empty
@@ -536,10 +526,9 @@ class OrderHistorySpecification
     val counter   = buy(pair, 0.0008, 100000000, Some(pk), Some(300000L))
     val submitted = sell(pair, 0.00079, 210000000, Some(pk), Some(300000L))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
+    oh.process(OrderAdded(LimitOrder(counter)))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
-    oh.orderExecuted(exec)
-    oh.orderAccepted(OrderAdded(exec.submittedRemaining))
+    oh.processAll(exec, OrderAdded(exec.submittedRemaining))
 
     val counterOrderInfo = oh.orderInfo(counter.id())
     withClue(s"counter: ${counter.id()}") {
@@ -585,8 +574,7 @@ class OrderHistorySpecification
     val counter   = buy(pair, 0.1, 10000000L, matcherFee = Some(300000L))
     val submitted = sell(pair, 10, 100000L, Some(pk), Some(300000L))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
-    oh.orderCanceled(OrderCanceled(LimitOrder(submitted), unmatchable = true))
+    oh.processAll(OrderAdded(LimitOrder(counter)), OrderCanceled(LimitOrder(submitted), unmatchable = true))
 
     oh.openVolume(pk, pair.amountAsset) should be >= 0L
     oh.openVolume(pk, pair.priceAsset) should be >= 0L
@@ -605,8 +593,7 @@ class OrderHistorySpecification
   property("Cancel buy order") {
     val ord1 = buy(pair, 0.0008, 100000000, matcherFee = Some(300000L))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
-    oh.orderCanceled(OrderCanceled(LimitOrder(ord1), unmatchable = false))
+    oh.processAll(OrderAdded(LimitOrder(ord1)), OrderCanceled(LimitOrder(ord1), unmatchable = false))
 
     oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Cancelled(0)
 
@@ -629,8 +616,8 @@ class OrderHistorySpecification
   property("Cancel sell order") {
     val ord1 = sell(pair, 0.0008, 100000000, matcherFee = Some(300000L))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
-    oh.orderCanceled(OrderCanceled(LimitOrder(ord1), unmatchable = false))
+    oh.process(OrderAdded(LimitOrder(ord1)))
+    oh.process(OrderCanceled(LimitOrder(ord1), unmatchable = false))
 
     oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Cancelled(0)
 
@@ -644,10 +631,9 @@ class OrderHistorySpecification
     val counter   = sell(pair, 0.0008, 2100000000, matcherFee = Some(300000L))
     val submitted = buy(pair, 0.00081, 1000000000, matcherFee = Some(300000L))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
+    oh.process(OrderAdded(LimitOrder(counter)))
     val exec1 = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
-    oh.orderExecuted(exec1)
-    oh.orderCanceled(OrderCanceled(exec1.counter.partial(exec1.counterRemainingAmount, exec1.counterRemainingFee), unmatchable = false))
+    oh.processAll(exec1, OrderCanceled(exec1.counter.partial(exec1.counterRemainingAmount, exec1.counterRemainingFee), unmatchable = false))
 
     oh.orderInfo(counter.id()).status shouldBe LimitOrder.Cancelled(1000000000)
     oh.orderInfo(submitted.id()).status shouldBe LimitOrder.Filled(1000000000)
@@ -676,9 +662,9 @@ class OrderHistorySpecification
     val counter   = buy(pair, 0.0008, 210000000, Some(pk), Some(300000L))
     val submitted = sell(pair, 0.00079, 100000000, Some(pk), Some(300000L))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(counter)))
+    oh.process(OrderAdded(LimitOrder(counter)))
     val exec1 = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
-    oh.orderExecuted(exec1)
+    oh.process(exec1)
 
     val counterInfo = oh.orderInfo(counter.id())
     counterInfo.status shouldBe LimitOrder.PartiallyFilled(100000000)
@@ -719,14 +705,18 @@ class OrderHistorySpecification
     val ord4 = sell(pair, 0.00079, 2100000000, Some(pk), Some(300000L), Some(4L)) // Partial
     val ord5 = buy(pair, 0.0004, 130000000, Some(pk), Some(300000L), Some(45)) // Accepted
 
-    oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
-    oh.orderAccepted(OrderAdded(LimitOrder(ord2)))
-    oh.orderAccepted(OrderAdded(LimitOrder(ord3)))
+    oh.processAll(
+      OrderAdded(LimitOrder(ord1)),
+      OrderAdded(LimitOrder(ord2)),
+      OrderAdded(LimitOrder(ord3))
+    )
     val exec = OrderExecuted(LimitOrder(ord4), LimitOrder(ord1))
-    oh.orderExecuted(exec)
-    oh.orderAccepted(OrderAdded(exec.submittedRemaining))
-    oh.orderCanceled(OrderCanceled(LimitOrder(ord3), unmatchable = false))
-    oh.orderAccepted(OrderAdded(LimitOrder(ord5)))
+    oh.processAll(
+      exec,
+      OrderAdded(exec.submittedRemaining),
+      OrderCanceled(LimitOrder(ord3), unmatchable = false),
+      OrderAdded(LimitOrder(ord5))
+    )
 
     allOrderIds(ord1.senderPublicKey, Set.empty) shouldBe
       Seq(ord5.id(), ord4.id(), ord2.id(), ord3.id(), ord1.id())
@@ -756,14 +746,14 @@ class OrderHistorySpecification
     (0 until matcherSettings.maxOrdersPerRequest).foreach { i =>
       val o = buy(pair, 0.0008 + 0.00001 * i, 100000000, Some(pk), Some(300000L), Some(100L + i))
       orders += o
-      oh.orderAccepted(OrderAdded(LimitOrder(o)))
+      oh.process(OrderAdded(LimitOrder(o)))
     }
 
-    oh.orderCanceled(OrderCanceled(LimitOrder(orders.last), unmatchable = false))
+    oh.process(OrderCanceled(LimitOrder(orders.last), unmatchable = false))
 
     val newOrder = buy(pair, 0.001, 100000000, Some(pk), Some(300000L), Some(1L))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(newOrder)))
+    oh.process(OrderAdded(LimitOrder(newOrder)))
 
     withClue("orders list") {
       oldestActiveSeqNr(pk) shouldBe Some(1)
@@ -782,10 +772,10 @@ class OrderHistorySpecification
     (0 until matcherSettings.maxOrdersPerRequest + 1).foreach { i =>
       val o = buy(pair, 0.0008 + 0.00001 * i, 100000000, Some(pk), Some(300000L), Some(100L + i))
       orders += o
-      oh.orderAccepted(OrderAdded(LimitOrder(o)))
+      oh.process(OrderAdded(LimitOrder(o)))
     }
 
-    oh.orderCanceled(OrderCanceled(LimitOrder(orders.last), unmatchable = false))
+    oh.process(OrderCanceled(LimitOrder(orders.last), unmatchable = false))
 
     withClue("orders list") {
       oldestActiveSeqNr(pk) shouldBe Some(1)
@@ -805,8 +795,7 @@ class OrderHistorySpecification
     val ord1       = sell(pair1, 0.0008, 10000, Some(pk), Some(matcherFee))
     val ord2       = sell(pair2, 0.0009, 10001, Some(pk), Some(matcherFee))
 
-    oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
-    oh.orderAccepted(OrderAdded(LimitOrder(ord2)))
+    oh.processAll(OrderAdded(LimitOrder(ord1)), OrderAdded(LimitOrder(ord2)))
 
     DBUtils.reservedBalance(db, pk) shouldBe
       Map(
@@ -814,5 +803,11 @@ class OrderHistorySpecification
         ass1 -> ord1.amount,
         ass2 -> ord2.amount
       )
+  }
+}
+
+private object OrderHistorySpecification {
+  final implicit class OrderHistoryOps(val self: OrderHistory) extends AnyVal {
+    def processAll(events: Events.Event*): Unit = events.foreach(self.process)
   }
 }
