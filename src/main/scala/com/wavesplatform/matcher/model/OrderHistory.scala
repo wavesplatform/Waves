@@ -69,7 +69,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
           addOrderIndexes(rw, change, changedKeys1)
         } else changedKeys1
 
-        (updateOldestActive(rw, change, changedKeys2), r.updated(orderId, change))
+        (updateOldestActiveNr(rw, change, changedKeys2), r.updated(orderId, change))
     }
 
     val opDiff = diff(event, changes)
@@ -176,17 +176,15 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
     changedKeys + (commonSeqNrKey -> commonNextSeqNr)
   }
 
-  private def updateOldestActive(rw: RW, change: OrderInfoChange, changedKeys: ChangedKeys): ChangedKeys = {
+  private def updateOldestActiveNr(rw: RW, change: OrderInfoChange, origKeys: ChangedKeys): ChangedKeys = {
     lazy val address              = change.order.senderPublicKey.toAddress
-    lazy val lastSeqNr            = changedOrElse(changedKeys, MatcherKeys.addressOrdersSeqNr(address), math.max(getLastSeqNr(rw, address), 1))
+    lazy val lastSeqNr            = changedOrElse(origKeys, MatcherKeys.addressOrdersSeqNr(address), math.max(getLastSeqNr(rw, address), 1))
     lazy val oldestActiveSeqNrKey = MatcherKeys.addressOldestActiveOrderSeqNr(address)
-    lazy val oldestActiveSeqNr = {
-      val r = changedOrElse(changedKeys, oldestActiveSeqNrKey, rw.get(oldestActiveSeqNrKey))
-      if (r == 0) lastSeqNr else r
-    }
+    lazy val oldestActiveSeqNr    = changedOrElse[Option[Int]](origKeys, oldestActiveSeqNrKey, rw.get(oldestActiveSeqNrKey))
 
-    def findOldestActiveNr(fromNr: Int): Option[Int] =
-      (fromNr to lastSeqNr).view
+    def findOldestActiveNr(afterNr: Int): Option[Int] =
+      (afterNr to lastSeqNr).view
+        .drop(1)
         .find { i =>
           val isActive = rw
             .get(MatcherKeys.addressOrders(address, i))
@@ -197,30 +195,38 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
           isActive
         }
 
-    val newOldestActiveSeqNr = if (!change.updatedInfo.status.isFinal) {
-      // Just a new active order
-      if (oldestActiveSeqNr == lastSeqNr) Some(lastSeqNr) else None
+    def update(newOldestActiveNr: Int): ChangedKeys = {
+      rw.put(oldestActiveSeqNrKey, Some(newOldestActiveNr))
+      origKeys + (oldestActiveSeqNrKey -> newOldestActiveNr)
+    }
+
+    if (!change.updatedInfo.status.isFinal) {
+      // A new active order
+      if (oldestActiveSeqNr.isEmpty) update(lastSeqNr) else origKeys
     } else if (change.origInfo.nonEmpty) {
-      // An active order could be closed
-      val shouldUpdateOldestActive = rw
-        .get(MatcherKeys.addressOrders(address, oldestActiveSeqNr))
-        .map(_.orderId == change.order.id())
-        .getOrElse {
-          // Hope, this is impossible case
-          log.warn(s"Can't find nr=$oldestActiveSeqNr order for $address, will update it")
-          true
+      // An active order was closed
+      oldestActiveSeqNr
+        .map { oldestActiveSeqNr =>
+          val shouldUpdateOldestActive = rw
+            .get(MatcherKeys.addressOrders(address, oldestActiveSeqNr))
+            .map(_.orderId == change.order.id())
+            .getOrElse {
+              // Hope, this is impossible case
+              log.warn(s"Can't find nr=$oldestActiveSeqNr order for $address, will update it")
+              true
+            }
+
+          if (shouldUpdateOldestActive) {
+            findOldestActiveNr(oldestActiveSeqNr) match {
+              case Some(x) => update(x)
+              case None =>
+                rw.delete(oldestActiveSeqNrKey)
+                origKeys + (oldestActiveSeqNrKey -> None) // wrong
+            }
+          } else origKeys
         }
-
-      if (shouldUpdateOldestActive) findOldestActiveNr(oldestActiveSeqNr + 1).orElse(Some(lastSeqNr))
-      else None
-    } else None
-
-    newOldestActiveSeqNr
-      .map { x =>
-        rw.put(oldestActiveSeqNrKey, x)
-        changedKeys + (oldestActiveSeqNrKey -> x)
-      }
-      .getOrElse(changedKeys)
+        .getOrElse(origKeys)
+    } else origKeys
   }
 
   def orderAccepted(event: OrderAdded): Unit = db.readWrite { rw =>

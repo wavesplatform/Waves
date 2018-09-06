@@ -377,7 +377,7 @@ object MatcherTool extends ScorexLogging {
 
     db.readWrite { rw =>
       lastActiveOrderIdxs.forEach { (address, lastIdx) =>
-        rw.put(MatcherKeys.addressOldestActiveOrderSeqNr(address), lastIdx)
+        rw.put(MatcherKeys.addressOldestActiveOrderSeqNr(address), Some(lastIdx))
       }
     }
   }
