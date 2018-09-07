@@ -29,7 +29,6 @@ import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.utils._
 
-import scala.collection.immutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.Try
@@ -264,18 +263,21 @@ class MatcherActor(orderHistory: ActorRef,
     if (tradedPairs.contains(pair)) {
       tradedPairs -= pair
       deleteMessages(lastSequenceNr)
-      persistAll(tradedPairs.map(v => OrderBookCreated(v._1)).to[immutable.Seq])(_ => ())
+      saveSnapshot(Snapshot(tradedPairs.keySet))
     }
   }
 
   override def receiveRecover: Receive = {
     case OrderBookCreated(pair) =>
-      if (orderBook(pair).isEmpty) createOrderBook(pair)
+      if (orderBook(pair).isEmpty) {
+        log.info(s"Order book created for $pair")
+        createOrderBook(pair)
+      }
 
     case SnapshotOffer(metadata, snapshot: Snapshot) =>
       lastSnapshotSequenceNr = metadata.sequenceNr
       log.info(s"Loaded the snapshot with nr = ${metadata.sequenceNr}")
-      snapshot.tradedPairsSet.par.foreach(createOrderBook)
+      snapshot.tradedPairsSet.foreach(createOrderBook)
 
     case RecoveryCompleted =>
       log.info("Recovery completed!")

@@ -23,6 +23,7 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.{Base58, NTP, ScorexLogging}
 import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
@@ -47,6 +48,7 @@ case class MatcherApiRoute(wallet: Wallet,
                            txWriter: ActorRef,
                            settings: RestAPISettings,
                            matcherSettings: MatcherSettings,
+                           blockchain: Blockchain,
                            db: DB)
     extends ApiRoute
     with ScorexLogging {
@@ -151,7 +153,12 @@ case class MatcherApiRoute(wallet: Wallet,
     (pathEndOrSingleSlash & post) {
       json[Order] { order =>
         placeTimer.measure {
-          (matcher ? order).mapTo[MatcherResponse].map(r => r.code -> r.json)
+          if (blockchain.hasScript(order.senderPublicKey.toAddress)) {
+            val resp = StatusCodeMatcherResponse(StatusCodes.BadRequest, "Trading on scripted account isn't allowed yet.")
+            Future.successful(resp.code -> resp.json)
+          } else {
+            (matcher ? order).mapTo[MatcherResponse].map(r => r.code -> r.json)
+          }
         }
       }
     }
@@ -189,7 +196,7 @@ case class MatcherApiRoute(wallet: Wallet,
                 .map {
                   case (order, _) =>
                     orderBook(order.assetPair).fold {
-                      log.warn(s"Can't find pair ${order.assetPair} for order ${order.idStr()}")
+                      log.warn(s"Can't find pair ${order.assetPair} for order ${order.id()}")
                       Future.successful[Any](())
                     } { x =>
                       cancelTimer.measure(x ? CancelOrder(order.assetPair, req.senderPublicKey, ByteStr(order.id())))
@@ -243,7 +250,7 @@ case class MatcherApiRoute(wallet: Wallet,
                   .map {
                     case (order, _) =>
                       orderBook(order.assetPair).fold {
-                        log.warn(s"Can't find pair ${order.assetPair} for order ${order.idStr()}")
+                        log.warn(s"Can't find pair ${order.assetPair} for order ${order.id()}")
                         Future.successful[Any](())
                       } { x =>
                         cancelTimer.measure(x ? CancelOrder(order.assetPair, req.senderPublicKey, ByteStr(order.id())))
@@ -546,7 +553,7 @@ object MatcherApiRoute {
 
   def orderJson(order: Order, orderInfo: OrderInfo): JsObject =
     Json.obj(
-      "id"        -> order.idStr(),
+      "id"        -> order.id(),
       "type"      -> order.orderType.toString,
       "amount"    -> order.amount,
       "price"     -> order.price,

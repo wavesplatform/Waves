@@ -74,8 +74,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         txToBob || backToAliceAfterHeight
       case other => false
     }""".stripMargin).get.value
-      assert(untyped.size == 1)
-      CompilerV1(dummyCompilerContext, untyped.head).explicitGet()._1
+      CompilerV1(dummyCompilerContext, untyped).explicitGet()._1
     }
 
     val pkSwapBC1 = pkByAddress(swapBC1)
