@@ -92,7 +92,6 @@ inTask(assembly)(
 
 inConfig(Compile)(
   Seq(
-    // mainClass := Some("com.wavesplatform.matcher.MigrationTool"),
     mainClass := Some("com.wavesplatform.Application"),
     publishArtifact in packageDoc := false,
     publishArtifact in packageSrc := false,

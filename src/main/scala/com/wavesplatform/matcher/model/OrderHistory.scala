@@ -55,13 +55,19 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
 
     val (_, changes) = orderInfoDiffs.foldLeft((Map.empty: ChangedKeys, Map.empty[Order.Id, OrderInfoChange])) {
       case ((origChangedKeys, origChanges), (order, orderInfoDiff)) =>
-        val orderId      = order.id()
-        val origInfo     = DBUtils.orderInfoOpt(rw, orderId)
+        val orderId = order.id()
+
+        val orderInfoOptKey = MatcherKeys.orderInfoOpt(orderId)
+        val origInfo        = changedOrElse(origChangedKeys, orderInfoOptKey, rw.get(orderInfoOptKey))
+
         val combinedInfo = combine(order, origInfo, orderInfoDiff)
         val change       = OrderInfoChange(order, origInfo, combinedInfo)
-        rw.put(MatcherKeys.orderInfo(orderId), change.updatedInfo)
 
-        val changedKeys1 = origChangedKeys.updated(MatcherKeys.orderInfo(orderId), change.updatedInfo)
+        rw.put(MatcherKeys.orderInfo(orderId), change.updatedInfo)
+        val changedKeys1 = origChangedKeys
+          .updated(MatcherKeys.orderInfo(orderId), change.updatedInfo)
+          .updated(orderInfoOptKey, Some(change.updatedInfo))
+
         val changedKeys2 = if (origInfo.isEmpty) {
           saveOrder(rw, order)
           addOrderIndexes(rw, change, changedKeys1)
