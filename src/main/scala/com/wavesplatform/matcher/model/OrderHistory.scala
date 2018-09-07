@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.model
 
 import cats.implicits._
 import cats.kernel.Monoid
-import com.wavesplatform.database.{DBExt, RW}
+import com.wavesplatform.database.{DBExt, Key, RW}
 import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.model.Events._
 import com.wavesplatform.matcher.model.LimitOrder.{Filled, OrderStatus}
@@ -14,8 +14,9 @@ import org.iq80.leveldb.DB
 import scorex.account.Address
 import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.Order
+import scorex.utils.ScorexLogging
 
-class OrderHistory(db: DB, settings: MatcherSettings) {
+class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
   import OrderHistory._
   import com.wavesplatform.matcher.MatcherKeys._
 
@@ -49,22 +50,35 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
       )
   }
 
-  private def saveOrderInfo(rw: RW, event: Event): Map[ByteStr, OrderInfoChange] =
-    saveOrderInfoTimer.measure(db.readWrite { rw =>
-      val orderInfoDiffs = collectChanges(event)
+  private def saveOrderInfo(rw: RW, event: Event): Unit = saveOrderInfoTimer.measure {
+    val orderInfoDiffs = collectChanges(event)
 
-      val updatedInfo = orderInfoDiffs.map {
-        case (order, orderInfoDiff) =>
-          val orderId  = order.id()
-          val orig     = DBUtils.orderInfoOpt(rw, orderId)
-          val combined = combine(order, orig, orderInfoDiff)
-          val change   = OrderInfoChange(order, orig, combined)
-          rw.put(MatcherKeys.orderInfo(orderId), change.updatedInfo)
-          orderId -> change
-      }
+    val (_, changes) = orderInfoDiffs.foldLeft((Map.empty: ChangedKeys, Map.empty[Order.Id, OrderInfoChange])) {
+      case ((origChangedKeys, origChanges), (order, orderInfoDiff)) =>
+        val orderId = order.id()
 
-      updatedInfo.toMap
-    })
+        val orderInfoOptKey = MatcherKeys.orderInfoOpt(orderId)
+        val origInfo        = changedOrElse(origChangedKeys, orderInfoOptKey, rw.get(orderInfoOptKey))
+
+        val combinedInfo = combine(order, origInfo, orderInfoDiff)
+        val change       = OrderInfoChange(order, origInfo, combinedInfo)
+
+        rw.put(MatcherKeys.orderInfo(orderId), change.updatedInfo)
+        val changedKeys1 = origChangedKeys
+          .updated(MatcherKeys.orderInfo(orderId), change.updatedInfo)
+          .updated(orderInfoOptKey, Some(change.updatedInfo))
+
+        val changedKeys2 = if (origInfo.isEmpty) {
+          saveOrder(rw, order)
+          addOrderIndexes(rw, change, changedKeys1)
+        } else changedKeys1
+
+        (updateOldestActiveNr(rw, change, changedKeys2), origChanges.updated(orderId, change))
+    }
+
+    val opDiff = diff(event, changes)
+    saveOpenVolume(rw, opDiff)
+  }
 
   private def collectChanges(event: Event): Seq[(Order, OrderInfoDiff)] = event match {
     case OrderAdded(lo) =>
@@ -131,68 +145,96 @@ class OrderHistory(db: DB, settings: MatcherSettings) {
 
   private def saveOrder(rw: RW, order: Order): Unit = rw.put(MatcherKeys.order(order.id()), Some(order))
 
-  def orderAccepted(event: OrderAdded): Unit = db.readWrite { rw =>
-    val lo = event.order
-    saveOrder(rw, lo.order)
+  private type ChangedKeys = Map[Key[_], Any]
 
-    val updated = saveOrderInfo(rw, event)
-    val opDiff  = diff(event, updated)
-    saveOpenVolume(rw, opDiff)
+  private def changedOrElse[V](changedKeys: ChangedKeys, key: Key[V], orElse: => V): V = changedKeys.getOrElse(key, orElse).asInstanceOf[V]
 
-    val accepted = updated(lo.order.id())
-    if (accepted.origInfo.isEmpty) {
-      // for OrderAdded events, updatedInfo contains just one element
-      val o         = accepted.order
-      val k         = MatcherKeys.addressOrdersSeqNr(o.senderPublicKey)
-      val nextSeqNr = rw.get(k) + 1
-      rw.put(k, nextSeqNr)
-      rw.put(MatcherKeys.addressOrders(o.senderPublicKey, nextSeqNr), Some(OrderAssets(o.id(), lo.spentAsset)))
-    }
+  private def addOrderIndexes(rw: RW, change: OrderInfoChange, changedKeys: ChangedKeys): ChangedKeys = {
+    import change.{order => o}
+    val address = o.senderPublicKey.toAddress
+
+    val commonSeqNrKey  = MatcherKeys.addressOrdersSeqNr(address)
+    val commonNextSeqNr = changedOrElse(changedKeys, commonSeqNrKey, rw.get(commonSeqNrKey)) + 1
+
+    rw.put(
+      MatcherKeys.addressOrders(address, commonNextSeqNr),
+      Some(OrderAssets(o.id(), o.getSpendAssetId))
+    )
+
+    rw.put(commonSeqNrKey, commonNextSeqNr)
+
+    val pairSeqNrKey  = MatcherKeys.addressOrdersByPairSeqNr(address, o.assetPair)
+    val pairNextSeqNr = rw.get(pairSeqNrKey) + 1
+
+    rw.put(
+      MatcherKeys.addressOrdersByPair(address, o.assetPair, pairNextSeqNr),
+      Some(o.id())
+    )
+
+    rw.put(pairSeqNrKey, pairNextSeqNr)
+
+    changedKeys + (commonSeqNrKey -> commonNextSeqNr)
   }
 
-  def orderExecuted(event: OrderExecuted): Unit = db.readWrite { rw =>
-    saveOrder(rw, event.submitted.order)
+  private def updateOldestActiveNr(rw: RW, change: OrderInfoChange, origKeys: ChangedKeys): ChangedKeys = {
+    lazy val address              = change.order.senderPublicKey.toAddress
+    lazy val oldestActiveSeqNrKey = MatcherKeys.addressOldestActiveOrderSeqNr(address)
+    lazy val oldestActiveSeqNr    = changedOrElse[Option[Int]](origKeys, oldestActiveSeqNrKey, rw.get(oldestActiveSeqNrKey))
+    lazy val lastSeqNr = changedOrElse(
+      origKeys,
+      MatcherKeys.addressOrdersSeqNr(address),
+      math.max(rw.get(MatcherKeys.addressOrdersSeqNr(address)), 1)
+    )
 
-    val updated = saveOrderInfo(rw, event)
-    val opDiff  = diff(event, updated)
-    saveOpenVolume(rw, opDiff)
+    def findOldestActiveNr(afterNr: Int): Option[Int] =
+      (afterNr to lastSeqNr).view
+        .drop(1)
+        .find { i =>
+          val isActive = rw
+            .get(MatcherKeys.addressOrders(address, i))
+            .exists { orderAssets =>
+              !rw.get(MatcherKeys.orderInfo(orderAssets.orderId)).status.isFinal
+            }
 
-    val submitted = updated(event.submitted.order.id())
-    if (submitted.origInfo.isEmpty) {
-      import event.submitted.{order => submittedOrder}
-      val k         = MatcherKeys.addressOrdersSeqNr(submittedOrder.senderPublicKey)
-      val nextSeqNr = rw.get(k) + 1
-      rw.put(k, nextSeqNr)
-      rw.put(
-        MatcherKeys.addressOrders(submittedOrder.senderPublicKey.toAddress, nextSeqNr),
-        Some(OrderAssets(submittedOrder.id(), event.submitted.spentAsset))
-      )
+          isActive
+        }
+
+    def update(newOldestActiveNr: Int): ChangedKeys = {
+      rw.put(oldestActiveSeqNrKey, Some(newOldestActiveNr))
+      origKeys + (oldestActiveSeqNrKey -> newOldestActiveNr)
     }
+
+    if (!change.updatedInfo.status.isFinal) {
+      // A new active order
+      if (oldestActiveSeqNr.isEmpty) update(lastSeqNr) else origKeys
+    } else if (change.origInfo.nonEmpty) {
+      // An active order was closed
+      oldestActiveSeqNr
+        .map { oldestActiveSeqNr =>
+          val shouldUpdateOldestActive = rw
+            .get(MatcherKeys.addressOrders(address, oldestActiveSeqNr))
+            .map(_.orderId == change.order.id())
+            .getOrElse {
+              // Hope, this is impossible case
+              log.warn(s"Can't find nr=$oldestActiveSeqNr order for $address, will update it")
+              true
+            }
+
+          if (shouldUpdateOldestActive) {
+            findOldestActiveNr(oldestActiveSeqNr) match {
+              case Some(x) => update(x)
+              case None =>
+                rw.delete(oldestActiveSeqNrKey)
+                origKeys + (oldestActiveSeqNrKey -> None)
+            }
+          } else origKeys
+        }
+        .getOrElse(origKeys)
+    } else origKeys
   }
 
-  def orderCanceled(event: OrderCanceled): Unit = db.readWrite { rw =>
-    val updated = saveOrderInfo(rw, event)
-    val opDiff  = diff(event, updated)
-    saveOpenVolume(rw, opDiff)
-
-    val canceledOrder = event.limitOrder.order
-    val canceled      = updated(canceledOrder.id())
-    // When the submitted order can't be matched, it cancelled immediately
-    if (canceled.origInfo.isEmpty) {
-      saveOrder(rw, canceledOrder)
-      val owner     = canceledOrder.senderPublicKey.toAddress
-      val k         = MatcherKeys.addressOrdersSeqNr(owner)
-      val nextSeqNr = rw.get(k) + 1
-      rw.put(k, nextSeqNr)
-      rw.put(
-        MatcherKeys.addressOrders(owner, nextSeqNr),
-        Some(OrderAssets(canceledOrder.id(), event.limitOrder.spentAsset))
-      )
-    }
-  }
-
+  def process(event: Event): Unit       = db.readWrite(saveOrderInfo(_, event))
   def orderInfo(id: ByteStr): OrderInfo = DBUtils.orderInfo(db, id)
-
   def order(id: ByteStr): Option[Order] = DBUtils.order(db, id)
 
   def deleteOrder(address: Address, orderId: ByteStr): Boolean = db.readWrite { rw =>

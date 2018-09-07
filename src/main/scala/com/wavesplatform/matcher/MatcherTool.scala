@@ -1,7 +1,8 @@
 package com.wavesplatform.matcher
 
 import java.io.File
-import java.util.{HashMap => JHashMap}
+import java.nio.ByteBuffer
+import java.util.{HashMap => JHashMap, HashSet => JHashSet}
 
 import akka.actor.ActorSystem
 import akka.persistence.serialization.Snapshot
@@ -9,6 +10,7 @@ import akka.serialization.SerializationExtension
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Ints, Shorts}
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.crypto.DigestSize
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
 import com.wavesplatform.matcher.api.DBUtils
@@ -23,6 +25,7 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
+import scala.collection.immutable.Queue
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
@@ -279,6 +282,106 @@ object MatcherTool extends ScorexLogging {
     }
   }
 
+  def createPairIndexes(db: DB): Unit = {
+    import com.wavesplatform.matcher.util.Codecs.ByteBufferExt
+    val currOrderIds: JHashSet[ByteStr] = {
+      val key = Shorts.toByteArray(11) // MatcherKeys.addressOrdersByPairSeqNr
+      val r   = new JHashSet[ByteStr]
+      db.iterateOver(key) { e =>
+        val seqNr = Ints.fromByteArray(e.getValue)
+        if (seqNr > 0) {
+          val skip    = Address.AddressLength + 2
+          val address = Address.fromBytes(e.getKey.slice(2, skip)).explicitGet()
+          val pair    = ByteBuffer.wrap(e.getKey, skip, e.getKey.length - skip).getAssetPair
+          (1 to seqNr).foreach { idx =>
+            val key = MatcherKeys.addressOrdersByPair(address, pair, idx)
+            key.parse(db.get(key.keyBytes)).foreach { orderId =>
+              r.add(orderId)
+            }
+          }
+        }
+      }
+      r
+    }
+    log.info(s"Records in new indexes: ${currOrderIds.size()}")
+
+    val orderRefs: JHashMap[(Address, AssetPair), Queue[Order.Id]] = {
+      log.info("Loading orders")
+      val r   = new JHashMap[(Address, AssetPair), Queue[Order.Id]]()
+      val key = MatcherKeys.orderInfo(ByteStr(Array.emptyByteArray))
+      db.iterateOver(key.keyBytes) { e =>
+        val orderId = ByteStr(new Array[Byte](DigestSize))
+        Array.copy(e.getKey, 2, orderId.arr, 0, DigestSize)
+        db.get(MatcherKeys.order(orderId)).foreach { order =>
+          val key = (order.sender.toAddress, order.assetPair)
+          r.compute(
+            key, { (_, currRefsRaw) =>
+              if (currOrderIds.contains(order.id())) currRefsRaw
+              else
+                Option(currRefsRaw)
+                  .getOrElse(Queue.empty[Order.Id])
+                  .enqueue(order.id())
+            }
+          )
+        }
+      }
+      r
+    }
+
+    var totalRecordsAdded = 0
+    db.readWrite { rw =>
+      orderRefs.forEach { (k, q) =>
+        val (address, pair) = k
+        val seqNrK          = MatcherKeys.addressOrdersByPairSeqNr(address, pair)
+
+        var lastSeqNr = rw.get(seqNrK)
+        var i         = 0
+        q.foreach { orderId =>
+          i += 1
+          lastSeqNr += 1
+          val k = MatcherKeys.addressOrdersByPair(address, pair, lastSeqNr)
+          rw.put(k, Some(orderId))
+        }
+
+        totalRecordsAdded += lastSeqNr
+        rw.put(seqNrK, lastSeqNr)
+        log.info(s"$address added $i orders")
+      }
+    }
+
+    log.info(s"Total records added: $totalRecordsAdded")
+  }
+
+  def writeLastActive(db: DB): Unit = {
+    val lastActiveOrderIdxs: JHashMap[Address, Int] = {
+      val r   = new JHashMap[Address, Int]()
+      val key = Shorts.toByteArray(3) // MatcherKeys.addressOrdersSeqNr
+      db.iterateOver(key) { e =>
+        val addrOrdersSeqNr = Ints.fromByteArray(e.getValue)
+        if (addrOrdersSeqNr > 0) {
+          val address = Address.fromBytes(e.getKey.drop(2)).explicitGet()
+          val activeIdxs = for {
+            idx             <- (1 to db.get(MatcherKeys.addressOrdersSeqNr(address))).view
+            orderSpendAsset <- db.get(MatcherKeys.addressOrders(address, idx))
+            orderInfo = db.get(MatcherKeys.orderInfo(orderSpendAsset.orderId))
+            if !orderInfo.status.isFinal
+          } yield idx
+
+          activeIdxs.headOption.foreach(r.put(address, _))
+        }
+      }
+      r
+    }
+
+    log.info(s"Total addresses with active orders: ${lastActiveOrderIdxs.size()}")
+
+    db.readWrite { rw =>
+      lastActiveOrderIdxs.forEach { (address, lastIdx) =>
+        rw.put(MatcherKeys.addressOldestActiveOrderSeqNr(address), Some(lastIdx))
+      }
+    }
+  }
+
   def main(args: Array[String]): Unit = {
     log.info(s"OK, engine start")
 
@@ -293,8 +396,16 @@ object MatcherTool extends ScorexLogging {
 
     args(1) match {
       case "stats" => collectStats(db)
-      case "ao"    => println(DBUtils.ordersByAddress(db, Address.fromString(args(2)).explicitGet(), Set.empty, false, Int.MaxValue).mkString("\n"))
-      case "cb"    => recalculateReservedBalance(db)
+      case "ao" =>
+        if (args.length == 5) {
+          val pair = AssetPair.createAssetPair(args(3), args(4)).get
+          val o    = DBUtils.ordersByAddressAndPair(db, Address.fromString(args(2)).explicitGet(), pair, activeOnly = false)
+          println(o.mkString("\n"))
+        } else {
+          val o = DBUtils.ordersByAddress(db, Address.fromString(args(2)).explicitGet(), Set.empty, activeOnly = false, Int.MaxValue)
+          println(o.mkString("\n"))
+        }
+      case "cb" => recalculateReservedBalance(db)
       case "rb" =>
         for ((assetId, balance) <- DBUtils.reservedBalance(db, Address.fromString(args(2)).explicitGet())) {
           log.info(s"${AssetPair.assetIdStr(assetId)}: $balance")
@@ -310,6 +421,14 @@ object MatcherTool extends ScorexLogging {
       case "recover-orderbooks" =>
         val dryRun = args.length == 3 && args(2) == "--dry-run"
         recoverOrderBooks(db, settings.matcherSettings.snapshotsDataDir, actualConfig, dryRun)
+      case "create-pair-indexes" =>
+        log.info("Creating pair indexes")
+        createPairIndexes(db)
+        log.info("Completed")
+      case "write-last-active" =>
+        log.info("Writing last active indexes")
+        writeLastActive(db)
+        log.info("Completed")
       case _ =>
     }
 

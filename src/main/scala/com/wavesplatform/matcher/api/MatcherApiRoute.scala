@@ -185,7 +185,6 @@ case class MatcherApiRoute(wallet: Wallet,
     withAssetPair(p) { pair =>
       orderBook(pair).fold[Route](complete(StatusCodes.NotFound -> Json.obj("message" -> "Invalid asset pair"))) { _ =>
         json[CancelOrderRequest] { req =>
-          println(s"\n\tCANCEL: $req\n")
           if (req.isSignatureValid()) cancelTimer.measure {
             cancelOrder(req.orderId, Some(req.sender))
           } else {

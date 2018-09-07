@@ -103,7 +103,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
       Longs.toByteArray(matcherFee)
 
   @ApiModelProperty(hidden = true)
-  val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(crypto.fastHash(toSign)))
+  val id: Coeval[Id] = Coeval.evalOnce(ByteStr(crypto.fastHash(toSign)))
 
   @ApiModelProperty(hidden = true)
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign ++ signature)
@@ -191,6 +191,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
 }
 
 object Order {
+  type Id = ByteStr
+
   val MaxLiveTime: Long     = 30L * 24L * 60L * 60L * 1000L
   val PriceConstant         = 100000000L
   val MaxAmount: Long       = 100 * PriceConstant * PriceConstant

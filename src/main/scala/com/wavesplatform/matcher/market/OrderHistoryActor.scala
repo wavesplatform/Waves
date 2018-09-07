@@ -53,11 +53,11 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
         processExpirableRequest(req)
       }
     case ev: OrderAdded =>
-      addedTimer.measure(orderHistory.orderAccepted(ev))
+      addedTimer.measure(orderHistory.process(ev))
     case ev: OrderExecuted =>
-      executedTimer.measure(orderHistory.orderExecuted(ev))
+      executedTimer.measure(orderHistory.process(ev))
     case ev: OrderCanceled =>
-      cancelledTimer.measure(orderHistory.orderCanceled(ev))
+      cancelledTimer.measure(orderHistory.process(ev))
     case ForceCancelOrderFromHistory(id) =>
       forceCancelOrder(id)
   }
@@ -66,7 +66,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
     val maybeOrder = orderHistory.order(id)
     for (o <- maybeOrder) {
       val oi = orderHistory.orderInfo(id)
-      orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, oi.remainingFee, o), unmatchable = false))
+      orderHistory.process(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, oi.remainingFee, o), unmatchable = false))
     }
     sender ! maybeOrder
   }

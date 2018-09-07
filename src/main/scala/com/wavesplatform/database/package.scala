@@ -238,6 +238,9 @@ package object database {
       finally snapshot.close()
     }
 
+    /**
+      * @note Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
+      */
     def readWrite[A](f: RW => A): A = {
       val rw = new RW(db)
       try f(rw)

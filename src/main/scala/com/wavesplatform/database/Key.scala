@@ -1,4 +1,5 @@
 package com.wavesplatform.database
+import java.util
 
 trait Key[V] {
   def keyBytes: Array[Byte]
@@ -8,6 +9,13 @@ trait Key[V] {
   def encode(v: V): Array[Byte]
 
   override lazy val toString: String = BigInt(keyBytes).toString(16)
+
+  override def equals(obj: scala.Any): Boolean = obj match {
+    case that: Key[V] => that.keyBytes.sameElements(keyBytes)
+    case _            => false
+  }
+
+  override def hashCode(): Int = util.Arrays.hashCode(keyBytes)
 }
 
 object Key {
