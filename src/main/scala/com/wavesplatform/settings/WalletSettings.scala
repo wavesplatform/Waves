@@ -6,9 +6,6 @@ import com.typesafe.config.Config
 import com.wavesplatform.state.ByteStr
 import net.ceedubs.ficus.Ficus._
 
-import scala.io.Source
-import scala.util.{Failure, Success, Try}
-
 case class WalletSettings(file: Option[File], password: String, seed: Option[ByteStr])
 
 object WalletSettings {
@@ -16,55 +13,48 @@ object WalletSettings {
 
   def fromConfig(config: Config): WalletSettings = {
     val password: String =
-      readPasswordFromConfig(config)
-        .fold(
-          WalletSettings.readPasswordFromCommandLine,
-          identity
-        )
+      config
+        .getAs[String](s"$configPath.password")
+        .getOrElse(readPasswordFromCommandLine())
 
-    val walletFile = config.as[Option[File]](s"$configPath.file")
-    val seed       = config.as[Option[ByteStr]](s"$configPath.seed")
+    val walletFile =
+      config
+        .as[Option[File]](s"$configPath.file")
+    val seed =
+      config
+        .as[Option[ByteStr]](s"$configPath.seed")
 
     WalletSettings(walletFile, password, seed)
   }
-  def readPasswordFromCommandLine(maybeEx: Throwable): String = {
+  def readPasswordFromCommandLine(): String = {
     val message =
       s"""
-        |Cannot obtain password from configuration file: ${maybeEx.getMessage}
+        |Cannot obtain password from configuration file.
         |
         |**********************************
         |* Enter password for your wallet *
         |**********************************
       """.stripMargin
 
-    message.lines
-      .foreach(println)
+    try {
+      message.lines
+        .foreach(println)
 
-    System
-      .console()
-      .readPassword("Password > ")
-      .mkString
-  }
-
-  def readPasswordFromConfig(config: Config): Try[String] = {
-    val passwordFromFile = config
-      .getAs[File](s"$configPath.password-file")
-      .map { file =>
-        val buf = Source.fromFile(file)
-
-        Try {
-          val password = buf.getLines().next()
-          buf.close()
-          password
-        }
-      }
-
-    val passwordFromConfig = config
-      .getAs[String](s"$configPath.password")
-      .map(Success(_))
-
-    passwordFromFile
-      .orElse(passwordFromConfig)
-      .getOrElse(Failure(new Exception("No password configuration specified")))
+      System
+        .console()
+        .readPassword("Password > ")
+        .mkString
+    } catch {
+      case _: NullPointerException =>
+        throw new Exception(
+          """
+            |***********************************************************************************************************
+            |* Cannot get the console to ask wallet password.                                                          *
+            |* Probably, it happens because you trying to start Waves node using supervisor service (like systemd)     *
+            |* without specified wallet password.                                                                      *
+            |***********************************************************************************************************
+          """.stripMargin)
+      case ex: Throwable => throw ex
+    }
   }
 }

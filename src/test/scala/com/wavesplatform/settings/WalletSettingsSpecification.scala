@@ -15,15 +15,4 @@ class WalletSettingsSpecification extends FlatSpec with Matchers {
     settings.seed should be(Some(ByteStr.decodeBase58("BASE58SEED").get))
     settings.password should be("some string as password")
   }
-
-  "WalletSettings" should "read password from file" in {
-    val config   = loadConfig(ConfigFactory.parseString(s"""waves.wallet {
-                                                          |  password-file: "./src/test/resources/password.conf"
-                                                          |  seed: "BASE58SEED"
-                                                          |}""".stripMargin))
-    val settings = WalletSettings.fromConfig(config)
-
-    settings.seed should be(Some(ByteStr.decodeBase58("BASE58SEED").get))
-    settings.password should be("some string as password")
-  }
 }
