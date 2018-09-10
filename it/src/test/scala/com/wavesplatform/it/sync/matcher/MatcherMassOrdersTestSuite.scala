@@ -143,6 +143,9 @@ class MatcherMassOrdersTestSuite
     "check order history orders count" in {
       val aliceOrderHistory = matcherNode.fullOrderHistory(aliceNode)
       aliceOrderHistory.size shouldBe orderLimit
+
+      val aliceOrderHistoryByPair = matcherNode.orderHistoryByPair(aliceNode, aliceWavesPair)
+      aliceOrderHistoryByPair.size shouldBe orderLimit
     }
 
   }

@@ -44,10 +44,12 @@ class OrderHistorySpecification
     DBUtils.ordersByAddress(db, address, assetIds, activeOnly = false, matcherSettings.maxOrdersPerRequest).map(_._1.id())
 
   private def activeOrderIdsByPair(address: Address, pair: AssetPair): Seq[ByteStr] =
-    DBUtils.ordersByAddressAndPair(db, address, pair, activeOnly = true).map(_._1.id())
+    DBUtils.ordersByAddressAndPair(db, address, pair, matcherSettings.maxOrdersPerRequest).collect {
+      case (o, s) if !s.status.isFinal => o.id()
+    }
 
   private def allOrderIdsByPair(address: Address, pair: AssetPair): Seq[ByteStr] =
-    DBUtils.ordersByAddressAndPair(db, address, pair, activeOnly = false).map(_._1.id())
+    DBUtils.ordersByAddressAndPair(db, address, pair, matcherSettings.maxOrdersPerRequest).map(_._1.id())
 
   private def oldestActiveSeqNr(address: Address): Option[Int] = {
     val k = MatcherKeys.addressOldestActiveOrderSeqNr(address)

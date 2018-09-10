@@ -282,7 +282,7 @@ object MatcherTool extends ScorexLogging {
     }
   }
 
-  def createPairIndexes(db: DB): Unit = {
+  def createPairIndices(db: DB): Unit = {
     import com.wavesplatform.matcher.util.Codecs.ByteBufferExt
     val currOrderIds: JHashSet[ByteStr] = {
       val key = Shorts.toByteArray(11) // MatcherKeys.addressOrdersByPairSeqNr
@@ -303,7 +303,7 @@ object MatcherTool extends ScorexLogging {
       }
       r
     }
-    log.info(s"Records in new indexes: ${currOrderIds.size()}")
+    log.info(s"Records in new indices: ${currOrderIds.size()}")
 
     val orderRefs: JHashMap[(Address, AssetPair), Queue[Order.Id]] = {
       log.info("Loading orders")
@@ -399,7 +399,7 @@ object MatcherTool extends ScorexLogging {
       case "ao" =>
         if (args.length == 5) {
           val pair = AssetPair.createAssetPair(args(3), args(4)).get
-          val o    = DBUtils.ordersByAddressAndPair(db, Address.fromString(args(2)).explicitGet(), pair, activeOnly = false)
+          val o    = DBUtils.ordersByAddressAndPair(db, Address.fromString(args(2)).explicitGet(), pair, Int.MaxValue)
           println(o.mkString("\n"))
         } else {
           val o = DBUtils.ordersByAddress(db, Address.fromString(args(2)).explicitGet(), Set.empty, activeOnly = false, Int.MaxValue)
@@ -421,12 +421,12 @@ object MatcherTool extends ScorexLogging {
       case "recover-orderbooks" =>
         val dryRun = args.length == 3 && args(2) == "--dry-run"
         recoverOrderBooks(db, settings.matcherSettings.snapshotsDataDir, actualConfig, dryRun)
-      case "create-pair-indexes" =>
-        log.info("Creating pair indexes")
-        createPairIndexes(db)
+      case "create-pair-indices" =>
+        log.info("Creating pair indices")
+        createPairIndices(db)
         log.info("Completed")
       case "write-last-active" =>
-        log.info("Writing last active indexes")
+        log.info("Writing last active indices")
         writeLastActive(db)
         log.info("Completed")
       case _ =>

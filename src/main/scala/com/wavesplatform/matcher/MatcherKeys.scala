@@ -70,7 +70,7 @@ object MatcherKeys {
 
   def addressOrdersByPairSeqNr(address: Address, pair: AssetPair): Key[Int] = bytesSeqNr(11, address.bytes.arr ++ pair.bytes)
   def addressOrdersByPair(address: Address, pair: AssetPair, seqNr: Int): Key[Option[Order.Id]] =
-    Key.opt(hBytes(11, seqNr, address.bytes.arr ++ pair.bytes), ByteStr(_), _.arr)
+    Key.opt(hBytes(12, seqNr, address.bytes.arr ++ pair.bytes), ByteStr(_), _.arr)
 
-  def addressOldestActiveOrderSeqNr(address: Address): Key[Option[Int]] = Key.opt(bytes(12, address.bytes.arr), Ints.fromByteArray, Ints.toByteArray)
+  def addressOldestActiveOrderSeqNr(address: Address): Key[Option[Int]] = Key.opt(bytes(13, address.bytes.arr), Ints.fromByteArray, Ints.toByteArray)
 }

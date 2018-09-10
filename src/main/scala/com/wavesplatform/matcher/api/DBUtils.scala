@@ -12,14 +12,13 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 object DBUtils {
   import OrderInfo.orderStatusOrdering
 
-  def ordersByAddressAndPair(db: DB, address: Address, pair: AssetPair, activeOnly: Boolean): Seq[(Order, OrderInfo)] = db.readOnly { ro =>
+  def ordersByAddressAndPair(db: DB, address: Address, pair: AssetPair, maxOrders: Int): Seq[(Order, OrderInfo)] = db.readOnly { ro =>
     (for {
-      idx     <- db.get(MatcherKeys.addressOrdersByPairSeqNr(address, pair)) to 0 by -1
+      idx     <- (db.get(MatcherKeys.addressOrdersByPairSeqNr(address, pair)) to 0 by -1).view
       orderId <- ro.get(MatcherKeys.addressOrdersByPair(address, pair, idx))
       order   <- ro.get(MatcherKeys.order(orderId))
       orderInfo = ro.get(MatcherKeys.orderInfo(orderId))
-      if !(activeOnly && orderInfo.status.isFinal)
-    } yield (order, orderInfo)).sortBy { case (order, info) => (info.status, -order.timestamp) }
+    } yield (order, orderInfo)).take(maxOrders).sortBy { case (order, info) => (info.status, -order.timestamp) }
   }
 
   def ordersByAddress(db: DB, address: Address, changedAssets: Set[Option[AssetId]], activeOnly: Boolean, maxOrders: Int): Seq[(Order, OrderInfo)] =
