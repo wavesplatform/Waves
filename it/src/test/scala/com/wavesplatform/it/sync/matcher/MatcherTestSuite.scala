@@ -238,7 +238,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         val resp = matcherNode.marketStatus(aliceWavesPair)
 
         resp.lastPrice shouldBe Some(2.waves * Order.PriceConstant)
-        resp.lastSide shouldBe Some("sell")
+        resp.lastSide shouldBe Some("buy") // Same type as order5
         resp.bid shouldBe Some(2.waves * Order.PriceConstant)
         resp.bidAmount shouldBe Some(30)
         resp.ask shouldBe None

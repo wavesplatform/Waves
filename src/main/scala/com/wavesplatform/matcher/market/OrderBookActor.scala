@@ -396,8 +396,7 @@ class OrderBookActor(assetPair: AssetPair,
           _  <- utx.putIfNew(tx)
         } yield tx) match {
           case Right(tx) =>
-            lastTrade = Some(c.order)
-            lastTrade = Some(c.order)
+            lastTrade = Some(o.order)
             allChannels.broadcastTx(tx)
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx))

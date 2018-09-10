@@ -183,17 +183,17 @@ class MatcherActor(orderHistory: ActorRef,
     case GetMarkets =>
       sender() ! GetMarketsResponse(getMatcherPublicKey, tradedPairs.values.toSeq)
 
-    case req: GetMarketStatusRequest =>
+    case req @ GetMarketStatusRequest(pair) =>
       val snd = sender()
-      checkAssetPair(req.assetPair, req) {
+      checkAssetPair(pair, req) {
         context
-          .child(OrderBookActor.name(req.assetPair))
+          .child(OrderBookActor.name(pair))
           .fold {
             snd ! StatusCodeMatcherResponse(StatusCodes.NotFound, "Market not found")
           } { orderbook =>
             (orderbook ? req)
               .mapTo[GetMarketStatusResponse]
-              .map(snd ! _)
+              .foreach(snd ! _)
           }
       }
 

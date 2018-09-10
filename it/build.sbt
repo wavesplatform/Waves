@@ -39,7 +39,7 @@ inTask(docker)(
 
         add((assembly in LocalProject("node")).value, "/opt/waves/waves.jar")
         add(Seq(configTemplate, startWaves), "/opt/waves/")
-        run("chmod", "+x", "/opt/waves/start-waves.sh")
+        runShell("chmod", "+x", "/opt/waves/start-waves.sh")
         entryPoint("/opt/waves/start-waves.sh")
         expose(10001)
       }
