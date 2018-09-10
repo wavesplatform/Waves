@@ -15,7 +15,7 @@ object WalletSettings {
     val password: String =
       config
         .getAs[String](s"$configPath.password")
-        .getOrElse(readPasswordFromCommandLine())
+        .getOrElse(readPasswordFromConsole())
 
     val walletFile =
       config
@@ -26,7 +26,7 @@ object WalletSettings {
 
     WalletSettings(walletFile, password, seed)
   }
-  def readPasswordFromCommandLine(): String = {
+  def readPasswordFromConsole(): String = {
     val message =
       s"""
         |Cannot obtain password from configuration file.
