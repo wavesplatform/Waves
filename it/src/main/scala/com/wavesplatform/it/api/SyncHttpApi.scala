@@ -38,9 +38,8 @@ object SyncHttpApi extends Assertions {
 
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
-      Assertions.assert(
-        statusCode == BadRequest.intValue &&
-          responseBody.replace("\n", "").matches(s".*$errorRegex.*"))
+      Assertions.assert(statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"),
+                        s"\nexpected '$errorRegex'\nactual '$responseBody'")
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail("Expecting bad request")
   }
