@@ -4,11 +4,10 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeoutException
 
-import com.wavesplatform.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import com.wavesplatform.api.http.alias.CreateAliasV1Request
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
-import com.wavesplatform.api.http.{AddressApiRoute, DataRequest}
+import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq, DataRequest}
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.http.DebugApiRoute._
 import com.wavesplatform.http.DebugMessage._
