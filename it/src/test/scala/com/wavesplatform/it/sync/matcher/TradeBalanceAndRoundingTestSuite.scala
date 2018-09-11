@@ -171,6 +171,27 @@ class TradeBalanceAndRoundingTestSuite
 
   }
 
+  "Alice and Bob trade WCT-USD sell price less than buy price" - {
+    "place wcd-usd order corrected by new price sell amount less then initial one" in {
+      val buyPrice        = 247700
+      val sellPrice       = 135600
+      val buyAmount       = 46978
+      val sellAmount      = 56978
+      val aliceUsdBalance = aliceNode.assetBalance(aliceNode.address, UsdId.base58).balance
+      val bobUsdBalance   = bobNode.assetBalance(bobNode.address, UsdId.base58).balance
+
+      val bobOrderId = matcherNode.placeOrder(bobNode, wctUsdPair, SELL, sellPrice, sellAmount).message.id
+      matcherNode.waitOrderStatus(wctUsdPair, bobOrderId, "Accepted", 1.minute)
+      val aliceOrderId = matcherNode.placeOrder(aliceNode, wctUsdPair, BUY, buyPrice, buyAmount).message.id
+      matcherNode.waitOrderStatus(wctUsdPair, aliceOrderId, "Filled", 1.minute)
+      matcherNode.cancelOrder(bobNode, wctUsdPair, bobOrderId)
+      matcherNode.waitOrderStatus(wctUsdPair, bobOrderId, "Cancelled", 1.minute)
+
+      matcherNode.reservedBalance(bobNode) shouldBe empty
+      matcherNode.reservedBalance(aliceNode) shouldBe empty
+    }
+  }
+
   "Alice and Bob trade WCT-USD" - {
     val wctUsdBuyAmount  = 146
     val wctUsdSellAmount = 347
