@@ -78,7 +78,7 @@ class MatcherTickerTestSuite
     val bidPrice  = 200
     val bidAmount = 1.waves
     val askPrice  = 400
-    val askAmount = 0.5.waves
+    val askAmount = bidAmount / 2
 
     "place bid order for first pair" in {
       matcherNode.placeOrder(aliceNode, edUsdPair, OrderType.BUY, bidPrice, bidAmount)
