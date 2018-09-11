@@ -501,6 +501,8 @@ class OrderHistorySpecification
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
       oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
       oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
+      oh.openVolume(submitted.senderPublicKey, None) shouldBe 0L
+
     }
   }
 
@@ -524,6 +526,22 @@ class OrderHistorySpecification
     }
   }
 
+  property("Sell EUR (partial), buy EUR order - filled") {
+    val pair      = AssetPair(mkAssetId("EUR"), mkAssetId("USD"))
+    val counter   = sell(pair, 0.001356, 57918, matcherFee = Some(300000L))
+    val submitted = buy(pair, 0.003333, 46978, matcherFee = Some(300000L))
+
+    oh.process(OrderAdded(LimitOrder(counter)))
+    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    oh.process(exec)
+
+    withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
+      oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
+      oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
+      oh.openVolume(submitted.senderPublicKey, None) shouldBe 0L
+    }
+  }
+
   property("Total execution of two counter orders and the one submitted") {
     val pair = AssetPair(mkAssetId("Alice"), None)
 
@@ -543,7 +561,8 @@ class OrderHistorySpecification
 
     val alicePk = PrivateKeyAccount("alice".getBytes("utf-8"))
     val counter = buy(pair, 0.00031887, 923431000L, matcherFee = Some(300000), sender = Some(alicePk))
-
+    //923431000L
+    //223345000L
     val bobPk     = PrivateKeyAccount("bob".getBytes("utf-8"))
     val submitted = sell(pair, 0.00031887, 223345000L, matcherFee = Some(300000), sender = Some(bobPk))
 
@@ -551,10 +570,11 @@ class OrderHistorySpecification
 
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
     exec.executedAmount shouldBe 223344937L
-    oh.processAll(exec, OrderCanceled(exec.submittedRemaining, unmatchable = true))
+    oh.processAll(exec, OrderCanceled(exec.counterRemaining, unmatchable = false))
 
     withClue(s"Account of submitted order (id=${submitted.id()}) should have positive balances:") {
       DBUtils.reservedBalance(db, bobPk) shouldBe empty
+      DBUtils.reservedBalance(db, alicePk) shouldBe empty
     }
   }
 
