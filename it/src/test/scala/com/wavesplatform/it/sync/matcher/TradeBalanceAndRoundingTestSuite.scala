@@ -330,10 +330,11 @@ object TradeBalanceAndRoundingTestSuite {
     .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))
     .map { case (n, o) => o.withFallback(n) }
 
-  private val aliceSeed = _Configs(1).getString("account-seed")
-  private val bobSeed   = _Configs(2).getString("account-seed")
-  private val alicePk   = PrivateKeyAccount.fromSeed(aliceSeed).right.get
-  private val bobPk     = PrivateKeyAccount.fromSeed(bobSeed).right.get
+  private val matcherSeed = _Configs(0).getString("account-seed")
+  private val aliceSeed   = _Configs(1).getString("account-seed")
+  private val bobSeed     = _Configs(2).getString("account-seed")
+  private val alicePk     = PrivateKeyAccount.fromSeed(aliceSeed).right.get
+  private val bobPk       = PrivateKeyAccount.fromSeed(bobSeed).right.get
 
   val usdAssetName = "USD-X"
   val wctAssetName = "WCT-X"
