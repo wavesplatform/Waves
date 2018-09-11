@@ -345,7 +345,6 @@ object MatcherTool extends ScorexLogging {
 
         totalRecordsAdded += lastSeqNr
         rw.put(seqNrK, lastSeqNr)
-        log.info(s"$address added $i orders")
       }
     }
 

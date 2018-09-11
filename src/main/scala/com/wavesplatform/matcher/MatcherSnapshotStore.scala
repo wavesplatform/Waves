@@ -1,7 +1,5 @@
 package com.wavesplatform.matcher
 
-import java.io._
-import java.net.{URLDecoder, URLEncoder}
 import java.nio.ByteBuffer
 
 import akka.persistence._
@@ -18,7 +16,6 @@ import scorex.utils.ScorexLogging
 
 import scala.concurrent.Future
 import scala.util._
-import scala.util.control.NonFatal
 
 class MatcherSnapshotStore(config: Config) extends SnapshotStore {
   import MatcherSnapshotStore._
@@ -27,7 +24,7 @@ class MatcherSnapshotStore(config: Config) extends SnapshotStore {
 
   private val serializationExtension = SerializationExtension(context.system)
 
-  private val writableDB = openDB(config.getString("leveldb-dir"))
+  private val writableDB = openDB(config.getString("dir"))
 
   private def readOnly[A](f: ReadOnlyDB => A): A = {
     val s = writableDB.getSnapshot
@@ -124,44 +121,6 @@ class MatcherSnapshotStore(config: Config) extends SnapshotStore {
     serializationExtension.deserialize(input, classOf[Snapshot]).get
 
   private def serialize(s: Any) = serializationExtension.serialize(Snapshot(s)).get
-
-  override def preStart() {
-    migrate()
-    super.preStart()
-  }
-
-  private def migrate(): Unit = for (snapshotDir <- Option(new File(config.getString("dir"))) if snapshotDir.isDirectory) {
-    log.info(s"Migrating snapshots from $snapshotDir")
-
-    def snapshotFileForWrite(metadata: SnapshotMetadata, extension: String = ""): File =
-      new File(snapshotDir,
-               s"snapshot-${URLEncoder.encode(metadata.persistenceId, UTF_8.name())}-${metadata.sequenceNr}-${metadata.timestamp}$extension")
-
-    val allSnapshots = Option(snapshotDir.listFiles()).fold(Seq.empty[SnapshotMetadata]) { fs =>
-      fs.map(f => extractMetadata(f.getName)).collect {
-        case Some((pid, snr, tms)) => SnapshotMetadata(URLDecoder.decode(pid, UTF_8.name()), snr, tms)
-      }
-    }
-
-    if (allSnapshots.nonEmpty) {
-      log.info(s"Collected ${allSnapshots.size} snapshot(s)")
-      for (sm <- allSnapshots) {
-        val snapshotFile        = snapshotFileForWrite(sm)
-        val snapshotInputStream = new BufferedInputStream(new FileInputStream(snapshotFile))
-        try {
-          save(sm, deserialize(streamToBytes(snapshotInputStream)).data)
-          snapshotInputStream.close()
-          snapshotFile.delete()
-        } catch {
-          case NonFatal(e) => log.error(s"Error migrating snapshot $sm", e)
-        }
-      }
-    } else {
-      log.info("No snapshots found")
-    }
-
-    log.info("Migration completed")
-  }
 }
 
 object MatcherSnapshotStore extends ScorexLogging {

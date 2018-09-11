@@ -145,7 +145,6 @@ class OrderBookActor(assetPair: AssetPair,
 
         if (lastSnapshotSequenceNr < lastSequenceNr) saveSnapshot(Snapshot(orderBook))
         else {
-          log.debug(s"No changes in $assetPair, lastSnapshotSequenceNr = $lastSnapshotSequenceNr, lastSequenceNr = $lastSequenceNr")
           shutdownStatus = shutdownStatus.copy(
             oldSnapshotsDeleted = true,
             oldMessagesDeleted = true
@@ -351,14 +350,13 @@ class OrderBookActor(assetPair: AssetPair,
       applyEvent(evt)
 
     case RecoveryCompleted =>
-      log.info(assetPair.toString() + " - Recovery completed!")
       updateSnapshot(orderBook)
 
     case SnapshotOffer(metadata, snapshot: Snapshot) =>
       lastSnapshotSequenceNr = metadata.sequenceNr
       orderBook = snapshot.orderBook
       updateSnapshot(orderBook)
-      log.debug(s"Recovering OrderBook from snapshot: $snapshot for $persistenceId")
+      log.debug(s"Recovering $persistenceId from $snapshot")
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -367,7 +365,6 @@ class OrderBookActor(assetPair: AssetPair,
   }
 
   override def postStop(): Unit = {
-    log.info(context.self.toString() + " - postStop method")
     snapshotCancellable.cancel()
     cleanupCancellable.cancel()
     cancellable.foreach(_.cancel())
