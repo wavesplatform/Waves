@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.{DeserializationContext, JsonNode, ObjectM
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import com.wavesplatform.state.ByteStr
-import scorex.transaction.assets.exchange.AssetPair
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 
 object JsonSerializer {
 

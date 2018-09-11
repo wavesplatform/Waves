@@ -100,10 +100,10 @@ class MatcherSnapshotStore(config: Config) extends SnapshotStore {
     )
 
   override def receivePluginInternal: Receive = {
-    case SaveSnapshotSuccess(metadata) ⇒
-    case _: SaveSnapshotFailure        ⇒ // ignore
-    case _: DeleteSnapshotsSuccess     ⇒ // ignore
-    case _: DeleteSnapshotsFailure     ⇒ // ignore
+    case _: SaveSnapshotSuccess    ⇒ // ignore
+    case _: SaveSnapshotFailure    ⇒ // ignore
+    case _: DeleteSnapshotsSuccess ⇒ // ignore
+    case _: DeleteSnapshotsFailure ⇒ // ignore
   }
 
   protected def save(metadata: SnapshotMetadata, snapshot: Any): Unit =
@@ -131,20 +131,6 @@ object MatcherSnapshotStore extends ScorexLogging {
 
     def matches(metadata: SnapshotMetadata): Boolean =
       seqNr == metadata.sequenceNr && (metadata.timestamp == 0 || ts == metadata.timestamp)
-  }
-
-  private val persistenceIdStartIdx = 9 // Persistence ID starts after the "snapshot-" substring
-  private def extractMetadata(filename: String): Option[(String, Long, Long)] = {
-    val sequenceNumberEndIdx = filename.lastIndexOf('-')
-    val persistenceIdEndIdx  = filename.lastIndexOf('-', sequenceNumberEndIdx - 1)
-    val timestampString      = filename.substring(sequenceNumberEndIdx + 1)
-    if (persistenceIdStartIdx >= persistenceIdEndIdx || timestampString.exists(!_.isDigit)) None
-    else {
-      val persistenceId  = filename.substring(persistenceIdStartIdx, persistenceIdEndIdx)
-      val sequenceNumber = filename.substring(persistenceIdEndIdx + 1, sequenceNumberEndIdx).toLong
-      val timestamp      = filename.substring(sequenceNumberEndIdx + 1).toLong
-      Some((persistenceId, sequenceNumber, timestamp))
-    }
   }
 
   private def readSnapshotMetadata(b: Array[Byte]) = {

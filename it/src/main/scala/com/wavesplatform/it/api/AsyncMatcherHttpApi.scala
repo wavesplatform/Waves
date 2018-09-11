@@ -15,7 +15,7 @@ import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.Assertions
 import play.api.libs.json.Json.{parse, stringify, toJson}
-import play.api.libs.json.Writes
+import play.api.libs.json.{Json, Writes}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -114,7 +114,7 @@ object AsyncMatcherHttpApi extends Assertions {
       val request       = CancelOrderRequest(publicKey, None, timestamp, Array.emptyByteArray)
       val sig           = crypto.sign(privateKey, request.toSign)
       val signedRequest = request.copy(signature = sig)
-      matcherPost(s"/matcher/orderbook/cancel", signedRequest.json).as[MatcherStatusResponse]
+      matcherPost(s"/matcher/orderbook/cancel", Json.toJson(signedRequest)).as[MatcherStatusResponse]
     }
 
     def cancelOrderWithApiKey(orderId: String): Future[MatcherStatusResponse] = {

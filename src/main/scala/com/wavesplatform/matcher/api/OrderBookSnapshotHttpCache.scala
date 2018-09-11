@@ -8,9 +8,9 @@ import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache.Settings
 import com.wavesplatform.matcher.market.OrderBookActor.GetOrderBookResponse
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import com.wavesplatform.matcher.model.{LevelAgg, LimitOrder, OrderBook}
+import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.utils.NTP
 import kamon.Kamon
-import scorex.transaction.assets.exchange.AssetPair
-import scorex.utils.NTP
 
 import scala.concurrent.duration._
 

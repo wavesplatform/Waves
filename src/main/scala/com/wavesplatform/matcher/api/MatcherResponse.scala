@@ -20,3 +20,5 @@ case class StatusCodeMatcherResponse(code: StatusCode, message: String)
                               "message" -> message,
                               "result"  -> JsNull // For backward compatibility
                             ))
+
+object InvalidSignature extends StatusCodeMatcherResponse(StatusCodes.BadRequest, "Invalid signature")

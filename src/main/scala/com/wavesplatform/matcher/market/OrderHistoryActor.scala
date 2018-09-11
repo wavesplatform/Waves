@@ -41,8 +41,6 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   def processExpirableRequest(r: Any): Unit = r match {
     case ValidateOrder(o, _) =>
       sender() ! ValidateOrderResult(o.id(), validateNewOrder(o))
-    case req: DeleteOrderFromHistory =>
-      deleteFromOrderHistory(req)
     case GetTradableBalance(assetPair, addr, _) =>
       sender() ! getPairTradableBalance(assetPair, addr)
   }
@@ -88,24 +86,6 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
         assetPair.priceAssetStr  -> bal._2
       ))
   }
-
-  def deleteFromOrderHistory(req: DeleteOrderFromHistory): Unit = {
-    def delete(id: ByteStr): Boolean = orderHistory.orderInfo(id).status match {
-      case LimitOrder.Filled(_) | LimitOrder.Cancelled(_) => orderHistory.deleteOrder(req.address, id)
-      case _                                              => false
-    }
-
-    req.id match {
-      case Some(id) =>
-        val response = if (delete(id)) OrderDeleted(id) else BadMatcherResponse(StatusCodes.BadRequest, "Order couldn't be deleted")
-        sender() ! response
-      case None =>
-        sender() ! OrderDeletingAccepted
-        DBUtils
-          .ordersByAddressAndPair(db, req.address, req.assetPair, activeOnly = false)
-          .foreach(orderData => delete(orderData._1.id()))
-    }
-  }
 }
 
 object OrderHistoryActor {
@@ -128,11 +108,6 @@ object OrderHistoryActor {
   case class ValidateOrderResult(validatedOrderId: ByteStr, result: Either[GenericError, Order])
 
   case class ForceCancelOrderFromHistory(orderId: ByteStr)
-
-  case object OrderDeletingAccepted extends MatcherResponse {
-    val json: JsObject            = Json.obj("status" -> "Accepted")
-    val code: StatusCodes.Success = StatusCodes.Accepted
-  }
 
   case class OrderDeleted(orderId: ByteStr) extends MatcherResponse(StatusCodes.OK, Json.obj("status" -> "OrderDeleted", "orderId" -> orderId))
 

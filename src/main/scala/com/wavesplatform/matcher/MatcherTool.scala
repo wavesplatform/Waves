@@ -10,6 +10,7 @@ import akka.serialization.SerializationExtension
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Ints, Shorts}
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.crypto.DigestSize
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
@@ -18,11 +19,10 @@ import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderBook}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.{ByteStr, EitherExt2}
+import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
-import scorex.account.{Address, AddressScheme}
-import scorex.transaction.AssetId
-import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Queue

@@ -7,9 +7,9 @@ import com.wavesplatform.TransactionGenBase
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.transaction.assets.exchange.{AssetPair, Order}
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration._

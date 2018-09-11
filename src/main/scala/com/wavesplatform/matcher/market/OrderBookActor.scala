@@ -3,10 +3,7 @@ package com.wavesplatform.matcher.market
 import akka.actor.{ActorRef, Cancellable, Props, Stash}
 import akka.http.scaladsl.model.{StatusCodes, _}
 import akka.persistence._
-import com.google.common.cache.CacheBuilder
-import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.MatcherResponse
 import com.wavesplatform.matcher.api.{JsonSerializer, MatcherResponse}
 import com.wavesplatform.matcher.market.MatcherActor.{Shutdown, ShutdownComplete}
 import com.wavesplatform.matcher.market.OrderBookActor._
