@@ -161,4 +161,77 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.quantity shouldBe 10000
   }
 
+  test("SponsorFeeRequest json parsing works") {
+    import com.wavesplatform.api.http.assets.SponsorFeeRequest._
+
+    val One = 100000000L
+    val js1 = s"""{
+  "type": 14,
+  "id": "Gobt7AiyQAfduRkW8Mk3naWbzH67Zsv9rdmgRNmon1Mb",
+  "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+  "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+  "fee": $One,
+  "timestamp": 1520945679531,
+  "proofs": [
+   "3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7"
+  ],
+  "version": 1,
+  "assetId": "9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz",
+  "minSponsoredAssetFee": 100000
+ }"""
+    val js2 = s"""{
+  "type": 14,
+  "id": "Gobt7AiyQAfduRkW8Mk3naWbzH67Zsv9rdmgRNmon1Mb",
+  "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+  "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+  "fee": $One,
+  "timestamp": 1520945679531,
+  "proofs": [
+   "3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7"
+  ],
+  "version": 1,
+  "assetId": "9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz"
+ }"""
+    val js3 = s"""{
+  "type": 14,
+  "id": "Gobt7AiyQAfduRkW8Mk3naWbzH67Zsv9rdmgRNmon1Mb",
+  "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+  "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+  "fee": $One,
+  "timestamp": 1520945679531,
+  "proofs": [
+   "3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7"
+  ],
+  "version": 1,
+  "assetId": "9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz",
+  "minSponsoredAssetFee": 0
+ }"""
+    val js4 = s"""{
+  "type": 14,
+  "id": "Gobt7AiyQAfduRkW8Mk3naWbzH67Zsv9rdmgRNmon1Mb",
+  "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+  "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+  "fee": $One,
+  "timestamp": 1520945679531,
+  "proofs": [
+   "3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7"
+  ],
+  "version": 1,
+  "assetId": "9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz",
+  "minSponsoredAssetFee": null
+ }"""
+
+    val req = Json.parse(js1).validate[SignedSponsorFeeRequest].get.toTx.right.get
+    //req.proofs shouldBe List("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7")
+    req.fee shouldBe 100000000L
+    req.minSponsoredAssetFee shouldBe Some(100000)
+
+    for (js <- Seq(js2, js3, js4)) {
+      val req = Json.parse(js).validate[SignedSponsorFeeRequest].get.toTx.right.get
+      //req.proofs shouldBe List("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7")
+      req.fee shouldBe 100000000L
+      req.minSponsoredAssetFee shouldBe None
+    }
+  }
+
 }

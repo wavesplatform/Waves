@@ -61,8 +61,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
         }
 
       """.stripMargin).get.value
-      assert(untyped.size == 1)
-      CompilerV1(dummyCompilerContext, untyped.head).explicitGet()._1
+      CompilerV1(dummyCompilerContext, untyped).explicitGet()._1
     }
 
     val script = ScriptV1(scriptText).explicitGet()

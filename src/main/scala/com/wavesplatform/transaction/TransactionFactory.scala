@@ -6,7 +6,7 @@ import com.wavesplatform.api.http.DataRequest._
 import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request, SignedCreateAliasV1Request, SignedCreateAliasV2Request}
 import com.wavesplatform.api.http.assets.SponsorFeeRequest._
 import com.wavesplatform.api.http.assets._
-import com.wavesplatform.api.http.leasing._
+import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseCancelV2Request, LeaseV1Request, LeaseV2Request, _}
 import com.wavesplatform.api.http.{DataRequest, SignedDataRequest, versionReads}
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.state.ByteStr

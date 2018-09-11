@@ -35,14 +35,16 @@ object Verifier extends Instrumented with ScorexLogging {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
         (pt, blockchain.accountScript(pt.sender)) match {
+          case (stx: SignedTransaction, None) =>
+            stats.signatureVerification
+              .measureForType(stx.builder.typeId)(stx.signaturesValid())
+          case (_: SignedTransaction, Some(_)) =>
+            Left(GenericError("Can't process transaction with signature from scripted account"))
           case (et: ExchangeTransaction, scriptOpt) =>
             verifyExchange(et, blockchain, scriptOpt, currentBlockHeight)
           case (_, Some(script)) =>
             stats.accountScriptExecution
               .measureForType(pt.builder.typeId)(verifyTx(blockchain, script, currentBlockHeight, pt, false))
-          case (stx: SignedTransaction, None) =>
-            stats.signatureVerification
-              .measureForType(stx.builder.typeId)(stx.signaturesValid())
           case _ =>
             stats.signatureVerification
               .measureForType(tx.builder.typeId)(verifyAsEllipticCurveSignature(pt))
