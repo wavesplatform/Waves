@@ -40,7 +40,7 @@ class TradeBalanceAndRoundingTestSuite
 
   private def bobNode = nodes(2)
 
-  Seq(IssueUsdTx, IssueWctTx).map(createSignedIssueRequest).foreach(matcherNode.signedIssue)
+  Seq(IssueUsdTx, IssueWctTx, IssueEthTx).map(createSignedIssueRequest).foreach(matcherNode.signedIssue)
   nodes.waitForHeightArise()
 
   "Alice and Bob trade WAVES-USD" - {
@@ -199,6 +199,21 @@ class TradeBalanceAndRoundingTestSuite
       matcherNode.cancelOrder(bobNode, wctUsdPair, Some(matcherNode.fullOrderHistory(bobNode).head.id))
     }
 
+    "reserved balance is empty after the total execution" in {
+      val aliceOrderId = matcherNode.placeOrder(aliceNode, wctUsdPair, BUY, 100000, 5000000).message.id
+      matcherNode.waitOrderStatus(wctUsdPair, aliceOrderId, "Accepted", 1.minute)
+
+      val bobOrderId = matcherNode.placeOrder(bobNode, wctUsdPair, SELL, 99908, 5000000).message.id
+      matcherNode.waitOrderStatus(wctUsdPair, bobOrderId, "Filled", 1.minute)
+      matcherNode.waitOrderStatus(wctUsdPair, aliceOrderId, "Filled", 1.minute)
+
+      val exchangeTx = matcherNode.transactionsByOrder(bobOrderId).headOption.getOrElse(fail("Expected an exchange transaction"))
+      nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
+
+      matcherNode.reservedBalance(aliceNode) shouldBe empty
+      matcherNode.reservedBalance(bobNode) shouldBe empty
+    }
+
   }
 
   "get opened trading markets. Check WCT-USD" in {
@@ -218,8 +233,7 @@ class TradeBalanceAndRoundingTestSuite
 
     "bob lease all waves exact half matcher fee" in {
       val leasingAmount = bobNode.accountBalances(bobNode.address)._1 - leasingFee - matcherFee / 2
-      val leaseTxId =
-        bobNode.lease(bobNode.address, matcherNode.address, leasingAmount, leasingFee).id
+      val leaseTxId     = bobNode.lease(bobNode.address, matcherNode.address, leasingAmount, leasingFee).id
       nodes.waitForHeightAriseAndTxPresent(leaseTxId)
       val bobOrderId = matcherNode.placeOrder(bobNode, wctWavesPair, SELL, wctWavesPrice, wctWavesSellAmount).message.id
       matcherNode.waitOrderStatus(wctWavesPair, bobOrderId, "Accepted", 1.minute)
@@ -230,7 +244,30 @@ class TradeBalanceAndRoundingTestSuite
       assertBadRequestAndResponse(matcherNode.placeOrder(bobNode, wctWavesPair, SELL, wctWavesPrice, wctWavesSellAmount / 2),
                                   "Not enough tradable balance")
 
-      bobNode.cancelLease(bobNode.address, leaseTxId, leasingFee)
+      val cancelLeaseTxId = bobNode.cancelLease(bobNode.address, leaseTxId, leasingFee).id
+      nodes.waitForHeightAriseAndTxPresent(cancelLeaseTxId)
+    }
+  }
+
+  "Alice and Bob trade ETH-WAVES" - {
+    "reserved balance is empty after the total execution" in {
+      val counterId1 = matcherNode.placeOrder(aliceNode, ethWavesPair, SELL, 300000, 2864310).message.id
+      matcherNode.waitOrderStatus(ethWavesPair, counterId1, "Accepted", 1.minute)
+
+      val counterId2 = matcherNode.placeOrder(aliceNode, ethWavesPair, SELL, 300000, 7237977).message.id
+      matcherNode.waitOrderStatus(ethWavesPair, counterId2, "Accepted", 1.minute)
+
+      val submittedId = matcherNode.placeOrder(bobNode, ethWavesPair, BUY, 300000, 4373667).message.id
+
+      matcherNode.waitOrderStatus(ethWavesPair, counterId1, "Filled", 1.minute)
+      matcherNode.waitOrderStatus(ethWavesPair, counterId2, "PartiallyFilled", 1.minute)
+      matcherNode.waitOrderStatus(ethWavesPair, submittedId, "Filled", 1.minute)
+
+      val exchangeTx = matcherNode.transactionsByOrder(submittedId).headOption.getOrElse(fail("Expected an exchange transaction"))
+      nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
+
+      matcherNode.reservedBalance(bobNode) shouldBe empty
+      matcherNode.cancelOrder(aliceNode, ethWavesPair, Some(counterId2))
     }
   }
 
@@ -293,13 +330,17 @@ object TradeBalanceAndRoundingTestSuite {
     .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))
     .map { case (n, o) => o.withFallback(n) }
 
-  private val aliceSeed = _Configs(1).getString("account-seed")
-  private val bobSeed   = _Configs(2).getString("account-seed")
-  private val alicePk   = PrivateKeyAccount.fromSeed(aliceSeed).right.get
-  private val bobPk     = PrivateKeyAccount.fromSeed(bobSeed).right.get
+  private val matcherSeed = _Configs(0).getString("account-seed")
+  private val aliceSeed   = _Configs(1).getString("account-seed")
+  private val bobSeed     = _Configs(2).getString("account-seed")
+  private val alicePk     = PrivateKeyAccount.fromSeed(aliceSeed).right.get
+  private val bobPk       = PrivateKeyAccount.fromSeed(bobSeed).right.get
+  private val matcherPk   = PrivateKeyAccount.fromSeed(matcherSeed).right.get
 
   val usdAssetName = "USD-X"
   val wctAssetName = "WCT-X"
+  val ethAssetName = "ETH-X"
+
   val IssueUsdTx: IssueTransactionV1 = IssueTransactionV1
     .selfSigned(
       sender = alicePk,
@@ -328,8 +369,23 @@ object TradeBalanceAndRoundingTestSuite {
     .right
     .get
 
+  val IssueEthTx: IssueTransactionV1 = IssueTransactionV1
+    .selfSigned(
+      sender = alicePk,
+      name = ethAssetName.getBytes(),
+      description = "asset description".getBytes(),
+      quantity = defaultAssetQuantity,
+      decimals = 8,
+      reissuable = false,
+      fee = 1.waves,
+      timestamp = System.currentTimeMillis()
+    )
+    .right
+    .get
+
   val UsdId: AssetId = IssueUsdTx.id()
   val WctId: AssetId = IssueWctTx.id()
+  val EthId: AssetId = IssueEthTx.id()
 
   val wctUsdPair = AssetPair(
     amountAsset = Some(WctId),
@@ -341,16 +397,17 @@ object TradeBalanceAndRoundingTestSuite {
     priceAsset = None
   )
 
+  val ethWavesPair = AssetPair(
+    amountAsset = Some(EthId),
+    priceAsset = None
+  )
+
   val wavesUsdPair = AssetPair(
     amountAsset = None,
     priceAsset = Some(UsdId)
   )
 
-  private val updatedMatcherConfig = parseString(s"""
-                                                    |waves.matcher {
-                                                    |  price-assets = ["$UsdId", "WAVES"]
-                                                    |}
-     """.stripMargin)
+  private val updatedMatcherConfig = parseString(s"""waves.matcher.price-assets = ["$UsdId", "WAVES"]""".stripMargin)
 
   private val Configs = _Configs.map(updatedMatcherConfig.withFallback(_))
 

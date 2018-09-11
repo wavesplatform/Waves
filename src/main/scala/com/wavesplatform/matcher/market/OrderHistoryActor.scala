@@ -1,11 +1,10 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{Actor, Props}
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.account.Address
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.{BadMatcherResponse, DBUtils, MatcherResponse}
-import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
+import com.wavesplatform.matcher.api.MatcherResponse
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ExpirableOrderHistoryRequest, _}
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model._
@@ -42,8 +41,6 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   def processExpirableRequest(r: Any): Unit = r match {
     case ValidateOrder(o, _) =>
       sender() ! ValidateOrderResult(o.id(), validateNewOrder(o))
-    case ValidateCancelOrder(co, _) =>
-      sender() ! ValidateCancelResult(co.orderId, validateCancelOrder(co))
     case req: DeleteOrderFromHistory =>
       deleteFromOrderHistory(req)
     case GetTradableBalance(assetPair, addr, _) =>
@@ -56,25 +53,22 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
         processExpirableRequest(req)
       }
     case ev: OrderAdded =>
-      addedTimer.measure(orderHistory.orderAccepted(ev))
+      addedTimer.measure(orderHistory.process(ev))
     case ev: OrderExecuted =>
-      executedTimer.measure(orderHistory.orderExecuted(ev))
+      executedTimer.measure(orderHistory.process(ev))
     case ev: OrderCanceled =>
-      cancelledTimer.measure(orderHistory.orderCanceled(ev))
-    case RecoverFromOrderBook(ob) =>
-      recoverFromOrderBook(ob)
+      cancelledTimer.measure(orderHistory.process(ev))
     case ForceCancelOrderFromHistory(id) =>
       forceCancelOrder(id)
   }
 
   def forceCancelOrder(id: ByteStr): Unit = {
-    orderHistory.order(id).map((_, orderHistory.orderInfo(id))) match {
-      case Some((o, oi)) =>
-        orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, oi.remainingFee, o), unmatchable = false))
-        sender() ! Some(o)
-      case None =>
-        sender() ! None
+    val maybeOrder = orderHistory.order(id)
+    for (o <- maybeOrder) {
+      val oi = orderHistory.orderInfo(id)
+      orderHistory.process(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, oi.remainingFee, o), unmatchable = false))
     }
+    sender ! maybeOrder
   }
 
   def getPairTradableBalance(assetPair: AssetPair, acc: Address): GetTradableBalanceResponse = {
@@ -112,18 +106,6 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
           .foreach(orderData => delete(orderData._1.id()))
     }
   }
-
-  def recoverFromOrderBook(ob: OrderBook): Unit = {
-    ob.asks.foreach {
-      case (_, orders) =>
-        orders.foreach(o => orderHistory.orderAccepted(OrderAdded(o)))
-    }
-    ob.bids.foreach {
-      case (_, orders) =>
-        orders.foreach(o => orderHistory.orderAccepted(OrderAdded(o)))
-    }
-  }
-
 }
 
 object OrderHistoryActor {
@@ -135,9 +117,7 @@ object OrderHistoryActor {
   def props(db: DB, settings: MatcherSettings, utxPool: UtxPool, wallet: Wallet): Props =
     Props(new OrderHistoryActor(db, settings, utxPool, wallet))
 
-  sealed trait OrderHistoryRequest
-
-  sealed trait ExpirableOrderHistoryRequest extends OrderHistoryRequest {
+  sealed trait ExpirableOrderHistoryRequest {
     def ts: Long
   }
 
@@ -147,28 +127,17 @@ object OrderHistoryActor {
 
   case class ValidateOrderResult(validatedOrderId: ByteStr, result: Either[GenericError, Order])
 
-  case class ValidateCancelOrder(cancel: CancelOrder, ts: Long) extends ExpirableOrderHistoryRequest
-
-  case class ValidateCancelResult(validatedOrderId: ByteStr, result: Either[GenericError, CancelOrder])
-
-  case class RecoverFromOrderBook(ob: OrderBook) extends OrderHistoryRequest
-
-  case class ForceCancelOrderFromHistory(orderId: ByteStr) extends OrderHistoryRequest
+  case class ForceCancelOrderFromHistory(orderId: ByteStr)
 
   case object OrderDeletingAccepted extends MatcherResponse {
     val json: JsObject            = Json.obj("status" -> "Accepted")
     val code: StatusCodes.Success = StatusCodes.Accepted
   }
 
-  case class OrderDeleted(orderId: ByteStr) extends MatcherResponse {
-    val json: JsObject            = Json.obj("status" -> "OrderDeleted", "orderId" -> orderId)
-    val code: StatusCodes.Success = StatusCodes.OK
-  }
+  case class OrderDeleted(orderId: ByteStr) extends MatcherResponse(StatusCodes.OK, Json.obj("status" -> "OrderDeleted", "orderId" -> orderId))
 
   case class GetTradableBalance(assetPair: AssetPair, address: Address, ts: Long) extends ExpirableOrderHistoryRequest
 
-  case class GetTradableBalanceResponse(balances: Map[String, Long]) extends MatcherResponse {
-    val json: JsObject   = JsObject(balances.map { case (k, v) => (k, JsNumber(v)) })
-    val code: StatusCode = StatusCodes.OK
-  }
+  case class GetTradableBalanceResponse(balances: Map[String, Long])
+      extends MatcherResponse(StatusCodes.OK, JsObject(balances.map { case (k, v) => (k, JsNumber(v)) }))
 }

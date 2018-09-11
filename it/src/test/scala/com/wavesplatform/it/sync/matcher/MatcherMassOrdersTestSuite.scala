@@ -91,7 +91,6 @@ class MatcherMassOrdersTestSuite
     orderStatus(aliceNode, alicePartialOrderId) shouldBe "PartiallyFilled"
 
     "Mass orders creation with random lifetime. Active orders still in list" in {
-
       matcherNode.ordersByAddress(aliceNode, activeOnly = false).length shouldBe 4
       matcherNode.ordersByAddress(aliceNode, activeOnly = true).length shouldBe 2
 
@@ -104,9 +103,10 @@ class MatcherMassOrdersTestSuite
 
       ordersRequestsGen(orderLimit, aliceNode, aliceWavesPair, OrderType.SELL, 3)
       //wait for some orders cancelled
-      Thread.sleep(100000)
+      Thread.sleep(5000)
       /*val bobsOrderIds = */
       ordersRequestsGen(orderLimit, bobNode, aliceWavesPair, OrderType.BUY, 2)
+      Thread.sleep(5000)
 
       // Alice check that order Active order is still in list
       val orderIdsAfterMatching = matcherNode.fullOrderHistory(aliceNode).map(_.id)
@@ -143,6 +143,9 @@ class MatcherMassOrdersTestSuite
     "check order history orders count" in {
       val aliceOrderHistory = matcherNode.fullOrderHistory(aliceNode)
       aliceOrderHistory.size shouldBe orderLimit
+
+      val aliceOrderHistoryByPair = matcherNode.orderHistoryByPair(aliceNode, aliceWavesPair)
+      aliceOrderHistoryByPair.size shouldBe orderLimit
     }
 
   }

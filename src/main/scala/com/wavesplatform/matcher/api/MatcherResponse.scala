@@ -1,31 +1,22 @@
 package com.wavesplatform.matcher.api
 
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import akka.http.scaladsl.marshalling.ToResponseMarshaller
+import akka.http.scaladsl.model._
 import play.api.libs.json.{JsNull, JsValue, Json}
 
-trait MatcherResponse {
-  def json: JsValue
-  def code: StatusCode
+abstract class MatcherResponse(val statusCode: StatusCode, val json: JsValue)
+
+object MatcherResponse {
+  import akka.http.scaladsl.marshalling.PredefinedToResponseMarshallers._
+  import com.wavesplatform.http.ApiMarshallers._
+  implicit val trm: ToResponseMarshaller[MatcherResponse] =
+    fromStatusCodeAndValue[StatusCode, JsValue].compose(mr => mr.statusCode -> mr.json)
 }
 
-trait GenericMatcherResponse extends MatcherResponse {
-  def success: Boolean
-  def message: String
-
-  def result: JsValue = JsNull
-
-  def json: JsValue = Json.obj(
-    "success" -> success,
-    "message" -> message,
-    "result"  -> result
-  )
-  def code: StatusCode = if (success) StatusCodes.OK else StatusCodes.BadRequest
-}
-
-case class StatusCodeMatcherResponse(override val code: StatusCode, message: String) extends GenericMatcherResponse {
-  override def success: Boolean = code == StatusCodes.OK
-}
-
-case class BadMatcherResponse(override val code: StatusCode, message: String) extends GenericMatcherResponse {
-  override def success: Boolean = code == StatusCodes.OK
-}
+case class StatusCodeMatcherResponse(code: StatusCode, message: String)
+    extends MatcherResponse(code,
+                            Json.obj(
+                              "success" -> (code == StatusCodes.OK),
+                              "message" -> message,
+                              "result"  -> JsNull // For backward compatibility
+                            ))
