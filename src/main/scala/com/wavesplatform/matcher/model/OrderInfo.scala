@@ -27,9 +27,9 @@ case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: O
     else LimitOrder.Filled(filled)
   }
 
-  def jsonStr: String = {
-    Json.stringify(Json.toJson(this))
-  }
+  def jsonStr: String = Json.stringify(Json.toJson(this))
+  override def toString: String =
+    s"OrderInfo(filled=$filled/$amount, canceled=$canceled, minAmount=$minAmount, remainingFee=$remainingFee, unsafeTotalSpend=$unsafeTotalSpend)"
 }
 
 object OrderInfo {

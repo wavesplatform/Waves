@@ -3,7 +3,6 @@ package com.wavesplatform.matcher.model
 import cats.implicits._
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.matcher.model.Events.OrderAdded
 import com.wavesplatform.matcher.model.OrderHistory.OrderInfoChange
 import com.wavesplatform.metrics.TimerExt
@@ -65,24 +64,6 @@ trait OrderValidator {
         Either
           .cond(v, order, GenericError(v.messages()))
       }
-
-  def validateCancelOrder(cancel: CancelOrder): Either[GenericError, CancelOrder] = {
-    timer
-      .refine("action" -> "cancel", "pair" -> cancel.assetPair.toString)
-      .measure {
-        val status = orderHistory.orderInfo(cancel.orderId).status
-        val v = status match {
-          case LimitOrder.NotFound  => Validation.failure("Order not found")
-          case LimitOrder.Filled(_) => Validation.failure("Order is already Filled")
-          case _ =>
-            orderHistory
-              .order(cancel.orderId)
-              .fold(false)(_.senderPublicKey == cancel.sender) :| "Order not found"
-        }
-
-        Either.cond(v, cancel, GenericError(v.messages()))
-      }
-  }
 
   private def spendableBalance(a: AssetAcc): Long = {
     val portfolio = utxPool.portfolio(a.account)

@@ -64,7 +64,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     }
 
     "sell order could be placed correctly" - {
-      // Alice places sell order
       "alice places sell order" in {
         order1.status shouldBe "OrderAccepted"
 
@@ -301,7 +300,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
         val transferBobId = aliceNode.transfer(aliceNode.address, bobNode.address, transferAmount, TransactionFee, None, None).id
         nodes.waitForHeightAriseAndTxPresent(transferBobId)
-
       }
     }
 

@@ -31,6 +31,8 @@ case class AssetPair(@ApiModelProperty(dataType = "java.lang.String") amountAsse
   )
 
   def reverse = AssetPair(priceAsset, amountAsset)
+
+  def assets: Set[Option[AssetId]] = Set(amountAsset, priceAsset)
 }
 
 object AssetPair {
