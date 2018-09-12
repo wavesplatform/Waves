@@ -5,7 +5,7 @@ object Dependencies {
 
   def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.4.19"
 
-  def swaggerModule(module: String) = ("io.swagger" % s"swagger-$module" % "1.5.16").exclude("com.google.guava", "guava")
+  def swaggerModule(module: String) = ("io.swagger" % s"swagger-$module" % "1.5.21").exclude("com.google.guava", "guava")
 
   def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.0.9"
 
