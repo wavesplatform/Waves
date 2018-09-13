@@ -147,6 +147,7 @@ case class MatcherApiRoute(wallet: Wallet,
           case Some(order) =>
             orderBook(order.assetPair) match {
               case Some(orderBookRef) =>
+                log.trace(s"Cancelling ${order.id()} for ${senderPublicKey.map(_.address)}")
                 (orderBookRef ? CancelOrder(orderId)).mapTo[MatcherResponse]
               case None =>
                 log.debug(s"Order book for ${order.assetPair} was not found, cancelling $orderId anyway")
