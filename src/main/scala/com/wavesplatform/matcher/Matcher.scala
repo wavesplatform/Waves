@@ -53,7 +53,6 @@ class Matcher(actorSystem: ActorSystem,
       txWriter,
       restAPISettings,
       matcherSettings,
-      blockchain,
       db
     )
   )

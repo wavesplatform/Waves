@@ -23,7 +23,6 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.{Base58, NTP, ScorexLogging}
 import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
@@ -48,7 +47,6 @@ case class MatcherApiRoute(wallet: Wallet,
                            txWriter: ActorRef,
                            settings: RestAPISettings,
                            matcherSettings: MatcherSettings,
-                           blockchain: Blockchain,
                            db: DB)
     extends ApiRoute
     with ScorexLogging {
@@ -153,12 +151,7 @@ case class MatcherApiRoute(wallet: Wallet,
     (pathEndOrSingleSlash & post) {
       json[Order] { order =>
         placeTimer.measure {
-          if (blockchain.hasScript(order.senderPublicKey.toAddress)) {
-            val resp = StatusCodeMatcherResponse(StatusCodes.BadRequest, "Trading on scripted account isn't allowed yet.")
-            Future.successful(resp.code -> resp.json)
-          } else {
-            (matcher ? order).mapTo[MatcherResponse].map(r => r.code -> r.json)
-          }
+          (matcher ? order).mapTo[MatcherResponse].map(r => r.code -> r.json)
         }
       }
     }

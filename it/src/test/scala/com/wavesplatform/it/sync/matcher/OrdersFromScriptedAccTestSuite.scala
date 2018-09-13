@@ -37,7 +37,7 @@ class OrdersFromScriptedAccTestSuite
   private def aliceNode = nodes(1)
   private def bobNode   = nodes(2)
 
-  "issue asset and run test" - {
+  "can place order from scripted account" in {
     // Alice issues new asset
     val aliceAsset =
       aliceNode.issue(aliceNode.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, 100000000L).id
@@ -48,57 +48,49 @@ class OrdersFromScriptedAccTestSuite
     aliceNode.assertAssetBalance(aliceNode.address, aliceAsset, someAssetAmount)
     aliceNode.assertAssetBalance(matcherNode.address, aliceAsset, 0)
 
-    "make Bob's address as scripted" in {
-      val scriptText = {
-        val sc = Parser(s"""true""".stripMargin).get.value
-        CompilerV1(dummyCompilerContext, sc).explicitGet()._1
-      }
-
-      val script = ScriptV1(scriptText).explicitGet()
-      val setScriptTransaction = SetScriptTransaction
-        .selfSigned(SetScriptTransaction.supportedVersions.head, bobNode.privateKey, Some(script), minFee, System.currentTimeMillis())
-        .right
-        .get
-
-      val setScriptId = bobNode
-        .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
-        .id
-
-      nodes.waitForHeightAriseAndTxPresent(setScriptId)
-
+    // make Bob's address scripted
+    val scriptText = {
+      val sc = Parser(s"""true""".stripMargin).get.value
+      CompilerV1(dummyCompilerContext, sc).explicitGet()._1
     }
 
-    "Alice place sell order, but Bob cannot place order, because his acc is scripted" in {
-      // Alice places sell order
-      val aliceOrder = matcherNode
-        .placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes)
+    val script = ScriptV1(scriptText).explicitGet()
+    val setScriptTransaction = SetScriptTransaction
+      .selfSigned(SetScriptTransaction.supportedVersions.head, bobNode.privateKey, Some(script), minFee, System.currentTimeMillis())
+      .right
+      .get
 
-      aliceOrder.status shouldBe "OrderAccepted"
+    val setScriptId = bobNode
+      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+      .id
 
-      val orderId = aliceOrder.message.id
+    nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
-      // Alice checks that the order in order book
-      matcherNode.orderStatus(orderId, aliceWavesPair).status shouldBe "Accepted"
-      matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
+    // Alice places sell order
+    val aliceOrder = matcherNode
+      .placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes)
 
-      // Alice check that order is correct
-      val orders = matcherNode.orderBook(aliceWavesPair)
-      orders.asks.head.amount shouldBe 500
-      orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
+    aliceOrder.status shouldBe "OrderAccepted"
 
-      // sell order should be in the aliceNode orderbook
-      matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
+    val orderId = aliceOrder.message.id
 
-      // Bob gets error message
-      assertBadRequestAndResponse(
-        matcherNode
-          .placeOrder(bobNode, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes),
-        "Trading on scripted account isn't allowed yet."
-      )
+    // Alice checks that the order in order book
+    matcherNode.orderStatus(orderId, aliceWavesPair).status shouldBe "Accepted"
+    matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
 
-    }
+    // Alice check that order is correct
+    val orders = matcherNode.orderBook(aliceWavesPair)
+    orders.asks.head.amount shouldBe 500
+    orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
+
+    // sell order should be in the aliceNode orderbook
+    matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
+
+    // Bob places matching buy order
+    val bobOrder = matcherNode
+      .placeOrder(bobNode, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes)
+    bobOrder.status shouldBe "OrderAccepted"
   }
-
 }
 
 object OrdersFromScriptedAccTestSuite {
