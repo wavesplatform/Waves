@@ -2,6 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.api.http.CustomValidationError
+import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{Blockchain, ByteStr, NG}
@@ -11,7 +12,7 @@ import play.api.libs.json.Json
 
 import scala.util.Random
 
-class RolbackRouteSpec extends RouteSpec("/debug") with MockFactory with RestAPISettingsHelper {
+class RollbackRouteSpec extends RouteSpec("/debug") with MockFactory with RestAPISettingsHelper {
   private val sampleConfig  = com.typesafe.config.ConfigFactory.load()
   private val wavesSettings = WavesSettings.fromConfig(sampleConfig).copy(restAPISettings = restAPISettings)
   private val configObject  = sampleConfig.root()
@@ -24,7 +25,7 @@ class RolbackRouteSpec extends RouteSpec("/debug") with MockFactory with RestAPI
   }
 
   "DebugApiRoute" - {
-    "can't rollback to more than 1990" in {
+    s"can't rollback to more than ${LevelDBWriter.MAX_DEPTH}" in {
       val blockchain = stub[Blockchain]
       val ng         = stub[NG]
 

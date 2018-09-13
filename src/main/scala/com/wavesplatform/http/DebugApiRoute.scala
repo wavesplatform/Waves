@@ -29,6 +29,7 @@ import io.swagger.annotations._
 import monix.eval.{Coeval, Task}
 import play.api.libs.json._
 import cats.implicits._
+import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.transaction.ValidationError.{GenericError, InvalidRequestSignature}
 
 import scala.concurrent.Future
@@ -194,7 +195,7 @@ case class DebugApiRoute(ws: WavesSettings,
     ))
   def rollback: Route = (path("rollback") & post & withAuth) {
     json[RollbackParams] { params =>
-      if (ng.height - params.rollbackTo > 1990)
+      if (ng.height - params.rollbackTo > LevelDBWriter.MAX_DEPTH - 10)
         (StatusCodes.BadRequest, "Rollback of more than 1990 blocks is forbidden")
       else {
         ng.blockAt(params.rollbackTo) match {
@@ -293,7 +294,7 @@ case class DebugApiRoute(ws: WavesSettings,
           .toRight(GenericError("Block with such signature not found"))
         _ <- Either
           .cond(
-            ng.height - height <= 1990,
+            ng.height - height < (LevelDBWriter.MAX_DEPTH - 10),
             (),
             GenericError("Rollback of more than 1990 blocks is forbidden")
           )
