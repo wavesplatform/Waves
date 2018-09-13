@@ -347,6 +347,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
 
       val txId = sender.signedBroadcast(tx).id
       nodes.waitForHeightAriseAndTxPresent(txId)
+      assertBadRequestAndMessage(sender.signedBroadcast(tx), "is already in the state on a height")
     }
   }
 
