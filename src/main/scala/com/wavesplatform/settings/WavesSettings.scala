@@ -32,7 +32,7 @@ object WavesSettings {
     val dataDirectory           = config.as[String](s"$configPath.data-directory")
     val maxCacheSize            = config.as[Int](s"$configPath.max-cache-size")
     val networkSettings         = config.as[NetworkSettings]("waves.network")
-    val walletSettings          = WalletSettings.fromConfig(config)
+    val walletSettings          = config.as[WalletSettings]("waves.wallet")
     val blockchainSettings      = BlockchainSettings.fromConfig(config)
     val checkpointsSettings     = CheckpointsSettings.fromConfig(config)
     val matcherSettings         = MatcherSettings.fromConfig(config)
