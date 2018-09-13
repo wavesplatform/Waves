@@ -17,7 +17,7 @@ object PasswordProvider extends ScorexLogging {
       case Some(console) =>
         console
           .writer()
-          .write("Enter password for your wallet")
+          .write("Enter password for your wallet\n")
 
         console
           .readPassword("Password > ")
