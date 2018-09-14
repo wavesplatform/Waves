@@ -4,7 +4,7 @@ import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.account.Address
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.{MatcherResponse, NotImplemented}
+import com.wavesplatform.matcher.api.{MatcherResponse, NotImplemented, OrderDeleted}
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ExpirableOrderHistoryRequest, _}
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model._
@@ -19,9 +19,6 @@ import com.wavesplatform.wallet.Wallet
 import kamon.Kamon
 import org.iq80.leveldb.DB
 import play.api.libs.json._
-
-import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxPool, val wallet: Wallet) extends Actor with OrderValidator {
 
@@ -46,13 +43,13 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
     case DeleteOrderFromHistory(_, address, maybeId, _) =>
       val result = for {
         id <- maybeId.toRight[MatcherResponse](NotImplemented("Batch order deletion is not supported yet"))
-        status <- orderHistory.deleteOrder(address, id).left.map[MatcherResponse] {
+        _ <- orderHistory.deleteOrder(address, id).left.map[MatcherResponse] {
           case LimitOrder.NotFound => StatusCodes.NotFound   -> s"Order $id not found"
           case other               => StatusCodes.BadRequest -> s"Invalid status: $other"
         }
-      } yield status
+      } yield id
 
-      sender() ! result.fold[MatcherResponse](identity, _ => StatusCodes.OK -> "Order deleted")
+      sender() ! result.fold[MatcherResponse](identity, id => OrderDeleted(id))
   }
 
   override def receive: Receive = {
@@ -99,8 +96,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
 }
 
 object OrderHistoryActor {
-  val RequestTTL: Int                          = 5 * 1000
-  val UpdateOpenPortfolioDelay: FiniteDuration = 30 seconds
+  val RequestTTL: Int = 5 * 1000
 
   def name: String = "OrderHistory"
 
@@ -118,8 +114,6 @@ object OrderHistoryActor {
   case class ValidateOrderResult(validatedOrderId: ByteStr, result: Either[GenericError, Order])
 
   case class ForceCancelOrderFromHistory(orderId: ByteStr)
-
-  case class OrderDeleted(orderId: ByteStr) extends MatcherResponse(StatusCodes.OK, Json.obj("status" -> "OrderDeleted", "orderId" -> orderId))
 
   case class GetTradableBalance(assetPair: AssetPair, address: Address, ts: Long) extends ExpirableOrderHistoryRequest
 

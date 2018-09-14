@@ -7,6 +7,7 @@ import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnap
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.matcher.MatcherTestData
+import com.wavesplatform.matcher.api.{OperationTimedOut, OrderAccepted, OrderCanceled}
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
@@ -440,7 +441,7 @@ class OrderBookActorSpecification
       receiveN(1)
       getOrders(actor) shouldEqual Seq(BuyLimitOrder(price * Order.PriceConstant, amount, expiredOrder.matcherFee, expiredOrder))
       actor ! OrderCleanup
-      expectMsg(OrderCanceled(expiredOrder.id().base58))
+      expectMsg(OrderCanceled(expiredOrder.id()))
       getOrders(actor).size should be(0)
     }
 
@@ -458,7 +459,7 @@ class OrderBookActorSpecification
       getOrders(actor) shouldEqual expectedOrders
     }
 
-    "responses with a error after timeout" in {
+    "responsd with a error after timeout" in {
       val actor: ActorRef = createOrderBookActor(TestProbe().ref, 50.millis)
 
       val order = buy(pair, 1, 1)
@@ -467,7 +468,7 @@ class OrderBookActorSpecification
       expectMsg(OperationTimedOut)
     }
 
-    "ignores an unexpected validation message" when {
+    "ignore an unexpected validation message" when {
       "receives ValidateOrderResult of another order" in {
         val historyActor = TestProbe()
         val actor        = createOrderBookActor(historyActor.ref)
@@ -477,18 +478,6 @@ class OrderBookActorSpecification
 
         val unexpectedOrder = buy(pair, 1, 2)
         actor.tell(ValidateOrderResult(unexpectedOrder.id(), Right(unexpectedOrder)), historyActor.ref)
-        expectNoMsg()
-      }
-
-      "receives ValidateCancelResult of another order" in {
-        val historyActor = TestProbe()
-        val actor        = createOrderBookActor(historyActor.ref)
-
-        val order = buy(pair, 1, 1)
-        actor ! CancelOrder(order.id())
-
-        val unexpectedOrder = buy(pair, 1, 2)
-        actor.tell(CancelOrder(unexpectedOrder.id()), historyActor.ref)
         expectNoMsg()
       }
     }
