@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.matcher.api.StatusCodeMatcherResponse
+import com.wavesplatform.matcher.api.MatcherResponse
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse, MarketData}
 import com.wavesplatform.matcher.market.OrderBookActor._
@@ -120,7 +120,7 @@ class MatcherActorSpecification
 
       val invalidOrder = sameAssetsOrder()
       actor ! invalidOrder
-      expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Amount and price assets must be different"))
+      expectMsg(MatcherResponse(StatusCodes.NotFound, "Amount and price assets must be different"))
     }
 
     "accept orders with AssetPair with same assets" in {
@@ -139,7 +139,7 @@ class MatcherActorSpecification
 
       val invalidOrder = sameAssetsOrder()
       actor ! invalidOrder
-      expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Amount and price assets must be different"))
+      expectMsg(MatcherResponse(StatusCodes.NotFound, "Amount and price assets must be different"))
     }
 
     "return all open markets" in {

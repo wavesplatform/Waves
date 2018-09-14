@@ -6,7 +6,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.database.{DBExt, Key, RW}
 import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.model.Events._
-import com.wavesplatform.matcher.model.LimitOrder.{Filled, OrderStatus}
+import com.wavesplatform.matcher.model.LimitOrder._
 import com.wavesplatform.matcher.{MatcherKeys, MatcherSettings, OrderAssets}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
@@ -249,14 +249,13 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
   def orderInfo(id: ByteStr): OrderInfo = DBUtils.orderInfo(db, id)
   def order(id: ByteStr): Option[Order] = DBUtils.order(db, id)
 
-  def deleteOrder(address: Address, orderId: ByteStr): Boolean = db.readWrite { rw =>
+  def deleteOrder(address: Address, orderId: ByteStr): Either[OrderStatus, Unit] = db.readWrite { rw =>
     DBUtils.orderInfo(rw, orderId).status match {
       case Filled(_) | LimitOrder.Cancelled(_) =>
         rw.delete(MatcherKeys.order(orderId))
         rw.delete(MatcherKeys.orderInfo(orderId))
-        true
-      case _ =>
-        false
+        Right(())
+      case nonFinalStatus => Left(nonFinalStatus)
     }
   }
 }

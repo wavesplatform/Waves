@@ -7,7 +7,7 @@ import akka.http.scaladsl.model._
 import akka.persistence.{PersistentActor, RecoveryCompleted, _}
 import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
-import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
+import com.wavesplatform.matcher.api.MatcherResponse
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.OrderBook
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherSettings}
@@ -87,7 +87,7 @@ class MatcherActor(orderHistory: ActorRef,
 
   def checkBlacklistedAddress(address: Address)(f: => Unit): Unit = {
     val v = !settings.blacklistedAddresses.contains(address.address) :| s"Invalid Address: ${address.address}"
-    if (v) f else sender() ! StatusCodeMatcherResponse(StatusCodes.Forbidden, v.messages())
+    if (v) f else sender() ! MatcherResponse(StatusCodes.Forbidden, v.messages())
   }
 
   def createAndForward(order: Order): Unit = {
@@ -109,9 +109,9 @@ class MatcherActor(orderHistory: ActorRef,
       case Left(e) =>
         sender() ! pairBuilder
           .validateAssetPair(assetPair.reverse)
-          .fold(
-            _ => StatusCodeMatcherResponse(StatusCodes.NotFound, e),
-            _ => StatusCodeMatcherResponse(StatusCodes.Found, e)
+          .fold[MatcherResponse](
+            _ => StatusCodes.NotFound -> e,
+            _ => StatusCodes.Found    -> e
           )
     }
 
@@ -241,7 +241,7 @@ class MatcherActor(orderHistory: ActorRef,
       shutdownStatus = shutdownStatus.copy(orderBooksStopped = true)
       shutdownStatus.tryComplete()
 
-    case _ if shutdownStatus.initiated => sender() ! StatusCodeMatcherResponse(StatusCodes.ServiceUnavailable, "System is going shutdown")
+    case _ if shutdownStatus.initiated => sender() ! MatcherResponse(StatusCodes.ServiceUnavailable, "System is going shutdown")
   }
 
   override def receiveCommand: Receive = forwardToOrderBook orElse snapshotsCommands

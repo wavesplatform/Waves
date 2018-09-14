@@ -139,8 +139,7 @@ case class MatcherApiRoute(wallet: Wallet,
       json[Order] { order =>
         placeTimer.measure {
           if (blockchain.hasScript(order.senderPublicKey.toAddress)) {
-            val resp = StatusCodeMatcherResponse(StatusCodes.BadRequest, "Trading on scripted account isn't allowed yet.")
-            Future.successful(resp)
+            Future.successful[MatcherResponse](StatusCodes.BadRequest -> "Trading on scripted account isn't allowed yet.")
           } else {
             (matcher ? order).mapTo[MatcherResponse]
           }
@@ -205,7 +204,7 @@ case class MatcherApiRoute(wallet: Wallet,
         json[CancelOrderRequest] { req =>
           if (req.isSignatureValid()) req.orderId match {
             case Some(id) => cancelOrder(id, Some(req.sender))
-            case None     => StatusCodeMatcherResponse(StatusCodes.NotImplemented, "Batch cancel is not supported yet")
+            case None     => NotImplemented("Batch cancel is not supported yet")
           } else InvalidSignature
         }
       }

@@ -716,8 +716,8 @@ class OrderHistorySpecification
     val expectedPriceReserved = counterLo.getSpendAmount - counterInfo.totalSpend(counterLo)
     oh.openVolume(pk, pair.priceAsset) shouldBe expectedPriceReserved
 
-    oh.deleteOrder(pk, counter.id()) shouldBe false
-    oh.deleteOrder(pk, submitted.id()) shouldBe true
+    oh.deleteOrder(pk, counter.id()) shouldBe Left(LimitOrder.PartiallyFilled(100000000))
+    oh.deleteOrder(pk, submitted.id()) shouldBe Right(())
 
     withClue("orders list") {
       val addr = pk.toAddress
