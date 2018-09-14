@@ -75,6 +75,8 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
         val combinedInfo = combine(order, origInfo, orderInfoDiff)
         val change       = OrderInfoChange(order, origInfo, combinedInfo)
 
+        log.trace(s"$orderId: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
+
         rw.put(MatcherKeys.orderInfo(orderId), change.updatedInfo)
         val changedKeys1 = origChangedKeys
           .updated(MatcherKeys.orderInfo(orderId), change.updatedInfo)
@@ -182,6 +184,8 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
       MatcherKeys.addressOrdersByPair(address, o.assetPair, pairNextSeqNr),
       Some(o.id())
     )
+
+    log.trace(s"Adding order ${o.id()} to $address at $pairNextSeqNr")
 
     rw.put(pairSeqNrKey, pairNextSeqNr)
 

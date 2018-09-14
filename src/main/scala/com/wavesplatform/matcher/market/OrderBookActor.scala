@@ -205,7 +205,8 @@ class OrderBookActor(assetPair: AssetPair,
           st.stop()
         }
       case _ =>
-        apiSender.foreach(_ ! OrderCancelRejected("Order not found"))
+        log.debug(s"Error cancelling $orderIdToCancel: order not found")
+        sender() ! OrderCancelRejected("Order not found")
     }
 
   private def onAddOrder(order: Order): Unit = {
