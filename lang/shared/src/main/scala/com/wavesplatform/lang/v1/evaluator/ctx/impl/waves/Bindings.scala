@@ -10,10 +10,9 @@ object Bindings {
   import Types._
 
   private def headerPart(tx: Header): Map[String, Any] = Map(
-    "id"        -> tx.id,
-    "fee"       -> tx.fee,
-    "timestamp" -> tx.timestamp,
-    "version"   -> tx.version,
+    "id"      -> tx.id,
+    "fee"     -> tx.fee,
+    "version" -> tx.version,
   )
 
   private def proofsPart(existingProofs: IndexedSeq[ByteVector]) =
@@ -60,7 +59,6 @@ object Bindings {
         "orderType"        -> ordType(ord.orderType),
         "price"            -> ord.price,
         "amount"           -> ord.amount,
-        "timestamp"        -> ord.timestamp,
         "expiration"       -> ord.expiration,
         "matcherFee"       -> ord.matcherFee,
         "bodyBytes"        -> ord.bodyBytes,
@@ -69,6 +67,16 @@ object Bindings {
     )
 
   def senderObject(sender: Recipient.Address): CaseObj = CaseObj(addressType.typeRef, Map("bytes" -> sender.bytes))
+
+  def blockObject(blk: Blk): CaseObj =
+    CaseObj(
+      blockType.typeRef,
+      Map(
+        "timestamp"           -> blk.timestamp,
+        "height"              -> blk.height,
+        "generationSignature" -> blk.generationSignature
+      )
+    )
 
   def transactionObject(tx: Tx): CaseObj =
     tx match {

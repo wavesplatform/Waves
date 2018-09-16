@@ -118,6 +118,9 @@ object Types {
   val ordTypeType = UNION(buyType.typeRef, sellType.typeRef)
 
   val assetPairType = CaseType("AssetPair", List("amountAsset" -> optionByteVector, "priceAsset" -> optionByteVector))
+
+  val blockType = CaseType("Block", List("timestamp" -> LONG, "height" -> LONG, "generationSignature" -> BYTEVECTOR))
+
   val orderType = CaseType(
     "Order",
     List(
@@ -192,5 +195,5 @@ object Types {
   val outgoingTransactionType = UNION.create(activeTransactionTypes.map(_.typeRef))
   val anyTransactionType      = UNION.create(transactionTypes.map(_.typeRef))
 
-  val wavesTypes = Seq(addressType, aliasType, transfer, orderType, assetPairType, dataEntryType) ++ transactionTypes
+  val wavesTypes = Seq(blockType, addressType, aliasType, transfer, orderType, assetPairType, dataEntryType) ++ transactionTypes
 }

@@ -112,7 +112,8 @@ case class MatcherApiRoute(wallet: Wallet,
     ))
   def getOrderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
     parameters('depth.as[Int].?) { depth =>
-      withAssetPair(p, redirectToInverse = true) { pair => complete(orderBookSnapshot.get(pair, depth))
+      withAssetPair(p, redirectToInverse = true) { pair =>
+        complete(orderBookSnapshot.get(pair, depth))
       }
     }
   }
@@ -327,7 +328,8 @@ case class MatcherApiRoute(wallet: Wallet,
     Array(
       new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path")
     ))
-  def forceCancelOrder: Route = (path("orders" / "cancel" / ByteStrPM) & post & withAuth) { orderId => complete(cancelOrder(orderId, None))
+  def forceCancelOrder: Route = (path("orders" / "cancel" / ByteStrPM) & post & withAuth) { orderId =>
+    complete(cancelOrder(orderId, None))
   }
 
   @Path("/orders/{address}")
@@ -415,7 +417,8 @@ case class MatcherApiRoute(wallet: Wallet,
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     ))
   def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { p =>
-    withAssetPair(p) { pair => complete((matcher ? DeleteOrderBookRequest(pair)).mapTo[MatcherResponse])
+    withAssetPair(p) { pair =>
+      complete((matcher ? DeleteOrderBookRequest(pair)).mapTo[MatcherResponse])
     }
   }
 

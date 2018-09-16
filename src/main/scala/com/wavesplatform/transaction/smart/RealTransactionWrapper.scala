@@ -4,6 +4,7 @@ import com.wavesplatform.lang.v1.traits.{Proven, _}
 import com.wavesplatform.state._
 import scodec.bits.ByteVector
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
@@ -18,7 +19,7 @@ object RealTransactionWrapper {
       case vt: VersionedTransaction => vt.version
       case _                        => 1
     }
-    Header(ByteVector(tx.id().arr), tx.assetFee._2, tx.timestamp, v)
+    Header(ByteVector(tx.id().arr), tx.assetFee._2, v)
   }
   private def proven(tx: ProvenTransaction): Proven =
     Proven(
@@ -45,7 +46,6 @@ object RealTransactionWrapper {
       },
       price = o.price,
       amount = o.amount,
-      timestamp = o.timestamp,
       expiration = o.expiration,
       matcherFee = o.matcherFee,
       bodyBytes = ByteVector(o.bodyBytes()),
@@ -107,4 +107,6 @@ object RealTransactionWrapper {
         )
     }
   }
+
+  def block(b: BlockHeader, h: Int): Blk = Blk(b.timestamp, h, b.consensusData.generationSignature)
 }

@@ -1,10 +1,10 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient, Tx}
+import com.wavesplatform.lang.v1.traits._
 
 object WavesContext {
   val env = new Environment {
-    override def height: Int                                         = impl.Environment.height
+    override def lastBlock: Blk                                      = impl.Environment.lastBlock
     override def networkByte: Byte                                   = impl.Environment.networkByte
     override def transaction: Tx                                     = impl.Environment.transaction
     override def transactionById(id: Array[Byte]): Option[Tx]        = impl.Environment.transactionById(id)
