@@ -14,10 +14,6 @@ object BlockchainContext {
 
   private val baseContext = Monoid.combine(PureContext.ctx, CryptoContext.build(Global)).evaluationContext
 
-  def build(nByte: Byte,
-            tx: Coeval[Transaction],
-            currentHeight: Coeval[Int],
-            lastBlockInfo: Coeval[BlockHeader],
-            blockchain: Blockchain): EvaluationContext =
+  def build(nByte: Byte, tx: Coeval[Transaction], currentHeight: Coeval[Int], blockchain: Blockchain): EvaluationContext =
     Monoid.combine(baseContext, WavesContext.build(new WavesEnvironment(nByte, tx, currentHeight, blockchain)).evaluationContext)
 }
