@@ -46,7 +46,7 @@ object JsAPI {
   def compile(input: String): js.Dynamic = {
 
     val wavesContext = WavesContext.build(new Environment {
-      override def lastBlock: Blk                                                                                  = ???
+      override def block: Blk                                                                                      = ???
       override def networkByte: Byte                                                                               = ???
       override def transaction: Tx                                                                                 = ???
       override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???

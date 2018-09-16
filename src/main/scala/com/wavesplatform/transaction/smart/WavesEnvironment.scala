@@ -9,7 +9,7 @@ import monix.eval.Coeval
 import scodec.bits.ByteVector
 
 class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], currentHeight: Coeval[Int], blockchain: Blockchain) extends Environment {
-  override def lastBlock: Blk = {
+  override def block: Blk = {
     val height = currentHeight()
     RealTransactionWrapper.block(blockchain.blockHeaderAndSize(height).get._1, height)
   }

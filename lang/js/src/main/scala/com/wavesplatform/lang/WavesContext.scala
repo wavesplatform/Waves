@@ -4,7 +4,7 @@ import com.wavesplatform.lang.v1.traits._
 
 object WavesContext {
   val env = new Environment {
-    override def lastBlock: Blk                                      = impl.Environment.lastBlock
+    override def block: Blk                                          = impl.Environment.lastBlock
     override def networkByte: Byte                                   = impl.Environment.networkByte
     override def transaction: Tx                                     = impl.Environment.transaction
     override def transactionById(id: Array[Byte]): Option[Tx]        = impl.Environment.transactionById(id)

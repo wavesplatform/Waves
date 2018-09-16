@@ -69,7 +69,7 @@ object Common {
     EvaluationContext.build(Map.empty, Map("p" -> LazyVal(EitherT.pure(instance))), Seq.empty)
 
   def emptyBlockchainEnvironment(h: Int = 1, tx: Coeval[Tx] = Coeval(???), nByte: Byte = 'T'): Environment = new Environment {
-    override def lastBlock: Blk    = Blk(0, h, ByteVector.empty)
+    override def block: Blk        = Blk(0, h, ByteVector.empty)
     override def networkByte: Byte = nByte
     override def transaction: Tx   = tx()
 
