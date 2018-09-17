@@ -4,6 +4,7 @@ import com.wavesplatform.lang.v1.traits.{Proven, _}
 import com.wavesplatform.state._
 import scodec.bits.ByteVector
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
@@ -107,4 +108,6 @@ object RealTransactionWrapper {
         )
     }
   }
+
+  def block(b: BlockHeader, h: Int): Blk = Blk(b.timestamp, h, b.consensusData.generationSignature)
 }

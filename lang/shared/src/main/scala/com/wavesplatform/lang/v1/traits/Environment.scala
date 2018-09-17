@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.traits
 
 trait Environment {
-  def height: Int
+  def block: Blk
   def networkByte: Byte
   def transaction: Tx
   def transactionById(id: Array[Byte]): Option[Tx]

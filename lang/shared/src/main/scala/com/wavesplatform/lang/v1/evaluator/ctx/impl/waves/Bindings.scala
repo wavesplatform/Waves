@@ -70,6 +70,16 @@ object Bindings {
 
   def senderObject(sender: Recipient.Address): CaseObj = CaseObj(addressType.typeRef, Map("bytes" -> sender.bytes))
 
+  def blockObject(blk: Blk): CaseObj =
+    CaseObj(
+      blockType.typeRef,
+      Map(
+        "timestamp"           -> blk.timestamp,
+        "height"              -> blk.height,
+        "generationSignature" -> blk.generationSignature
+      )
+    )
+
   def transactionObject(tx: Tx): CaseObj =
     tx match {
       case Tx.Genesis(h, amount, recipient) =>

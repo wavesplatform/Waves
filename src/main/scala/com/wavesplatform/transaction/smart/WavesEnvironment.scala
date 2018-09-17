@@ -1,15 +1,23 @@
 package com.wavesplatform.transaction.smart
 
+import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.lang.v1.traits.Recipient.{Address, Alias}
-import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient, Tx => ContractTransaction}
+import com.wavesplatform.lang.v1.traits.{Blk, DataType, Environment, Recipient, Tx => ContractTransaction}
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Transaction
 import monix.eval.Coeval
 import scodec.bits.ByteVector
-import com.wavesplatform.account.AddressOrAlias
-import com.wavesplatform.transaction.Transaction
 
-class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], blockchain: Blockchain) extends Environment {
-  override def height: Int = h()
+class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], currentHeight: Coeval[Int], blockchain: Blockchain) extends Environment {
+  override def block: Blk = {
+    val height     = currentHeight() - 1
+    val maybeTuple = blockchain.blockHeaderAndSize(height)
+    maybeTuple match {
+      case Some((header, _)) => RealTransactionWrapper.block(header, height)
+      case None              => ???
+
+    }
+  }
 
   override def transaction: ContractTransaction = RealTransactionWrapper(tx())
 

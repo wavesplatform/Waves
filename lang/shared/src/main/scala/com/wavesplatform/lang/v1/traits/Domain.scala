@@ -33,6 +33,8 @@ object DataItem {
   case class Str(k: String, v: String)     extends DataItem[String]     { val key = k; val value = v }
 }
 
+case class Blk(timestamp: Long, height: Long, generationSignature: ByteVector)
+
 case class Ord(id: ByteVector,
                sender: Recipient.Address,
                senderPublicKey: ByteVector,

@@ -65,6 +65,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
       val untyped = Parser(s"""
     let Bob = Address(base58'$BobBC1')
     let Alice = Address(base58'$AliceBC1')
+    let height = lastBlock.height
 
     match tx {
       case ttx: TransferTransaction =>
