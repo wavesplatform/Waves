@@ -25,10 +25,11 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
       |   case gen: GenesisTransaction =>
       |     let genId = gen.id == base58'${g.id().base58}'
       |     let genFee = gen.fee == ${g.assetFee._2}
+      |     let genTimestamp = gen.timestamp== ${g.timestamp}
       |     let genVersion = gen.version == 1
       |     let genAmount = gen.amount == ${g.amount}
       |     let genRecipient = gen.recipient == Address(base58'${g.recipient.address}')
-      |     genId && genFee && genVersion && genAmount && genRecipient
+      |     genId && genFee && genTimestamp && genVersion && genAmount && genRecipient
       |    case _ => false
       |  }
       |
@@ -36,6 +37,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
       |   case pay: PaymentTransaction =>
       |     let payId = pay.id == base58'${p.id().base58}'
       |     let payFee = pay.fee == ${p.assetFee._2}
+      |     let payTimestamp = pay.timestamp== ${p.timestamp}
       |     let payVersion = pay.version == 1
       |     let payAmount = pay.amount == ${p.amount}
       |     let payRecipient = pay.recipient == Address(base58'${p.recipient.address}')
@@ -52,7 +54,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
       |     let empty6 = pay.proofs[6]== base58''
       |     let empty7 = pay.proofs[7]== base58''
       |
-      |     let payBindings = payId && payFee && payVersion && payAmount && payRecipient
+      |     let payBindings = payId && payFee && payTimestamp && payVersion && payAmount && payRecipient
       |     let payBindings1 = bodyBytes && sender && senderPublicKey && signature
       |     let payBindings2 = empty1 && empty2 && empty3 && empty4 && empty5 && empty6 && empty7
       |

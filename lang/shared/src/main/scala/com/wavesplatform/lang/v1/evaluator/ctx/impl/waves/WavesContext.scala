@@ -206,8 +206,8 @@ object WavesContext {
         case _ => ???
       }
 
-    val txCoeval: Coeval[Either[String, CaseObj]]        = Coeval.evalOnce(Right(transactionObject(env.transaction)))
-    val lastBlockCoeval: Coeval[Either[String, CaseObj]] = Coeval.evalOnce(Right(blockObject(env.block)))
+    val txCoeval: Coeval[Either[String, CaseObj]]    = Coeval.evalOnce(Right(transactionObject(env.transaction)))
+    val blockCoeval: Coeval[Either[String, CaseObj]] = Coeval.evalOnce(Right(blockObject(env.block)))
 
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(com.wavesplatform.lang.v1.compiler.Types.UNIT +: anyTransactionType.l)
@@ -244,7 +244,7 @@ object WavesContext {
     }
 
     val vars: Map[String, (FINAL, LazyVal)] = Map(
-      ("block", (blockType.typeRef, LazyVal(EitherT(lastBlockCoeval)))),
+      ("block", (blockType.typeRef, LazyVal(EitherT(blockCoeval)))),
       ("tx", (outgoingTransactionType, LazyVal(EitherT(txCoeval))))
     )
 

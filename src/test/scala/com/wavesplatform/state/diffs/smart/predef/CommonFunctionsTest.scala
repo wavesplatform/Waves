@@ -118,7 +118,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
             |match tx {
             | case tx : TransferTransaction  => tx.id == base58'${transfer.id().base58}'
             | case tx : IssueTransaction => tx.fee == ${transfer.assetFee._2}
-            | case tx : MassTransferTransaction => tx.fee == ${transfer.assetFee._2}
+            | case tx : MassTransferTransaction => tx.timestamp == ${transfer.timestamp}
             | case other => throw()
             | }
             |""".stripMargin,

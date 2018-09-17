@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.traits
 
 import scodec.bits.ByteVector
 
-case class Header(id: ByteVector, fee: Long, version: Long)
+case class Header(id: ByteVector, fee: Long, timestamp: Long, version: Long)
 
 case class Proven(h: Header, sender: Recipient.Address, bodyBytes: ByteVector, senderPk: ByteVector, proofs: IndexedSeq[ByteVector])
 
@@ -43,6 +43,7 @@ case class Ord(id: ByteVector,
                orderType: OrdType,
                price: Long,
                amount: Long,
+               timestamp: Long,
                expiration: Long,
                matcherFee: Long,
                bodyBytes: ByteVector,

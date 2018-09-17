@@ -19,7 +19,7 @@ object RealTransactionWrapper {
       case vt: VersionedTransaction => vt.version
       case _                        => 1
     }
-    Header(ByteVector(tx.id().arr), tx.assetFee._2, v)
+    Header(ByteVector(tx.id().arr), tx.assetFee._2, tx.timestamp, v)
   }
   private def proven(tx: ProvenTransaction): Proven =
     Proven(
@@ -46,6 +46,7 @@ object RealTransactionWrapper {
       },
       price = o.price,
       amount = o.amount,
+      timestamp = o.timestamp,
       expiration = o.expiration,
       matcherFee = o.matcherFee,
       bodyBytes = ByteVector(o.bodyBytes()),

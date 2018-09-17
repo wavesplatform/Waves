@@ -10,9 +10,10 @@ object Bindings {
   import Types._
 
   private def headerPart(tx: Header): Map[String, Any] = Map(
-    "id"      -> tx.id,
-    "fee"     -> tx.fee,
-    "version" -> tx.version,
+    "id"        -> tx.id,
+    "fee"       -> tx.fee,
+    "timestamp" -> tx.timestamp,
+    "version"   -> tx.version,
   )
 
   private def proofsPart(existingProofs: IndexedSeq[ByteVector]) =

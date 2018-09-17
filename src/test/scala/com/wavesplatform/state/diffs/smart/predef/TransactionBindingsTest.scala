@@ -22,6 +22,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     s"""
        |   let id = t.id == base58'${t.id().base58}'
        |   let fee = t.fee == ${t.assetFee._2}
+       |   let timestamp = t.timestamp == ${t.timestamp}
        |   let bodyBytes = t.bodyBytes == base64'${ByteStr(t.bodyBytes.apply()).base64}'
        |   let sender = t.sender == addressFromPublicKey(base58'${ByteStr(t.sender.publicKey).base58}')
        |   let senderPublicKey = t.senderPublicKey == base58'${ByteStr(t.sender.publicKey).base58}'
@@ -35,7 +36,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     s"${prefix}proof0 && ${prefix}proof1 && ${prefix}proof2 && ${prefix}proof3 && ${prefix}proof4 && ${prefix}proof5 && ${prefix}proof6 && ${prefix}proof7"
   }
   def assertProvenPart(prefix: String) =
-    s"id && fee && sender && senderPublicKey && ${assertProofs(prefix)} && bodyBytes && version"
+    s"id && fee && timestamp && sender && senderPublicKey && ${assertProofs(prefix)} && bodyBytes && version"
 
   property("TransferTransaction binding") {
     forAll(Gen.oneOf(transferV1Gen, transferV2Gen)) { t =>
@@ -334,6 +335,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |   let ${oType}MatcherPk = t.${oType}Order.matcherPublicKey == base58'${ByteStr(ord.matcherPublicKey.publicKey).base58}'
            |   let ${oType}Price = t.${oType}Order.price == ${ord.price}
            |   let ${oType}Amount = t.${oType}Order.amount == ${ord.amount}
+           |   let ${oType}Timestamp = t.${oType}Order.timestamp == ${ord.timestamp}
            |   let ${oType}Expiration = t.${oType}Order.expiration == ${ord.expiration}
            |   let ${oType}OrderMatcherFee = t.${oType}Order.matcherFee == ${ord.matcherFee}
            |   let ${oType}BodyBytes = t.${oType}Order.bodyBytes == base58'${ByteStr(ord.bodyBytes()).base58}'
