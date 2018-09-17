@@ -138,8 +138,9 @@ package object predef {
        | }
        |
        | let balances = assetBalance(tx.sender, unit) > 0 && wavesBalance(tx.sender) != 0
+       | let block = lastBlock.height > 0 && lastBlock.timestamp > 1500000000000 && size(lastBlock.generationSignature) > 0
        |
-       | let waves = txById && entries && balances && aFromPK && aFromStrOrRecip && block.height > 0
+       | let waves = txById && entries && balances && aFromPK && aFromStrOrRecip && block
        |
        | # Crypto context
        | let bks = blake2b256(base58'') != base58'' && keccak256(base58'') != base58'' && sha256(base58'') != base58''

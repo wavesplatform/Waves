@@ -244,7 +244,7 @@ object WavesContext {
     }
 
     val vars: Map[String, (FINAL, LazyVal)] = Map(
-      ("block", (blockType.typeRef, LazyVal(EitherT(blockCoeval)))),
+      ("lastBlock", (blockType.typeRef, LazyVal(EitherT(blockCoeval)))),
       ("tx", (outgoingTransactionType, LazyVal(EitherT(txCoeval))))
     )
 
