@@ -10,8 +10,13 @@ import scodec.bits.ByteVector
 
 class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], currentHeight: Coeval[Int], blockchain: Blockchain) extends Environment {
   override def block: Blk = {
-    val height = currentHeight()
-    RealTransactionWrapper.block(blockchain.blockHeaderAndSize(height).get._1, height)
+    val height     = currentHeight() - 1
+    val maybeTuple = blockchain.blockHeaderAndSize(height)
+    maybeTuple match {
+      case Some((header, _)) => RealTransactionWrapper.block(header, height)
+      case None              => ???
+
+    }
   }
 
   override def transaction: ContractTransaction = RealTransactionWrapper(tx())

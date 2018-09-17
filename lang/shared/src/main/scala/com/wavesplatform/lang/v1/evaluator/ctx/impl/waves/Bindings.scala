@@ -60,6 +60,7 @@ object Bindings {
         "orderType"        -> ordType(ord.orderType),
         "price"            -> ord.price,
         "amount"           -> ord.amount,
+        "timestamp"        -> ord.timestamp,
         "expiration"       -> ord.expiration,
         "matcherFee"       -> ord.matcherFee,
         "bodyBytes"        -> ord.bodyBytes,
