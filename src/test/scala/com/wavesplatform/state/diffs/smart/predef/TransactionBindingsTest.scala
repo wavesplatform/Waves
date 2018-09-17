@@ -359,6 +359,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           "MatcherPk",
           "Price",
           "Amount",
+          "Timestamp",
           "Expiration",
           "OrderMatcherFee",
           "BodyBytes",
