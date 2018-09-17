@@ -15,56 +15,29 @@ import play.api.libs.json.{JsObject, Json}
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Try
 
-sealed trait OrderType {
-  def bytes: Array[Byte]
-}
-
-object OrderType {
-
-  case object BUY extends OrderType {
-    def bytes: Array[Byte] = Array(0.toByte)
-
-    override def toString: String = "buy"
-  }
-
-  case object SELL extends OrderType {
-    def bytes: Array[Byte] = Array(1.toByte)
-
-    override def toString: String = "sell"
-  }
-
-  def apply(value: Int): OrderType = value match {
-    case 0 => OrderType.BUY
-    case 1 => OrderType.SELL
-    case _ => throw new RuntimeException(s"Unexpected OrderType: $value")
-  }
-
-  def apply(value: String): OrderType = value match {
-    case "buy"  => OrderType.BUY
-    case "sell" => OrderType.SELL
-    case _      => throw new RuntimeException("Unexpected OrderType")
-  }
-
-  def reverse(orderType: OrderType): OrderType = orderType match {
-    case BUY  => SELL
-    case SELL => BUY
-  }
-}
-
 /**
   * Order to matcher service for asset exchange
   */
 trait Order extends BytesSerializable with JsonSerializable with Proven {
-  @ApiModelProperty(dataType = "java.lang.String") def senderPublicKey: PublicKeyAccount
-  @ApiModelProperty(dataType = "java.lang.String", example = "") def matcherPublicKey: PublicKeyAccount
+  def senderPublicKey: PublicKeyAccount
+
+  def matcherPublicKey: PublicKeyAccount
+
   def assetPair: AssetPair
-  @ApiModelProperty(dataType = "java.lang.String", example = "buy") def orderType: OrderType
-  @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8", example = "100000000") def price: Long
-  @ApiModelProperty("Amount in AssetPair.second") def amount: Long
-  @ApiModelProperty(value = "Creation timestamp") def timestamp: Long
-  @ApiModelProperty(value = "Order time to live, max = 30 days") def expiration: Long
-  @ApiModelProperty(example = "100000") def matcherFee: Long
-  @ApiModelProperty(dataType = "Proofs") def proofs: Proofs
+
+  def orderType: OrderType
+
+  def price: Long
+
+  def amount: Long
+
+  def timestamp: Long
+
+  def expiration: Long
+
+  def matcherFee: Long
+
+  def proofs: Proofs
 
   def version: Byte
 
@@ -72,8 +45,10 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
 
   import Order._
 
+  @ApiModelProperty(hidden = true)
   val sender = senderPublicKey
 
+  @ApiModelProperty(hidden = true)
   def isValid(atTime: Long): Validation = {
     isValidAmount(price, amount) &&
     assetPair.isValid &&
@@ -84,6 +59,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
     (expiration >= atTime) :| "expiration should be > currentTime"
   }
 
+  //  @ApiModelProperty(hidden = true)
   def isValidAmount(matchPrice: Long, matchAmount: Long): Validation = {
     (matchAmount > 0) :| "amount should be > 0" &&
     (matchPrice > 0) :| "price should be > 0" &&
@@ -96,13 +72,10 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
 
   @ApiModelProperty(hidden = true)
   val bodyBytes: Coeval[Array[Byte]]
-
   @ApiModelProperty(hidden = true)
   val id: Coeval[Array[Byte]] = Coeval.evalOnce(crypto.fastHash(bodyBytes()))
-
   @ApiModelProperty(hidden = true)
   val idStr: Coeval[String] = Coeval.evalOnce(Base58.encode(id()))
-
   @ApiModelProperty(hidden = true)
   val bytes: Coeval[Array[Byte]]
 
@@ -161,8 +134,10 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
     )
   })
 
+  @ApiModelProperty(hidden = true)
   def jsonStr: String = Json.stringify(json())
 
+  @ApiModelProperty(hidden = true)
   override def equals(obj: Any): Boolean = {
     obj match {
       case o: Order =>
@@ -179,6 +154,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
     }
   }
 
+  @ApiModelProperty(hidden = true)
   override def hashCode(): Int = idStr.hashCode()
 }
 
@@ -187,33 +163,34 @@ object Order {
   val PriceConstant     = 100000000L
   val MaxAmount: Long   = 100 * PriceConstant * PriceConstant
 
-  def apply(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
-            @ApiModelProperty(dataType = "java.lang.String", example = "") matcherPublicKey: PublicKeyAccount,
+  def apply(senderPublicKey: PublicKeyAccount,
+            matcherPublicKey: PublicKeyAccount,
             assetPair: AssetPair,
-            @ApiModelProperty(dataType = "java.lang.String", example = "buy") orderType: OrderType,
-            @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8", example = "100000000") price: Long,
-            @ApiModelProperty("Amount in AssetPair.second") amount: Long,
-            @ApiModelProperty(value = "Creation timestamp") timestamp: Long,
-            @ApiModelProperty(value = "Order time to live, max = 30 days") expiration: Long,
-            @ApiModelProperty(example = "100000") matcherFee: Long,
-            @ApiModelProperty(dataType = "Proofs") proofs: Proofs,
-            @ApiModelProperty(dataType = "java.lang.Byte") version: Byte = 1): Order = {
+            orderType: OrderType,
+            price: Long,
+            amount: Long,
+            timestamp: Long,
+            expiration: Long,
+            matcherFee: Long,
+            proofs: Proofs,
+            version: Byte = 1): Order = {
     if (version == 1) {
       OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, price, amount, timestamp, expiration, matcherFee, proofs)
     } else {
       OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, price, amount, timestamp, expiration, matcherFee, proofs)
     }
   }
-  def apply(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
-            @ApiModelProperty(dataType = "java.lang.String", example = "") matcherPublicKey: PublicKeyAccount,
+
+  def apply(senderPublicKey: PublicKeyAccount,
+            matcherPublicKey: PublicKeyAccount,
             assetPair: AssetPair,
-            @ApiModelProperty(dataType = "java.lang.String", example = "buy") orderType: OrderType,
-            @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8", example = "100000000") price: Long,
-            @ApiModelProperty("Amount in AssetPair.second") amount: Long,
-            @ApiModelProperty(value = "Creation timestamp") timestamp: Long,
-            @ApiModelProperty(value = "Order time to live, max = 30 days") expiration: Long,
-            @ApiModelProperty(example = "100000") matcherFee: Long,
-            @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte]): Order = {
+            orderType: OrderType,
+            price: Long,
+            amount: Long,
+            timestamp: Long,
+            expiration: Long,
+            matcherFee: Long,
+            signature: Array[Byte]): Order = {
     OrderV1(senderPublicKey,
             matcherPublicKey,
             assetPair,
