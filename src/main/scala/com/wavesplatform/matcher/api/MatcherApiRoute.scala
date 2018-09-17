@@ -141,6 +141,7 @@ case class MatcherApiRoute(wallet: Wallet,
           if (blockchain.hasScript(order.senderPublicKey.toAddress)) {
             Future.successful[MatcherResponse](StatusCodes.BadRequest -> "Trading on scripted account isn't allowed yet.")
           } else {
+            log.trace(s"Placing ${order.id()}")
             (matcher ? order).mapTo[MatcherResponse]
           }
         }
@@ -236,6 +237,7 @@ case class MatcherApiRoute(wallet: Wallet,
     withAssetPair(p) { pair =>
       json[CancelOrderRequest] { req =>
         if (req.isSignatureValid()) {
+          log.trace(s"Deleting ${req.orderId.fold(s"all orders for ${req.sender}")(_.base58)}")
           (orderHistory ? DeleteOrderFromHistory(pair, req.sender, req.orderId, NTP.correctedTime()))
             .mapTo[MatcherResponse]
         } else InvalidSignature

@@ -164,7 +164,7 @@ class OrderBookActor(assetPair: AssetPair,
     case ValidateOrderResult(validatedOrderId, res) =>
       if (validatedOrderId == sentMessage.order.id()) {
         cancellable.foreach(_.cancel())
-        handleValidateOrderResult(res)
+        handleValidateOrderResult(validatedOrderId, res)
       } else {
         log.warn(s"Unexpected ValidateOrderResult for order $validatedOrderId while waiting for ${sentMessage.order.id()}")
       }
@@ -217,10 +217,10 @@ class OrderBookActor(assetPair: AssetPair,
     context.become(waitingValidation(msg))
   }
 
-  private def handleValidateOrderResult(res: Either[GenericError, Order]): Unit = {
+  private def handleValidateOrderResult(orderId: ByteStr, res: Either[GenericError, Order]): Unit = {
     res match {
       case Left(err) =>
-        log.debug(s"Order rejected: $err.err")
+        log.debug(s"Order $orderId rejected: ${err.err}")
         apiSender.foreach(_ ! OrderRejected(err.err))
       case Right(o) =>
         log.debug(s"Order accepted: '${o.id()}' in '${o.assetPair.key}', trying to match ...")
