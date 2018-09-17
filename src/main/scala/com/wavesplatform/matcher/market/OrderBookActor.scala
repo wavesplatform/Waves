@@ -1,14 +1,14 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{ActorRef, Cancellable, Props, Stash}
-import akka.http.scaladsl.model.{StatusCodes, _}
+import akka.http.scaladsl.model._
 import akka.persistence._
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.{JsonSerializer, MatcherResponse}
+import com.wavesplatform.matcher.api._
 import com.wavesplatform.matcher.market.MatcherActor.{Shutdown, ShutdownComplete}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
-import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded, OrderExecuted}
+import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.network._
@@ -201,7 +201,7 @@ class OrderBookActor(assetPair: AssetPair,
         val st = cancelTimer.start()
         persist(oc) { _ =>
           handleCancelEvent(oc)
-          sender() ! OrderCanceled(orderIdToCancel.base58)
+          sender() ! OrderCanceled(orderIdToCancel)
           st.stop()
         }
       case _ =>
@@ -224,8 +224,8 @@ class OrderBookActor(assetPair: AssetPair,
         apiSender.foreach(_ ! OrderRejected(err.err))
       case Right(o) =>
         log.debug(s"Order accepted: '${o.id()}' in '${o.assetPair.key}', trying to match ...")
-        apiSender.foreach(_ ! OrderAccepted(o))
         timer.measure(matchOrder(LimitOrder(o)))
+        apiSender.foreach(_ ! OrderAccepted(o))
     }
 
     becomeFullCommands()
@@ -267,7 +267,7 @@ class OrderBookActor(assetPair: AssetPair,
     context.system.eventStream.publish(e)
   }
 
-  private def processInvalidTransaction(event: OrderExecuted, err: ValidationError): Option[LimitOrder] = {
+  private def processInvalidTransaction(event: Events.OrderExecuted, err: ValidationError): Option[LimitOrder] = {
     def cancelCounterOrder(): Option[LimitOrder] = {
       processEvent(Events.OrderCanceled(event.counter, unmatchable = false))
       Some(event.submitted)
@@ -297,11 +297,11 @@ class OrderBookActor(assetPair: AssetPair,
 
   private def handleMatchEvent(e: Event): (Option[LimitOrder], Option[LimitOrder]) = {
     e match {
-      case e: OrderAdded =>
+      case e: Events.OrderAdded =>
         processEvent(e)
         (None, None)
 
-      case event @ OrderExecuted(o, c) =>
+      case event @ Events.OrderExecuted(o, c) =>
         (for {
           tx <- createTransaction(event)
           _  <- utx.putIfNew(tx)
@@ -396,20 +396,6 @@ object OrderBookActor {
   case class CancelOrder(orderId: ByteStr)
 
   case object OrderCleanup
-
-  case object OperationTimedOut
-      extends MatcherResponse(StatusCodes.InternalServerError,
-                              Json.obj("status" -> "OperationTimedOut", "message" -> "Operation is timed out, please try later"))
-
-  case class OrderAccepted(order: Order) extends MatcherResponse(StatusCodes.OK, Json.obj("status" -> "OrderAccepted", "message" -> order.json()))
-
-  case class OrderRejected(message: String)
-      extends MatcherResponse(StatusCodes.BadRequest, Json.obj("status" -> "OrderRejected", "message" -> message))
-
-  case class OrderCanceled(orderId: String) extends MatcherResponse(StatusCodes.OK, Json.obj("status" -> "OrderCanceled", "orderId" -> orderId))
-
-  case class OrderCancelRejected(message: String)
-      extends MatcherResponse(StatusCodes.BadRequest, Json.obj("status" -> "OrderCancelRejected", "message" -> message))
 
   case class GetOrderBookResponse(ts: Long, pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) {
     def toHttpResponse: HttpResponse = HttpResponse(

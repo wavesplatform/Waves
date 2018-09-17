@@ -1,14 +1,16 @@
 package com.wavesplatform.matcher.api
 
 import akka.http.scaladsl.marshalling.ToResponseMarshaller
-import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.{StatusCodes => C, _}
+import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.assets.exchange.Order
 import play.api.libs.json.{JsNull, JsValue, Json}
 
 abstract class MatcherResponse(val statusCode: StatusCode, val json: JsValue) {
   def this(code: StatusCode, message: String) =
     this(code,
          Json.obj(
-           "success" -> (code == StatusCodes.OK),
+           "success" -> (code == C.OK),
            "message" -> message,
            "result"  -> JsNull // For backward compatibility
          ))
@@ -27,6 +29,20 @@ object MatcherResponse {
 
 case class SimpleResponse(code: StatusCode, message: String) extends MatcherResponse(code, message)
 
-case class NotImplemented(message: String) extends MatcherResponse(StatusCodes.NotImplemented, message)
+case class NotImplemented(message: String) extends MatcherResponse(C.NotImplemented, message)
 
-case object InvalidSignature extends MatcherResponse(StatusCodes.BadRequest, "Invalid signature")
+case object InvalidSignature extends MatcherResponse(C.BadRequest, "Invalid signature")
+
+case object OperationTimedOut
+    extends MatcherResponse(C.InternalServerError, Json.obj("status" -> "OperationTimedOut", "message" -> "Operation is timed out, please try later"))
+
+case class OrderAccepted(order: Order) extends MatcherResponse(C.OK, Json.obj("status" -> "OrderAccepted", "message" -> order.json()))
+
+case class OrderRejected(message: String) extends MatcherResponse(C.BadRequest, Json.obj("status" -> "OrderRejected", "message" -> message))
+
+case class OrderCanceled(orderId: ByteStr) extends MatcherResponse(C.OK, Json.obj("status" -> "OrderCanceled", "orderId" -> orderId))
+
+case class OrderDeleted(orderId: ByteStr) extends MatcherResponse(C.OK, Json.obj("status" -> "OrderDeleted", "orderId" -> orderId))
+
+case class OrderCancelRejected(message: String)
+    extends MatcherResponse(C.BadRequest, Json.obj("status" -> "OrderCancelRejected", "message" -> message))

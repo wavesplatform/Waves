@@ -8,10 +8,9 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.matcher.api.MatcherResponse
+import com.wavesplatform.matcher.api.{MatcherResponse, OrderAccepted}
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse, MarketData}
-import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.OrderBook
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherTestData}
