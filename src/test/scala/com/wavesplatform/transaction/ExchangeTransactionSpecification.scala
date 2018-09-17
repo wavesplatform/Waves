@@ -11,6 +11,7 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
 import com.wavesplatform.OrderOps._
+import scala.math.pow
 
 class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -84,6 +85,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         sell.version shouldBe o2ver
 
         create() shouldBe an[Right[_, _]]
+        create(fee = pow(10, 18).toLong) shouldBe an[Right[_, _]]
+        create(amount = Order.MaxAmount) shouldBe an[Right[_, _]]
 
         create(fee = -1) shouldBe an[Left[_, _]]
         create(amount = -1) shouldBe an[Left[_, _]]
@@ -92,18 +95,35 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         create(sellMatcherFee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
         create(buyMatcherFee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
         create(fee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
+        create(price = buy.price + 1) shouldBe an[Left[_, _]]
+        create(price = sell.price - 1) shouldBe an[Left[_, _]]
+
+        create(buyOrder = buy.updateType(OrderType.SELL)) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.updateAmount(0)) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.updateAmount(-1)) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.updateAmount(Order.MaxAmount + 1)) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.updatePair(buy.assetPair.copy(amountAsset = sell.assetPair.priceAsset))) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.updateExpiration(1L)) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.updateExpiration(buy.expiration + 1)) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.updatePrice(-1)) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.updatePrice(price = sellPrice - 1)) shouldBe an[Left[_, _]]
         create(buyOrder = buy.updateMatcher(sender2)) shouldBe an[Left[_, _]]
-        create(sellOrder = buy.updateMatcher(sender2)) shouldBe an[Left[_, _]]
+
+        create(sellOrder = sell.updateType(OrderType.BUY)) shouldBe an[Left[_, _]]
+        create(sellOrder = sell.updateAmount(0)) shouldBe an[Left[_, _]]
+        create(sellOrder = sell.updateAmount(-1)) shouldBe an[Left[_, _]]
+        create(sellOrder = sell.updateAmount(Order.MaxAmount + 1)) shouldBe an[Left[_, _]]
+        create(sellOrder = sell.updatePair(sell.assetPair.copy(priceAsset = buy.assetPair.amountAsset))) shouldBe an[Left[_, _]]
+        create(sellOrder = sell.updateExpiration(1L)) shouldBe an[Left[_, _]]
+        create(sellOrder = sell.updateExpiration(sell.expiration + 1)) shouldBe an[Left[_, _]]
+        create(sellOrder = sell.updatePrice(-1)) shouldBe an[Left[_, _]]
+        create(sellOrder = sell.updatePrice(price = buyPrice + 1)) shouldBe an[Left[_, _]]
+        create(sellOrder = sell.updateMatcher(sender2)) shouldBe an[Left[_, _]]
+
         create(
           buyOrder = buy.updatePair(buy.assetPair.copy(amountAsset = None)),
           sellOrder = sell.updatePair(sell.assetPair.copy(priceAsset = Some(ByteStr(Array(1: Byte)))))
         ) shouldBe an[Left[_, _]]
-        create(buyOrder = buy.updateExpiration(1L)) shouldBe an[Left[_, _]]
-        create(price = buy.price + 1) shouldBe an[Left[_, _]]
-        create(price = sell.price - 1) shouldBe an[Left[_, _]]
-        create(sellOrder = sell.updateAmount(-1)) shouldBe an[Left[_, _]]
-        create(buyOrder = buy.updateAmount(-1)) shouldBe an[Left[_, _]]
-
     }
   }
 
