@@ -1,37 +1,71 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.google.common.primitives.Longs
-import com.wavesplatform.crypto
-import com.wavesplatform.state.ByteStr
-import io.swagger.annotations.ApiModelProperty
-import monix.eval.Coeval
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction._
-import com.wavesplatform.crypto._
-import scala.util.Try
 import cats.data.State
+import com.google.common.primitives.Longs
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.crypto
+import com.wavesplatform.crypto._
+import com.wavesplatform.serialization.Deser
+import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction._
+import io.swagger.annotations.{ApiModel, ApiModelProperty}
+import monix.eval.Coeval
+
+import scala.util.Try
 
 /**
   * Order to matcher service for asset exchange
   */
-case class OrderV1(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
-                   @ApiModelProperty(dataType = "java.lang.String", example = "") matcherPublicKey: PublicKeyAccount,
+@ApiModel
+case class OrderV1(@ApiModelProperty(
+                     value = "Base58 encoded Sender public key",
+                     required = true,
+                     dataType = "string",
+                     example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8"
+                   )
+                   senderPublicKey: PublicKeyAccount,
+                   @ApiModelProperty(
+                     value = "Base58 encoded Matcher public key",
+                     required = true,
+                     dataType = "string",
+                     example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8"
+                   )
+                   matcherPublicKey: PublicKeyAccount,
+                   @ApiModelProperty(value = "Asset pair", required = true)
                    assetPair: AssetPair,
-                   @ApiModelProperty(dataType = "java.lang.String", example = "buy") orderType: OrderType,
-                   @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8", example = "100000000") price: Long,
-                   @ApiModelProperty("Amount in AssetPair.second") amount: Long,
-                   @ApiModelProperty(value = "Creation timestamp") timestamp: Long,
-                   @ApiModelProperty(value = "Order time to live, max = 30 days") expiration: Long,
-                   @ApiModelProperty(example = "100000") matcherFee: Long,
-                   @ApiModelProperty(dataType = "Proofs") proofs: Proofs)
+                   @ApiModelProperty(
+                     value = "Order type (sell or buy)",
+                     required = true,
+                     dataType = "string",
+                     example = "sell"
+                   )
+                   orderType: OrderType,
+                   @ApiModelProperty(value = "Price", required = true)
+                   price: Long,
+                   @ApiModelProperty(value = "Amount", required = true)
+                   amount: Long,
+                   @ApiModelProperty(value = "Timestamp", required = true)
+                   timestamp: Long,
+                   @ApiModelProperty(value = "Expiration timestamp", required = true)
+                   expiration: Long,
+                   @ApiModelProperty(value = "Matcher fee", required = true)
+                   matcherFee: Long,
+                   @ApiModelProperty(
+                     value = "Order proofs",
+                     required = true,
+                     dataType = "[Ljava.lang.String;"
+                   )
+                   proofs: Proofs)
     extends Order
     with Signed {
 
+  @ApiModelProperty(required = true, dataType = "long", example = "1")
   override def version: Byte = 1
 
+  @ApiModelProperty(hidden = true)
   override def signature: Array[Byte] = proofs.proofs(0).arr
 
+  @ApiModelProperty(hidden = true)
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     senderPublicKey.publicKey ++ matcherPublicKey.publicKey ++
       assetPair.bytes ++ orderType.bytes ++
@@ -40,6 +74,7 @@ case class OrderV1(@ApiModelProperty(dataType = "java.lang.String") senderPublic
       Longs.toByteArray(matcherFee)
   )
 
+  @ApiModelProperty(hidden = true)
   val signatureValid = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), senderPublicKey.publicKey))
 
   @ApiModelProperty(hidden = true)
@@ -49,16 +84,16 @@ case class OrderV1(@ApiModelProperty(dataType = "java.lang.String") senderPublic
 object OrderV1 {
   private val AssetIdLength = 32
 
-  def apply(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
-            @ApiModelProperty(dataType = "java.lang.String", example = "") matcherPublicKey: PublicKeyAccount,
+  def apply(senderPublicKey: PublicKeyAccount,
+            matcherPublicKey: PublicKeyAccount,
             assetPair: AssetPair,
-            @ApiModelProperty(dataType = "java.lang.String", example = "buy") orderType: OrderType,
-            @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8", example = "100000000") price: Long,
-            @ApiModelProperty("Amount in AssetPair.second") amount: Long,
-            @ApiModelProperty(value = "Creation timestamp") timestamp: Long,
-            @ApiModelProperty(value = "Order time to live, max = 30 days") expiration: Long,
-            @ApiModelProperty(example = "100000") matcherFee: Long,
-            @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte]): OrderV1 = {
+            orderType: OrderType,
+            price: Long,
+            amount: Long,
+            timestamp: Long,
+            expiration: Long,
+            matcherFee: Long,
+            signature: Array[Byte]): OrderV1 = {
     OrderV1(senderPublicKey,
             matcherPublicKey,
             assetPair,

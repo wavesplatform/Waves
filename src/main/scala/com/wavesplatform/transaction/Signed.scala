@@ -4,17 +4,18 @@ import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import com.wavesplatform.transaction.ValidationError.InvalidSignature
+import io.swagger.annotations.ApiModelProperty
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
 trait Signed extends Authorized {
   protected val signatureValid: Coeval[Boolean]
-
+  @ApiModelProperty(hidden = true)
   protected val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(Seq.empty)
-
+  @ApiModelProperty(hidden = true)
   protected val signaturesValidMemoized: Task[Either[InvalidSignature, this.type]] = Signed.validateTask[this.type](this).memoize
-
+  @ApiModelProperty(hidden = true)
   val signaturesValid: Coeval[Either[InvalidSignature, this.type]] =
     Coeval.evalOnce(Await.result(signaturesValidMemoized.runAsync(Signed.scheduler), Duration.Inf))
 }
