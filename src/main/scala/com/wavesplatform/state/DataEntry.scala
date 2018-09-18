@@ -2,12 +2,19 @@ package com.wavesplatform.state
 
 import java.nio.charset.StandardCharsets.UTF_8
 
+import io.swagger.annotations.ApiModelProperty
+import scala.annotation.meta.field
+
 import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.state.DataEntry._
 import play.api.libs.json._
 import com.wavesplatform.serialization.Deser
 
-sealed abstract class DataEntry[T](val key: String, val value: T) {
+sealed abstract class DataEntry[T](
+    @(ApiModelProperty @field)(required = true, dataType = "java.lang.String", value = "integer", allowableValues = "integer,boolean,binary,string")
+    val `type`: String,
+    val key: String,
+    val value: T) {
   def valueBytes: Array[Byte]
 
   def toBytes: Array[Byte] = {
@@ -15,7 +22,7 @@ sealed abstract class DataEntry[T](val key: String, val value: T) {
     Array.concat(Shorts.toByteArray(keyBytes.length.toShort), keyBytes, valueBytes)
   }
 
-  def toJson: JsObject = Json.obj("key" -> key)
+  def toJson: JsObject = Json.obj("key" -> key, "type" -> `type`)
   def valid: Boolean   = key.length <= MaxKeySize
 }
 
@@ -88,30 +95,30 @@ object DataEntry {
   }
 }
 
-case class IntegerDataEntry(override val key: String, override val value: Long) extends DataEntry[Long](key, value) {
+case class IntegerDataEntry(override val key: String, override val value: Long) extends DataEntry[Long]("integer", key, value) {
   override def valueBytes: Array[Byte] = Type.Integer.id.toByte +: Longs.toByteArray(value)
 
-  override def toJson: JsObject = super.toJson + ("type" -> JsString("integer")) + ("value" -> JsNumber(value))
+  override def toJson: JsObject = super.toJson + ("value" -> JsNumber(value))
 }
 
-case class BooleanDataEntry(override val key: String, override val value: Boolean) extends DataEntry[Boolean](key, value) {
+case class BooleanDataEntry(override val key: String, override val value: Boolean) extends DataEntry[Boolean]("boolean", key, value) {
   override def valueBytes: Array[Byte] = Array(Type.Boolean.id, if (value) 1 else 0).map(_.toByte)
 
-  override def toJson: JsObject = super.toJson + ("type" -> JsString("boolean")) + ("value" -> JsBoolean(value))
+  override def toJson: JsObject = super.toJson + ("value" -> JsBoolean(value))
 }
 
-case class BinaryDataEntry(override val key: String, override val value: ByteStr) extends DataEntry[ByteStr](key, value) {
+case class BinaryDataEntry(override val key: String, override val value: ByteStr) extends DataEntry[ByteStr]("binary", key, value) {
   override def valueBytes: Array[Byte] = Type.Binary.id.toByte +: Deser.serializeArray(value.arr)
 
-  override def toJson: JsObject = super.toJson + ("type" -> JsString("binary")) + ("value" -> JsString(value.base64))
+  override def toJson: JsObject = super.toJson + ("value" -> JsString(value.base64))
 
   override def valid: Boolean = super.valid && value.arr.length <= MaxValueSize
 }
 
-case class StringDataEntry(override val key: String, override val value: String) extends DataEntry[String](key, value) {
+case class StringDataEntry(override val key: String, override val value: String) extends DataEntry[String]("string", key, value) {
   override def valueBytes: Array[Byte] = Type.String.id.toByte +: Deser.serializeArray(value.getBytes(UTF_8))
 
-  override def toJson: JsObject = super.toJson + ("type" -> JsString("string")) + ("value" -> JsString(value))
+  override def toJson: JsObject = super.toJson + ("value" -> JsString(value))
 
   override def valid: Boolean = super.valid && value.getBytes(UTF_8).length <= MaxValueSize
 }
