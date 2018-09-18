@@ -25,13 +25,14 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
   private val saveOrderInfoTimer  = timer.refine("action" -> "save-order-info")
   private val openVolumeTimer     = timer.refine("action" -> "open-volume")
 
-  private def combine(order: Order, curr: Option[OrderInfo], diff: OrderInfoDiff): OrderInfo = {
+  private def combine(order: Order, curr: Option[OrderInfo], diff: OrderInfoDiff, event: Event): OrderInfo = {
     val r = curr match {
       case Some(x) =>
         OrderInfo(
           amount = order.amount,
           filled = x.filled + diff.addExecutedAmount.getOrElse(0L),
-          canceled = diff.cancelledByUser.getOrElse(x.canceled),
+          canceledByUser = diff.cancelledByUser.getOrElse(x.canceledByUser),
+          canceledBySystem = diff.cancelledBySystem.getOrElse(x.canceledBySystem),
           minAmount = diff.newMinAmount.orElse(x.minAmount),
           remainingFee = x.remainingFee - diff.executedFee.getOrElse(0L),
           unsafeTotalSpend = Some(OrderInfo.safeSum(x.totalSpend(LimitOrder(order)), diff.lastSpend.getOrElse(0L)))
@@ -39,27 +40,37 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
       case None =>
         val executedAmount = diff.addExecutedAmount.getOrElse(0L)
         val remainingFee   = order.matcherFee - diff.executedFee.getOrElse(0L)
-        val canceled       = if (curr.isEmpty) diff.cancelledByUser.map(!_) else diff.cancelledByUser
 
         OrderInfo(
           amount = order.amount,
           filled = executedAmount,
-          canceled = canceled.getOrElse(false),
+          canceledByUser = diff.cancelledByUser.getOrElse(false),
+          canceledBySystem = diff.cancelledBySystem.getOrElse(false),
           minAmount = diff.newMinAmount,
           remainingFee = remainingFee,
           unsafeTotalSpend = diff.lastSpend.orElse(Some(0L))
         )
     }
 
-    // We should return all reserved assets. To do this, let's imagine, that order was filled on 100%
-    // TODO: Solve issue without the hack
-    if (r.status.isInstanceOf[LimitOrder.Filled]) {
+    val rr = if (r.status.isFinal) {
+      // We should return all reserved assets
       val lo = LimitOrder(order)
       r.copy(
         remainingFee = 0,
         unsafeTotalSpend = Some(lo.getRawSpendAmount)
       )
     } else r
+
+    println(s"""--- combine: order.id: ${order.id()}
+         |event: $event
+         |curr: $curr
+         |diff: $diff
+         |r:        $r
+         |r.status: ${r.status}
+         |rr: $rr
+         |rr.status: ${rr.status}""".stripMargin)
+
+    rr
   }
 
   private def saveOrderInfo(rw: RW, event: Event): Unit = saveOrderInfoTimer.measure {
@@ -72,7 +83,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
         val orderInfoOptKey = MatcherKeys.orderInfoOpt(orderId)
         val origInfo        = changedOrElse(origChangedKeys, orderInfoOptKey, rw.get(orderInfoOptKey))
 
-        val combinedInfo = combine(order, origInfo, orderInfoDiff)
+        val combinedInfo = combine(order, origInfo, orderInfoDiff, event)
         val change       = OrderInfoChange(order, origInfo, combinedInfo)
 
         log.trace(s"$orderId: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
@@ -102,6 +113,17 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
       val submitted = oe.submittedExecuted
       val counter   = oe.counterExecuted
 
+      println(s"""--- collectChanges:
+           |executed:                            ${oe.executedAmount}
+           |submitted.executionAmount(counter):  ${oe.submitted.executionAmount(oe.counter)}
+           |submitted.amountOfAmountAsset:       ${oe.submitted.amountOfAmountAsset}
+           |oe.submittedExecuted.getSpendAmount: ${oe.submittedExecuted.getSpendAmount}
+           |counter.amountOfAmountAsset:         ${oe.counter.amountOfAmountAsset}
+           |oe.submittedRemaining.isValid:       ${oe.submittedRemaining.isValid}
+           |oe.counterRemaining.isValid:         ${oe.counterRemaining.isValid}
+           |oe.counterExecuted.getSpendAmount:   ${oe.counterExecuted.getSpendAmount}
+         """.stripMargin)
+
       Seq(
         (submitted.order,
          OrderInfoDiff(
@@ -121,10 +143,14 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
 
     case OrderCanceled(lo, unmatchable) =>
       // The order should not have Cancelled status, if it was cancelled by unmatchable amounts
-      val canceled = !unmatchable
-      // Hack to get the right status
-      val newMinAmount = if (canceled) None else Some(lo.order.amount)
-      Seq((lo.order, OrderInfoDiff(cancelledByUser = Some(canceled), newMinAmount = newMinAmount)))
+      val canceledByUser   = !unmatchable
+      val canceledBySystem = unmatchable
+      Seq(
+        (lo.order,
+         OrderInfoDiff(
+           cancelledByUser = if (canceledByUser) Some(canceledByUser) else None,
+           cancelledBySystem = if (canceledBySystem) Some(canceledBySystem) else None
+         )))
   }
 
   def openVolume(address: Address, assetId: Option[AssetId]): Long =
@@ -279,9 +305,18 @@ object OrderHistory {
 
   private case class OrderInfoDiff(addExecutedAmount: Option[Long] = None,
                                    cancelledByUser: Option[Boolean] = None,
+                                   cancelledBySystem: Option[Boolean] = None,
                                    newMinAmount: Option[Long] = None,
                                    executedFee: Option[Long] = None,
-                                   lastSpend: Option[Long] = None)
+                                   lastSpend: Option[Long] = None) {
+    override def toString: String =
+      s"OrderInfoDiff(${addExecutedAmount.fold("")(x => s"addExecutedAmount=$x, ")}" +
+        cancelledByUser.fold("")(x => s"cancelledByUser=$x, ") +
+        cancelledBySystem.fold("")(x => s"cancelledBySystem=$x, ") +
+        newMinAmount.fold("")(x => s"newMinAmount=$x, ") +
+        executedFee.fold("")(x => s"executedFee=$x, ") +
+        lastSpend.fold(")")(x => s"lastSpend=$x)")
+  }
 
   def diff(event: Event, changes: Map[ByteStr, OrderInfoChange]): Map[Address, OpenPortfolio] = {
     changes.values.foldLeft(Map.empty[Address, OpenPortfolio]) {
@@ -289,8 +324,20 @@ object OrderHistory {
         Monoid.combine(
           r,
           event match {
-            case _: OrderCanceled => if (change.origInfo.isEmpty) Map.empty else diffReturn(change)
-            case _                => if (change.origInfo.isEmpty) diffNew(change) else diffUpdate(change)
+            // comment:
+            //   fixes "Sell EUR - partial, buy EUR order - filled"
+            //   breaks "WCT/BTC: sell - filled partially, buy - filled"
+            // and vise versa
+            //
+            // case canceled: OrderCanceled if canceled.unmatchable => Map.empty
+            case _ =>
+              if (change.origInfo.exists(_.status.isFinal)) Map.empty
+              else if (change.origInfo.isEmpty) {
+                if (change.updatedInfo.status.isFinal) Map.empty else diffNew(change)
+//                if (change.updatedInfo.status.isFinal) diffNew(change) else diffNew(change)
+              } else {
+                if (change.updatedInfo.status.isFinal) diffReturn(change) else diffUpdate(change)
+              }
           }
         )
     }
@@ -300,48 +347,60 @@ object OrderHistory {
     import change.{order, updatedInfo}
     val lo             = LimitOrder(order)
     val maxSpendAmount = lo.getRawSpendAmount
-    val remainingSpend = maxSpendAmount - updatedInfo.totalSpend(lo)
-    val remainingFee   = if (lo.feeAcc == lo.rcvAcc) math.max(updatedInfo.remainingFee - lo.getReceiveAmount, 0L) else updatedInfo.remainingFee
-
-    Map(
-      order.sender.toAddress -> OpenPortfolio(
-        Monoid.combine(
-          Map(order.getSpendAssetId -> remainingSpend),
-          Map(lo.feeAsset           -> remainingFee)
-        )
-      )
+    val r = diffMap(
+      lo,
+      diffSpend = maxSpendAmount - updatedInfo.totalSpend(lo),
+      diffFee = releaseFee(order, change.updatedInfo.remainingFee, updatedRemaining = 0)
     )
+    println(s"""--- diffNew: order.id: ${order.id()}
+               |$r
+       """.stripMargin)
+    r
   }
 
   private def diffUpdate(change: OrderInfoChange): Map[Address, OpenPortfolio] = {
     import change.{order, updatedInfo}
-    val prev         = change.origInfo.getOrElse(throw new IllegalStateException("origInfo must be defined"))
-    val lo           = LimitOrder(order)
-    val changedSpend = prev.totalSpend(lo) - updatedInfo.totalSpend(lo)
-    val changedFee   = -releaseFee(order, prev.remainingFee, updatedInfo.remainingFee)
-
-    Map(
-      order.sender.toAddress -> OpenPortfolio(
-        Monoid.combine(
-          Map(order.getSpendAssetId -> changedSpend),
-          Map(lo.feeAsset           -> changedFee)
-        )
-      )
+    val prev = change.origInfo.getOrElse(throw new IllegalStateException("origInfo must be defined"))
+    val lo   = LimitOrder(order)
+    val r = diffMap(
+      lo,
+      diffSpend = prev.totalSpend(lo) - updatedInfo.totalSpend(lo),
+      diffFee = -releaseFee(order, prev.remainingFee, updatedInfo.remainingFee)
     )
+    println(s"""--- diffUpdate: order.id: ${order.id()}
+               |$r
+       """.stripMargin)
+    r
   }
 
   private def diffReturn(change: OrderInfoChange): Map[Address, OpenPortfolio] = {
     import change.{order, updatedInfo}
     val lo             = LimitOrder(order)
+    val prev           = change.origInfo.getOrElse(throw new IllegalStateException("origInfo must be defined"))
     val maxSpendAmount = lo.getRawSpendAmount
-    val remainingSpend = updatedInfo.totalSpend(lo) - maxSpendAmount
-    val remainingFee   = -releaseFee(order, updatedInfo.remainingFee, 0)
+//    val r = diffMap(
+//      lo,
+//      diffSpend = updatedInfo.totalSpend(lo) - maxSpendAmount,
+//      diffFee = -releaseFee(order, updatedInfo.remainingFee, updatedRemaining = 0)
+//    )
+    val r = diffMap(
+      lo,
+      diffSpend = prev.totalSpend(lo) - maxSpendAmount,
+      diffFee = -releaseFee(order, prev.remainingFee, updatedRemaining = 0)
+    )
+    println(s"""--- diffReturn: order.id: ${order.id()}
+         |$r
+       """.stripMargin)
+    r
+  }
 
+  private def diffMap(lo: LimitOrder, diffSpend: Long, diffFee: Long): Map[Address, OpenPortfolio] = {
+    import lo.order
     Map(
       order.sender.toAddress -> OpenPortfolio(
         Monoid.combine(
-          Map(order.getSpendAssetId -> remainingSpend),
-          Map(lo.feeAsset           -> remainingFee)
+          Map(order.getSpendAssetId -> diffSpend),
+          Map(lo.feeAsset           -> diffFee)
         )
       )
     )

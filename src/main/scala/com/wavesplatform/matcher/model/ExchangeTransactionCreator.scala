@@ -31,6 +31,14 @@ trait ExchangeTransactionCreator extends ScorexLogging {
         val price             = counter.price
         val (buy, sell)       = Order.splitByType(submitted.order, counter.order)
         val (buyFee, sellFee) = calculateMatcherFee(buy, sell, event.executedAmount)
+        log.debug(s"""createTransaction:
+             |event: $event
+             |submitted.order.id:                 ${submitted.order.id()}
+             |counter.order.id:                   ${counter.order.id()}
+             |executed:                           ${event.executedAmount}
+             |submitted.executionAmount(counter): ${event.submitted.executionAmount(event.counter)}
+             |submitted.amountOfAmountAsset:      ${event.submitted.amountOfAmountAsset}
+           """.stripMargin)
         ExchangeTransaction.create(matcherPrivateKey, buy, sell, price, event.executedAmount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
       })
   }

@@ -8,8 +8,14 @@ import play.api.libs.json.{Format, Json}
 
 import scala.util.Try
 
-case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: Option[Long], remainingFee: Long, unsafeTotalSpend: Option[Long]) {
-  def remaining: Long = if (canceled) 0L else amount - filled
+case class OrderInfo(amount: Long,
+                     filled: Long,
+                     canceledByUser: Boolean,
+                     canceledBySystem: Boolean,
+                     minAmount: Option[Long],
+                     remainingFee: Long,
+                     unsafeTotalSpend: Option[Long]) {
+  def remaining: Long = if (canceledByUser || canceledBySystem) 0L else amount - filled // ?
 
   /**
     * TODO: Remove in future
@@ -21,7 +27,8 @@ case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: O
 
   def status: LimitOrder.OrderStatus = {
     if (amount == 0) LimitOrder.NotFound
-    else if (canceled) LimitOrder.Cancelled(filled)
+    else if (canceledByUser) LimitOrder.Cancelled(filled)
+    else if (canceledBySystem) LimitOrder.Filled(filled)
     else if (filled == 0) LimitOrder.Accepted
     else if (filled < amount - minAmount.getOrElse(0L)) LimitOrder.PartiallyFilled(filled)
     else LimitOrder.Filled(filled)
@@ -29,14 +36,14 @@ case class OrderInfo(amount: Long, filled: Long, canceled: Boolean, minAmount: O
 
   def jsonStr: String = Json.stringify(Json.toJson(this))
   override def toString: String =
-    s"OrderInfo(filled=$filled/$amount, canceled=$canceled, minAmount=$minAmount, remainingFee=$remainingFee, unsafeTotalSpend=$unsafeTotalSpend)"
+    s"OrderInfo(filled=$filled/$amount, canceledByUser=$canceledByUser, canceledBySystem=$canceledBySystem, minAmount=$minAmount, remainingFee=$remainingFee, unsafeTotalSpend=$unsafeTotalSpend)"
 }
 
 object OrderInfo {
   def safeSum(x: Long, y: Long): Long         = Try(Math.addExact(x, y)).getOrElse(Long.MaxValue)
   implicit val longSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
 
-  val empty = OrderInfo(0L, 0L, false, None, 0L, Some(0L))
+  val empty = OrderInfo(0L, 0L, false, false, None, 0L, Some(0L))
 
   implicit val orderInfoFormat: Format[OrderInfo] = Json.format[OrderInfo]
 
