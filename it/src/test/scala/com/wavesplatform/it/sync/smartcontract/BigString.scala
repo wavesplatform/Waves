@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, transferAmount}
@@ -10,14 +9,14 @@ import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV2, LeaseTransactionV2}
+import com.wavesplatform.transaction.lease.LeaseTransactionV2
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
-import com.wavesplatform.utils.dummyCompilerContext
+import com.wavesplatform.utils.{Base58, dummyCompilerContext}
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.JsNumber
 
-class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfterFailure {
+class BigString extends BaseTransactionSuite with CancelAfterFailure {
   private val acc0 = pkByAddress(firstAddress)
   private val acc1 = pkByAddress(secondAddress)
   private val acc2 = pkByAddress(thirdAddress)
@@ -37,7 +36,10 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
         let pkB = base58'${ByteStr(acc1.publicKey)}'
         let pkC = base58'${ByteStr(acc2.publicKey)}'
 
-        match tx {
+        let a0 = "йцукенгшщзхъфывапролдячсмитьбюйцукпврарвараравртавтрвапваппвпавп"
+        ${(for (b <- 1 to 20) yield { "let a" + b + "=a" + (b - 1) + "+a" + (b - 1) }).mkString("\n")}
+        
+        a20 == a0 || match tx {
           case ltx: LeaseTransaction => sigVerify(ltx.bodyBytes,ltx.proofs[0],pkA) && sigVerify(ltx.bodyBytes,ltx.proofs[2],pkC)
           case lctx : LeaseCancelTransaction => sigVerify(lctx.bodyBytes,lctx.proofs[1],pkA) && sigVerify(lctx.bodyBytes,lctx.proofs[2],pkB)
           case other => false
@@ -76,43 +78,15 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
     val signedLeasing =
       unsignedLeasing.copy(proofs = Proofs(Seq(sigLeasingA, ByteStr.empty, sigLeasingC)))
 
-    val leasingId =
-      sender.signedBroadcast(signedLeasing.json() + ("type" -> JsNumber(LeaseTransactionV2.typeId.toInt))).id
+    assertBadRequestAndMessage(sender.signedBroadcast(signedLeasing.json() + ("type" -> JsNumber(LeaseTransactionV2.typeId.toInt))).id,
+                               "String is too large")
 
-    nodes.waitForHeightAriseAndTxPresent(leasingId)
+    val leasingId = Base58.encode(unsignedLeasing.id().arr)
 
-    notMiner.assertBalances(firstAddress,
-                            balance1 + 10 * transferAmount - (2 * minFee + 0.2.waves),
-                            eff1 + 9 * transferAmount - (2 * minFee + 0.2.waves))
-    notMiner.assertBalances(thirdAddress, balance2, eff2 + transferAmount)
+    nodes.waitForHeightArise()
+    nodes(0).findTransactionInfo(leasingId) shouldBe None
 
-    val unsignedCancelLeasing =
-      LeaseCancelTransactionV2
-        .create(
-          version = 2,
-          chainId = AddressScheme.current.chainId,
-          sender = acc0,
-          leaseId = ByteStr.decodeBase58(leasingId).get,
-          fee = minFee + 0.2.waves,
-          timestamp = System.currentTimeMillis(),
-          proofs = Proofs.empty
-        )
-        .explicitGet()
-
-    val sigLeasingCancelA = ByteStr(crypto.sign(acc0, unsignedCancelLeasing.bodyBytes()))
-    val sigLeasingCancelB = ByteStr(crypto.sign(acc1, unsignedCancelLeasing.bodyBytes()))
-
-    val signedLeasingCancel =
-      unsignedCancelLeasing.copy(proofs = Proofs(Seq(ByteStr.empty, sigLeasingCancelA, sigLeasingCancelB)))
-
-    val leasingCancelId =
-      sender.signedBroadcast(signedLeasingCancel.json() + ("type" -> JsNumber(LeaseCancelTransactionV2.typeId.toInt))).id
-
-    nodes.waitForHeightAriseAndTxPresent(leasingCancelId)
-
-    notMiner.assertBalances(firstAddress,
-                            balance1 + 10 * transferAmount - (3 * minFee + 2 * 0.2.waves),
-                            eff1 + 10 * transferAmount - (3 * minFee + 2 * 0.2.waves))
+    notMiner.assertBalances(firstAddress, balance1 + 10 * transferAmount - minFee, eff1 + 10 * transferAmount - minFee)
     notMiner.assertBalances(thirdAddress, balance2, eff2)
 
   }

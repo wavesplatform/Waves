@@ -4,11 +4,10 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeoutException
 
-import com.wavesplatform.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import com.wavesplatform.api.http.alias.CreateAliasV1Request
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
-import com.wavesplatform.api.http.{AddressApiRoute, DataRequest}
+import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq, DataRequest}
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.http.DebugApiRoute._
 import com.wavesplatform.http.DebugMessage._
@@ -273,7 +272,7 @@ object AsyncHttpApi extends Assertions {
     def signedIssue(issue: SignedIssueV1Request): Future[Transaction] =
       postJson("/assets/broadcast/issue", issue).as[Transaction]
 
-    def batchSignedTransfer(transfers: Seq[SignedTransferV1Request], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
+    def batchSignedTransfer(transfers: Seq[SignedTransferV2Request], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
       val request = _post(s"${n.nodeApiEndpoint}/assets/broadcast/batch-transfer")
         .setHeader("Content-type", "application/json")
         .withApiKey(n.apiKey)

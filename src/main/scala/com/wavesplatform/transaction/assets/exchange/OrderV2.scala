@@ -1,30 +1,30 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.google.common.primitives.Longs
-import com.wavesplatform.crypto
-import com.wavesplatform.state.ByteStr
-import io.swagger.annotations.ApiModelProperty
-import monix.eval.Coeval
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction._
-import com.wavesplatform.crypto._
-import scala.util.Try
 import cats.data.State
+import com.google.common.primitives.Longs
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.crypto
+import com.wavesplatform.crypto._
+import com.wavesplatform.serialization.Deser
+import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction._
+import monix.eval.Coeval
+
+import scala.util.Try
 
 /**
   * Order to matcher service for asset exchange
   */
-case class OrderV2(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
-                   @ApiModelProperty(dataType = "java.lang.String", example = "") matcherPublicKey: PublicKeyAccount,
+case class OrderV2(senderPublicKey: PublicKeyAccount,
+                   matcherPublicKey: PublicKeyAccount,
                    assetPair: AssetPair,
-                   @ApiModelProperty(dataType = "java.lang.String", example = "buy") orderType: OrderType,
-                   @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8", example = "100000000") price: Long,
-                   @ApiModelProperty("Amount in AssetPair.second") amount: Long,
-                   @ApiModelProperty(value = "Creation timestamp") timestamp: Long,
-                   @ApiModelProperty(value = "Order time to live, max = 30 days") expiration: Long,
-                   @ApiModelProperty(example = "100000") matcherFee: Long,
-                   @ApiModelProperty(dataType = "Proofs") proofs: Proofs)
+                   orderType: OrderType,
+                   price: Long,
+                   amount: Long,
+                   timestamp: Long,
+                   expiration: Long,
+                   matcherFee: Long,
+                   proofs: Proofs)
     extends Order {
 
   override def version: Byte = 2
@@ -39,7 +39,6 @@ case class OrderV2(@ApiModelProperty(dataType = "java.lang.String") senderPublic
       Longs.toByteArray(matcherFee)
   )
 
-  @ApiModelProperty(hidden = true)
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ proofs.bytes())
 }
 

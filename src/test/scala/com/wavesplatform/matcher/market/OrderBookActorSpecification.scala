@@ -66,7 +66,7 @@ class OrderBookActorSpecification
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
 
-  val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
+  val wallet = Wallet(WalletSettings(None, Some("matcher"), Some(WalletSeed)))
   wallet.generateNewAccount()
 
   val orderHistoryRef = TestActorRef(new Actor {

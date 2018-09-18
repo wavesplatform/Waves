@@ -10,7 +10,7 @@ import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.utils.{Base58, ScorexLogging}
 import org.scalatest.Suite
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PrivateKeyAccount}
-import com.wavesplatform.api.http.assets.SignedTransferV1Request
+import com.wavesplatform.api.http.assets.SignedTransferV2Request
 import com.wavesplatform.transaction.transfer._
 
 import scala.concurrent.Future
@@ -110,7 +110,7 @@ trait TransferSending extends ScorexLogging {
       .map {
         case (x, i) =>
           createSignedTransferRequest(
-            TransferTransactionV1
+            TransferTransactionV2
               .selfSigned(
                 assetId = None,
                 sender = PrivateKeyAccount.fromSeed(x.senderSeed).explicitGet(),
@@ -121,7 +121,8 @@ trait TransferSending extends ScorexLogging {
                 feeAmount = x.fee,
                 attachment = if (includeAttachment) {
                   Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)
-                } else Array.emptyByteArray
+                } else Array.emptyByteArray,
+                version = 2
               )
               .right
               .get)
@@ -134,18 +135,19 @@ trait TransferSending extends ScorexLogging {
       .map(_.flatten)
   }
 
-  protected def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferV1Request = {
+  protected def createSignedTransferRequest(tx: TransferTransactionV2): SignedTransferV2Request = {
     import tx._
-    SignedTransferV1Request(
+    SignedTransferV2Request(
       Base58.encode(tx.sender.publicKey),
       assetId.map(_.base58),
       recipient.stringRepr,
       amount,
-      fee,
       feeAssetId.map(_.base58),
+      fee,
       timestamp,
+      2,
       attachment.headOption.map(_ => Base58.encode(attachment)),
-      signature.base58
+      proofs.base58().toList
     )
   }
 

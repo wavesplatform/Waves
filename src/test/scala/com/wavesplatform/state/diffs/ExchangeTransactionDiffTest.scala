@@ -7,7 +7,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.DirectiveParser
 import com.wavesplatform.lang.v1.ScriptEstimator
-import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
 import com.wavesplatform.state._
@@ -32,7 +31,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id       -> 0,
       BlockchainFeatures.SmartAssets.id         -> 0,
-      BlockchainFeatures.SmartAccountsTrades.id -> 0
+      BlockchainFeatures.SmartAccountTrading.id -> 0
     )
   )
 
@@ -62,34 +61,6 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
             blockDiff.portfolios(exchange.sender).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee
         }
-    }
-  }
-
-  property("can't trade from scripted account") {
-
-    val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
-
-    val preconditionsAndExchange
-      : Gen[(GenesisTransaction, GenesisTransaction, SetScriptTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
-      version <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
-      buyer   <- accountGen
-      seller  <- accountGen
-      fee     <- smallFeeGen
-      ts      <- timestampGen
-      gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).explicitGet()
-      gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).explicitGet()
-      setScript                = SetScriptTransaction.selfSigned(version, seller, Some(ScriptV1(TRUE).explicitGet()), fee, ts).explicitGet()
-      issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
-      issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
-      maybeAsset1              <- Gen.option(issue1.id())
-      maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
-      exchange                 <- exchangeV1GeneratorP(buyer, seller, maybeAsset1, maybeAsset2).filter(_.version == 1)
-    } yield (gen1, gen2, setScript, issue1, issue2, exchange)
-
-    forAll(preconditionsAndExchange) {
-      case ((gen1, gen2, setScript, issue1, issue2, exchange)) =>
-        assertLeft(Seq(TestBlock.create(Seq(gen1, gen2, setScript, issue1, issue2))), TestBlock.create(Seq(exchange)), fs)(
-          "can't participate in ExchangeTransaction")
     }
   }
 
@@ -251,7 +222,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     .copy(
       preActivatedFeatures = Map(
         BlockchainFeatures.SmartAccounts.id       -> 0,
-        BlockchainFeatures.SmartAccountsTrades.id -> 0,
+        BlockchainFeatures.SmartAccountTrading.id -> 0,
         BlockchainFeatures.SmartAssets.id         -> 0,
         BlockchainFeatures.FairPoS.id             -> 0
       ))

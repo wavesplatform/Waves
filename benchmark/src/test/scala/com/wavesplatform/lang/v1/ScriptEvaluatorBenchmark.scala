@@ -7,7 +7,7 @@ import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
-import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FROMBASE58, TOBASE58, SIGVERIFY}
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FROMBASE58, SIGVERIFY, TOBASE58}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.utils.Base58
@@ -35,10 +35,16 @@ class ScriptEvaluatorBenchmark {
   def signatures(st: Signatures, bh: Blackhole): Unit = bh.consume(EvaluatorV1[Boolean](st.context, st.expr))
 
   @Benchmark
-  def base58encode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(EvaluatorV1[Boolean](st.context, st.encode))
+  def base58encode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(EvaluatorV1[Long](st.context, st.encode))
 
   @Benchmark
-  def base58decode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(EvaluatorV1[Boolean](st.context, st.decode))
+  def base58decode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(EvaluatorV1[Long](st.context, st.decode))
+
+  @Benchmark
+  def stringConcat(st: Concat, bh: Blackhole): Unit = bh.consume(EvaluatorV1[String](st.context, st.strings))
+
+  @Benchmark
+  def bytesConcat(st: Concat, bh: Blackhole): Unit = bh.consume(EvaluatorV1[String](st.context, st.bytes)._2)
 }
 
 @State(Scope.Benchmark)
@@ -70,20 +76,21 @@ class Base58Perf {
         Random.nextBytes(b)
         LET("v" + i, FUNCTION_CALL(PureContext.sizeString, List(FUNCTION_CALL(Native(TOBASE58), List(CONST_BYTEVECTOR(ByteVector(b)))))))
       }
-      .foldRight[EXPR](FUNCTION_CALL(PureContext.eq, List(sum, CONST_LONG(base58Count)))) {
-        case (let, e) => BLOCK(let, e)
-      }
+      .foldRight[EXPR](sum) { case (let, e) => BLOCK(let, e) }
   }
 
   val decode: EXPR = {
-    val base58Length = 6000
-    val b            = new Array[Byte](base58Length)
-    Random.nextBytes(b)
-    FUNCTION_CALL(
-      PureContext.eq,
-      List(FUNCTION_CALL(PureContext.sizeBytes, List(FUNCTION_CALL(Native(FROMBASE58), List(CONST_STRING(Base58.encode(b)))))),
-           CONST_LONG(base58Length))
-    )
+    val base58Count = 60
+    val sum = (1 to base58Count).foldRight[EXPR](CONST_LONG(0)) {
+      case (i, e) => FUNCTION_CALL(PureContext.sumLong, List(REF("v" + i), e))
+    }
+    (1 to base58Count)
+      .map { i =>
+        val b = new Array[Byte](64)
+        Random.nextBytes(b)
+        LET("v" + i, FUNCTION_CALL(PureContext.sizeBytes, List(FUNCTION_CALL(Native(FROMBASE58), List(CONST_STRING(Base58.encode(b)))))))
+      }
+      .foldRight[EXPR](sum) { case (let, e) => BLOCK(let, e) }
   }
 }
 
@@ -119,4 +126,21 @@ class Signatures {
         case (let, e) => BLOCK(let, e)
       }
   }
+}
+
+@State(Scope.Benchmark)
+class Concat {
+  val context: EvaluationContext = PureContext.evalContext
+
+  private val Steps = 180
+
+  private def expr(init: EXPR, func: FunctionHeader, operand: EXPR, count: Int) =
+    (1 to count).foldLeft[EXPR](init) {
+      case (e, _) => FUNCTION_CALL(func, List(e, operand))
+    }
+
+  val strings: EXPR = expr(CONST_STRING("a" * (Short.MaxValue - Steps)), PureContext.sumString, CONST_STRING("a"), Steps)
+
+  val bytes: EXPR =
+    expr(CONST_BYTEVECTOR(ByteVector.fill(Short.MaxValue - Steps)(0)), PureContext.sumByteVector, CONST_BYTEVECTOR(ByteVector(0)), Steps)
 }
