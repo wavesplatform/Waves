@@ -14,7 +14,7 @@ object DataRequest {
 }
 
 case class DataRequest(
-    @(ApiModelProperty @field)(required = true, dataType = "java.lang.Integer", value = "2", allowableValues = "1,2") version: Byte,
+    @(ApiModelProperty @field)(required = true, dataType = "java.lang.Integer", value = "1", allowableValues = "1") version: Byte,
     sender: String,
     @(ApiModelProperty @field)(required = true) data: List[DataEntry[_]],
     @(ApiModelProperty @field)(required = true, value = "1000") fee: Long,
