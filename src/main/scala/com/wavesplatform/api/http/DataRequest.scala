@@ -21,7 +21,7 @@ case class DataRequest(
     timestamp: Option[Long] = None)
 
 @ApiModel(value = "Signed Data transaction")
-case class SignedDataRequest(@(ApiModelProperty @field)(required = true, dataType = "java.lang.Integer", value = "2", allowableValues = "1,2")
+case class SignedDataRequest(@(ApiModelProperty @field)(required = true, dataType = "java.lang.Integer", value = "1", allowableValues = "1")
                              version: Byte,
                              @(ApiModelProperty @field)(value = "Base58 encoded sender public key", required = true)
                              senderPublicKey: String,
