@@ -11,6 +11,8 @@ import com.google.common.primitives.Longs
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http._
 import com.wavesplatform.crypto
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse}
 import com.wavesplatform.matcher.market.MatcherTransactionWriter.GetTransactionsByOrder
 import com.wavesplatform.matcher.market.OrderBookActor._
@@ -20,10 +22,9 @@ import com.wavesplatform.matcher.model.{LevelAgg, LimitOrder, OrderBook, OrderIn
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherSettings}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.{Base58, NTP, ScorexLogging}
 import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
@@ -153,7 +154,8 @@ case class MatcherApiRoute(wallet: Wallet,
     (pathEndOrSingleSlash & post) {
       json[Order] { order =>
         placeTimer.measure {
-          if (blockchain.hasScript(order.senderPublicKey.toAddress)) {
+          if (blockchain.hasScript(order.senderPublicKey.toAddress) &&
+              !blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height)) {
             val resp = StatusCodeMatcherResponse(StatusCodes.BadRequest, "Trading on scripted account isn't allowed yet.")
             Future.successful(resp.code -> resp.json)
           } else {
