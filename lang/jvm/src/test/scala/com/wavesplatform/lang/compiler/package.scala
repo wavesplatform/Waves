@@ -12,14 +12,19 @@ package object compiler {
 
   val pointType   = CaseType("Point", List("x" -> LONG, "y" -> LONG))
   val listOfLongs = LIST
-  val idT         = NativeFunction("idT", 1, 10000: Short, TYPEPARAM('T'), "p1" -> TYPEPARAM('T'))(Right(_))
+  val idT         = NativeFunction("idT", 1, 10000: Short, TYPEPARAM('T'), "test id", ("p1", TYPEPARAM('T'), "p1"))(Right(_))
   val returnsListLong =
-    NativeFunction("undefinedOptionLong", 1, 1002: Short, LIST(LONG): TYPE)(_ => ???)
+    NativeFunction("undefinedOptionLong", 1, 1002: Short, LIST(LONG): TYPE, "test undefinedOptionLong")(_ => ???)
   val idOptionLong =
-    NativeFunction("idOptionLong", 1, 1003: Short, UNIT, ("opt" -> UNION(LONG, UNIT)))(_ => Right(()))
+    NativeFunction("idOptionLong", 1, 1003: Short, UNIT, "test Some", ("opt", UNION(LONG, UNIT), "opt"))(_ => Right(()))
   val functionWithTwoPrarmsOfTheSameType =
-    NativeFunction("functionWithTwoPrarmsOfTheSameType", 1, 1005: Short, TYPEPARAM('T'), ("p1" -> TYPEPARAM('T')), ("p2" -> TYPEPARAM('T')))(l =>
-      Right(l.head))
+    NativeFunction("functionWithTwoPrarmsOfTheSameType",
+                   1,
+                   1005: Short,
+                   TYPEPARAM('T'),
+                   "test same type params",
+                   ("p1", TYPEPARAM('T'), "p1"),
+                   ("p2", TYPEPARAM('T'), "p2"))(l => Right(l.head))
 
   val compilerContext = Monoid
     .combine(

@@ -32,21 +32,26 @@ object MatcherContext {
       ("tx", (orderType.typeRef, LazyVal(EitherT(inputEntityCoeval))))
     )
 
-    def inaccessibleFunction(name: String, internalName: Short): BaseFunction =
-      NativeFunction(name, 1, internalName, UNIT, Seq.empty: _*) {
+    def inaccessibleFunction(name: String, internalName: Short): BaseFunction = {
+      val msg = s"Function ${name} is inaccessible when running script on matcher"
+      NativeFunction(name, 1, internalName, UNIT, msg, Seq.empty: _*) {
         case _ =>
-          s"Function ${name} is inaccessible when running script on matcher".asLeft
+          msg.asLeft
       }
+    }
 
     def inaccessibleUserFunction(name: String): BaseFunction = {
+      val msg = s"Function ${name} is inaccessible when running script on matcher"
       NativeFunction(
         name,
         1,
         FunctionTypeSignature(UNIT, Seq.empty, FunctionHeader.User(name)),
-        ev = {
+        ({
           case _ =>
-            s"Function ${name} is inaccessible when running script on matcher".asLeft
-        }
+            msg.asLeft
+        }),
+        msg,
+        Seq.empty
       )
     }
 

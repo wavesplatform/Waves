@@ -174,7 +174,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("let is evaluated maximum once") {
     var functionEvaluated = 0
 
-    val f = NativeFunction("F", 1, 258, LONG, "_" -> LONG) { _ =>
+    val f = NativeFunction("F", 1: Long, 258: Short, LONG: TYPE, "test function", Seq(("_", LONG, "")): _*) { _ =>
       functionEvaluated = functionEvaluated + 1
       Right(1L)
     }
@@ -211,7 +211,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on function call getter evaluation") {
     val fooType = CaseType("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction("createFoo", 1, 259, fooType.typeRef, List.empty: _*) { _ =>
+    val fooCtor = NativeFunction("createFoo", 1: Long, 259: Short, fooType.typeRef, "test function", List.empty: _*) { _ =>
       Right(CaseObj(fooType.typeRef, Map("bar" -> "bAr", "buz" -> 1L)))
     }
 
@@ -228,7 +228,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on block getter evaluation") {
     val fooType = CaseType("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction("createFoo", 1, 259, fooType.typeRef, List.empty: _*) { _ =>
+    val fooCtor = NativeFunction("createFoo", 1: Long, 259: Short, fooType.typeRef, "test function", List.empty: _*) { _ =>
       Right(
         CaseObj(
           fooType.typeRef,
@@ -239,7 +239,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         ))
     }
     val fooTransform =
-      NativeFunction("transformFoo", 1, 260, fooType.typeRef, "foo" -> fooType.typeRef) {
+      NativeFunction("transformFoo", 1: Long, 260: Short, fooType.typeRef, "test function", ("foo", fooType.typeRef, "foo")) {
         case (fooObj: CaseObj) :: Nil => Right(fooObj.copy(fields = fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
         case _                        => ???
       }

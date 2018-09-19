@@ -44,24 +44,24 @@ object JsAPI {
     r(ast)
   }
 
+  val wavesContext = WavesContext.build(new Environment {
+    override def height: Int                                                                                     = ???
+    override def networkByte: Byte                                                                               = ???
+    override def inputEntity: Tx :+: Ord :+: CNil                                                                = ???
+    override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+    override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
+    override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
+    override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+    override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
+  })
+
+  val cryptoContext = CryptoContext.build(Global)
+
+  @JSExportTopLevel("compilerContext")
+  val compilerContext = Monoid.combineAll(Seq(PureContext.ctx, cryptoContext, wavesContext)).compilerContext
+
   @JSExportTopLevel("compile")
   def compile(input: String): js.Dynamic = {
-
-    val wavesContext = WavesContext.build(new Environment {
-      override def height: Int                                                                                     = ???
-      override def networkByte: Byte                                                                               = ???
-      override def inputEntity: Tx :+: Ord :+: CNil                                                                = ???
-      override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-      override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
-      override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
-      override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
-      override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-    })
-
-    //comment
-    val cryptoContext = CryptoContext.build(Global)
-
-    val compilerContext = Monoid.combineAll(Seq(PureContext.ctx, cryptoContext, wavesContext)).compilerContext
 
     def hash(m: Array[Byte]) = Global.keccak256(Global.blake2b256(m))
 

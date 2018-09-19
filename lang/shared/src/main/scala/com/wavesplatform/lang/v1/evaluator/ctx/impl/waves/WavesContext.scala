@@ -23,7 +23,7 @@ object WavesContext {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getDataFromStateF(name: String, internalName: Short, dataType: DataType): BaseFunction =
-      NativeFunction(name, 100, internalName, UNION(dataType.innerType, UNIT), "addressOrAlias" -> addressOrAliasType, "key" -> STRING) {
+      NativeFunction(name, 100, internalName, UNION(dataType.innerType, UNIT), "get data from the accaunt state", ("addressOrAlias", addressOrAliasType, "accaunt"), ("key", STRING, "key")) {
         case (addressOrAlias: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addressOrAlias, k, dataType).map(fromOption)
         case _                                               => ???
       }
@@ -34,7 +34,7 @@ object WavesContext {
     val getStringFromStateF: BaseFunction  = getDataFromStateF("getString", DATA_STRING_FROM_STATE, DataType.String)
 
     def getDataFromArrayF(name: String, internalName: Short, dataType: DataType): BaseFunction =
-      NativeFunction(name, 10, internalName, UNION(dataType.innerType, UNIT), "data" -> LIST(dataEntryType.typeRef), "key" -> STRING) {
+      NativeFunction(name, 10, internalName, UNION(dataType.innerType, UNIT), "Find and extract data by key", ("data", LIST(dataEntryType.typeRef), "DataEntry vector, usally tx.data"), ("key", STRING, "key")) {
         case (data: IndexedSeq[CaseObj] @unchecked) :: (key: String) :: Nil =>
           data.find(_.fields("key") == key).map(_.fields("value")) match {
             case Some(n: Long) if dataType == DataType.Long => Right(n)
@@ -52,7 +52,7 @@ object WavesContext {
     val getStringFromArrayF: BaseFunction = getDataFromArrayF("getString", DATA_STRING_FROM_ARRAY, DataType.String)
 
     def getDataByIndexF(name: String, dataType: DataType): BaseFunction =
-      UserFunction(name, UNION(dataType.innerType, UNIT), "data" -> LIST(dataEntryType.typeRef), "index" -> LONG) {
+      UserFunction(name, UNION(dataType.innerType, UNIT), "Extract data by index", ("data", LIST(dataEntryType.typeRef), "DataEntry vector, usally tx.data"), ("index", LONG, "index")) {
         case data :: index :: Nil =>
           BLOCK(
             LET("@val", GETTER(FUNCTION_CALL(PureContext.getElement, List(data, index)), "value")),
@@ -77,7 +77,7 @@ object WavesContext {
       )
     )
 
-    val addressFromPublicKeyF: BaseFunction = UserFunction("addressFromPublicKey", addressType.typeRef, "publicKey" -> BYTEVECTOR) {
+    val addressFromPublicKeyF: BaseFunction = UserFunction("addressFromPublicKey", addressType.typeRef, "Convert public key to accaunt address", ("publicKey", BYTEVECTOR, "public key")) {
       case pk :: Nil =>
         FUNCTION_CALL(
           FunctionHeader.User("Address"),
@@ -148,7 +148,7 @@ object WavesContext {
       )
     )
 
-    val addressFromStringF: BaseFunction = UserFunction("addressFromString", optionAddress, "string" -> STRING) {
+    val addressFromStringF: BaseFunction = UserFunction("addressFromString", optionAddress, "Decode accaunt address", ("string", STRING, "string address represntation")) {
       case (str: EXPR) :: Nil =>
         BLOCK(
           LET("@afs_addrBytes", FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(str, EnvironmentFunctions.AddressPrefix)))),
@@ -200,7 +200,7 @@ object WavesContext {
     }
 
     val addressFromRecipientF: BaseFunction =
-      NativeFunction("addressFromRecipient", 100, ADDRESSFROMRECIPIENT, addressType.typeRef, "AddressOrAlias" -> addressOrAliasType) {
+      NativeFunction("addressFromRecipient", 100, ADDRESSFROMRECIPIENT, addressType.typeRef, "Extract address or lookup alias", ("AddressOrAlias", addressOrAliasType, "address or alias, usally tx.recipient")) {
         case (c @ CaseObj(addressType.typeRef, _)) :: Nil => Right(c)
         case CaseObj(aliasType.typeRef, fields) :: Nil =>
           environmentFunctions
@@ -224,7 +224,7 @@ object WavesContext {
 
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(com.wavesplatform.lang.v1.compiler.Types.UNIT +: anyTransactionType.l)
-      NativeFunction("transactionById", 100, GETTRANSACTIONBYID, returnType, "id" -> BYTEVECTOR) {
+      NativeFunction("transactionById", 100, GETTRANSACTIONBYID, returnType, "Lookup transaction", ("id", BYTEVECTOR, "transaction Id")) {
         case (id: ByteVector) :: Nil =>
           val maybeDomainTx = env.transactionById(id.toArray).map(transactionObject)
           Right(fromOption(maybeDomainTx))
@@ -239,19 +239,19 @@ object WavesContext {
     }
 
     val assetBalanceF: BaseFunction =
-      NativeFunction("assetBalance", 100, ACCOUNTASSETBALANCE, LONG, "addressOrAlias" -> addressOrAliasType, "assetId" -> UNION(UNIT, BYTEVECTOR)) {
+      NativeFunction("assetBalance", 100, ACCOUNTASSETBALANCE, LONG, "get asset balance for account", ("addressOrAlias", addressOrAliasType, "account"), ("assetId", UNION(UNIT, BYTEVECTOR), "assetId (WAVES if none)")) {
         case (c: CaseObj) :: (()) :: Nil                  => env.accountBalanceOf(caseObjToRecipient(c), None)
         case (c: CaseObj) :: (assetId: ByteVector) :: Nil => env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.toArray))
 
         case _ => ???
       }
 
-    val wavesBalanceF: UserFunction = UserFunction("wavesBalance", LONG, "addressOrAlias" -> addressOrAliasType) {
+    val wavesBalanceF: UserFunction = UserFunction("wavesBalance", LONG, "get WAVES balanse for account", ("addressOrAlias", addressOrAliasType, "account")) {
       case aoa :: Nil => FUNCTION_CALL(assetBalanceF.header, List(aoa, REF("unit")))
       case _          => ???
     }
 
-    val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, optionLong, "id" -> BYTEVECTOR) {
+    val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, optionLong, "get height when transaction was stored to blockchain", ("id", BYTEVECTOR, "transaction Id")) {
       case (id: ByteVector) :: Nil => Right(fromOption(env.transactionHeightById(id.toArray)))
       case _                       => ???
     }
