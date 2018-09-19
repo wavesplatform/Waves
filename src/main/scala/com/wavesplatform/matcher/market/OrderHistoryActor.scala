@@ -58,13 +58,10 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
         processExpirableRequest(req)
       }
     case ev: OrderAdded =>
-      println(s"==> $ev, order.id: ${ev.order.order.id()}")
       addedTimer.measure(orderHistory.process(ev))
     case ev: OrderExecuted =>
-      println(s"==> $ev, counter.id: ${ev.counter.order.id()}, submitted.id: ${ev.submitted.order.id()}")
       executedTimer.measure(orderHistory.process(ev))
     case ev: OrderCanceled =>
-      println(s"==> $ev, order.id: ${ev.limitOrder.order.id()}")
       cancelledTimer.measure(orderHistory.process(ev))
     case ForceCancelOrderFromHistory(id) =>
       forceCancelOrder(id)

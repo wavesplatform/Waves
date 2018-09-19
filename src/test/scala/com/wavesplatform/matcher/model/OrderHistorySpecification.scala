@@ -490,18 +490,9 @@ class OrderHistorySpecification
     val counter   = sell(pair, 0.12739213, 347, matcherFee = Some(300000L))
     val submitted = buy(pair, 0.12739213, 146, matcherFee = Some(300000L))
 
-    println(s"=== adding counter.id: ${counter.id()} ===")
     oh.process(OrderAdded(LimitOrder(counter)))
-    println(s"=== added counter.id: ${counter.id()} ===")
-
-    println(s"=== executing counter.id: ${counter.id()} against submitted.id: ${submitted.id()} ===")
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
-    oh.processAll(exec)
-    println(s"=== executed counter.id: ${counter.id()} against submitted.id: ${submitted.id()} ===")
-
-    println(s"""=== cancelling orders ===""")
-    oh.processAll(OrderCanceled(exec.submittedRemaining, unmatchable = true))
-    println(s"""=== canceled orders ===""")
+    oh.processAll(exec, OrderCanceled(exec.submittedRemaining, unmatchable = true))
 
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
       oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 205L
@@ -559,40 +550,14 @@ class OrderHistorySpecification
     val counter   = sell(pair, 0.001356, 57918, matcherFee = Some(300000L))
     val submitted = buy(pair, 0.003333, 46978, matcherFee = Some(300000L))
 
-    println(s"=== adding counter.id: ${counter.id()} ===")
     oh.process(OrderAdded(LimitOrder(counter)))
-    println(s"=== added counter.id: ${counter.id()} ===")
 
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
-
-    println(s"""--- submitted.id: ${submitted.id()}
-           |amount: ${oh.openVolume(submitted.senderPublicKey, pair.amountAsset)}
-           |price:  ${oh.openVolume(submitted.senderPublicKey, pair.priceAsset)}
-           |waves:  ${oh.openVolume(submitted.senderPublicKey, None)}""".stripMargin)
-
-    println(s"=== executing counter.id: ${counter.id()} against submitted.id: ${submitted.id()} ===")
-    oh.processAll(exec)
-    println(s"=== executed counter.id: ${counter.id()} against submitted.id: ${submitted.id()} ===")
-
-    println(s"""--- after exec submitted.id: ${submitted.id()}
-               |remaining.isValid: ${exec.submittedRemaining.isValid}
-               |amount: ${oh.openVolume(submitted.senderPublicKey, pair.amountAsset)}
-               |price:  ${oh.openVolume(submitted.senderPublicKey, pair.priceAsset)}
-               |waves:  ${oh.openVolume(submitted.senderPublicKey, None)}""".stripMargin)
-
-    println(s"""=== cancelling orders ===""")
     oh.processAll(
+      exec,
       OrderCanceled(exec.submittedRemaining, unmatchable = true),
       OrderCanceled(exec.counterRemaining, unmatchable = false) // Cancelled by user
     )
-
-    println(s"""=== canceled orders ===""")
-
-    println(s"""--- after cancel submitted.id: ${submitted.id()}
-               |counter.isValid: ${exec.counterRemaining.isValid}
-               |amount: ${oh.openVolume(submitted.senderPublicKey, pair.amountAsset)}
-               |price:  ${oh.openVolume(submitted.senderPublicKey, pair.priceAsset)}
-               |waves:  ${oh.openVolume(submitted.senderPublicKey, None)}""".stripMargin)
 
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
       oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
@@ -618,10 +583,8 @@ class OrderHistorySpecification
   property("Reserved balance should empty after full rounded execution") {
     val pair = AssetPair(mkAssetId("BTC"), mkAssetId("ETH"))
 
-    val alicePk = PrivateKeyAccount("alice".getBytes("utf-8"))
-    val counter = buy(pair, 0.00031887, 923431000L, matcherFee = Some(300000), sender = Some(alicePk))
-    //923431000L
-    //223345000L
+    val alicePk   = PrivateKeyAccount("alice".getBytes("utf-8"))
+    val counter   = buy(pair, 0.00031887, 923431000L, matcherFee = Some(300000), sender = Some(alicePk))
     val bobPk     = PrivateKeyAccount("bob".getBytes("utf-8"))
     val submitted = sell(pair, 0.00031887, 223345000L, matcherFee = Some(300000), sender = Some(bobPk))
 

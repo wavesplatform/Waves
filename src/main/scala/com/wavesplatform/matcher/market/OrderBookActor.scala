@@ -209,21 +209,12 @@ class OrderBookActor(assetPair: AssetPair,
         sender() ! OrderCancelRejected("Order not found")
     }
 
-  private val added = scala.collection.mutable.Set.empty[ByteStr]
-
   private def onAddOrder(order: Order): Unit = {
-    if (added.contains(order.id())) {
-      log.debug(s"Already has ${order.id()}, ignore it")
-      apiSender.foreach(_ ! OrderAccepted(order))
-    } else {
-      log.debug(s"A new order ${order.id()}")
-      added += order.id()
-      val msg = ValidateOrder(order, NTP.correctedTime())
-      orderHistory ! msg
-      apiSender = Some(sender())
-      cancellable = Some(context.system.scheduler.scheduleOnce(settings.validationTimeout, self, ValidationTimeoutExceeded))
-      context.become(waitingValidation(msg))
-    }
+    val msg = ValidateOrder(order, NTP.correctedTime())
+    orderHistory ! msg
+    apiSender = Some(sender())
+    cancellable = Some(context.system.scheduler.scheduleOnce(settings.validationTimeout, self, ValidationTimeoutExceeded))
+    context.become(waitingValidation(msg))
   }
 
   private def handleValidateOrderResult(orderId: ByteStr, res: Either[GenericError, Order]): Unit = {
@@ -297,9 +288,7 @@ class OrderBookActor(assetPair: AssetPair,
           Some(event.submitted)
         }
       case _: NegativeAmount =>
-        val e = Events.OrderCanceled(event.submitted, unmatchable = true)
-        log.debug(s"NegativeAmount: sending $e")
-        processEvent(e)
+        processEvent(Events.OrderCanceled(event.submitted, unmatchable = true))
         None
       case _ =>
         cancelCounterOrder()
@@ -321,8 +310,7 @@ class OrderBookActor(assetPair: AssetPair,
             allChannels.broadcastTx(tx)
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
-
-            val submitted =
+            (
               if (event.submittedRemainingAmount <= 0) None
               else
                 Some(
@@ -330,9 +318,7 @@ class OrderBookActor(assetPair: AssetPair,
                     event.submittedRemainingAmount,
                     event.submittedRemainingFee
                   )
-                )
-
-            val counter =
+                ),
               if (event.counterRemainingAmount <= 0) None
               else
                 Some(
@@ -341,8 +327,7 @@ class OrderBookActor(assetPair: AssetPair,
                     event.counterRemainingFee
                   )
                 )
-
-            (submitted, counter)
+            )
           case Left(ex) =>
             log.info(s"""Can't create tx: $ex
                  |o1: (amount=${o.amount}, fee=${o.fee}): ${Json.prettyPrint(o.order.json())}

@@ -298,9 +298,10 @@ class OrderBookActorSpecification
 
     "place orders and restart without waiting for response" in {
       val ord1 = sell(pair, 100, 10 * Order.PriceConstant)
+      val ts   = System.currentTimeMillis()
 
       (1 to 100).foreach({ i =>
-        actor ! ord1.copy()
+        actor ! ord1.copy(timestamp = ts + i)
       })
 
       within(10.seconds) {

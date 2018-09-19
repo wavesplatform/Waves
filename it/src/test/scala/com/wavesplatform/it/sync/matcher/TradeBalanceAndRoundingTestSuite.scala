@@ -186,7 +186,7 @@ class TradeBalanceAndRoundingTestSuite
 
       val exchangeTx = matcherNode.transactionsByOrder(aliceOrderId).headOption.getOrElse(fail("Expected an exchange transaction"))
       nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
-      matcherNode.cancelOrder(bobNode, wctUsdPair, bobOrderId)
+      matcherNode.cancelOrder(bobNode, wctUsdPair, Some(bobOrderId))
 
       matcherNode.waitOrderStatus(wctUsdPair, bobOrderId, "Cancelled", 1.minute)
 
@@ -201,6 +201,8 @@ class TradeBalanceAndRoundingTestSuite
     val wctUsdPrice      = 12739213
 
     "place wct-usd order" in {
+      nodes.waitForSameBlockHeadesAt(nodes.map(_.height).max + 1)
+
       val aliceUsdBalance   = matcherNode.assetBalance(aliceNode.address, UsdId.base58).balance
       val bobUsdBalance     = matcherNode.assetBalance(bobNode.address, UsdId.base58).balance
       val bobWctInitBalance = matcherNode.assetBalance(bobNode.address, WctId.base58).balance
@@ -214,20 +216,17 @@ class TradeBalanceAndRoundingTestSuite
       val exchangeTx = matcherNode.transactionsByOrder(aliceOrderId).headOption.getOrElse(fail("Expected an exchange transaction"))
       nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
 
-      val executedAmount = correctAmount(wctUsdBuyAmount, wctUsdPrice) // 142
-
-      val bobSpendWctAmount   = executedAmount
-      val aliceSpendUsdAmount = receiveAmount(BUY, wctUsdPrice, bobSpendWctAmount) // 18
-
+      val executedAmount         = correctAmount(wctUsdBuyAmount, wctUsdPrice) // 142
+      val bobReceiveUsdAmount    = receiveAmount(SELL, wctUsdBuyAmount, wctUsdPrice)
       val expectedReservedBobWct = wctUsdSellAmount - executedAmount // 205 = 347 - 142
+
       matcherNode.reservedBalance(bobNode)(s"$WctId") shouldBe expectedReservedBobWct
       // 999999999652 = 999999999999 - 142 - 205
-      matcherNode.tradableBalance(bobNode, wctUsdPair)(s"$WctId") shouldBe bobWctInitBalance - bobSpendWctAmount - expectedReservedBobWct
+      matcherNode.tradableBalance(bobNode, wctUsdPair)(s"$WctId") shouldBe bobWctInitBalance - executedAmount - expectedReservedBobWct
+      matcherNode.tradableBalance(bobNode, wctUsdPair)(s"$UsdId") shouldBe bobUsdBalance + bobReceiveUsdAmount
 
       matcherNode.reservedBalance(aliceNode) shouldBe empty
-      matcherNode.tradableBalance(aliceNode, wctUsdPair)(s"$UsdId") shouldBe aliceUsdBalance - receiveAmount(SELL, wctUsdBuyAmount, wctUsdPrice)
-
-      matcherNode.tradableBalance(bobNode, wctUsdPair)(s"$UsdId") shouldBe bobUsdBalance + receiveAmount(SELL, wctUsdBuyAmount, wctUsdPrice)
+      matcherNode.tradableBalance(aliceNode, wctUsdPair)(s"$UsdId") shouldBe aliceUsdBalance - bobReceiveUsdAmount
 
       val expectedReservedWaves = matcherFee - LimitOrder.getPartialFee(matcherFee, wctUsdSellAmount, executedAmount)
       matcherNode.reservedBalance(bobNode)("WAVES") shouldBe expectedReservedWaves
@@ -366,11 +365,10 @@ object TradeBalanceAndRoundingTestSuite {
     .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))
     .map { case (n, o) => o.withFallback(n) }
 
-  private val matcherSeed = _Configs(0).getString("account-seed")
-  private val aliceSeed   = _Configs(1).getString("account-seed")
-  private val bobSeed     = _Configs(2).getString("account-seed")
-  private val alicePk     = PrivateKeyAccount.fromSeed(aliceSeed).right.get
-  private val bobPk       = PrivateKeyAccount.fromSeed(bobSeed).right.get
+  private val aliceSeed = _Configs(1).getString("account-seed")
+  private val bobSeed   = _Configs(2).getString("account-seed")
+  private val alicePk   = PrivateKeyAccount.fromSeed(aliceSeed).right.get
+  private val bobPk     = PrivateKeyAccount.fromSeed(bobSeed).right.get
 
   val usdAssetName = "USD-X"
   val wctAssetName = "WCT-X"
