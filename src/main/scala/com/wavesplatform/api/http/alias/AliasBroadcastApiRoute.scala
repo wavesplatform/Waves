@@ -17,7 +17,7 @@ case class AliasBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allCh
   }
 
   @Path("/create")
-  @ApiOperation(value = "Broadcasts a signed alias transaction", httpMethod = "POST", produces = "application/json", consumes = "application/json")
+  @ApiOperation(value = "Broadcast a signed alias transaction", httpMethod = "POST", produces = "application/json", consumes = "application/json")
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(
