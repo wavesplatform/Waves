@@ -29,13 +29,12 @@ object MatcherKeys {
   def orderInfo(orderId: ByteStr): Key[OrderInfo] = Key(
     bytes(OrderInfoPrefix, orderId.arr),
     Option(_).fold[OrderInfo](OrderInfo.empty)(decodeOrderInfo), { oi =>
-      val allocateBytes = if (oi.unsafeTotalSpend.isEmpty) 34 else 42
+      val allocateBytes = if (oi.unsafeTotalSpend.isEmpty) 33 else 41
       val buf = ByteBuffer
         .allocate(allocateBytes)
         .putLong(oi.amount)
         .putLong(oi.filled)
-        .put(if (oi.canceledByUser) 1.toByte else 0.toByte)
-        .put(if (oi.canceledBySystem) 1.toByte else 0.toByte)
+        .put(oi.canceledByUser.fold(0: Byte)(if (_) 1 else 2))
         .putLong(oi.minAmount.getOrElse(0L))
         .putLong(oi.remainingFee)
 
@@ -45,11 +44,17 @@ object MatcherKeys {
   )
 
   def decodeOrderInfo(input: Array[Byte]): OrderInfo = {
+    def canceledByUser(x: Byte): Option[Boolean] = x match {
+      case 0 => None
+      case 1 => Some(true)
+      case 2 => Some(false)
+    }
+
     val bb = ByteBuffer.wrap(input)
     input.length match {
-      case 18 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, bb.get == 1, None, 0, None)
-      case 34 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, bb.get == 1, Some(bb.getLong), bb.getLong, None)
-      case 42 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, bb.get == 1, Some(bb.getLong), bb.getLong, Some(bb.getLong))
+      case 17 => OrderInfo(bb.getLong, bb.getLong, canceledByUser(bb.get), None, 0, None)
+      case 33 => OrderInfo(bb.getLong, bb.getLong, canceledByUser(bb.get), Some(bb.getLong), bb.getLong, None)
+      case 41 => OrderInfo(bb.getLong, bb.getLong, canceledByUser(bb.get), Some(bb.getLong), bb.getLong, Some(bb.getLong))
     }
   }
 

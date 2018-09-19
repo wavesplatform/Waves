@@ -178,8 +178,6 @@ class TradeBalanceAndRoundingTestSuite
       val sellPrice  = 135600
       val buyAmount  = 46978
       val sellAmount = 56978
-      println(s"Bob USD:   ${matcherNode.assetBalance(bobNode.address, UsdId.base58)}")
-      println(s"Alice WCT: ${matcherNode.assetBalance(aliceNode.address, WctId.base58)}")
 
       val bobOrderId = matcherNode.placeOrder(bobNode, wctUsdPair, SELL, sellPrice, sellAmount).message.id
       matcherNode.waitOrderStatus(wctUsdPair, bobOrderId, "Accepted", 1.minute)
@@ -192,9 +190,6 @@ class TradeBalanceAndRoundingTestSuite
 
       matcherNode.waitOrderStatus(wctUsdPair, bobOrderId, "Cancelled", 1.minute)
 
-      println(s"Bob USD:   ${matcherNode.assetBalance(bobNode.address, UsdId.base58)}")
-      println(s"Alice WCT: ${matcherNode.assetBalance(aliceNode.address, WctId.base58)}")
-
       matcherNode.reservedBalance(bobNode) shouldBe empty
       matcherNode.reservedBalance(aliceNode) shouldBe empty
     }
@@ -206,8 +201,6 @@ class TradeBalanceAndRoundingTestSuite
     val wctUsdPrice      = 12739213
 
     "place wct-usd order" in {
-//      nodes.waitForSameBlockHeadesAt(nodes.map(_.height).max + 1)
-
       val aliceUsdBalance   = matcherNode.assetBalance(aliceNode.address, UsdId.base58).balance
       val bobUsdBalance     = matcherNode.assetBalance(bobNode.address, UsdId.base58).balance
       val bobWctInitBalance = matcherNode.assetBalance(bobNode.address, WctId.base58).balance
@@ -225,10 +218,6 @@ class TradeBalanceAndRoundingTestSuite
 
       val bobSpendWctAmount   = executedAmount
       val aliceSpendUsdAmount = receiveAmount(BUY, wctUsdPrice, bobSpendWctAmount) // 18
-
-      // TODO: getSpendAmount
-      println(
-        s"executedAmount: $executedAmount\nspend amount: ${receiveAmount(SELL, wctUsdBuyAmount, wctUsdPrice)}\naliceSpendUsdAmount: $aliceSpendUsdAmount")
 
       val expectedReservedBobWct = wctUsdSellAmount - executedAmount // 205 = 347 - 142
       matcherNode.reservedBalance(bobNode)(s"$WctId") shouldBe expectedReservedBobWct

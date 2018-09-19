@@ -31,8 +31,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
         OrderInfo(
           amount = order.amount,
           filled = x.filled + diff.addExecutedAmount.getOrElse(0L),
-          canceledByUser = diff.cancelledByUser.getOrElse(x.canceledByUser),
-          canceledBySystem = diff.cancelledBySystem.getOrElse(x.canceledBySystem),
+          canceledByUser = diff.cancelledByUser.orElse(x.canceledByUser),
           minAmount = diff.newMinAmount.orElse(x.minAmount),
           remainingFee = x.remainingFee - diff.executedFee.getOrElse(0L),
           unsafeTotalSpend = Some(OrderInfo.safeSum(x.totalSpend(LimitOrder(order)), diff.lastSpend.getOrElse(0L)))
@@ -44,8 +43,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
         OrderInfo(
           amount = order.amount,
           filled = executedAmount,
-          canceledByUser = diff.cancelledByUser.getOrElse(false),
-          canceledBySystem = diff.cancelledBySystem.getOrElse(false),
+          canceledByUser = diff.cancelledByUser,
           minAmount = diff.newMinAmount,
           remainingFee = remainingFee,
           unsafeTotalSpend = diff.lastSpend.orElse(Some(0L))
@@ -142,15 +140,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
       )
 
     case OrderCanceled(lo, unmatchable) =>
-      // The order should not have Cancelled status, if it was cancelled by unmatchable amounts
-      val canceledByUser   = !unmatchable
-      val canceledBySystem = unmatchable
-      Seq(
-        (lo.order,
-         OrderInfoDiff(
-           cancelledByUser = if (canceledByUser) Some(canceledByUser) else None,
-           cancelledBySystem = if (canceledBySystem) Some(canceledBySystem) else None
-         )))
+      Seq((lo.order, OrderInfoDiff(cancelledByUser = Some(!unmatchable))))
   }
 
   def openVolume(address: Address, assetId: Option[AssetId]): Long =
@@ -305,14 +295,12 @@ object OrderHistory {
 
   private case class OrderInfoDiff(addExecutedAmount: Option[Long] = None,
                                    cancelledByUser: Option[Boolean] = None,
-                                   cancelledBySystem: Option[Boolean] = None,
                                    newMinAmount: Option[Long] = None,
                                    executedFee: Option[Long] = None,
                                    lastSpend: Option[Long] = None) {
     override def toString: String =
       s"OrderInfoDiff(${addExecutedAmount.fold("")(x => s"addExecutedAmount=$x, ")}" +
         cancelledByUser.fold("")(x => s"cancelledByUser=$x, ") +
-        cancelledBySystem.fold("")(x => s"cancelledBySystem=$x, ") +
         newMinAmount.fold("")(x => s"newMinAmount=$x, ") +
         executedFee.fold("")(x => s"executedFee=$x, ") +
         lastSpend.fold(")")(x => s"lastSpend=$x)")
@@ -374,15 +362,10 @@ object OrderHistory {
   }
 
   private def diffReturn(change: OrderInfoChange): Map[Address, OpenPortfolio] = {
-    import change.{order, updatedInfo}
+    import change.order
     val lo             = LimitOrder(order)
     val prev           = change.origInfo.getOrElse(throw new IllegalStateException("origInfo must be defined"))
     val maxSpendAmount = lo.getRawSpendAmount
-//    val r = diffMap(
-//      lo,
-//      diffSpend = updatedInfo.totalSpend(lo) - maxSpendAmount,
-//      diffFee = -releaseFee(order, updatedInfo.remainingFee, updatedRemaining = 0)
-//    )
     val r = diffMap(
       lo,
       diffSpend = prev.totalSpend(lo) - maxSpendAmount,

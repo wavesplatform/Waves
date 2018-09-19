@@ -65,7 +65,7 @@ class OrderHistorySpecification
     val info = oh.orderInfo(ord.id())
     withClue("info") {
       info.status shouldBe LimitOrder.Accepted
-      info shouldBe OrderInfo(ord.amount, 0, canceledByUser = false, false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, Some(0L))
+      info shouldBe OrderInfo(ord.amount, 0, None, Some(lo.minAmountOfAmountAsset), ord.matcherFee, Some(0L))
     }
 
     withClue("reserved assets") {
@@ -96,7 +96,7 @@ class OrderHistorySpecification
     val info = oh.orderInfo(ord.id())
     withClue("info") {
       info.status shouldBe LimitOrder.Accepted
-      info shouldBe OrderInfo(ord.amount, 0, canceledByUser = false, false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, Some(0L))
+      info shouldBe OrderInfo(ord.amount, 0, None, Some(lo.minAmountOfAmountAsset), ord.matcherFee, Some(0L))
     }
 
     withClue("reserved assets") {
@@ -128,7 +128,7 @@ class OrderHistorySpecification
     val info = oh.orderInfo(ord.id())
     withClue("info") {
       info.status shouldBe LimitOrder.Accepted
-      info shouldBe OrderInfo(ord.amount, 0, canceledByUser = false, false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, Some(0L))
+      info shouldBe OrderInfo(ord.amount, 0, None, Some(lo.minAmountOfAmountAsset), ord.matcherFee, Some(0L))
     }
 
     withClue("reserved assets considering amount of received WAVES") {

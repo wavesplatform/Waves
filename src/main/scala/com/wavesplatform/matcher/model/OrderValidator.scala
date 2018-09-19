@@ -32,7 +32,7 @@ trait OrderValidator {
 
     val b: Map[Option[ByteStr], Long] = Seq(lo.spentAcc, lo.feeAcc).map(a => a.assetId -> spendableBalance(a)).toMap
 
-    val change = OrderInfoChange(lo.order, None, OrderInfo(order.amount, 0L, canceledByUser = false, false, None, order.matcherFee, Some(0L)))
+    val change = OrderInfoChange(lo.order, None, OrderInfo(order.amount, 0L, None, None, order.matcherFee, Some(0L)))
     val newOrder = OrderHistory
       .diff(OrderAdded(lo), Map(lo.order.id() -> change))
       .getOrElse(order.senderPublicKey.toAddress, OpenPortfolio.empty)
