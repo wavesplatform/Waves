@@ -48,46 +48,26 @@ class OrdersFromScriptedAccTestSuite
     aliceNode.assertAssetBalance(aliceNode.address, aliceAsset, someAssetAmount)
     aliceNode.assertAssetBalance(matcherNode.address, aliceAsset, 0)
 
-    val scriptText = {
-      val sc = Parser(s"""true""".stripMargin).get.value
-      CompilerV1(dummyCompilerContext, sc).explicitGet()._1
+    "setScript at account" in {
+      val scriptText = {
+        val sc = Parser(s"""true""".stripMargin).get.value
+        CompilerV1(dummyCompilerContext, sc).explicitGet()._1
+      }
+
+      val script = ScriptV1(scriptText).explicitGet()
+      val setScriptTransaction = SetScriptTransaction
+        .selfSigned(SetScriptTransaction.supportedVersions.head, bobNode.privateKey, Some(script), minFee, System.currentTimeMillis())
+        .right
+        .get
+
+      val setScriptId = bobNode
+        .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+        .id
+
+      nodes.waitForHeightAriseAndTxPresent(setScriptId)
     }
 
-    val script = ScriptV1(scriptText).explicitGet()
-    val setScriptTransaction = SetScriptTransaction
-      .selfSigned(SetScriptTransaction.supportedVersions.head, bobNode.privateKey, Some(script), minFee, System.currentTimeMillis())
-      .right
-      .get
-
-    val setScriptId = bobNode
-      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
-      .id
-
-    nodes.waitForHeightAriseAndTxPresent(setScriptId)
-
-    "can trade from non-scripted account" in {
-      // Alice places sell order
-      val aliceOrder = matcherNode
-        .placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes)
-
-      aliceOrder.status shouldBe "OrderAccepted"
-
-      val orderId = aliceOrder.message.id
-
-      // Alice checks that the order in order book
-      matcherNode.orderStatus(orderId, aliceWavesPair).status shouldBe "Accepted"
-      matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
-
-      // Alice check that order is correct
-      val orders = matcherNode.orderBook(aliceWavesPair)
-      orders.asks.head.amount shouldBe 500
-      orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
-
-      // sell order should be in the aliceNode orderbook
-      matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
-    }
-
-    "scripted account cannot trade until SmartAccountTrading is activated" in {
+    "trading is deprecated" in {
       assertBadRequestAndResponse(
         matcherNode
           .placeOrder(bobNode, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes),
@@ -100,6 +80,23 @@ class OrdersFromScriptedAccTestSuite
       val bobOrder = matcherNode
         .placeOrder(bobNode, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes)
       bobOrder.status shouldBe "OrderAccepted"
+    }
+
+    "can trade from non-scripted account" in {
+      // Alice places sell order
+      val aliceOrder = matcherNode
+        .placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes)
+
+      aliceOrder.status shouldBe "OrderAccepted"
+
+      val orderId = aliceOrder.message.id
+
+      // Alice checks that the order in order book
+      matcherNode.orderStatus(orderId, aliceWavesPair).status shouldBe "Filled"
+      matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Filled"
+
+      // sell order should be in the aliceNode orderbook
+      matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Filled"
     }
   }
 }
