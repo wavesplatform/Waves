@@ -290,7 +290,7 @@ object OrderHistory extends ScorexLogging {
               } else if (change.origInfo.isEmpty) {
                 if (change.updatedInfo.status.isFinal) Map.empty else diffNew(change)
               } else {
-                if (change.updatedInfo.status.isFinal) diffReturn(change) else diffUpdate(change)
+                if (change.updatedInfo.status.isFinal) diffRelease(change) else diffUpdate(change)
               }
           }
         )
@@ -319,7 +319,7 @@ object OrderHistory extends ScorexLogging {
     )
   }
 
-  private def diffReturn(change: OrderInfoChange): Map[Address, OpenPortfolio] = {
+  private def diffRelease(change: OrderInfoChange): Map[Address, OpenPortfolio] = {
     import change.order
     val lo             = LimitOrder(order)
     val prev           = change.origInfo.getOrElse(throw new IllegalStateException("origInfo must be defined"))

@@ -87,8 +87,8 @@ class MatcherMassOrdersTestSuite
     //check orders after filling
     matcherNode.waitOrderStatus(aliceSecondWavesPair, alicePartialOrderId, "PartiallyFilled")
 
-    orderStatus(aliceNode, aliceOrderIdFill) shouldBe "Filled"
-    orderStatus(aliceNode, alicePartialOrderId) shouldBe "PartiallyFilled"
+    orderStatus(aliceNode, aliceSecondWavesPair, aliceOrderIdFill, "Filled")
+    orderStatus(aliceNode, aliceSecondWavesPair, alicePartialOrderId, "PartiallyFilled")
 
     "Mass orders creation with random lifetime. Active orders still in list" in {
       matcherNode.ordersByAddress(aliceNode, activeOnly = false).length shouldBe 4
@@ -159,8 +159,9 @@ class MatcherMassOrdersTestSuite
     orderIds
   }
 
-  private def orderStatus(node: Node, orderId: String) = {
-    matcherNode.fullOrderHistory(node).filter(_.id == orderId).seq.head.status
+  private def orderStatus(node: Node, assetPair: AssetPair, orderId: String, expectedStatus: String) = {
+    matcherNode.waitOrderStatus(assetPair, orderId, expectedStatus)
+    matcherNode.fullOrderHistory(node).filter(_.id == orderId).seq.head.status shouldBe expectedStatus
   }
 }
 
@@ -172,6 +173,7 @@ object MatcherMassOrdersTestSuite {
   import ConfigFactory._
   import NodeConfigs.Default
 
+  private val minerDisabled = parseString("waves.miner.enable = no")
   private val matcherConfig = ConfigFactory.parseString(s"""
        |waves.matcher {
        |  enable = yes
@@ -181,9 +183,7 @@ object MatcherMassOrdersTestSuite {
        |  blacklisted-assets = [$ForbiddenAssetId]
        |  order-cleanup-interval = 20s
        |  rest-order-limit=$orderLimit
-       |}""".stripMargin)
-
-  private val minerDisabled = parseString("waves.miner.enable = no")
+       |}""".stripMargin).withFallback(minerDisabled)
 
   private val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
     .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))

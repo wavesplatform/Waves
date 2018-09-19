@@ -68,7 +68,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         order1.status shouldBe "OrderAccepted"
 
         // Alice checks that the order in order book
-        matcherNode.orderStatus(order1.message.id, aliceWavesPair).status shouldBe "Accepted"
+        matcherNode.waitOrderStatus(aliceWavesPair, order1.message.id, "Accepted")
 
         // Alice check that order is correct
         val orders = matcherNode.orderBook(aliceWavesPair)
@@ -324,7 +324,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         cancel.status should be("OrderCanceled")
 
         ordersToRetain foreach {
-          matcherNode.orderStatus(_, aliceWavesPair).status should be("Accepted")
+          matcherNode.waitOrderStatus(aliceWavesPair, _, "Accepted")
         }
       }
 
@@ -337,10 +337,10 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         cancel.status should be("Cancelled")
 
         ordersToCancel foreach {
-          matcherNode.orderStatus(_, aliceWavesPair).status should be("Cancelled")
+          matcherNode.waitOrderStatus(aliceWavesPair, _, "Cancelled")
         }
         ordersToRetain foreach {
-          matcherNode.orderStatus(_, aliceWavesPair2).status should be("Accepted")
+          matcherNode.waitOrderStatus(aliceWavesPair2, _, "Accepted")
         }
 
         // signed timestamp is mandatory
@@ -359,10 +359,10 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         cancel.status should be("Cancelled")
 
         orders1 foreach {
-          matcherNode.orderStatus(_, aliceWavesPair).status should be("Cancelled")
+          matcherNode.waitOrderStatus(aliceWavesPair, _, "Cancelled")
         }
         orders2 foreach {
-          matcherNode.orderStatus(_, aliceWavesPair2).status should be("Cancelled")
+          matcherNode.waitOrderStatus(aliceWavesPair2, _, "Cancelled")
         }
 
         // signed timestamp is mandatory
@@ -396,7 +396,7 @@ object MatcherTestSuite {
        |  blacklisted-assets = ["$ForbiddenAssetId"]
        |  balance-watching.enable = yes
        |  rest-order-limit=$orderLimit
-       |}""".stripMargin)
+       |}""".stripMargin).withFallback(minerDisabled)
 
   private val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
     .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))
