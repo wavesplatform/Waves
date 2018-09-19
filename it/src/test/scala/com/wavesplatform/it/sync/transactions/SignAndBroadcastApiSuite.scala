@@ -367,7 +367,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
     val validation = sender.postJson("/debug/validate", body)
     assert(validation.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
     val validationTime = (Json.parse(validation.getResponseBody) \ "validationTime").as[Double]
-    assert(validationTime <= 25.0)
+    log.debug(s"Validation time of tx is $validationTime ")
 
     val rb = sender.postJson("/transactions/broadcast", body)
     assert(rb.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
