@@ -3,7 +3,6 @@ package com.wavesplatform.matcher.model
 import cats.implicits._
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.model.Events.OrderAdded
 import com.wavesplatform.matcher.model.OrderHistory.OrderInfoChange
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
@@ -34,7 +33,7 @@ trait OrderValidator {
 
     val change = OrderInfoChange(lo.order, None, OrderInfo(order.amount, 0L, None, None, order.matcherFee, Some(0L)))
     val newOrder = OrderHistory
-      .diff(OrderAdded(lo), Map(lo.order.id() -> change))
+      .diff(Map(lo.order.id() -> change))
       .getOrElse(order.senderPublicKey.toAddress, OpenPortfolio.empty)
 
     val open  = b.keySet.map(id => id -> orderHistory.openVolume(order.senderPublicKey, id)).toMap

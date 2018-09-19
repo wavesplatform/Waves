@@ -79,7 +79,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
         }
     }
 
-    val opDiff = diff(event, changes)
+    val opDiff = diff(changes)
     saveOpenVolume(rw, opDiff)
   }
 
@@ -275,23 +275,19 @@ object OrderHistory extends ScorexLogging {
         lastSpend.fold(")")(x => s"lastSpend=$x)")
   }
 
-  def diff(event: Event, changes: Map[ByteStr, OrderInfoChange]): Map[Address, OpenPortfolio] = {
+  def diff(changes: Map[ByteStr, OrderInfoChange]): Map[Address, OpenPortfolio] = {
     changes.values.foldLeft(Map.empty[Address, OpenPortfolio]) {
       case (r, change) =>
         Monoid.combine(
           r,
-          event match {
-            case _ =>
-              if (change.origInfo.exists(_.status.isFinal)) {
-                log.warn(
-                  s"Trying to create a diff for a finalized order '${change.order.id()}', origInfo: ${change.origInfo}, updatedInfo: ${change.updatedInfo}"
-                )
-                Map.empty
-              } else if (change.origInfo.isEmpty) {
-                if (change.updatedInfo.status.isFinal) Map.empty else diffNew(change)
-              } else {
-                if (change.updatedInfo.status.isFinal) diffRelease(change) else diffUpdate(change)
-              }
+          change.origInfo match {
+            case Some(origInfo) if origInfo.status.isFinal =>
+              log.warn(
+                s"Trying to create a diff for a finalized order '${change.order.id()}', origInfo: $origInfo, updatedInfo: ${change.updatedInfo}"
+              )
+              Map.empty
+            case Some(_) => if (change.updatedInfo.status.isFinal) diffRelease(change) else diffUpdate(change)
+            case None    => if (change.updatedInfo.status.isFinal) Map.empty else diffNew(change)
           }
         )
     }
