@@ -65,7 +65,7 @@ class OrderHistorySpecification
     val info = oh.orderInfo(ord.id())
     withClue("info") {
       info.status shouldBe LimitOrder.Accepted
-      info shouldBe OrderInfo(ord.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, Some(0L))
+      info shouldBe OrderInfo(ord.amount, 0, None, Some(lo.minAmountOfAmountAsset), ord.matcherFee, Some(0L))
     }
 
     withClue("reserved assets") {
@@ -96,7 +96,7 @@ class OrderHistorySpecification
     val info = oh.orderInfo(ord.id())
     withClue("info") {
       info.status shouldBe LimitOrder.Accepted
-      info shouldBe OrderInfo(ord.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, Some(0L))
+      info shouldBe OrderInfo(ord.amount, 0, None, Some(lo.minAmountOfAmountAsset), ord.matcherFee, Some(0L))
     }
 
     withClue("reserved assets") {
@@ -128,7 +128,7 @@ class OrderHistorySpecification
     val info = oh.orderInfo(ord.id())
     withClue("info") {
       info.status shouldBe LimitOrder.Accepted
-      info shouldBe OrderInfo(ord.amount, 0, canceled = false, Some(lo.minAmountOfAmountAsset), ord.matcherFee, Some(0L))
+      info shouldBe OrderInfo(ord.amount, 0, None, Some(lo.minAmountOfAmountAsset), ord.matcherFee, Some(0L))
     }
 
     withClue("reserved assets considering amount of received WAVES") {
@@ -328,8 +328,6 @@ class OrderHistorySpecification
       exec.submittedRemainingAmount shouldBe submittedOrderInfo.remaining
 
       exec.submittedRemainingFee shouldBe 3781L
-      submittedOrderInfo.remainingFee shouldBe 0L
-
       submittedOrderInfo.status shouldBe LimitOrder.Filled(exec.executedAmount)
     }
 
@@ -460,8 +458,6 @@ class OrderHistorySpecification
     val counterInfo2 = oh.orderInfo(counter.id())
     withClue(s"counter: ${counter.id()}") {
       exec2.counterRemainingAmount shouldBe counterInfo2.remaining
-      counterInfo2.remainingFee shouldBe 0
-
       oh.orderInfo(counter.id()).status shouldBe LimitOrder.Filled(100000000)
     }
 
@@ -489,6 +485,30 @@ class OrderHistorySpecification
     }
   }
 
+  property("WCT/BTC: sell - filled partially, buy - filled") {
+    val pair      = AssetPair(mkAssetId("WCT"), mkAssetId("BTC"))
+    val counter   = sell(pair, 0.12739213, 347, matcherFee = Some(300000L))
+    val submitted = buy(pair, 0.12739213, 146, matcherFee = Some(300000L))
+
+    oh.process(OrderAdded(LimitOrder(counter)))
+    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    oh.processAll(exec, OrderCanceled(exec.submittedRemaining, unmatchable = true))
+
+    withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
+      oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 205L
+      oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
+      oh.openVolume(counter.senderPublicKey, None) shouldBe counter.matcherFee - LimitOrder.getPartialFee(counter.matcherFee,
+                                                                                                          counter.amount,
+                                                                                                          exec.executedAmount)
+    }
+
+    withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
+      oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
+      oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
+      oh.openVolume(submitted.senderPublicKey, None) shouldBe 0L
+    }
+  }
+
   property("Buy USD order - filled, sell BTC order - filled") {
     val pair      = AssetPair(mkAssetId("USD"), mkAssetId("BTC"))
     val counter   = buy(pair, 0.001, 5000000, matcherFee = Some(1000L))
@@ -501,6 +521,7 @@ class OrderHistorySpecification
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
       oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
       oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
+      oh.openVolume(submitted.senderPublicKey, None) shouldBe 0L
     }
   }
 
@@ -524,6 +545,27 @@ class OrderHistorySpecification
     }
   }
 
+  property("Sell EUR - partial, buy EUR order - filled") {
+    val pair      = AssetPair(mkAssetId("EUR"), mkAssetId("USD"))
+    val counter   = sell(pair, 0.001356, 57918, matcherFee = Some(300000L))
+    val submitted = buy(pair, 0.003333, 46978, matcherFee = Some(300000L))
+
+    oh.process(OrderAdded(LimitOrder(counter)))
+
+    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    oh.processAll(
+      exec,
+      OrderCanceled(exec.submittedRemaining, unmatchable = true),
+      OrderCanceled(exec.counterRemaining, unmatchable = false) // Cancelled by user
+    )
+
+    withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
+      oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
+      oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
+      oh.openVolume(submitted.senderPublicKey, None) shouldBe 0L
+    }
+  }
+
   property("Total execution of two counter orders and the one submitted") {
     val pair = AssetPair(mkAssetId("Alice"), None)
 
@@ -541,9 +583,8 @@ class OrderHistorySpecification
   property("Reserved balance should empty after full rounded execution") {
     val pair = AssetPair(mkAssetId("BTC"), mkAssetId("ETH"))
 
-    val alicePk = PrivateKeyAccount("alice".getBytes("utf-8"))
-    val counter = buy(pair, 0.00031887, 923431000L, matcherFee = Some(300000), sender = Some(alicePk))
-
+    val alicePk   = PrivateKeyAccount("alice".getBytes("utf-8"))
+    val counter   = buy(pair, 0.00031887, 923431000L, matcherFee = Some(300000), sender = Some(alicePk))
     val bobPk     = PrivateKeyAccount("bob".getBytes("utf-8"))
     val submitted = sell(pair, 0.00031887, 223345000L, matcherFee = Some(300000), sender = Some(bobPk))
 
@@ -551,10 +592,11 @@ class OrderHistorySpecification
 
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
     exec.executedAmount shouldBe 223344937L
-    oh.processAll(exec, OrderCanceled(exec.submittedRemaining, unmatchable = true))
+    oh.processAll(exec, OrderCanceled(exec.counterRemaining, unmatchable = false))
 
     withClue(s"Account of submitted order (id=${submitted.id()}) should have positive balances:") {
       DBUtils.reservedBalance(db, bobPk) shouldBe empty
+      DBUtils.reservedBalance(db, alicePk) shouldBe empty
     }
   }
 

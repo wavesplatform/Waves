@@ -11,6 +11,7 @@ import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
+import com.wavesplatform.matcher.model.LimitOrder
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
@@ -171,30 +172,64 @@ class TradeBalanceAndRoundingTestSuite
 
   }
 
-  "Alice and Bob trade WCT-USD" - {
-    val wctUsdBuyAmount  = 146
+  "Alice and Bob trade WCT-USD sell price less than buy price" - {
+    "place wcd-usd order corrected by new price sell amount less then initial one" in {
+      val buyPrice   = 247700
+      val sellPrice  = 135600
+      val buyAmount  = 46978
+      val sellAmount = 56978
+
+      val bobOrderId = matcherNode.placeOrder(bobNode, wctUsdPair, SELL, sellPrice, sellAmount).message.id
+      matcherNode.waitOrderStatus(wctUsdPair, bobOrderId, "Accepted", 1.minute)
+      val aliceOrderId = matcherNode.placeOrder(aliceNode, wctUsdPair, BUY, buyPrice, buyAmount).message.id
+      matcherNode.waitOrderStatus(wctUsdPair, aliceOrderId, "Filled", 1.minute)
+
+      val exchangeTx = matcherNode.transactionsByOrder(aliceOrderId).headOption.getOrElse(fail("Expected an exchange transaction"))
+      nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
+      matcherNode.cancelOrder(bobNode, wctUsdPair, Some(bobOrderId))
+
+      matcherNode.waitOrderStatus(wctUsdPair, bobOrderId, "Cancelled", 1.minute)
+
+      matcherNode.reservedBalance(bobNode) shouldBe empty
+      matcherNode.reservedBalance(aliceNode) shouldBe empty
+    }
+  }
+
+  "Alice and Bob trade WCT-USD 1" - {
     val wctUsdSellAmount = 347
+    val wctUsdBuyAmount  = 146
     val wctUsdPrice      = 12739213
 
     "place wct-usd order" in {
-      val aliceUsdBalance = aliceNode.assetBalance(aliceNode.address, UsdId.base58).balance
-      val bobUsdBalance   = bobNode.assetBalance(bobNode.address, UsdId.base58).balance
+      nodes.waitForSameBlockHeadesAt(nodes.map(_.height).max + 1)
+
+      val aliceUsdBalance   = matcherNode.assetBalance(aliceNode.address, UsdId.base58).balance
+      val bobUsdBalance     = matcherNode.assetBalance(bobNode.address, UsdId.base58).balance
+      val bobWctInitBalance = matcherNode.assetBalance(bobNode.address, WctId.base58).balance
 
       val bobOrderId = matcherNode.placeOrder(bobNode, wctUsdPair, SELL, wctUsdPrice, wctUsdSellAmount).message.id
       matcherNode.waitOrderStatus(wctUsdPair, bobOrderId, "Accepted", 1.minute)
+
       val aliceOrderId = matcherNode.placeOrder(aliceNode, wctUsdPair, BUY, wctUsdPrice, wctUsdBuyAmount).message.id
       matcherNode.waitOrderStatus(wctUsdPair, aliceOrderId, "Filled", 1.minute)
 
       val exchangeTx = matcherNode.transactionsByOrder(aliceOrderId).headOption.getOrElse(fail("Expected an exchange transaction"))
       nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
 
-      matcherNode.reservedBalance(bobNode)(s"$WctId") should be(wctUsdSellAmount - correctAmount(wctUsdBuyAmount, wctUsdPrice))
-      matcherNode.tradableBalance(bobNode, wctUsdPair)(s"$WctId") shouldBe defaultAssetQuantity - wctUsdSellAmount
-      matcherNode.tradableBalance(aliceNode, wctUsdPair)(s"$UsdId") shouldBe aliceUsdBalance - receiveAmount(SELL, wctUsdBuyAmount, wctUsdPrice)
+      val executedAmount         = correctAmount(wctUsdBuyAmount, wctUsdPrice) // 142
+      val bobReceiveUsdAmount    = receiveAmount(SELL, wctUsdBuyAmount, wctUsdPrice)
+      val expectedReservedBobWct = wctUsdSellAmount - executedAmount // 205 = 347 - 142
 
-      matcherNode.tradableBalance(bobNode, wctUsdPair)(s"$UsdId") shouldBe bobUsdBalance + receiveAmount(SELL, wctUsdBuyAmount, wctUsdPrice)
-      matcherNode.reservedBalance(bobNode)("WAVES") shouldBe
-        (matcherFee - (BigDecimal(matcherFee * receiveAmount(OrderType.BUY, wctUsdPrice, wctUsdBuyAmount)) / wctUsdSellAmount).toLong)
+      matcherNode.reservedBalance(bobNode)(s"$WctId") shouldBe expectedReservedBobWct
+      // 999999999652 = 999999999999 - 142 - 205
+      matcherNode.tradableBalance(bobNode, wctUsdPair)(s"$WctId") shouldBe bobWctInitBalance - executedAmount - expectedReservedBobWct
+      matcherNode.tradableBalance(bobNode, wctUsdPair)(s"$UsdId") shouldBe bobUsdBalance + bobReceiveUsdAmount
+
+      matcherNode.reservedBalance(aliceNode) shouldBe empty
+      matcherNode.tradableBalance(aliceNode, wctUsdPair)(s"$UsdId") shouldBe aliceUsdBalance - bobReceiveUsdAmount
+
+      val expectedReservedWaves = matcherFee - LimitOrder.getPartialFee(matcherFee, wctUsdSellAmount, executedAmount)
+      matcherNode.reservedBalance(bobNode)("WAVES") shouldBe expectedReservedWaves
 
       matcherNode.cancelOrder(bobNode, wctUsdPair, Some(matcherNode.fullOrderHistory(bobNode).head.id))
     }
@@ -279,7 +314,7 @@ class TradeBalanceAndRoundingTestSuite
     val aliceOrder   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, 1000L, 100000L)
     val aliceOrderId = matcherNode.placeOrder(aliceOrder).message.id
 
-    matcherNode.waitOrderStatus(wavesUsdPair, aliceOrderId, "Cancelled", 1.minute)
+    matcherNode.waitOrderStatusAndAmount(wavesUsdPair, aliceOrderId, "Filled", Some(0), 1.minute)
 
     withClue("Alice's reserved balance:") {
       matcherNode.reservedBalance(aliceNode) shouldBe empty
@@ -289,7 +324,7 @@ class TradeBalanceAndRoundingTestSuite
     aliceOrders should not be empty
 
     val order = aliceOrders.find(_.id == aliceOrderId).getOrElse(throw new IllegalStateException(s"Alice should have the $aliceOrderId order"))
-    order.status shouldBe "Cancelled"
+    order.status shouldBe "Filled"
 
     matcherNode.cancelOrder(matcherNode, wavesUsdPair, Some(bobOrderId))
   }
@@ -324,7 +359,7 @@ object TradeBalanceAndRoundingTestSuite {
                                              |  order-match-tx-fee = 300000
                                              |  blacklisted-assets = ["$ForbiddenAssetId"]
                                              |  balance-watching.enable = yes
-                                             |}""".stripMargin)
+                                             |}""".stripMargin).withFallback(minerDisabled)
 
   private val _Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
     .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))

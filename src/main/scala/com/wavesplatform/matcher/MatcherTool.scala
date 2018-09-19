@@ -252,7 +252,7 @@ object MatcherTool extends ScorexLogging {
             }
           }
         }
-        val allOrderIdsToCancel = ordersToCancel.result().map(id => id -> DBUtils.orderInfo(db, id).copy(canceled = true))
+        val allOrderIdsToCancel = ordersToCancel.result().map(id => id -> DBUtils.orderInfo(db, id).copy(canceledByUser = Some(true)))
         log.info(s"Cancelling ${allOrderIdsToCancel.size} order(s)")
         db.readWrite { rw =>
           for ((id, info) <- allOrderIdsToCancel) {

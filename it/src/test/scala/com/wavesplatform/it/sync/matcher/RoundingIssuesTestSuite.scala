@@ -132,7 +132,7 @@ object RoundingIssuesTestSuite {
                                              |  order-match-tx-fee = 300000
                                              |  blacklisted-assets = ["$ForbiddenAssetId"]
                                              |  balance-watching.enable = yes
-                                             |}""".stripMargin)
+                                             |}""".stripMargin).withFallback(minerDisabled)
 
   private val _Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
     .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))

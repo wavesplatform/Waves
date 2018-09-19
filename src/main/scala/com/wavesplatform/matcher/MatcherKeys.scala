@@ -34,7 +34,7 @@ object MatcherKeys {
         .allocate(allocateBytes)
         .putLong(oi.amount)
         .putLong(oi.filled)
-        .put(if (oi.canceled) 1.toByte else 0.toByte)
+        .put(oi.canceledByUser.fold(0: Byte)(if (_) 1 else 2))
         .putLong(oi.minAmount.getOrElse(0L))
         .putLong(oi.remainingFee)
 
@@ -44,11 +44,17 @@ object MatcherKeys {
   )
 
   def decodeOrderInfo(input: Array[Byte]): OrderInfo = {
+    def canceledByUser(x: Byte): Option[Boolean] = x match {
+      case 0 => None
+      case 1 => Some(true)
+      case 2 => Some(false)
+    }
+
     val bb = ByteBuffer.wrap(input)
     input.length match {
-      case 17 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, None, 0, None)
-      case 33 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, Some(bb.getLong), bb.getLong, None)
-      case 41 => OrderInfo(bb.getLong, bb.getLong, bb.get == 1, Some(bb.getLong), bb.getLong, Some(bb.getLong))
+      case 17 => OrderInfo(bb.getLong, bb.getLong, canceledByUser(bb.get), None, 0, None)
+      case 33 => OrderInfo(bb.getLong, bb.getLong, canceledByUser(bb.get), Some(bb.getLong), bb.getLong, None)
+      case 41 => OrderInfo(bb.getLong, bb.getLong, canceledByUser(bb.get), Some(bb.getLong), bb.getLong, Some(bb.getLong))
     }
   }
 
