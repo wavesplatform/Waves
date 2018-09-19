@@ -64,7 +64,7 @@ object Wallet extends ScorexLogging {
       extends ScorexLogging
       with Wallet {
 
-    private val key = {
+    private lazy val key = {
       val password = passwordOpt.getOrElse(PasswordProvider.askPassword())
       JsonFileStorage.prepareKey(password)
     }

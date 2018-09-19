@@ -48,27 +48,24 @@ class OrdersFromScriptedAccTestSuite
     aliceNode.assertAssetBalance(aliceNode.address, aliceAsset, someAssetAmount)
     aliceNode.assertAssetBalance(matcherNode.address, aliceAsset, 0)
 
-    "make Bob's address as scripted" in {
-      val scriptText = {
-        val sc = Parser(s"""true""".stripMargin).get.value
-        CompilerV1(dummyCompilerContext, sc).explicitGet()._1
-      }
-
-      val script = ScriptV1(scriptText).explicitGet()
-      val setScriptTransaction = SetScriptTransaction
-        .selfSigned(SetScriptTransaction.supportedVersions.head, bobNode.privateKey, Some(script), minFee, System.currentTimeMillis())
-        .right
-        .get
-
-      val setScriptId = bobNode
-        .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
-        .id
-
-      nodes.waitForHeightAriseAndTxPresent(setScriptId)
-
+    val scriptText = {
+      val sc = Parser(s"""true""".stripMargin).get.value
+      CompilerV1(dummyCompilerContext, sc).explicitGet()._1
     }
 
-    "Alice place sell order, but Bob cannot place order, because his acc is scripted" in {
+    val script = ScriptV1(scriptText).explicitGet()
+    val setScriptTransaction = SetScriptTransaction
+      .selfSigned(SetScriptTransaction.supportedVersions.head, bobNode.privateKey, Some(script), minFee, System.currentTimeMillis())
+      .right
+      .get
+
+    val setScriptId = bobNode
+      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+      .id
+
+    nodes.waitForHeightAriseAndTxPresent(setScriptId)
+
+    "can trade from non-scripted account" in {
       // Alice places sell order
       val aliceOrder = matcherNode
         .placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes)
@@ -88,21 +85,27 @@ class OrdersFromScriptedAccTestSuite
 
       // sell order should be in the aliceNode orderbook
       matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
+    }
 
-      // Bob gets error message
+    "scripted account cannot trade until SmartAccountTrading is activated" in {
       assertBadRequestAndResponse(
         matcherNode
           .placeOrder(bobNode, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes),
         "Trading on scripted account isn't allowed yet."
       )
+    }
 
+    "scripted account can trade once SmartAccountTrading is activated" in {
+      matcherNode.waitForHeight(ActivationHeight, 2.minutes)
+      val bobOrder = matcherNode
+        .placeOrder(bobNode, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes)
+      bobOrder.status shouldBe "OrderAccepted"
     }
   }
-
 }
 
 object OrdersFromScriptedAccTestSuite {
-  val ForbiddenAssetId = "FdbnAsset"
+  val ActivationHeight = 9
 
   import NodeConfigs.Default
 
@@ -113,7 +116,6 @@ object OrdersFromScriptedAccTestSuite {
                                                            |    account = 3HmFkAoQRs4Y3PE2uR6ohN7wS4VqPBGKv7k
                                                            |    bind-address = "0.0.0.0"
                                                            |    order-match-tx-fee = 300000
-                                                           |    blacklisted-assets = [$ForbiddenAssetId]
                                                            |    order-cleanup-interval = 20s
                                                            |  }
                                                            |  rest-api {
@@ -121,6 +123,8 @@ object OrdersFromScriptedAccTestSuite {
                                                            |    api-key-hash = 7L6GpLHhA5KyJTAVc8WFHwEcyTY8fC8rRbyMCiFnM4i
                                                            |  }
                                                            |  miner.enable=no
+                                                           |  blockchain.custom.functionality.pre-activated-features = { 10 = $ActivationHeight }
+                                                           |
                                                            |}""".stripMargin)
 
   private val nonGeneratingPeersConfig = ConfigFactory.parseString(

@@ -21,7 +21,7 @@ object ExchangeTransactionDiff {
                        tx.sellOrder.assetPair.amountAsset,
                        tx.sellOrder.assetPair.priceAsset).flatten
     val assets             = assetIds.map(blockchain.assetDescription)
-    val smartTradesEnabled = blockchain.activatedFeatures.contains(BlockchainFeatures.SmartAccountsTrades.id)
+    val smartTradesEnabled = blockchain.activatedFeatures.contains(BlockchainFeatures.SmartAccountTrading.id)
     for {
       _ <- Either.cond(assets.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
       _ <- Either.cond(

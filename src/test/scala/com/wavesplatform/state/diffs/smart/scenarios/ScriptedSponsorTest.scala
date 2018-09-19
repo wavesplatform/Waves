@@ -31,7 +31,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         BlockchainFeatures.FeeSponsorship.id                  -> 0,
         BlockchainFeatures.FairPoS.id                         -> 0,
         BlockchainFeatures.SmartAssets.id                     -> 0,
-        BlockchainFeatures.SmartAccountsTrades.id             -> 0,
+        BlockchainFeatures.SmartAccountTrading.id             -> 0,
         BlockchainFeatures.SmallerMinimalGeneratingBalance.id -> 0
       ),
       featureCheckBlocksPeriod = 1,
