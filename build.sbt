@@ -50,7 +50,10 @@ inThisBuild(
     scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds", "-language:implicitConversions", "-Ywarn-unused:-implicits", "-Xlint")
   ))
 
-resolvers += Resolver.bintrayRepo("ethereum", "maven")
+resolvers ++= Seq(
+  Resolver.bintrayRepo("ethereum", "maven"),
+  Resolver.bintrayRepo("dnvriend", "maven")
+)
 
 fork in run := true
 javaOptions in run ++= Seq(

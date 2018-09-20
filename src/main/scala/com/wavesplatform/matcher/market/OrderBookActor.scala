@@ -237,6 +237,7 @@ class OrderBookActor(assetPair: AssetPair,
   }
 
   private def applyEvent(e: Event): Unit = {
+    log.debug(s"Apply event $e")
     orderBook = OrderBook.updateState(orderBook, e)
     updateSnapshot(orderBook)
   }
@@ -352,6 +353,7 @@ class OrderBookActor(assetPair: AssetPair,
 
     case RecoveryCompleted =>
       updateSnapshot(orderBook)
+      log.debug(s"Recovery completed: $orderBook")
 
     case SnapshotOffer(metadata, snapshot: Snapshot) =>
       lastSnapshotSequenceNr = metadata.sequenceNr
