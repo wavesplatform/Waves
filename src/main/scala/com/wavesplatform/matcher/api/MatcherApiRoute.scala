@@ -304,7 +304,7 @@ case class MatcherApiRoute(wallet: Wallet,
           case Success(_) =>
             complete(
               StatusCodes.OK -> DBUtils
-                .ordersByAddress(db, publicKey, Set.empty, activeOnly.getOrElse(false), matcherSettings.maxOrdersPerRequest)
+                .ordersByAddress(db, publicKey, activeOnly.getOrElse(false), matcherSettings.maxOrdersPerRequest)
                 .map {
                   case (order, orderInfo) =>
                     orderJson(order, orderInfo)
@@ -342,11 +342,10 @@ case class MatcherApiRoute(wallet: Wallet,
     ))
   def getAllOrderHistory: Route = (path("orders" / AddressPM) & get & withAuth) { address =>
     parameters('activeOnly.as[Boolean].?) { activeOnly =>
-      complete(
-        StatusCodes.OK -> DBUtils.ordersByAddress(db, address, Set.empty, activeOnly.getOrElse(true), matcherSettings.maxOrdersPerRequest).map {
-          case (order, orderInfo) =>
-            orderJson(order, orderInfo)
-        })
+      complete(StatusCodes.OK -> DBUtils.ordersByAddress(db, address, activeOnly.getOrElse(true), matcherSettings.maxOrdersPerRequest).map {
+        case (order, orderInfo) =>
+          orderJson(order, orderInfo)
+      })
     }
   }
 

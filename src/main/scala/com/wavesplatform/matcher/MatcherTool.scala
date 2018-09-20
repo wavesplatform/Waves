@@ -401,7 +401,7 @@ object MatcherTool extends ScorexLogging {
           val o    = DBUtils.ordersByAddressAndPair(db, Address.fromString(args(2)).explicitGet(), pair, Int.MaxValue)
           println(o.mkString("\n"))
         } else {
-          val o = DBUtils.ordersByAddress(db, Address.fromString(args(2)).explicitGet(), Set.empty, activeOnly = false, Int.MaxValue)
+          val o = DBUtils.ordersByAddress(db, Address.fromString(args(2)).explicitGet(), activeOnly = false, Int.MaxValue)
           println(o.mkString("\n"))
         }
       case "cb" => recalculateReservedBalance(db)
