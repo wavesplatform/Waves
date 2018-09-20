@@ -79,6 +79,7 @@ class MatcherActor(orderHistory: ActorRef,
   )
 
   def createOrderBook(pair: AssetPair): ActorRef = {
+    log.info(s"Creating order book for $pair")
     val orderBook = createOrderBookActor(pair)
     orderBooks.updateAndGet(_ + (pair -> orderBook))
     tradedPairs += pair -> createMarketData(pair)

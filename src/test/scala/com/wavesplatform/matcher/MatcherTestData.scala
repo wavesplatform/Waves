@@ -2,15 +2,14 @@ package com.wavesplatform.matcher
 
 import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.crypto
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.ByteStr
-import org.scalacheck.{Arbitrary, Gen}
-import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.utils.NTP
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import org.scalacheck.{Arbitrary, Gen}
 
 trait MatcherTestData {
   private val signatureSize = 32
@@ -32,8 +31,8 @@ trait MatcherTestData {
 
   val assetPairGen = Gen.frequency((18, distinctPairGen), (1, assetIdGen(1).map(AssetPair(_, None))), (1, assetIdGen(2).map(AssetPair(None, _))))
 
-  val maxTimeGen: Gen[Long]     = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
-  val createdTimeGen: Gen[Long] = Gen.choose(0L, 10000L).map(NTP.correctedTime() - _)
+  val maxTimeGen: Gen[Long]     = Gen.choose(10000L, Order.MaxLiveTime).map(_ + System.currentTimeMillis())
+  val createdTimeGen: Gen[Long] = Gen.choose(0L, 10000L).map(System.currentTimeMillis() - _)
 
   val config = loadConfig(ConfigFactory.parseString("""waves {
       |  directory: "/tmp/waves-test"

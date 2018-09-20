@@ -24,7 +24,6 @@ import io.netty.channel.group.ChannelGroup
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.reflect.runtime.universe._
 
 class Matcher(actorSystem: ActorSystem,
               wallet: Wallet,
@@ -66,8 +65,8 @@ class Matcher(actorSystem: ActorSystem,
     )
   )
 
-  lazy val matcherApiTypes = Seq(
-    typeOf[MatcherApiRoute]
+  lazy val matcherApiTypes: Set[Class[_]] = Set(
+    classOf[MatcherApiRoute]
   )
 
   lazy val matcher: ActorRef = actorSystem.actorOf(
