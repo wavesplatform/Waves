@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.evaluator.ctx._
 
-case class CTX(types: Seq[DefinedType], vars: Map[String, (FINAL, LazyVal)], functions: Seq[BaseFunction]) {
+case class CTX(types: Seq[DefinedType], vars: Map[String, ((FINAL, String), LazyVal)], functions: Seq[BaseFunction]) {
   lazy val typeDefs = types.map(t => t.name -> t).toMap
   lazy val evaluationContext: EvaluationContext = {
     if (functions.map(_.header).distinct.size != functions.size) {

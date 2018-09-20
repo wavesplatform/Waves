@@ -27,9 +27,9 @@ object MatcherContext {
 
     val matcherTypes = Seq(addressType, aliasType, orderType, assetPairType)
 
-    val matcherVars: Map[String, (FINAL, LazyVal)] = Map(
-      ("height", (com.wavesplatform.lang.v1.compiler.Types.LONG, LazyVal(EitherT(heightCoeval)))),
-      ("tx", (orderType.typeRef, LazyVal(EitherT(inputEntityCoeval))))
+    val matcherVars: Map[String, ((FINAL, String), LazyVal)] = Map(
+      ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "undefined height placeholder"), LazyVal(EitherT(heightCoeval)))),
+      ("tx", ((orderType.typeRef, "Processing order"), LazyVal(EitherT(inputEntityCoeval))))
     )
 
     def inaccessibleFunction(name: String, internalName: Short): BaseFunction = {

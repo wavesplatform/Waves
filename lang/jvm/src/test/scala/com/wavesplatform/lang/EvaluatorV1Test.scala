@@ -673,10 +673,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
     )
 
-    val vars: Map[String, (FINAL, LazyVal)] = Map(
-      ("tx", (txType.typeRef, LazyVal(EitherT.pure(txObj)))),
-      ("alicePubKey", (BYTEVECTOR, LazyVal(EitherT.pure(ByteVector(alicePK))))),
-      ("bobPubKey", (BYTEVECTOR, LazyVal(EitherT.pure(ByteVector(bobPK)))))
+    val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
+      ("tx", ((txType.typeRef, "Test transaction"), LazyVal(EitherT.pure(txObj)))),
+      ("alicePubKey", ((BYTEVECTOR, "Alices test publik key"), LazyVal(EitherT.pure(ByteVector(alicePK))))),
+      ("bobPubKey", ((BYTEVECTOR, "Bob test public key"), LazyVal(EitherT.pure(ByteVector(bobPK)))))
     )
 
     val context = Monoid.combineAll(

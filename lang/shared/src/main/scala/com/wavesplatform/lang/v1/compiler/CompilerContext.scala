@@ -24,7 +24,7 @@ object CompilerContext {
     functionDefs = functions.groupBy(_.name).map { case (k, v) => k -> v.map(_.signature).toList }
   )
 
-  type VariableTypes = Map[String, FINAL]
+  type VariableTypes = Map[String, (FINAL, String)]
   type FunctionTypes = Map[String, List[FunctionTypeSignature]]
 
   val empty = CompilerContext(Map.empty, Map.empty, Map.empty, 0)

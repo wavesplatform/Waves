@@ -292,7 +292,7 @@ object PureContext {
     uNot
   )
 
-  private val vars: Map[String, (Types.FINAL, LazyVal)] = Map(("unit", (Types.UNIT, LazyVal(EitherT.pure(())))))
+  private val vars: Map[String, ((Types.FINAL, String), LazyVal)] = Map(("unit", ((Types.UNIT,"Single instance value"), LazyVal(EitherT.pure(())))))
   private val functions = Seq(
     fraction,
     sizeBytes,

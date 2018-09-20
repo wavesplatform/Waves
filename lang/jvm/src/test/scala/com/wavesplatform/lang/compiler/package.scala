@@ -32,10 +32,10 @@ package object compiler {
       CTX(
         Seq(pointType, Common.pointTypeA, Common.pointTypeB),
         Map(
-          ("p", (Common.AorB, null)),
-          ("l", (LIST(LONG), LazyVal(EitherT.pure(List(1L, 2L))))),
-          ("lpa", (LIST(Common.pointTypeA.typeRef), LazyVal(EitherT.pure(List(null, null))))),
-          ("lpabc", (LIST(Common.AorBorC), LazyVal(EitherT.pure(List(null, null)))))
+          ("p", ((Common.AorB, "Test variable"), null)),
+          ("l", ((LIST(LONG), "Test list"), LazyVal(EitherT.pure(List(1L, 2L))))),
+          ("lpa", ((LIST(Common.pointTypeA.typeRef), "Yet test list"), LazyVal(EitherT.pure(List(null, null))))),
+          ("lpabc", ((LIST(Common.AorBorC), "Yet another test list"), LazyVal(EitherT.pure(List(null, null)))))
         ),
         Seq(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, returnsListLong, idOptionLong)
       )

@@ -256,9 +256,9 @@ object WavesContext {
       case _                       => ???
     }
 
-    val vars: Map[String, (FINAL, LazyVal)] = Map(
-      ("height", (com.wavesplatform.lang.v1.compiler.Types.LONG, LazyVal(EitherT(heightCoeval)))),
-      ("tx", (scriptInputType, LazyVal(EitherT(inputEntityCoeval))))
+    val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
+      ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "Current blockchain height"), LazyVal(EitherT(heightCoeval)))),
+      ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
     )
 
     val functions = Seq(
