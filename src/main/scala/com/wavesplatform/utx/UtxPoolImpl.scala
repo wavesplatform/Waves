@@ -43,8 +43,10 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
   private val pessimisticPortfolios = new PessimisticPortfolios
 
   private val removeInvalid = Task {
-    val b                    = blockchain
-    val transactionsToRemove = transactions.values.asScala.filter(t => b.containsTransaction(t.id()))
+    val b = blockchain
+    val transactionsToRemove = transactions.values.asScala.filter { t =>
+      TransactionDiffer(fs, b.lastBlockTimestamp, time.correctedTime(), b.height)(b, t).isLeft
+    }
     removeAll(transactionsToRemove)
   }.delayExecution(utxSettings.cleanupInterval)
 
